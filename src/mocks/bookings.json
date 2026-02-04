@@ -1,0 +1,41 @@
+[
+  {
+    "id": "B-901",
+    "quoteId": "Q-1001",
+    "customer": "Makana Foods",
+    "origin": "JHB",
+    "destination": "CPT",
+    "slaHours": 48,
+    "vehicle": "V-04",
+    "driver": "D-12",
+    "status": "Planned",
+    "invoiceStatus": "Not Raised",
+    "pickupDate": "2025-09-07"
+  },
+  {
+    "id": "B-902",
+    "quoteId": "Q-1002",
+    "customer": "Tiger Brands",
+    "origin": "DUR",
+    "destination": "JHB",
+    "slaHours": 24,
+    "vehicle": "V-08",
+    "driver": "D-03",
+    "status": "En-route",
+    "invoiceStatus": "Raised",
+    "pickupDate": "2025-09-06"
+  },
+  {
+    "id": "B-903",
+    "quoteId": "Q-1000",
+    "customer": "Shoprite",
+    "origin": "CPT",
+    "destination": "JHB",
+    "slaHours": 48,
+    "vehicle": "V-12",
+    "driver": "D-07",
+    "status": "Delivered",
+    "invoiceStatus": "Paid",
+    "pickupDate": "2025-09-03"
+  }
+]

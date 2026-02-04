@@ -1,0 +1,104 @@
+[
+  {
+    "id": "Q-1001",
+    "customer": "Makana Foods",
+    "origin": "JHB",
+    "destination": "CPT",
+    "vehicleClass": "Superlink-30t",
+    "weightTons": 30,
+    "slaHours": 48,
+    "pickupDate": "2025-09-06",
+    "price": 21500,
+    "marginPct": 12.4,
+    "guardrail": "Within",
+    "costBreakdown": [
+      {"label": "Base", "value": 14500},
+      {"label": "Fuel", "value": 4800},
+      {"label": "Tolls", "value": 950},
+      {"label": "Border", "value": 450},
+      {"label": "Driver/Vehicle", "value": 800}
+    ],
+    "routes": [
+      {"id": "A", "etaMin": 1260, "risk": 0.21, "fuelL": 320, "profitDelta": 0},
+      {"id": "B", "etaMin": 1305, "risk": 0.23, "fuelL": 310, "profitDelta": 550},
+      {"id": "C", "etaMin": 1210, "risk": 0.30, "fuelL": 335, "profitDelta": -320}
+    ],
+    "winCurve": [
+      {"price": 20500, "winProb": 0.71},
+      {"price": 21500, "winProb": 0.62},
+      {"price": 22500, "winProb": 0.51}
+    ],
+    "confidence": "High",
+    "status": "Draft",
+    "updatedAt": "2025-08-28T12:12:00Z",
+    "expiresAt": "2025-09-08T17:00:00Z"
+  },
+  {
+    "id": "Q-1002",
+    "customer": "Tiger Brands",
+    "origin": "DUR",
+    "destination": "JHB",
+    "vehicleClass": "Interlink-34t",
+    "weightTons": 34,
+    "slaHours": 24,
+    "pickupDate": "2025-09-07",
+    "price": 18900,
+    "marginPct": 15.2,
+    "guardrail": "Within",
+    "costBreakdown": [
+      {"label": "Base", "value": 12800},
+      {"label": "Fuel", "value": 3900},
+      {"label": "Tolls", "value": 800},
+      {"label": "Border", "value": 0},
+      {"label": "Driver/Vehicle", "value": 1400}
+    ],
+    "routes": [
+      {"id": "A", "etaMin": 720, "risk": 0.15, "fuelL": 280, "profitDelta": 0},
+      {"id": "B", "etaMin": 780, "risk": 0.18, "fuelL": 270, "profitDelta": 320},
+      {"id": "C", "etaMin": 690, "risk": 0.25, "fuelL": 295, "profitDelta": -180}
+    ],
+    "winCurve": [
+      {"price": 18000, "winProb": 0.82},
+      {"price": 18900, "winProb": 0.74},
+      {"price": 19800, "winProb": 0.63}
+    ],
+    "confidence": "Medium",
+    "status": "Sent",
+    "updatedAt": "2025-08-29T09:30:00Z",
+    "expiresAt": "2025-09-09T15:00:00Z"
+  },
+  {
+    "id": "Q-1003",
+    "customer": "Pick n Pay",
+    "origin": "CPT",
+    "destination": "PE",
+    "vehicleClass": "Rigid-8t",
+    "weightTons": 8,
+    "slaHours": 72,
+    "pickupDate": "2025-09-08",
+    "price": 8500,
+    "marginPct": 9.8,
+    "guardrail": "Below",
+    "costBreakdown": [
+      {"label": "Base", "value": 6200},
+      {"label": "Fuel", "value": 1600},
+      {"label": "Tolls", "value": 350},
+      {"label": "Border", "value": 0},
+      {"label": "Driver/Vehicle", "value": 350}
+    ],
+    "routes": [
+      {"id": "A", "etaMin": 2880, "risk": 0.12, "fuelL": 110, "profitDelta": 0},
+      {"id": "B", "etaMin": 3120, "risk": 0.14, "fuelL": 105, "profitDelta": 180},
+      {"id": "C", "etaMin": 2760, "risk": 0.20, "fuelL": 118, "profitDelta": -95}
+    ],
+    "winCurve": [
+      {"price": 8000, "winProb": 0.65},
+      {"price": 8500, "winProb": 0.58},
+      {"price": 9000, "winProb": 0.48}
+    ],
+    "confidence": "Low",
+    "status": "Expired",
+    "updatedAt": "2025-08-25T14:45:00Z",
+    "expiresAt": "2025-09-01T12:00:00Z"
+  }
+]

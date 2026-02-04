@@ -1,0 +1,214 @@
+{
+  "period": "Oct-2024",
+  "kpis": {
+    "totalRevenue": {
+      "value": 95000000,
+      "change": 0.06,
+      "label": "Total Revenue"
+    },
+    "totalCogs": {
+      "value": 28500000,
+      "change": -0.13,
+      "label": "Total COGS"
+    },
+    "grossMargin": {
+      "value": 0.70,
+      "change": 0.05,
+      "label": "Gross Margin"
+    },
+    "netProfit": {
+      "value": 12300000,
+      "change": 0.089,
+      "label": "Net Profit"
+    }
+  },
+  "pnl": {
+    "revenue": {
+      "actuals": 95000000,
+      "budget": 95000000,
+      "forecast": 97000000,
+      "children": [
+        {
+          "name": "Freight Revenue",
+          "actuals": 82000000,
+          "budget": 80000000,
+          "forecast": 84000000
+        },
+        {
+          "name": "Fuel Surcharge",
+          "actuals": 9500000,
+          "budget": 10000000,
+          "forecast": 9000000
+        },
+        {
+          "name": "Other Revenue",
+          "actuals": 3500000,
+          "budget": 5000000,
+          "forecast": 4000000
+        }
+      ],
+      "aiCommentary": "Revenue up 6% driven by increased freight volumes. Fuel surcharge revenue declined due to stabilizing diesel prices."
+    },
+    "cogs": {
+      "actuals": 28500000,
+      "budget": 33400000,
+      "forecast": 29700000,
+      "children": [
+        {
+          "name": "Fuel Costs",
+          "actuals": 15200000,
+          "budget": 18000000,
+          "forecast": 16000000
+        },
+        {
+          "name": "Driver Wages",
+          "actuals": 9800000,
+          "budget": 11000000,
+          "forecast": 10200000
+        },
+        {
+          "name": "Maintenance",
+          "actuals": 3500000,
+          "budget": 4400000,
+          "forecast": 3500000
+        }
+      ],
+      "aiCommentary": "COGS down 13% vs budget. Fuel efficiency improvements and route optimization delivering savings. Margins compressed by fuel inflation +4.2% YoY."
+    },
+    "grossProfit": {
+      "actuals": 66500000,
+      "budget": 64600000,
+      "forecast": 66500000,
+      "margin": 0.70
+    },
+    "opex": {
+      "actuals": 54200000,
+      "budget": 52300000,
+      "forecast": 54200000,
+      "children": [
+        {
+          "name": "Sales & Marketing",
+          "actuals": 17500000,
+          "budget": 19000000,
+          "forecast": 17000000
+        },
+        {
+          "name": "General & Administrative",
+          "actuals": 13900000,
+          "budget": 14000000,
+          "forecast": 14200000,
+          "children": [
+            {
+              "name": "Salaries and Wages",
+              "actuals": 9000000,
+              "budget": 8500000,
+              "forecast": 9200000
+            },
+            {
+              "name": "Office and Administration",
+              "actuals": 2400000,
+              "budget": 2500000,
+              "forecast": 2500000
+            },
+            {
+              "name": "Legal and Professional Fees",
+              "actuals": 3000000,
+              "budget": 3000000,
+              "forecast": 2500000
+            }
+          ]
+        },
+        {
+          "name": "Research & Development",
+          "actuals": 21600000,
+          "budget": 21200000,
+          "forecast": 21000000
+        },
+        {
+          "name": "Other Operating Expenses",
+          "actuals": 1200000,
+          "budget": 1100000,
+          "forecast": 2000000
+        }
+      ],
+      "aiCommentary": "Operating expenses 3.6% above budget, primarily due to increased R&D investment in fleet automation technology."
+    },
+    "netProfit": {
+      "actuals": 12300000,
+      "budget": 12300000,
+      "forecast": 12300000,
+      "margin": 0.129
+    }
+  },
+  "balanceSheet": {
+    "assets": {
+      "current": {
+        "total": 45800000,
+        "delta": 2300000,
+        "items": [
+          { "name": "Cash & Equivalents", "value": 18500000, "delta": 1200000 },
+          { "name": "Accounts Receivable", "value": 22300000, "delta": 800000 },
+          { "name": "Inventory", "value": 5000000, "delta": 300000 }
+        ]
+      },
+      "fixed": {
+        "total": 125000000,
+        "delta": -2500000,
+        "items": [
+          { "name": "Fleet Vehicles", "value": 95000000, "delta": -1500000 },
+          { "name": "Property & Equipment", "value": 28000000, "delta": -800000 },
+          { "name": "Intangible Assets", "value": 2000000, "delta": -200000 }
+        ]
+      }
+    },
+    "liabilities": {
+      "current": {
+        "total": 32500000,
+        "delta": 1500000,
+        "items": [
+          { "name": "Accounts Payable", "value": 18000000, "delta": 900000 },
+          { "name": "Short-term Debt", "value": 12000000, "delta": 500000 },
+          { "name": "Accrued Expenses", "value": 2500000, "delta": 100000 }
+        ]
+      },
+      "longTerm": {
+        "total": 58000000,
+        "delta": -1200000,
+        "items": [
+          { "name": "Long-term Debt", "value": 52000000, "delta": -1000000 },
+          { "name": "Deferred Tax Liability", "value": 6000000, "delta": -200000 }
+        ]
+      }
+    },
+    "equity": {
+      "total": 80300000,
+      "delta": 2400000
+    }
+  },
+  "cashFlow": {
+    "operating": {
+      "total": 18500000,
+      "items": [
+        { "name": "Net Profit", "value": 12300000 },
+        { "name": "Depreciation", "value": 8200000 },
+        { "name": "Working Capital Changes", "value": -2000000 }
+      ]
+    },
+    "investing": {
+      "total": -5200000,
+      "items": [
+        { "name": "Fleet Purchases", "value": -8500000 },
+        { "name": "Equipment Sales", "value": 3300000 }
+      ]
+    },
+    "financing": {
+      "total": -12100000,
+      "items": [
+        { "name": "Debt Repayment", "value": -10000000 },
+        { "name": "Interest Paid", "value": -2100000 }
+      ]
+    },
+    "netChange": 1200000,
+    "aiCommentary": "Strong operating cash flow of R18.5M. Capital investment focused on fleet modernization. Debt reduction on track with 5-year plan."
+  }
+}

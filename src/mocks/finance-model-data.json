@@ -1,0 +1,51 @@
+{
+  "nodes": [
+    { "id": "cust_makana", "type": "customer", "label": "Makana Foods" },
+    { "id": "cust_kudu", "type": "customer", "label": "Kudu Steel" },
+    { "id": "cust_umkhonto", "type": "customer", "label": "Umkhonto Retail" },
+    
+    { "id": "vehicle_v04", "type": "vehicle", "label": "V-04 HINO" },
+    { "id": "vehicle_v07", "type": "vehicle", "label": "V-07 FUSO" },
+    { "id": "vehicle_v02", "type": "vehicle", "label": "V-02 VOLVO" },
+
+    { "id": "lane_jhb_cpt", "type": "lane", "label": "JHB-CPT" },
+    { "id": "lane_dbn_jhb", "type": "lane", "label": "DBN-JHB" },
+    
+    { "id": "cost_fuel", "type": "costCenter", "label": "Fuel" },
+    { "id": "cost_tolls", "type": "costCenter", "label": "Tolls" },
+    { "id": "cost_maint", "type": "costCenter", "label": "Maintenance" },
+    { "id": "cost_payroll", "type": "costCenter", "label": "Payroll" }
+  ],
+  "links": [
+    { "source": "cust_makana", "target": "lane_jhb_cpt", "value": 1200000, "marginPct": 18.2, "type": "revenue" },
+    { "source": "cust_makana", "target": "lane_dbn_jhb", "value": 450000, "marginPct": 16.5, "type": "revenue" },
+    { "source": "cust_kudu", "target": "lane_dbn_jhb", "value": 2100000, "marginPct": 8.1, "type": "revenue" },
+    { "source": "cust_umkhonto", "target": "lane_jhb_cpt", "value": 850000, "marginPct": -2.5, "type": "revenue" },
+
+    { "source": "lane_jhb_cpt", "target": "vehicle_v04", "value": 1500000, "type": "assignment" },
+    { "source": "lane_dbn_jhb", "target": "vehicle_v07", "value": 2000000, "type": "assignment" },
+    { "source": "lane_dbn_jhb", "target": "vehicle_v02", "value": 550000, "type": "assignment" },
+
+    { "source": "vehicle_v04", "target": "cost_fuel", "value": 550000, "type": "cost" },
+    { "source": "vehicle_v07", "target": "cost_fuel", "value": 850000, "type": "cost" },
+    { "source": "vehicle_v02", "target": "cost_fuel", "value": 280000, "type": "cost" },
+
+    { "source": "vehicle_v04", "target": "cost_tolls", "value": 150000, "type": "cost" },
+    { "source": "vehicle_v07", "target": "cost_tolls", "value": 210000, "type": "cost" },
+    { "source": "vehicle_v02", "target": "cost_tolls", "value": 80000, "type": "cost" },
+
+    { "source": "vehicle_v02", "target": "cost_maint", "value": 120000, "type": "cost" }
+  ],
+  "globalKpis": {
+    "totalRevenue": 4600000,
+    "totalCosts": 4150000,
+    "netMargin": 14.4,
+    "cashOnHand": 1230500,
+    "changes": {
+      "totalRevenue": 5.2,
+      "totalCosts": 4.8,
+      "netMargin": 0.4,
+      "cashOnHand": -10.1
+    }
+  }
+}

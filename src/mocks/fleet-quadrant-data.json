@@ -1,0 +1,18 @@
+{
+  "avgRevenue": 300000,
+  "avgMargin": 0.15,
+  "vehicleData": [
+    { "id": "TRK-001", "name": "Star Performer", "revenue": 450000, "margin": 0.22 },
+    { "id": "TRK-002", "name": "Workhorse Truck", "revenue": 550000, "margin": 0.11 },
+    { "id": "TRK-003", "name": "Niche Route Specialist", "revenue": 150000, "margin": 0.25 },
+    { "id": "TRK-004", "name": "Financial Drag Asset", "revenue": 120000, "margin": 0.08 },
+    { "id": "TRK-005", "name": "Solid Contributor", "revenue": 350000, "margin": 0.18 },
+    { "id": "TRK-006", "name": "High Volume Low Margin", "revenue": 600000, "margin": 0.09 },
+    { "id": "TRK-007", "name": "Problem Vehicle", "revenue": 80000, "margin": 0.05 },
+    { "id": "TRK-008", "name": "Emerging Star", "revenue": 400000, "margin": 0.19 },
+    { "id": "TRK-009", "name": "Reliable Workhorse", "revenue": 480000, "margin": 0.12 },
+    { "id": "TRK-010", "name": "Specialty Asset", "revenue": 180000, "margin": 0.28 },
+    { "id": "TRK-011", "name": "Underperformer", "revenue": 100000, "margin": 0.07 },
+    { "id": "TRK-012", "name": "Volume King", "revenue": 580000, "margin": 0.10 }
+  ]
+}

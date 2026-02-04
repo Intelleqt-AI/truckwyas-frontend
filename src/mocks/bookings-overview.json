@@ -1,0 +1,65 @@
+{
+  "kpiData": {
+    "totalQuoted": { "value": "R 1,420,000.00", "subtext": "This month" },
+    "acceptanceRate": { "value": "73.2%", "subtext": "+5.1% vs last month" },
+    "averageMargin": { "value": "15.8%", "subtext": "1.2% AI Uplift" },
+    "priceAlerts": { "value": 7, "subtext": "Require attention" }
+  },
+  "pipelineSummaryData": [
+    { "stage": "Draft", "count": 3, "value": "R 125,400.00" },
+    { "stage": "Sent", "count": 8, "value": "R 342,800.00" },
+    { "stage": "Quoted", "count": 12, "value": "R 587,200.00" },
+    { "stage": "Accepted", "count": 5, "value": "R 289,500.00" },
+    { "stage": "Expired", "count": 2, "value": "R 45,300.00" }
+  ],
+  "activityFeedData": [
+    {
+      "id": "evt-001", 
+      "icon": "CheckCircle2", 
+      "color": "success",
+      "text": "Sarah Johnson <strong>accepted</strong> quote <a href='/bookings/pipeline/Q-1002'>Q-1002</a>.",
+      "timestamp": "2025-09-06T17:27:00Z", 
+      "user": { "initials": "SJ" }
+    },
+    {
+      "id": "evt-002", 
+      "icon": "Send", 
+      "color": "brand",
+      "text": "You <strong>sent</strong> quote <a href='/bookings/pipeline/Q-1004'>Q-1004</a> to Kudu Steel.",
+      "timestamp": "2025-09-06T16:29:00Z", 
+      "user": { "initials": "You" }
+    },
+    {
+      "id": "evt-003", 
+      "icon": "AlertTriangle", 
+      "color": "warn",
+      "text": "<strong>AI</strong> flagged a <strong>margin alert</strong> on <a href='/bookings/pipeline/Q-1005'>Q-1005</a>.",
+      "timestamp": "2025-09-06T14:15:00Z", 
+      "user": { "initials": "AI" }
+    },
+    {
+      "id": "evt-004", 
+      "icon": "Plus", 
+      "color": "brand",
+      "text": "Marcus Chen <strong>created</strong> quote <a href='/bookings/pipeline/Q-1006'>Q-1006</a> for Tiger Transport.",
+      "timestamp": "2025-09-06T13:45:00Z", 
+      "user": { "initials": "MC" }
+    },
+    {
+      "id": "evt-005", 
+      "icon": "Calendar", 
+      "color": "info",
+      "text": "Quote <a href='/bookings/pipeline/Q-0998'>Q-0998</a> expires in <strong>2 hours</strong>.",
+      "timestamp": "2025-09-06T12:30:00Z", 
+      "user": { "initials": "SY" }
+    },
+    {
+      "id": "evt-006", 
+      "icon": "Edit3", 
+      "color": "info",
+      "text": "Lisa Park <strong>updated</strong> pricing on <a href='/bookings/pipeline/Q-1001'>Q-1001</a>.",
+      "timestamp": "2025-09-06T11:15:00Z", 
+      "user": { "initials": "LP" }
+    }
+  ]
+}

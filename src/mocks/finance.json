@@ -1,0 +1,58 @@
+{
+  "cashFlow": {
+    "currentBalance": 2450750.00,
+    "projectedWeekly": [
+      { "week": "W3", "inflow": 485000, "outflow": 320000, "net": 165000 },
+      { "week": "W4", "inflow": 520000, "outflow": 340000, "net": 180000 },
+      { "week": "W5", "inflow": 495000, "outflow": 355000, "net": 140000 },
+      { "week": "W6", "inflow": 510000, "outflow": 375000, "net": 135000 }
+    ],
+    "dso": 28.5,
+    "dsoTrend": "improving"
+  },
+  "invoices": {
+    "outstanding": 1875000.00,
+    "overdue": 285000.00,
+    "overduePercentage": 0.152,
+    "aging": [
+      { "period": "0-30 days", "amount": 1590000, "percentage": 0.848 },
+      { "period": "31-60 days", "amount": 195000, "percentage": 0.104 },
+      { "period": "61-90 days", "amount": 65000, "percentage": 0.035 },
+      { "period": "90+ days", "amount": 25000, "percentage": 0.013 }
+    ]
+  },
+  "profitability": {
+    "grossMargin": 0.187,
+    "netMargin": 0.142,
+    "ebitda": 0.156,
+    "trends": {
+      "quarterly": [
+        { "quarter": "Q4 2023", "margin": 0.134 },
+        { "quarter": "Q1 2024", "margin": 0.142 }
+      ]
+    }
+  },
+  "leakages": [
+    {
+      "type": "fuel_variance", 
+      "amount": 15750.00,
+      "impact": "medium",
+      "trend": "increasing",
+      "description": "Fuel costs 3.2% above budget"
+    },
+    {
+      "type": "detention_charges",
+      "amount": 8900.00, 
+      "impact": "low",
+      "trend": "stable",
+      "description": "Customer detention charges not recovered"
+    },
+    {
+      "type": "route_inefficiency",
+      "amount": 12400.00,
+      "impact": "medium", 
+      "trend": "decreasing",
+      "description": "Sub-optimal route planning causing excess mileage"
+    }
+  ]
+}

@@ -85,94 +85,95 @@ export const patchData = async ({ url, data }) => {
 
 export const loginUser = async ({ username, password }: { username: string; password: string }) => {
   const res = await api.post('api/auth/login/', { username, password });
-  return res.data; // { access, refresh, user }
+  return res.data; // { token, refresh, user }
 };
 
-// api.interceptors.response.use(
-//   response => response,
-//   async error => {
-//     const originalRequest = error.config;
+/** Flag to prevent multiple concurrent refresh attempts */
+let isRefreshing = false;
+/** Queue of requests waiting for the refresh to complete */
+let failedQueue: Array<{
+  resolve: (value: unknown) => void;
+  reject: (reason?: unknown) => void;
+}> = [];
 
-//     // If 401 and not retried yet
-//     if (error.response?.status === 401 && !originalRequest._retry) {
-//       originalRequest._retry = true;
+const processQueue = (error: unknown, token: string | null = null) => {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error);
+    } else {
+      resolve(token);
+    }
+  });
+  failedQueue = [];
+};
 
-//       const refresh = localStorage.getItem('refresh');
+const forceLogout = () => {
+  tokenStorage.clearAll();
+  if (typeof window !== 'undefined') {
+    window.location.href = '/login';
+  }
+};
 
-//       // If no refresh → logout + redirect immediately
-//       if (!refresh) {
-//         localStorage.removeItem('access');
-//         localStorage.removeItem('refresh');
-//         window.location.href = '/login';
-//         return Promise.reject(error);
-//       }
+api.interceptors.response.use(
+  response => response,
+  async error => {
+    const originalRequest = error.config;
 
-//       try {
-//         // Attempt refresh
-//         const res = await api.post('/user/refresh/', { refresh });
-//         const newAccess = res.data.access;
+    // If the request that failed WAS the refresh request → logout immediately (prevent loop)
+    if (originalRequest.url?.includes('api/auth/token/refresh/')) {
+      forceLogout();
+      return Promise.reject(error);
+    }
 
-//         // Save new access token
-//         localStorage.setItem('access', newAccess);
+    // If 401 and not retried yet → attempt token refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
 
-//         // Retry original request with new token
-//         originalRequest.headers['Authorization'] = `Bearer ${newAccess}`;
-//         return api(originalRequest);
+      // If another refresh is already in progress, queue this request
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then(token => {
+          originalRequest.headers['Authorization'] = `Token ${token}`;
+          return api(originalRequest);
+        });
+      }
 
-//       } catch (refreshError) {
-//         // Refresh failed → force logout + redirect
-//         localStorage.removeItem('access');
-//         localStorage.removeItem('refresh');
-//         window.location.href = '/login';
-//         return Promise.reject(refreshError);
-//       }
-//     }
+      const refresh = tokenStorage.getRefreshToken();
 
-//     return Promise.reject(error);
-//   }
-// );
+      // No refresh token available → force logout
+      if (!refresh) {
+        forceLogout();
+        return Promise.reject(error);
+      }
 
+      isRefreshing = true;
 
-// api.interceptors.response.use(
-//   res => res,
-//   async error => {
-//     const originalRequest = error.config;
+      try {
+        const res = await api.post('api/auth/token/refresh/', { refresh });
+        const newToken = res.data.token || res.data.access;
 
-//     // If the request that failed WAS the refresh token request → logout immediately
-//     if (originalRequest.url.includes('/user/refresh/')) {
-//       localStorage.clear();
-//       window.location.href = '/login';
-//       return Promise.reject(error);
-//     }
+        tokenStorage.setToken(newToken);
 
-//     // Handle expired access → try refresh ONCE
-//     if (error.response?.status === 401 && !originalRequest._retry) {
-//       originalRequest._retry = true;
+        // If a new refresh token is returned, store it too
+        if (res.data.refresh) {
+          tokenStorage.setRefreshToken(res.data.refresh);
+        }
 
-//       const refresh = localStorage.getItem('refresh');
-//       if (!refresh) {
-//         localStorage.clear();
-//         window.location.href = '/login';
-//         return Promise.reject(error);
-//       }
+        processQueue(null, newToken);
 
-//       try {
-//         const res = await api.post('/user/refresh/', { refresh });
-//         const newAccess = res.data.access;
+        // Retry original request with new token
+        originalRequest.headers['Authorization'] = `Token ${newToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+        forceLogout();
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
 
-//         localStorage.setItem('access', newAccess);
-//         originalRequest.headers['Authorization'] = 'Bearer ' + newAccess;
-
-//         return api(originalRequest);
-
-//       } catch (refreshError) {
-//         // If refresh fails → logout gracefully
-//         localStorage.clear();
-//         window.location.href = '/login';
-//         return Promise.reject(refreshError);
-//       }
-//     }
-
-//     return Promise.reject(error);
-//   }
-// );
+    return Promise.reject(error);
+  }
+);

@@ -9,6 +9,9 @@ export const useLogin = () => {
     onSuccess: (data) => {
       // Save tokens and user data in sessionStorage (not localStorage)
       tokenStorage.setToken(data.token);
+      if (data.refresh) {
+        tokenStorage.setRefreshToken(data.refresh);
+      }
       tokenStorage.setUser(data.user);
     },
   });

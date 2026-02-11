@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Fuel, AlertTriangle, Target } from "lucide-react";
 import { motion } from "framer-motion";
+import DOMPurify from "dompurify";
 
 interface InsightItem {
   id: string;
@@ -81,7 +82,7 @@ export function AIInsightsFeed() {
                   <div className="flex-1 min-w-0 space-y-2">
                     <div 
                       className="text-body text-foreground"
-                      dangerouslySetInnerHTML={{ __html: insight.narrative }}
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(insight.narrative) }}
                     />
                     
                     <Button 

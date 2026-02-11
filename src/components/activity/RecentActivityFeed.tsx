@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CheckCircle2, Send, AlertTriangle, Plus, Calendar, Edit3 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/formatters";
+import DOMPurify from "dompurify";
 
 interface ActivityItem {
   id: string;
@@ -58,7 +59,7 @@ export function RecentActivityFeed({ activities, title = "Recent Activity" }: Re
                 <div className="flex-1 min-w-0">
                   <div 
                     className="text-caption text-foreground leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: activity.text }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(activity.text) }}
                   />
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-xs text-muted-foreground">

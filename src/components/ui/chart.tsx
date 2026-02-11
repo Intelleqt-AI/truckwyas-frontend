@@ -65,6 +65,20 @@ const ChartContainer = React.forwardRef<
 })
 ChartContainer.displayName = "Chart"
 
+// Validates that a string is a safe CSS color value (hex, rgb, hsl, named colors, oklch, etc.)
+// Rejects anything that could be used for CSS injection (e.g., url(), expression(), etc.)
+function isSafeCssColor(value: string): boolean {
+  const trimmed = value.trim()
+  // Allow common CSS color formats: hex, rgb/rgba, hsl/hsla, oklch, named colors, CSS variables
+  const safeColorPattern = /^(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)|oklch\([^)]+\)|var\(--[a-zA-Z0-9-]+\)|[a-zA-Z]{1,30})$/
+  return safeColorPattern.test(trimmed)
+}
+
+// Validates that a string is a safe CSS variable name suffix (alphanumeric + hyphens)
+function isSafeCssKey(key: string): boolean {
+  return /^[a-zA-Z0-9-]+$/.test(key)
+}
+
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
     ([_, config]) => config.theme || config.color
@@ -74,28 +88,25 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null
   }
 
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color =
-      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
-      itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
-  })
-  .join("\n")}
-}
-`
-          )
-          .join("\n"),
-      }}
-    />
-  )
+  // Build CSS safely by validating each key and color value
+  const cssRules = Object.entries(THEMES)
+    .map(([theme, prefix]) => {
+      const variables = colorConfig
+        .map(([key, itemConfig]) => {
+          if (!isSafeCssKey(key)) return null
+          const color =
+            itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
+            itemConfig.color
+          if (!color || !isSafeCssColor(color)) return null
+          return `  --color-${key}: ${color};`
+        })
+        .filter(Boolean)
+        .join("\n")
+      return `${prefix} [data-chart=${id}] {\n${variables}\n}`
+    })
+    .join("\n")
+
+  return <style>{cssRules}</style>
 }
 
 const ChartTooltip = RechartsPrimitive.Tooltip

@@ -1,15 +1,15 @@
 // hooks/useLogin.ts
 import { useMutation } from "@tanstack/react-query";
 import { loginUser } from "@/lib/Api";
+import { tokenStorage } from "@/lib/tokenStorage";
 
 export const useLogin = () => {
   return useMutation({
     mutationFn: loginUser,
     onSuccess: (data) => {
-      console.log(data)
-      // Save tokens and user data
-      localStorage.setItem("access", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      // Save tokens and user data in sessionStorage (not localStorage)
+      tokenStorage.setToken(data.token);
+      tokenStorage.setUser(data.user);
     },
   });
 };

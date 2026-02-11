@@ -13,6 +13,7 @@ import useFetch from "@/hooks/useFetch";
 import { usePatch } from "@/hooks/usePatch";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { tokenStorage } from "@/lib/tokenStorage";
 
 export function ProfileSettings() {
   const queryClient = useQueryClient();
@@ -48,12 +49,10 @@ export function ProfileSettings() {
     onSuccess: (data) => {
       toast.success("Profile updated successfully");
       queryClient.invalidateQueries({ queryKey: ["api/auth/me/"] });
-      // Update local storage for sidebar
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        localStorage.setItem("user", JSON.stringify({ ...user, ...data }));
-        // Trigger a storage event or just rely on the next page load/state update
+      // Update session storage for sidebar
+      const user = tokenStorage.getUser();
+      if (user) {
+        tokenStorage.setUser({ ...user, ...data });
         window.dispatchEvent(new Event('storage'));
       }
     },

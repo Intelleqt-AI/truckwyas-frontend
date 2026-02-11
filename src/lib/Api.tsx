@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { tokenStorage } from '@/lib/tokenStorage';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -6,7 +7,7 @@ const api = axios.create({
 
 api.interceptors.request.use(config => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('access');
+    const token = tokenStorage.getToken();
     if (token) {
       config.headers.Authorization = `Token ${token}`;
     }

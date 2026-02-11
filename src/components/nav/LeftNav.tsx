@@ -35,6 +35,7 @@ import {
 import { NAVIGATION_ITEMS, type NavigationItem } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { usePost } from "@/hooks/usePost";
+import { tokenStorage } from "@/lib/tokenStorage";
 
 const iconMap = {
   LayoutDashboard,
@@ -55,9 +56,9 @@ export function LeftNav() {
 
   useEffect(() => {
     const loadUser = () => {
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        setUser(JSON.parse(userStr));
+      const userData = tokenStorage.getUser();
+      if (userData) {
+        setUser(userData);
       }
     };
 
@@ -68,15 +69,11 @@ export function LeftNav() {
 
   const { mutate: logout } = usePost({
     onSuccess: () => {
-      localStorage.removeItem('access');
-      localStorage.removeItem('refresh');
-      localStorage.removeItem('user');
+      tokenStorage.clearAll();
       window.location.href = '/login';
     },
     onError: () => {
-      localStorage.removeItem('access');
-      localStorage.removeItem('refresh');
-      localStorage.removeItem('user');
+      tokenStorage.clearAll();
       window.location.href = '/login';
     }
   });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { postData } from "@/lib/Api";
+import { validatePassword, getStrengthColor, getStrengthBarWidth, getStrengthBarColor } from "@/lib/passwordValidation";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -17,12 +18,22 @@ const Signup = () => {
     confirmPassword: "",
   });
 
+  const passwordValidation = useMemo(
+    () => validatePassword(formData.password),
+    [formData.password]
+  );
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!passwordValidation.isValid) {
+      toast.error("Please choose a stronger password");
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       toast.error("Passwords do not match");
@@ -96,6 +107,28 @@ const Signup = () => {
                 value={formData.password}
                 onChange={handleChange}
               />
+              {formData.password.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Password strength:</span>
+                    <span className={`text-xs font-medium capitalize ${getStrengthColor(passwordValidation.strength)}`}>
+                      {passwordValidation.strength}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${getStrengthBarWidth(passwordValidation.strength)} ${getStrengthBarColor(passwordValidation.strength)}`}
+                    />
+                  </div>
+                  {passwordValidation.errors.length > 0 && (
+                    <ul className="text-xs text-muted-foreground space-y-0.5">
+                      {passwordValidation.errors.map((error) => (
+                        <li key={error} className="text-red-400">• {error}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>

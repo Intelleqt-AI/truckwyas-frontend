@@ -102,7 +102,7 @@ export default function Invoices() {
   ];
 
   const handleCardMove = (cardId: string, fromColumn: string, toColumn: string) => {
-    console.log(`Moving ${cardId} from ${fromColumn} to ${toColumn}`);
+    // TODO: implement card move logic
   };
 
   return (

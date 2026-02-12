@@ -28,8 +28,6 @@ export default function FleetDashboard() {
   const { data: fleetInsights, isLoading: fleetInsightsLoading } = useFetch("api/fleet/insights/");
   const { data: fleetIntelligence, isLoading: fleetIntelligenceLoading } = useFetch("api/fleet/intelligence/");
 
-  console.log(fleetIntelligence)
-
   // Fleet Summary sparkline data (7-day trends)
   const summaryData = [
     {

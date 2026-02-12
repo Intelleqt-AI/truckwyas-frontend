@@ -53,11 +53,8 @@ export default function NewQuote() {
 
   const { data: existingQuote, isLoading: isLoadingQuote } = useFetch(id ? `api/quotes/${id}` : null, { enabled: !!id });
 
-  // console.log("existingQuote", existingQuote);
-
   useEffect(() => {
     if (existingQuote) {
-      console.log("Found existing quote:", existingQuote);
       setSelectedMethod("form");
     }
   }, [existingQuote]);
@@ -149,11 +146,8 @@ export default function NewQuote() {
     };
     setParsedQuote(parsed);
 
-    // console.log("Parsed Quote Data:", parsed);
-
     // If we have an ID, we are updating, otherwise creating
     if (id) {
-      console.log("Updating quote:", id);
       updateQuote(parsed);
     } else {
       sendQuote({ url: "api/quotes/", data: parsed });

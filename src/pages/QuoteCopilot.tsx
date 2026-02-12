@@ -42,7 +42,7 @@ export function QuoteCopilot() {
 
   const handleSendMessage = () => {
     if (chatInput.trim()) {
-      console.log("Sending message:", chatInput);
+      // TODO: implement chat message sending
       setChatInput("");
     }
   };

@@ -79,8 +79,7 @@ export function QuoteFormComponent({ onSubmit, initialData }: QuoteFormComponent
 
   // Mock smart defaults (can be expanded)
   const applySmartDefaults = (customerId: string) => {
-    // In a real app, fetch customer specific defaults or contracts
-    console.log("Applying defaults for customer:", customerId);
+    // TODO: fetch customer specific defaults or contracts
   };
 
   const handleSubmit = () => {

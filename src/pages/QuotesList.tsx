@@ -56,13 +56,9 @@ export function QuotesList() {
   const { data: quotesData, isLoading, error, refetch } = useFetch("api/quotes");
   const { data: pipelineData, isLoading: pipelineLoading, error: pipelineError } = useFetch("api/bookings/pipeline/");
 
-  // console.log("quotesData", quotesData);
-
   // useEffect(() => {
   //   refetch?.();
   // }, []);
-
-  // console.log("pipelineData", pipelineData);
 
   const quotes = quotesData?.results || [];
 
@@ -86,8 +82,6 @@ export function QuotesList() {
     estimatedFuelL: (parseFloat(quote.distance) || 0) * 0.4, // Rough estimate
     tollsZar: 0 // Mock
   }));
-
-  console.log("quotesData", mappedQuotes);
 
   // Mock AI insights data
   const mockInsights = {
@@ -134,8 +128,7 @@ export function QuotesList() {
   };
 
   const handleApplyChanges = (quoteId: string, patch: { price?: number; marginPct?: number; planId?: 'A' | 'B' | 'C' }) => {
-    console.log(`Applying changes to quote ${quoteId}:`, patch);
-    // In real app, this would update the quote data and show a success animation
+    // TODO: update the quote data and show a success animation
   };
 
   const handleOpenCanvas = (quoteId: string) => {
@@ -143,8 +136,7 @@ export function QuotesList() {
   };
 
   const handleSaveQuote = (updatedQuote: any) => {
-    console.log('Saving quote updates:', updatedQuote);
-    // In real app, this would update the quote data via API
+    // TODO: update the quote data via API
     setExpandedQuoteId(null);
     setSelectedQuoteId(null);
     refetch?.();

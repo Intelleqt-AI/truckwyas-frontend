@@ -89,15 +89,14 @@ export function QuoteDetailsModal({ isOpen, onClose, quote, onSave }: QuoteDetai
   const navigate = useNavigate();
 
   const handleShare = () => {
-    console.log('Share quote:', quote.id);
+    // TODO: implement share quote functionality
   };
 
   const handleSend = () => {
-    console.log('Send quote:', quote.id);
+    // TODO: implement send quote functionality
   };
 
   const handleEdit = () => {
-    console.log('Edit quote:', quote?.originalId);
     navigate(`/bookings/pipeline/${quote?.originalId}`);
   };
 

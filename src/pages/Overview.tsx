@@ -16,7 +16,7 @@ export default function Overview() {
       subtitle: "Value: R 88,400",
       buttonText: "Review Now",
       variant: 'default' as const,
-      onClick: () => console.log('Navigate to expiring quotes')
+      onClick: () => { /* TODO: Navigate to expiring quotes */ }
     },
     {
       icon: AlertTriangle,
@@ -25,7 +25,7 @@ export default function Overview() {
       subtitle: "Potential Loss: R 18,200",
       buttonText: "Analyse Loads",
       variant: 'warning' as const,
-      onClick: () => console.log('Navigate to at-risk loads')
+      onClick: () => { /* TODO: Navigate to at-risk loads */ }
     },
     {
       icon: Clock,
@@ -34,7 +34,7 @@ export default function Overview() {
       subtitle: "from 2 Customers",
       buttonText: "View Invoices",
       variant: 'danger' as const,
-      onClick: () => console.log('Navigate to overdue invoices')
+      onClick: () => { /* TODO: Navigate to overdue invoices */ }
     },
     {
       icon: TrendingDown,
@@ -43,7 +43,7 @@ export default function Overview() {
       subtitle: "High Fuel Burn",
       buttonText: "Investigate Fleet",
       variant: 'default' as const,
-      onClick: () => console.log('Navigate to fleet issues')
+      onClick: () => { /* TODO: Navigate to fleet issues */ }
     }
   ];
 

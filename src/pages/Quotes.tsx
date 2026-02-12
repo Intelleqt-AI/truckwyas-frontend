@@ -34,7 +34,7 @@ export function Quotes() {
 
   const handleSendMessage = () => {
     if (chatInput.trim()) {
-      console.log("Sending message:", chatInput);
+      // TODO: implement chat message sending
       setChatInput("");
     }
   };

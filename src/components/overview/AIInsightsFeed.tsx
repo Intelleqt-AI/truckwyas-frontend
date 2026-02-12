@@ -90,8 +90,7 @@ export function AIInsightsFeed() {
                       size="sm" 
                       className="h-auto p-0 text-brand-500 hover:text-brand-700"
                       onClick={() => {
-                        // In a real app, this would use react-router navigation
-                        console.log(`Navigate to: ${insight.actionLink}`);
+                        // TODO: implement react-router navigation to insight.actionLink
                       }}
                     >
                       {insight.actionText} →

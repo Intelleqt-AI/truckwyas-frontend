@@ -97,7 +97,7 @@ export function QuoteCard({ quote, onCardClick, onAIClick }: QuoteCardProps) {
 
   const handleMenuAction = (action: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log(`${action} quote:`, quote.id);
+    // TODO: implement quote menu actions
   };
 
   // Mock assigned users for collaborative element

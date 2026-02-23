@@ -15,8 +15,11 @@ import Vehicles from "./pages/Vehicles";
 import VehicleDigitalTwin from "./pages/VehicleDigitalTwin";
 import Drivers from "./pages/Drivers";
 import DriverProfile from "./pages/DriverProfile";
+import FleetDashboard from "./pages/FleetDashboard";
 import FinanceHQ from "./pages/FinanceHQ";
 import Invoices from "./pages/Invoices";
+import InvoiceDetail from "./pages/InvoiceDetail";
+import CreateInvoice from "./pages/CreateInvoice";
 import Expenses from "./pages/Expenses";
 import FinanceReports from "./pages/FinanceReports";
 import Capital from "./pages/Capital";
@@ -109,6 +112,16 @@ const App = () => (
             <Route path="/finance/invoices" element={
               <DashboardLayout>
                 <Invoices />
+              </DashboardLayout>
+            } />
+            <Route path="/finance/invoices/new" element={
+              <DashboardLayout>
+                <CreateInvoice />
+              </DashboardLayout>
+            } />
+            <Route path="/finance/invoices/:id" element={
+              <DashboardLayout>
+                <InvoiceDetail />
               </DashboardLayout>
             } />
             <Route path="/finance/expenses" element={

@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { Bell, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bell, User } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -18,7 +17,6 @@ import { cn } from "@/lib/utils";
 import useFetch from "@/hooks/useFetch";
 import { usePost } from "@/hooks/usePost";
 import { useQueryClient } from "@tanstack/react-query";
-import truckwysLogo from "@/assets/truckwys-logo.png";
 
 // Notification interface
 interface AppNotification {
@@ -38,11 +36,36 @@ interface PaginatedResponse<T> {
   results: T[];
 }
 
+// Page title mapping
+const PAGE_TITLES: Record<string, string> = {
+  '/': 'Home',
+  '/bookings': 'Orders',
+  '/bookings/pipeline': 'Pipeline',
+  '/finance-hq': 'Finance Overview',
+  '/finance/invoices': 'Invoices',
+  '/finance/expenses': 'Expenses',
+  '/finance/reports': 'Reports',
+  '/capital': 'Capital',
+  '/fleet': 'Fleet Dashboard',
+  '/fleet/vehicles': 'Vehicles',
+  '/fleet/drivers': 'Drivers',
+  '/settings': 'Settings',
+};
+
 export function TopBar() {
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const queryClient = useQueryClient();
   const { data: notificationsData } = useFetch<PaginatedResponse<AppNotification>>("api/notifications/");
   const notificationList = notificationsData?.results || [];
+
+  useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      setUser(JSON.parse(userStr));
+    }
+  }, []);
 
   const { mutate: markRead } = usePost({
     onSuccess: () => {
@@ -58,54 +81,40 @@ export function TopBar() {
     markRead({ url: "api/notifications/mark-read/", data: { ids: [id] } });
   };
 
+  const pageTitle = PAGE_TITLES[location.pathname] || 'TruckWys';
+
   return (
     <>
       {isOpen && (
         <div className="fixed inset-0 bg-black/20 z-[40] transition-all duration-300" />
       )}
-      <header className="h-16 bg-nav-bg border-b border-nav-border shadow-nav flex items-center justify-between px-6 fixed top-0 left-0 right-0 z-50">
-        {/* Left Section - Logo & Menu */}
+      <header className="h-16 bg-white border-b border-[#F1F5F9] flex items-center justify-between px-8 sticky top-0 z-40">
+        {/* Left Section - Page Title/Breadcrumb */}
         <div className="flex items-center gap-4">
-          <img
-            src={truckwysLogo}
-            alt="Truckwys"
-            className="h-20"
-          />
-          <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+          <h1 className="text-2xl font-semibold text-[#0F172A]">{pageTitle}</h1>
         </div>
 
-        {/* Center Section - AI Search */}
-        <div className="flex-1 max-w-lg mx-8">
-          <div className="relative">
-            <Sparkles className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary w-4 h-4" />
-            <Input
-              placeholder="Ask AI about loads, quotes, invoices..."
-              className="pl-10 bg-background border-border"
-            />
-          </div>
-        </div>
-
-        {/* Right Section */}
-        <div className="flex items-center gap-4">
+        {/* Right Section - Notifications & User */}
+        <div className="flex items-center gap-3">
           {/* Notifications */}
           <DropdownMenu onOpenChange={setIsOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className="relative hover:bg-slate-100">
+                <Bell className="w-5 h-5 text-slate-600" />
                 {notificationList.filter(n => n.unread).length > 0 && (
-                  <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center bg-destructive text-destructive-foreground text-xs border-2 border-nav-bg">
+                  <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center bg-[#2563EB] text-white text-xs border-2 border-white">
                     {notificationList.filter(n => n.unread).length}
                   </Badge>
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 bg-background border-border p-0 shadow-xl">
-              <div className="p-4 border-b border-border flex items-center justify-between">
-                <DropdownMenuLabel className="p-0 font-heading text-body-medium">Notifications</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-80 bg-white border-slate-200 p-0 shadow-xl">
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+                <DropdownMenuLabel className="p-0 font-semibold text-sm">Notifications</DropdownMenuLabel>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-auto p-0 text-xs text-primary hover:bg-transparent"
+                  className="h-auto p-0 text-xs text-[#2563EB] hover:bg-transparent hover:text-[#1D4ED8]"
                   onClick={handleMarkAllAsRead}
                 >
                   Mark all as read
@@ -117,45 +126,49 @@ export function TopBar() {
                     notificationList.map((notification) => (
                       <DropdownMenuItem
                         key={notification.id}
-                        className="flex flex-col items-start gap-1 p-4 cursor-pointer border-b border-border/50 last:border-0 focus:bg-accent/50"
+                        className="flex flex-col items-start gap-1 p-4 cursor-pointer border-b border-slate-100 last:border-0 focus:bg-slate-50"
                         onClick={() => notification.unread && handleMarkAsRead(notification.id)}
                       >
                         <div className="flex items-center justify-between w-full gap-2">
                           <div className="flex items-center gap-2">
-                            {notification.type === 'success' && <CheckCircle2 className="w-4 h-4 text-success" />}
-                            {notification.type === 'warning' && <AlertCircle className="w-4 h-4 text-warning" />}
-                            {notification.type === 'info' && <Info className="w-4 h-4 text-primary" />}
-                            <span className={cn("text-body-medium", notification.unread ? "font-semibold" : "font-normal")}>
+                            {notification.type === 'success' && <CheckCircle2 className="w-4 h-4 text-[#10B981]" />}
+                            {notification.type === 'warning' && <AlertCircle className="w-4 h-4 text-[#F59E0B]" />}
+                            {notification.type === 'info' && <Info className="w-4 h-4 text-[#2563EB]" />}
+                            <span className={cn("text-sm", notification.unread ? "font-semibold text-[#0F172A]" : "font-normal text-[#64748B]")}>
                               {notification.title}
                             </span>
                           </div>
                           {notification.unread && (
-                            <div className="w-2 h-2 bg-primary rounded-full" />
+                            <div className="w-2 h-2 bg-[#2563EB] rounded-full" />
                           )}
                         </div>
-                        <p className="text-caption text-muted-foreground line-clamp-2">
+                        <p className="text-xs text-[#64748B] line-clamp-2">
                           {notification.description}
                         </p>
                         <div className="flex items-center gap-1 mt-1">
-                          <Clock className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-[10px] text-muted-foreground">{notification.time}</span>
+                          <Clock className="w-3 h-3 text-[#94A3B8]" />
+                          <span className="text-[10px] text-[#94A3B8]">{notification.time}</span>
                         </div>
                       </DropdownMenuItem>
                     ))
                   ) : (
-                    <div className="p-8 text-center text-muted-foreground">
+                    <div className="p-8 text-center text-[#64748B]">
                       <p className="text-sm">No notifications</p>
                     </div>
                   )}
                 </div>
               </ScrollArea>
-              <div className="p-2 border-t border-border bg-muted/30">
-                <Button variant="ghost" className="w-full text-xs h-8 hover:bg-accent">
-                  View all notifications
-                </Button>
-              </div>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* User Avatar */}
+          <Button variant="ghost" size="icon" className="relative hover:bg-slate-100 rounded-full w-9 h-9">
+            <div className="w-8 h-8 bg-[#2563EB] rounded-full flex items-center justify-center">
+              <span className="text-xs font-medium text-white">
+                {user?.username ? user.username.substring(0, 2).toUpperCase() : "US"}
+              </span>
+            </div>
+          </Button>
         </div>
       </header>
     </>

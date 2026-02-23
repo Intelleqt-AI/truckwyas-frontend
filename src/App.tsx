@@ -5,30 +5,25 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 
+// Page imports
 import Overview from "./pages/Overview";
 import { QuotesList } from "./pages/QuotesList";
-import { QuoteCopilot } from "./pages/QuoteCopilot";
 import NewQuote from "./pages/NewQuote";
 import { BookingsList } from "./pages/BookingsList";
-import RevenueGuard from "./pages/RevenueGuard";
 import Bookings from "./pages/Bookings";
-import FleetDashboard from "./pages/FleetDashboard";
 import Vehicles from "./pages/Vehicles";
 import VehicleDigitalTwin from "./pages/VehicleDigitalTwin";
 import Drivers from "./pages/Drivers";
 import DriverProfile from "./pages/DriverProfile";
-import FleetScenarios from "./pages/FleetScenarios";
 import FinanceHQ from "./pages/FinanceHQ";
 import Invoices from "./pages/Invoices";
 import Expenses from "./pages/Expenses";
 import FinanceReports from "./pages/FinanceReports";
-import EconomicModel from "./pages/EconomicModel";
 import Capital from "./pages/Capital";
-import FleetDirect from "./pages/FleetDirect";
-import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
+// Auth
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -106,11 +101,6 @@ const App = () => (
                 <DriverProfile />
               </DashboardLayout>
             } />
-            <Route path="/fleet/scenarios" element={
-              <DashboardLayout>
-                <FleetScenarios />
-              </DashboardLayout>
-            } />
             <Route path="/finance-hq" element={
               <DashboardLayout>
                 <FinanceHQ />
@@ -131,20 +121,9 @@ const App = () => (
                 <FinanceReports />
               </DashboardLayout>
             } />
-            <Route path="/finance/economic-model" element={<EconomicModel />} />
             <Route path="/capital" element={
               <DashboardLayout>
                 <Capital />
-              </DashboardLayout>
-            } />
-            <Route path="/fleetdirect" element={
-              <DashboardLayout>
-                <FleetDirect />
-              </DashboardLayout>
-            } />
-            <Route path="/reports" element={
-              <DashboardLayout>
-                <Reports />
               </DashboardLayout>
             } />
             <Route path="/settings/:section?" element={

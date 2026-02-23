@@ -140,16 +140,31 @@ export function LeftNav() {
   };
 
   return (
-    <Sidebar className="border-r-0 bg-sidebar-background mt-16" style={{ "--sidebar-width": "14rem" } as React.CSSProperties}>
-      <SidebarContent>
+    <Sidebar className="border-r-0 bg-[#0F172A]" style={{ "--sidebar-width": "240px" } as React.CSSProperties}>
+      <SidebarContent className="bg-[#0F172A]">
+        {/* TruckWys Logo at Top */}
+        <div className="p-6 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <img
+              src="/favicon.png"
+              alt="TruckWys"
+              className="w-8 h-8"
+            />
+            {!collapsed && (
+              <span className="text-white font-semibold text-lg">TruckWys</span>
+            )}
+          </div>
+        </div>
+
         {/* Navigation Menu */}
-        <SidebarGroup className="py-4 px-6">
+        <SidebarGroup className="py-4 px-3">
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {NAVIGATION_ITEMS.map((item) => {
                 const IconComponent = iconMap[item.icon as keyof typeof iconMap];
                 const hasChildren = 'children' in item;
                 const isExpanded = expandedMenu === item.id;
+                const isItemActive = isParentActive(item);
 
                 return (
                   <div key={item.id}>
@@ -158,12 +173,15 @@ export function LeftNav() {
                         <div
                           onClick={() => handleMenuClick(item.id)}
                           className={cn(
-                            getParentClassName(item),
-                            "flex items-center justify-between cursor-pointer rounded-md px-2 py-2"
+                            "flex items-center justify-between cursor-pointer rounded-md px-3 py-2.5 text-sm transition-all",
+                            "border-l-3 border-transparent",
+                            isItemActive
+                              ? "bg-[#1E293B] text-white border-l-[#2563EB] border-l-3"
+                              : "text-[#94A3B8] hover:bg-[#1E293B]/50 hover:text-white"
                           )}
                         >
-                          <div className="flex items-center">
-                            <IconComponent className="w-5 h-5 mr-3 flex-shrink-0" />
+                          <div className="flex items-center gap-3">
+                            <IconComponent className="w-5 h-5 flex-shrink-0" />
                             {!collapsed && (
                               <span className="truncate flex-1">{item.label}</span>
                             )}
@@ -177,12 +195,18 @@ export function LeftNav() {
                           )}
                         </div>
                       ) : (
-                        <SidebarMenuButton asChild>
+                        <SidebarMenuButton asChild className="h-auto p-0">
                           <NavLink
                             to={'href' in item ? item.href : '#'}
-                            className={getNavClassName('href' in item ? item.href : '#')}
+                            className={cn(
+                              "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-all",
+                              "border-l-3 border-transparent",
+                              isActive('href' in item ? item.href : '#')
+                                ? "bg-[#1E293B] text-white border-l-[#2563EB] border-l-3"
+                                : "text-[#94A3B8] hover:bg-[#1E293B]/50 hover:text-white"
+                            )}
                           >
-                            <IconComponent className="w-5 h-5 mr-3 flex-shrink-0" />
+                            <IconComponent className="w-5 h-5 flex-shrink-0" />
                             {!collapsed && (
                               <span className="truncate">{item.label}</span>
                             )}
@@ -193,16 +217,16 @@ export function LeftNav() {
 
                     {/* Sub-menu */}
                     {hasChildren && isExpanded && !collapsed && (
-                      <div className="ml-8 mt-2 space-y-1">
+                      <div className="ml-11 mt-1 space-y-0.5">
                         {'children' in item && item.children.map((child) => (
-                          <div key={child.id} className="py-1">
+                          <div key={child.id}>
                             <NavLink
                               to={child.href}
                               className={cn(
-                                "flex items-center px-2 py-2 text-sm rounded-md transition-smooth",
+                                "flex items-center px-3 py-2 text-sm rounded-md transition-all",
                                 isActive(child.href)
-                                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                                  ? "bg-[#1E293B] text-white font-medium"
+                                  : "text-[#94A3B8] hover:bg-[#1E293B]/50 hover:text-white"
                               )}
                             >
                               <span className="truncate">{child.label}</span>
@@ -219,36 +243,36 @@ export function LeftNav() {
         </SidebarGroup>
 
         {/* User Info Footer */}
-        <div className="mt-auto p-4 border-t border-sidebar-border">
+        <div className="mt-auto p-4 border-t border-slate-800">
           {(() => {
             const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "US";
 
             return (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-3 w-full hover:bg-sidebar-accent/50 p-2 rounded-lg transition-smooth text-left">
-                    <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center shrink-0">
+                  <button className="flex items-center gap-3 w-full hover:bg-[#1E293B]/50 p-2 rounded-lg transition-all text-left">
+                    <div className="w-8 h-8 bg-[#2563EB] rounded-full flex items-center justify-center shrink-0">
                       <span className="text-xs font-medium text-white">{initials}</span>
                     </div>
                     {!collapsed && (
                       <div className="min-w-0 flex-1">
-                        <div className="text-caption font-body-medium text-sidebar-foreground truncate capitalize">
+                        <div className="text-sm font-medium text-white truncate capitalize">
                           {user?.username || "User"}
                         </div>
-                        <div className="text-xs text-muted-foreground truncate">
+                        <div className="text-xs text-[#94A3B8] truncate">
                           {user?.role || "Profile"}
                         </div>
                       </div>
                     )}
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-full bg-sidebar-background border-sidebar-border">
-                  <DropdownMenuItem className="cursor-pointer hover:bg-sidebar-accent" onClick={() => window.location.href = '/settings/profile'}>
+                <DropdownMenuContent align="end" className="w-56 bg-white border-slate-200">
+                  <DropdownMenuItem className="cursor-pointer hover:bg-slate-100" onClick={() => window.location.href = '/settings/profile'}>
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>View Profile</span>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-sidebar-border" />
-                  <DropdownMenuItem className="cursor-pointer text-destructive hover:bg-destructive/10" onClick={handleLogout}>
+                  <DropdownMenuSeparator className="bg-slate-200" />
+                  <DropdownMenuItem className="cursor-pointer text-red-600 hover:bg-red-50" onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
                   </DropdownMenuItem>

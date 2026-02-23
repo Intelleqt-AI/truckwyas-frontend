@@ -1,9 +1,9 @@
 // Truckwys Application Constants
 
 export const APP_CONFIG = {
-  name: 'Truckwys',
-  version: '1.0.0',
-  description: 'AI-Powered Logistics Operations Platform'
+  name: 'TruckWys',
+  version: '3.0.0',
+  description: 'World-Class AI Financial & Logistics Platform'
 } as const;
 
 // Navigation types
@@ -42,41 +42,14 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: 'FileText',
     children: [
       {
-        id: 'bookings-overview',
-        label: 'Overview',
-        href: '/bookings'
-      },
-      {
         id: 'bookings-pipeline',
         label: 'Pipeline',
         href: '/bookings/pipeline'
-      }
-    ]
-  },
-  {
-    id: 'fleet',
-    label: 'Fleet',
-    icon: 'Truck',
-    children: [
-      {
-        id: 'dashboard',
-        label: 'Dashboard',
-        href: '/fleet'
       },
       {
-        id: 'vehicles',
-        label: 'Vehicles',
-        href: '/fleet/vehicles'
-      },
-      {
-        id: 'drivers',
-        label: 'Drivers',
-        href: '/fleet/drivers'
-      },
-      {
-        id: 'scenarios',
-        label: 'Scenarios',
-        href: '/fleet/scenarios'
+        id: 'bookings-orders',
+        label: 'Orders',
+        href: '/bookings'
       }
     ]
   },
@@ -85,11 +58,6 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: 'Finance',
     icon: 'Building2',
     children: [
-      {
-        id: 'finance-overview',
-        label: 'Overview',
-        href: '/finance-hq'
-      },
       {
         id: 'invoices',
         label: 'Invoices',
@@ -104,11 +72,6 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
         id: 'reports',
         label: 'Reports',
         href: '/finance/reports'
-      },
-      {
-        id: 'economic-model',
-        label: 'Economic Model',
-        href: '/finance/economic-model'
       }
     ]
   },
@@ -119,6 +82,23 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: 'Banknote'
   },
   {
+    id: 'fleet',
+    label: 'Fleet',
+    icon: 'Truck',
+    children: [
+      {
+        id: 'vehicles',
+        label: 'Vehicles',
+        href: '/fleet/vehicles'
+      },
+      {
+        id: 'drivers',
+        label: 'Drivers',
+        href: '/fleet/drivers'
+      }
+    ]
+  },
+  {
     id: 'settings',
     label: 'Settings',
     href: '/settings',
@@ -126,16 +106,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   }
 ] as const;
 
-export const MOCK_DATA_ENDPOINTS = {
-  quotes: '/mocks/quotes.json',
-  lanes: '/mocks/lanes.json',
-  trips: '/mocks/trips.json',
-  invoices: '/mocks/invoices.json',
-  finance: '/mocks/finance.json',
-  border: '/mocks/border.json',
-  fuel: '/mocks/fuel.json',
-  loads: '/mocks/loads.json'
-} as const;
+// Removed MOCK_DATA_ENDPOINTS - use API calls via useFetch/usePost hooks
 
 export const STATUS_COLOURS = {
   success: 'hsl(var(--success))',

@@ -23,11 +23,11 @@ export default {
 				'18': 'repeat(18, minmax(0, 1fr))',
 				'30': 'repeat(30, minmax(0, 1fr))'
 			},
-			/* Typography - Inter system for professional logistics platform */
+			/* Typography - Mercury-inspired system */
 			fontFamily: {
-				'display': ['Inter Tight', 'sans-serif'], // H1, H2
+				'display': ['Inter', 'sans-serif'],        // Headings
 				'body': ['Inter', 'sans-serif'],           // Body text
-				'mono': ['ui-monospace', 'SFMono-Regular', 'Consolas', 'monospace']
+				'mono': ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Consolas', 'monospace']
 			},
 			fontWeight: {
 				'display-bold': '700',    // H1

@@ -128,3 +128,57 @@ export const METRIC_FORMATS = {
   weight: 'tonnes',
   volume: 'litres'
 } as const;
+
+// Invoice Status Configuration
+export const INVOICE_STATUS = {
+  DRAFT: 'DRAFT',
+  SENT: 'SENT',
+  PAID: 'PAID',
+  OVERDUE: 'OVERDUE',
+  PARTIALLY_PAID: 'PARTIALLY_PAID',
+  CANCELLED: 'CANCELLED'
+} as const;
+
+export const INVOICE_STATUS_COLORS = {
+  DRAFT: { bg: '#94A3B8', text: '#FFFFFF' },
+  SENT: { bg: '#2563EB', text: '#FFFFFF' },
+  PAID: { bg: '#10B981', text: '#FFFFFF' },
+  OVERDUE: { bg: '#EF4444', text: '#FFFFFF' },
+  PARTIALLY_PAID: { bg: '#F59E0B', text: '#FFFFFF' },
+  CANCELLED: { bg: '#64748B', text: '#FFFFFF' }
+} as const;
+
+// Expense Status Configuration
+export const EXPENSE_STATUS = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED'
+} as const;
+
+// Expense Category Configuration
+export const EXPENSE_CATEGORIES = {
+  FUEL: { label: 'Fuel', icon: '⛽', color: '#F59E0B' },
+  TOLLS: { label: 'Tolls', icon: '🛣️', color: '#2563EB' },
+  MAINTENANCE: { label: 'Maintenance', icon: '🔧', color: '#EF4444' },
+  DRIVER: { label: 'Driver', icon: '👤', color: '#10B981' },
+  INSURANCE: { label: 'Insurance', icon: '🛡️', color: '#8B5CF6' },
+  OVERHEAD: { label: 'Overhead', icon: '📋', color: '#64748B' }
+} as const;
+
+// Currency Formatter Utility
+export const formatZAR = (amount: number, showPrefix = true): string => {
+  const formatted = amount.toLocaleString('en-ZA', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return showPrefix ? `R ${formatted}` : formatted;
+};
+
+// Date Age Calculator
+export const calculateDaysAge = (date: string): number => {
+  const targetDate = new Date(date);
+  const today = new Date();
+  const diffTime = Math.abs(today.getTime() - targetDate.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+};

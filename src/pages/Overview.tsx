@@ -75,17 +75,7 @@ export default function Overview() {
     day: 'numeric'
   });
 
-  // Brief loading — but don't block forever on API error
-  if (isLoading && !dashboardError) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-sm text-slate-500">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+  // Don't block rendering — show page with defaults if API is slow/failing
 
   // Create empty state data if API returns nothing
   const safeData: DashboardData = dashboardData || {

@@ -35,6 +35,7 @@ import {
 import { NAVIGATION_ITEMS, type NavigationItem } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { usePost } from "@/hooks/usePost";
+import useFetch from "@/hooks/useFetch";
 
 const iconMap = {
   LayoutDashboard,
@@ -52,6 +53,12 @@ export function LeftNav() {
   const collapsed = state === 'collapsed';
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+
+  // Fetch eligible invoice count for Capital badge
+  const { data: capitalData } = useFetch<{ eligible_invoices_count: number }>(
+    '/api/v1/dashboard/capital/',
+    { refetchInterval: 60000 } // Refresh every minute
+  );
 
   useEffect(() => {
     const loadUser = () => {
@@ -166,6 +173,9 @@ export function LeftNav() {
                 const isExpanded = expandedMenu === item.id;
                 const isItemActive = isParentActive(item);
 
+                const eligibleCount = item.id === 'capital' && capitalData?.eligible_invoices_count ? capitalData.eligible_invoices_count : 0;
+                const showBadge = item.id === 'capital' && eligibleCount > 0;
+
                 return (
                   <div key={item.id}>
                     <SidebarMenuItem>
@@ -199,16 +209,23 @@ export function LeftNav() {
                           <NavLink
                             to={'href' in item ? item.href : '#'}
                             className={cn(
-                              "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-all",
+                              "flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-sm transition-all",
                               "border-l-3 border-transparent",
                               isActive('href' in item ? item.href : '#')
                                 ? "bg-[#1E293B] text-white border-l-[#2563EB] border-l-3"
                                 : "text-[#94A3B8] hover:bg-[#1E293B]/50 hover:text-white"
                             )}
                           >
-                            <IconComponent className="w-5 h-5 flex-shrink-0" />
-                            {!collapsed && (
-                              <span className="truncate">{item.label}</span>
+                            <div className="flex items-center gap-3">
+                              <IconComponent className="w-5 h-5 flex-shrink-0" />
+                              {!collapsed && (
+                                <span className="truncate">{item.label}</span>
+                              )}
+                            </div>
+                            {!collapsed && showBadge && (
+                              <span className="flex items-center justify-center w-5 h-5 bg-[#2563EB] text-white text-xs font-bold rounded-full">
+                                {eligibleCount}
+                              </span>
                             )}
                           </NavLink>
                         </SidebarMenuButton>

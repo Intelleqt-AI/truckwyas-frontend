@@ -23,6 +23,8 @@ import CreateInvoice from "./pages/CreateInvoice";
 import Expenses from "./pages/Expenses";
 import FinanceReports from "./pages/FinanceReports";
 import Capital from "./pages/Capital";
+import AdvanceRequest from "./pages/AdvanceRequest";
+import AdvanceDetail from "./pages/AdvanceDetail";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -137,6 +139,16 @@ const App = () => (
             <Route path="/capital" element={
               <DashboardLayout>
                 <Capital />
+              </DashboardLayout>
+            } />
+            <Route path="/capital/request" element={
+              <DashboardLayout>
+                <AdvanceRequest />
+              </DashboardLayout>
+            } />
+            <Route path="/capital/advances/:id" element={
+              <DashboardLayout>
+                <AdvanceDetail />
               </DashboardLayout>
             } />
             <Route path="/settings/:section?" element={

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Zap, CheckCircle, AlertCircle, Settings, ExternalLink } from "lucide-react";
+import { Zap, CheckCircle, AlertCircle, Settings, ExternalLink, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 interface Integration {
@@ -83,13 +84,14 @@ const integrations: Integration[] = [
 ];
 
 export function IntegrationsSettings() {
+  const navigate = useNavigate();
   const [integrationsList, setIntegrationsList] = useState(integrations);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const categories = ['all', ...Array.from(new Set(integrations.map(i => i.category)))];
 
-  const filteredIntegrations = selectedCategory === 'all' 
-    ? integrationsList 
+  const filteredIntegrations = selectedCategory === 'all'
+    ? integrationsList
     : integrationsList.filter(i => i.category === selectedCategory);
 
   const getStatusColor = (status: string) => {
@@ -242,93 +244,179 @@ export function IntegrationsSettings() {
         </Card>
       </div>
 
-      {/* Integrations Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredIntegrations.slice(0, 6).map((integration) => (
-          <Card key={integration.id} className="relative">
+      {/* Featured Integration Cards - Xero and Fleet Import */}
+      <div>
+        <h3 className="text-base font-semibold text-[#0F172A] mb-3">
+          Featured Integrations
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Xero Integration */}
+          <Card className="border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="text-lg">{integration.logo}</div>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-[#13B5EA] rounded-lg flex items-center justify-center text-2xl">
+                    💼
+                  </div>
                   <div>
-                    <CardTitle className="text-body-medium">{integration.name}</CardTitle>
-                    <Badge variant="outline" className="mt-1 text-xs">
-                      {integration.category}
-                    </Badge>
+                    <CardTitle className="text-base">Xero Accounting</CardTitle>
+                    <p className="text-xs text-[#64748B] mt-0.5">
+                      Sync invoices and payments
+                    </p>
                   </div>
                 </div>
-                <Badge 
-                  variant="outline" 
-                  className={getStatusColor(integration.status)}
-                >
-                  {getStatusIcon(integration.status)}
-                  {integration.status.charAt(0).toUpperCase() + integration.status.slice(1)}
-                </Badge>
               </div>
             </CardHeader>
-            
             <CardContent className="pt-0 space-y-3">
-              <p className="text-caption text-muted-foreground">
-                {integration.description}
+              <p className="text-sm text-[#64748B]">
+                Connect your Xero account to automatically sync invoices and payments between TruckWys and Xero.
               </p>
-
-              {integration.status === 'connected' && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-caption">Enable Integration</span>
-                    <Switch
-                      checked={integration.enabled}
-                      onCheckedChange={() => handleToggle(integration.id)}
-                    />
-                  </div>
-                  
-                  {integration.lastSync && (
-                    <div className="text-caption text-muted-foreground">
-                      Last sync: {integration.lastSync}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex justify-between items-center pt-2 border-t border-border">
-                <div className="flex gap-1">
-                  {integration.status === 'connected' ? (
-                    <>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="gap-1 h-7 px-2"
-                      >
-                        <Settings className="w-3 h-3" />
-                        Config
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleDisconnect(integration.id)}
-                        className="h-7 px-2"
-                      >
-                        Disconnect
-                      </Button>
-                    </>
-                  ) : (
-                    <Button 
-                      size="sm"
-                      onClick={() => handleConnect(integration.id)}
-                      className="h-7 px-3"
-                    >
-                      Connect
-                    </Button>
-                  )}
-                </div>
-                
-                <Button variant="ghost" size="sm" className="gap-1 h-7 px-2">
-                  <ExternalLink className="w-3 h-3" />
-                </Button>
-              </div>
+              <Button
+                onClick={() => navigate("/settings/integrations/xero")}
+                className="w-full bg-[#2563EB] hover:bg-[#1D4ED8]"
+              >
+                Manage Xero Integration
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
             </CardContent>
           </Card>
-        ))}
+
+          {/* Fleet Import */}
+          <Card className="border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-[#F59E0B] rounded-lg flex items-center justify-center text-2xl">
+                    🚛
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Fleet Data Import</CardTitle>
+                    <p className="text-xs text-[#64748B] mt-0.5">
+                      Import trip data from CSV/Excel
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-3">
+              <p className="text-sm text-[#64748B]">
+                Upload CSV or Excel files to bulk import trip data, fuel usage, and other fleet information.
+              </p>
+              <Button
+                onClick={() => navigate("/settings/integrations/fleet")}
+                className="w-full bg-[#2563EB] hover:bg-[#1D4ED8]"
+              >
+                Import Fleet Data
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Integrations Grid */}
+      <div>
+        <h3 className="text-base font-semibold text-[#0F172A] mb-3">
+          All Integrations
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredIntegrations.slice(0, 6).map((integration) => (
+            <Card key={integration.id} className="relative">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="text-lg">{integration.logo}</div>
+                    <div>
+                      <CardTitle className="text-body-medium">{integration.name}</CardTitle>
+                      <Badge variant="outline" className="mt-1 text-xs">
+                        {integration.category}
+                      </Badge>
+                    </div>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={getStatusColor(integration.status)}
+                  >
+                    {getStatusIcon(integration.status)}
+                    {integration.status.charAt(0).toUpperCase() + integration.status.slice(1)}
+                  </Badge>
+                </div>
+              </CardHeader>
+
+              <CardContent className="pt-0 space-y-3">
+                <p className="text-caption text-muted-foreground">
+                  {integration.description}
+                </p>
+
+                {integration.status === 'connected' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-caption">Enable Integration</span>
+                      <Switch
+                        checked={integration.enabled}
+                        onCheckedChange={() => handleToggle(integration.id)}
+                      />
+                    </div>
+
+                    {integration.lastSync && (
+                      <div className="text-caption text-muted-foreground">
+                        Last sync: {integration.lastSync}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-2 border-t border-border">
+                  <div className="flex gap-1">
+                    {integration.status === 'connected' ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 h-7 px-2"
+                          onClick={() => {
+                            if (integration.id === 'xero') {
+                              navigate("/settings/integrations/xero");
+                            }
+                          }}
+                        >
+                          <Settings className="w-3 h-3" />
+                          Config
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDisconnect(integration.id)}
+                          className="h-7 px-2"
+                        >
+                          Disconnect
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          if (integration.id === 'xero') {
+                            navigate("/settings/integrations/xero");
+                          } else {
+                            handleConnect(integration.id);
+                          }
+                        }}
+                        className="h-7 px-3"
+                      >
+                        Connect
+                      </Button>
+                    )}
+                  </div>
+
+                  <Button variant="ghost" size="sm" className="gap-1 h-7 px-2">
+                    <ExternalLink className="w-3 h-3" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       {/* API Keys Section */}

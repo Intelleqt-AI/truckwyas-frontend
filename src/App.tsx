@@ -25,7 +25,10 @@ import FinanceReports from "./pages/FinanceReports";
 import Capital from "./pages/Capital";
 import AdvanceRequest from "./pages/AdvanceRequest";
 import AdvanceDetail from "./pages/AdvanceDetail";
+import Insights from "./pages/Insights";
 import Settings from "./pages/Settings";
+import XeroIntegration from "./pages/settings/XeroIntegration";
+import FleetImport from "./pages/settings/FleetImport";
 import NotFound from "./pages/NotFound";
 
 // Auth
@@ -151,9 +154,24 @@ const App = () => (
                 <AdvanceDetail />
               </DashboardLayout>
             } />
+            <Route path="/insights" element={
+              <DashboardLayout>
+                <Insights />
+              </DashboardLayout>
+            } />
             <Route path="/settings/:section?" element={
               <DashboardLayout>
                 <Settings />
+              </DashboardLayout>
+            } />
+            <Route path="/settings/integrations/xero" element={
+              <DashboardLayout>
+                <XeroIntegration />
+              </DashboardLayout>
+            } />
+            <Route path="/settings/integrations/fleet" element={
+              <DashboardLayout>
+                <FleetImport />
               </DashboardLayout>
             } />
           </Route>

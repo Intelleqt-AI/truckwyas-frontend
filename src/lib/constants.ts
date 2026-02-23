@@ -82,6 +82,12 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: 'Banknote'
   },
   {
+    id: 'insights',
+    label: 'Insights',
+    href: '/insights',
+    icon: 'Sparkles'
+  },
+  {
     id: 'fleet',
     label: 'Fleet',
     icon: 'Truck',

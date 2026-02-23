@@ -1,9 +1,11 @@
-import { TrendingUp, DollarSign, Package, Truck, ArrowUpRight, ArrowDownRight, Activity } from "lucide-react";
+import { TrendingUp, DollarSign, Package, Truck, ArrowUpRight, ArrowDownRight, Activity, Lightbulb, ArrowRight, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { CurrencyDisplay } from "@/components/finance/CurrencyDisplay";
 import useFetch from "@/hooks/useFetch";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface DashboardData {
   total_revenue: number;
@@ -27,11 +29,32 @@ interface DashboardData {
   }>;
 }
 
+interface Insight {
+  id: number;
+  category: "Margin" | "Cash" | "Customer" | "Fleet" | "Pricing";
+  severity: "high" | "medium" | "low";
+  title: string;
+  description: string;
+  suggested_action: string;
+}
+
+interface MiniCashFlow {
+  week: string;
+  net: number;
+}
+
 export default function Overview() {
+  const navigate = useNavigate();
   const [greeting, setGreeting] = useState("Good morning");
   const [user, setUser] = useState<any>(null);
 
   const { data: dashboardData, isLoading } = useFetch<DashboardData>("/api/dashboard/");
+
+  // Fetch top 3 insights
+  const { data: insights } = useFetch<Insight[]>("/api/v1/dashboard/insights/");
+
+  // Fetch mini cash flow for sparkline
+  const { data: miniCashFlow } = useFetch<MiniCashFlow[]>("/api/v1/dashboard/cashflow/mini/");
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -72,6 +95,29 @@ export default function Overview() {
 
   const cashFlowData = dashboardData.cash_flow_data || [];
   const recentActivity = dashboardData.recent_activity || [];
+
+  // Get top 3 insights sorted by severity
+  const topInsights = insights
+    ? [...insights]
+        .sort((a, b) => {
+          const severityOrder = { high: 0, medium: 1, low: 2 };
+          return severityOrder[a.severity] - severityOrder[b.severity];
+        })
+        .slice(0, 3)
+    : [];
+
+  const getSeverityIcon = (severity: string) => {
+    switch (severity) {
+      case "high":
+        return "🔴";
+      case "medium":
+        return "🟡";
+      case "low":
+        return "🟢";
+      default:
+        return "⚪";
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -164,11 +210,93 @@ export default function Overview() {
         </Card>
       </div>
 
+      {/* AI Insights */}
+      {topInsights.length > 0 && (
+        <Card className="p-6 bg-gradient-to-br from-[#EFF6FF] to-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-[#2563EB]" />
+                <h2 className="text-lg font-semibold text-[#0F172A]">AI Insights</h2>
+              </div>
+              <button
+                onClick={() => navigate("/insights")}
+                className="text-sm text-[#2563EB] hover:text-[#1D4ED8] font-medium flex items-center gap-1"
+              >
+                View all
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {topInsights.map((insight) => (
+                <div
+                  key={insight.id}
+                  onClick={() => navigate("/insights")}
+                  className="bg-white rounded-lg p-4 border border-[#E2E8F0] hover:shadow-md transition-shadow cursor-pointer"
+                >
+                  <div className="flex gap-3">
+                    <span className="text-xl flex-shrink-0">
+                      {getSeverityIcon(insight.severity)}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge
+                          variant="outline"
+                          className="text-xs bg-white"
+                        >
+                          {insight.category}
+                        </Badge>
+                      </div>
+                      <h3 className="text-sm font-semibold text-[#0F172A] mb-1">
+                        {insight.title}
+                      </h3>
+                      <p className="text-xs text-[#64748B] line-clamp-2">
+                        {insight.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Cash Flow Chart */}
       {cashFlowData.length > 0 && (
         <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-[#0F172A]">Cash Flow</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-[#0F172A]">Cash Flow</h2>
+              {miniCashFlow && miniCashFlow.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-xs text-[#64748B]">30-day trend</p>
+                  </div>
+                  <div className="w-24 h-8">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={miniCashFlow}>
+                        <defs>
+                          <linearGradient id="miniSparkline" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#2563EB" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <Area
+                          type="monotone"
+                          dataKey="net"
+                          stroke="#2563EB"
+                          strokeWidth={1.5}
+                          fillOpacity={1}
+                          fill="url(#miniSparkline)"
+                          isAnimationActive={false}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+            </div>
             <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={cashFlowData}>
                 <defs>

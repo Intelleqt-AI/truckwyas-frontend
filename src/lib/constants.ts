@@ -54,6 +54,23 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     ]
   },
   {
+    id: 'fleet',
+    label: 'Fleet',
+    icon: 'Truck',
+    children: [
+      {
+        id: 'vehicles',
+        label: 'Vehicles',
+        href: '/fleet/vehicles'
+      },
+      {
+        id: 'drivers',
+        label: 'Drivers',
+        href: '/fleet/drivers'
+      }
+    ]
+  },
+  {
     id: 'finance',
     label: 'Finance',
     icon: 'Building2',
@@ -86,23 +103,6 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: 'Insights',
     href: '/insights',
     icon: 'Sparkles'
-  },
-  {
-    id: 'fleet',
-    label: 'Fleet',
-    icon: 'Truck',
-    children: [
-      {
-        id: 'vehicles',
-        label: 'Vehicles',
-        href: '/fleet/vehicles'
-      },
-      {
-        id: 'drivers',
-        label: 'Drivers',
-        href: '/fleet/drivers'
-      }
-    ]
   },
   {
     id: 'settings',

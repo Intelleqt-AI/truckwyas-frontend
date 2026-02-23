@@ -38,12 +38,12 @@ export default function XeroIntegration() {
 
   // Fetch connection status
   const { data: connection, isLoading } = useFetch<XeroConnection>(
-    "/api/v1/integrations/xero/status/"
+    "/api/integrations/xero/status/"
   );
 
   // Fetch sync log
   const { data: syncLogs } = useFetch<SyncLog[]>(
-    "/api/v1/integrations/xero/sync-log/"
+    "/api/integrations/xero/sync-log/"
   );
 
   // Connect to Xero
@@ -65,7 +65,7 @@ export default function XeroIntegration() {
     onSuccess: () => {
       toast.success("Disconnected from Xero");
       queryClient.invalidateQueries({
-        queryKey: ["/api/v1/integrations/xero/status/"],
+        queryKey: ["/api/integrations/xero/status/"],
       });
     },
     onError: () => {
@@ -79,10 +79,10 @@ export default function XeroIntegration() {
       toast.success("Invoice sync completed successfully");
       setIsSyncing(null);
       queryClient.invalidateQueries({
-        queryKey: ["/api/v1/integrations/xero/status/"],
+        queryKey: ["/api/integrations/xero/status/"],
       });
       queryClient.invalidateQueries({
-        queryKey: ["/api/v1/integrations/xero/sync-log/"],
+        queryKey: ["/api/integrations/xero/sync-log/"],
       });
     },
     onError: () => {
@@ -97,10 +97,10 @@ export default function XeroIntegration() {
       toast.success("Payment sync completed successfully");
       setIsSyncing(null);
       queryClient.invalidateQueries({
-        queryKey: ["/api/v1/integrations/xero/status/"],
+        queryKey: ["/api/integrations/xero/status/"],
       });
       queryClient.invalidateQueries({
-        queryKey: ["/api/v1/integrations/xero/sync-log/"],
+        queryKey: ["/api/integrations/xero/sync-log/"],
       });
     },
     onError: () => {
@@ -110,7 +110,7 @@ export default function XeroIntegration() {
   });
 
   const handleConnect = () => {
-    connectXero({ url: "/api/v1/integrations/xero/connect/", data: {} });
+    connectXero({ url: "/api/integrations/xero/connect/", data: {} });
   };
 
   const handleDisconnect = () => {
@@ -119,18 +119,18 @@ export default function XeroIntegration() {
         "Are you sure you want to disconnect from Xero? This will stop automatic syncing."
       )
     ) {
-      disconnectXero({ url: "/api/v1/integrations/xero/disconnect/", data: {} });
+      disconnectXero({ url: "/api/integrations/xero/disconnect/", data: {} });
     }
   };
 
   const handleSyncInvoices = () => {
     setIsSyncing("invoices");
-    syncInvoices({ url: "/api/v1/integrations/xero/sync-invoices/", data: {} });
+    syncInvoices({ url: "/api/integrations/xero/sync-invoices/", data: {} });
   };
 
   const handleSyncPayments = () => {
     setIsSyncing("payments");
-    syncPayments({ url: "/api/v1/integrations/xero/sync-payments/", data: {} });
+    syncPayments({ url: "/api/integrations/xero/sync-payments/", data: {} });
   };
 
   const formatDate = (dateString?: string) => {

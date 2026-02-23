@@ -48,13 +48,13 @@ export default function Overview() {
   const [greeting, setGreeting] = useState("Good morning");
   const [user, setUser] = useState<any>(null);
 
-  const { data: dashboardData, isLoading } = useFetch<DashboardData>("/api/dashboard/");
+  const { data: dashboardData, isLoading, error: dashboardError } = useFetch<DashboardData>("api/dashboard/finance/");
 
   // Fetch top 3 insights
-  const { data: insights } = useFetch<Insight[]>("/api/v1/dashboard/insights/");
+  const { data: insights } = useFetch<Insight[]>("api/dashboard/insights/");
 
   // Fetch mini cash flow for sparkline
-  const { data: miniCashFlow } = useFetch<MiniCashFlow[]>("/api/v1/dashboard/cashflow/mini/");
+  const { data: miniCashFlow } = useFetch<MiniCashFlow[]>("api/dashboard/cashflow/");
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -75,26 +75,36 @@ export default function Overview() {
     day: 'numeric'
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-[#64748B]">Loading dashboard...</p>
-      </div>
-    );
-  }
-
-  if (!dashboardData) {
+  // Brief loading — but don't block forever on API error
+  if (isLoading && !dashboardError) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <p className="text-[#64748B]">No data available. Start by creating your first booking or invoice.</p>
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-sm text-slate-500">Loading dashboard...</p>
         </div>
       </div>
     );
   }
 
-  const cashFlowData = dashboardData.cash_flow_data || [];
-  const recentActivity = dashboardData.recent_activity || [];
+  // Create empty state data if API returns nothing
+  const safeData: DashboardData = dashboardData || {
+    total_revenue: 0,
+    outstanding_invoices: {
+      count: 0,
+      total_amount: 0,
+      overdue_count: 0,
+    },
+    cash_position: 0,
+    active_loads: 0,
+    revenue_change_percent: 0,
+    cash_position_change_percent: 0,
+    cash_flow_data: [],
+    recent_activity: [],
+  };
+
+  const cashFlowData = safeData.cash_flow_data || [];
+  const recentActivity = safeData.recent_activity || [];
 
   // Get top 3 insights sorted by severity
   const topInsights = insights
@@ -123,53 +133,53 @@ export default function Overview() {
     <div className="space-y-8">
       {/* Welcome Section */}
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold text-[#0F172A]">
+        <h1 className="text-2xl font-semibold text-slate-900">
           {greeting}, {user?.username || "User"}
         </h1>
-        <p className="text-sm text-[#64748B]">{currentDate}</p>
+        <p className="text-sm text-slate-500">{currentDate}</p>
       </div>
 
       {/* KPI Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Revenue (MTD) */}
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
+        <Card className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border-0">
           <div className="space-y-3">
-            <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">Total Revenue (MTD)</p>
-            <p className="text-3xl font-mono font-medium text-[#0F172A]">
-              <CurrencyDisplay amount={dashboardData.total_revenue} />
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Revenue (MTD)</p>
+            <p className="text-3xl font-mono font-semibold text-slate-900">
+              <CurrencyDisplay amount={safeData.total_revenue} />
             </p>
             <div className="flex items-center gap-1 text-sm">
-              {dashboardData.revenue_change_percent >= 0 ? (
-                <ArrowUpRight className="w-4 h-4 text-[#10B981]" />
+              {safeData.revenue_change_percent >= 0 ? (
+                <ArrowUpRight className="w-4 h-4 text-green-600" />
               ) : (
-                <ArrowDownRight className="w-4 h-4 text-[#EF4444]" />
+                <ArrowDownRight className="w-4 h-4 text-red-600" />
               )}
-              <span className={dashboardData.revenue_change_percent >= 0 ? "text-[#10B981] font-medium" : "text-[#EF4444] font-medium"}>
-                {Math.abs(dashboardData.revenue_change_percent).toFixed(1)}%
+              <span className={safeData.revenue_change_percent >= 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                {Math.abs(safeData.revenue_change_percent).toFixed(1)}%
               </span>
-              <span className="text-[#64748B]">vs last month</span>
+              <span className="text-slate-500">vs last month</span>
             </div>
           </div>
         </Card>
 
         {/* Outstanding Invoices */}
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
+        <Card className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border-0">
           <div className="space-y-3">
-            <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">Outstanding Invoices</p>
-            <p className="text-3xl font-mono font-medium text-[#0F172A]">
-              <CurrencyDisplay amount={dashboardData.outstanding_invoices.total_amount} />
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Outstanding Invoices</p>
+            <p className="text-3xl font-mono font-semibold text-slate-900">
+              <CurrencyDisplay amount={safeData.outstanding_invoices.total_amount} />
             </p>
             <div className="flex items-center gap-1 text-sm">
-              {dashboardData.outstanding_invoices.overdue_count > 0 ? (
+              {safeData.outstanding_invoices.overdue_count > 0 ? (
                 <>
-                  <ArrowDownRight className="w-4 h-4 text-[#EF4444]" />
-                  <span className="text-[#EF4444] font-medium">
-                    {dashboardData.outstanding_invoices.overdue_count} overdue
+                  <ArrowDownRight className="w-4 h-4 text-red-600" />
+                  <span className="text-red-600 font-medium">
+                    {safeData.outstanding_invoices.overdue_count} overdue
                   </span>
                 </>
               ) : (
-                <span className="text-[#64748B]">
-                  {dashboardData.outstanding_invoices.count} invoices
+                <span className="text-slate-500">
+                  {safeData.outstanding_invoices.count} invoices
                 </span>
               )}
             </div>
@@ -177,34 +187,34 @@ export default function Overview() {
         </Card>
 
         {/* Cash Position */}
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
+        <Card className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border-0">
           <div className="space-y-3">
-            <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">Cash Position</p>
-            <p className="text-3xl font-mono font-medium text-[#0F172A]">
-              <CurrencyDisplay amount={dashboardData.cash_position} />
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Cash Position</p>
+            <p className="text-3xl font-mono font-semibold text-slate-900">
+              <CurrencyDisplay amount={safeData.cash_position} />
             </p>
             <div className="flex items-center gap-1 text-sm">
-              {dashboardData.cash_position_change_percent >= 0 ? (
-                <ArrowUpRight className="w-4 h-4 text-[#10B981]" />
+              {safeData.cash_position_change_percent >= 0 ? (
+                <ArrowUpRight className="w-4 h-4 text-green-600" />
               ) : (
-                <ArrowDownRight className="w-4 h-4 text-[#EF4444]" />
+                <ArrowDownRight className="w-4 h-4 text-red-600" />
               )}
-              <span className={dashboardData.cash_position_change_percent >= 0 ? "text-[#10B981] font-medium" : "text-[#EF4444] font-medium"}>
-                {Math.abs(dashboardData.cash_position_change_percent).toFixed(1)}%
+              <span className={safeData.cash_position_change_percent >= 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                {Math.abs(safeData.cash_position_change_percent).toFixed(1)}%
               </span>
-              <span className="text-[#64748B]">vs last month</span>
+              <span className="text-slate-500">vs last month</span>
             </div>
           </div>
         </Card>
 
         {/* Active Loads */}
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
+        <Card className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border-0">
           <div className="space-y-3">
-            <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">Active Loads</p>
-            <p className="text-3xl font-mono font-medium text-[#0F172A]">{dashboardData.active_loads}</p>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Active Loads</p>
+            <p className="text-3xl font-mono font-semibold text-slate-900">{safeData.active_loads}</p>
             <div className="flex items-center gap-1 text-sm">
-              <Activity className="w-4 h-4 text-[#2563EB]" />
-              <span className="text-[#64748B]">in progress or pending</span>
+              <Activity className="w-4 h-4 text-blue-600" />
+              <span className="text-slate-500">in progress or pending</span>
             </div>
           </div>
         </Card>
@@ -212,16 +222,16 @@ export default function Overview() {
 
       {/* AI Insights */}
       {topInsights.length > 0 && (
-        <Card className="p-6 bg-gradient-to-br from-[#EFF6FF] to-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <Card className="p-6 bg-gradient-to-br from-blue-50 to-white rounded-xl shadow-sm border-0">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-[#2563EB]" />
-                <h2 className="text-lg font-semibold text-[#0F172A]">AI Insights</h2>
+                <Sparkles className="w-5 h-5 text-blue-600" />
+                <h2 className="text-lg font-semibold text-slate-900">AI Insights</h2>
               </div>
               <button
                 onClick={() => navigate("/insights")}
-                className="text-sm text-[#2563EB] hover:text-[#1D4ED8] font-medium flex items-center gap-1"
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
               >
                 View all
                 <ArrowRight className="w-4 h-4" />
@@ -232,7 +242,7 @@ export default function Overview() {
                 <div
                   key={insight.id}
                   onClick={() => navigate("/insights")}
-                  className="bg-white rounded-lg p-4 border border-[#E2E8F0] hover:shadow-md transition-shadow cursor-pointer"
+                  className="bg-white rounded-lg p-4 border border-slate-100 hover:shadow-md transition-shadow cursor-pointer"
                 >
                   <div className="flex gap-3">
                     <span className="text-xl flex-shrink-0">
@@ -247,10 +257,10 @@ export default function Overview() {
                           {insight.category}
                         </Badge>
                       </div>
-                      <h3 className="text-sm font-semibold text-[#0F172A] mb-1">
+                      <h3 className="text-sm font-semibold text-slate-900 mb-1">
                         {insight.title}
                       </h3>
-                      <p className="text-xs text-[#64748B] line-clamp-2">
+                      <p className="text-xs text-slate-500 line-clamp-2">
                         {insight.description}
                       </p>
                     </div>
@@ -264,14 +274,14 @@ export default function Overview() {
 
       {/* Cash Flow Chart */}
       {cashFlowData.length > 0 && (
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <Card className="p-6 bg-white rounded-xl shadow-sm border-0">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[#0F172A]">Cash Flow</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Cash Flow</h2>
               {miniCashFlow && miniCashFlow.length > 0 && (
                 <div className="flex items-center gap-3">
                   <div className="text-right">
-                    <p className="text-xs text-[#64748B]">30-day trend</p>
+                    <p className="text-xs text-slate-500">30-day trend</p>
                   </div>
                   <div className="w-24 h-8">
                     <ResponsiveContainer width="100%" height="100%">
@@ -305,13 +315,13 @@ export default function Overview() {
                     <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="month" stroke="#94A3B8" style={{ fontSize: '12px' }} />
                 <YAxis stroke="#94A3B8" style={{ fontSize: '12px' }} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: 'white',
-                    border: '1px solid #E2E8F0',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '8px',
                     fontSize: '12px'
                   }}
@@ -331,24 +341,28 @@ export default function Overview() {
       )}
 
       {/* Recent Activity */}
-      <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <h2 className="text-lg font-semibold text-[#0F172A] mb-4">Recent Activity</h2>
+      <Card className="p-6 bg-white rounded-xl shadow-sm border-0">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Recent Activity</h2>
         <div className="space-y-4">
           {recentActivity.length === 0 ? (
-            <p className="text-sm text-[#64748B] text-center py-8">No recent activity</p>
+            <div className="flex flex-col items-center justify-center py-12">
+              <Activity className="w-12 h-12 text-slate-300 mb-4" />
+              <p className="text-lg font-medium text-slate-700">No activity yet</p>
+              <p className="text-sm text-slate-500 mt-1">Activity will appear here as you use the platform</p>
+            </div>
           ) : (
             recentActivity.map((item) => (
-              <div key={item.id} className="flex items-start gap-3 pb-4 border-b border-[#F1F5F9] last:border-0 last:pb-0">
-                <div className="w-2 h-2 rounded-full bg-[#2563EB] mt-2 flex-shrink-0" />
+              <div key={item.id} className="flex items-start gap-3 pb-4 border-b border-slate-50 last:border-0 last:pb-0">
+                <div className="w-2 h-2 rounded-full bg-blue-600 mt-2 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#0F172A]">{item.description}</p>
+                  <p className="text-sm font-medium text-slate-900">{item.description}</p>
                   {item.amount && (
-                    <p className="text-sm font-mono text-[#64748B] mt-0.5">{item.amount}</p>
+                    <p className="text-sm font-mono text-slate-500 mt-0.5">{item.amount}</p>
                   )}
                   {item.customer && (
-                    <p className="text-sm text-[#64748B] mt-0.5">{item.customer}</p>
+                    <p className="text-sm text-slate-500 mt-0.5">{item.customer}</p>
                   )}
-                  <p className="text-xs text-[#94A3B8] mt-1">{item.time}</p>
+                  <p className="text-xs text-slate-400 mt-1">{item.time}</p>
                 </div>
               </div>
             ))

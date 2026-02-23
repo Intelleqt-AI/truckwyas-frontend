@@ -35,12 +35,15 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-dashboard-bg p-4">
-      <Card className="w-full max-w-md border-border/50 shadow-modal">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Sign in</CardTitle>
-          <CardDescription className="text-center">
-            Enter your username and password to access your account
+    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ backgroundColor: '#FAFAFA' }}>
+      <div className="mb-8">
+        <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" className="h-10 w-auto" />
+      </div>
+      <Card className="w-full max-w-md bg-white rounded-xl shadow-lg border border-slate-100">
+        <CardHeader className="space-y-1 pb-4">
+          <CardTitle className="text-xl font-semibold text-center text-slate-900">Sign in to your account</CardTitle>
+          <CardDescription className="text-center text-slate-500">
+            Enter your credentials to access the dashboard
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -76,7 +79,7 @@ const Login = () => {
                 onChange={handleChange}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isPending}>
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-11 text-sm font-medium" disabled={isPending}>
               {isPending ? "Signing in..." : "Sign in"}
             </Button>
           </form>

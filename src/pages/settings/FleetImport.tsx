@@ -44,7 +44,7 @@ export default function FleetImport() {
 
   // Fetch import history
   const { data: importHistory, isLoading } = useFetch<ImportHistory[]>(
-    "/api/v1/integrations/fleet/import-history/"
+    "/api/integrations/fleet/import-history/"
   );
 
   // Upload file
@@ -56,7 +56,7 @@ export default function FleetImport() {
       setPreviewData(null);
       setColumnMapping({});
       queryClient.invalidateQueries({
-        queryKey: ["/api/v1/integrations/fleet/import-history/"],
+        queryKey: ["/api/integrations/fleet/import-history/"],
       });
     },
     onError: (error: any) => {
@@ -167,7 +167,7 @@ export default function FleetImport() {
     // Note: usePost with FormData requires special handling
     // For now, using the pattern - backend will handle multipart/form-data
     uploadFile({
-      url: "/api/v1/integrations/fleet/import/",
+      url: "/api/integrations/fleet/import/",
       data: formData,
       config: {
         headers: {

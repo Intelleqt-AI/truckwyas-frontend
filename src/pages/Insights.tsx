@@ -58,19 +58,19 @@ export default function Insights() {
 
   // Fetch insights
   const { data: insights, isLoading: insightsLoading } = useFetch<Insight[]>(
-    "/api/v1/dashboard/insights/"
+    "/api/dashboard/insights/"
   );
 
   // Fetch cash flow forecast
   const { data: cashFlow, isLoading: cashFlowLoading } =
-    useFetch<CashFlowForecast>("/api/v1/dashboard/cashflow/");
+    useFetch<CashFlowForecast>("/api/dashboard/cashflow/");
 
   // Refresh insights
   const { mutate: refreshInsights, isPending: isRefreshing } = usePost({
     onSuccess: () => {
       toast.success("Insights refreshed successfully");
       queryClient.invalidateQueries({
-        queryKey: ["/api/v1/dashboard/insights/"],
+        queryKey: ["/api/dashboard/insights/"],
       });
     },
     onError: () => {
@@ -80,7 +80,7 @@ export default function Insights() {
 
   const handleRefresh = () => {
     refreshInsights({
-      url: "/api/v1/dashboard/insights/refresh/",
+      url: "/api/dashboard/insights/refresh/",
       data: {},
     });
   };

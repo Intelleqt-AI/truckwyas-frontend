@@ -58,7 +58,7 @@ export function LeftNav() {
 
   // Fetch eligible invoice count for Capital badge
   const { data: capitalData } = useFetch<{ eligible_invoices_count: number }>(
-    '/api/v1/dashboard/capital/',
+    '/api/dashboard/',
     { refetchInterval: 60000 } // Refresh every minute
   );
 
@@ -153,14 +153,19 @@ export function LeftNav() {
       <SidebarContent className="bg-[#0F172A]">
         {/* TruckWys Logo at Top */}
         <div className="p-6 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <img
-              src="/favicon.png"
-              alt="TruckWys"
-              className="w-8 h-8"
-            />
-            {!collapsed && (
-              <span className="text-white font-semibold text-lg">TruckWys</span>
+          <div className="flex items-center justify-center">
+            {!collapsed ? (
+              <img
+                src="/brand/truckwys-logo-transparent.png"
+                alt="TruckWys"
+                className="h-8 w-auto"
+              />
+            ) : (
+              <img
+                src="/favicon.png"
+                alt="TruckWys"
+                className="w-8 h-8"
+              />
             )}
           </div>
         </div>

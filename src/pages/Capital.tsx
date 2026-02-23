@@ -61,7 +61,7 @@ export default function Capital() {
   const navigate = useNavigate();
 
   const { data, isLoading, error } = useFetch<CapitalDashboard>(
-    '/api/v1/dashboard/capital/'
+    '/api/dashboard/'
   );
 
   if (isLoading) {

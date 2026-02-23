@@ -44,7 +44,7 @@ export default function AdvanceRequest() {
 
   // Fetch eligible invoices
   const { data: invoices, isLoading: loadingInvoices } = useFetch<EligibleInvoice[]>(
-    '/api/v1/invoices/?early_pay_eligible=true'
+    '/api/invoices/?early_pay_eligible=true'
   );
 
   // Risk score mutation
@@ -89,7 +89,7 @@ export default function AdvanceRequest() {
   const handleGetRiskScore = () => {
     if (!selectedInvoiceId) return;
     scoreInvoice({
-      url: '/api/v1/risk/score/',
+      url: '/api/risk/score/',
       data: { invoice_id: selectedInvoiceId }
     });
   };
@@ -97,7 +97,7 @@ export default function AdvanceRequest() {
   const handleConfirmRequest = () => {
     if (!selectedInvoiceId) return;
     requestAdvance({
-      url: '/api/v1/advances/',
+      url: '/api/advances/',
       data: { invoice_id: selectedInvoiceId }
     });
   };

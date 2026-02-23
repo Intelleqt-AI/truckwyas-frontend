@@ -74,7 +74,7 @@ export default function AdvanceDetail() {
   const { id } = useParams<{ id: string }>();
 
   const { data, isLoading, error } = useFetch<AdvanceDetail>(
-    `/api/v1/advances/${id}/`
+    `/api/advances/${id}/`
   );
 
   if (isLoading) {

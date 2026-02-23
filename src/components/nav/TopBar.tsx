@@ -161,14 +161,7 @@ export function TopBar() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* User Avatar */}
-          <Button variant="ghost" size="icon" className="relative hover:bg-slate-100 rounded-full w-9 h-9">
-            <div className="w-8 h-8 bg-[#2563EB] rounded-full flex items-center justify-center">
-              <span className="text-xs font-medium text-white">
-                {user?.username ? user.username.substring(0, 2).toUpperCase() : "US"}
-              </span>
-            </div>
-          </Button>
+          {/* User avatar removed — user actions are in sidebar footer */}
         </div>
       </header>
     </>

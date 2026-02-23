@@ -7,7 +7,8 @@ interface CurrencyDisplayProps {
 }
 
 export function CurrencyDisplay({ amount, className, showPrefix = true }: CurrencyDisplayProps) {
-  const formatted = amount.toLocaleString('en-ZA', {
+  const safeAmount = amount ?? 0;
+  const formatted = safeAmount.toLocaleString('en-ZA', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -21,7 +22,8 @@ export function CurrencyDisplay({ amount, className, showPrefix = true }: Curren
 }
 
 export function formatCurrency(amount: number, showPrefix = true): string {
-  const formatted = amount.toLocaleString('en-ZA', {
+  const safeAmount = amount ?? 0;
+  const formatted = safeAmount.toLocaleString('en-ZA', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });

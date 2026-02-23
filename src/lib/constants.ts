@@ -31,8 +31,8 @@ export type NavigationItem = NavigationParent | NavigationLink;
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
   {
-    id: 'overview',
-    label: 'Overview',
+    id: 'home',
+    label: 'Home',
     href: '/',
     icon: 'LayoutDashboard'
   },

@@ -1,123 +1,280 @@
-import { TrendingUp, DollarSign, Package, Truck, ArrowUpRight, ArrowDownRight, Activity, Lightbulb, ArrowRight, Sparkles } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { CurrencyDisplay } from "@/components/finance/CurrencyDisplay";
-import useFetch from "@/hooks/useFetch";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+/**
+ * TruckWys V3 - Overview/Command Center
+ *
+ * NOT a generic dashboard. A COMMAND CENTER for fleet operators managing cash flow.
+ * Shows: Cash position strip, AI signal cards, portfolio health, cash flow forecast, activity feed
+ */
 
-interface DashboardData {
-  total_revenue: number;
-  outstanding_invoices: {
-    count: number;
-    total_amount: number;
-    overdue_count: number;
-  };
-  cash_position: number;
-  active_loads: number;
-  revenue_change_percent: number;
-  cash_position_change_percent: number;
-  cash_flow_data: Array<{ month: string; value: number }>;
-  recent_activity: Array<{
-    id: number;
-    type: string;
-    description: string;
-    amount?: string;
-    customer?: string;
-    time: string;
-  }>;
-}
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  TrendingUp,
+  TrendingDown,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  DollarSign,
+  FileText,
+  ArrowRight,
+  Activity,
+} from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { getPortfolioSummary, allInvoices, operators, currentMacroData } from '@/mocks/risk-mock-data';
 
-interface Insight {
-  id: number;
-  category: "Margin" | "Cash" | "Customer" | "Fleet" | "Pricing";
-  severity: "high" | "medium" | "low";
+// ==========================
+// TYPES
+// ==========================
+
+interface Signal {
+  id: string;
+  severity: 'critical' | 'warning' | 'opportunity' | 'info';
+  category: 'Cash' | 'Risk' | 'Opportunity' | 'Network';
   title: string;
   description: string;
-  suggested_action: string;
+  amount?: number;
+  actionLabel?: string;
+  actionPath?: string;
 }
 
-interface MiniCashFlow {
-  week: string;
+interface CashFlowDataPoint {
+  date: string;
+  confirmed: number;
+  predicted: number;
+  expenses: number;
   net: number;
 }
 
+interface ActivityItem {
+  id: string;
+  timestamp: Date;
+  type: 'invoice_generated' | 'advance_requested' | 'payment_received' | 'alert_triggered';
+  description: string;
+  amount?: number;
+  status?: 'success' | 'pending' | 'warning';
+}
+
+// ==========================
+// MOCK DATA GENERATORS
+// ==========================
+
+function generateCashFlowForecast(): CashFlowDataPoint[] {
+  const data: CashFlowDataPoint[] = [];
+  const startDate = new Date();
+
+  for (let i = 0; i < 90; i += 7) {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + i);
+
+    const confirmed = 250000 + Math.random() * 150000;
+    const predicted = 180000 + Math.random() * 120000;
+    const expenses = 200000 + Math.random() * 80000;
+    const net = confirmed + predicted - expenses;
+
+    data.push({
+      date: date.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }),
+      confirmed,
+      predicted,
+      expenses,
+      net,
+    });
+  }
+
+  return data;
+}
+
+function generateSignals(): Signal[] {
+  const portfolio = getPortfolioSummary();
+  const eligibleInvoices = allInvoices.filter((inv) => inv.riskScore.isEligible);
+  const overdueInvoices = allInvoices.filter(
+    (inv) => inv.invoice.daysUntilDue < 0 && inv.riskScore.isEligible
+  );
+
+  const totalEligibleAmount = eligibleInvoices.reduce((sum, inv) => sum + inv.invoice.amount, 0);
+  const avgFee =
+    eligibleInvoices.reduce((sum, inv) => sum + inv.riskScore.finalFeePercent, 0) / eligibleInvoices.length;
+
+  const signals: Signal[] = [];
+
+  // Overdue invoices signal
+  if (overdueInvoices.length > 0) {
+    const overdueAmount = overdueInvoices.reduce((sum, inv) => sum + inv.invoice.amount, 0);
+    signals.push({
+      id: 'overdue',
+      severity: 'critical',
+      category: 'Cash',
+      title: `${overdueInvoices.length} invoices overdue`,
+      description: `R ${(overdueAmount / 1000).toFixed(0)}k at risk — prioritize collections`,
+      amount: overdueAmount,
+      actionLabel: 'View overdue',
+      actionPath: '/finance/invoices?filter=overdue',
+    });
+  }
+
+  // Fast pay opportunity
+  if (eligibleInvoices.length >= 5) {
+    signals.push({
+      id: 'fast_pay',
+      severity: 'opportunity',
+      category: 'Opportunity',
+      title: `R ${(totalEligibleAmount / 1000).toFixed(0)}k eligible for early pay`,
+      description: `${eligibleInvoices.length} invoices at ${avgFee.toFixed(1)}% average fee`,
+      amount: totalEligibleAmount,
+      actionLabel: 'Request advances',
+      actionPath: '/capital',
+    });
+  }
+
+  // Fuel price warning
+  if (currentMacroData.fuelPriceTrend3Mo === 'rising') {
+    signals.push({
+      id: 'fuel_prices',
+      severity: 'warning',
+      category: 'Risk',
+      title: 'Fuel prices rising — margin impact',
+      description: '3-month upward trend affecting 12 active trips',
+      actionLabel: 'View routes',
+      actionPath: '/fleet',
+    });
+  }
+
+  // Cross-platform intelligence
+  const latePayingCustomers = allInvoices.filter(
+    (inv) => inv.customer.debtorCredit.hasCrossOperatorLatePaymentFlag
+  );
+  if (latePayingCustomers.length > 0) {
+    const uniqueCustomers = new Set(latePayingCustomers.map((inv) => inv.customer.customerName));
+    signals.push({
+      id: 'cross_platform',
+      severity: 'warning',
+      category: 'Network',
+      title: `${uniqueCustomers.size} customers flagged on network`,
+      description: 'Late payments to other operators — monitor closely',
+      actionLabel: 'View customers',
+      actionPath: '/finance/reports?tab=customer',
+    });
+  }
+
+  return signals.slice(0, 4); // Max 4 signals
+}
+
+function generateRecentActivity(): ActivityItem[] {
+  const now = new Date();
+  const activities: ActivityItem[] = [];
+
+  // Recent invoices
+  const recentInvoices = [...allInvoices]
+    .sort((a, b) => a.invoice.ageInDays - b.invoice.ageInDays)
+    .slice(0, 5);
+
+  recentInvoices.forEach((inv, idx) => {
+    const timestamp = new Date(now);
+    timestamp.setHours(timestamp.getHours() - (idx + 1) * 2);
+
+    activities.push({
+      id: `inv-${inv.invoice.invoiceId}`,
+      timestamp,
+      type: 'invoice_generated',
+      description: `Invoice ${inv.invoice.invoiceId} generated for ${inv.customer.customerName}`,
+      amount: inv.invoice.amount,
+      status: 'success',
+    });
+  });
+
+  return activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 10);
+}
+
+// ==========================
+// HELPER FUNCTIONS
+// ==========================
+
+function formatZAR(amount: number): string {
+  return `R ${(amount / 1000).toFixed(0)}k`;
+}
+
+function formatZARFull(amount: number): string {
+  return new Intl.NumberFormat('en-ZA', {
+    style: 'currency',
+    currency: 'ZAR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function getRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
+}
+
+// ==========================
+// MAIN COMPONENT
+// ==========================
+
 export default function Overview() {
   const navigate = useNavigate();
-  const [greeting, setGreeting] = useState("Good morning");
-  const [user, setUser] = useState<any>(null);
+  const [greeting, setGreeting] = useState('Good morning');
+  const [user] = useState({ username: 'Dennis' }); // Mock user
 
-  const { data: dashboardData, isLoading, error: dashboardError } = useFetch<DashboardData>("api/dashboard/finance/");
+  const portfolio = getPortfolioSummary();
+  const cashFlowData = generateCashFlowForecast();
+  const signals = generateSignals();
+  const recentActivity = generateRecentActivity();
 
-  // Fetch top 3 insights
-  const { data: insights } = useFetch<Insight[]>("api/dashboard/insights/");
-
-  // Fetch mini cash flow for sparkline
-  const { data: rawCashFlow } = useFetch<any>("api/dashboard/cashflow/");
-  const miniCashFlow: MiniCashFlow[] = (Array.isArray(rawCashFlow) ? rawCashFlow : rawCashFlow?.forecast ?? [])
-    .map((item: any) => ({ week: item.week ?? item.period ?? '', net: item.net ?? 0 }));
+  // Mock cash position calculations
+  const currentOperator = operators[0]; // TransNamib
+  const cashAvailable = 1250000;
+  const expectedIn7d = 420000;
+  const expectedIn30d = 1850000;
+  const expectedOut30d = 1200000;
+  const advanceAvailable = currentOperator.facilityLimit * (1 - currentOperator.clientFinancial.advanceUtilizationRate / 100);
 
   useEffect(() => {
     const hour = new Date().getHours();
-    if (hour < 12) setGreeting("Good morning");
-    else if (hour < 18) setGreeting("Good afternoon");
-    else setGreeting("Good evening");
-
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      setUser(JSON.parse(userStr));
-    }
+    if (hour < 12) setGreeting('Good morning');
+    else if (hour < 18) setGreeting('Good afternoon');
+    else setGreeting('Good evening');
   }, []);
 
-  const currentDate = new Date().toLocaleDateString('en-US', {
+  const currentDate = new Date().toLocaleDateString('en-ZA', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
   });
 
-  // Map API response (which uses different field names) to our UI structure
-  const raw = dashboardData as any;
-  const safeData: DashboardData = {
-    total_revenue: raw?.revenue_mtd ?? raw?.total_revenue ?? 0,
-    outstanding_invoices: {
-      count: raw?.outstanding_invoices?.count ?? 0,
-      total_amount: raw?.outstanding_invoices_total ?? raw?.outstanding_invoices?.total_amount ?? 0,
-      overdue_count: raw?.overdue_invoices_count ?? raw?.outstanding_invoices?.overdue_count ?? 0,
-    },
-    cash_position: raw?.cash_flow_forecast?.next_30_days ?? raw?.cash_position ?? 0,
-    active_loads: raw?.active_loads ?? 0,
-    revenue_change_percent: raw?.revenue_change_percent ?? 0,
-    cash_position_change_percent: raw?.cash_position_change_percent ?? 0,
-    cash_flow_data: raw?.cash_flow_data ?? [],
-    recent_activity: raw?.recent_activity ?? [],
+  // Severity styling
+  const getSeverityStyle = (severity: Signal['severity']) => {
+    switch (severity) {
+      case 'critical':
+        return 'border-l-4 border-l-[#EF4444] bg-[#FEE2E2]';
+      case 'warning':
+        return 'border-l-4 border-l-[#F59E0B] bg-[#FEF3C7]';
+      case 'opportunity':
+        return 'border-l-4 border-l-[#10B981] bg-[#D1FAE5]';
+      case 'info':
+        return 'border-l-4 border-l-[#2563EB] bg-[#DBEAFE]';
+    }
   };
 
-  const cashFlowData = safeData.cash_flow_data || [];
-  const recentActivity = safeData.recent_activity || [];
-
-  // Get top 3 insights sorted by severity
-  const rawInsights = Array.isArray(insights) ? insights : (insights as any)?.recommendations ?? [];
-  const topInsights = rawInsights.length > 0
-    ? [...rawInsights]
-        .sort((a, b) => {
-          const severityOrder = { high: 0, medium: 1, low: 2, HIGH: 0, MEDIUM: 1, LOW: 2 };
-          return (severityOrder[a.severity] ?? 2) - (severityOrder[b.severity] ?? 2);
-        })
-        .slice(0, 3)
-    : [];
-
-  const getSeverityIcon = (severity: string) => {
+  const getSeverityIcon = (severity: Signal['severity']) => {
     switch (severity) {
-      case "high":
-        return "🔴";
-      case "medium":
-        return "🟡";
-      case "low":
-        return "🟢";
-      default:
-        return "⚪";
+      case 'critical':
+        return <AlertCircle className="w-5 h-5 text-[#EF4444]" />;
+      case 'warning':
+        return <Clock className="w-5 h-5 text-[#F59E0B]" />;
+      case 'opportunity':
+        return <TrendingUp className="w-5 h-5 text-[#10B981]" />;
+      case 'info':
+        return <CheckCircle className="w-5 h-5 text-[#2563EB]" />;
     }
   };
 
@@ -125,242 +282,320 @@ export default function Overview() {
     <div className="space-y-8">
       {/* Welcome Section */}
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold text-slate-900">
-          {greeting}, {user?.username || "User"}
+        <h1 className="text-2xl font-semibold text-[#0F172A]">
+          {greeting}, {user.username}
         </h1>
-        <p className="text-sm text-slate-500">{currentDate}</p>
+        <p className="text-sm text-[#475569]">{currentDate}</p>
       </div>
 
-      {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Revenue (MTD) */}
-        <Card className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border-0">
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Revenue (MTD)</p>
-            <p className="text-3xl font-mono font-semibold text-slate-900">
-              <CurrencyDisplay amount={safeData.total_revenue} />
+      {/* Cash Position Strip */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card className="border border-[#E2E8F0] shadow-none">
+          <div className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Cash Available Now</p>
+            <p className="text-2xl font-semibold text-[#0F172A] mt-1 tabular-nums font-mono">
+              {formatZAR(cashAvailable)}
             </p>
-            <div className="flex items-center gap-1 text-sm">
-              {safeData.revenue_change_percent >= 0 ? (
-                <ArrowUpRight className="w-4 h-4 text-green-600" />
-              ) : (
-                <ArrowDownRight className="w-4 h-4 text-red-600" />
-              )}
-              <span className={safeData.revenue_change_percent >= 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                {Math.abs(safeData.revenue_change_percent).toFixed(1)}%
-              </span>
-              <span className="text-slate-500">vs last month</span>
-            </div>
+            <p className="text-xs text-[#64748B] mt-1">Bank balance</p>
           </div>
         </Card>
 
-        {/* Outstanding Invoices */}
-        <Card className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border-0">
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Outstanding Invoices</p>
-            <p className="text-3xl font-mono font-semibold text-slate-900">
-              <CurrencyDisplay amount={safeData.outstanding_invoices.total_amount} />
+        <Card className="border border-[#E2E8F0] shadow-none">
+          <div className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Expected In (7d)</p>
+            <p className="text-2xl font-semibold text-[#10B981] mt-1 tabular-nums font-mono">
+              {formatZAR(expectedIn7d)}
             </p>
-            <div className="flex items-center gap-1 text-sm">
-              {safeData.outstanding_invoices.overdue_count > 0 ? (
-                <>
-                  <ArrowDownRight className="w-4 h-4 text-red-600" />
-                  <span className="text-red-600 font-medium">
-                    {safeData.outstanding_invoices.overdue_count} overdue
-                  </span>
-                </>
-              ) : (
-                <span className="text-slate-500">
-                  {safeData.outstanding_invoices.count} invoices
-                </span>
-              )}
-            </div>
+            <p className="text-xs text-[#64748B] mt-1">Predicted inflow</p>
           </div>
         </Card>
 
-        {/* Cash Position */}
-        <Card className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border-0">
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Cash Position</p>
-            <p className="text-3xl font-mono font-semibold text-slate-900">
-              <CurrencyDisplay amount={safeData.cash_position} />
+        <Card className="border border-[#E2E8F0] shadow-none">
+          <div className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Expected In (30d)</p>
+            <p className="text-2xl font-semibold text-[#10B981] mt-1 tabular-nums font-mono">
+              {formatZAR(expectedIn30d)}
             </p>
-            <div className="flex items-center gap-1 text-sm">
-              {safeData.cash_position_change_percent >= 0 ? (
-                <ArrowUpRight className="w-4 h-4 text-green-600" />
-              ) : (
-                <ArrowDownRight className="w-4 h-4 text-red-600" />
-              )}
-              <span className={safeData.cash_position_change_percent >= 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                {Math.abs(safeData.cash_position_change_percent).toFixed(1)}%
-              </span>
-              <span className="text-slate-500">vs last month</span>
-            </div>
+            <p className="text-xs text-[#64748B] mt-1">30-day forecast</p>
           </div>
         </Card>
 
-        {/* Active Loads */}
-        <Card className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border-0">
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Active Loads</p>
-            <p className="text-3xl font-mono font-semibold text-slate-900">{safeData.active_loads}</p>
-            <div className="flex items-center gap-1 text-sm">
-              <Activity className="w-4 h-4 text-blue-600" />
-              <span className="text-slate-500">in progress or pending</span>
-            </div>
+        <Card className="border border-[#E2E8F0] shadow-none">
+          <div className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Expected Out (30d)</p>
+            <p className="text-2xl font-semibold text-[#EF4444] mt-1 tabular-nums font-mono">
+              {formatZAR(expectedOut30d)}
+            </p>
+            <p className="text-xs text-[#64748B] mt-1">Scheduled expenses</p>
+          </div>
+        </Card>
+
+        <Card className="border border-[#E2E8F0] shadow-none">
+          <div className="p-5">
+            <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Advance Available</p>
+            <p className="text-2xl font-semibold text-[#2563EB] mt-1 tabular-nums font-mono">
+              {formatZAR(advanceAvailable)}
+            </p>
+            <p className="text-xs text-[#64748B] mt-1">
+              {currentOperator.clientFinancial.advanceUtilizationRate.toFixed(0)}% facility used
+            </p>
           </div>
         </Card>
       </div>
 
-      {/* AI Insights */}
-      {topInsights.length > 0 && (
-        <Card className="p-6 bg-gradient-to-br from-blue-50 to-white rounded-xl shadow-sm border-0">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-blue-600" />
-                <h2 className="text-lg font-semibold text-slate-900">AI Insights</h2>
-              </div>
-              <button
-                onClick={() => navigate("/insights")}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+      {/* AI Signal Cards */}
+      {signals.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[#0F172A]">AI Signals</h2>
+            <Badge variant="outline" className="text-xs bg-[#EFF6FF] text-[#2563EB] border-[#2563EB]">
+              AI
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {signals.map((signal) => (
+              <Card
+                key={signal.id}
+                className={`border border-[#E2E8F0] shadow-none cursor-pointer hover:shadow-md transition-shadow ${getSeverityStyle(
+                  signal.severity
+                )}`}
+                onClick={() => signal.actionPath && navigate(signal.actionPath)}
               >
-                View all
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              {topInsights.map((insight) => (
-                <div
-                  key={insight.id}
-                  onClick={() => navigate("/insights")}
-                  className="bg-white rounded-lg p-4 border border-slate-100 hover:shadow-md transition-shadow cursor-pointer"
-                >
-                  <div className="flex gap-3">
-                    <span className="text-xl flex-shrink-0">
-                      {getSeverityIcon(insight.severity)}
-                    </span>
+                <div className="p-5">
+                  <div className="flex items-start gap-3">
+                    {getSeverityIcon(signal.severity)}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <Badge
                           variant="outline"
-                          className="text-xs bg-white"
+                          className="text-[10px] font-semibold bg-white border-[#E2E8F0]"
                         >
-                          {insight.category}
+                          {signal.category}
                         </Badge>
                       </div>
-                      <h3 className="text-sm font-semibold text-slate-900 mb-1">
-                        {insight.title}
-                      </h3>
-                      <p className="text-xs text-slate-500 line-clamp-2">
-                        {insight.description}
-                      </p>
+                      <h3 className="text-sm font-semibold text-[#0F172A] mb-1">{signal.title}</h3>
+                      <p className="text-xs text-[#475569]">{signal.description}</p>
+                      {signal.actionLabel && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 h-7 px-2 text-xs hover:bg-white"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            signal.actionPath && navigate(signal.actionPath);
+                          }}
+                        >
+                          {signal.actionLabel}
+                          <ArrowRight className="w-3 h-3 ml-1" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              </Card>
+            ))}
           </div>
-        </Card>
+        </div>
       )}
 
-      {/* Cash Flow Chart */}
-      {cashFlowData.length > 0 && (
-        <Card className="p-6 bg-white rounded-xl shadow-sm border-0">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Cash Flow</h2>
-              {miniCashFlow && miniCashFlow.length > 0 && (
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500">30-day trend</p>
-                  </div>
-                  <div className="w-24 h-8">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={miniCashFlow}>
-                        <defs>
-                          <linearGradient id="miniSparkline" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#2563EB" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <Area
-                          type="monotone"
-                          dataKey="net"
-                          stroke="#2563EB"
-                          strokeWidth={1.5}
-                          fillOpacity={1}
-                          fill="url(#miniSparkline)"
-                          isAnimationActive={false}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
+      {/* Portfolio Health */}
+      <Card className="border border-[#E2E8F0] shadow-none">
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[#0F172A]">Portfolio Health Score</h2>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-[#10B981]" />
+              <span className="text-sm font-medium text-[#10B981]">Improving</span>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={cashFlowData}>
-                <defs>
-                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="month" stroke="#94A3B8" style={{ fontSize: '12px' }} />
-                <YAxis stroke="#94A3B8" style={{ fontSize: '12px' }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '12px'
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#2563EB"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorValue)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
           </div>
-        </Card>
-      )}
-
-      {/* Recent Activity */}
-      <Card className="p-6 bg-white rounded-xl shadow-sm border-0">
-        <h2 className="text-lg font-semibold text-slate-900 mb-4">Recent Activity</h2>
-        <div className="space-y-4">
-          {recentActivity.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Activity className="w-12 h-12 text-slate-300 mb-4" />
-              <p className="text-lg font-medium text-slate-700">No activity yet</p>
-              <p className="text-sm text-slate-500 mt-1">Activity will appear here as you use the platform</p>
+          <div className="flex items-end gap-3">
+            <p className="text-5xl font-semibold text-[#0F172A] tabular-nums font-mono">
+              {portfolio.avgRiskScore}
+            </p>
+            <p className="text-sm text-[#64748B] mb-2">/ 100</p>
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            <div className="text-center">
+              <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8] mb-1">PRIME</p>
+              <p className="text-lg font-semibold text-[#10B981] tabular-nums">
+                {portfolio.tierDistribution.prime}
+              </p>
+              <p className="text-xs text-[#64748B]">
+                {((portfolio.tierDistribution.prime / portfolio.totalInvoices) * 100).toFixed(0)}%
+              </p>
             </div>
-          ) : (
-            recentActivity.map((item) => (
-              <div key={item.id} className="flex items-start gap-3 pb-4 border-b border-slate-50 last:border-0 last:pb-0">
-                <div className="w-2 h-2 rounded-full bg-blue-600 mt-2 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900">{item.description}</p>
-                  {item.amount && (
-                    <p className="text-sm font-mono text-slate-500 mt-0.5">{item.amount}</p>
-                  )}
-                  {item.customer && (
-                    <p className="text-sm text-slate-500 mt-0.5">{item.customer}</p>
-                  )}
-                  <p className="text-xs text-slate-400 mt-1">{item.time}</p>
-                </div>
-              </div>
-            ))
-          )}
+            <div className="text-center">
+              <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8] mb-1">STANDARD</p>
+              <p className="text-lg font-semibold text-[#2563EB] tabular-nums">
+                {portfolio.tierDistribution.standard}
+              </p>
+              <p className="text-xs text-[#64748B]">
+                {((portfolio.tierDistribution.standard / portfolio.totalInvoices) * 100).toFixed(0)}%
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8] mb-1">ELEVATED</p>
+              <p className="text-lg font-semibold text-[#F59E0B] tabular-nums">
+                {portfolio.tierDistribution.elevated}
+              </p>
+              <p className="text-xs text-[#64748B]">
+                {((portfolio.tierDistribution.elevated / portfolio.totalInvoices) * 100).toFixed(0)}%
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8] mb-1">HIGH</p>
+              <p className="text-lg font-semibold text-[#EF4444] tabular-nums">
+                {portfolio.tierDistribution.high}
+              </p>
+              <p className="text-xs text-[#64748B]">
+                {((portfolio.tierDistribution.high / portfolio.totalInvoices) * 100).toFixed(0)}%
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8] mb-1">INELIGIBLE</p>
+              <p className="text-lg font-semibold text-[#64748B] tabular-nums">
+                {portfolio.tierDistribution.ineligible}
+              </p>
+              <p className="text-xs text-[#64748B]">
+                {((portfolio.tierDistribution.ineligible / portfolio.totalInvoices) * 100).toFixed(0)}%
+              </p>
+            </div>
+          </div>
         </div>
       </Card>
+
+      {/* Cash Flow Forecast Chart */}
+      <Card className="border border-[#E2E8F0] shadow-none">
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[#0F172A]">90-Day Cash Flow Forecast</h2>
+            <Badge variant="outline" className="text-xs bg-[#EFF6FF] text-[#2563EB] border-[#2563EB]">
+              AI Predicted
+            </Badge>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={cashFlowData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorConfirmed" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="colorPredicted" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#2563EB" stopOpacity={0.1} />
+                  <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+              <XAxis dataKey="date" stroke="#94A3B8" style={{ fontSize: '12px' }} />
+              <YAxis stroke="#94A3B8" style={{ fontSize: '12px' }} tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                }}
+                formatter={(value: number) => formatZAR(value)}
+              />
+              <ReferenceLine y={0} stroke="#94A3B8" strokeDasharray="3 3" />
+              <Area
+                type="monotone"
+                dataKey="confirmed"
+                stroke="#10B981"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#colorConfirmed)"
+                name="Confirmed"
+              />
+              <Area
+                type="monotone"
+                dataKey="predicted"
+                stroke="#2563EB"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                fillOpacity={1}
+                fill="url(#colorPredicted)"
+                name="Predicted"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+
+      {/* Recent Activity + Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Recent Activity (2/3 width) */}
+        <Card className="border border-[#E2E8F0] shadow-none md:col-span-2">
+          <div className="p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-[#0F172A]">Recent Activity</h2>
+            <div className="space-y-3">
+              {recentActivity.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Activity className="h-12 w-12 text-[#CBD5E1] mb-4" />
+                  <h3 className="text-lg font-medium text-[#0F172A]">No activity yet</h3>
+                  <p className="text-sm text-[#64748B] mt-1 text-center max-w-sm">
+                    Activity will appear here as you use the platform
+                  </p>
+                </div>
+              ) : (
+                recentActivity.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-start gap-3 pb-3 border-b border-[#F1F5F9] last:border-0 last:pb-0"
+                  >
+                    <div className="w-2 h-2 rounded-full bg-[#2563EB] mt-2 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[#0F172A]">{item.description}</p>
+                      {item.amount && (
+                        <p className="text-sm font-mono text-[#475569] mt-0.5">
+                          {formatZARFull(item.amount)}
+                        </p>
+                      )}
+                      <p className="text-xs text-[#94A3B8] mt-1">{getRelativeTime(item.timestamp)}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* Quick Actions (1/3 width) */}
+        <Card className="border border-[#E2E8F0] shadow-none">
+          <div className="p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-[#0F172A]">Quick Actions</h2>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                className="w-full justify-start border-[#E2E8F0] hover:bg-[#F8FAFC]"
+                onClick={() => navigate('/capital')}
+              >
+                <DollarSign className="w-4 h-4 mr-2 text-[#10B981]" />
+                Request Early Pay
+                <Badge variant="secondary" className="ml-auto bg-[#D1FAE5] text-[#10B981]">
+                  {portfolio.eligibleCount}
+                </Badge>
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start border-[#E2E8F0] hover:bg-[#F8FAFC]"
+                onClick={() => navigate('/finance/invoices')}
+              >
+                <FileText className="w-4 h-4 mr-2 text-[#2563EB]" />
+                View Invoices
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start border-[#E2E8F0] hover:bg-[#F8FAFC]"
+                onClick={() => navigate('/finance/reports')}
+              >
+                <TrendingUp className="w-4 h-4 mr-2 text-[#F59E0B]" />
+                View Reports
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -56,14 +56,6 @@ export function QuotesList() {
   const { data: quotesData, isLoading, error, refetch } = useFetch("api/quotes");
   const { data: pipelineData, isLoading: pipelineLoading, error: pipelineError } = useFetch("api/bookings/pipeline/");
 
-  // console.log("quotesData", quotesData);
-
-  // useEffect(() => {
-  //   refetch?.();
-  // }, []);
-
-  // console.log("pipelineData", pipelineData);
-
   const quotes = quotesData?.results || [];
 
   // Map API data to component structure
@@ -86,8 +78,6 @@ export function QuotesList() {
     estimatedFuelL: (parseFloat(quote.distance) || 0) * 0.4, // Rough estimate
     tollsZar: 0 // Mock
   }));
-
-  console.log("quotesData", mappedQuotes);
 
   // Mock AI insights data
   const mockInsights = {
@@ -134,7 +124,6 @@ export function QuotesList() {
   };
 
   const handleApplyChanges = (quoteId: string, patch: { price?: number; marginPct?: number; planId?: 'A' | 'B' | 'C' }) => {
-    console.log(`Applying changes to quote ${quoteId}:`, patch);
     // In real app, this would update the quote data and show a success animation
   };
 
@@ -143,7 +132,6 @@ export function QuotesList() {
   };
 
   const handleSaveQuote = (updatedQuote: any) => {
-    console.log('Saving quote updates:', updatedQuote);
     // In real app, this would update the quote data via API
     setExpandedQuoteId(null);
     setSelectedQuoteId(null);
@@ -262,21 +250,21 @@ export function QuotesList() {
         transition={{ delay: 0.3 }}
       >
         {viewMode === "list" ? (
-          <Card className="bg-card border-border hover:shadow-glow transition-smooth">
+          <Card className="border-[#E2E8F0] bg-white rounded-md">
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-border">
-                    <TableHead className="text-caption text-muted-foreground">Quote ID</TableHead>
-                    <TableHead className="text-caption text-muted-foreground">Customer</TableHead>
-                    <TableHead className="text-caption text-muted-foreground">Lane</TableHead>
-                    <TableHead className="text-caption text-muted-foreground">SLA</TableHead>
-                    <TableHead className="text-caption text-muted-foreground">Price</TableHead>
-                    <TableHead className="text-caption text-muted-foreground">Margin %</TableHead>
-                    <TableHead className="text-caption text-muted-foreground">Confidence</TableHead>
-                    <TableHead className="text-caption text-muted-foreground">Status</TableHead>
-                    <TableHead className="text-caption text-muted-foreground">Updated</TableHead>
-                    <TableHead className="text-caption text-muted-foreground w-12">AI</TableHead>
+                  <TableRow className="border-[#E2E8F0]">
+                    <TableHead className="text-xs text-[#94A3B8]">Quote ID</TableHead>
+                    <TableHead className="text-xs text-[#94A3B8]">Customer</TableHead>
+                    <TableHead className="text-xs text-[#94A3B8]">Lane</TableHead>
+                    <TableHead className="text-xs text-[#94A3B8]">SLA</TableHead>
+                    <TableHead className="text-xs text-[#94A3B8]">Price</TableHead>
+                    <TableHead className="text-xs text-[#94A3B8]">Margin %</TableHead>
+                    <TableHead className="text-xs text-[#94A3B8]">Confidence</TableHead>
+                    <TableHead className="text-xs text-[#94A3B8]">Status</TableHead>
+                    <TableHead className="text-xs text-[#94A3B8]">Updated</TableHead>
+                    <TableHead className="text-xs text-[#94A3B8] w-12">AI</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -293,19 +281,19 @@ export function QuotesList() {
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: 0.4 + index * 0.05 }}
-                          className={`cursor-pointer hover:bg-accent/50 transition-smooth border-border ${isExpanded ? 'bg-accent/20' : ''}`}
+                          className={`cursor-pointer hover:bg-[#F8FAFC] transition-colors border-[#E2E8F0] ${isExpanded ? 'bg-[#F8FAFC]' : ''}`}
                           onClick={() => setSelectedQuoteId(quote.id)}
                         >
-                          <TableCell className="text-body-medium text-foreground">{quote.id}</TableCell>
-                          <TableCell className="text-body text-foreground">{quote.customer}</TableCell>
-                          <TableCell className="text-body text-foreground">
+                          <TableCell className="text-sm font-medium text-[#0F172A]">{quote.id}</TableCell>
+                          <TableCell className="text-sm text-[#0F172A]">{quote.customer}</TableCell>
+                          <TableCell className="text-sm text-[#0F172A]">
                             {quote.origin} → {quote.destination}
                           </TableCell>
-                          <TableCell className="text-body text-foreground">{quote.slaHours}h</TableCell>
-                          <TableCell className="text-body-medium text-foreground text-tabular">
+                          <TableCell className="text-sm text-[#0F172A]">{quote.slaHours}h</TableCell>
+                          <TableCell className="text-sm font-medium text-[#0F172A] font-mono tabular-nums">
                             {formatCurrency(quote.price)}
                           </TableCell>
-                          <TableCell className={`text-body-medium text-tabular ${marginColor}`}>
+                          <TableCell className={`text-sm font-medium font-mono tabular-nums ${marginColor}`}>
                             {quote.marginPct.toFixed(1)}%
                           </TableCell>
                           <TableCell>
@@ -324,14 +312,14 @@ export function QuotesList() {
                               {quote.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-caption text-muted-foreground">
+                          <TableCell className="text-xs text-[#64748B]">
                             {formatRelativeTime(quote.updatedAt)}
                           </TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 transition-all hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                              className="h-8 w-8 transition-all hover:bg-[#2563EB]/10 text-[#94A3B8] hover:text-[#2563EB]"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleAIClick(e, quote.id);
@@ -354,8 +342,8 @@ export function QuotesList() {
                   transition={{ delay: 0.5 }}
                   className="text-center py-12"
                 >
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-body text-muted-foreground mb-4">No quotes found</p>
+                  <FileText className="h-12 w-12 text-[#94A3B8] mx-auto mb-4" />
+                  <p className="text-sm text-[#64748B] mb-4">No quotes found</p>
                   <Button onClick={() => navigate('/quotes/new')} variant="outline" className="gap-2">
                     <Plus className="w-4 h-4" />
                     Create your first quote

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Page imports
 import Overview from "./pages/Overview";
@@ -36,11 +37,20 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ProtectedRoute from "./components/ProtectedRoute";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      throwOnError: false,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <BrowserRouter>
     <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -178,6 +188,7 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
       </TooltipProvider>
+      </ErrorBoundary>
     </QueryClientProvider>
   </BrowserRouter >
 );

@@ -1,8 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, TrendingUp, Zap } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ArrowRight, TrendingUp, Zap, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import useFetch from "@/hooks/useFetch";
 import { formatZAR } from "@/lib/constants";
@@ -271,7 +279,229 @@ export default function Capital() {
       <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#0F172A]">Risk Distribution</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-[#0F172A]">Risk Distribution</h2>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-2 text-[#2563EB] hover:text-[#1D4ED8] hover:bg-blue-50"
+                  >
+                    <Info className="w-4 h-4" />
+                    How it works
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-semibold text-[#0F172A]">
+                      How Risk Scores Work
+                    </DialogTitle>
+                    <DialogDescription className="text-[#64748B]">
+                      Understanding our 6-factor weighted scoring methodology
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-6 mt-4">
+                    {/* Overview */}
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold text-[#0F172A]">Overview</h3>
+                      <p className="text-sm text-[#64748B]">
+                        Every invoice is evaluated using 6 weighted factors to produce a risk score (0-100).
+                        This score determines eligibility, tier classification, and the fee percentage for Fast Pay advances.
+                      </p>
+                    </div>
+
+                    {/* 6 Factors */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-[#0F172A]">Scoring Factors</h3>
+
+                      <div className="space-y-3">
+                        <div className="p-4 bg-[#F8FAFC] rounded-lg space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-[#0F172A]">1. Customer Payment History</h4>
+                            <Badge className="bg-[#2563EB] text-white">35% weight</Badge>
+                          </div>
+                          <p className="text-sm text-[#64748B]">
+                            Based on historical on-time payment rate, average days late, and active disputes.
+                            Excellent payers (95%+ on-time) score highest. Active disputes result in significant penalties.
+                          </p>
+                        </div>
+
+                        <div className="p-4 bg-[#F8FAFC] rounded-lg space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-[#0F172A]">2. Invoice Age</h4>
+                            <Badge className="bg-[#2563EB] text-white">20% weight</Badge>
+                          </div>
+                          <p className="text-sm text-[#64748B]">
+                            Fresh invoices (≤7 days) score highest. Scores decrease as invoices age.
+                            Invoices older than 91 days are automatically ineligible.
+                          </p>
+                        </div>
+
+                        <div className="p-4 bg-[#F8FAFC] rounded-lg space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-[#0F172A]">3. POD Verification Quality</h4>
+                            <Badge className="bg-[#2563EB] text-white">15% weight</Badge>
+                          </div>
+                          <p className="text-sm text-[#64748B]">
+                            E-signatures with complete fields score best, followed by photo timestamps,
+                            driver signatures, and photos. Manual entries score low. No POD = ineligible.
+                          </p>
+                        </div>
+
+                        <div className="p-4 bg-[#F8FAFC] rounded-lg space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-[#0F172A]">4. Customer Credit Score</h4>
+                            <Badge className="bg-[#2563EB] text-white">15% weight</Badge>
+                          </div>
+                          <p className="text-sm text-[#64748B]">
+                            D&B PAYDEX or similar credit bureau ratings. A-rated customers score highest.
+                            Bankruptcy history = automatic ineligibility. Falls back to payment history if unavailable.
+                          </p>
+                        </div>
+
+                        <div className="p-4 bg-[#F8FAFC] rounded-lg space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-[#0F172A]">5. Relationship Length</h4>
+                            <Badge className="bg-[#2563EB] text-white">10% weight</Badge>
+                          </div>
+                          <p className="text-sm text-[#64748B]">
+                            Time since first transaction. Relationships 24+ months score highest.
+                            Adjusted for transaction frequency (high volume = bonus, infrequent = penalty).
+                          </p>
+                        </div>
+
+                        <div className="p-4 bg-[#F8FAFC] rounded-lg space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-[#0F172A]">6. Invoice/Facility Ratio</h4>
+                            <Badge className="bg-[#2563EB] text-white">5% weight</Badge>
+                          </div>
+                          <p className="text-sm text-[#64748B]">
+                            Concentration risk. Invoices representing ≤5% of facility limit score best.
+                            Large concentrations (50%+) score lower.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tier Thresholds */}
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold text-[#0F172A]">Risk Tiers & Fees</h3>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-4 border-2 border-[#10B981] rounded-lg bg-[#D1FAE5]/30">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-3 h-3 rounded-full bg-[#10B981]" />
+                            <h4 className="font-semibold text-[#10B981]">Excellent</h4>
+                          </div>
+                          <p className="text-sm text-[#0F172A] font-mono mb-1">Score: 85-100</p>
+                          <p className="text-xs text-[#64748B]">Fee: 2.0-2.5%</p>
+                        </div>
+
+                        <div className="p-4 border-2 border-[#2563EB] rounded-lg bg-[#DBEAFE]/30">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-3 h-3 rounded-full bg-[#2563EB]" />
+                            <h4 className="font-semibold text-[#2563EB]">Good</h4>
+                          </div>
+                          <p className="text-sm text-[#0F172A] font-mono mb-1">Score: 70-84</p>
+                          <p className="text-xs text-[#64748B]">Fee: 2.5-3.0%</p>
+                        </div>
+
+                        <div className="p-4 border-2 border-[#F59E0B] rounded-lg bg-[#FEF3C7]/30">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-3 h-3 rounded-full bg-[#F59E0B]" />
+                            <h4 className="font-semibold text-[#F59E0B]">Fair</h4>
+                          </div>
+                          <p className="text-sm text-[#0F172A] font-mono mb-1">Score: 55-69</p>
+                          <p className="text-xs text-[#64748B]">Fee: 3.0-3.5%</p>
+                        </div>
+
+                        <div className="p-4 border-2 border-[#EF4444] rounded-lg bg-[#FEE2E2]/30">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-3 h-3 rounded-full bg-[#EF4444]" />
+                            <h4 className="font-semibold text-[#EF4444]">Elevated</h4>
+                          </div>
+                          <p className="text-sm text-[#0F172A] font-mono mb-1">Score: 40-54</p>
+                          <p className="text-xs text-[#64748B]">Fee: 3.5-4.0%</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Fee Adjustments */}
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold text-[#0F172A]">Fee Adjustments</h3>
+                      <p className="text-sm text-[#64748B]">
+                        Base tier fees are adjusted based on specific conditions:
+                      </p>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-start gap-2">
+                          <span className="text-green-600 font-bold">-0.25%</span>
+                          <span className="text-[#64748B]">Fresh invoice (&lt;7 days old)</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="text-green-600 font-bold">-0.25%</span>
+                          <span className="text-[#64748B]">Low facility utilization (&lt;25%)</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="text-red-600 font-bold">+0.25%</span>
+                          <span className="text-[#64748B]">Aging invoice (31-45 days)</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="text-red-600 font-bold">+0.50%</span>
+                          <span className="text-[#64748B]">First-time customer (&lt;3 transactions) or aged (46-60 days)</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="text-red-600 font-bold">+0.75%</span>
+                          <span className="text-[#64748B]">Significantly aged invoice (60+ days)</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="text-red-600 font-bold">+1.0%</span>
+                          <span className="text-[#64748B]">Active payment dispute</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-[#64748B] italic mt-3">
+                        Final fees are capped between 0.75% (minimum) and 4.0% (maximum).
+                      </p>
+                    </div>
+
+                    {/* Ineligibility Rules */}
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold text-[#0F172A]">Ineligibility Criteria</h3>
+                      <p className="text-sm text-[#64748B]">
+                        Invoices are automatically ineligible if ANY of these conditions are met:
+                      </p>
+                      <ul className="space-y-1 text-sm text-[#64748B]">
+                        <li className="flex items-start gap-2">
+                          <span className="text-red-600 font-bold">•</span>
+                          Risk score below 40
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-red-600 font-bold">•</span>
+                          Invoice age exceeds 91 days
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-red-600 font-bold">•</span>
+                          Customer has bankruptcy history
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-red-600 font-bold">•</span>
+                          Active payment dispute on invoice
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-red-600 font-bold">•</span>
+                          No Proof of Delivery verified
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-red-600 font-bold">•</span>
+                          Advance would exceed facility limit
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
             <p className="text-sm text-[#64748B]">
               {data.risk_distribution.excellent + data.risk_distribution.good + data.risk_distribution.fair + data.risk_distribution.elevated} eligible invoices
             </p>

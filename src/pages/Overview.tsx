@@ -54,7 +54,9 @@ export default function Overview() {
   const { data: insights } = useFetch<Insight[]>("api/dashboard/insights/");
 
   // Fetch mini cash flow for sparkline
-  const { data: miniCashFlow } = useFetch<MiniCashFlow[]>("api/dashboard/cashflow/");
+  const { data: rawCashFlow } = useFetch<any>("api/dashboard/cashflow/");
+  const miniCashFlow: MiniCashFlow[] = (Array.isArray(rawCashFlow) ? rawCashFlow : rawCashFlow?.forecast ?? [])
+    .map((item: any) => ({ week: item.week ?? item.period ?? '', net: item.net ?? 0 }));
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -75,33 +77,33 @@ export default function Overview() {
     day: 'numeric'
   });
 
-  // Don't block rendering — show page with defaults if API is slow/failing
-
-  // Create empty state data if API returns nothing
-  const safeData: DashboardData = dashboardData || {
-    total_revenue: 0,
+  // Map API response (which uses different field names) to our UI structure
+  const raw = dashboardData as any;
+  const safeData: DashboardData = {
+    total_revenue: raw?.revenue_mtd ?? raw?.total_revenue ?? 0,
     outstanding_invoices: {
-      count: 0,
-      total_amount: 0,
-      overdue_count: 0,
+      count: raw?.outstanding_invoices?.count ?? 0,
+      total_amount: raw?.outstanding_invoices_total ?? raw?.outstanding_invoices?.total_amount ?? 0,
+      overdue_count: raw?.overdue_invoices_count ?? raw?.outstanding_invoices?.overdue_count ?? 0,
     },
-    cash_position: 0,
-    active_loads: 0,
-    revenue_change_percent: 0,
-    cash_position_change_percent: 0,
-    cash_flow_data: [],
-    recent_activity: [],
+    cash_position: raw?.cash_flow_forecast?.next_30_days ?? raw?.cash_position ?? 0,
+    active_loads: raw?.active_loads ?? 0,
+    revenue_change_percent: raw?.revenue_change_percent ?? 0,
+    cash_position_change_percent: raw?.cash_position_change_percent ?? 0,
+    cash_flow_data: raw?.cash_flow_data ?? [],
+    recent_activity: raw?.recent_activity ?? [],
   };
 
   const cashFlowData = safeData.cash_flow_data || [];
   const recentActivity = safeData.recent_activity || [];
 
   // Get top 3 insights sorted by severity
-  const topInsights = insights
-    ? [...insights]
+  const rawInsights = Array.isArray(insights) ? insights : (insights as any)?.recommendations ?? [];
+  const topInsights = rawInsights.length > 0
+    ? [...rawInsights]
         .sort((a, b) => {
-          const severityOrder = { high: 0, medium: 1, low: 2 };
-          return severityOrder[a.severity] - severityOrder[b.severity];
+          const severityOrder = { high: 0, medium: 1, low: 2, HIGH: 0, MEDIUM: 1, LOW: 2 };
+          return (severityOrder[a.severity] ?? 2) - (severityOrder[b.severity] ?? 2);
         })
         .slice(0, 3)
     : [];

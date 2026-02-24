@@ -8,6 +8,12 @@ export default defineConfig({
     host: "::",
     port: 3000,
     allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3700',
+        changeOrigin: true,
+      },
+    },
   },
   plugins: [
     react(),

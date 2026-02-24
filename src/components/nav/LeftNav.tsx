@@ -58,8 +58,8 @@ export function LeftNav() {
 
   // Fetch eligible invoice count for Capital badge
   const { data: capitalData } = useFetch<{ eligible_invoices_count: number }>(
-    '/api/dashboard/',
-    { refetchInterval: 60000 } // Refresh every minute
+    '/api/dashboard/capital/',
+    { refetchInterval: 60000, retry: false } // Refresh every minute
   );
 
   useEffect(() => {

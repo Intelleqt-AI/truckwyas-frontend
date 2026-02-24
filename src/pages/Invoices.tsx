@@ -5,12 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowUpRight, Plus, Search, ChevronLeft, ChevronRight, Zap } from "lucide-react";
 import { StatusBadge } from "@/components/finance/StatusBadge";
-import { CurrencyDisplay } from "@/components/finance/CurrencyDisplay";
 import { RiskBadge } from "@/components/capital/RiskBadge";
 import { FastPayModal } from "@/components/capital/FastPayModal";
 import { calculateDaysAge } from "@/lib/constants";
 import { calculateRiskScore, type RiskScoreResult } from "@/lib/risk-engine";
 import { MOCK_INVOICES, MOCK_CUSTOMERS, FACILITY_DATA, getCustomerById } from "@/lib/mock-capital-data";
+import { formatCurrency } from "@/lib/formatters";
 import useFetch from "@/hooks/useFetch";
 import { useNavigate } from "react-router-dom";
 
@@ -110,7 +110,7 @@ export default function Invoices() {
 
         scores[mockInv.id] = riskResult;
       } catch (err) {
-        console.error(`Error calculating risk for invoice ${mockInv.id}:`, err);
+        // Risk calculation failed for this invoice
       }
     });
 
@@ -217,68 +217,66 @@ export default function Invoices() {
       </div>
 
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Outstanding */}
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">Total Outstanding</p>
-            <p className="text-3xl font-mono font-medium text-[#0F172A]">
-              <CurrencyDisplay amount={kpis.outstanding} />
-            </p>
-            <div className="flex items-center gap-1 text-sm">
-              <span className="text-[#64748B]">{filteredInvoices.filter(i => i.status === 'SENT' || i.status === 'PARTIALLY_PAID').length} invoices</span>
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-4">
+            <div className="text-xs text-[#94A3B8] mb-1">Total Outstanding</div>
+            <div className="text-2xl font-semibold text-[#0F172A] font-mono tabular-nums">
+              {formatCurrency(kpis.outstanding)}
+            </div>
+            <div className="text-sm text-[#64748B] mt-1">
+              {filteredInvoices.filter(i => i.status === 'SENT' || i.status === 'PARTIALLY_PAID').length} invoices
             </div>
           </div>
         </Card>
 
         {/* Eligible for Fast Pay */}
-        <Card className="p-6 bg-gradient-to-br from-[#10B981] to-[#059669] text-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4" />
-              <p className="text-xs font-medium uppercase tracking-wide">Fast Pay Eligible</p>
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-4">
+            <div className="flex items-center gap-2 text-xs text-[#94A3B8] mb-1">
+              <Zap className="w-3 h-3 text-[#10B981]" />
+              <span>Fast Pay Eligible</span>
             </div>
-            <p className="text-3xl font-mono font-medium">
+            <div className="text-2xl font-semibold text-[#10B981] font-mono tabular-nums">
               {kpis.eligibleCount}
-            </p>
-            <div className="flex items-center gap-1 text-sm">
-              <span className="opacity-90">invoices ready for advance</span>
+            </div>
+            <div className="text-sm text-[#64748B] mt-1">
+              invoices ready for advance
             </div>
           </div>
         </Card>
 
         {/* Overdue */}
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">Overdue</p>
-            <p className="text-3xl font-mono font-medium text-[#EF4444]">
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-4">
+            <div className="text-xs text-[#94A3B8] mb-1">Overdue</div>
+            <div className="text-2xl font-semibold text-[#EF4444] font-mono tabular-nums">
               {kpis.overdueCount}
-            </p>
-            <div className="flex items-center gap-1 text-sm">
-              <span className="text-[#EF4444] font-medium">
-                <CurrencyDisplay amount={kpis.overdueAmount} />
-              </span>
+            </div>
+            <div className="text-sm text-[#EF4444] mt-1">
+              {formatCurrency(kpis.overdueAmount)}
             </div>
           </div>
         </Card>
 
         {/* Average DSO */}
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">Average DSO</p>
-            <p className="text-3xl font-mono font-medium text-[#0F172A]">
-              {Math.round(kpis.avgDSO)} days
-            </p>
-            <div className="flex items-center gap-1 text-sm">
-              <span className="text-[#64748B]">Days Sales Outstanding</span>
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-4">
+            <div className="text-xs text-[#94A3B8] mb-1">Average DSO</div>
+            <div className="text-2xl font-semibold text-[#0F172A] font-mono tabular-nums">
+              {Math.round(kpis.avgDSO)}
+            </div>
+            <div className="text-sm text-[#64748B] mt-1">
+              Days Sales Outstanding
             </div>
           </div>
         </Card>
       </div>
 
       {/* Filter Bar */}
-      <Card className="p-4 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="flex gap-4">
+      <Card className="border-[#E2E8F0] bg-white rounded-md">
+        <div className="p-4 flex gap-4">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="All Statuses" />
@@ -293,49 +291,49 @@ export default function Invoices() {
             </SelectContent>
           </Select>
 
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
-            <Input
-              placeholder="Search invoices or customers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
+              <Input
+                placeholder="Search invoices or customers..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
-        </div>
       </Card>
 
       {/* Data Table */}
-      <Card className="bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <Card className="border-[#E2E8F0] bg-white rounded-md">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[#F1F5F9]">
-                <th className="text-left py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+              <tr className="border-b border-[#E2E8F0]">
+                <th className="text-left py-4 px-6 text-xs text-[#94A3B8]">
                   Invoice #
                 </th>
-                <th className="text-left py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                <th className="text-left py-4 px-6 text-xs text-[#94A3B8]">
                   Customer
                 </th>
-                <th className="text-right py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                <th className="text-right py-4 px-6 text-xs text-[#94A3B8]">
                   Amount
                 </th>
-                <th className="text-left py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                <th className="text-left py-4 px-6 text-xs text-[#94A3B8]">
                   Status
                 </th>
                 {useMockData && (
-                  <th className="text-left py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-left py-4 px-6 text-xs text-[#94A3B8]">
                     Risk
                   </th>
                 )}
-                <th className="text-left py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                <th className="text-left py-4 px-6 text-xs text-[#94A3B8]">
                   Due Date
                 </th>
-                <th className="text-right py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                <th className="text-right py-4 px-6 text-xs text-[#94A3B8]">
                   Age
                 </th>
                 {useMockData && (
-                  <th className="text-right py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-right py-4 px-6 text-xs text-[#94A3B8]">
                     Fast Pay
                   </th>
                 )}
@@ -356,7 +354,7 @@ export default function Invoices() {
                     <tr
                       key={invoice.id}
                       onClick={() => handleRowClick(invoice.id)}
-                      className="border-b border-[#F1F5F9] last:border-0 hover:bg-[#F8FAFC] transition-colors cursor-pointer"
+                      className="border-b border-[#E2E8F0] last:border-0 hover:bg-[#F8FAFC] transition-colors cursor-pointer"
                     >
                       <td className="py-4 px-6 text-sm font-medium text-[#0F172A]">
                         {invoice.invoice_number || `INV-${invoice.id}`}
@@ -364,8 +362,8 @@ export default function Invoices() {
                       <td className="py-4 px-6 text-sm text-[#0F172A]">
                         {invoice.customer_name || "N/A"}
                       </td>
-                      <td className="py-4 px-6 text-sm text-right">
-                        <CurrencyDisplay amount={invoice.total_amount} />
+                      <td className="py-4 px-6 text-sm text-right font-mono tabular-nums text-[#0F172A]">
+                        {formatCurrency(invoice.total_amount)}
                       </td>
                       <td className="py-4 px-6">
                         <StatusBadge status={invoice.status} />
@@ -395,8 +393,7 @@ export default function Invoices() {
                           {riskResult && riskResult.isEligible ? (
                             <Button
                               size="sm"
-                              variant="outline"
-                              className="bg-[#10B981] hover:bg-[#059669] text-white border-0"
+                              className="bg-[#10B981] hover:bg-[#059669] text-white"
                               onClick={(e) => handleFastPayClick(e, invoice.id as string)}
                             >
                               <Zap className="w-3 h-3 mr-1" />
@@ -417,7 +414,7 @@ export default function Invoices() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-[#F1F5F9]">
+          <div className="flex items-center justify-between px-6 py-4 border-t border-[#E2E8F0]">
             <p className="text-sm text-[#64748B]">
               Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredInvoices.length)} of {filteredInvoices.length} invoices
             </p>

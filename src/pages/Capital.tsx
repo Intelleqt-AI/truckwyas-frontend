@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import {
 import { ArrowRight, TrendingUp, Zap, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import useFetch from "@/hooks/useFetch";
-import { formatZAR } from "@/lib/constants";
+import { formatCurrency } from "@/lib/formatters";
 import { calculateRiskScore, getRiskTier } from "@/lib/risk-engine";
 import { MOCK_INVOICES, FACILITY_DATA, getCustomerById } from "@/lib/mock-capital-data";
 
@@ -46,25 +46,25 @@ interface CapitalDashboard {
 const getStatusColor = (status: string) => {
   switch (status.toUpperCase()) {
     case 'ELIGIBLE':
-      return 'bg-slate-50 text-slate-700 border-slate-200';
+      return 'bg-[#E2E8F0] text-[#64748B] border-0';
     case 'REQUESTED':
-      return 'bg-blue-50 text-blue-700 border-blue-200';
+      return 'bg-[#2563EB]/5 text-[#2563EB] border-[#2563EB]/20';
     case 'APPROVED':
-      return 'bg-green-50 text-green-700 border-green-200';
+      return 'bg-[#10B981]/5 text-[#10B981] border-[#10B981]/20';
     case 'DISBURSED':
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      return 'bg-[#10B981]/5 text-[#10B981] border-[#10B981]/20';
     case 'SETTLED':
-      return 'bg-slate-50 text-slate-600 border-slate-200';
+      return 'bg-[#E2E8F0] text-[#64748B] border-0';
     case 'DENIED':
-      return 'bg-red-50 text-red-700 border-red-200';
+      return 'bg-[#EF4444]/5 text-[#EF4444] border-[#EF4444]/20';
     default:
-      return 'bg-slate-50 text-slate-700 border-slate-200';
+      return 'bg-[#E2E8F0] text-[#64748B] border-0';
   }
 };
 
 const getUtilizationColor = (percent: number) => {
-  if (percent >= 90) return 'bg-red-500';
-  if (percent >= 75) return 'bg-amber-500';
+  if (percent >= 90) return 'bg-[#EF4444]';
+  if (percent >= 75) return 'bg-[#F59E0B]';
   return 'bg-[#2563EB]';
 };
 
@@ -152,11 +152,11 @@ export default function Capital() {
 
   if (isLoading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6">
         <div className="flex items-center justify-center h-64">
           <div className="space-y-4 text-center">
             <div className="animate-spin w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full mx-auto" />
-            <p className="text-[#64748B]">Loading capital dashboard...</p>
+            <p className="text-sm text-[#64748B]">Loading capital dashboard...</p>
           </div>
         </div>
       </div>
@@ -167,12 +167,12 @@ export default function Capital() {
   const hasEligibleInvoices = data.eligible_invoices_count > 0;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Page Title */}
       <div>
-        <h1 className="text-3xl font-bold text-[#0F172A]">Capital</h1>
+        <h1 className="text-2xl font-semibold text-[#0F172A]">Capital</h1>
         <div className="flex items-center gap-2 mt-1">
-          <p className="text-[#64748B]">Manage your working capital and advance requests</p>
+          <p className="text-sm text-[#64748B]">Manage your working capital and advance requests</p>
           {useMockData && (
             <span className="text-xs bg-[#FEF3C7] text-[#92400E] px-2 py-0.5 rounded-full font-medium">
               Demo Mode
@@ -182,49 +182,41 @@ export default function Capital() {
       </div>
 
       {/* Facility Overview - 3 Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">
-              Available Capital
-            </p>
-            <p className={`text-3xl font-mono font-medium ${
-              utilizationPercent < 50 ? 'text-green-600' : 'text-[#0F172A]'
-            }`}>
-              {formatZAR(data.available_capital)}
-            </p>
-            <p className="text-sm text-[#64748B]">
-              of {formatZAR(data.facility_limit)} limit
-            </p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-4">
+            <div className="text-xs text-[#94A3B8] mb-1">Available Capital</div>
+            <div className="text-2xl font-semibold text-[#0F172A] font-mono tabular-nums">
+              {formatCurrency(data.available_capital)}
+            </div>
+            <div className="text-sm text-[#64748B] mt-1">
+              of {formatCurrency(data.facility_limit)} limit
+            </div>
           </div>
         </Card>
 
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">
-              Outstanding Advances
-            </p>
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-4">
+            <div className="text-xs text-[#94A3B8] mb-1">Outstanding Advances</div>
             <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-mono font-medium text-[#0F172A]">
-                {formatZAR(data.outstanding_advances)}
-              </p>
-              <Badge className="bg-blue-50 text-blue-700 border-blue-200 border">
+              <div className="text-2xl font-semibold text-[#0F172A] font-mono tabular-nums">
+                {formatCurrency(data.outstanding_advances)}
+              </div>
+              <Badge className="bg-[#2563EB]/5 text-[#2563EB] border-[#2563EB]/20">
                 {data.outstanding_count}
               </Badge>
             </div>
-            <p className="text-sm text-[#64748B]">Active advances</p>
+            <div className="text-sm text-[#64748B] mt-1">Active advances</div>
           </div>
         </Card>
 
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">
-              Utilization
-            </p>
-            <p className="text-3xl font-mono font-medium text-[#0F172A]">
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-4">
+            <div className="text-xs text-[#94A3B8] mb-1">Utilization</div>
+            <div className="text-2xl font-semibold text-[#0F172A] font-mono tabular-nums">
               {utilizationPercent.toFixed(1)}%
-            </p>
-            <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
+            </div>
+            <div className="w-full bg-[#E2E8F0] rounded-full h-2 mt-2">
               <div
                 className={`h-2 rounded-full transition-all ${getUtilizationColor(utilizationPercent)}`}
                 style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
@@ -234,59 +226,56 @@ export default function Capital() {
         </Card>
       </div>
 
-      {/* Eligible Invoices CTA - Enhanced */}
+      {/* Eligible Invoices CTA */}
       {hasEligibleInvoices && (
-        <Card className="p-6 bg-gradient-to-r from-[#10B981] to-[#059669] text-white border-0 shadow-[0_4px_12px_rgba(16,185,129,0.25)]">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-3 flex-1">
-              <div className="flex items-center gap-2">
-                <Zap className="w-6 h-6" />
-                <h3 className="text-xl font-semibold">
-                  {data.eligible_invoices_count} invoice{data.eligible_invoices_count !== 1 ? 's' : ''} ready for Fast Pay
-                </h3>
-              </div>
-              <p className="text-base opacity-90">
-                Get paid today: <span className="font-mono font-bold">{formatZAR(data.eligible_invoices_total)}</span> available
-              </p>
-              <div className="flex items-center gap-4 text-sm opacity-90">
-                <div className="flex items-center gap-1">
-                  <span className="text-2xl">⚡</span>
-                  <span>1-2 hour deposit</span>
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-3 flex-1">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-[#10B981]" />
+                  <h3 className="text-lg font-semibold text-[#0F172A]">
+                    {data.eligible_invoices_count} invoice{data.eligible_invoices_count !== 1 ? 's' : ''} ready for Fast Pay
+                  </h3>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-2xl">✓</span>
-                  <span>Verified deliveries</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-2xl">📈</span>
-                  <span>Grow faster</span>
+                <p className="text-sm text-[#475569]">
+                  Get paid today: <span className="font-mono font-semibold text-[#0F172A] tabular-nums">{formatCurrency(data.eligible_invoices_total)}</span> available
+                </p>
+                <div className="flex items-center gap-4 text-sm text-[#64748B]">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    <span>1-2 hour deposit</span>
+                  </div>
+                  <div>•</div>
+                  <div>Verified deliveries</div>
+                  <div>•</div>
+                  <div>Grow faster</div>
                 </div>
               </div>
+              <Button
+                onClick={() => navigate('/finance/invoices')}
+                className="gap-2 shrink-0"
+              >
+                View Eligible Invoices
+                <ArrowRight className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              onClick={() => navigate('/finance/invoices')}
-              className="gap-2 shrink-0 bg-white hover:bg-gray-50 text-[#10B981] font-semibold shadow-lg"
-              size="lg"
-            >
-              View Eligible Invoices
-              <ArrowRight className="h-4 w-4" />
-            </Button>
           </div>
         </Card>
       )}
 
       {/* Risk Distribution Chart */}
-      <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
+      <Card className="border-[#E2E8F0] bg-white rounded-md">
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-[#0F172A]">Risk Distribution</h2>
+              <h2 className="text-sm font-medium text-[#0F172A]">Risk Distribution</h2>
               <Dialog>
                 <DialogTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 gap-2 text-[#2563EB] hover:text-[#1D4ED8] hover:bg-blue-50"
+                    className="h-8 gap-2 text-[#2563EB] hover:text-[#1D4ED8]"
                   >
                     <Info className="w-4 h-4" />
                     How it works
@@ -294,10 +283,10 @@ export default function Capital() {
                 </DialogTrigger>
                 <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle className="text-2xl font-semibold text-[#0F172A]">
+                    <DialogTitle className="text-xl font-semibold text-[#0F172A]">
                       How Risk Scores Work
                     </DialogTitle>
-                    <DialogDescription className="text-[#64748B]">
+                    <DialogDescription className="text-sm text-[#64748B]">
                       Understanding our 6-factor weighted scoring methodology
                     </DialogDescription>
                   </DialogHeader>
@@ -305,7 +294,7 @@ export default function Capital() {
                   <div className="space-y-6 mt-4">
                     {/* Overview */}
                     <div className="space-y-2">
-                      <h3 className="text-lg font-semibold text-[#0F172A]">Overview</h3>
+                      <h3 className="text-sm font-medium text-[#0F172A]">Overview</h3>
                       <p className="text-sm text-[#64748B]">
                         Every invoice is evaluated using 6 weighted factors to produce a risk score (0-100).
                         This score determines eligibility, tier classification, and the fee percentage for Fast Pay advances.
@@ -314,13 +303,13 @@ export default function Capital() {
 
                     {/* 6 Factors */}
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-[#0F172A]">Scoring Factors</h3>
+                      <h3 className="text-sm font-medium text-[#0F172A]">Scoring Factors</h3>
 
                       <div className="space-y-3">
-                        <div className="p-4 bg-[#F8FAFC] rounded-lg space-y-2">
+                        <div className="p-4 bg-[#F8FAFC] rounded-md space-y-2">
                           <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-[#0F172A]">1. Customer Payment History</h4>
-                            <Badge className="bg-[#2563EB] text-white">35% weight</Badge>
+                            <h4 className="text-sm font-medium text-[#0F172A]">1. Customer Payment History</h4>
+                            <Badge className="bg-[#2563EB]/5 text-[#2563EB] border-[#2563EB]/20">35% weight</Badge>
                           </div>
                           <p className="text-sm text-[#64748B]">
                             Based on historical on-time payment rate, average days late, and active disputes.
@@ -328,10 +317,10 @@ export default function Capital() {
                           </p>
                         </div>
 
-                        <div className="p-4 bg-[#F8FAFC] rounded-lg space-y-2">
+                        <div className="p-4 bg-[#F8FAFC] rounded-md space-y-2">
                           <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-[#0F172A]">2. Invoice Age</h4>
-                            <Badge className="bg-[#2563EB] text-white">20% weight</Badge>
+                            <h4 className="text-sm font-medium text-[#0F172A]">2. Invoice Age</h4>
+                            <Badge className="bg-[#2563EB]/5 text-[#2563EB] border-[#2563EB]/20">20% weight</Badge>
                           </div>
                           <p className="text-sm text-[#64748B]">
                             Fresh invoices (≤7 days) score highest. Scores decrease as invoices age.
@@ -339,10 +328,10 @@ export default function Capital() {
                           </p>
                         </div>
 
-                        <div className="p-4 bg-[#F8FAFC] rounded-lg space-y-2">
+                        <div className="p-4 bg-[#F8FAFC] rounded-md space-y-2">
                           <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-[#0F172A]">3. POD Verification Quality</h4>
-                            <Badge className="bg-[#2563EB] text-white">15% weight</Badge>
+                            <h4 className="text-sm font-medium text-[#0F172A]">3. POD Verification Quality</h4>
+                            <Badge className="bg-[#2563EB]/5 text-[#2563EB] border-[#2563EB]/20">15% weight</Badge>
                           </div>
                           <p className="text-sm text-[#64748B]">
                             E-signatures with complete fields score best, followed by photo timestamps,
@@ -350,10 +339,10 @@ export default function Capital() {
                           </p>
                         </div>
 
-                        <div className="p-4 bg-[#F8FAFC] rounded-lg space-y-2">
+                        <div className="p-4 bg-[#F8FAFC] rounded-md space-y-2">
                           <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-[#0F172A]">4. Customer Credit Score</h4>
-                            <Badge className="bg-[#2563EB] text-white">15% weight</Badge>
+                            <h4 className="text-sm font-medium text-[#0F172A]">4. Customer Credit Score</h4>
+                            <Badge className="bg-[#2563EB]/5 text-[#2563EB] border-[#2563EB]/20">15% weight</Badge>
                           </div>
                           <p className="text-sm text-[#64748B]">
                             D&B PAYDEX or similar credit bureau ratings. A-rated customers score highest.
@@ -361,10 +350,10 @@ export default function Capital() {
                           </p>
                         </div>
 
-                        <div className="p-4 bg-[#F8FAFC] rounded-lg space-y-2">
+                        <div className="p-4 bg-[#F8FAFC] rounded-md space-y-2">
                           <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-[#0F172A]">5. Relationship Length</h4>
-                            <Badge className="bg-[#2563EB] text-white">10% weight</Badge>
+                            <h4 className="text-sm font-medium text-[#0F172A]">5. Relationship Length</h4>
+                            <Badge className="bg-[#2563EB]/5 text-[#2563EB] border-[#2563EB]/20">10% weight</Badge>
                           </div>
                           <p className="text-sm text-[#64748B]">
                             Time since first transaction. Relationships 24+ months score highest.
@@ -372,10 +361,10 @@ export default function Capital() {
                           </p>
                         </div>
 
-                        <div className="p-4 bg-[#F8FAFC] rounded-lg space-y-2">
+                        <div className="p-4 bg-[#F8FAFC] rounded-md space-y-2">
                           <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-[#0F172A]">6. Invoice/Facility Ratio</h4>
-                            <Badge className="bg-[#2563EB] text-white">5% weight</Badge>
+                            <h4 className="text-sm font-medium text-[#0F172A]">6. Invoice/Facility Ratio</h4>
+                            <Badge className="bg-[#2563EB]/5 text-[#2563EB] border-[#2563EB]/20">5% weight</Badge>
                           </div>
                           <p className="text-sm text-[#64748B]">
                             Concentration risk. Invoices representing ≤5% of facility limit score best.
@@ -387,42 +376,42 @@ export default function Capital() {
 
                     {/* Tier Thresholds */}
                     <div className="space-y-3">
-                      <h3 className="text-lg font-semibold text-[#0F172A]">Risk Tiers & Fees</h3>
+                      <h3 className="text-sm font-medium text-[#0F172A]">Risk Tiers & Fees</h3>
 
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="p-4 border-2 border-[#10B981] rounded-lg bg-[#D1FAE5]/30">
+                        <div className="p-4 border border-[#10B981]/20 rounded-md bg-[#10B981]/5">
                           <div className="flex items-center gap-2 mb-1">
                             <div className="w-3 h-3 rounded-full bg-[#10B981]" />
-                            <h4 className="font-semibold text-[#10B981]">Excellent</h4>
+                            <h4 className="text-sm font-medium text-[#10B981]">Excellent</h4>
                           </div>
-                          <p className="text-sm text-[#0F172A] font-mono mb-1">Score: 85-100</p>
+                          <p className="text-sm text-[#0F172A] font-mono tabular-nums mb-1">Score: 85-100</p>
                           <p className="text-xs text-[#64748B]">Fee: 2.0-2.5%</p>
                         </div>
 
-                        <div className="p-4 border-2 border-[#2563EB] rounded-lg bg-[#DBEAFE]/30">
+                        <div className="p-4 border border-[#2563EB]/20 rounded-md bg-[#2563EB]/5">
                           <div className="flex items-center gap-2 mb-1">
                             <div className="w-3 h-3 rounded-full bg-[#2563EB]" />
-                            <h4 className="font-semibold text-[#2563EB]">Good</h4>
+                            <h4 className="text-sm font-medium text-[#2563EB]">Good</h4>
                           </div>
-                          <p className="text-sm text-[#0F172A] font-mono mb-1">Score: 70-84</p>
+                          <p className="text-sm text-[#0F172A] font-mono tabular-nums mb-1">Score: 70-84</p>
                           <p className="text-xs text-[#64748B]">Fee: 2.5-3.0%</p>
                         </div>
 
-                        <div className="p-4 border-2 border-[#F59E0B] rounded-lg bg-[#FEF3C7]/30">
+                        <div className="p-4 border border-[#F59E0B]/20 rounded-md bg-[#F59E0B]/5">
                           <div className="flex items-center gap-2 mb-1">
                             <div className="w-3 h-3 rounded-full bg-[#F59E0B]" />
-                            <h4 className="font-semibold text-[#F59E0B]">Fair</h4>
+                            <h4 className="text-sm font-medium text-[#F59E0B]">Fair</h4>
                           </div>
-                          <p className="text-sm text-[#0F172A] font-mono mb-1">Score: 55-69</p>
+                          <p className="text-sm text-[#0F172A] font-mono tabular-nums mb-1">Score: 55-69</p>
                           <p className="text-xs text-[#64748B]">Fee: 3.0-3.5%</p>
                         </div>
 
-                        <div className="p-4 border-2 border-[#EF4444] rounded-lg bg-[#FEE2E2]/30">
+                        <div className="p-4 border border-[#EF4444]/20 rounded-md bg-[#EF4444]/5">
                           <div className="flex items-center gap-2 mb-1">
                             <div className="w-3 h-3 rounded-full bg-[#EF4444]" />
-                            <h4 className="font-semibold text-[#EF4444]">Elevated</h4>
+                            <h4 className="text-sm font-medium text-[#EF4444]">Elevated</h4>
                           </div>
-                          <p className="text-sm text-[#0F172A] font-mono mb-1">Score: 40-54</p>
+                          <p className="text-sm text-[#0F172A] font-mono tabular-nums mb-1">Score: 40-54</p>
                           <p className="text-xs text-[#64748B]">Fee: 3.5-4.0%</p>
                         </div>
                       </div>
@@ -430,70 +419,70 @@ export default function Capital() {
 
                     {/* Fee Adjustments */}
                     <div className="space-y-3">
-                      <h3 className="text-lg font-semibold text-[#0F172A]">Fee Adjustments</h3>
+                      <h3 className="text-sm font-medium text-[#0F172A]">Fee Adjustments</h3>
                       <p className="text-sm text-[#64748B]">
                         Base tier fees are adjusted based on specific conditions:
                       </p>
                       <div className="space-y-2 text-sm">
                         <div className="flex items-start gap-2">
-                          <span className="text-green-600 font-bold">-0.25%</span>
+                          <span className="text-[#10B981] font-medium">-0.25%</span>
                           <span className="text-[#64748B]">Fresh invoice (&lt;7 days old)</span>
                         </div>
                         <div className="flex items-start gap-2">
-                          <span className="text-green-600 font-bold">-0.25%</span>
+                          <span className="text-[#10B981] font-medium">-0.25%</span>
                           <span className="text-[#64748B]">Low facility utilization (&lt;25%)</span>
                         </div>
                         <div className="flex items-start gap-2">
-                          <span className="text-red-600 font-bold">+0.25%</span>
+                          <span className="text-[#EF4444] font-medium">+0.25%</span>
                           <span className="text-[#64748B]">Aging invoice (31-45 days)</span>
                         </div>
                         <div className="flex items-start gap-2">
-                          <span className="text-red-600 font-bold">+0.50%</span>
+                          <span className="text-[#EF4444] font-medium">+0.50%</span>
                           <span className="text-[#64748B]">First-time customer (&lt;3 transactions) or aged (46-60 days)</span>
                         </div>
                         <div className="flex items-start gap-2">
-                          <span className="text-red-600 font-bold">+0.75%</span>
+                          <span className="text-[#EF4444] font-medium">+0.75%</span>
                           <span className="text-[#64748B]">Significantly aged invoice (60+ days)</span>
                         </div>
                         <div className="flex items-start gap-2">
-                          <span className="text-red-600 font-bold">+1.0%</span>
+                          <span className="text-[#EF4444] font-medium">+1.0%</span>
                           <span className="text-[#64748B]">Active payment dispute</span>
                         </div>
                       </div>
-                      <p className="text-xs text-[#64748B] italic mt-3">
+                      <p className="text-xs text-[#94A3B8] mt-3">
                         Final fees are capped between 0.75% (minimum) and 4.0% (maximum).
                       </p>
                     </div>
 
                     {/* Ineligibility Rules */}
                     <div className="space-y-3">
-                      <h3 className="text-lg font-semibold text-[#0F172A]">Ineligibility Criteria</h3>
+                      <h3 className="text-sm font-medium text-[#0F172A]">Ineligibility Criteria</h3>
                       <p className="text-sm text-[#64748B]">
                         Invoices are automatically ineligible if ANY of these conditions are met:
                       </p>
                       <ul className="space-y-1 text-sm text-[#64748B]">
                         <li className="flex items-start gap-2">
-                          <span className="text-red-600 font-bold">•</span>
+                          <span className="text-[#EF4444]">•</span>
                           Risk score below 40
                         </li>
                         <li className="flex items-start gap-2">
-                          <span className="text-red-600 font-bold">•</span>
+                          <span className="text-[#EF4444]">•</span>
                           Invoice age exceeds 91 days
                         </li>
                         <li className="flex items-start gap-2">
-                          <span className="text-red-600 font-bold">•</span>
+                          <span className="text-[#EF4444]">•</span>
                           Customer has bankruptcy history
                         </li>
                         <li className="flex items-start gap-2">
-                          <span className="text-red-600 font-bold">•</span>
+                          <span className="text-[#EF4444]">•</span>
                           Active payment dispute on invoice
                         </li>
                         <li className="flex items-start gap-2">
-                          <span className="text-red-600 font-bold">•</span>
+                          <span className="text-[#EF4444]">•</span>
                           No Proof of Delivery verified
                         </li>
                         <li className="flex items-start gap-2">
-                          <span className="text-red-600 font-bold">•</span>
+                          <span className="text-[#EF4444]">•</span>
                           Advance would exceed facility limit
                         </li>
                       </ul>
@@ -502,9 +491,9 @@ export default function Capital() {
                 </DialogContent>
               </Dialog>
             </div>
-            <p className="text-sm text-[#64748B]">
+            <div className="text-sm text-[#64748B]">
               {data.risk_distribution.excellent + data.risk_distribution.good + data.risk_distribution.fair + data.risk_distribution.elevated} eligible invoices
-            </p>
+            </div>
           </div>
           <div className="space-y-3">
             {/* Excellent */}
@@ -514,11 +503,11 @@ export default function Capital() {
                   <div className="w-2 h-2 rounded-full bg-[#10B981]" />
                   <span className="text-[#10B981] font-medium">Excellent (2.0-2.5%)</span>
                 </div>
-                <span className="text-[#0F172A] font-mono">
+                <span className="text-[#0F172A] font-mono tabular-nums">
                   {data.risk_distribution.excellent} invoices
                 </span>
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-2">
+              <div className="w-full bg-[#E2E8F0] rounded-full h-2">
                 <div
                   className="bg-[#10B981] h-2 rounded-full transition-all"
                   style={{
@@ -540,11 +529,11 @@ export default function Capital() {
                   <div className="w-2 h-2 rounded-full bg-[#2563EB]" />
                   <span className="text-[#2563EB] font-medium">Good (2.5-3.0%)</span>
                 </div>
-                <span className="text-[#0F172A] font-mono">
+                <span className="text-[#0F172A] font-mono tabular-nums">
                   {data.risk_distribution.good} invoices
                 </span>
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-2">
+              <div className="w-full bg-[#E2E8F0] rounded-full h-2">
                 <div
                   className="bg-[#2563EB] h-2 rounded-full transition-all"
                   style={{
@@ -566,11 +555,11 @@ export default function Capital() {
                   <div className="w-2 h-2 rounded-full bg-[#F59E0B]" />
                   <span className="text-[#F59E0B] font-medium">Fair (3.0-3.5%)</span>
                 </div>
-                <span className="text-[#0F172A] font-mono">
+                <span className="text-[#0F172A] font-mono tabular-nums">
                   {data.risk_distribution.fair} invoices
                 </span>
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-2">
+              <div className="w-full bg-[#E2E8F0] rounded-full h-2">
                 <div
                   className="bg-[#F59E0B] h-2 rounded-full transition-all"
                   style={{
@@ -592,11 +581,11 @@ export default function Capital() {
                   <div className="w-2 h-2 rounded-full bg-[#EF4444]" />
                   <span className="text-[#EF4444] font-medium">Elevated (3.5-4.0%)</span>
                 </div>
-                <span className="text-[#0F172A] font-mono">
+                <span className="text-[#0F172A] font-mono tabular-nums">
                   {data.risk_distribution.elevated} invoices
                 </span>
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-2">
+              <div className="w-full bg-[#E2E8F0] rounded-full h-2">
                 <div
                   className="bg-[#EF4444] h-2 rounded-full transition-all"
                   style={{
@@ -615,35 +604,35 @@ export default function Capital() {
       </Card>
 
       {/* Advance History Table */}
-      <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-[#0F172A]">Advance History</h2>
+      <Card className="border-[#E2E8F0] bg-white rounded-md">
+        <div className="p-4">
+          <h2 className="text-sm font-medium text-[#0F172A] mb-4">Advance History</h2>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[#F1F5F9]">
-                  <th className="text-left py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                <tr className="border-b border-[#E2E8F0]">
+                  <th className="text-left py-3 px-4 text-xs text-[#94A3B8]">
                     Date
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-left py-3 px-4 text-xs text-[#94A3B8]">
                     Invoice #
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-left py-3 px-4 text-xs text-[#94A3B8]">
                     Customer
                   </th>
-                  <th className="text-right py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-right py-3 px-4 text-xs text-[#94A3B8]">
                     Amount
                   </th>
-                  <th className="text-right py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-right py-3 px-4 text-xs text-[#94A3B8]">
                     Fee
                   </th>
-                  <th className="text-right py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-right py-3 px-4 text-xs text-[#94A3B8]">
                     Net Amount
                   </th>
-                  <th className="text-center py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-center py-3 px-4 text-xs text-[#94A3B8]">
                     Status
                   </th>
-                  <th className="text-center py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-center py-3 px-4 text-xs text-[#94A3B8]">
                     Actions
                   </th>
                 </tr>
@@ -653,7 +642,7 @@ export default function Capital() {
                   <tr>
                     <td colSpan={8} className="py-12 text-center">
                       <div className="space-y-2">
-                        <p className="text-[#64748B]">No advances yet</p>
+                        <p className="text-sm text-[#64748B]">No advances yet</p>
                         <p className="text-sm text-[#94A3B8]">
                           {hasEligibleInvoices
                             ? 'Request your first advance to get started'
@@ -666,29 +655,29 @@ export default function Capital() {
                   data.recent_advances.map((advance) => (
                     <tr
                       key={advance.id}
-                      className="border-b border-[#F1F5F9] last:border-0 hover:bg-[#F8FAFC] transition-colors cursor-pointer"
+                      className="border-b border-[#E2E8F0] last:border-0 hover:bg-[#F8FAFC] transition-colors cursor-pointer"
                       onClick={() => navigate(`/capital/advances/${advance.id}`)}
                     >
                       <td className="py-3 px-4 text-sm text-[#64748B]">
                         {new Date(advance.created_at).toLocaleDateString('en-ZA')}
                       </td>
-                      <td className="py-3 px-4 text-sm font-mono text-[#2563EB]">
+                      <td className="py-3 px-4 text-sm font-mono tabular-nums text-[#2563EB]">
                         {advance.invoice_number}
                       </td>
                       <td className="py-3 px-4 text-sm text-[#0F172A]">
                         {advance.customer_name}
                       </td>
-                      <td className="py-3 px-4 text-sm font-mono text-[#0F172A] text-right">
-                        {formatZAR(advance.gross_amount)}
+                      <td className="py-3 px-4 text-sm font-mono tabular-nums text-[#0F172A] text-right">
+                        {formatCurrency(advance.gross_amount)}
                       </td>
-                      <td className="py-3 px-4 text-sm font-mono text-[#64748B] text-right">
+                      <td className="py-3 px-4 text-sm font-mono tabular-nums text-[#64748B] text-right">
                         {advance.fee_percent.toFixed(2)}%
                       </td>
-                      <td className="py-3 px-4 text-sm font-mono text-[#0F172A] text-right font-medium">
-                        {formatZAR(advance.net_amount)}
+                      <td className="py-3 px-4 text-sm font-medium font-mono tabular-nums text-[#0F172A] text-right">
+                        {formatCurrency(advance.net_amount)}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <Badge className={`${getStatusColor(advance.status)} border font-medium`}>
+                        <Badge className={`${getStatusColor(advance.status)} border`}>
                           {advance.status}
                         </Badge>
                       </td>
@@ -696,7 +685,7 @@ export default function Capital() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-[#2563EB] hover:text-[#1D4ED8] hover:bg-blue-50"
+                          className="text-[#2563EB] hover:text-[#1D4ED8]"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(`/capital/advances/${advance.id}`);

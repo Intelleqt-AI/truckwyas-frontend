@@ -1,17 +1,21 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpRight, ArrowDownRight, Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowUpRight, Plus, Search, ChevronLeft, ChevronRight, Zap } from "lucide-react";
 import { StatusBadge } from "@/components/finance/StatusBadge";
 import { CurrencyDisplay } from "@/components/finance/CurrencyDisplay";
+import { RiskBadge } from "@/components/capital/RiskBadge";
+import { FastPayModal } from "@/components/capital/FastPayModal";
 import { calculateDaysAge } from "@/lib/constants";
+import { calculateRiskScore, type RiskScoreResult } from "@/lib/risk-engine";
+import { MOCK_INVOICES, MOCK_CUSTOMERS, FACILITY_DATA, getCustomerById } from "@/lib/mock-capital-data";
 import useFetch from "@/hooks/useFetch";
 import { useNavigate } from "react-router-dom";
 
 interface Invoice {
-  id: number;
+  id: number | string;
   invoice_number: string;
   customer_name?: string;
   total_amount: number;
@@ -25,15 +29,95 @@ export default function Invoices() {
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedInvoiceForFastPay, setSelectedInvoiceForFastPay] = useState<string | null>(null);
+  const [showFastPayModal, setShowFastPayModal] = useState(false);
   const itemsPerPage = 10;
 
-  // Fetch invoices from API
-  const { data: invoicesData, isLoading, error } = useFetch<{ results: Invoice[]; count: number }>("/api/invoices/");
+  // Try to fetch real invoices from API, fall back to mock data
+  const { data: invoicesData, isLoading, error } = useFetch<{ results: Invoice[]; count: number }>(
+    "/api/invoices/",
+    { retry: false }
+  );
 
-  const invoices = invoicesData?.results || [];
-  const totalCount = invoicesData?.count || 0;
+  // Use mock data if API fails or returns empty
+  const useMockData = error || !invoicesData || invoicesData.results?.length === 0;
 
-  // Calculate KPIs from real data
+  const invoices = useMemo(() => {
+    if (useMockData) {
+      // Map mock data to Invoice interface
+      return MOCK_INVOICES.map(inv => ({
+        id: inv.id,
+        invoice_number: inv.invoiceNumber,
+        customer_name: inv.customerName,
+        total_amount: inv.amount,
+        status: inv.status,
+        due_date: inv.dueDate,
+        created_at: inv.createdDate
+      }));
+    }
+    return invoicesData?.results || [];
+  }, [useMockData, invoicesData]);
+
+  const totalCount = invoices.length;
+
+  // Calculate risk scores for all invoices (memoized for performance)
+  const invoiceRiskScores = useMemo(() => {
+    if (!useMockData) return {};
+
+    const scores: Record<string, RiskScoreResult> = {};
+
+    MOCK_INVOICES.forEach(mockInv => {
+      const customer = getCustomerById(mockInv.customerId);
+      if (!customer) return;
+
+      try {
+        const riskResult = calculateRiskScore(
+          {
+            invoiceId: mockInv.id,
+            customerId: mockInv.customerId,
+            customerName: mockInv.customerName,
+            amount: mockInv.amount,
+            createdDate: mockInv.createdDate,
+            dueDate: mockInv.dueDate,
+            status: mockInv.status as any,
+            ageInDays: mockInv.ageInDays
+          },
+          {
+            totalInvoices: customer.totalInvoices,
+            onTimeCount: customer.onTimeCount,
+            avgDaysLate: customer.avgDaysLate,
+            hasActiveDispute: customer.hasActiveDispute
+          },
+          {
+            method: mockInv.podMethod,
+            allFieldsComplete: mockInv.podComplete,
+            hasQualityIssues: mockInv.podQualityIssues
+          },
+          {
+            rating: customer.creditRating,
+            hasBankruptcy: customer.hasBankruptcy
+          },
+          {
+            firstTransactionDate: customer.firstTransactionDate,
+            transactionCount: customer.totalInvoices
+          },
+          {
+            facilityLimit: FACILITY_DATA.facilityLimit,
+            currentOutstanding: FACILITY_DATA.currentOutstanding,
+            invoiceAmount: mockInv.amount
+          }
+        );
+
+        scores[mockInv.id] = riskResult;
+      } catch (err) {
+        console.error(`Error calculating risk for invoice ${mockInv.id}:`, err);
+      }
+    });
+
+    return scores;
+  }, [useMockData]);
+
+  // Calculate KPIs from data
   const calculateKPIs = () => {
     const outstanding = invoices
       .filter(inv => inv.status === 'SENT' || inv.status === 'PARTIALLY_PAID')
@@ -57,7 +141,10 @@ export default function Invoices() {
           .reduce((sum, inv) => sum + calculateDaysAge(inv.created_at), 0) / invoices.length
       : 0;
 
-    return { outstanding, overdueAmount, overdueCount: overdue.length, paidThisMonth, avgDSO };
+    // Count eligible for fast pay
+    const eligibleCount = Object.values(invoiceRiskScores).filter(r => r.isEligible).length;
+
+    return { outstanding, overdueAmount, overdueCount: overdue.length, paidThisMonth, avgDSO, eligibleCount };
   };
 
   const kpis = calculateKPIs();
@@ -78,7 +165,7 @@ export default function Invoices() {
     currentPage * itemsPerPage
   );
 
-  const handleRowClick = (invoiceId: number) => {
+  const handleRowClick = (invoiceId: number | string) => {
     navigate(`/finance/invoices/${invoiceId}`);
   };
 
@@ -86,18 +173,24 @@ export default function Invoices() {
     navigate('/finance/invoices/new');
   };
 
+  const handleFastPayClick = (e: React.MouseEvent, invoiceId: string) => {
+    e.stopPropagation(); // Prevent row click
+    setSelectedInvoiceForFastPay(invoiceId);
+    setShowFastPayModal(true);
+  };
+
+  const selectedRiskResult = selectedInvoiceForFastPay ? invoiceRiskScores[selectedInvoiceForFastPay] : null;
+  const selectedInvoice = selectedInvoiceForFastPay
+    ? MOCK_INVOICES.find(inv => inv.id === selectedInvoiceForFastPay)
+    : null;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <p className="text-[#64748B]">Loading invoices...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-[#EF4444]">Error loading invoices. Please try again.</p>
+        <div className="space-y-4 text-center">
+          <div className="animate-spin w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full mx-auto" />
+          <p className="text-[#64748B]">Loading invoices...</p>
+        </div>
       </div>
     );
   }
@@ -106,7 +199,14 @@ export default function Invoices() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-[#0F172A]">Invoices</h1>
+        <div>
+          <h1 className="text-2xl font-semibold text-[#0F172A]">Invoices</h1>
+          {useMockData && (
+            <p className="text-sm text-[#F59E0B] mt-1">
+              Demo Mode: Showing sample data with risk scoring
+            </p>
+          )}
+        </div>
         <Button
           onClick={handleCreateInvoice}
           className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
@@ -131,6 +231,22 @@ export default function Invoices() {
           </div>
         </Card>
 
+        {/* Eligible for Fast Pay */}
+        <Card className="p-6 bg-gradient-to-br from-[#10B981] to-[#059669] text-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4" />
+              <p className="text-xs font-medium uppercase tracking-wide">Fast Pay Eligible</p>
+            </div>
+            <p className="text-3xl font-mono font-medium">
+              {kpis.eligibleCount}
+            </p>
+            <div className="flex items-center gap-1 text-sm">
+              <span className="opacity-90">invoices ready for advance</span>
+            </div>
+          </div>
+        </Card>
+
         {/* Overdue */}
         <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
           <div className="space-y-3">
@@ -142,20 +258,6 @@ export default function Invoices() {
               <span className="text-[#EF4444] font-medium">
                 <CurrencyDisplay amount={kpis.overdueAmount} />
               </span>
-            </div>
-          </div>
-        </Card>
-
-        {/* Paid This Month */}
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_6px_rgba(0,0,0,0.07)] transition-shadow">
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">Paid This Month</p>
-            <p className="text-3xl font-mono font-medium text-[#0F172A]">
-              <CurrencyDisplay amount={kpis.paidThisMonth} />
-            </p>
-            <div className="flex items-center gap-1 text-sm">
-              <ArrowUpRight className="w-4 h-4 text-[#10B981]" />
-              <span className="text-[#10B981] font-medium">On track</span>
             </div>
           </div>
         </Card>
@@ -221,48 +323,93 @@ export default function Invoices() {
                 <th className="text-left py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
                   Status
                 </th>
+                {useMockData && (
+                  <th className="text-left py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                    Risk
+                  </th>
+                )}
                 <th className="text-left py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
                   Due Date
                 </th>
                 <th className="text-right py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
-                  Age (days)
+                  Age
                 </th>
+                {useMockData && (
+                  <th className="text-right py-4 px-6 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                    Fast Pay
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               {paginatedInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-[#64748B]">
+                  <td colSpan={useMockData ? 8 : 6} className="py-12 text-center text-[#64748B]">
                     No invoices found. Create your first invoice to get started.
                   </td>
                 </tr>
               ) : (
-                paginatedInvoices.map((invoice) => (
-                  <tr
-                    key={invoice.id}
-                    onClick={() => handleRowClick(invoice.id)}
-                    className="border-b border-[#F1F5F9] last:border-0 hover:bg-[#F8FAFC] transition-colors cursor-pointer"
-                  >
-                    <td className="py-4 px-6 text-sm font-medium text-[#0F172A]">
-                      {invoice.invoice_number || `INV-${invoice.id}`}
-                    </td>
-                    <td className="py-4 px-6 text-sm text-[#0F172A]">
-                      {invoice.customer_name || "N/A"}
-                    </td>
-                    <td className="py-4 px-6 text-sm text-right">
-                      <CurrencyDisplay amount={invoice.total_amount} />
-                    </td>
-                    <td className="py-4 px-6">
-                      <StatusBadge status={invoice.status} />
-                    </td>
-                    <td className="py-4 px-6 text-sm text-[#0F172A]">
-                      {new Date(invoice.due_date).toLocaleDateString('en-ZA')}
-                    </td>
-                    <td className="py-4 px-6 text-sm font-mono text-[#64748B] text-right">
-                      {calculateDaysAge(invoice.created_at)}
-                    </td>
-                  </tr>
-                ))
+                paginatedInvoices.map((invoice) => {
+                  const riskResult = invoiceRiskScores[invoice.id];
+
+                  return (
+                    <tr
+                      key={invoice.id}
+                      onClick={() => handleRowClick(invoice.id)}
+                      className="border-b border-[#F1F5F9] last:border-0 hover:bg-[#F8FAFC] transition-colors cursor-pointer"
+                    >
+                      <td className="py-4 px-6 text-sm font-medium text-[#0F172A]">
+                        {invoice.invoice_number || `INV-${invoice.id}`}
+                      </td>
+                      <td className="py-4 px-6 text-sm text-[#0F172A]">
+                        {invoice.customer_name || "N/A"}
+                      </td>
+                      <td className="py-4 px-6 text-sm text-right">
+                        <CurrencyDisplay amount={invoice.total_amount} />
+                      </td>
+                      <td className="py-4 px-6">
+                        <StatusBadge status={invoice.status} />
+                      </td>
+                      {useMockData && (
+                        <td className="py-4 px-6">
+                          {riskResult ? (
+                            <RiskBadge
+                              tier={riskResult.riskTier}
+                              score={riskResult.riskScore}
+                              showScore={false}
+                              size="sm"
+                            />
+                          ) : (
+                            <span className="text-xs text-[#94A3B8]">—</span>
+                          )}
+                        </td>
+                      )}
+                      <td className="py-4 px-6 text-sm text-[#0F172A]">
+                        {new Date(invoice.due_date).toLocaleDateString('en-ZA')}
+                      </td>
+                      <td className="py-4 px-6 text-sm font-mono text-[#64748B] text-right">
+                        {calculateDaysAge(invoice.created_at)}d
+                      </td>
+                      {useMockData && (
+                        <td className="py-4 px-6 text-right">
+                          {riskResult && riskResult.isEligible ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="bg-[#10B981] hover:bg-[#059669] text-white border-0"
+                              onClick={(e) => handleFastPayClick(e, invoice.id as string)}
+                            >
+                              <Zap className="w-3 h-3 mr-1" />
+                              Fast Pay
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-[#94A3B8]">Not eligible</span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -295,6 +442,20 @@ export default function Invoices() {
           </div>
         )}
       </Card>
+
+      {/* Fast Pay Modal */}
+      {selectedRiskResult && selectedInvoice && (
+        <FastPayModal
+          isOpen={showFastPayModal}
+          onClose={() => {
+            setShowFastPayModal(false);
+            setSelectedInvoiceForFastPay(null);
+          }}
+          riskResult={selectedRiskResult}
+          invoiceNumber={selectedInvoice.invoiceNumber}
+          customerName={selectedInvoice.customerName}
+        />
+      )}
     </div>
   );
 }

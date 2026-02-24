@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { getPortfolioSummary, allInvoices, operators, currentMacroData } from '@/mocks/risk-mock-data';
+import { formatCurrency } from '@/lib/formatters';
 
 // ==========================
 // TYPES
@@ -190,19 +191,6 @@ function generateRecentActivity(): ActivityItem[] {
 // HELPER FUNCTIONS
 // ==========================
 
-function formatZAR(amount: number): string {
-  return `R ${(amount / 1000).toFixed(0)}k`;
-}
-
-function formatZARFull(amount: number): string {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency: 'ZAR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 function getRelativeTime(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -251,19 +239,6 @@ export default function Overview() {
     day: 'numeric',
   });
 
-  // Severity styling
-  const getSeverityStyle = (severity: Signal['severity']) => {
-    switch (severity) {
-      case 'critical':
-        return 'border-l-4 border-l-[#EF4444] bg-[#FEE2E2]';
-      case 'warning':
-        return 'border-l-4 border-l-[#F59E0B] bg-[#FEF3C7]';
-      case 'opportunity':
-        return 'border-l-4 border-l-[#10B981] bg-[#D1FAE5]';
-      case 'info':
-        return 'border-l-4 border-l-[#2563EB] bg-[#DBEAFE]';
-    }
-  };
 
   const getSeverityIcon = (severity: Signal['severity']) => {
     switch (severity) {
@@ -290,51 +265,51 @@ export default function Overview() {
 
       {/* Cash Position Strip */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card className="border border-[#E2E8F0] shadow-none">
-          <div className="p-5">
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-4">
             <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Cash Available Now</p>
-            <p className="text-2xl font-semibold text-[#0F172A] mt-1 tabular-nums font-mono">
-              {formatZAR(cashAvailable)}
+            <p className="text-2xl font-semibold text-[#0F172A] mt-1 font-mono tabular-nums">
+              {formatCurrency(cashAvailable)}
             </p>
             <p className="text-xs text-[#64748B] mt-1">Bank balance</p>
           </div>
         </Card>
 
-        <Card className="border border-[#E2E8F0] shadow-none">
-          <div className="p-5">
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-4">
             <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Expected In (7d)</p>
-            <p className="text-2xl font-semibold text-[#10B981] mt-1 tabular-nums font-mono">
-              {formatZAR(expectedIn7d)}
+            <p className="text-2xl font-semibold text-[#10B981] mt-1 font-mono tabular-nums">
+              {formatCurrency(expectedIn7d)}
             </p>
             <p className="text-xs text-[#64748B] mt-1">Predicted inflow</p>
           </div>
         </Card>
 
-        <Card className="border border-[#E2E8F0] shadow-none">
-          <div className="p-5">
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-4">
             <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Expected In (30d)</p>
-            <p className="text-2xl font-semibold text-[#10B981] mt-1 tabular-nums font-mono">
-              {formatZAR(expectedIn30d)}
+            <p className="text-2xl font-semibold text-[#10B981] mt-1 font-mono tabular-nums">
+              {formatCurrency(expectedIn30d)}
             </p>
             <p className="text-xs text-[#64748B] mt-1">30-day forecast</p>
           </div>
         </Card>
 
-        <Card className="border border-[#E2E8F0] shadow-none">
-          <div className="p-5">
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-4">
             <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Expected Out (30d)</p>
-            <p className="text-2xl font-semibold text-[#EF4444] mt-1 tabular-nums font-mono">
-              {formatZAR(expectedOut30d)}
+            <p className="text-2xl font-semibold text-[#EF4444] mt-1 font-mono tabular-nums">
+              {formatCurrency(expectedOut30d)}
             </p>
             <p className="text-xs text-[#64748B] mt-1">Scheduled expenses</p>
           </div>
         </Card>
 
-        <Card className="border border-[#E2E8F0] shadow-none">
-          <div className="p-5">
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
+          <div className="p-4">
             <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Advance Available</p>
-            <p className="text-2xl font-semibold text-[#2563EB] mt-1 tabular-nums font-mono">
-              {formatZAR(advanceAvailable)}
+            <p className="text-2xl font-semibold text-[#2563EB] mt-1 font-mono tabular-nums">
+              {formatCurrency(advanceAvailable)}
             </p>
             <p className="text-xs text-[#64748B] mt-1">
               {currentOperator.clientFinancial.advanceUtilizationRate.toFixed(0)}% facility used
@@ -352,16 +327,14 @@ export default function Overview() {
               AI
             </Badge>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {signals.map((signal) => (
               <Card
                 key={signal.id}
-                className={`border border-[#E2E8F0] shadow-none cursor-pointer hover:shadow-md transition-shadow ${getSeverityStyle(
-                  signal.severity
-                )}`}
+                className="border-[#E2E8F0] bg-white rounded-md cursor-pointer hover:bg-[#F8FAFC] transition-colors"
                 onClick={() => signal.actionPath && navigate(signal.actionPath)}
               >
-                <div className="p-5">
+                <div className="p-4">
                   <div className="flex items-start gap-3">
                     {getSeverityIcon(signal.severity)}
                     <div className="flex-1 min-w-0">
@@ -379,7 +352,7 @@ export default function Overview() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="mt-2 h-7 px-2 text-xs hover:bg-white"
+                          className="mt-2 h-7 px-2 text-xs hover:bg-[#F1F5F9]"
                           onClick={(e) => {
                             e.stopPropagation();
                             signal.actionPath && navigate(signal.actionPath);
@@ -399,7 +372,7 @@ export default function Overview() {
       )}
 
       {/* Portfolio Health */}
-      <Card className="border border-[#E2E8F0] shadow-none">
+      <Card className="border-[#E2E8F0] bg-white rounded-md">
         <div className="p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-[#0F172A]">Portfolio Health Score</h2>
@@ -409,7 +382,7 @@ export default function Overview() {
             </div>
           </div>
           <div className="flex items-end gap-3">
-            <p className="text-5xl font-semibold text-[#0F172A] tabular-nums font-mono">
+            <p className="text-5xl font-semibold text-[#0F172A] font-mono tabular-nums">
               {portfolio.avgRiskScore}
             </p>
             <p className="text-sm text-[#64748B] mb-2">/ 100</p>
@@ -465,7 +438,7 @@ export default function Overview() {
       </Card>
 
       {/* Cash Flow Forecast Chart */}
-      <Card className="border border-[#E2E8F0] shadow-none">
+      <Card className="border-[#E2E8F0] bg-white rounded-md">
         <div className="p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-[#0F172A]">90-Day Cash Flow Forecast</h2>
@@ -487,7 +460,7 @@ export default function Overview() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
               <XAxis dataKey="date" stroke="#94A3B8" style={{ fontSize: '12px' }} />
-              <YAxis stroke="#94A3B8" style={{ fontSize: '12px' }} tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`} />
+              <YAxis stroke="#94A3B8" style={{ fontSize: '12px' }} tickFormatter={(val) => formatCurrency(val)} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: 'white',
@@ -523,9 +496,9 @@ export default function Overview() {
       </Card>
 
       {/* Recent Activity + Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Recent Activity (2/3 width) */}
-        <Card className="border border-[#E2E8F0] shadow-none md:col-span-2">
+        <Card className="border-[#E2E8F0] bg-white rounded-md md:col-span-2">
           <div className="p-6 space-y-4">
             <h2 className="text-lg font-semibold text-[#0F172A]">Recent Activity</h2>
             <div className="space-y-3">
@@ -547,8 +520,8 @@ export default function Overview() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-[#0F172A]">{item.description}</p>
                       {item.amount && (
-                        <p className="text-sm font-mono text-[#475569] mt-0.5">
-                          {formatZARFull(item.amount)}
+                        <p className="text-sm font-mono tabular-nums text-[#475569] mt-0.5">
+                          {formatCurrency(item.amount)}
                         </p>
                       )}
                       <p className="text-xs text-[#94A3B8] mt-1">{getRelativeTime(item.timestamp)}</p>
@@ -561,7 +534,7 @@ export default function Overview() {
         </Card>
 
         {/* Quick Actions (1/3 width) */}
-        <Card className="border border-[#E2E8F0] shadow-none">
+        <Card className="border-[#E2E8F0] bg-white rounded-md">
           <div className="p-6 space-y-4">
             <h2 className="text-lg font-semibold text-[#0F172A]">Quick Actions</h2>
             <div className="space-y-2">

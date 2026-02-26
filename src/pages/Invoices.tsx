@@ -98,7 +98,12 @@ export default function Invoices() {
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Finance</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Invoices</div>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Invoices</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+              Last updated: {new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
           <button className="btn-action" onClick={() => navigate('/finance/invoices/new')}>+ NEW INVOICE</button>
         </div>
       </div>
@@ -141,7 +146,7 @@ export default function Invoices() {
             <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }} style={{
               background: statusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
               border: `1px solid ${statusFilter === s ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-              color: statusFilter === s ? '#fff' : 'var(--text-secondary)',
+              color: statusFilter === s ? 'var(--text-on-accent)' : 'var(--text-secondary)',
               padding: '6px 10px', borderRadius: 2, fontSize: 10, fontFamily: 'var(--font-mono)', cursor: 'pointer',
             }}>{s}</button>
           ))}

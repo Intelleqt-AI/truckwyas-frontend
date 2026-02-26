@@ -1,18 +1,132 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { fetchData } from "@/lib/Api";
+import { fetchData } from '../lib/api';
+
+interface Vehicle {
+  id: number;
+  registration: string;
+  make?: string;
+  model?: string;
+  vehicle_type?: string;
+  vehicle_type_name?: string;
+  year?: number;
+  capacity?: number;
+  status: string;
+  revenue_this_month?: number;
+  trips_this_month?: number;
+  fuel_efficiency?: number;
+  ai_health_score?: number;
+}
+
+interface FleetOverview {
+  total_vehicles: number;
+  active_vehicles: number;
+  maintenance_vehicles: number;
+  revenue_this_month: number;
+}
+
+interface FleetInsight {
+  vehicle_id?: number;
+  vehicle_registration?: string;
+  type: string;
+  title: string;
+  message: string;
+  severity?: string;
+}
 
 const STATUS_COLOR: Record<string, string> = {
-  AVAILABLE: 'var(--accent-primary)',
-  IN_USE: 'var(--status-warning)',
-  MAINTENANCE: 'var(--status-danger)',
+  ACTIVE: 'var(--status-success)',
+  AVAILABLE: 'var(--status-success)',
+  IN_USE: 'var(--status-success)',
+  MAINTENANCE: 'var(--status-warning)',
+  INACTIVE: 'var(--text-tertiary)',
   OUT_OF_SERVICE: 'var(--text-tertiary)',
 };
 
+const formatZAR = (v: number) =>
+  'R ' + v.toLocaleString('en-ZA', { minimumFractionDigals: 0, maximumFractionDigits: 0 });
+
 export default function Vehicles() {
   const navigate = useNavigate();
-  const { data, isLoading } = useQuery({ queryKey: ['vehicles'], queryFn: () => fetchData('api/vehicles/') });
-  const vehicles = data?.results || data || [];
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [overview, setOverview] = useState<FleetOverview | null>(null);
+  const [insights, setInsights] = useState<FleetInsight[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('revenue');
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      fetchData('/api/v1/vehicles/'),
+      fetchData('/api/v1/fleet/overview/'),
+      fetchData('/api/v1/fleet/intelligence/')
+    ])
+      .then(([vehData, overviewData, insightsData]) => {
+        setVehicles(vehData || []);
+        setOverview(overviewData);
+        setInsights(insightsData || []);
+        setError(null);
+      })
+      .catch(() => {
+        setError('Failed to load fleet data');
+        setVehicles([]);
+        setOverview(null);
+        setInsights([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Filter vehicles
+  const filtered = vehicles.filter(v => {
+    if (statusFilter === 'All') return true;
+    return v.status === statusFilter;
+  });
+
+  // Sort vehicles
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === 'revenue') {
+      return (b.revenue_this_month || 0) - (a.revenue_this_month || 0);
+    }
+    return 0;
+  });
+
+  const getStatusBadge = (status: string) => {
+    const color = STATUS_COLOR[status] || 'var(--text-secondary)';
+    return (
+      <span style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 10,
+        color,
+        padding: '2px 6px',
+        background: 'var(--bg-surface-hover)',
+        borderRadius: 2,
+        textTransform: 'uppercase'
+      }}>
+        {status.replace('_', ' ')}
+      </span>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: 40 }}>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 8, width: '20%' }} />
+          <div style={{ height: 24, background: 'var(--bg-surface)', borderRadius: 4, width: '30%' }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="card" style={{ padding: 20 }}>
+              <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
+              <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -21,47 +135,131 @@ export default function Vehicles() {
         <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Vehicles</div>
       </div>
 
+      {/* Fleet Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        {[
-          { label: 'Total', value: vehicles.length, color: 'var(--text-primary)' },
-          { label: 'Available', value: vehicles.filter((v: any) => v.status === 'AVAILABLE').length, color: 'var(--accent-primary)' },
-          { label: 'In Use', value: vehicles.filter((v: any) => v.status === 'IN_USE').length, color: 'var(--status-warning)' },
-          { label: 'Maintenance', value: vehicles.filter((v: any) => v.status === 'MAINTENANCE').length, color: 'var(--status-danger)' },
-        ].map(m => (
-          <div key={m.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{m.label}</span></div>
-            <div className="metric-value" style={{ fontSize: 28, color: m.color }}>{isLoading ? '—' : m.value}</div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Total Vehicles</span></div>
+          <div className="metric-value" style={{ fontSize: 28 }}>{overview?.total_vehicles || vehicles.length}</div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Active</span></div>
+          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-success)' }}>
+            {overview?.active_vehicles || vehicles.filter(v => v.status === 'ACTIVE' || v.status === 'IN_USE').length}
           </div>
-        ))}
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">In Maintenance</span></div>
+          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-warning)' }}>
+            {overview?.maintenance_vehicles || vehicles.filter(v => v.status === 'MAINTENANCE').length}
+          </div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Revenue This Month</span></div>
+          <div className="metric-value" style={{ fontSize: 22 }}>
+            {formatZAR(overview?.revenue_this_month || vehicles.reduce((sum, v) => sum + (v.revenue_this_month || 0), 0))}
+          </div>
+        </div>
       </div>
 
-      <div className="card table-card">
-        <table className="data-table">
-          <thead>
-            <tr><th>Plate</th><th>Make / Model</th><th>Type</th><th>Year</th><th>Capacity</th><th>Status</th><th className="text-right">Health</th></tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 24 }}>Loading...</td></tr>
-            ) : vehicles.map((v: any) => (
-              <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/vehicles/${v.id}`)}>
-                <td className="mono">{v.plate}</td>
-                <td>{v.make} {v.model}</td>
-                <td style={{ color: 'var(--text-secondary)' }}>{v.vehicle_type_name || v.type}</td>
-                <td style={{ color: 'var(--text-secondary)' }}>{v.year}</td>
-                <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{parseFloat(v.capacity || '0').toFixed(0)} kg</td>
-                <td>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[v.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-                    {v.status?.replace('_', ' ')}
-                  </span>
-                </td>
-                <td className="text-right" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: v.ai_health_score > 70 ? 'var(--accent-primary)' : v.ai_health_score > 40 ? 'var(--status-warning)' : 'var(--text-tertiary)' }}>
-                  {v.ai_health_score || '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+        {/* Vehicle Table */}
+        <div>
+          {/* Filters */}
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              style={{
+                background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                color: 'var(--text-primary)', padding: '7px 12px',
+                fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
+              }}
+            >
+              <option value="All">All Status</option>
+              <option value="ACTIVE">Active</option>
+              <option value="MAINTENANCE">Maintenance</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              style={{
+                background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                color: 'var(--text-primary)', padding: '7px 12px',
+                fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
+              }}
+            >
+              <option value="revenue">Sort by Revenue</option>
+            </select>
+          </div>
+
+          {/* Table */}
+          <div className="card" style={{ padding: 0 }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Registration</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th className="text-right">Revenue MTD</th>
+                  <th className="text-right">Trips MTD</th>
+                  <th className="text-right">Efficiency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.length === 0 ? (
+                  <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles found</td></tr>
+                ) : sorted.map(v => (
+                  <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/vehicles/${v.id}`)}>
+                    <td className="mono" style={{ fontWeight: 500 }}>{v.registration}</td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                      {v.vehicle_type_name || v.vehicle_type || '—'}
+                    </td>
+                    <td>{getStatusBadge(v.status)}</td>
+                    <td className="text-right mono" style={{ fontSize: 12 }}>
+                      {v.revenue_this_month ? formatZAR(v.revenue_this_month) : '—'}
+                    </td>
+                    <td className="text-right mono" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      {v.trips_this_month || 0}
+                    </td>
+                    <td className="text-right mono" style={{ fontSize: 12 }}>
+                      {v.fuel_efficiency ? `${v.fuel_efficiency.toFixed(1)} L/100km` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Intelligence Sidebar */}
+        <div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 12 }}>
+            FLEET INTELLIGENCE
+          </div>
+
+          {insights.length === 0 ? (
+            <div className="card" style={{ padding: 20, textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                No fleet alerts at this time
+              </div>
+            </div>
+          ) : insights.map((insight, i) => (
+            <div key={i} className="card" style={{ marginBottom: 12, padding: 14, borderLeft: `2px solid ${insight.severity === 'high' ? 'var(--status-danger)' : insight.severity === 'medium' ? 'var(--status-warning)' : 'var(--accent-primary)'}` }}>
+              {insight.vehicle_registration && (
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                  {insight.vehicle_registration}
+                </div>
+              )}
+              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
+                {insight.title}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                {insight.message}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

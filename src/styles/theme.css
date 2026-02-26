@@ -918,3 +918,22 @@ body {
     grid-column: span 1;
   }
 }
+
+/* Theme Toggle */
+.theme-toggle {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.theme-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--border-active);
+}

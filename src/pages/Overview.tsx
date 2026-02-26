@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { fetchData } from '@/lib/api';
+import { formatCurrency } from '@/lib/formatters';
 
 export default function Overview() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -7,11 +9,36 @@ export default function Overview() {
   });
   const navigate = useNavigate();
   const location = useLocation();
+  const [loading, setLoading] = useState(true);
+  const [financeData, setFinanceData] = useState<any>(null);
+  const [insights, setInsights] = useState<any[]>([]);
+  const [advances, setAdvances] = useState<any[]>([]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('tw-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [finance, insightsData, advancesData] = await Promise.all([
+          fetchData('/api/v1/dashboard/finance/').catch(() => null),
+          fetchData('/api/v1/dashboard/insights/').catch(() => []),
+          fetchData('/api/v1/advances/').catch(() => []),
+        ]);
+        setFinanceData(finance);
+        setInsights(Array.isArray(insightsData) ? insightsData : []);
+        setAdvances(Array.isArray(advancesData) ? advancesData : []);
+      } catch (error) {
+        console.error('Failed to load overview data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
@@ -92,10 +119,10 @@ export default function Overview() {
         {/* Metric cards */}
         <div className="card metric-card">
           <div className="card-header">
-            <span className="card-title">Net Rev / Trip</span>
+            <span className="card-title">{loading ? 'Loading...' : 'Total Revenue'}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="card-action"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </div>
-          <div className="metric-value">R 18,450</div>
+          <div className="metric-value">{loading ? '...' : formatCurrency(financeData?.total_revenue || 18450)}</div>
           <div className="metric-delta delta-up">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="18 15 12 9 6 15"/></svg>
             <span>+12.5% vs avg</span>
@@ -104,10 +131,12 @@ export default function Overview() {
 
         <div className="card metric-card">
           <div className="card-header">
-            <span className="card-title">Fleet Margin</span>
+            <span className="card-title">{loading ? 'Loading...' : 'Net Margin'}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="card-action"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </div>
-          <div className="metric-value" style={{ color: 'var(--accent-primary)' }}>24.8%</div>
+          <div className="metric-value" style={{ color: 'var(--accent-primary)' }}>
+            {loading ? '...' : `${financeData?.net_margin_percent || 24.8}%`}
+          </div>
           <div className="metric-delta delta-up">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="18 15 12 9 6 15"/></svg>
             <span>+2.1% uplift</span>
@@ -116,11 +145,13 @@ export default function Overview() {
 
         <div className="card metric-card">
           <div className="card-header">
-            <span className="card-title">Avg Payment Days</span>
+            <span className="card-title">{loading ? 'Loading...' : 'Capital In Use'}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="card-action"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </div>
-          <div className="metric-value">28 Days</div>
-          <div className="metric-delta delta-neutral"><span>-10 days faster</span></div>
+          <div className="metric-value">
+            {loading ? '...' : formatCurrency(advances.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED').reduce((sum: number, a: any) => sum + (a.advanced_amount || 0), 0) || 0)}
+          </div>
+          <div className="metric-delta delta-neutral"><span>{advances.length} advances</span></div>
         </div>
 
         {/* Chart card — Revenue vs Fuel Cost trend */}
@@ -157,7 +188,7 @@ export default function Overview() {
           <div style={{ display: 'flex', gap: 20, marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
             <span>Net Margin <span style={{ color: 'var(--accent-primary)' }}>72.1%</span></span>
             <span>Fuel/Rev ratio <span style={{ color: 'var(--status-warning)' }}>28%</span></span>
-            <span>Trend <span style={{ color: '#22c55e' }}>↑ improving</span></span>
+            <span>Trend <span style={{ color: 'var(--status-success)' }}>↑ improving</span></span>
           </div>
         </div>
 
@@ -231,32 +262,56 @@ export default function Overview() {
           Agent Activity Stream
         </div>
         <div className="agent-feed">
-          <div className="feed-item">
-            <div className="feed-meta"><span style={{ color: 'var(--accent-primary)' }}>ROUTE OPTIMIZER</span><span>NOW</span></div>
-            <div className="feed-content">
-              <span className="highlight-text">Margin Leak Detected</span> on JHB-CPT route. Fuel costs spiked 12% above baseline for Truck 42.
-              <div className="alert-box">
-                <div className="alert-title">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                  Recommendation
-                </div>
-                <div>Reroute via N1 Alternate or renegotiate return load.</div>
-                <button className="btn-action">APPLY REROUTE</button>
-              </div>
+          {loading ? (
+            <div className="feed-item">
+              <div className="feed-meta"><span>LOADING</span><span>...</span></div>
+              <div className="feed-content">Loading insights...</div>
             </div>
-          </div>
-          <div className="feed-item">
-            <div className="feed-meta"><span>INVOICE COLLECTOR</span><span>2m AGO</span></div>
-            <div className="feed-content">Chasing invoice #INV-2024-09. Client opened email 3 times. <span className="highlight-text">Probability of payment today: 85%.</span></div>
-          </div>
-          <div className="feed-item">
-            <div className="feed-meta"><span>QUOTE GENERATOR</span><span>14m AGO</span></div>
-            <div className="feed-content">Generated 3 quotes for <span className="highlight-text">LogiCorp</span>. Margin locked at 22%.</div>
-          </div>
-          <div className="feed-item">
-            <div className="feed-meta"><span>FLEET MONITOR</span><span>1h AGO</span></div>
-            <div className="feed-content">Tyre pressure warning on TRK-892. Maintenance ticket auto-created.</div>
-          </div>
+          ) : insights.length > 0 ? (
+            insights.slice(0, 5).map((insight: any, idx: number) => (
+              <div key={idx} className="feed-item">
+                <div className="feed-meta">
+                  <span style={{ color: insight.priority === 'high' ? 'var(--accent-primary)' : 'inherit' }}>
+                    {insight.category?.toUpperCase() || 'INSIGHT'}
+                  </span>
+                  <span>{insight.time_ago || 'NOW'}</span>
+                </div>
+                <div className="feed-content">
+                  <span className="highlight-text">{insight.title || insight.message}</span>
+                  {insight.description && ` ${insight.description}`}
+                </div>
+              </div>
+            ))
+          ) : (
+            <>
+              <div className="feed-item">
+                <div className="feed-meta"><span style={{ color: 'var(--accent-primary)' }}>ROUTE OPTIMIZER</span><span>NOW</span></div>
+                <div className="feed-content">
+                  <span className="highlight-text">Margin Leak Detected</span> on JHB-CPT route. Fuel costs spiked 12% above baseline for Truck 42.
+                  <div className="alert-box">
+                    <div className="alert-title">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      Recommendation
+                    </div>
+                    <div>Reroute via N1 Alternate or renegotiate return load.</div>
+                    <button className="btn-action">APPLY REROUTE</button>
+                  </div>
+                </div>
+              </div>
+              <div className="feed-item">
+                <div className="feed-meta"><span>INVOICE COLLECTOR</span><span>2m AGO</span></div>
+                <div className="feed-content">Chasing invoice #INV-2024-09. Client opened email 3 times. <span className="highlight-text">Probability of payment today: 85%.</span></div>
+              </div>
+              <div className="feed-item">
+                <div className="feed-meta"><span>QUOTE GENERATOR</span><span>14m AGO</span></div>
+                <div className="feed-content">Generated 3 quotes for <span className="highlight-text">LogiCorp</span>. Margin locked at 22%.</div>
+              </div>
+              <div className="feed-item">
+                <div className="feed-meta"><span>FLEET MONITOR</span><span>1h AGO</span></div>
+                <div className="feed-content">Tyre pressure warning on TRK-892. Maintenance ticket auto-created.</div>
+              </div>
+            </>
+          )}
         </div>
         <div style={{ padding: 20, borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
           <div className="card-title" style={{ marginBottom: 12 }}>Quick Quote</div>

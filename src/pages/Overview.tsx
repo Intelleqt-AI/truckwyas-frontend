@@ -1,574 +1,251 @@
-/**
- * TruckWys V3 - Overview/Command Center
- *
- * NOT a generic dashboard. A COMMAND CENTER for fleet operators managing cash flow.
- * Shows: Cash position strip, AI signal cards, portfolio health, cash flow forecast, activity feed
- */
-
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  TrendingUp,
-  TrendingDown,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  DollarSign,
-  FileText,
-  ArrowRight,
-  Activity,
-} from 'lucide-react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { getPortfolioSummary, allInvoices, operators, currentMacroData } from '@/mocks/risk-mock-data';
-import { formatCurrency } from '@/lib/formatters';
-
-// ==========================
-// TYPES
-// ==========================
-
-interface Signal {
-  id: string;
-  severity: 'critical' | 'warning' | 'opportunity' | 'info';
-  category: 'Cash' | 'Risk' | 'Opportunity' | 'Network';
-  title: string;
-  description: string;
-  amount?: number;
-  actionLabel?: string;
-  actionPath?: string;
-}
-
-interface CashFlowDataPoint {
-  date: string;
-  confirmed: number;
-  predicted: number;
-  expenses: number;
-  net: number;
-}
-
-interface ActivityItem {
-  id: string;
-  timestamp: Date;
-  type: 'invoice_generated' | 'advance_requested' | 'payment_received' | 'alert_triggered';
-  description: string;
-  amount?: number;
-  status?: 'success' | 'pending' | 'warning';
-}
-
-// ==========================
-// MOCK DATA GENERATORS
-// ==========================
-
-function generateCashFlowForecast(): CashFlowDataPoint[] {
-  const data: CashFlowDataPoint[] = [];
-  const startDate = new Date();
-
-  for (let i = 0; i < 90; i += 7) {
-    const date = new Date(startDate);
-    date.setDate(date.getDate() + i);
-
-    const confirmed = 250000 + Math.random() * 150000;
-    const predicted = 180000 + Math.random() * 120000;
-    const expenses = 200000 + Math.random() * 80000;
-    const net = confirmed + predicted - expenses;
-
-    data.push({
-      date: date.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }),
-      confirmed,
-      predicted,
-      expenses,
-      net,
-    });
-  }
-
-  return data;
-}
-
-function generateSignals(): Signal[] {
-  const portfolio = getPortfolioSummary();
-  const eligibleInvoices = allInvoices.filter((inv) => inv.riskScore.isEligible);
-  const overdueInvoices = allInvoices.filter(
-    (inv) => inv.invoice.daysUntilDue < 0 && inv.riskScore.isEligible
-  );
-
-  const totalEligibleAmount = eligibleInvoices.reduce((sum, inv) => sum + inv.invoice.amount, 0);
-  const avgFee =
-    eligibleInvoices.reduce((sum, inv) => sum + inv.riskScore.finalFeePercent, 0) / eligibleInvoices.length;
-
-  const signals: Signal[] = [];
-
-  // Overdue invoices signal
-  if (overdueInvoices.length > 0) {
-    const overdueAmount = overdueInvoices.reduce((sum, inv) => sum + inv.invoice.amount, 0);
-    signals.push({
-      id: 'overdue',
-      severity: 'critical',
-      category: 'Cash',
-      title: `${overdueInvoices.length} invoices overdue`,
-      description: `R ${(overdueAmount / 1000).toFixed(0)}k at risk — prioritize collections`,
-      amount: overdueAmount,
-      actionLabel: 'View overdue',
-      actionPath: '/finance/invoices?filter=overdue',
-    });
-  }
-
-  // Fast pay opportunity
-  if (eligibleInvoices.length >= 5) {
-    signals.push({
-      id: 'fast_pay',
-      severity: 'opportunity',
-      category: 'Opportunity',
-      title: `R ${(totalEligibleAmount / 1000).toFixed(0)}k eligible for early pay`,
-      description: `${eligibleInvoices.length} invoices at ${avgFee.toFixed(1)}% average fee`,
-      amount: totalEligibleAmount,
-      actionLabel: 'Request advances',
-      actionPath: '/capital',
-    });
-  }
-
-  // Fuel price warning
-  if (currentMacroData.fuelPriceTrend3Mo === 'rising') {
-    signals.push({
-      id: 'fuel_prices',
-      severity: 'warning',
-      category: 'Risk',
-      title: 'Fuel prices rising — margin impact',
-      description: '3-month upward trend affecting 12 active trips',
-      actionLabel: 'View routes',
-      actionPath: '/fleet',
-    });
-  }
-
-  // Cross-platform intelligence
-  const latePayingCustomers = allInvoices.filter(
-    (inv) => inv.customer.debtorCredit.hasCrossOperatorLatePaymentFlag
-  );
-  if (latePayingCustomers.length > 0) {
-    const uniqueCustomers = new Set(latePayingCustomers.map((inv) => inv.customer.customerName));
-    signals.push({
-      id: 'cross_platform',
-      severity: 'warning',
-      category: 'Network',
-      title: `${uniqueCustomers.size} customers flagged on network`,
-      description: 'Late payments to other operators — monitor closely',
-      actionLabel: 'View customers',
-      actionPath: '/finance/reports?tab=customer',
-    });
-  }
-
-  return signals.slice(0, 4); // Max 4 signals
-}
-
-function generateRecentActivity(): ActivityItem[] {
-  const now = new Date();
-  const activities: ActivityItem[] = [];
-
-  // Recent invoices
-  const recentInvoices = [...allInvoices]
-    .sort((a, b) => a.invoice.ageInDays - b.invoice.ageInDays)
-    .slice(0, 5);
-
-  recentInvoices.forEach((inv, idx) => {
-    const timestamp = new Date(now);
-    timestamp.setHours(timestamp.getHours() - (idx + 1) * 2);
-
-    activities.push({
-      id: `inv-${inv.invoice.invoiceId}`,
-      timestamp,
-      type: 'invoice_generated',
-      description: `Invoice ${inv.invoice.invoiceId} generated for ${inv.customer.customerName}`,
-      amount: inv.invoice.amount,
-      status: 'success',
-    });
-  });
-
-  return activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 10);
-}
-
-// ==========================
-// HELPER FUNCTIONS
-// ==========================
-
-function getRelativeTime(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  return `${diffDays}d ago`;
-}
-
-// ==========================
-// MAIN COMPONENT
-// ==========================
 
 export default function Overview() {
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const navigate = useNavigate();
-  const [greeting, setGreeting] = useState('Good morning');
-  const [user] = useState({ username: 'Dennis' }); // Mock user
 
-  const portfolio = getPortfolioSummary();
-  const cashFlowData = generateCashFlowForecast();
-  const signals = generateSignals();
-  const recentActivity = generateRecentActivity();
-
-  // Mock cash position calculations
-  const currentOperator = operators[0]; // TransNamib
-  const cashAvailable = 1250000;
-  const expectedIn7d = 420000;
-  const expectedIn30d = 1850000;
-  const expectedOut30d = 1200000;
-  const advanceAvailable = currentOperator.facilityLimit * (1 - currentOperator.clientFinancial.advanceUtilizationRate / 100);
-
-  useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) setGreeting('Good morning');
-    else if (hour < 18) setGreeting('Good afternoon');
-    else setGreeting('Good evening');
-  }, []);
-
-  const currentDate = new Date().toLocaleDateString('en-ZA', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-
-
-  const getSeverityIcon = (severity: Signal['severity']) => {
-    switch (severity) {
-      case 'critical':
-        return <AlertCircle className="w-5 h-5 text-[#EF4444]" />;
-      case 'warning':
-        return <Clock className="w-5 h-5 text-[#F59E0B]" />;
-      case 'opportunity':
-        return <TrendingUp className="w-5 h-5 text-[#10B981]" />;
-      case 'info':
-        return <CheckCircle className="w-5 h-5 text-[#2563EB]" />;
-    }
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    document.documentElement.setAttribute('data-theme', next);
   };
 
   return (
-    <div className="space-y-8">
-      {/* Welcome Section */}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold text-[#0F172A]">
-          {greeting}, {user.username}
-        </h1>
-        <p className="text-sm text-[#475569]">{currentDate}</p>
-      </div>
+    <div className="os-container">
+      {/* Ambient glow */}
+      <div className="ambient-glow" />
 
-      {/* Cash Position Strip */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card className="border-[#E2E8F0] bg-white rounded-md">
-          <div className="p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Cash Available Now</p>
-            <p className="text-2xl font-semibold text-[#0F172A] mt-1 font-mono tabular-nums">
-              {formatCurrency(cashAvailable)}
-            </p>
-            <p className="text-xs text-[#64748B] mt-1">Bank balance</p>
-          </div>
-        </Card>
+      {/* HEADER */}
+      <header className="os-header">
+        <div className="logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter">
+            <path d="M4 4h16v16H4z" fill="none" />
+            <path d="M4 20L20 4" />
+            <path d="M4 4l5 5" stroke="var(--accent-primary)" />
+          </svg>
+          TRUCKWYS<span>OS</span>
+        </div>
 
-        <Card className="border-[#E2E8F0] bg-white rounded-md">
-          <div className="p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Expected In (7d)</p>
-            <p className="text-2xl font-semibold text-[#10B981] mt-1 font-mono tabular-nums">
-              {formatCurrency(expectedIn7d)}
-            </p>
-            <p className="text-xs text-[#64748B] mt-1">Predicted inflow</p>
-          </div>
-        </Card>
+        <div className="agent-command">
+          <div className="agent-icon" />
+          <input
+            type="text"
+            className="agent-input"
+            placeholder="Ask Agent to analyze route profitability or generate quote..."
+            defaultValue="Agent, show me margin leaks on the JHB-CPT route"
+          />
+        </div>
 
-        <Card className="border-[#E2E8F0] bg-white rounded-md">
-          <div className="p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Expected In (30d)</p>
-            <p className="text-2xl font-semibold text-[#10B981] mt-1 font-mono tabular-nums">
-              {formatCurrency(expectedIn30d)}
-            </p>
-            <p className="text-xs text-[#64748B] mt-1">30-day forecast</p>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <div className="status-badge active">
+            <span style={{ width: 6, height: 6, background: 'currentColor', borderRadius: '50%', display: 'inline-block' }} />
+            SYSTEMS ONLINE
           </div>
-        </Card>
+          <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+            {theme === 'dark' ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+            )}
+          </button>
+          <div style={{ width: 32, height: 32, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>TW</div>
+        </div>
+      </header>
 
-        <Card className="border-[#E2E8F0] bg-white rounded-md">
-          <div className="p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Expected Out (30d)</p>
-            <p className="text-2xl font-semibold text-[#EF4444] mt-1 font-mono tabular-nums">
-              {formatCurrency(expectedOut30d)}
-            </p>
-            <p className="text-xs text-[#64748B] mt-1">Scheduled expenses</p>
-          </div>
-        </Card>
+      {/* LEFT NAV */}
+      <nav className="os-nav">
+        <div className="nav-item active" title="Home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <div className="nav-item" title="Bookings" onClick={() => navigate('/quotes')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div className="nav-item" title="Fleet" onClick={() => navigate('/vehicles')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        </div>
+        <div className="nav-item" title="Finance" onClick={() => navigate('/invoices')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div className="nav-item" title="Capital" onClick={() => navigate('/capital')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <div className="nav-item" title="Insights" onClick={() => navigate('/insights')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <div className="nav-item" title="Settings" onClick={() => navigate('/settings')} style={{ marginTop: 'auto', marginBottom: 24 }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </div>
+      </nav>
 
-        <Card className="border-[#E2E8F0] bg-white rounded-md">
-          <div className="p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8]">Advance Available</p>
-            <p className="text-2xl font-semibold text-[#2563EB] mt-1 font-mono tabular-nums">
-              {formatCurrency(advanceAvailable)}
-            </p>
-            <p className="text-xs text-[#64748B] mt-1">
-              {currentOperator.clientFinancial.advanceUtilizationRate.toFixed(0)}% facility used
-            </p>
+      {/* MAIN WORKSPACE */}
+      <main className="workspace">
+        {/* Metric cards */}
+        <div className="card metric-card">
+          <div className="card-header">
+            <span className="card-title">Net Rev / Trip</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="card-action"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </div>
-        </Card>
-      </div>
+          <div className="metric-value">R 18,450</div>
+          <div className="metric-delta delta-up">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="18 15 12 9 6 15"/></svg>
+            <span>+12.5% vs avg</span>
+          </div>
+        </div>
 
-      {/* AI Signal Cards */}
-      {signals.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#0F172A]">AI Signals</h2>
-            <Badge variant="outline" className="text-xs bg-[#EFF6FF] text-[#2563EB] border-[#2563EB]">
-              AI
-            </Badge>
+        <div className="card metric-card">
+          <div className="card-header">
+            <span className="card-title">Fleet Margin</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="card-action"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {signals.map((signal) => (
-              <Card
-                key={signal.id}
-                className="border-[#E2E8F0] bg-white rounded-md cursor-pointer hover:bg-[#F8FAFC] transition-colors"
-                onClick={() => signal.actionPath && navigate(signal.actionPath)}
-              >
-                <div className="p-4">
-                  <div className="flex items-start gap-3">
-                    {getSeverityIcon(signal.severity)}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] font-semibold bg-white border-[#E2E8F0]"
-                        >
-                          {signal.category}
-                        </Badge>
-                      </div>
-                      <h3 className="text-sm font-semibold text-[#0F172A] mb-1">{signal.title}</h3>
-                      <p className="text-xs text-[#475569]">{signal.description}</p>
-                      {signal.actionLabel && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mt-2 h-7 px-2 text-xs hover:bg-[#F1F5F9]"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            signal.actionPath && navigate(signal.actionPath);
-                          }}
-                        >
-                          {signal.actionLabel}
-                          <ArrowRight className="w-3 h-3 ml-1" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Card>
+          <div className="metric-value" style={{ color: 'var(--accent-primary)' }}>24.8%</div>
+          <div className="metric-delta delta-up">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="18 15 12 9 6 15"/></svg>
+            <span>+2.1% uplift</span>
+          </div>
+        </div>
+
+        <div className="card metric-card">
+          <div className="card-header">
+            <span className="card-title">Avg Payment Days</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="card-action"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+          </div>
+          <div className="metric-value">28 Days</div>
+          <div className="metric-delta delta-neutral"><span>-10 days faster</span></div>
+        </div>
+
+        {/* Chart card */}
+        <div className="card chart-card">
+          <div className="card-header">
+            <span className="card-title">Fuel Efficiency vs Revenue (Last 30 Days)</span>
+            <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-secondary)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, background: 'var(--accent-primary)', borderRadius: 2, display: 'inline-block' }}/>Revenue</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, background: 'var(--chart-bar)', borderRadius: 2, display: 'inline-block' }}/>Cost</span>
+            </div>
+          </div>
+          <div className="chart-placeholder">
+            {[40, 55, 45, 60, 75, 50, 65, 85, 70, 60, 90, 75].map((h, i) => (
+              <div key={i} className={`bar${i === 7 ? ' highlight' : ''}`} style={{ height: `${h}%` }} />
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Portfolio Health */}
-      <Card className="border-[#E2E8F0] bg-white rounded-md">
-        <div className="p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#0F172A]">Portfolio Health Score</h2>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-[#10B981]" />
-              <span className="text-sm font-medium text-[#10B981]">Improving</span>
-            </div>
-          </div>
-          <div className="flex items-end gap-3">
-            <p className="text-5xl font-semibold text-[#0F172A] font-mono tabular-nums">
-              {portfolio.avgRiskScore}
-            </p>
-            <p className="text-sm text-[#64748B] mb-2">/ 100</p>
-          </div>
-          <div className="grid grid-cols-5 gap-2">
-            <div className="text-center">
-              <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8] mb-1">PRIME</p>
-              <p className="text-lg font-semibold text-[#10B981] tabular-nums">
-                {portfolio.tierDistribution.prime}
-              </p>
-              <p className="text-xs text-[#64748B]">
-                {((portfolio.tierDistribution.prime / portfolio.totalInvoices) * 100).toFixed(0)}%
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8] mb-1">STANDARD</p>
-              <p className="text-lg font-semibold text-[#2563EB] tabular-nums">
-                {portfolio.tierDistribution.standard}
-              </p>
-              <p className="text-xs text-[#64748B]">
-                {((portfolio.tierDistribution.standard / portfolio.totalInvoices) * 100).toFixed(0)}%
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8] mb-1">ELEVATED</p>
-              <p className="text-lg font-semibold text-[#F59E0B] tabular-nums">
-                {portfolio.tierDistribution.elevated}
-              </p>
-              <p className="text-xs text-[#64748B]">
-                {((portfolio.tierDistribution.elevated / portfolio.totalInvoices) * 100).toFixed(0)}%
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8] mb-1">HIGH</p>
-              <p className="text-lg font-semibold text-[#EF4444] tabular-nums">
-                {portfolio.tierDistribution.high}
-              </p>
-              <p className="text-xs text-[#64748B]">
-                {((portfolio.tierDistribution.high / portfolio.totalInvoices) * 100).toFixed(0)}%
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs font-medium uppercase tracking-wider text-[#94A3B8] mb-1">INELIGIBLE</p>
-              <p className="text-lg font-semibold text-[#64748B] tabular-nums">
-                {portfolio.tierDistribution.ineligible}
-              </p>
-              <p className="text-xs text-[#64748B]">
-                {((portfolio.tierDistribution.ineligible / portfolio.totalInvoices) * 100).toFixed(0)}%
-              </p>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>
+            <span>01 Nov</span><span>15 Nov</span><span>30 Nov</span>
           </div>
         </div>
-      </Card>
 
-      {/* Cash Flow Forecast Chart */}
-      <Card className="border-[#E2E8F0] bg-white rounded-md">
-        <div className="p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#0F172A]">90-Day Cash Flow Forecast</h2>
-            <Badge variant="outline" className="text-xs bg-[#EFF6FF] text-[#2563EB] border-[#2563EB]">
-              AI Predicted
-            </Badge>
+        {/* Utilization card */}
+        <div className="card utilization-card">
+          <div className="card-header"><span className="card-title">Fleet Utilization</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <span style={{ fontSize: 24, fontWeight: 500, color: 'var(--text-primary)' }}>88%</span>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>High Demand</span>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={cashFlowData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorConfirmed" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorPredicted" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#2563EB" stopOpacity={0.1} />
-                  <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-              <XAxis dataKey="date" stroke="#94A3B8" style={{ fontSize: '12px' }} />
-              <YAxis stroke="#94A3B8" style={{ fontSize: '12px' }} tickFormatter={(val) => formatCurrency(val)} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                }}
-                formatter={(value: number) => formatZAR(value)}
-              />
-              <ReferenceLine y={0} stroke="#94A3B8" strokeDasharray="3 3" />
-              <Area
-                type="monotone"
-                dataKey="confirmed"
-                stroke="#10B981"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#colorConfirmed)"
-                name="Confirmed"
-              />
-              <Area
-                type="monotone"
-                dataKey="predicted"
-                stroke="#2563EB"
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                fillOpacity={1}
-                fill="url(#colorPredicted)"
-                name="Predicted"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div className="heatmap-grid">
+            {['low','med','high','low','high','high','low','high','high','med','high','low','high','high','high','med','high','high','high','high','med','med','med','low','low','med','low','low'].map((v, i) => (
+              <div key={i} className={`heat-cell heat-${v}`} />
+            ))}
+          </div>
+          <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-tertiary)' }}>3 trucks idle in Depot 4</div>
         </div>
-      </Card>
 
-      {/* Recent Activity + Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Recent Activity (2/3 width) */}
-        <Card className="border-[#E2E8F0] bg-white rounded-md md:col-span-2">
-          <div className="p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-[#0F172A]">Recent Activity</h2>
-            <div className="space-y-3">
-              {recentActivity.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Activity className="h-12 w-12 text-[#CBD5E1] mb-4" />
-                  <h3 className="text-lg font-medium text-[#0F172A]">No activity yet</h3>
-                  <p className="text-sm text-[#64748B] mt-1 text-center max-w-sm">
-                    Activity will appear here as you use the platform
-                  </p>
+        {/* P&L Table */}
+        <div className="card table-card">
+          <div className="card-header">
+            <span className="card-title">Live Trip P&L Breakdown</span>
+            <button style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 8px', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>EXPORT CSV</button>
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Route ID</th><th>Driver</th><th>Status</th><th>Est. Rev</th><th>Fuel Cost</th><th className="text-right">Net Profit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="mono">TRK-892</td><td>S. Nkosi</td>
+                <td><span className="status-badge active">In Transit</span></td>
+                <td>R 45,200</td><td>R 12,400</td>
+                <td className="text-right" style={{ color: 'var(--accent-primary)' }}>+ R 18,200</td>
+              </tr>
+              <tr>
+                <td className="mono">TRK-901</td><td>J. Dlamini</td>
+                <td><span className="status-badge">Loading</span></td>
+                <td>R 32,150</td><td>R 8,900</td>
+                <td className="text-right" style={{ color: 'var(--accent-primary)' }}>+ R 14,050</td>
+              </tr>
+              <tr>
+                <td className="mono">TRK-774</td><td>P. Botha</td>
+                <td><span className="status-badge">Completed</span></td>
+                <td>R 28,400</td><td>R 9,200</td>
+                <td className="text-right" style={{ color: 'var(--text-primary)' }}>+ R 9,100</td>
+              </tr>
+              <tr>
+                <td className="mono">TRK-882</td><td>M. Moyo</td>
+                <td><span className="status-badge active" style={{ color: 'var(--status-danger)', background: 'var(--status-danger-bg)' }}>Delayed</span></td>
+                <td>R 51,000</td><td>R 16,500</td>
+                <td className="text-right" style={{ color: 'var(--status-danger)' }}>+ R 8,200</td>
+              </tr>
+              <tr>
+                <td className="mono">TRK-911</td><td>L. Zulu</td>
+                <td><span className="status-badge">Scheduled</span></td>
+                <td>R 38,000</td><td>R 10,100</td>
+                <td className="text-right" style={{ color: 'var(--text-tertiary)' }}>--</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+
+      {/* AGENT SIDEBAR */}
+      <aside className="agent-sidebar">
+        <div className="agent-header">
+          <div className="live-dot" />
+          Agent Activity Stream
+        </div>
+        <div className="agent-feed">
+          <div className="feed-item">
+            <div className="feed-meta"><span style={{ color: 'var(--accent-primary)' }}>ROUTE OPTIMIZER</span><span>NOW</span></div>
+            <div className="feed-content">
+              <span className="highlight-text">Margin Leak Detected</span> on JHB-CPT route. Fuel costs spiked 12% above baseline for Truck 42.
+              <div className="alert-box">
+                <div className="alert-title">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  Recommendation
                 </div>
-              ) : (
-                recentActivity.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-start gap-3 pb-3 border-b border-[#F1F5F9] last:border-0 last:pb-0"
-                  >
-                    <div className="w-2 h-2 rounded-full bg-[#2563EB] mt-2 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#0F172A]">{item.description}</p>
-                      {item.amount && (
-                        <p className="text-sm font-mono tabular-nums text-[#475569] mt-0.5">
-                          {formatCurrency(item.amount)}
-                        </p>
-                      )}
-                      <p className="text-xs text-[#94A3B8] mt-1">{getRelativeTime(item.timestamp)}</p>
-                    </div>
-                  </div>
-                ))
-              )}
+                <div>Reroute via N1 Alternate or renegotiate return load.</div>
+                <button className="btn-action">APPLY REROUTE</button>
+              </div>
             </div>
           </div>
-        </Card>
-
-        {/* Quick Actions (1/3 width) */}
-        <Card className="border-[#E2E8F0] bg-white rounded-md">
-          <div className="p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-[#0F172A]">Quick Actions</h2>
-            <div className="space-y-2">
-              <Button
-                variant="outline"
-                className="w-full justify-start border-[#E2E8F0] hover:bg-[#F8FAFC]"
-                onClick={() => navigate('/capital')}
-              >
-                <DollarSign className="w-4 h-4 mr-2 text-[#10B981]" />
-                Request Early Pay
-                <Badge variant="secondary" className="ml-auto bg-[#D1FAE5] text-[#10B981]">
-                  {portfolio.eligibleCount}
-                </Badge>
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start border-[#E2E8F0] hover:bg-[#F8FAFC]"
-                onClick={() => navigate('/finance/invoices')}
-              >
-                <FileText className="w-4 h-4 mr-2 text-[#2563EB]" />
-                View Invoices
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start border-[#E2E8F0] hover:bg-[#F8FAFC]"
-                onClick={() => navigate('/finance/reports')}
-              >
-                <TrendingUp className="w-4 h-4 mr-2 text-[#F59E0B]" />
-                View Reports
-              </Button>
-            </div>
+          <div className="feed-item">
+            <div className="feed-meta"><span>INVOICE COLLECTOR</span><span>2m AGO</span></div>
+            <div className="feed-content">Chasing invoice #INV-2024-09. Client opened email 3 times. <span className="highlight-text">Probability of payment today: 85%.</span></div>
           </div>
-        </Card>
-      </div>
+          <div className="feed-item">
+            <div className="feed-meta"><span>QUOTE GENERATOR</span><span>14m AGO</span></div>
+            <div className="feed-content">Generated 3 quotes for <span className="highlight-text">LogiCorp</span>. Margin locked at 22%.</div>
+          </div>
+          <div className="feed-item">
+            <div className="feed-meta"><span>FLEET MONITOR</span><span>1h AGO</span></div>
+            <div className="feed-content">Tyre pressure warning on TRK-892. Maintenance ticket auto-created.</div>
+          </div>
+        </div>
+        <div style={{ padding: 20, borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
+          <div className="card-title" style={{ marginBottom: 12 }}>Quick Quote</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+            <input type="text" placeholder="Origin" style={{ background: 'var(--bg-surface-hover)', border: '1px solid var(--border-subtle)', padding: 8, color: 'var(--text-primary)', borderRadius: 2, fontSize: 11, outline: 'none' }} />
+            <input type="text" placeholder="Dest" style={{ background: 'var(--bg-surface-hover)', border: '1px solid var(--border-subtle)', padding: 8, color: 'var(--text-primary)', borderRadius: 2, fontSize: 11, outline: 'none' }} />
+          </div>
+          <button className="btn-action" style={{ background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}>GENERATE PREVIEW</button>
+        </div>
+      </aside>
     </div>
   );
 }

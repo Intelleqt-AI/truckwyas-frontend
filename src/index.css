@@ -1,10 +1,15 @@
+/* OS Theme first — defines all CSS variables and layout classes */
 @import './styles/theme.css';
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* Tailwind utilities only — no base reset (it fights our OS vars) */
+@tailwind components;
+@tailwind utilities;
 
 html, body, #root {
   height: 100vh;
   overflow: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 body {
@@ -13,5 +18,9 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
-  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
 }

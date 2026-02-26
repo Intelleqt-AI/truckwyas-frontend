@@ -3,10 +3,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { OSLayout } from "./components/os/OSLayout";
 
-// Page imports
+// Pages
 import Overview from "./pages/Overview";
 import { QuotesList } from "./pages/QuotesList";
 import NewQuote from "./pages/NewQuote";
@@ -31,18 +31,9 @@ import XeroIntegration from "./pages/settings/XeroIntegration";
 import FleetImport from "./pages/settings/FleetImport";
 import NotFound from "./pages/NotFound";
 
-// Auth
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import ProtectedRoute from "./components/ProtectedRoute";
-
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      retry: 1,
-      throwOnError: false,
-      refetchOnWindowFocus: false,
-    },
+    queries: { retry: 1, throwOnError: false, refetchOnWindowFocus: false },
   },
 });
 
@@ -50,138 +41,47 @@ const App = () => (
   <BrowserRouter>
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            {/* Homepage — has its own full OS layout with agent sidebar */}
+            <Route path="/" element={<Overview />} />
 
-          <Route path="/" element={<Overview />} />
-
-          <Route element={<ProtectedRoute />}>
-            <Route path="/bookings" element={
-              <DashboardLayout>
-                <Bookings />
-              </DashboardLayout>
-            } />
-            <Route path="/bookings/:id" element={
-              <DashboardLayout>
-                <Bookings />
-              </DashboardLayout>
-            } />
-            <Route path="/bookings/list" element={
-              <DashboardLayout>
-                <BookingsList />
-              </DashboardLayout>
-            } />
-            <Route path="/bookings/pipeline" element={
-              <DashboardLayout>
-                <QuotesList />
-              </DashboardLayout>
-            } />
-            <Route path="/bookings/pipeline/:id" element={
-              <DashboardLayout>
-                <NewQuote />
-              </DashboardLayout>
-            } />
-            <Route path="/quotes/new" element={
-              <DashboardLayout>
-                <NewQuote />
-              </DashboardLayout>
-            } />
-            <Route path="/fleet" element={
-              <DashboardLayout>
-                <FleetDashboard />
-              </DashboardLayout>
-            } />
-            <Route path="/fleet/vehicles" element={
-              <DashboardLayout>
-                <Vehicles />
-              </DashboardLayout>
-            } />
-            <Route path="/fleet/vehicles/:id" element={
-              <DashboardLayout>
-                <VehicleDigitalTwin />
-              </DashboardLayout>
-            } />
-            <Route path="/fleet/drivers" element={
-              <DashboardLayout>
-                <Drivers />
-              </DashboardLayout>
-            } />
-            <Route path="/fleet/drivers/:driverId" element={
-              <DashboardLayout>
-                <DriverProfile />
-              </DashboardLayout>
-            } />
-            <Route path="/finance/invoices" element={
-              <DashboardLayout>
-                <Invoices />
-              </DashboardLayout>
-            } />
-            <Route path="/finance/invoices/new" element={
-              <DashboardLayout>
-                <CreateInvoice />
-              </DashboardLayout>
-            } />
-            <Route path="/finance/invoices/:id" element={
-              <DashboardLayout>
-                <InvoiceDetail />
-              </DashboardLayout>
-            } />
-            <Route path="/finance/expenses" element={
-              <DashboardLayout>
-                <Expenses />
-              </DashboardLayout>
-            } />
-            <Route path="/finance/reports" element={
-              <DashboardLayout>
-                <FinanceReports />
-              </DashboardLayout>
-            } />
-            <Route path="/capital" element={
-              <DashboardLayout>
-                <Capital />
-              </DashboardLayout>
-            } />
-            <Route path="/capital/request" element={
-              <DashboardLayout>
-                <AdvanceRequest />
-              </DashboardLayout>
-            } />
-            <Route path="/capital/advances/:id" element={
-              <DashboardLayout>
-                <AdvanceDetail />
-              </DashboardLayout>
-            } />
-            <Route path="/insights" element={
-              <DashboardLayout>
-                <Insights />
-              </DashboardLayout>
-            } />
-            <Route path="/settings/:section?" element={
-              <DashboardLayout>
-                <Settings />
-              </DashboardLayout>
-            } />
-            <Route path="/settings/integrations/xero" element={
-              <DashboardLayout>
-                <XeroIntegration />
-              </DashboardLayout>
-            } />
-            <Route path="/settings/integrations/fleet" element={
-              <DashboardLayout>
-                <FleetImport />
-              </DashboardLayout>
-            } />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </TooltipProvider>
+            {/* All other pages — wrapped in OSLayout (header + nav + content) */}
+            <Route path="/quotes" element={<OSLayout><QuotesList /></OSLayout>} />
+            <Route path="/quotes/new" element={<OSLayout><NewQuote /></OSLayout>} />
+            <Route path="/bookings" element={<OSLayout><Bookings /></OSLayout>} />
+            <Route path="/bookings/:id" element={<OSLayout><Bookings /></OSLayout>} />
+            <Route path="/bookings/list" element={<OSLayout><BookingsList /></OSLayout>} />
+            <Route path="/bookings/pipeline" element={<OSLayout><QuotesList /></OSLayout>} />
+            <Route path="/bookings/pipeline/:id" element={<OSLayout><NewQuote /></OSLayout>} />
+            <Route path="/fleet" element={<OSLayout><FleetDashboard /></OSLayout>} />
+            <Route path="/fleet/vehicles" element={<OSLayout><Vehicles /></OSLayout>} />
+            <Route path="/fleet/vehicles/:id" element={<OSLayout><VehicleDigitalTwin /></OSLayout>} />
+            <Route path="/fleet/drivers" element={<OSLayout><Drivers /></OSLayout>} />
+            <Route path="/fleet/drivers/:driverId" element={<OSLayout><DriverProfile /></OSLayout>} />
+            <Route path="/vehicles" element={<OSLayout><Vehicles /></OSLayout>} />
+            <Route path="/drivers" element={<OSLayout><Drivers /></OSLayout>} />
+            <Route path="/invoices" element={<OSLayout><Invoices /></OSLayout>} />
+            <Route path="/finance/invoices" element={<OSLayout><Invoices /></OSLayout>} />
+            <Route path="/finance/invoices/new" element={<OSLayout><CreateInvoice /></OSLayout>} />
+            <Route path="/finance/invoices/:id" element={<OSLayout><InvoiceDetail /></OSLayout>} />
+            <Route path="/finance/expenses" element={<OSLayout><Expenses /></OSLayout>} />
+            <Route path="/finance/reports" element={<OSLayout><FinanceReports /></OSLayout>} />
+            <Route path="/capital" element={<OSLayout><Capital /></OSLayout>} />
+            <Route path="/capital/request" element={<OSLayout><AdvanceRequest /></OSLayout>} />
+            <Route path="/capital/advances/:id" element={<OSLayout><AdvanceDetail /></OSLayout>} />
+            <Route path="/insights" element={<OSLayout><Insights /></OSLayout>} />
+            <Route path="/settings/:section?" element={<OSLayout><Settings /></OSLayout>} />
+            <Route path="/settings/integrations/xero" element={<OSLayout><XeroIntegration /></OSLayout>} />
+            <Route path="/settings/integrations/fleet" element={<OSLayout><FleetImport /></OSLayout>} />
+            <Route path="*" element={<OSLayout><NotFound /></OSLayout>} />
+          </Routes>
+        </TooltipProvider>
       </ErrorBoundary>
     </QueryClientProvider>
-  </BrowserRouter >
+  </BrowserRouter>
 );
 
 export default App;

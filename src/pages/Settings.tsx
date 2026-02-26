@@ -1,23 +1,4 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { NavLink, useParams, Navigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import {
-  User,
-  Bell,
-  Shield,
-  Building2,
-  Users,
-  CreditCard,
-  Zap,
-  UsersIcon,
-  Truck,
-  Settings as SettingsIcon,
-  Contact
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useParams, NavLink, Navigate } from "react-router-dom";
 
 // Import individual setting pages
 import { ProfileSettings } from "./settings/ProfileSettings";
@@ -31,187 +12,95 @@ import { CustomersDirectory } from "./settings/CustomersDirectory";
 import { VehiclesDirectory } from "./settings/VehiclesDirectory";
 import { VehicleTypesDirectory } from "./settings/VehicleTypesDirectory";
 
-const SETTINGS_SECTIONS = [
+const SECTIONS = [
   {
-    title: "My Account",
+    group: 'My Account',
     items: [
-      {
-        id: "profile",
-        label: "Profile",
-        icon: User,
-        component: ProfileSettings,
-        description: "Manage your personal information and preferences"
-      },
-      {
-        id: "notifications",
-        label: "Notifications",
-        icon: Bell,
-        component: NotificationSettings,
-        description: "Configure email and push notifications"
-      },
-      {
-        id: "security",
-        label: "Security",
-        icon: Shield,
-        component: SecuritySettings,
-        description: "Password, 2FA, and security settings"
-      }
-    ]
+      { id: 'profile', label: 'Profile', component: ProfileSettings },
+      { id: 'notifications', label: 'Notifications', component: NotificationSettings },
+      { id: 'security', label: 'Security', component: SecuritySettings },
+    ],
   },
   {
-    title: "Workspace",
+    group: 'Workspace',
     items: [
-      {
-        id: "company",
-        label: "Company Details",
-        icon: Building2,
-        component: CompanySettings,
-        description: "Company information and branding"
-      },
-      {
-        id: "users",
-        label: "Users & Permissions",
-        icon: UsersIcon,
-        component: UsersPermissions,
-        description: "Manage team members and their access"
-      },
-      {
-        id: "billing",
-        label: "Billing",
-        icon: CreditCard,
-        component: BillingSettings,
-        description: "Subscription and payment information"
-      },
-      {
-        id: "integrations",
-        label: "Integrations",
-        icon: Zap,
-        component: IntegrationsSettings,
-        description: "Connect TMS, accounting, and other systems"
-      }
-    ]
+      { id: 'company', label: 'Company Details', component: CompanySettings },
+      { id: 'users', label: 'Users & Permissions', component: UsersPermissions },
+      { id: 'billing', label: 'Billing', component: BillingSettings },
+      { id: 'integrations', label: 'Integrations', component: IntegrationsSettings },
+    ],
   },
   {
-    title: "Directory",
+    group: 'Directory',
     items: [
-      {
-        id: "customers",
-        label: "Customers",
-        icon: Contact,
-        component: CustomersDirectory,
-        description: "Manage customer database and credit terms"
-      },
-      {
-        id: "vehicles",
-        label: "Vehicles",
-        icon: Truck,
-        component: VehiclesDirectory,
-        description: "Fleet vehicle details and maintenance"
-      },
-      {
-        id: "vehicle-types",
-        label: "Vehicle Types",
-        icon: SettingsIcon,
-        component: VehicleTypesDirectory,
-        description: "Configure vehicle type classifications"
-      }
-    ]
-  }
+      { id: 'customers', label: 'Customers', component: CustomersDirectory },
+      { id: 'vehicles', label: 'Vehicles', component: VehiclesDirectory },
+      { id: 'vehicle-types', label: 'Vehicle Types', component: VehicleTypesDirectory },
+    ],
+  },
 ];
+
+const ALL_ITEMS = SECTIONS.flatMap(s => s.items);
 
 export default function Settings() {
   const { section } = useParams();
 
-  // If no section specified, redirect to profile
-  if (!section) {
-    return <Navigate to="/settings/profile" replace />;
-  }
+  if (!section) return <Navigate to="/settings/profile" replace />;
 
-  // Find the current section and component
-  const currentItem = SETTINGS_SECTIONS
-    .flatMap(section => section.items)
-    .find(item => item.id === section);
-
-  const CurrentComponent = currentItem?.component || ProfileSettings;
+  const current = ALL_ITEMS.find(i => i.id === section);
+  const CurrentComponent = current?.component || ProfileSettings;
 
   return (
-    <div className="flex min-h-full">
-      {/* Sidebar Navigation */}
-      <div className="w-64 border-r border-border bg-card/30 flex-shrink-0">
-        <div className="p-6 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-              <SettingsIcon className="w-5 h-5 text-white" />
+    <div style={{ display: 'flex', minHeight: '100%', gap: 0 }}>
+      {/* Sidebar */}
+      <div style={{
+        width: 220,
+        flexShrink: 0,
+        borderRight: '1px solid var(--border-subtle)',
+        paddingTop: 8,
+        paddingBottom: 24,
+      }}>
+        {SECTIONS.map((s, idx) => (
+          <div key={s.group} style={{ marginBottom: idx < SECTIONS.length - 1 ? 20 : 0 }}>
+            <div style={{
+              fontSize: 10,
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--text-tertiary)',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              padding: '12px 20px 6px',
+            }}>
+              {s.group}
             </div>
-            <div>
-              <h1 className="text-display-1 text-foreground">Settings</h1>
-              <p className="text-caption text-muted-foreground">Manage your workspace</p>
-            </div>
+            {s.items.map(item => {
+              const active = section === item.id;
+              return (
+                <NavLink
+                  key={item.id}
+                  to={`/settings/${item.id}`}
+                  style={{
+                    display: 'block',
+                    padding: '8px 20px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    textDecoration: 'none',
+                    color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                    background: active ? 'rgba(var(--accent-primary-rgb, 37,99,235), 0.08)' : 'transparent',
+                    borderLeft: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                    transition: 'color 0.15s, background 0.15s',
+                  }}
+                >
+                  {item.label}
+                </NavLink>
+              );
+            })}
           </div>
-        </div>
-
-        <div className="p-3 space-y-4 overflow-y-auto">
-          {SETTINGS_SECTIONS.map((sectionGroup, index) => (
-            <motion.div
-              key={sectionGroup.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <h3 className="text-caption text-muted-foreground uppercase tracking-wide px-3 mb-3">
-                {sectionGroup.title}
-              </h3>
-              <div className="space-y-1">
-                {sectionGroup.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = section === item.id;
-
-                  return (
-                    <NavLink
-                      key={item.id}
-                      to={`/settings/${item.id}`}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group",
-                        isActive
-                          ? "bg-primary/10 text-primary border border-primary/20"
-                          : "hover:bg-accent text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      <Icon className={cn(
-                        "w-4 h-4 shrink-0",
-                        isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                      )} />
-                      <div className="min-w-0 flex-1">
-                        <div className={cn(
-                          "text-body-medium",
-                          isActive ? "text-primary" : "text-foreground"
-                        )}>
-                          {item.label}
-                        </div>
-                      </div>
-                    </NavLink>
-                  );
-                })}
-              </div>
-              {index < SETTINGS_SECTIONS.length - 1 && (
-                <Separator className="mt-4" />
-              )}
-            </motion.div>
-          ))}
-        </div>
+        ))}
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 bg-background">
-        <motion.div
-          key={section}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3 }}
-          className="p-6 min-h-full max-w-full"
-        >
-          <CurrentComponent />
-        </motion.div>
+      {/* Content */}
+      <div style={{ flex: 1, padding: '0 0 0 32px', minWidth: 0 }}>
+        <CurrentComponent />
       </div>
     </div>
   );

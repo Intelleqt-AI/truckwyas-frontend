@@ -1,359 +1,180 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  ArrowLeft,
-  AlertCircle,
-  CheckCircle
-} from "lucide-react";
-import { QuoteCopilot } from "./QuoteCopilot";
-import { SelectionCardGroup } from "@/components/quotes/SelectionCardGroup";
-import { AIQuoteAssistant } from "@/components/quotes/AIQuoteAssistant";
-import { QuoteFormComponent } from "@/components/quotes/QuoteFormComponent";
-import { ImportFileComponent } from "@/components/quotes/ImportFileComponent";
-import { formatCurrency } from "@/lib/formatters";
-import { usePost } from "@/hooks/usePost";
-import { toast } from "sonner";
-import useFetch from "@/hooks/useFetch";
-import { patchData } from "@/lib/Api";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-
-interface ParsedQuote {
-  quote_number: string;
-  customer: string;
-  pickup_location: string;
-  delivery_location: string;
-  cargo_description: string;
-  weight: number;
-  distance: number;
-  base_rate: number;
-  fuel_surcharge: number;
-  additional_charges: number;
-  total_amount: number;
-  valid_until: string;
-  status: string;
-  notes?: string;
-  // UI helpers
-  vehicleType?: string;
-  sla?: number;
-  date?: string;
-}
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { postData, fetchData } from "@/lib/Api";
 
 export default function NewQuote() {
   const navigate = useNavigate();
-  const { id } = useParams();
-  const [selectedMethod, setSelectedMethod] = useState("ai");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [parsedQuote, setParsedQuote] = useState<ParsedQuote | null>(null);
-  const [showCopilot, setShowCopilot] = useState(false);
-  const queryClient = useQueryClient();
+  const [form, setForm] = useState({
+    customer: '',
+    pickup_location: '',
+    delivery_location: '',
+    origin: '',
+    destination: '',
+    cargo_description: '',
+    weight: '',
+    distance: '',
+    base_rate: '',
+    fuel_surcharge: '',
+    additional_charges: '',
+    notes: '',
+    confidence: 'MEDIUM',
+    status: 'DRAFT',
+  });
+  const [error, setError] = useState('');
 
-  const { data: existingQuote, isLoading: isLoadingQuote } = useFetch(id ? `api/quotes/${id}` : null, { enabled: !!id });
+  const { data: customersData } = useQuery({
+    queryKey: ['customers'],
+    queryFn: () => fetchData('api/customers/'),
+  });
+  const customers = customersData?.results || customersData || [];
 
-  // console.log("existingQuote", existingQuote);
+  const total = (parseFloat(form.base_rate || '0') + parseFloat(form.fuel_surcharge || '0') + parseFloat(form.additional_charges || '0'));
 
-  useEffect(() => {
-    if (existingQuote) {
-      console.log("Found existing quote:", existingQuote);
-      setSelectedMethod("form");
-    }
-  }, [existingQuote]);
-
-  // Mock AI parsing function for chat
-  const parseNaturalLanguage = async (text: string): Promise<ParsedQuote> => {
-    setIsProcessing(true);
-
-    // Simulate AI processing delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // Mock parsing result
-    const parsed: ParsedQuote = {
-      quote_number: "Q-AI-GEN",
-      customer: "Makana Foods",
-      pickup_location: "JHB",
-      delivery_location: "CPT",
-      cargo_description: "General Goods",
-      weight: 30,
-      distance: 1400,
-      base_rate: 18000,
-      fuel_surcharge: 2000,
-      additional_charges: 500,
-      total_amount: 20500,
-      valid_until: "2025-12-31",
-      status: "DRAFT",
-      vehicleType: "Superlink 30t",
-      sla: 48,
-      date: "tomorrow",
-      notes: text
-    };
-
-    setIsProcessing(false);
-    return parsed;
-  };
-
-  const handleAISubmit = async (input: string) => {
-    try {
-      const parsed = await parseNaturalLanguage(input);
-      setParsedQuote(parsed);
-    } catch (error) {
-      console.error("Failed to parse quote:", error);
-    }
-  };
-
-  const { mutate: updateQuote, isPending: isUpdating } = useMutation<any, Error, any>({
-    mutationFn: (data) => patchData({ url: `api/quotes/${id}/`, data }),
-    onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ['api/quotes'] });
-      navigate('/bookings/pipeline');
-      toast('Quote Updated');
-    },
-    onError: () => {
-      toast('Error! Try again');
-    },
+  const mutation = useMutation({
+    mutationFn: (data: any) => postData({ url: 'api/quotes/', data }),
+    onSuccess: () => navigate('/quotes'),
+    onError: (e: any) => setError(e?.message || 'Failed to create quote'),
   });
 
-  const { mutate: sendQuote, isPending: isSendingQuote } = usePost({
-    onSuccess: () => {
-      toast.success(id ? 'Quote updated successfully' : 'Quote sent successfully');
-      queryClient.refetchQueries({ queryKey: ['api/quotes'] });
-      navigate('/bookings/pipeline');
-    },
-    onError: () => {
-      toast.error(id ? 'Failed to update quote' : 'Failed to send quote');
-    },
-  });
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }));
 
-  const handleFormSubmit = (data: any) => {
-    const parsed: ParsedQuote = {
-      quote_number: data.quote_number,
-      customer: data.customer,
-      pickup_location: data.pickup_location,
-      delivery_location: data.delivery_location,
-      cargo_description: data.cargo_description,
-      weight: parseFloat(data.weight) || 0,
-      distance: parseFloat(data.distance) || 0,
-      base_rate: parseFloat(data.base_rate) || 0,
-      fuel_surcharge: parseFloat(data.fuel_surcharge) || 0,
-      additional_charges: parseFloat(data.additional_charges) || 0,
-      total_amount: parseFloat(data.total_amount) || 0,
-      valid_until: data.valid_until,
-      status: data.status,
-      notes: data.notes,
-      // UI helpers
-      vehicleType: data.vehicleType,
-      sla: parseInt(data.sla) || 0,
-      date: data.date
-    };
-    setParsedQuote(parsed);
-
-    // console.log("Parsed Quote Data:", parsed);
-
-    // If we have an ID, we are updating, otherwise creating
-    if (id) {
-      console.log("Updating quote:", id);
-      updateQuote(parsed);
-    } else {
-      sendQuote({ url: "api/quotes/", data: parsed });
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.customer || !form.pickup_location || !form.delivery_location) {
+      setError('Customer, pickup and delivery are required');
+      return;
     }
+    mutation.mutate({ ...form, total_amount: total });
   };
 
-  const handleImportSubmit = async (data: { file?: File; text?: string }) => {
-    setIsProcessing(true);
-
-    // Simulate AI import processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Mock parsing imported data
-    const parsed: ParsedQuote = {
-      quote_number: "Q-IMPORT-001",
-      customer: "Tiger Brands",
-      pickup_location: "DUR",
-      delivery_location: "JHB",
-      cargo_description: "Imported Cargo",
-      weight: 25,
-      distance: 600,
-      base_rate: 12000,
-      fuel_surcharge: 1500,
-      additional_charges: 0,
-      total_amount: 13500,
-      valid_until: "2025-12-31",
-      status: "DRAFT",
-      vehicleType: "Rigid 12t",
-      sla: 24,
-      date: "2025-09-07",
-      notes: data.file ? `Imported from ${data.file.name}` : "Imported from text"
-    };
-
-    setParsedQuote(parsed);
-    setIsProcessing(false);
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border-subtle)',
+    padding: '10px 12px',
+    color: 'var(--text-primary)',
+    borderRadius: 2,
+    fontSize: 13,
+    outline: 'none',
+    width: '100%',
+    fontFamily: 'var(--font-sans)',
   };
-
-  const handleConfirmQuote = () => {
-    setShowCopilot(true);
-  };
-
-  if (showCopilot) {
-    return <QuoteCopilot />;
-  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
-      >
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/bookings')}
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-display-1 font-display-semibold text-foreground">
-              {id ? `Edit Quote ${id}` : "New Quote"}
-            </h1>
-            <p className="text-body text-muted-foreground">Create a quote using chat, form, or import</p>
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <button onClick={() => navigate('/quotes')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← BACK</button>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>New Quote</div>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
+          {/* Main form */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Customer */}
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 16 }}>Customer</div>
+              <select value={form.customer} onChange={set('customer')} style={{ ...inputStyle }}>
+                <option value="">Select customer...</option>
+                {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+
+            {/* Route */}
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 16 }}>Route</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {[
+                  { label: 'Pickup Location', key: 'pickup_location', placeholder: 'e.g. Johannesburg Depot' },
+                  { label: 'Delivery Location', key: 'delivery_location', placeholder: 'e.g. Cape Town Warehouse' },
+                  { label: 'Origin City', key: 'origin', placeholder: 'e.g. JHB' },
+                  { label: 'Destination City', key: 'destination', placeholder: 'e.g. CPT' },
+                ].map(f => (
+                  <div key={f.key}>
+                    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>{f.label.toUpperCase()}</div>
+                    <input type="text" placeholder={f.placeholder} value={(form as any)[f.key]} onChange={set(f.key)} style={inputStyle} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Cargo */}
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 16 }}>Cargo</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {[
+                  { label: 'Cargo Description', key: 'cargo_description', placeholder: 'e.g. General Freight' },
+                  { label: 'Weight (kg)', key: 'weight', placeholder: '15000' },
+                  { label: 'Distance (km)', key: 'distance', placeholder: '1400' },
+                ].map(f => (
+                  <div key={f.key}>
+                    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>{f.label.toUpperCase()}</div>
+                    <input type="text" placeholder={f.placeholder} value={(form as any)[f.key]} onChange={set(f.key)} style={inputStyle} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 12 }}>Notes</div>
+              <textarea value={form.notes} onChange={set('notes')} placeholder="Additional notes..." rows={3}
+                style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
+            </div>
+          </div>
+
+          {/* Sidebar — pricing */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 16 }}>Pricing</div>
+              {[
+                { label: 'Base Rate (R)', key: 'base_rate', placeholder: '28000' },
+                { label: 'Fuel Surcharge (R)', key: 'fuel_surcharge', placeholder: '2800' },
+                { label: 'Additional Charges (R)', key: 'additional_charges', placeholder: '0' },
+              ].map(f => (
+                <div key={f.key} style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>{f.label.toUpperCase()}</div>
+                  <input type="number" placeholder={f.placeholder} value={(form as any)[f.key]} onChange={set(f.key)} style={inputStyle} />
+                </div>
+              ))}
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12, marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Total</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 600, color: 'var(--accent-primary)' }}>R {total.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 12 }}>Settings</div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>STATUS</div>
+                <select value={form.status} onChange={set('status')} style={inputStyle}>
+                  <option value="DRAFT">Draft</option>
+                  <option value="SENT">Send to Customer</option>
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>CONFIDENCE</div>
+                <select value={form.confidence} onChange={set('confidence')} style={inputStyle}>
+                  <option value="HIGH">High</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="LOW">Low</option>
+                </select>
+              </div>
+            </div>
+
+            {error && <div style={{ fontSize: 12, color: 'var(--status-danger)', padding: '10px 12px', background: 'var(--status-danger-bg)', borderRadius: 2 }}>{error}</div>}
+
+            <button type="submit" className="btn-action" style={{ width: '100%', padding: '12px 16px', fontSize: 12 }} disabled={mutation.isPending}>
+              {mutation.isPending ? 'CREATING...' : 'CREATE QUOTE'}
+            </button>
+            <button type="button" onClick={() => navigate('/quotes')} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '10px 16px', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', width: '100%' }}>
+              CANCEL
+            </button>
           </div>
         </div>
-      </motion.div>
-
-      {/* Selection Card Group */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <SelectionCardGroup
-          selectedMethod={selectedMethod}
-          onMethodChange={setSelectedMethod}
-        />
-      </motion.div>
-
-      {/* Dynamic Content Area */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <AnimatePresence mode="wait">
-          {selectedMethod === 'ai' && (
-            <motion.div
-              key="ai"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <AIQuoteAssistant
-                onSubmit={handleAISubmit}
-                isProcessing={isProcessing}
-              />
-            </motion.div>
-          )}
-
-          {selectedMethod === 'form' && (
-            <motion.div
-              key="form"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <QuoteFormComponent
-                onSubmit={handleFormSubmit}
-                initialData={existingQuote}
-              />
-            </motion.div>
-          )}
-
-          {selectedMethod === 'import' && (
-            <motion.div
-              key="import"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <ImportFileComponent
-                onSubmit={handleImportSubmit}
-                isProcessing={isProcessing}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-
-      {/* Quote Confirmation */}
-      {parsedQuote && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="space-y-4"
-        >
-          <Card className="border-success/20 bg-success/5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-success" />
-                Quote Parsed Successfully
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Quote #</p>
-                  <p className="font-medium">{parsedQuote.quote_number}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Customer</p>
-                  <p className="font-medium">{parsedQuote.customer}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Route</p>
-                  <p className="font-medium">{parsedQuote.pickup_location} → {parsedQuote.delivery_location}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Amount</p>
-                  <p className="font-medium text-success">{formatCurrency(parsedQuote.total_amount)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Load</p>
-                  <p className="font-medium">{parsedQuote.weight}t {parsedQuote.vehicleType}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <Badge variant="outline">{parsedQuote.status}</Badge>
-                </div>
-              </div>
-
-              {parsedQuote.notes && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Notes</p>
-                  <p className="text-sm bg-muted/30 rounded p-2 mt-1">{parsedQuote.notes}</p>
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <Button onClick={handleConfirmQuote} className="flex-1">
-                  Open Co-Pilot Canvas
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setParsedQuote(null)}
-                >
-                  Edit Details
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+      </form>
     </div>
   );
 }

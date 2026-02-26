@@ -1,5 +1,5 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import useFetch from "@/hooks/useFetch";
 
 const MOCK_VEHICLES = [
   { id: 1, registration: 'CA 123-456', make: 'Volvo', model: 'FH16', status: 'IN_TRANSIT', driver: 'S. Nkosi', route: 'JHB → CPT', fuel: 82 },
@@ -26,88 +26,125 @@ const STATUS_COLOR: Record<string, string> = {
   OFF: 'var(--text-tertiary)',
 };
 
+const tabStyle = (active: boolean): React.CSSProperties => ({
+  background: 'none',
+  border: 'none',
+  borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
+  color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  padding: '10px 18px',
+  cursor: 'pointer',
+  marginBottom: -1,
+});
+
 export default function FleetDashboard() {
   const navigate = useNavigate();
+  const [tab, setTab] = useState<'vehicles' | 'drivers'>('vehicles');
 
   const activeVehicles = MOCK_VEHICLES.filter(v => v.status === 'IN_TRANSIT' || v.status === 'LOADING').length;
   const idleVehicles = MOCK_VEHICLES.filter(v => v.status === 'IDLE').length;
   const inMaintenance = MOCK_VEHICLES.filter(v => v.status === 'MAINTENANCE').length;
+  const activeDrivers = MOCK_DRIVERS.filter(d => d.status === 'ACTIVE').length;
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
+      {/* Header */}
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
+        </div>
+        <button className="btn-action" onClick={() => navigate(tab === 'vehicles' ? '/fleet/vehicles' : '/fleet/drivers')}>
+          + ADD {tab === 'vehicles' ? 'VEHICLE' : 'DRIVER'}
+        </button>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      {/* Stats — always visible */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 24 }}>
         {[
           { label: 'Total Vehicles', value: MOCK_VEHICLES.length, color: 'var(--text-primary)' },
           { label: 'Active', value: activeVehicles, color: 'var(--accent-primary)' },
           { label: 'Idle', value: idleVehicles, color: 'var(--text-secondary)' },
           { label: 'Maintenance', value: inMaintenance, color: 'var(--status-danger)' },
+          { label: 'Drivers On Duty', value: activeDrivers, color: '#22c55e' },
         ].map(m => (
           <div key={m.label} className="card metric-card">
             <div className="card-header"><span className="card-title">{m.label}</span></div>
-            <div className="metric-value" style={{ fontSize: 28, color: m.color }}>{m.value}</div>
+            <div className="metric-value" style={{ fontSize: 26, color: m.color }}>{m.value}</div>
           </div>
         ))}
       </div>
 
-      {/* Vehicles table */}
-      <div className="card table-card" style={{ marginBottom: 20 }}>
-        <div className="card-header" style={{ marginBottom: 16 }}>
-          <span className="card-title">Vehicles</span>
-          <button className="btn-action" style={{ fontSize: 10 }} onClick={() => navigate('/fleet/vehicles')}>VIEW ALL</button>
-        </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Registration</th><th>Vehicle</th><th>Driver</th><th>Status</th><th>Route</th><th className="text-right">Fuel %</th>
-            </tr>
-          </thead>
-          <tbody>
-            {MOCK_VEHICLES.map(v => (
-              <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/vehicles/${v.id}`)}>
-                <td className="mono">{v.registration}</td>
-                <td>{v.make} {v.model}</td>
-                <td>{v.driver}</td>
-                <td><span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[v.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>{v.status.replace('_', ' ')}</span></td>
-                <td style={{ color: 'var(--text-secondary)' }}>{v.route}</td>
-                <td className="text-right" style={{ color: v.fuel < 50 ? 'var(--status-danger)' : 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{v.fuel}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Sub-tabs */}
+      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 20, display: 'flex' }}>
+        <button style={tabStyle(tab === 'vehicles')} onClick={() => setTab('vehicles')}>Vehicles</button>
+        <button style={tabStyle(tab === 'drivers')} onClick={() => setTab('drivers')}>Drivers</button>
       </div>
 
-      {/* Drivers table */}
-      <div className="card table-card">
-        <div className="card-header" style={{ marginBottom: 16 }}>
-          <span className="card-title">Drivers</span>
-          <button className="btn-action" style={{ fontSize: 10 }} onClick={() => navigate('/fleet/drivers')}>VIEW ALL</button>
-        </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Name</th><th>Code</th><th>Trips</th><th>On Time %</th><th>Rating</th><th className="text-right">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {MOCK_DRIVERS.map(d => (
-              <tr key={d.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/drivers/${d.id}`)}>
-                <td>{d.name}</td>
-                <td className="mono">{d.code}</td>
-                <td>{d.trips}</td>
-                <td style={{ color: d.onTime >= 90 ? 'var(--accent-primary)' : d.onTime >= 80 ? 'var(--status-warning)' : 'var(--status-danger)', fontFamily: 'var(--font-mono)' }}>{d.onTime}%</td>
-                <td style={{ color: 'var(--accent-primary)' }}>★ {d.rating}</td>
-                <td className="text-right"><span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[d.status], padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>{d.status}</span></td>
+      {/* Vehicles tab */}
+      {tab === 'vehicles' && (
+        <div className="card table-card">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Registration</th><th>Vehicle</th><th>Driver</th><th>Status</th><th>Route</th><th className="text-right">Fuel %</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {MOCK_VEHICLES.map(v => (
+                <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/vehicles/${v.id}`)}>
+                  <td className="mono">{v.registration}</td>
+                  <td>{v.make} {v.model}</td>
+                  <td>{v.driver}</td>
+                  <td>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[v.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
+                      {v.status.replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{v.route}</td>
+                  <td className="text-right">
+                    <span style={{ fontFamily: 'var(--font-mono)', color: v.fuel < 50 ? 'var(--status-danger)' : v.fuel < 70 ? 'var(--status-warning)' : 'var(--text-primary)' }}>
+                      {v.fuel}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Drivers tab */}
+      {tab === 'drivers' && (
+        <div className="card table-card">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Name</th><th>Code</th><th>Trips</th><th>On Time %</th><th>Rating</th><th className="text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {MOCK_DRIVERS.map(d => (
+                <tr key={d.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/drivers/${d.id}`)}>
+                  <td>{d.name}</td>
+                  <td className="mono">{d.code}</td>
+                  <td className="mono">{d.trips}</td>
+                  <td style={{ color: d.onTime >= 90 ? 'var(--accent-primary)' : d.onTime >= 80 ? 'var(--status-warning)' : 'var(--status-danger)', fontFamily: 'var(--font-mono)' }}>{d.onTime}%</td>
+                  <td style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>★ {d.rating}</td>
+                  <td className="text-right">
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[d.status], padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
+                      {d.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

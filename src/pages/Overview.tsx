@@ -25,11 +25,7 @@ export default function Overview() {
       {/* HEADER */}
       <header className="os-header">
         <div className="logo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter">
-            <path d="M4 4h16v16H4z" fill="none" />
-            <path d="M4 20L20 4" />
-            <path d="M4 4l5 5" stroke="var(--accent-primary)" />
-          </svg>
+          <img src="/brand/logo.svg" alt="Truckwys" style={{ height: 24, width: 'auto', display: 'block' }} onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
           TRUCKWYS<span>OS</span>
         </div>
 
@@ -127,22 +123,41 @@ export default function Overview() {
           <div className="metric-delta delta-neutral"><span>-10 days faster</span></div>
         </div>
 
-        {/* Chart card */}
+        {/* Chart card — Revenue vs Fuel Cost trend */}
         <div className="card chart-card">
           <div className="card-header">
-            <span className="card-title">Fuel Efficiency vs Revenue (Last 30 Days)</span>
+            <span className="card-title">Revenue vs Fuel Cost (Last 30 Days)</span>
             <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-secondary)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, background: 'var(--accent-primary)', borderRadius: 2, display: 'inline-block' }}/>Revenue</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, background: 'var(--chart-bar)', borderRadius: 2, display: 'inline-block' }}/>Cost</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 20, height: 2, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1 }}/>Revenue</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 20, height: 2, background: 'var(--status-danger)', display: 'inline-block', borderRadius: 1, borderTop: '1px dashed var(--status-danger)' }}/>Fuel Cost</span>
             </div>
           </div>
-          <div className="chart-placeholder">
-            {[40, 55, 45, 60, 75, 50, 65, 85, 70, 60, 90, 75].map((h, i) => (
-              <div key={i} className={`bar${i === 7 ? ' highlight' : ''}`} style={{ height: `${h}%` }} />
-            ))}
+          {(() => {
+            const rev =  [42,48,51,45,58,62,55,68,72,65,80,76,71,85,90,82,78,88,92,86,95,100,94,88,96,102,98,104,108,112];
+            const fuel = [18,20,19,21,22,20,24,22,25,23,28,26,24,27,30,28,26,29,31,28,32,34,31,30,33,35,32,34,36,37];
+            const maxV = 120;
+            const pts = (arr: number[]) => arr.map((v, i) => `${(i / (arr.length - 1)) * 100},${100 - (v / maxV) * 100}`).join(' ');
+            return (
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: 120, display: 'block', marginTop: 8 }}>
+                <defs>
+                  <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.15"/>
+                    <stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0"/>
+                  </linearGradient>
+                </defs>
+                <polygon points={`0,100 ${pts(rev)} 100,100`} fill="url(#revGrad)" />
+                <polyline points={pts(rev)} fill="none" stroke="var(--accent-primary)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                <polyline points={pts(fuel)} fill="none" stroke="var(--status-danger)" strokeWidth="1.2" strokeDasharray="3,2" vectorEffect="non-scaling-stroke" />
+              </svg>
+            );
+          })()}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>
+            <span>01 Feb</span><span>10 Feb</span><span>20 Feb</span><span>26 Feb</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>
-            <span>01 Nov</span><span>15 Nov</span><span>30 Nov</span>
+          <div style={{ display: 'flex', gap: 20, marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+            <span>Net Margin <span style={{ color: 'var(--accent-primary)' }}>72.1%</span></span>
+            <span>Fuel/Rev ratio <span style={{ color: 'var(--status-warning)' }}>28%</span></span>
+            <span>Trend <span style={{ color: '#22c55e' }}>↑ improving</span></span>
           </div>
         </div>
 

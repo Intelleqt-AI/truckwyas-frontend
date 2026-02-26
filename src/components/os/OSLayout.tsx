@@ -33,11 +33,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
       {/* HEADER */}
       <header className="os-header">
         <div className="logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square">
-            <path d="M4 4h16v16H4z" fill="none" />
-            <path d="M4 20L20 4" />
-            <path d="M4 4l5 5" stroke="var(--accent-primary)" />
-          </svg>
+          <img src="/brand/logo.svg" alt="Truckwys" style={{ height: 22, width: 'auto', display: 'block' }} onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
           TRUCKWYS<span>OS</span>
         </div>
         <div className="agent-command">

@@ -39,6 +39,7 @@ import Capital from "./pages/Capital";
 import AdvanceRequest from "./pages/AdvanceRequest";
 import AdvanceDetail from "./pages/AdvanceDetail";
 import Insights from "./pages/Insights";
+import PartnerDashboard from "./pages/PartnerDashboard";
 import Settings from "./pages/Settings";
 import XeroIntegration from "./pages/settings/XeroIntegration";
 import FleetImport from "./pages/settings/FleetImport";
@@ -86,6 +87,7 @@ const App = () => (
             <Route path="/capital/request" element={<OSLayout><AdvanceRequest /></OSLayout>} />
             <Route path="/capital/advances/:id" element={<OSLayout><AdvanceDetail /></OSLayout>} />
             <Route path="/insights" element={<OSLayout><Insights /></OSLayout>} />
+            <Route path="/partner-dashboard" element={<OSLayout><PartnerDashboard /></OSLayout>} />
             <Route path="/settings/:section?" element={<OSLayout><Settings /></OSLayout>} />
             <Route path="/settings/integrations/xero" element={<OSLayout><XeroIntegration /></OSLayout>} />
             <Route path="/settings/integrations/fleet" element={<OSLayout><FleetImport /></OSLayout>} />

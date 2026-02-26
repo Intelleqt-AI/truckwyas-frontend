@@ -52,8 +52,8 @@
 
   /* Heatmap */
   --heat-empty: #1a1a1a;
-  --heat-low: var(--accent-dim);
-  --heat-medium: #333;
+  --heat-low: #0D2A4A;
+  --heat-medium: #1A4A8A;
   --heat-high: var(--accent-primary);
   --heat-max: var(--accent-primary);
 
@@ -420,10 +420,12 @@ body {
   grid-row: 2 / 3;
   padding: 24px;
   overflow-y: auto;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto auto;
   gap: 20px;
+  align-content: start;
 }
 
 /* ===========================
@@ -644,6 +646,8 @@ body {
   background: var(--bg-sidebar);
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .agent-header {
@@ -740,16 +744,19 @@ body {
    =========================== */
 
 .btn-action {
-  margin-top: 12px;
+  margin-top: 0;
   background: var(--accent-primary);
   color: var(--btn-action-color);
   border: none;
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-radius: 2px;
   font-size: 11px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
   font-weight: 600;
   cursor: pointer;
-  width: 100%;
+  width: fit-content;
+  white-space: nowrap;
   transition: opacity 0.2s;
   box-shadow: var(--btn-action-shadow);
 }
@@ -807,6 +814,10 @@ body {
 .heat-cell.max {
   background: var(--heat-max);
 }
+/* Aliases used by Overview.tsx */
+.heat-cell.heat-low { background: var(--heat-low); }
+.heat-cell.heat-med { background: var(--heat-medium); }
+.heat-cell.heat-high { background: var(--heat-high); }
 
 /* ===========================
    QUICK QUOTE FORM

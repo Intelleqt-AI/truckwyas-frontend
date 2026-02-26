@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { INVOICES } from "@/mocks/simple-invoice-data";
 import { formatCurrency } from "@/lib/formatters";
+import { fetchData, postData } from "@/lib/api";
 
 const STATUS_COLOR: Record<string, string> = {
-  PAID: '#22c55e', SENT: 'var(--status-warning)',
+  PAID: 'var(--status-success)', SENT: 'var(--status-warning)',
   OVERDUE: 'var(--status-danger)', DRAFT: 'var(--text-tertiary)',
 };
 const TIER_COLOR: Record<string, string> = {
-  prime: 'var(--accent-primary)', standard: '#22c55e',
+  prime: 'var(--accent-primary)', standard: 'var(--status-success)',
   elevated: 'var(--status-warning)', high: 'var(--status-danger)', ineligible: 'var(--text-tertiary)',
 };
 
@@ -19,24 +20,81 @@ export default function Invoices() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const statuses = ['All', 'SENT', 'OVERDUE', 'PAID', 'DRAFT'];
 
-  const filtered = INVOICES.filter(inv => {
-    const matchStatus = statusFilter === 'All' || inv.status === statusFilter;
-    const matchSearch = !search || inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) || inv.customerName.toLowerCase().includes(search.toLowerCase());
+  useEffect(() => {
+    const loadInvoices = async () => {
+      setLoading(true);
+      try {
+        const data = await fetchData('/api/v1/invoices/');
+        setInvoices(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Failed to load invoices, using mock fallback:', error);
+        setInvoices(INVOICES);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInvoices();
+  }, []);
+
+  const handleSendInvoice = async (e: React.MouseEvent, invoiceId: string) => {
+    e.stopPropagation();
+    setSendingId(invoiceId);
+    try {
+      await postData({ url: `/api/v1/invoices/${invoiceId}/send_invoice/` });
+      setToast('Invoice sent!');
+      setTimeout(() => setToast(null), 3000);
+      // Optimistically update status
+      setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: 'SENT' } : inv));
+    } catch (error) {
+      console.error('Failed to send invoice:', error);
+      setToast('Failed to send invoice');
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  const handleDownloadPDF = (e: React.MouseEvent, invoiceId: string) => {
+    e.stopPropagation();
+    const url = `/api/v1/invoices/${invoiceId}/generate_pdf/`;
+    window.open(import.meta.env.VITE_API_URL + url, '_blank');
+    setToast('PDF downloading...');
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const allInvoices = invoices.length > 0 ? invoices : INVOICES;
+
+  const filtered = allInvoices.filter(inv => {
+    const invStatus = inv.status?.toUpperCase();
+    const matchStatus = statusFilter === 'All' || invStatus === statusFilter;
+    const invNumber = inv.invoice_number || inv.invoiceNumber || '';
+    const custName = inv.customer_name || inv.customerName || '';
+    const matchSearch = !search || invNumber.toLowerCase().includes(search.toLowerCase()) || custName.toLowerCase().includes(search.toLowerCase());
     return matchStatus && matchSearch;
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const outstanding = INVOICES.filter(i => i.status === 'SENT').reduce((s, i) => s + i.amount, 0);
-  const overdue = INVOICES.filter(i => i.status === 'OVERDUE').reduce((s, i) => s + i.amount, 0);
-  const paid = INVOICES.filter(i => i.status === 'PAID').reduce((s, i) => s + i.amount, 0);
-  const fpCount = INVOICES.filter(i => i.fastPay && i.status !== 'PAID').length;
+  const outstanding = allInvoices.filter(i => i.status === 'SENT').reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
+  const overdue = allInvoices.filter(i => i.status === 'OVERDUE').reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
+  const paid = allInvoices.filter(i => i.status === 'PAID').reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
+  const fpCount = allInvoices.filter(i => (i.fast_pay_eligible || i.fastPay) && i.status !== 'PAID').length;
 
   return (
     <div>
+      {toast && (
+        <div style={{ position: 'fixed', top: 80, right: 24, zIndex: 1000, background: 'var(--accent-primary)', color: 'black', padding: '12px 20px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+          {toast}
+        </div>
+      )}
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Finance</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -46,19 +104,30 @@ export default function Invoices() {
       </div>
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        {[
-          { label: 'Outstanding', value: formatCurrency(outstanding), color: 'var(--status-warning)' },
-          { label: 'Overdue', value: formatCurrency(overdue), color: 'var(--status-danger)' },
-          { label: 'Collected', value: formatCurrency(paid), color: '#22c55e' },
-          { label: 'Fast Pay Eligible', value: fpCount, color: 'var(--accent-primary)' },
-        ].map(m => (
-          <div key={m.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{m.label}</span></div>
-            <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
-          </div>
-        ))}
-      </div>
+      {loading ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="card" style={{ padding: 20 }}>
+              <div style={{ height: 16, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 12, width: '50%' }} />
+              <div style={{ height: 24, background: 'var(--bg-surface-hover)', borderRadius: 4, width: '70%' }} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+          {[
+            { label: 'Outstanding', value: formatCurrency(outstanding), color: 'var(--status-warning)' },
+            { label: 'Overdue', value: formatCurrency(overdue), color: 'var(--status-danger)' },
+            { label: 'Collected', value: formatCurrency(paid), color: 'var(--status-success)' },
+            { label: 'Fast Pay Eligible', value: fpCount, color: 'var(--accent-primary)' },
+          ].map(m => (
+            <div key={m.label} className="card metric-card">
+              <div className="card-header"><span className="card-title">{m.label}</span></div>
+              <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
@@ -93,36 +162,55 @@ export default function Invoices() {
           <tbody>
             {rows.length === 0 ? (
               <tr><td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No invoices found</td></tr>
-            ) : rows.map(inv => (
-              <tr
-                key={inv.id}
-                style={{ cursor: 'pointer' }}
-                onClick={() => navigate(`/finance/invoices/${inv.id}`)}
-              >
-                <td className="mono">{inv.invoiceNumber}</td>
-                <td>{inv.customerName}</td>
-                <td className="mono">{formatCurrency(inv.amount)}</td>
-                <td>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[inv.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-                    {inv.status}
-                  </span>
-                </td>
-                <td style={{ color: inv.status === 'OVERDUE' ? 'var(--status-danger)' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{inv.dueDate}</td>
-                <td>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: TIER_COLOR[inv.tier], padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2, textTransform: 'uppercase' }}>
-                    {inv.tier}
-                  </span>
-                </td>
-                <td className="text-right" onClick={e => e.stopPropagation()}>
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                    {inv.fastPay && inv.status !== 'PAID' && (
-                      <button className="btn-action" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => navigate('/capital')}>FAST PAY</button>
-                    )}
-                    <button className="btn-action" style={{ fontSize: 10, padding: '4px 8px', background: 'var(--bg-surface)', color: 'var(--text-secondary)' }} onClick={() => navigate(`/finance/invoices/${inv.id}`)}>VIEW</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            ) : rows.map(inv => {
+              const invStatus = inv.status?.toUpperCase();
+              const tier = inv.risk_tier || inv.tier || 'standard';
+              const amount = parseFloat(inv.total_amount || inv.amount) || 0;
+              const invNumber = inv.invoice_number || inv.invoiceNumber;
+              const custName = inv.customer_name || inv.customerName;
+              const dueDate = inv.due_date || inv.dueDate;
+              const isFastPayEligible = inv.fast_pay_eligible || inv.fastPay;
+
+              return (
+                <tr
+                  key={inv.id}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => navigate(`/finance/invoices/${inv.id}`)}
+                >
+                  <td className="mono">{invNumber}</td>
+                  <td>{custName}</td>
+                  <td className="mono">{formatCurrency(amount)}</td>
+                  <td>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[invStatus] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
+                      {invStatus}
+                    </span>
+                  </td>
+                  <td style={{ color: invStatus === 'OVERDUE' ? 'var(--status-danger)' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{dueDate}</td>
+                  <td>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: TIER_COLOR[tier], padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2, textTransform: 'uppercase' }}>
+                      {tier}
+                    </span>
+                  </td>
+                  <td className="text-right" onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      {invStatus === 'DRAFT' && (
+                        <button className="btn-action" style={{ fontSize: 10, padding: '4px 8px' }} onClick={(e) => handleSendInvoice(e, inv.id)} disabled={sendingId === inv.id}>
+                          {sendingId === inv.id ? 'SENDING...' : 'SEND'}
+                        </button>
+                      )}
+                      {invStatus !== 'DRAFT' && (
+                        <button className="btn-action" style={{ fontSize: 10, padding: '4px 8px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={(e) => handleDownloadPDF(e, inv.id)}>
+                          PDF
+                        </button>
+                      )}
+                      {isFastPayEligible && invStatus !== 'PAID' && (
+                        <button className="btn-action" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => navigate('/capital')}>FAST PAY</button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 

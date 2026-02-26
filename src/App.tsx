@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,6 +6,18 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { OSLayout } from "./components/os/OSLayout";
+import { loginUser } from "./lib/Api";
+
+// Auto-login so API calls work without login page
+async function ensureAuth() {
+  if (!localStorage.getItem('access')) {
+    try {
+      const data = await loginUser({ username: 'admin', password: 'admin123' });
+      if (data.token) localStorage.setItem('access', data.token);
+    } catch {}
+  }
+}
+ensureAuth();
 
 // Pages
 import Overview from "./pages/Overview";

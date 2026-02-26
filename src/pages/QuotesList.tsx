@@ -1,389 +1,204 @@
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FileText, Sparkles, List, LayoutGrid } from "lucide-react";
-import { formatCurrency, formatRelativeTime } from "@/lib/formatters";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AIInsightsModal } from "@/components/quotes/AIInsightsModal";
-import { KanbanBoard } from "@/components/quotes/KanbanBoard";
-import { QuoteDetailsModal } from "@/components/quotes/QuoteDetailsModal";
-import useFetch from "@/hooks/useFetch";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { patchData } from "@/lib/Api";
-import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchData, patchData } from "@/lib/Api";
+import { formatCurrency } from "@/lib/formatters";
 
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case "Draft": return { variant: "subtle" as const, className: "bg-muted/50 text-muted-foreground border-0" };
-    case "Sent": return { variant: "outline" as const, className: "bg-primary/5 text-primary border-primary/20" };
-    case "Accepted": return { variant: "outline" as const, className: "bg-success/5 text-success border-success/20" };
-    case "Expired": return { variant: "outline" as const, className: "bg-destructive/5 text-destructive border-destructive/20" };
-    default: return { variant: "subtle" as const, className: "bg-muted/50 text-muted-foreground border-0" };
-  }
+const STATUS_COLOR: Record<string, string> = {
+  IN_TRANSIT: 'var(--accent-primary)',
+  DELIVERED: '#22c55e',
+  SCHEDULED: 'var(--text-secondary)',
+  LOADING: 'var(--status-warning)',
+  DELAYED: 'var(--status-danger)',
+  DRAFT: 'var(--text-tertiary)',
+  SENT: 'var(--status-warning)',
+  ACCEPTED: '#22c55e',
+  EXPIRED: 'var(--status-danger)',
 };
 
-const getConfidenceBadge = (confidence: string) => {
-  switch (confidence) {
-    case "High": return { variant: "outline" as const, className: "bg-success/5 text-success border-success/20" };
-    case "Medium": return { variant: "outline" as const, className: "bg-warning/5 text-warning border-warning/20" };
-    case "Low": return { variant: "outline" as const, className: "bg-destructive/5 text-destructive border-destructive/20" };
-    default: return { variant: "subtle" as const, className: "bg-muted/50 text-muted-foreground border-0" };
-  }
-};
-
-const getMarginColor = (marginPct: number) => {
-  if (marginPct >= 15) return "text-success";
-  if (marginPct >= 12) return "text-warning";
-  return "text-destructive";
+const COLUMNS = ['SCHEDULED', 'LOADING', 'IN_TRANSIT', 'DELIVERED'];
+const COLUMN_LABELS: Record<string, string> = {
+  SCHEDULED: 'Scheduled',
+  LOADING: 'Loading',
+  IN_TRANSIT: 'In Transit',
+  DELIVERED: 'Delivered',
 };
 
 export function QuotesList() {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState("all");
-  const [selectedStatus, setSelectedStatus] = useState("all");
-  const [viewMode, setViewMode] = useState<"list" | "board">("board");
-  const [openInsightsId, setOpenInsightsId] = useState<string | null>(null);
-  const [expandedQuoteId, setExpandedQuoteId] = useState<string | null>(null);
-  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [view, setView] = useState<'board' | 'list'>('board');
 
-  const { data: quotesData, isLoading, error, refetch } = useFetch("api/quotes");
-  const { data: pipelineData, isLoading: pipelineLoading, error: pipelineError } = useFetch("api/bookings/pipeline/");
-
-  const quotes = quotesData?.results || [];
-
-  // Map API data to component structure
-  const mappedQuotes = quotes.map((quote: any) => ({
-    id: `Q-${quote.quote_number}`,
-    originalId: quote.id, // Keep original ID for API calls
-    customer: quote.customer_name,
-    origin: quote.pickup_location,
-    destination: quote.delivery_location,
-    slaHours: 48, // Default as not in API
-    price: parseFloat(quote.total_amount),
-    marginPct: 12.5, // Default/Mock as not in API
-    confidence: "High", // Default/Mock as not in API
-    status: quote.status.charAt(0).toUpperCase() + quote.status.slice(1).toLowerCase(), // Capitalize
-    updatedAt: quote.updated_at,
-    expiresAt: quote.valid_until,
-    vehicle: "Curtain Side 34t", // Mock
-    weightTons: parseFloat(quote.weight) || 0,
-    distanceKm: parseFloat(quote.distance) || 0,
-    estimatedFuelL: (parseFloat(quote.distance) || 0) * 0.4, // Rough estimate
-    tollsZar: 0 // Mock
-  }));
-
-  // Mock AI insights data
-  const mockInsights = {
-    recommendation: {
-      scenario: "Route B",
-      uplift: 750,
-      reason: "lower fuel, higher ETA"
-    },
-    confidence: {
-      level: "High",
-      percentage: 92,
-      estimatedUplift: 550
-    }
-  };
-
-  const filteredQuotes = mappedQuotes.filter((quote: any) => {
-    const matchesSearch = quote.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      `${quote.origin} → ${quote.destination}`.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCustomer = selectedCustomer === "all" || quote.customer === selectedCustomer;
-    const matchesStatus = viewMode === "board" || selectedStatus === "all" || quote.status === selectedStatus;
-
-    return matchesSearch && matchesCustomer && matchesStatus;
+  const { data: loadsData } = useQuery({
+    queryKey: ['loads'],
+    queryFn: () => fetchData('api/loads/'),
+    retry: 1,
   });
 
-  const handleRowClick = (quoteId: string) => {
-    setExpandedQuoteId(expandedQuoteId === quoteId ? null : quoteId);
-  };
-
-  const handleAIClick = (e: React.MouseEvent, quoteId: string) => {
-    e.stopPropagation(); // Prevent row click navigation
-    setOpenInsightsId(quoteId);
-    // Update URL with query parameter
-    const url = new URL(window.location.href);
-    url.searchParams.set('insight', quoteId);
-    window.history.pushState({}, '', url.toString());
-  };
-
-  const handleCloseInsights = () => {
-    setOpenInsightsId(null);
-    // Remove query parameter from URL
-    const url = new URL(window.location.href);
-    url.searchParams.delete('insight');
-    window.history.pushState({}, '', url.toString());
-  };
-
-  const handleApplyChanges = (quoteId: string, patch: { price?: number; marginPct?: number; planId?: 'A' | 'B' | 'C' }) => {
-    // In real app, this would update the quote data and show a success animation
-  };
-
-  const handleOpenCanvas = (quoteId: string) => {
-    navigate(`/quotes/${quoteId}`);
-  };
-
-  const handleSaveQuote = (updatedQuote: any) => {
-    // In real app, this would update the quote data via API
-    setExpandedQuoteId(null);
-    setSelectedQuoteId(null);
-    refetch?.();
-  };
-
-  const { mutate: updateQuoteStatus } = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) =>
-      patchData({ url: `api/quotes/${id}/`, data: { status } }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["api/quotes"] });
-      toast.success("Quote status updated");
-    },
-    onError: () => {
-      toast.error("Failed to update quote status");
-      refetch?.(); // Revert UI on error
-    }
+  const { data: quotesData } = useQuery({
+    queryKey: ['quotes'],
+    queryFn: () => fetchData('api/quotes/'),
+    retry: 1,
   });
 
-  const handleStatusChange = (quoteId: string, newStatus: string) => {
-    const quote = mappedQuotes.find((q: any) => q.id === quoteId);
-    if (quote) {
-      // Map UI status back to backend format (e.g., "In-Transit" -> "IN_TRANSIT", "Draft" -> "DRAFT")
-      const backendStatus = newStatus.toUpperCase().replace("-", "_");
-      updateQuoteStatus({
-        id: quote.originalId,
-        status: backendStatus
-      });
-    }
-  };
+  const loads: any[] = loadsData?.results || loadsData || [];
+  const quotes: any[] = quotesData?.results || quotesData || [];
 
-  if (isLoading) {
-    return <div className="p-8 text-center text-muted-foreground">Loading quotes...</div>;
-  }
+  const filteredLoads = loads.filter(l =>
+    !search ||
+    l.load_number?.toLowerCase().includes(search.toLowerCase()) ||
+    l.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
+    l.pickup_location?.toLowerCase().includes(search.toLowerCase()) ||
+    l.delivery_location?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredQuotes = quotes.filter(q =>
+    !search ||
+    q.quote_number?.toLowerCase().includes(search.toLowerCase()) ||
+    q.customer_name?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const loadsByStatus = COLUMNS.reduce((acc, col) => {
+    acc[col] = filteredLoads.filter(l => l.status === col || (col === 'DELIVERED' && l.status === 'DELIVERED'));
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  // Fill unrecognised statuses into IN_TRANSIT
+  filteredLoads.forEach(l => {
+    if (!COLUMNS.includes(l.status)) {
+      loadsByStatus['IN_TRANSIT'].push(l);
+    }
+  });
 
   return (
-    <div className="space-y-6">
-      {/* Streamlined Control Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-      >
-        {/* Left: Search and Filters */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 w-full lg:max-w-3xl">
-          <div className="relative flex-1 sm:flex-initial">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by customer or lane..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-full sm:w-64 lg:w-80"
-            />
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Loads & Quotes</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-action" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={() => navigate('/quotes/new')}>
+              + NEW QUOTE
+            </button>
+            <button className="btn-action" onClick={() => navigate('/quotes/new')}>+ NEW LOAD</button>
           </div>
-          <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-            <SelectTrigger className="w-full sm:w-44">
-              <SelectValue placeholder="All Customers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Customers</SelectItem>
-              {Array.from(new Set(mappedQuotes.map((q: any) => q.customer))).map((customer: any) => (
-                <SelectItem key={customer} value={customer}>{customer}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {viewMode === "list" && (
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-full sm:w-36">
-                <SelectValue placeholder="All Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="Draft">Draft</SelectItem>
-                <SelectItem value="Sent">Sent</SelectItem>
-                <SelectItem value="Accepted">Accepted</SelectItem>
-                <SelectItem value="Expired">Expired</SelectItem>
-              </SelectContent>
-            </Select>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center' }}>
+        <input
+          type="text"
+          placeholder="Search loads, customers, routes..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '8px 12px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 12, outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
+        />
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(['board', 'list'] as const).map(v => (
+            <button key={v} onClick={() => setView(v)} style={{
+              background: view === v ? 'var(--accent-primary)' : 'var(--bg-surface)',
+              border: `1px solid ${view === v ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+              color: view === v ? '#000' : 'var(--text-secondary)',
+              padding: '6px 12px', borderRadius: 2, fontSize: 10, fontFamily: 'var(--font-mono)', cursor: 'pointer', textTransform: 'uppercase',
+            }}>{v}</button>
+          ))}
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 16, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
+          <span>{loads.length} loads</span>
+          <span>{quotes.length} quotes</span>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      {view === 'board' ? (
+        <>
+          {/* Loads Kanban */}
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 12 }}>ACTIVE LOADS PIPELINE</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
+            {COLUMNS.map(col => (
+              <div key={col}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '0 2px' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[col] || 'var(--text-secondary)', letterSpacing: '0.08em' }}>{COLUMN_LABELS[col]}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2 }}>{loadsByStatus[col]?.length || 0}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {(loadsByStatus[col] || []).map((load: any) => (
+                    <div key={load.id} className="card" style={{ padding: 14, cursor: 'pointer', borderLeft: `2px solid ${STATUS_COLOR[load.status] || 'var(--border-subtle)'}` }} onClick={() => navigate(`/bookings/${load.id}`)}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6 }}>{load.load_number}</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{load.customer_name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                        {load.pickup_location?.split(' ').slice(0,2).join(' ')} → {load.delivery_location?.split(' ').slice(0,2).join(' ')}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent-primary)' }}>{formatCurrency(parseFloat(load.total_amount || '0'))}</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>{load.driver_name}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {(loadsByStatus[col] || []).length === 0 && (
+                    <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12, border: '1px dashed var(--border-subtle)', borderRadius: 2 }}>—</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Quotes section */}
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 12 }}>QUOTES</div>
+          {quotes.length === 0 ? (
+            <div className="card" style={{ padding: 32, textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 12 }}>No quotes yet. Create one to start the pipeline.</div>
+              <button className="btn-action" onClick={() => navigate('/quotes/new')}>+ NEW QUOTE</button>
+            </div>
+          ) : (
+            <div className="card table-card">
+              <table className="data-table">
+                <thead>
+                  <tr><th>Quote #</th><th>Customer</th><th>Route</th><th>Amount</th><th>Status</th><th>Confidence</th><th className="text-right">Actions</th></tr>
+                </thead>
+                <tbody>
+                  {filteredQuotes.map((q: any) => (
+                    <tr key={q.id}>
+                      <td className="mono">{q.quote_number}</td>
+                      <td>{q.customer_name}</td>
+                      <td style={{ color: 'var(--text-secondary)' }}>{q.origin} → {q.destination}</td>
+                      <td>{formatCurrency(parseFloat(q.total_amount || '0'))}</td>
+                      <td><span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[q.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>{q.status}</span></td>
+                      <td style={{ color: q.confidence === 'HIGH' ? '#22c55e' : q.confidence === 'MEDIUM' ? 'var(--status-warning)' : 'var(--status-danger)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{q.confidence}</td>
+                      <td className="text-right"><button className="btn-action" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => navigate(`/bookings/pipeline/${q.id}`)}>VIEW</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
+        </>
+      ) : (
+        /* List view — all loads */
+        <div className="card table-card">
+          <table className="data-table">
+            <thead>
+              <tr><th>Load #</th><th>Customer</th><th>Route</th><th>Driver</th><th>Status</th><th>Amount</th><th className="text-right">Pickup</th></tr>
+            </thead>
+            <tbody>
+              {filteredLoads.map((load: any) => (
+                <tr key={load.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/bookings/${load.id}`)}>
+                  <td className="mono">{load.load_number}</td>
+                  <td>{load.customer_name}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{load.pickup_location?.split(' ').slice(0,2).join(' ')} → {load.delivery_location?.split(' ').slice(0,2).join(' ')}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{load.driver_name}</td>
+                  <td><span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[load.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>{load.status?.replace('_', ' ')}</span></td>
+                  <td style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{formatCurrency(parseFloat(load.total_amount || '0'))}</td>
+                  <td className="text-right" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{load.pickup_date?.slice(0, 10)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filteredLoads.length === 0 && <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No loads found</div>}
         </div>
-
-        {/* Right: View Toggle and New Quote */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-          <div className="flex items-center justify-center gap-2 bg-muted/30 rounded-lg p-1 w-full sm:w-auto">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="flex-1 sm:flex-none gap-2 h-8 px-3"
-            >
-              <List className="w-4 h-4" />
-              List
-            </Button>
-            <Button
-              variant={viewMode === "board" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("board")}
-              className="flex-1 sm:flex-none gap-2 h-8 px-3"
-            >
-              <LayoutGrid className="w-4 h-4" />
-              Board
-            </Button>
-          </div>
-          <Button onClick={() => navigate('/quotes/new')} className="gap-2 w-full sm:w-auto">
-            <Plus className="w-4 h-4" />
-            New Quote
-          </Button>
-        </div>
-      </motion.div>
-
-      {/* Content Area */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        {viewMode === "list" ? (
-          <Card className="border-[#E2E8F0] bg-white rounded-md">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-[#E2E8F0]">
-                    <TableHead className="text-xs text-[#94A3B8]">Quote ID</TableHead>
-                    <TableHead className="text-xs text-[#94A3B8]">Customer</TableHead>
-                    <TableHead className="text-xs text-[#94A3B8]">Lane</TableHead>
-                    <TableHead className="text-xs text-[#94A3B8]">SLA</TableHead>
-                    <TableHead className="text-xs text-[#94A3B8]">Price</TableHead>
-                    <TableHead className="text-xs text-[#94A3B8]">Margin %</TableHead>
-                    <TableHead className="text-xs text-[#94A3B8]">Confidence</TableHead>
-                    <TableHead className="text-xs text-[#94A3B8]">Status</TableHead>
-                    <TableHead className="text-xs text-[#94A3B8]">Updated</TableHead>
-                    <TableHead className="text-xs text-[#94A3B8] w-12">AI</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredQuotes.map((quote: any, index: number) => {
-                    const statusBadge = getStatusBadge(quote.status);
-                    const confidenceBadge = getConfidenceBadge(quote.confidence);
-                    const marginColor = getMarginColor(quote.marginPct);
-                    const isExpanded = expandedQuoteId === quote.id;
-
-                    return (
-                      <>
-                        <motion.tr
-                          key={quote.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.4 + index * 0.05 }}
-                          className={`cursor-pointer hover:bg-[#F8FAFC] transition-colors border-[#E2E8F0] ${isExpanded ? 'bg-[#F8FAFC]' : ''}`}
-                          onClick={() => setSelectedQuoteId(quote.id)}
-                        >
-                          <TableCell className="text-sm font-medium text-[#0F172A]">{quote.id}</TableCell>
-                          <TableCell className="text-sm text-[#0F172A]">{quote.customer}</TableCell>
-                          <TableCell className="text-sm text-[#0F172A]">
-                            {quote.origin} → {quote.destination}
-                          </TableCell>
-                          <TableCell className="text-sm text-[#0F172A]">{quote.slaHours}h</TableCell>
-                          <TableCell className="text-sm font-medium text-[#0F172A] font-mono tabular-nums">
-                            {formatCurrency(quote.price)}
-                          </TableCell>
-                          <TableCell className={`text-sm font-medium font-mono tabular-nums ${marginColor}`}>
-                            {quote.marginPct.toFixed(1)}%
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={confidenceBadge.variant}
-                              className={confidenceBadge.className}
-                            >
-                              {quote.confidence}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={statusBadge.variant}
-                              className={statusBadge.className}
-                            >
-                              {quote.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-xs text-[#64748B]">
-                            {formatRelativeTime(quote.updatedAt)}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 transition-all hover:bg-[#2563EB]/10 text-[#94A3B8] hover:text-[#2563EB]"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAIClick(e, quote.id);
-                              }}
-                            >
-                              <Sparkles className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </motion.tr>
-                      </>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-
-              {filteredQuotes.length === 0 && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="text-center py-12"
-                >
-                  <FileText className="h-12 w-12 text-[#94A3B8] mx-auto mb-4" />
-                  <p className="text-sm text-[#64748B] mb-4">No quotes found</p>
-                  <Button onClick={() => navigate('/quotes/new')} variant="outline" className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Create your first quote
-                  </Button>
-                </motion.div>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <KanbanBoard
-            quotes={filteredQuotes}
-            onQuoteClick={(quoteId) => setSelectedQuoteId(quoteId)}
-            onAIClick={(e, quoteId) => handleAIClick(e, quoteId)}
-            onStatusChange={handleStatusChange}
-          />
-        )}
-      </motion.div>
-
-      {/* Modals */}
-      {openInsightsId && (
-        <AIInsightsModal
-          isOpen={!!openInsightsId}
-          onClose={handleCloseInsights}
-          quote={mappedQuotes.find((q: any) => q.id === openInsightsId)!}
-          insights={mockInsights}
-          onApply={(patch) => handleApplyChanges(openInsightsId, patch)}
-          onOpenCanvas={() => handleOpenCanvas(openInsightsId)}
-        />
-      )}
-
-      {selectedQuoteId && (
-        <QuoteDetailsModal
-          isOpen={!!selectedQuoteId}
-          onClose={() => {
-            setSelectedQuoteId(null);
-            refetch?.();
-          }}
-          quote={mappedQuotes.find((q: any) => q.id === selectedQuoteId)!}
-          onSave={handleSaveQuote}
-        />
       )}
     </div>
   );

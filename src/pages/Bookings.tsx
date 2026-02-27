@@ -60,10 +60,11 @@ export default function Bookings() {
   const uploadPOD = async (file: File) => {
     setUploadMsg('Uploading...');
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('pod_document', file);
     try {
       const token = localStorage.getItem('access');
-      const res = await fetch(`http://localhost:3700/api/v1/loads/${id}/upload_pod/`, {
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3700';
+      const res = await fetch(`${baseURL}/api/v1/loads/${id}/upload_pod/`, {
         method: 'POST',
         headers: { Authorization: `Token ${token}` },
         body: formData,

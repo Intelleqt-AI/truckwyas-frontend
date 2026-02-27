@@ -11,17 +11,20 @@ export default function Overview() {
   const [advances, setAdvances] = useState<any[]>([]);
   const [recentQuotes, setRecentQuotes] = useState<any[]>([]);
   const [activeLoadsCount, setActiveLoadsCount] = useState(0);
+  const [activity, setActivity] = useState<any[]>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [finance, insightsData, advancesData, quotesData, loadsData] = await Promise.all([
+        const [finance, insightsData, advancesData, quotesData, loadsData, activityData] = await Promise.all([
           fetchData('api/v1/dashboard/finance/').catch(() => null),
           fetchData('api/v1/dashboard/signals/').catch(() => fetchData('api/v1/dashboard/insights/').catch(() => [])),
           fetchData('api/v1/advances/').catch(() => []),
           fetchData('api/v1/quotes/?limit=5').catch(() => []),
           fetchData('api/v1/loads/').catch(() => []),
+          fetchData('api/v1/activity/').catch(() => []),
         ]);
         setFinanceData(finance);
         // dashboard/insights/ may not exist — handle gracefully, signals come as array or {signals:[]}
@@ -58,6 +61,9 @@ export default function Overview() {
         const loads = loadsData?.results || loadsData || [];
         const activeLoads = loads.filter((l: any) => l.status === 'IN_TRANSIT' || l.status === 'LOADING');
         setActiveLoadsCount(activeLoads.length);
+
+        setActivity(Array.isArray(activityData) ? activityData : (activityData?.results || []));
+        setActivityLoading(false);
       } catch (error) {
         console.error('Failed to load overview data:', error);
       } finally {
@@ -66,6 +72,16 @@ export default function Overview() {
     };
     loadData();
   }, []);
+
+  const timeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
 
   return (
     <div style={{ display: 'flex', gap: 24, alignItems: 'start' }}>
@@ -252,6 +268,27 @@ export default function Overview() {
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--accent-primary)' }}>
               {activeLoadsCount}
             </span>
+          </div>
+
+          {/* RECENT ACTIVITY */}
+          <div style={{ marginTop: 24 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 12 }}>
+              Recent Activity
+            </div>
+            {activityLoading ? (
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>Loading...</div>
+            ) : activity.length === 0 ? (
+              <div style={{ color: 'var(--text-secondary)', fontSize: 13, padding: '16px 0' }}>No recent activity</div>
+            ) : (
+              <div>
+                {activity.slice(0, 8).map((e: any) => (
+                  <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border-row)' }}>
+                    <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{e.title}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap', marginLeft: 16 }}>{timeAgo(e.created_at)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

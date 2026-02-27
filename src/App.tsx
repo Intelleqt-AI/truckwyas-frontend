@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,17 +7,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { OSLayout } from "./components/os/OSLayout";
 import { loginUser } from "./lib/Api";
-
-// Auto-login so API calls work without login page
-async function ensureAuth() {
-  if (!localStorage.getItem('access')) {
-    try {
-      const data = await loginUser({ username: 'admin', password: 'admin123' });
-      if (data.token) localStorage.setItem('access', data.token);
-    } catch {}
-  }
-}
-ensureAuth();
 
 // Pages
 import Overview from "./pages/Overview";
@@ -52,7 +41,23 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
+const App = () => {
+  const [ready, setReady] = useState(!!localStorage.getItem('access'));
+
+  useEffect(() => {
+    if (!localStorage.getItem('access')) {
+      loginUser({ username: 'admin', password: 'admin123' })
+        .then(data => {
+          if (data?.token) localStorage.setItem('access', data.token);
+        })
+        .catch(() => {})
+        .finally(() => setReady(true));
+    }
+  }, []);
+
+  if (!ready) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0e1a', color: '#4B6CB7', fontFamily: 'monospace', fontSize: 13 }}>CONNECTING...</div>;
+
+  return (
   <BrowserRouter>
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
@@ -99,5 +104,8 @@ const App = () => (
     </QueryClientProvider>
   </BrowserRouter>
 );
+
+  );
+};
 
 export default App;

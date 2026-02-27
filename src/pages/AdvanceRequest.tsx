@@ -105,38 +105,38 @@ export default function AdvanceRequest() {
   const renderStep1 = () => (
     <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-[#0F172A]">Select Invoice</h2>
-        <p className="text-sm text-[#64748B]">
+        <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Select Invoice</h2>
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
           Choose an eligible invoice to request early payment
         </p>
 
         {loadingInvoices ? (
           <div className="py-12 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-[#2563EB]" />
+            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
           </div>
         ) : !invoices || invoices.length === 0 ? (
-          <div className="py-12 text-center text-[#64748B]">
+          <div className="py-12 text-center" style={{ color: 'var(--text-secondary)' }}>
             No eligible invoices found. Check back later.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[#F1F5F9]">
+                <tr className="border-b" style={{ borderColor: 'var(--border-subtle)' }}>
                   <th className="w-12 py-3 px-4"></th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-left py-3 px-4 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
                     Invoice #
                   </th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-left py-3 px-4 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
                     Customer
                   </th>
-                  <th className="text-right py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-right py-3 px-4 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
                     Amount
                   </th>
-                  <th className="text-right py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-right py-3 px-4 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
                     Age (days)
                   </th>
-                  <th className="text-right py-3 px-4 text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                  <th className="text-right py-3 px-4 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
                     Due Date
                   </th>
                 </tr>
@@ -145,39 +145,39 @@ export default function AdvanceRequest() {
                 {invoices.map((invoice) => (
                   <tr
                     key={invoice.id}
-                    className={`border-b border-[#F1F5F9] last:border-0 cursor-pointer transition-colors ${
-                      selectedInvoiceId === invoice.id
-                        ? 'bg-blue-50'
-                        : 'hover:bg-[#F8FAFC]'
-                    }`}
+                    className="border-b last:border-0 cursor-pointer transition-colors"
+                    style={{
+                      borderColor: 'var(--border-subtle)',
+                      background: selectedInvoiceId === invoice.id ? 'var(--accent-dim)' : 'transparent'
+                    }}
                     onClick={() => handleSelectInvoice(invoice.id)}
                   >
                     <td className="py-3 px-4">
                       <div
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          selectedInvoiceId === invoice.id
-                            ? 'border-[#2563EB] bg-[#2563EB]'
-                            : 'border-slate-300'
-                        }`}
+                        className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                        style={{
+                          borderColor: selectedInvoiceId === invoice.id ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                          background: selectedInvoiceId === invoice.id ? 'var(--accent-primary)' : 'transparent'
+                        }}
                       >
                         {selectedInvoiceId === invoice.id && (
                           <Check className="w-3 h-3 text-white" />
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-sm font-mono text-[#2563EB]">
+                    <td className="py-3 px-4 text-sm font-mono" style={{ color: 'var(--accent-primary)' }}>
                       {invoice.invoice_number}
                     </td>
-                    <td className="py-3 px-4 text-sm text-[#0F172A]">
+                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-primary)' }}>
                       {invoice.customer_name}
                     </td>
-                    <td className="py-3 px-4 text-sm font-mono text-[#0F172A] text-right">
+                    <td className="py-3 px-4 text-sm font-mono text-right" style={{ color: 'var(--text-primary)' }}>
                       {formatZAR(invoice.total_amount)}
                     </td>
-                    <td className="py-3 px-4 text-sm font-mono text-[#64748B] text-right">
+                    <td className="py-3 px-4 text-sm font-mono text-right" style={{ color: 'var(--text-secondary)' }}>
                       {invoice.age_days || calculateDaysAge(invoice.invoice_date)}
                     </td>
-                    <td className="py-3 px-4 text-sm text-[#64748B] text-right">
+                    <td className="py-3 px-4 text-sm text-right" style={{ color: 'var(--text-secondary)' }}>
                       {new Date(invoice.due_date).toLocaleDateString()}
                     </td>
                   </tr>
@@ -199,7 +199,8 @@ export default function AdvanceRequest() {
           <Button
             onClick={handleGetRiskScore}
             disabled={!selectedInvoiceId || scoring}
-            className="gap-2 bg-[#2563EB] hover:bg-[#1D4ED8]"
+            className="gap-2"
+            style={{ background: 'var(--accent-primary)' }}
           >
             {scoring ? (
               <>
@@ -227,10 +228,10 @@ export default function AdvanceRequest() {
         <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-[#0F172A]">
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {selectedInvoice.invoice_number}
               </h3>
-              <p className="text-sm text-[#64748B] mt-1">
+              <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
                 {selectedInvoice.customer_name} • {formatZAR(selectedInvoice.total_amount)}
               </p>
             </div>
@@ -241,7 +242,7 @@ export default function AdvanceRequest() {
                 setStep(1);
                 setRiskScore(null);
               }}
-              className="text-[#64748B] hover:text-[#0F172A]"
+              style={{ color: 'var(--text-secondary)' }}
             >
               Change Invoice
             </Button>
@@ -265,7 +266,7 @@ export default function AdvanceRequest() {
               <Check className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-[#0F172A]">
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                 Estimated Turnaround
               </p>
               <p className="text-2xl font-bold text-green-600 mt-1">
@@ -289,7 +290,8 @@ export default function AdvanceRequest() {
           </Button>
           <Button
             onClick={() => setStep(3)}
-            className="gap-2 bg-[#2563EB] hover:bg-[#1D4ED8]"
+            className="gap-2"
+            style={{ background: 'var(--accent-primary)' }}
           >
             Continue to Confirm
             <ArrowRight className="w-4 h-4" />
@@ -307,36 +309,36 @@ export default function AdvanceRequest() {
         <Card className="p-8 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-[#0F172A]">
+              <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                 Confirm Your Request
               </h2>
-              <p className="text-[#64748B] mt-2">
+              <p className="mt-2" style={{ color: 'var(--text-secondary)' }}>
                 Review the details below before submitting
               </p>
             </div>
 
             {/* Summary */}
-            <div className="border-t border-b border-slate-200 py-6 space-y-4">
+            <div className="border-t border-b py-6 space-y-4" style={{ borderColor: 'var(--border-subtle)' }}>
               <div className="flex justify-between items-center">
-                <span className="text-[#64748B]">Invoice</span>
-                <span className="text-[#0F172A] font-mono font-medium">
+                <span style={{ color: 'var(--text-secondary)' }}>Invoice</span>
+                <span className="font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
                   {selectedInvoice.invoice_number}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[#64748B]">Customer</span>
-                <span className="text-[#0F172A] font-medium">
+                <span style={{ color: 'var(--text-secondary)' }}>Customer</span>
+                <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
                   {selectedInvoice.customer_name}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[#64748B]">Invoice Amount</span>
-                <span className="text-[#0F172A] font-mono font-medium">
+                <span style={{ color: 'var(--text-secondary)' }}>Invoice Amount</span>
+                <span className="font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
                   {formatZAR(riskScore.gross_amount)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[#64748B]">Risk Tier</span>
+                <span style={{ color: 'var(--text-secondary)' }}>Risk Tier</span>
                 <Badge className={`${
                   riskScore.tier.toLowerCase() === 'excellent'
                     ? 'bg-green-50 text-green-700 border-green-200'
@@ -350,23 +352,23 @@ export default function AdvanceRequest() {
                 </Badge>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[#64748B]">Fee ({riskScore.fee_percent}%)</span>
-                <span className="text-[#64748B] font-mono">
+                <span style={{ color: 'var(--text-secondary)' }}>Fee ({riskScore.fee_percent}%)</span>
+                <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>
                   -{formatZAR(riskScore.fee_amount)}
                 </span>
               </div>
-              <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-                <span className="text-[#0F172A] font-semibold text-lg">
+              <div className="flex justify-between items-center pt-4 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+                <span className="font-semibold text-lg" style={{ color: 'var(--text-primary)' }}>
                   Net Payout
                 </span>
-                <span className="text-3xl text-[#2563EB] font-mono font-bold">
+                <span className="text-3xl font-mono font-bold" style={{ color: 'var(--accent-primary)' }}>
                   {formatZAR(riskScore.net_amount)}
                 </span>
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-[#0F172A]">
+            <div className="border rounded-lg p-4" style={{ background: 'var(--accent-dim)', borderColor: 'var(--accent-primary)' }}>
+              <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
                 By submitting this request, you authorize TruckWys to advance funds for this invoice.
                 Payment will be processed within {riskScore.estimated_turnaround_days}.
               </p>
@@ -387,7 +389,8 @@ export default function AdvanceRequest() {
           <Button
             onClick={handleConfirmRequest}
             disabled={requesting}
-            className="gap-2 bg-[#2563EB] hover:bg-[#1D4ED8]"
+            className="gap-2"
+            style={{ background: 'var(--accent-primary)' }}
           >
             {requesting ? (
               <>
@@ -410,17 +413,18 @@ export default function AdvanceRequest() {
     <div className="space-y-8 max-w-5xl mx-auto">
       {/* Header */}
       <div>
-        <div className="flex items-center gap-2 text-sm text-[#64748B] mb-2">
+        <div className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>
           <button
             onClick={() => navigate('/capital')}
-            className="hover:text-[#2563EB] transition-colors"
+            className="transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
           >
             Capital
           </button>
           <span>/</span>
           <span>Request Advance</span>
         </div>
-        <h1 className="text-3xl font-bold text-[#0F172A]">Request Early Payment</h1>
+        <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>Request Early Payment</h1>
       </div>
 
       {/* Progress Steps */}
@@ -429,27 +433,25 @@ export default function AdvanceRequest() {
           <div key={stepNum} className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm ${
-                  step >= stepNum
-                    ? 'bg-[#2563EB] text-white'
-                    : 'bg-slate-200 text-[#64748B]'
-                }`}
+                className="w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm"
+                style={{
+                  background: step >= stepNum ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                  color: step >= stepNum ? 'white' : 'var(--text-secondary)'
+                }}
               >
                 {step > stepNum ? <Check className="w-4 h-4" /> : stepNum}
               </div>
               <span
-                className={`text-sm font-medium ${
-                  step >= stepNum ? 'text-[#0F172A]' : 'text-[#64748B]'
-                }`}
+                className="text-sm font-medium"
+                style={{ color: step >= stepNum ? 'var(--text-primary)' : 'var(--text-secondary)' }}
               >
                 {stepNum === 1 ? 'Select' : stepNum === 2 ? 'Risk Score' : 'Confirm'}
               </span>
             </div>
             {stepNum < 3 && (
               <div
-                className={`w-12 h-0.5 ${
-                  step > stepNum ? 'bg-[#2563EB]' : 'bg-slate-200'
-                }`}
+                className="w-12 h-0.5"
+                style={{ background: step > stepNum ? 'var(--accent-primary)' : 'var(--border-subtle)' }}
               />
             )}
           </div>

@@ -34,7 +34,7 @@ export function FastPayModal({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-[#EF4444]" />
+              <AlertCircle className="w-5 h-5" style={{ color: 'var(--status-danger)' }} />
               Not Eligible for Fast Pay
             </DialogTitle>
             <DialogDescription>
@@ -43,9 +43,9 @@ export function FastPayModal({
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="p-4 bg-[#FEE2E2] rounded-lg">
-              <h4 className="text-sm font-medium text-[#991B1B] mb-2">Reasons:</h4>
-              <ul className="list-disc list-inside space-y-1 text-sm text-[#991B1B]">
+            <div className="p-4 rounded-lg" style={{ background: 'var(--accent-dim)' }}>
+              <h4 className="text-sm font-medium mb-2" style={{ color: 'var(--status-danger)' }}>Reasons:</h4>
+              <ul className="list-disc list-inside space-y-1 text-sm" style={{ color: 'var(--status-danger)' }}>
                 {riskResult.ineligibilityReasons?.map((reason, idx) => (
                   <li key={idx}>{reason}</li>
                 ))}
@@ -75,14 +75,14 @@ export function FastPayModal({
 
         <div className="space-y-6">
           {/* Risk Summary */}
-          <div className="flex items-center justify-between p-4 bg-[#F8FAFC] rounded-lg">
+          <div className="flex items-center justify-between p-4 rounded-lg" style={{ background: 'var(--bg-surface-hover)' }}>
             <div>
-              <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1">Risk Assessment</p>
+              <p className="text-xs uppercase tracking-wide mb-1" style={{ color: 'var(--text-secondary)' }}>Risk Assessment</p>
               <RiskBadge tier={riskResult.riskTier} score={riskResult.riskScore} size="lg" />
             </div>
             <div className="text-right">
-              <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1">Approval Rate</p>
-              <p className="text-lg font-medium text-[#0F172A]">
+              <p className="text-xs uppercase tracking-wide mb-1" style={{ color: 'var(--text-secondary)' }}>Approval Rate</p>
+              <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
                 {riskResult.riskTier === 'excellent' ? '98%' :
                  riskResult.riskTier === 'good' ? '95%' :
                  riskResult.riskTier === 'fair' ? '85%' : '70%'}
@@ -92,70 +92,71 @@ export function FastPayModal({
 
           {/* Fee Breakdown */}
           <div className="space-y-3">
-            <h4 className="text-sm font-medium text-[#0F172A]">Pricing Breakdown</h4>
+            <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Pricing Breakdown</h4>
 
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-[#64748B]">Invoice Amount</span>
-                <span className="font-mono text-[#0F172A]">{formatZAR(riskResult.netAmount + riskResult.feeAmount)}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>Invoice Amount</span>
+                <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{formatZAR(riskResult.netAmount + riskResult.feeAmount)}</span>
               </div>
 
               <div className="flex justify-between text-sm">
-                <span className="text-[#64748B]">
+                <span style={{ color: 'var(--text-secondary)' }}>
                   Base Fee ({riskResult.baseFeePercent}%)
                 </span>
-                <span className="font-mono text-[#64748B]">
+                <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>
                   {formatZAR((riskResult.netAmount + riskResult.feeAmount) * riskResult.baseFeePercent / 100)}
                 </span>
               </div>
 
               {riskResult.adjustments.map((adj, idx) => (
                 <div key={idx} className="flex justify-between text-xs pl-4">
-                  <span className="text-[#94A3B8]">{adj.description}</span>
-                  <span className={`font-mono ${adj.amountPercent > 0 ? 'text-[#EF4444]' : 'text-[#10B981]'}`}>
+                  <span style={{ color: 'var(--text-tertiary)' }}>{adj.description}</span>
+                  <span className="font-mono" style={{ color: adj.amountPercent > 0 ? 'var(--status-danger)' : 'var(--status-success)' }}>
                     {adj.amountPercent > 0 ? '+' : ''}{adj.amountPercent.toFixed(2)}%
                   </span>
                 </div>
               ))}
 
-              <div className="border-t border-[#F1F5F9] pt-2 mt-2 flex justify-between text-sm font-medium">
-                <span className="text-[#0F172A]">Total Fee ({riskResult.finalFeePercent}%)</span>
-                <span className="font-mono text-[#EF4444]">-{formatZAR(riskResult.feeAmount)}</span>
+              <div className="border-t pt-2 mt-2 flex justify-between text-sm font-medium" style={{ borderColor: 'var(--border-subtle)' }}>
+                <span style={{ color: 'var(--text-primary)' }}>Total Fee ({riskResult.finalFeePercent}%)</span>
+                <span className="font-mono" style={{ color: 'var(--status-danger)' }}>-{formatZAR(riskResult.feeAmount)}</span>
               </div>
 
-              <div className="border-t-2 border-[#0F172A] pt-3 flex justify-between">
-                <span className="text-base font-medium text-[#0F172A]">You Receive</span>
-                <span className="text-xl font-mono font-bold text-[#10B981]">{formatZAR(riskResult.netAmount)}</span>
+              <div className="border-t-2 pt-3 flex justify-between" style={{ borderColor: 'var(--text-primary)' }}>
+                <span className="text-base font-medium" style={{ color: 'var(--text-primary)' }}>You Receive</span>
+                <span className="text-xl font-mono font-bold" style={{ color: 'var(--status-success)' }}>{formatZAR(riskResult.netAmount)}</span>
               </div>
             </div>
           </div>
 
           {/* Benefits */}
           <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-3 bg-[#F0FDF4] rounded-lg">
-              <Clock className="w-5 h-5 text-[#10B981] mx-auto mb-1" />
-              <p className="text-xs text-[#166534] font-medium">1-2 Hours</p>
-              <p className="text-xs text-[#64748B]">Typical deposit</p>
+            <div className="text-center p-3 rounded-lg" style={{ background: 'var(--accent-dim)' }}>
+              <Clock className="w-5 h-5 mx-auto mb-1" style={{ color: 'var(--status-success)' }} />
+              <p className="text-xs font-medium" style={{ color: 'var(--status-success)' }}>1-2 Hours</p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Typical deposit</p>
             </div>
-            <div className="text-center p-3 bg-[#EFF6FF] rounded-lg">
-              <CheckCircle2 className="w-5 h-5 text-[#2563EB] mx-auto mb-1" />
-              <p className="text-xs text-[#1E40AF] font-medium">Verified POD</p>
-              <p className="text-xs text-[#64748B]">Delivery confirmed</p>
+            <div className="text-center p-3 rounded-lg" style={{ background: 'var(--accent-dim)' }}>
+              <CheckCircle2 className="w-5 h-5 mx-auto mb-1" style={{ color: 'var(--accent-primary)' }} />
+              <p className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>Verified POD</p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Delivery confirmed</p>
             </div>
-            <div className="text-center p-3 bg-[#FEF3C7] rounded-lg">
-              <TrendingUp className="w-5 h-5 text-[#F59E0B] mx-auto mb-1" />
-              <p className="text-xs text-[#92400E] font-medium">Grow Faster</p>
-              <p className="text-xs text-[#64748B]">Unlock capital</p>
+            <div className="text-center p-3 rounded-lg" style={{ background: 'var(--accent-dim)' }}>
+              <TrendingUp className="w-5 h-5 mx-auto mb-1" style={{ color: 'var(--status-warning)' }} />
+              <p className="text-xs font-medium" style={{ color: 'var(--status-warning)' }}>Grow Faster</p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Unlock capital</p>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#F1F5F9]">
+          <div className="flex justify-end gap-3 pt-4 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button
-              className="bg-[#10B981] hover:bg-[#059669] text-white"
+              className="text-white"
+              style={{ background: 'var(--status-success)', '--tw-bg-opacity': '1' } as React.CSSProperties}
               onClick={handleRequestAdvance}
             >
               Request Advance

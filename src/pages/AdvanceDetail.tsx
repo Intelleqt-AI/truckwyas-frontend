@@ -81,7 +81,7 @@ export default function AdvanceDetail() {
     return (
       <div className="space-y-8">
         <div className="flex items-center justify-center h-64">
-          <div className="text-[#64748B]">Loading advance details...</div>
+          <div style={{ color: 'var(--text-secondary)' }}>Loading advance details...</div>
         </div>
       </div>
     );
@@ -91,7 +91,7 @@ export default function AdvanceDetail() {
     return (
       <div className="space-y-8">
         <div className="flex items-center justify-center h-64">
-          <div className="text-red-600">Error loading advance details</div>
+          <div style={{ color: 'var(--status-danger)' }}>Error loading advance details</div>
         </div>
       </div>
     );
@@ -137,17 +137,18 @@ export default function AdvanceDetail() {
         <Button
           variant="ghost"
           onClick={() => navigate('/capital')}
-          className="gap-2 mb-4 -ml-3 text-[#64748B] hover:text-[#0F172A]"
+          className="gap-2 mb-4 -ml-3"
+          style={{ color: 'var(--text-secondary)' }}
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Capital
         </Button>
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[#0F172A]">
+            <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
               Advance #{data.id}
             </h1>
-            <p className="text-[#64748B] mt-1">
+            <p className="mt-1" style={{ color: 'var(--text-secondary)' }}>
               Created {new Date(data.created_at).toLocaleDateString()}
             </p>
           </div>
@@ -156,8 +157,8 @@ export default function AdvanceDetail() {
               {data.status}
             </Badge>
             <div className="text-right">
-              <p className="text-sm text-[#64748B]">Net Amount</p>
-              <p className="text-2xl font-mono font-bold text-[#2563EB]">
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Net Amount</p>
+              <p className="text-2xl font-mono font-bold" style={{ color: 'var(--accent-primary)' }}>
                 {formatZAR(data.net_amount)}
               </p>
             </div>
@@ -178,47 +179,47 @@ export default function AdvanceDetail() {
 
           {/* Invoice Details */}
           <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <h3 className="text-lg font-semibold text-[#0F172A] mb-4">
+            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
               Invoice Details
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
                   Invoice Number
                 </p>
-                <p className="text-sm font-mono text-[#0F172A] mt-1">
+                <p className="text-sm font-mono mt-1" style={{ color: 'var(--text-primary)' }}>
                   {data.invoice_number}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
                   Customer
                 </p>
-                <p className="text-sm text-[#0F172A] mt-1">
+                <p className="text-sm mt-1" style={{ color: 'var(--text-primary)' }}>
                   {data.customer_name}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
                   Invoice Date
                 </p>
-                <p className="text-sm text-[#0F172A] mt-1">
+                <p className="text-sm mt-1" style={{ color: 'var(--text-primary)' }}>
                   {new Date(data.invoice_details.invoice_date).toLocaleDateString()}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
                   Due Date
                 </p>
-                <p className="text-sm text-[#0F172A] mt-1">
+                <p className="text-sm mt-1" style={{ color: 'var(--text-primary)' }}>
                   {new Date(data.invoice_details.due_date).toLocaleDateString()}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium text-[#64748B] uppercase tracking-wide">
+                <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
                   Invoice Amount
                 </p>
-                <p className="text-sm font-mono text-[#0F172A] mt-1">
+                <p className="text-sm font-mono mt-1" style={{ color: 'var(--text-primary)' }}>
                   {formatZAR(data.invoice_details.total_amount)}
                 </p>
               </div>
@@ -227,7 +228,7 @@ export default function AdvanceDetail() {
 
           {/* Timeline */}
           <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <h3 className="text-lg font-semibold text-[#0F172A] mb-6">
+            <h3 className="text-lg font-semibold mb-6" style={{ color: 'var(--text-primary)' }}>
               Timeline
             </h3>
             <div className="space-y-6">
@@ -237,11 +238,11 @@ export default function AdvanceDetail() {
                   <div key={index} className="flex items-start gap-4">
                     <div className="relative">
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          step.completed
-                            ? 'bg-[#2563EB] text-white'
-                            : 'bg-slate-200 text-slate-400'
-                        }`}
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        style={{
+                          background: step.completed ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                          color: step.completed ? 'white' : 'var(--text-tertiary)'
+                        }}
                       >
                         {step.completed ? (
                           <Check className="w-5 h-5" />
@@ -251,20 +252,17 @@ export default function AdvanceDetail() {
                       </div>
                       {index < timelineSteps.length - 1 && (
                         <div
-                          className={`absolute left-5 top-10 w-0.5 h-8 ${
-                            step.completed ? 'bg-[#2563EB]' : 'bg-slate-200'
-                          }`}
+                          className="absolute left-5 top-10 w-0.5 h-8"
+                          style={{ background: step.completed ? 'var(--accent-primary)' : 'var(--border-subtle)' }}
                         />
                       )}
                     </div>
                     <div className="flex-1 pt-2">
-                      <p className={`font-medium ${
-                        step.completed ? 'text-[#0F172A]' : 'text-[#64748B]'
-                      }`}>
+                      <p className="font-medium" style={{ color: step.completed ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
                         {step.label}
                       </p>
                       {step.date && (
-                        <p className="text-sm text-[#64748B] mt-1">
+                        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
                           {new Date(step.date).toLocaleString()}
                         </p>
                       )}
@@ -280,29 +278,27 @@ export default function AdvanceDetail() {
         <div className="space-y-6">
           {/* Fee Breakdown */}
           <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <h3 className="text-lg font-semibold text-[#0F172A] mb-4">
+            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
               Fee Breakdown
             </h3>
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-[#64748B]">Base Fee</span>
-                <span className="text-[#0F172A] font-mono">
+                <span style={{ color: 'var(--text-secondary)' }}>Base Fee</span>
+                <span className="font-mono" style={{ color: 'var(--text-primary)' }}>
                   {data.fee_breakdown.base_fee.toFixed(2)}%
                 </span>
               </div>
               {data.fee_breakdown.adjustments.map((adj, index) => (
                 <div key={index} className="flex justify-between text-sm">
-                  <span className="text-[#64748B]">{adj.name}</span>
-                  <span className={`font-mono ${
-                    adj.amount >= 0 ? 'text-red-600' : 'text-green-600'
-                  }`}>
+                  <span style={{ color: 'var(--text-secondary)' }}>{adj.name}</span>
+                  <span className="font-mono" style={{ color: adj.amount >= 0 ? 'var(--status-danger)' : 'var(--status-success)' }}>
                     {adj.amount >= 0 ? '+' : ''}{adj.amount.toFixed(2)}%
                   </span>
                 </div>
               ))}
-              <div className="pt-3 border-t border-slate-200 flex justify-between">
-                <span className="font-semibold text-[#0F172A]">Final Fee</span>
-                <span className="font-mono font-bold text-[#0F172A]">
+              <div className="pt-3 border-t flex justify-between" style={{ borderColor: 'var(--border-subtle)' }}>
+                <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Final Fee</span>
+                <span className="font-mono font-bold" style={{ color: 'var(--text-primary)' }}>
                   {data.fee_breakdown.final_fee.toFixed(2)}%
                 </span>
               </div>
@@ -311,25 +307,25 @@ export default function AdvanceDetail() {
 
           {/* Amount Summary */}
           <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <h3 className="text-lg font-semibold text-[#0F172A] mb-4">
+            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
               Amount Summary
             </h3>
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-[#64748B]">Gross Amount</span>
-                <span className="text-[#0F172A] font-mono">
+                <span style={{ color: 'var(--text-secondary)' }}>Gross Amount</span>
+                <span className="font-mono" style={{ color: 'var(--text-primary)' }}>
                   {formatZAR(data.gross_amount)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#64748B]">Fee ({data.fee_percent.toFixed(2)}%)</span>
-                <span className="text-red-600 font-mono">
+                <span style={{ color: 'var(--text-secondary)' }}>Fee ({data.fee_percent.toFixed(2)}%)</span>
+                <span className="font-mono" style={{ color: 'var(--status-danger)' }}>
                   -{formatZAR(data.fee_amount)}
                 </span>
               </div>
-              <div className="pt-3 border-t border-slate-200 flex justify-between">
-                <span className="font-semibold text-[#0F172A]">Net Amount</span>
-                <span className="font-mono font-bold text-[#2563EB] text-lg">
+              <div className="pt-3 border-t flex justify-between" style={{ borderColor: 'var(--border-subtle)' }}>
+                <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Net Amount</span>
+                <span className="font-mono font-bold text-lg" style={{ color: 'var(--accent-primary)' }}>
                   {formatZAR(data.net_amount)}
                 </span>
               </div>
@@ -338,41 +334,42 @@ export default function AdvanceDetail() {
 
           {/* Facility Impact */}
           <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <h3 className="text-lg font-semibold text-[#0F172A] mb-4">
+            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
               Facility Impact
             </h3>
             <div className="space-y-4">
               <div>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-[#64748B]">Before</span>
-                  <span className="text-[#0F172A] font-mono">
+                  <span style={{ color: 'var(--text-secondary)' }}>Before</span>
+                  <span className="font-mono" style={{ color: 'var(--text-primary)' }}>
                     {data.facility_impact.utilization_before.toFixed(1)}%
                   </span>
                 </div>
-                <div className="w-full bg-slate-200 rounded-full h-2">
+                <div className="w-full rounded-full h-2" style={{ background: 'var(--border-subtle)' }}>
                   <div
-                    className="bg-slate-400 h-2 rounded-full"
-                    style={{ width: `${data.facility_impact.utilization_before}%` }}
+                    className="h-2 rounded-full"
+                    style={{ width: `${data.facility_impact.utilization_before}%`, background: 'var(--text-tertiary)' }}
                   />
                 </div>
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-[#64748B]">After</span>
-                  <span className="text-[#0F172A] font-mono">
+                  <span style={{ color: 'var(--text-secondary)' }}>After</span>
+                  <span className="font-mono" style={{ color: 'var(--text-primary)' }}>
                     {data.facility_impact.utilization_after.toFixed(1)}%
                   </span>
                 </div>
-                <div className="w-full bg-slate-200 rounded-full h-2">
+                <div className="w-full rounded-full h-2" style={{ background: 'var(--border-subtle)' }}>
                   <div
-                    className={`h-2 rounded-full ${
-                      data.facility_impact.utilization_after >= 90
-                        ? 'bg-red-500'
+                    className="h-2 rounded-full"
+                    style={{
+                      width: `${data.facility_impact.utilization_after}%`,
+                      background: data.facility_impact.utilization_after >= 90
+                        ? 'var(--status-danger)'
                         : data.facility_impact.utilization_after >= 75
-                        ? 'bg-amber-500'
-                        : 'bg-[#2563EB]'
-                    }`}
-                    style={{ width: `${data.facility_impact.utilization_after}%` }}
+                        ? 'var(--status-warning)'
+                        : 'var(--accent-primary)'
+                    }}
                   />
                 </div>
               </div>

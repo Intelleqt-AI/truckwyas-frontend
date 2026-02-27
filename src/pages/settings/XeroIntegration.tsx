@@ -147,7 +147,7 @@ export default function XeroIntegration() {
   if (isLoading) {
     return (
       <div className="p-6">
-        <div className="text-[#64748B]">Loading Xero integration status...</div>
+        <div style={{ color: 'var(--text-secondary)' }}>Loading Xero integration status...</div>
       </div>
     );
   }

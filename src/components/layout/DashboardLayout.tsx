@@ -18,7 +18,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Clean Top Bar */}
           <TopBar />
 
-          {/* Main Content - #FAFAFA background */}
+          {/* Main Content */}
           <main className="flex-1 p-8 overflow-auto">
             {children}
           </main>

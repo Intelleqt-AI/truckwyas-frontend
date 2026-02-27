@@ -36,15 +36,15 @@ const getTierColor = (tier: string) => {
 const getTierBarColor = (tier: string) => {
   switch (tier.toLowerCase()) {
     case 'excellent':
-      return '#10B981';
+      return 'var(--status-success)';
     case 'good':
-      return '#2563EB';
+      return 'var(--accent-primary)';
     case 'fair':
-      return '#F59E0B';
+      return 'var(--status-warning)';
     case 'elevated':
-      return '#EF4444';
+      return 'var(--status-danger)';
     default:
-      return '#64748B';
+      return 'var(--text-secondary)';
   }
 };
 
@@ -66,7 +66,7 @@ export function RiskScoreCard({
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-[#0F172A]">Risk Assessment</h3>
+          <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Risk Assessment</h3>
           <Badge className={`${getTierColor(tier)} border font-medium`}>
             {tier}
           </Badge>
@@ -83,7 +83,7 @@ export function RiskScoreCard({
                   cx="64"
                   cy="64"
                   r="45"
-                  stroke="#E2E8F0"
+                  stroke="var(--border-subtle)"
                   strokeWidth="8"
                   fill="none"
                 />
@@ -103,10 +103,10 @@ export function RiskScoreCard({
               </svg>
               {/* Score text */}
               <div className="absolute inset-0 flex items-center justify-center flex-col">
-                <div className="text-3xl font-mono font-bold text-[#0F172A]">
+                <div className="text-3xl font-mono font-bold" style={{ color: 'var(--text-primary)' }}>
                   {score}
                 </div>
-                <div className="text-xs text-[#64748B] font-medium">/ 100</div>
+                <div className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>/ 100</div>
               </div>
             </div>
           </div>
@@ -116,8 +116,8 @@ export function RiskScoreCard({
             {factors.map((factor) => (
               <div key={factor.name} className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#64748B] font-medium">{factor.name}</span>
-                  <span className="text-[#0F172A] font-mono">
+                  <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{factor.name}</span>
+                  <span className="font-mono" style={{ color: 'var(--text-primary)' }}>
                     {factor.score}/{factor.max}
                   </span>
                 </div>
@@ -137,20 +137,20 @@ export function RiskScoreCard({
 
         {/* Fee Summary (if provided) */}
         {fee !== undefined && feeAmount !== undefined && netAmount !== undefined && (
-          <div className="pt-4 border-t border-slate-200 space-y-3">
+          <div className="pt-4 border-t space-y-3" style={{ borderColor: 'var(--border-subtle)' }}>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-[#64748B]">Fee Rate</span>
-              <span className="text-[#0F172A] font-mono font-medium">{fee}%</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Fee Rate</span>
+              <span className="font-mono font-medium" style={{ color: 'var(--text-primary)' }}>{fee}%</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-[#64748B]">Fee Amount</span>
-              <span className="text-[#0F172A] font-mono font-medium">
+              <span style={{ color: 'var(--text-secondary)' }}>Fee Amount</span>
+              <span className="font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
                 {formatZAR(feeAmount)}
               </span>
             </div>
-            <div className="flex items-center justify-between pt-2 border-t border-slate-200">
-              <span className="text-[#0F172A] font-semibold">Net Payout</span>
-              <span className="text-2xl text-[#2563EB] font-mono font-bold">
+            <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Net Payout</span>
+              <span className="text-2xl font-mono font-bold" style={{ color: 'var(--accent-primary)' }}>
                 {formatZAR(netAmount)}
               </span>
             </div>

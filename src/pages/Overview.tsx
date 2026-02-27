@@ -9,19 +9,30 @@ export default function Overview() {
   const [financeData, setFinanceData] = useState<any>(null);
   const [insights, setInsights] = useState<any[]>([]);
   const [advances, setAdvances] = useState<any[]>([]);
+  const [recentQuotes, setRecentQuotes] = useState<any[]>([]);
+  const [activeLoadsCount, setActiveLoadsCount] = useState(0);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [finance, insightsData, advancesData] = await Promise.all([
+        const [finance, insightsData, advancesData, quotesData, loadsData] = await Promise.all([
           fetchData('api/v1/dashboard/finance/').catch(() => null),
           fetchData('api/v1/dashboard/insights/').catch(() => []),
           fetchData('api/v1/advances/').catch(() => []),
+          fetchData('api/v1/quotes/?limit=5').catch(() => []),
+          fetchData('api/v1/loads/').catch(() => []),
         ]);
         setFinanceData(finance);
         setInsights(Array.isArray(insightsData) ? insightsData : []);
         setAdvances(Array.isArray(advancesData) ? advancesData : []);
+
+        const quotes = quotesData?.results || quotesData || [];
+        setRecentQuotes(quotes.slice(0, 5));
+
+        const loads = loadsData?.results || loadsData || [];
+        const activeLoads = loads.filter((l: any) => l.status === 'IN_TRANSIT' || l.status === 'LOADING');
+        setActiveLoadsCount(activeLoads.length);
       } catch (error) {
         console.error('Failed to load overview data:', error);
       } finally {
@@ -133,51 +144,83 @@ export default function Overview() {
           <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-tertiary)' }}>3 trucks idle in Depot 4</div>
         </div>
 
-        {/* P&L Table */}
+        {/* Recent Quotes */}
         <div className="card table-card">
           <div className="card-header">
-            <span className="card-title">Live Trip P&L Breakdown</span>
-            <button style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 8px', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>EXPORT CSV</button>
+            <span className="card-title">Recent Quotes</span>
+            <button onClick={() => navigate('/quotes')} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 8px', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>VIEW ALL</button>
           </div>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Route ID</th><th>Driver</th><th>Status</th><th>Est. Rev</th><th>Fuel Cost</th><th className="text-right">Net Profit</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="mono">TRK-892</td><td>S. Nkosi</td>
-                <td><span className="status-badge active">In Transit</span></td>
-                <td>R 45,200</td><td>R 12,400</td>
-                <td className="text-right" style={{ color: 'var(--accent-primary)' }}>+ R 18,200</td>
-              </tr>
-              <tr>
-                <td className="mono">TRK-901</td><td>J. Dlamini</td>
-                <td><span className="status-badge">Loading</span></td>
-                <td>R 32,150</td><td>R 8,900</td>
-                <td className="text-right" style={{ color: 'var(--accent-primary)' }}>+ R 14,050</td>
-              </tr>
-              <tr>
-                <td className="mono">TRK-774</td><td>P. Botha</td>
-                <td><span className="status-badge">Completed</span></td>
-                <td>R 28,400</td><td>R 9,200</td>
-                <td className="text-right" style={{ color: 'var(--text-primary)' }}>+ R 9,100</td>
-              </tr>
-              <tr>
-                <td className="mono">TRK-882</td><td>M. Moyo</td>
-                <td><span className="status-badge active" style={{ color: 'var(--status-danger)', background: 'var(--status-danger-bg)' }}>Delayed</span></td>
-                <td>R 51,000</td><td>R 16,500</td>
-                <td className="text-right" style={{ color: 'var(--status-danger)' }}>+ R 8,200</td>
-              </tr>
-              <tr>
-                <td className="mono">TRK-911</td><td>L. Zulu</td>
-                <td><span className="status-badge">Scheduled</span></td>
-                <td>R 38,000</td><td>R 10,100</td>
-                <td className="text-right" style={{ color: 'var(--text-tertiary)' }}>--</td>
-              </tr>
-            </tbody>
-          </table>
+          {loading ? (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)' }}>Loading quotes...</div>
+          ) : recentQuotes.length > 0 ? (
+            <table className="data-table">
+              <thead>
+                <tr><th>Quote #</th><th>Customer</th><th>Route</th><th>Total</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                {recentQuotes.map((quote: any) => (
+                  <tr key={quote.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/quotes/${quote.id}`)}>
+                    <td className="mono">{quote.quote_number}</td>
+                    <td>{quote.customer_name}</td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                      {quote.pickup_location?.split(' ').slice(0, 2).join(' ')} → {quote.delivery_location?.split(' ').slice(0, 2).join(' ')}
+                    </td>
+                    <td style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {formatCurrency(parseFloat(quote.total_amount || '0'))}
+                    </td>
+                    <td>
+                      <span style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 10,
+                        color: quote.status === 'ACCEPTED' ? '#22c55e' : quote.status === 'SENT' ? 'var(--status-warning)' : 'var(--text-tertiary)',
+                        padding: '2px 6px',
+                        background: 'var(--bg-surface-hover)',
+                        borderRadius: 2
+                      }}>
+                        {quote.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)' }}>No recent quotes</div>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="card" style={{ padding: 20 }}>
+          <div className="card-title" style={{ marginBottom: 16 }}>Quick Actions</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button
+              onClick={() => navigate('/quotes/new')}
+              className="btn-action"
+              style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 12px', fontSize: 12 }}
+            >
+              + NEW QUOTE
+            </button>
+            <button
+              onClick={() => navigate('/finance/invoices/new')}
+              className="btn-action"
+              style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 12px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+            >
+              + NEW INVOICE
+            </button>
+            <button
+              onClick={() => navigate('/fleet')}
+              className="btn-action"
+              style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 12px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+            >
+              → VIEW FLEET
+            </button>
+          </div>
+          <div style={{ marginTop: 16, padding: '12px', background: 'var(--bg-surface-hover)', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Active Loads:</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--accent-primary)' }}>
+              {activeLoadsCount}
+            </span>
+          </div>
         </div>
       </div>
 

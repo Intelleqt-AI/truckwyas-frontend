@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchData, postData, deleteData } from "@/lib/Api";
+import { fetchData, postData, deleteData, patchData } from "@/lib/Api";
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -62,12 +62,12 @@ interface Webhook {
 
 const EVENT_OPTIONS = [
   { value: 'load.created', label: 'Load Created' },
+  { value: 'load.updated', label: 'Load Updated' },
   { value: 'load.status_changed', label: 'Load Status Changed' },
-  { value: 'load.delivered', label: 'Load Delivered' },
   { value: 'invoice.created', label: 'Invoice Created' },
   { value: 'invoice.paid', label: 'Invoice Paid' },
-  { value: 'quote.accepted', label: 'Quote Accepted' },
   { value: 'advance.approved', label: 'Advance Approved' },
+  { value: 'advance.disbursed', label: 'Advance Disbursed' },
 ];
 
 export function IntegrationsSettings() {
@@ -131,6 +131,16 @@ export function IntegrationsSettings() {
       alert('Failed to send test ping');
     } finally {
       setTestingWebhook(null);
+    }
+  };
+
+  const handleToggleWebhook = async (id: number, currentActive: boolean) => {
+    try {
+      await patchData({ url: `api/v1/webhooks/${id}/`, data: { is_active: !currentActive } });
+      await loadWebhooks();
+    } catch (err) {
+      console.error('Failed to toggle webhook:', err);
+      alert('Failed to toggle webhook status');
     }
   };
 
@@ -356,6 +366,21 @@ export function IntegrationsSettings() {
                   </div>
                 )}
               </div>
+              <button
+                onClick={() => handleToggleWebhook(webhook.id, webhook.active)}
+                style={{
+                  background: 'none',
+                  border: `1px solid ${webhook.active ? 'var(--status-warning)' : 'var(--status-success)'}`,
+                  color: webhook.active ? 'var(--status-warning)' : 'var(--status-success)',
+                  padding: '4px 10px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                }}
+              >
+                {webhook.active ? 'DISABLE' : 'ENABLE'}
+              </button>
               <button
                 onClick={() => handleTestWebhook(webhook.id)}
                 disabled={testingWebhook === webhook.id}

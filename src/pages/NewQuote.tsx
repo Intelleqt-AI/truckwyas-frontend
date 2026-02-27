@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { postData, fetchData } from "@/lib/Api";
+import { RouteCalculator } from "@/components/quotes/RouteCalculator";
 
 // SA toll + fuel constants
 const FUEL_PRICE_PER_LITRE = 21.5; // ZAR
@@ -44,6 +45,15 @@ export default function NewQuote() {
     status: 'DRAFT',
   });
   const [error, setError] = useState('');
+  const [routeCalcData, setRouteCalcData] = useState<{
+    distance: number;
+    fuelCost: number;
+    tollCost: number;
+    totalCost: number;
+    durationMinutes: number;
+    fuelUsageLitres: number;
+    source: 'tomtom' | 'estimated';
+  } | null>(null);
 
   const { data: customersData } = useQuery({ queryKey: ['customers'], queryFn: () => fetchData('api/customers/') });
   const customers = customersData?.results || customersData || [];
@@ -53,6 +63,25 @@ export default function NewQuote() {
 
   const distKm = parseFloat(form.distance || '0');
   const weightKg = parseFloat(form.weight || '0');
+
+  // Handle TomTom route calculation
+  const handleRouteApply = (data: {
+    distance: number;
+    fuelCost: number;
+    tollCost: number;
+    totalCost: number;
+    durationMinutes: number;
+    fuelUsageLitres: number;
+    source: 'tomtom' | 'estimated';
+  }) => {
+    setRouteCalcData(data);
+    setForm(f => ({
+      ...f,
+      distance: String(Math.round(data.distance)),
+      fuel_surcharge: String(Math.round(data.fuelCost)),
+      toll_charges: String(Math.round(data.tollCost)),
+    }));
+  };
 
   // Auto-calculate fuel + tolls when distance changes
   const autoCalc = () => {
@@ -165,33 +194,81 @@ export default function NewQuote() {
                 {[
                   { l: 'Pickup Location', k: 'pickup_location', p: 'e.g. Johannesburg Depot' },
                   { l: 'Delivery Location', k: 'delivery_location', p: 'e.g. Cape Town Warehouse' },
-                  { l: 'Origin City', k: 'origin', p: 'e.g. JHB' },
-                  { l: 'Destination City', k: 'destination', p: 'e.g. CPT' },
                 ].map(f => (
                   <div key={f.k}>{label(f.l)}<input type="text" placeholder={f.p} value={(form as any)[f.k]} onChange={set(f.k)} style={inputStyle} /></div>
                 ))}
               </div>
             </div>
 
-            {/* Cargo + distance */}
+            {/* TomTom Route Calculator */}
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>Cargo & Distance</div>
+              <div className="card-title" style={{ marginBottom: 16 }}>Route Calculator (TomTom API)</div>
+              <RouteCalculator
+                defaultOrigin={form.pickup_location}
+                defaultDestination={form.delivery_location}
+                onApply={handleRouteApply}
+              />
+              {routeCalcData && (
+                <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
+                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 8 }}>APPLIED ROUTE DATA</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-tertiary)' }}>Distance: </span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{Math.round(routeCalcData.distance)} km</span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-tertiary)' }}>Duration: </span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                        {Math.floor(routeCalcData.durationMinutes / 60)}h {routeCalcData.durationMinutes % 60}m
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-tertiary)' }}>Fuel: </span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{Math.round(routeCalcData.fuelUsageLitres)} L</span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-tertiary)' }}>Fuel Cost: </span>
+                      <span style={{ color: 'var(--status-success)', fontWeight: 600 }}>R {Math.round(routeCalcData.fuelCost).toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-tertiary)' }}>Toll Cost: </span>
+                      <span style={{ color: 'var(--status-success)', fontWeight: 600 }}>R {Math.round(routeCalcData.tollCost).toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-tertiary)' }}>Source: </span>
+                      <span style={{ color: routeCalcData.source === 'tomtom' ? 'var(--accent-primary)' : 'var(--status-warning)', fontWeight: 600 }}>
+                        {routeCalcData.source === 'tomtom' ? 'TomTom API' : 'Estimated'}
+                      </span>
+                    </div>
+                  </div>
+                  {routeCalcData.source === 'estimated' && (
+                    <div style={{ marginTop: 8, fontSize: 10, color: 'var(--status-warning)', fontFamily: 'var(--font-mono)' }}>
+                      ⚠ Using estimated values — TomTom API calculation unavailable
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Cargo */}
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 16 }}>Cargo Details</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>{label('Cargo Description')}<input type="text" placeholder="General Freight" value={form.cargo_description} onChange={set('cargo_description')} style={inputStyle} /></div>
                 <div>{label('Weight (kg)')}<input type="number" placeholder="15000" value={form.weight} onChange={set('weight')} style={inputStyle} /></div>
-                <div>
-                  {label('Distance (km)')}
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input type="number" placeholder="1400" value={form.distance} onChange={set('distance')} style={{ ...inputStyle, flex: 1 }} />
-                    <button type="button" onClick={autoCalc} title="Auto-calculate fuel & tolls" style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', padding: '0 12px', borderRadius: 2, fontSize: 10, fontFamily: 'var(--font-mono)', cursor: 'pointer', whiteSpace: 'nowrap' }}>AUTO-CALC ⚡</button>
-                  </div>
-                </div>
               </div>
-              {distKm > 0 && (
-                <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--bg-surface-hover)', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'flex', gap: 20 }}>
-                  <span>Est. fuel: <span style={{ color: 'var(--text-primary)' }}>R {Math.round((distKm / 100) * AVG_LITRES_PER_100KM * FUEL_PRICE_PER_LITRE).toLocaleString()}</span></span>
-                  <span>Est. tolls: <span style={{ color: 'var(--text-primary)' }}>R {Math.round(distKm * SA_TOLL_RATE_PER_KM).toLocaleString()}</span></span>
-                  <span>Est. total cost: <span style={{ color: 'var(--text-primary)' }}>R {Math.round(distKm * (AVG_LITRES_PER_100KM / 100 * FUEL_PRICE_PER_LITRE + SA_TOLL_RATE_PER_KM + 0.8 + 0.5)).toLocaleString()}</span></span>
+              {form.distance && (
+                <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--bg-surface)', borderRadius: 2, border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 6 }}>MANUAL OVERRIDE (OPTIONAL)</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+                    <div>
+                      {label('Distance (km) — Override')}
+                      <input type="number" placeholder="1400" value={form.distance} onChange={set('distance')} style={inputStyle} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 6 }}>
+                    💡 You can manually adjust distance and costs after using the Route Calculator
+                  </div>
                 </div>
               )}
             </div>

@@ -15,20 +15,38 @@ interface RouteData {
 }
 
 interface RouteCalculatorProps {
+  defaultOrigin?: string;
+  defaultDestination?: string;
   onApply?: (data: {
     distance: number;
     fuelCost: number;
     tollCost: number;
     totalCost: number;
+    durationMinutes: number;
+    fuelUsageLitres: number;
+    source: 'tomtom' | 'estimated';
   }) => void;
 }
 
-export const RouteCalculator: React.FC<RouteCalculatorProps> = ({ onApply }) => {
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
+export const RouteCalculator: React.FC<RouteCalculatorProps> = ({
+  defaultOrigin = '',
+  defaultDestination = '',
+  onApply
+}) => {
+  const [origin, setOrigin] = useState(defaultOrigin);
+  const [destination, setDestination] = useState(defaultDestination);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [routeData, setRouteData] = useState<RouteData | null>(null);
+
+  // Update local state when defaults change
+  React.useEffect(() => {
+    if (defaultOrigin) setOrigin(defaultOrigin);
+  }, [defaultOrigin]);
+
+  React.useEffect(() => {
+    if (defaultDestination) setDestination(defaultDestination);
+  }, [defaultDestination]);
 
   const handleCalculate = async () => {
     if (!origin.trim() || !destination.trim()) {
@@ -70,6 +88,9 @@ export const RouteCalculator: React.FC<RouteCalculatorProps> = ({ onApply }) => 
         fuelCost: routeData.fuel_cost_zar,
         tollCost: routeData.toll_cost_zar,
         totalCost: routeData.total_cost_zar,
+        durationMinutes: routeData.duration_minutes,
+        fuelUsageLitres: routeData.fuel_usage_litres,
+        source: routeData.source,
       });
     }
   };
@@ -85,251 +106,114 @@ export const RouteCalculator: React.FC<RouteCalculatorProps> = ({ onApply }) => 
     return `R ${formatNumber(amount)}`;
   };
 
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border-subtle)',
+    padding: '10px 12px',
+    color: 'var(--text-primary)',
+    borderRadius: 2,
+    fontSize: 13,
+    outline: 'none',
+    width: '100%',
+    fontFamily: 'var(--font-sans)',
+  };
+
+  const label = (text: string) => (
+    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>
+      {text.toUpperCase()}
+    </div>
+  );
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Input Form */}
-      <div className="card" style={{ padding: 24 }}>
-        <h3 style={{ margin: '0 0 20px 0', color: 'var(--text-primary)', fontSize: 18 }}>
-          Route Calculator
-        </h3>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <label
-              htmlFor="origin"
-              style={{
-                display: 'block',
-                marginBottom: 8,
-                fontSize: 14,
-                color: 'var(--text-secondary)',
-                fontWeight: 500,
-              }}
-            >
-              Origin
-            </label>
-            <input
-              id="origin"
-              type="text"
-              value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
-              placeholder="e.g., Johannesburg, South Africa"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                fontSize: 14,
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 6,
-                background: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
-              }}
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="destination"
-              style={{
-                display: 'block',
-                marginBottom: 8,
-                fontSize: 14,
-                color: 'var(--text-secondary)',
-                fontWeight: 500,
-              }}
-            >
-              Destination
-            </label>
-            <input
-              id="destination"
-              type="text"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              placeholder="e.g., Cape Town, South Africa"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                fontSize: 14,
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 6,
-                background: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
-              }}
-              disabled={loading}
-            />
-          </div>
-
-          <button
-            onClick={handleCalculate}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Compact Input Form */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div>
+          {label('Origin')}
+          <input
+            type="text"
+            value={origin}
+            onChange={(e) => setOrigin(e.target.value)}
+            placeholder="e.g. Johannesburg"
+            style={inputStyle}
             disabled={loading}
-            style={{
-              padding: '12px 24px',
-              fontSize: 14,
-              fontWeight: 600,
-              color: 'white',
-              background: loading ? 'var(--text-tertiary)' : 'var(--accent-primary)',
-              border: 'none',
-              borderRadius: 6,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
-            }}
-          >
-            {loading ? 'Calculating...' : 'Calculate Route'}
-          </button>
-
-          {error && (
-            <div
-              style={{
-                padding: 12,
-                background: 'rgba(220, 38, 38, 0.1)',
-                border: '1px solid var(--status-danger)',
-                borderRadius: 6,
-                color: 'var(--status-danger)',
-                fontSize: 14,
-              }}
-            >
-              {error}
-            </div>
-          )}
+          />
+        </div>
+        <div>
+          {label('Destination')}
+          <input
+            type="text"
+            value={destination}
+            onChange={(e) => setDestination(e.target.value)}
+            placeholder="e.g. Cape Town"
+            style={inputStyle}
+            disabled={loading}
+          />
         </div>
       </div>
 
-      {/* Results */}
+      <button
+        onClick={handleCalculate}
+        disabled={loading}
+        className="btn-action"
+        style={{ width: '100%', fontSize: 12, padding: '10px 16px' }}
+      >
+        {loading ? 'CALCULATING ROUTE...' : '🗺️ CALCULATE ROUTE (TomTom)'}
+      </button>
+
+      {error && (
+        <div style={{ padding: '8px 12px', background: 'var(--bg-surface)', border: '1px solid var(--status-danger)', borderRadius: 2, color: 'var(--status-danger)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+          {error}
+        </div>
+      )}
+
+      {/* Compact Results */}
       {routeData && (
-        <div className="card" style={{ padding: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 18 }}>
-              Route Summary
-            </h3>
-            {routeData.source === 'estimated' && (
-              <span
-                style={{
-                  padding: '4px 10px',
-                  background: 'rgba(251, 191, 36, 0.1)',
-                  border: '1px solid var(--status-warning)',
-                  borderRadius: 4,
-                  fontSize: 12,
-                  color: 'var(--status-warning)',
-                  fontWeight: 500,
-                }}
-              >
-                Estimated
-              </span>
-            )}
+        <div style={{ padding: '12px 14px', background: 'var(--bg-surface-hover)', borderRadius: 2, border: `1px solid ${routeData.source === 'tomtom' ? 'var(--accent-primary)' : 'var(--status-warning)'}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}>ROUTE CALCULATED</div>
+            <span style={{ padding: '2px 8px', background: routeData.source === 'tomtom' ? 'var(--accent-dim)' : 'rgba(251, 191, 36, 0.1)', border: `1px solid ${routeData.source === 'tomtom' ? 'var(--accent-primary)' : 'var(--status-warning)'}`, borderRadius: 2, fontSize: 9, color: routeData.source === 'tomtom' ? 'var(--accent-primary)' : 'var(--status-warning)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+              {routeData.source === 'tomtom' ? 'TOMTOM' : 'ESTIMATED'}
+            </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 10, fontSize: 11, fontFamily: 'var(--font-mono)' }}>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                Distance
-              </div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>
-                {formatNumber(routeData.distance_km)} km
-              </div>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 9, marginBottom: 3 }}>DISTANCE</div>
+              <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 15 }}>{Math.round(routeData.distance_km)} km</div>
             </div>
-
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                Est. Duration
-              </div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 9, marginBottom: 3 }}>DURATION</div>
+              <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 15 }}>
                 {Math.floor(routeData.duration_minutes / 60)}h {routeData.duration_minutes % 60}m
               </div>
             </div>
-
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                Fuel Usage
-              </div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>
-                {formatNumber(routeData.fuel_usage_litres)} L
-              </div>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 9, marginBottom: 3 }}>FUEL</div>
+              <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 15 }}>{Math.round(routeData.fuel_usage_litres)} L</div>
             </div>
           </div>
 
-          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16, marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Fuel Cost</span>
-              <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
-                {formatCurrency(routeData.fuel_cost_zar)}
-              </span>
+          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Fuel Cost:</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-success)', fontWeight: 600 }}>R {Math.round(routeData.fuel_cost_zar).toLocaleString()}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Toll Cost</span>
-              <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>
-                {formatCurrency(routeData.toll_cost_zar)}
-              </span>
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                paddingTop: 12,
-                borderTop: '1px solid var(--border-subtle)',
-              }}
-            >
-              <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
-                Total Cost
-              </span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-primary)' }}>
-                {formatCurrency(routeData.total_cost_zar)}
-              </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Toll Cost:</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-success)', fontWeight: 600 }}>R {Math.round(routeData.toll_cost_zar).toLocaleString()}</span>
             </div>
           </div>
 
           {onApply && (
             <button
               onClick={handleApply}
-              style={{
-                width: '100%',
-                padding: '12px 24px',
-                fontSize: 14,
-                fontWeight: 600,
-                color: 'white',
-                background: 'var(--status-success)',
-                border: 'none',
-                borderRadius: 6,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
+              className="btn-action"
+              style={{ width: '100%', marginTop: 10, fontSize: 11, padding: '8px 12px' }}
             >
-              Apply to Quote
+              ✓ APPLY TO QUOTE
             </button>
           )}
-        </div>
-      )}
-
-      {/* Map Placeholder */}
-      {routeData && (
-        <div
-          className="card"
-          style={{
-            padding: 40,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: 200,
-            background: 'var(--bg-surface)',
-            border: '2px dashed var(--border-subtle)',
-          }}
-        >
-          <svg
-            width="48"
-            height="48"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--text-tertiary)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ marginBottom: 12 }}
-          >
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-            <circle cx="12" cy="10" r="3" />
-          </svg>
-          <div style={{ fontSize: 14, color: 'var(--text-secondary)', textAlign: 'center' }}>
-            Map view coming soon
-          </div>
         </div>
       )}
     </div>

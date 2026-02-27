@@ -101,3 +101,7 @@ export const formatCompactNumber = (value: number): string => {
   }
   return formatNumber(value);
 };
+
+export const formatPercent = (value: number, decimals: number = 1): string => {
+  return `${value.toFixed(decimals)}%`;
+};

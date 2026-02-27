@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchData } from '@/lib/Api';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency, formatPercent } from '@/lib/formatters';
 
 export default function Overview() {
   const navigate = useNavigate();
@@ -61,7 +61,7 @@ export default function Overview() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="card-action"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </div>
           <div className="metric-value" style={{ color: 'var(--accent-primary)' }}>
-            {loading ? '...' : `${financeData?.net_margin_percent || 24.8}%`}
+            {loading ? '...' : formatPercent(financeData?.net_margin_percent || 24.8)}
           </div>
           <div className="metric-delta delta-up">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="18 15 12 9 6 15"/></svg>

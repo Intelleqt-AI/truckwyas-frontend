@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchData } from "@/lib/api";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatPercent } from "@/lib/formatters";
 
 const TABS = [
   { id: 'pl', label: 'P&L' },
@@ -128,7 +128,7 @@ export default function FinanceReports() {
                 {[
                   { label: 'Total Revenue', value: formatCurrency(financeData?.total_revenue || 0), color: 'var(--accent-primary)' },
                   { label: 'Total Expenses', value: formatCurrency(financeData?.total_expenses || 0), color: 'var(--status-danger)' },
-                  { label: 'Net Margin %', value: `${financeData?.net_margin_percent || 0}%`, color: 'var(--status-success)' },
+                  { label: 'Net Margin %', value: formatPercent(financeData?.net_margin_percent || 0), color: 'var(--status-success)' },
                   { label: 'Net Profit', value: formatCurrency((financeData?.total_revenue || 0) - (financeData?.total_expenses || 0)), color: 'var(--text-primary)' },
                 ].map(m => (
                   <div key={m.label} className="card metric-card">

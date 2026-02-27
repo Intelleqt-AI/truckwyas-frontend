@@ -1,0 +1,316 @@
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { fetchData, patchData, deleteData, postData } from '@/lib/Api';
+import { formatCurrency } from '@/lib/formatters';
+
+const STATUS_COLOR: Record<string, string> = {
+  DRAFT: 'var(--text-tertiary)',
+  SENT: 'var(--status-warning)',
+  ACCEPTED: '#22c55e',
+  IT: 'var(--accent-primary)',
+  COMPLETED: '#22c55e',
+};
+
+export default function QuoteDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const { data: quote, isLoading, error } = useQuery({
+    queryKey: ['quote', id],
+    queryFn: () => fetchData(`api/quotes/${id}/`),
+    retry: 1,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteData({ url: `api/quotes/${id}/` }),
+    onSuccess: () => {
+      navigate('/quotes');
+    },
+  });
+
+  const convertToLoadMutation = useMutation({
+    mutationFn: () =>
+      postData({
+        url: 'api/loads/',
+        data: {
+          customer: quote.customer,
+          customer_name: quote.customer_name,
+          pickup_location: quote.pickup_location,
+          delivery_location: quote.delivery_location,
+          cargo_description: quote.cargo_description || 'General Freight',
+          weight: quote.weight || 0,
+          quote_id: quote.id,
+          quote_number: quote.quote_number,
+          total_amount: quote.total_amount,
+          status: 'PENDING',
+        },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['loads'] });
+      alert('Quote converted to booking successfully!');
+      navigate('/bookings');
+    },
+  });
+
+  const handleDelete = () => {
+    if (confirm(`Delete quote ${quote?.quote_number}? This cannot be undone.`)) {
+      deleteMutation.mutate();
+    }
+  };
+
+  const handleConvertToLoad = () => {
+    if (confirm(`Convert quote ${quote?.quote_number} to a booking/load?`)) {
+      convertToLoadMutation.mutate();
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: 40 }}>
+        <div className="card" style={{ padding: 24 }}>
+          <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
+          <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !quote) {
+    return (
+      <div style={{ padding: 40 }}>
+        <div style={{ fontSize: 13, color: 'var(--status-danger)', marginBottom: 12 }}>Quote not found</div>
+        <button className="btn-action" onClick={() => navigate('/quotes')}>Back to Quotes</button>
+      </div>
+    );
+  }
+
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border-subtle)',
+    padding: '10px 12px',
+    color: 'var(--text-primary)',
+    borderRadius: 2,
+    fontSize: 13,
+    outline: 'none',
+    width: '100%',
+    fontFamily: 'var(--font-sans)',
+  };
+
+  const label = (text: string) => (
+    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>
+      {text.toUpperCase()}
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <button
+          onClick={() => navigate('/quotes')}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-tertiary)',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            marginBottom: 8,
+            padding: 0,
+          }}
+        >
+          ← BACK TO QUOTES
+        </button>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
+          Quote Detail
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{quote.quote_number}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{quote.customer_name}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                color: STATUS_COLOR[quote.status] || 'var(--text-secondary)',
+                padding: '4px 10px',
+                border: `1px solid ${STATUS_COLOR[quote.status] || 'var(--border-subtle)'}`,
+                borderRadius: 2,
+                background: 'var(--bg-surface)',
+              }}
+            >
+              {quote.status}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
+        {/* LEFT — Quote Details */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Customer */}
+          <div className="card" style={{ padding: 20 }}>
+            <div className="card-title" style={{ marginBottom: 16 }}>Customer</div>
+            <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)' }}>{quote.customer_name}</div>
+          </div>
+
+          {/* Route */}
+          <div className="card" style={{ padding: 20 }}>
+            <div className="card-title" style={{ marginBottom: 16 }}>Route</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                {label('Pickup Location')}
+                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.pickup_location || '—'}</div>
+              </div>
+              <div>
+                {label('Delivery Location')}
+                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
+              </div>
+              <div>
+                {label('Origin')}
+                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.origin || '—'}</div>
+              </div>
+              <div>
+                {label('Destination')}
+                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.destination || '—'}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Cargo Details */}
+          <div className="card" style={{ padding: 20 }}>
+            <div className="card-title" style={{ marginBottom: 16 }}>Cargo Details</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div>
+                {label('Description')}
+                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.cargo_description || '—'}</div>
+              </div>
+              <div>
+                {label('Weight (kg)')}
+                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.weight || '—'}</div>
+              </div>
+              <div>
+                {label('Distance (km)')}
+                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.distance || '—'}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Cost Breakdown */}
+          <div className="card" style={{ padding: 20 }}>
+            <div className="card-title" style={{ marginBottom: 16 }}>Cost Breakdown</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { label: 'Base Rate', value: quote.base_rate },
+                { label: 'Fuel Surcharge', value: quote.fuel_surcharge },
+                { label: 'Toll Charges', value: quote.toll_charges },
+                { label: 'Driver Allowance', value: quote.driver_allowance },
+                { label: 'Additional Charges', value: quote.additional_charges },
+              ].map((item) => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{item.label}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)' }}>
+                    {formatCurrency(parseFloat(item.value || '0'))}
+                  </span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 12, marginTop: 4 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Total Amount</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--accent-primary)' }}>
+                  {formatCurrency(parseFloat(quote.total_amount || '0'))}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          {quote.notes && (
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 12 }}>Notes</div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{quote.notes}</div>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT — Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Metadata */}
+          <div className="card" style={{ padding: 20 }}>
+            <div className="card-title" style={{ marginBottom: 12 }}>Quote Info</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                {label('Quote Number')}
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>{quote.quote_number}</div>
+              </div>
+              <div>
+                {label('Status')}
+                <div style={{ fontSize: 12, color: STATUS_COLOR[quote.status] || 'var(--text-secondary)' }}>{quote.status}</div>
+              </div>
+              <div>
+                {label('Confidence')}
+                <div style={{ fontSize: 12, color: quote.confidence === 'HIGH' ? '#22c55e' : quote.confidence === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)' }}>
+                  {quote.confidence}
+                </div>
+              </div>
+              {quote.created_at && (
+                <div>
+                  {label('Created')}
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                    {new Date(quote.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="card" style={{ padding: 20 }}>
+            <div className="card-title" style={{ marginBottom: 12 }}>Actions</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                className="btn-action"
+                onClick={() => navigate(`/quotes/${id}/edit`)}
+                style={{ width: '100%', fontSize: 11, padding: '10px 16px' }}
+              >
+                EDIT QUOTE
+              </button>
+
+              {quote.status === 'ACCEPTED' && (
+                <button
+                  className="btn-action"
+                  onClick={handleConvertToLoad}
+                  style={{ width: '100%', fontSize: 11, padding: '10px 16px', background: 'var(--status-success)', border: 'none' }}
+                  disabled={convertToLoadMutation.isPending}
+                >
+                  {convertToLoadMutation.isPending ? 'CONVERTING...' : '✓ CONVERT TO BOOKING'}
+                </button>
+              )}
+
+              <button
+                onClick={handleDelete}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--status-danger)',
+                  color: 'var(--status-danger)',
+                  padding: '10px 16px',
+                  borderRadius: 2,
+                  fontSize: 11,
+                  fontFamily: 'var(--font-mono)',
+                  cursor: 'pointer',
+                  width: '100%',
+                }}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'DELETING...' : 'DELETE QUOTE'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

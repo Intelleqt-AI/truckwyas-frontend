@@ -1,426 +1,503 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { postData, fetchData } from "@/lib/Api";
-import { RouteCalculator } from "@/components/quotes/RouteCalculator";
 
-// SA toll + fuel constants
-const FUEL_PRICE_PER_LITRE = 21.5; // ZAR
-const AVG_LITRES_PER_100KM = 35;   // heavy truck
-const SA_TOLL_RATE_PER_KM = 0.95;  // avg e-toll/N-road rate ZAR/km
+// SA constants
+const DEFAULT_BASE_RATE_PER_KM = 10;
+const FUEL_PRICE_PER_LITRE = 21.7;
 
-// AI margin optimizer — suggests rate to hit target margin
-function calcAIRate(distanceKm: number, weightKg: number, targetMargin: number) {
-  const fuelCost = (distanceKm / 100) * AVG_LITRES_PER_100KM * FUEL_PRICE_PER_LITRE;
-  const tollCost = distanceKm * SA_TOLL_RATE_PER_KM;
-  const driverCost = distanceKm * 0.8;
-  const otherCost = distanceKm * 0.5;
-  const totalCost = fuelCost + tollCost + driverCost + otherCost;
-  const rate = totalCost / (1 - targetMargin / 100);
-  return { fuelCost, tollCost, driverCost, otherCost, totalCost, rate };
+type VehicleType = 'Flatbed' | 'Tautliner' | 'Refrigerated' | 'Box Truck' | 'Tanker';
+
+interface RouteData {
+  distance_km: number;
+  duration_minutes: number;
+  fuel_usage_litres: number;
+  fuel_cost_zar: number;
+  toll_cost_zar: number;
+  total_cost_zar: number;
+  success: boolean;
+  source: 'tomtom' | 'estimated';
 }
-
-type QuoteMethod = 'manual' | 'per_km' | 'ai';
 
 export default function NewQuote() {
   const navigate = useNavigate();
-  const [method, setMethod] = useState<QuoteMethod>('manual');
-  const [targetMargin, setTargetMargin] = useState(25);
-  const [form, setForm] = useState({
-    customer: '',
-    pickup_location: '',
-    delivery_location: '',
-    origin: '',
-    destination: '',
-    cargo_description: '',
-    weight: '',
-    distance: '',
-    base_rate: '',
-    fuel_surcharge: '',
-    toll_charges: '',
-    driver_allowance: '',
-    additional_charges: '',
-    notes: '',
-    confidence: 'MEDIUM',
-    status: 'DRAFT',
-  });
+  const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState('');
-  const [routeCalcData, setRouteCalcData] = useState<{
-    distance: number;
-    fuelCost: number;
-    tollCost: number;
-    totalCost: number;
-    durationMinutes: number;
-    fuelUsageLitres: number;
-    source: 'tomtom' | 'estimated';
-  } | null>(null);
 
-  const { data: customersData } = useQuery({ queryKey: ['customers'], queryFn: () => fetchData('api/customers/') });
+  // Step 1: Route data
+  const [pickupLocation, setPickupLocation] = useState('');
+  const [deliveryLocation, setDeliveryLocation] = useState('');
+  const [routeData, setRouteData] = useState<RouteData | null>(null);
+  const [calculatingRoute, setCalculatingRoute] = useState(false);
+
+  // Step 2: Freight details
+  const [weight, setWeight] = useState('');
+  const [vehicleType, setVehicleType] = useState<VehicleType>('Flatbed');
+  const [baseRatePerKm, setBaseRatePerKm] = useState(String(DEFAULT_BASE_RATE_PER_KM));
+
+  // Step 3: Customer & Summary
+  const [customerId, setCustomerId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [status, setStatus] = useState<'DRAFT' | 'SENT'>('DRAFT');
+
+  const { data: customersData } = useQuery({
+    queryKey: ['customers'],
+    queryFn: () => fetchData('api/v1/customers/')
+  });
   const customers = customersData?.results || customersData || [];
 
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setForm(f => ({ ...f, [k]: e.target.value }));
+  // Calculate route via TomTom backend
+  const calculateRoute = async () => {
+    if (!pickupLocation.trim() || !deliveryLocation.trim()) {
+      setError('Please enter both pickup and delivery locations');
+      return;
+    }
 
-  const distKm = parseFloat(form.distance || '0');
-  const weightKg = parseFloat(form.weight || '0');
+    setCalculatingRoute(true);
+    setError('');
+    setRouteData(null);
 
-  // Handle TomTom route calculation
-  const handleRouteApply = (data: {
-    distance: number;
-    fuelCost: number;
-    tollCost: number;
-    totalCost: number;
-    durationMinutes: number;
-    fuelUsageLitres: number;
-    source: 'tomtom' | 'estimated';
-  }) => {
-    setRouteCalcData(data);
-    setForm(f => ({
-      ...f,
-      distance: String(Math.round(data.distance)),
-      fuel_surcharge: String(Math.round(data.fuelCost)),
-      toll_charges: String(Math.round(data.tollCost)),
-    }));
+    try {
+      const data = await postData('/api/v1/route/calculate/', {
+        origin: pickupLocation.trim(),
+        destination: deliveryLocation.trim(),
+        vehicle_type: 'truck',
+        weight_kg: parseFloat(weight || '20000'),
+      });
+
+      if (data.success) {
+        setRouteData(data);
+        setError('');
+      } else {
+        setError(data.error || 'Failed to calculate route');
+      }
+    } catch (err) {
+      setError('Failed to calculate route. Please try again.');
+    } finally {
+      setCalculatingRoute(false);
+    }
   };
 
-  // Auto-calculate fuel + tolls when distance changes
-  const autoCalc = () => {
-    if (!distKm) return;
-    const fuel = Math.round((distKm / 100) * AVG_LITRES_PER_100KM * FUEL_PRICE_PER_LITRE);
-    const tolls = Math.round(distKm * SA_TOLL_RATE_PER_KM);
-    setForm(f => ({ ...f, fuel_surcharge: String(fuel), toll_charges: String(tolls) }));
-  };
-
-  // Per-km method: auto-fill base_rate from rate/km input
-  const [ratePerKm, setRatePerKm] = useState('');
-  const handleRatePerKm = (v: string) => {
-    setRatePerKm(v);
-    const r = parseFloat(v || '0');
-    if (r && distKm) setForm(f => ({ ...f, base_rate: String(Math.round(r * distKm)) }));
-  };
-
-  // AI method
-  const aiResult = method === 'ai' && distKm ? calcAIRate(distKm, weightKg, targetMargin) : null;
-  const applyAIRate = () => {
-    if (!aiResult) return;
-    setForm(f => ({
-      ...f,
-      base_rate: String(Math.round(aiResult.rate - aiResult.fuelCost - aiResult.tollCost - aiResult.driverCost - aiResult.otherCost)),
-      fuel_surcharge: String(Math.round(aiResult.fuelCost)),
-      toll_charges: String(Math.round(aiResult.tollCost)),
-      driver_allowance: String(Math.round(aiResult.driverCost)),
-    }));
-    setMethod('manual');
-  };
-
-  const total = (
-    parseFloat(form.base_rate || '0') +
-    parseFloat(form.fuel_surcharge || '0') +
-    parseFloat(form.toll_charges || '0') +
-    parseFloat(form.driver_allowance || '0') +
-    parseFloat(form.additional_charges || '0')
-  );
-
-  const impliedMargin = total > 0 && aiResult
-    ? (((total - aiResult.totalCost) / total) * 100).toFixed(1)
-    : null;
+  // Cost calculations
+  const distanceKm = routeData?.distance_km || 0;
+  const baseCost = distanceKm * parseFloat(baseRatePerKm || '0');
+  const fuelCost = routeData?.fuel_cost_zar || 0;
+  const tollCost = routeData?.toll_cost_zar || 0;
+  const driverAllowance = 0; // default 0
+  const total = baseCost + fuelCost + tollCost + driverAllowance;
 
   const mutation = useMutation({
-    mutationFn: (data: any) => postData({ url: 'api/quotes/', data }),
+    mutationFn: (data: any) => postData({ url: 'api/v1/quotes/', data }),
     onSuccess: () => navigate('/quotes'),
     onError: (e: any) => setError(e?.message || 'Failed to create quote'),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.customer || !form.pickup_location || !form.delivery_location) {
-      setError('Customer, pickup and delivery are required');
+  const handleSave = () => {
+    if (!customerId) {
+      setError('Please select a customer');
       return;
     }
     mutation.mutate({
-      ...form,
-      fuel_surcharge: parseFloat(form.fuel_surcharge || '0'),
-      toll_charges: parseFloat(form.toll_charges || '0'),
-      driver_allowance: parseFloat(form.driver_allowance || '0'),
-      additional_charges: parseFloat(form.additional_charges || '0'),
-      total_amount: total,
+      customer: customerId,
+      pickup_location: pickupLocation,
+      delivery_location: deliveryLocation,
+      origin: pickupLocation,
+      destination: deliveryLocation,
+      cargo_description: `${weight}kg ${vehicleType}`,
+      weight: parseFloat(weight || '0'),
+      distance: Math.round(distanceKm),
+      base_rate: Math.round(baseCost),
+      fuel_surcharge: Math.round(fuelCost),
+      toll_charges: Math.round(tollCost),
+      driver_allowance: driverAllowance,
+      additional_charges: 0,
+      total_amount: Math.round(total),
+      notes,
+      status,
+      confidence: 'MEDIUM',
     });
   };
 
-  const inputStyle: React.CSSProperties = {
-    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-    padding: '10px 12px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 13,
-    outline: 'none', width: '100%', fontFamily: 'var(--font-sans)',
-  };
-  const label = (text: string) => (
-    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>{text.toUpperCase()}</div>
-  );
+  // Step validation
+  const canGoToStep2 = routeData && routeData.success;
+  const canGoToStep3 = canGoToStep2 && weight && parseFloat(weight) > 0;
 
-  const methodTab = (id: QuoteMethod, name: string) => (
-    <button type="button" onClick={() => setMethod(id)} style={{
-      background: method === id ? 'var(--accent-primary)' : 'var(--bg-surface)',
-      border: `1px solid ${method === id ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-      color: method === id ? '#fff' : 'var(--text-secondary)',
-      padding: '8px 16px', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', flex: 1,
-    }}>{name}</button>
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border-subtle)',
+    padding: '10px 12px',
+    color: 'var(--text-primary)',
+    borderRadius: 2,
+    fontSize: 13,
+    outline: 'none',
+    width: '100%',
+    fontFamily: 'var(--font-sans)',
+  };
+
+  const label = (text: string) => (
+    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>
+      {text.toUpperCase()}
+    </div>
   );
 
   return (
     <div>
+      {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <button onClick={() => navigate('/quotes')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← BACK</button>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
+        <button
+          onClick={() => navigate('/quotes')}
+          style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}
+        >
+          ← BACK
+        </button>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
+          Operations
+        </div>
         <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>New Quote</div>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
-          {/* LEFT — main form */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-            {/* Customer */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>Customer</div>
-              <select value={form.customer} onChange={set('customer')} style={inputStyle}>
-                <option value="">Select customer...</option>
-                {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+      {/* Step Indicator */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: 24, gap: 12 }}>
+        {[1, 2, 3].map(step => (
+          <div key={step} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              background: currentStep >= step ? 'var(--accent-primary)' : 'var(--bg-surface)',
+              border: `1px solid ${currentStep >= step ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+              color: currentStep >= step ? '#000' : 'var(--text-tertiary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 12,
+              fontWeight: 600,
+            }}>
+              {step}
             </div>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: currentStep >= step ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
+              {step === 1 && 'ROUTE'}
+              {step === 2 && 'FREIGHT'}
+              {step === 3 && 'SUMMARY'}
+            </span>
+            {step < 3 && <div style={{ width: 40, height: 1, background: currentStep > step ? 'var(--accent-primary)' : 'var(--border-subtle)' }} />}
+          </div>
+        ))}
+      </div>
 
-            {/* Route */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>Route</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                {[
-                  { l: 'Pickup Location', k: 'pickup_location', p: 'e.g. Johannesburg Depot' },
-                  { l: 'Delivery Location', k: 'delivery_location', p: 'e.g. Cape Town Warehouse' },
-                ].map(f => (
-                  <div key={f.k}>{label(f.l)}<input type="text" placeholder={f.p} value={(form as any)[f.k]} onChange={set(f.k)} style={inputStyle} /></div>
-                ))}
-              </div>
-            </div>
+      {/* STEP 1: Route Entry */}
+      {currentStep === 1 && (
+        <div className="card" style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+          <div className="card-title" style={{ marginBottom: 16 }}>Step 1: Route Details</div>
 
-            {/* TomTom Route Calculator */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>Route Calculator (TomTom API)</div>
-              <RouteCalculator
-                defaultOrigin={form.pickup_location}
-                defaultDestination={form.delivery_location}
-                onApply={handleRouteApply}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+            <div>
+              {label('Pickup Location')}
+              <input
+                type="text"
+                placeholder="e.g. Johannesburg Depot"
+                value={pickupLocation}
+                onChange={e => setPickupLocation(e.target.value)}
+                style={inputStyle}
               />
-              {routeCalcData && (
-                <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 8 }}>APPLIED ROUTE DATA</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, fontSize: 11, fontFamily: 'var(--font-mono)' }}>
-                    <div>
-                      <span style={{ color: 'var(--text-tertiary)' }}>Distance: </span>
-                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{Math.round(routeCalcData.distance)} km</span>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-tertiary)' }}>Duration: </span>
-                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                        {Math.floor(routeCalcData.durationMinutes / 60)}h {routeCalcData.durationMinutes % 60}m
-                      </span>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-tertiary)' }}>Fuel: </span>
-                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{Math.round(routeCalcData.fuelUsageLitres)} L</span>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-tertiary)' }}>Fuel Cost: </span>
-                      <span style={{ color: 'var(--status-success)', fontWeight: 600 }}>R {Math.round(routeCalcData.fuelCost).toLocaleString()}</span>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-tertiary)' }}>Toll Cost: </span>
-                      <span style={{ color: 'var(--status-success)', fontWeight: 600 }}>R {Math.round(routeCalcData.tollCost).toLocaleString()}</span>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-tertiary)' }}>Source: </span>
-                      <span style={{ color: routeCalcData.source === 'tomtom' ? 'var(--accent-primary)' : 'var(--status-warning)', fontWeight: 600 }}>
-                        {routeCalcData.source === 'tomtom' ? 'TomTom API' : 'Estimated'}
-                      </span>
-                    </div>
-                  </div>
-                  {routeCalcData.source === 'estimated' && (
-                    <div style={{ marginTop: 8, fontSize: 10, color: 'var(--status-warning)', fontFamily: 'var(--font-mono)' }}>
-                      ⚠ Using estimated values — TomTom API calculation unavailable
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
-
-            {/* Cargo */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>Cargo Details</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>{label('Cargo Description')}<input type="text" placeholder="General Freight" value={form.cargo_description} onChange={set('cargo_description')} style={inputStyle} /></div>
-                <div>{label('Weight (kg)')}<input type="number" placeholder="15000" value={form.weight} onChange={set('weight')} style={inputStyle} /></div>
-              </div>
-              {form.distance && (
-                <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--bg-surface)', borderRadius: 2, border: '1px solid var(--border-subtle)' }}>
-                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 6 }}>MANUAL OVERRIDE (OPTIONAL)</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
-                    <div>
-                      {label('Distance (km) — Override')}
-                      <input type="number" placeholder="1400" value={form.distance} onChange={set('distance')} style={inputStyle} />
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 6 }}>
-                    💡 You can manually adjust distance and costs after using the Route Calculator
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Notes */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 12 }}>Notes</div>
-              <textarea value={form.notes} onChange={set('notes')} placeholder="Additional notes..." rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
+            <div>
+              {label('Delivery Location')}
+              <input
+                type="text"
+                placeholder="e.g. Cape Town Warehouse"
+                value={deliveryLocation}
+                onChange={e => setDeliveryLocation(e.target.value)}
+                style={inputStyle}
+              />
             </div>
           </div>
 
-          {/* RIGHT — pricing sidebar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <button
+            onClick={calculateRoute}
+            disabled={calculatingRoute || !pickupLocation.trim() || !deliveryLocation.trim()}
+            className="btn-action"
+            style={{ width: '100%', marginBottom: 16 }}
+          >
+            {calculatingRoute ? 'CALCULATING ROUTE...' : '🗺️ CALCULATE ROUTE (TomTom)'}
+          </button>
 
-            {/* Pricing method selector */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 12 }}>Pricing Method</div>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-                {methodTab('manual', 'Manual')}
-                {methodTab('per_km', 'Per KM')}
-                {methodTab('ai', 'AI Optimise')}
-              </div>
-
-              {/* Method: Manual */}
-              {method === 'manual' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {[
-                    { l: 'Base Rate (R)', k: 'base_rate', p: '28000' },
-                    { l: 'Fuel Surcharge (R)', k: 'fuel_surcharge', p: 'Auto-calc or manual' },
-                    { l: 'Toll Charges (R)', k: 'toll_charges', p: 'Auto-calc or manual' },
-                    { l: 'Driver Allowance (R)', k: 'driver_allowance', p: '0' },
-                    { l: 'Additional Charges (R)', k: 'additional_charges', p: '0' },
-                  ].map(f => (
-                    <div key={f.k}>{label(f.l)}<input type="number" placeholder={f.p} value={(form as any)[f.k]} onChange={set(f.k)} style={inputStyle} /></div>
-                  ))}
-                </div>
-              )}
-
-              {/* Method: Per KM */}
-              {method === 'per_km' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div>
-                    {label('Rate per KM (R/km)')}
-                    <input type="number" placeholder="e.g. 22.50" value={ratePerKm} onChange={e => handleRatePerKm(e.target.value)} style={inputStyle} />
-                  </div>
-                  {distKm > 0 && ratePerKm && (
-                    <div style={{ padding: '10px 12px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
-                        {distKm} km × R {ratePerKm}/km
-                      </div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 600, color: 'var(--accent-primary)', marginTop: 4 }}>
-                        = R {Math.round(parseFloat(ratePerKm) * distKm).toLocaleString()}
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    {label('Fuel Surcharge (R)')}
-                    <input type="number" placeholder="Auto-calc or manual" value={form.fuel_surcharge} onChange={set('fuel_surcharge')} style={inputStyle} />
-                  </div>
-                  <div>
-                    {label('Toll Charges (R)')}
-                    <input type="number" placeholder="Auto-calc or manual" value={form.toll_charges} onChange={set('toll_charges')} style={inputStyle} />
-                  </div>
-                  <div>
-                    {label('Additional Charges (R)')}
-                    <input type="number" placeholder="0" value={form.additional_charges} onChange={set('additional_charges')} style={inputStyle} />
-                  </div>
-                </div>
-              )}
-
-              {/* Method: AI Optimise */}
-              {method === 'ai' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div>
-                    {label('Target Margin %')}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <input type="range" min={5} max={50} value={targetMargin} onChange={e => setTargetMargin(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--accent-primary)' }} />
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--accent-primary)', fontWeight: 700, minWidth: 36 }}>{targetMargin}%</span>
-                    </div>
-                  </div>
-                  {!distKm && (
-                    <div style={{ fontSize: 12, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>Enter distance to calculate</div>
-                  )}
-                  {aiResult && (
-                    <div style={{ padding: 14, background: 'var(--bg-surface-hover)', borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}>AI COST BREAKDOWN</div>
-                      {[
-                        { label: 'Fuel', value: aiResult.fuelCost },
-                        { label: 'Tolls', value: aiResult.tollCost },
-                        { label: 'Driver', value: aiResult.driverCost },
-                        { label: 'Other', value: aiResult.otherCost },
-                        { label: 'Total Cost', value: aiResult.totalCost },
-                      ].map(r => (
-                        <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                          <span style={{ color: 'var(--text-secondary)' }}>{r.label}</span>
-                          <span style={{ fontFamily: 'var(--font-mono)', color: r.label === 'Total Cost' ? 'var(--status-warning)' : 'var(--text-primary)' }}>R {Math.round(r.value).toLocaleString()}</span>
-                        </div>
-                      ))}
-                      <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>Recommended Rate</span>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--accent-primary)' }}>R {Math.round(aiResult.rate).toLocaleString()}</span>
-                      </div>
-                      <button type="button" onClick={applyAIRate} className="btn-action" style={{ width: '100%', marginTop: 4 }}>APPLY AI RATE</button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Total */}
-              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14, marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Quote Total</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: 'var(--accent-primary)' }}>R {total.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</span>
-              </div>
-              {impliedMargin && (
-                <div style={{ marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: parseFloat(impliedMargin) >= targetMargin ? '#22c55e' : 'var(--status-danger)' }}>
-                  Implied margin: {impliedMargin}% {parseFloat(impliedMargin) >= targetMargin ? '✓' : '↓ below target'}
-                </div>
-              )}
+          {error && (
+            <div style={{ padding: '10px 12px', background: 'var(--bg-surface)', border: '1px solid var(--status-danger)', borderRadius: 2, color: 'var(--status-danger)', fontSize: 12, marginBottom: 16 }}>
+              {error}
             </div>
+          )}
 
-            {/* Settings */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 12 }}>Settings</div>
-              <div style={{ marginBottom: 12 }}>
-                {label('Status')}
-                <select value={form.status} onChange={set('status')} style={inputStyle}>
-                  <option value="DRAFT">Draft</option>
-                  <option value="SENT">Send to Customer</option>
-                </select>
+          {routeData && routeData.success && (
+            <div style={{ padding: '16px', background: 'var(--bg-surface-hover)', borderRadius: 2, border: `1px solid ${routeData.source === 'tomtom' ? 'var(--accent-primary)' : 'var(--status-warning)'}`, marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}>
+                  ROUTE CALCULATED
+                </div>
+                <span style={{
+                  padding: '2px 8px',
+                  background: routeData.source === 'tomtom' ? 'rgba(0, 194, 255, 0.1)' : 'rgba(251, 191, 36, 0.1)',
+                  border: `1px solid ${routeData.source === 'tomtom' ? 'var(--accent-primary)' : 'var(--status-warning)'}`,
+                  borderRadius: 2,
+                  fontSize: 9,
+                  color: routeData.source === 'tomtom' ? 'var(--accent-primary)' : 'var(--status-warning)',
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-mono)',
+                }}>
+                  {routeData.source === 'tomtom' ? 'TOMTOM' : 'ESTIMATED'}
+                </span>
               </div>
-              <div>
-                {label('Confidence')}
-                <select value={form.confidence} onChange={set('confidence')} style={inputStyle}>
-                  <option value="HIGH">High</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="LOW">Low</option>
-                </select>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12, fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+                <div>
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: 9, marginBottom: 3 }}>DISTANCE</div>
+                  <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 16 }}>{Math.round(routeData.distance_km)} km</div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: 9, marginBottom: 3 }}>DURATION</div>
+                  <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 16 }}>
+                    {Math.floor(routeData.duration_minutes / 60)}h {routeData.duration_minutes % 60}m
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: 9, marginBottom: 3 }}>FUEL</div>
+                  <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 16 }}>{Math.round(routeData.fuel_usage_litres)} L</div>
+                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Fuel Cost:</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-success)', fontWeight: 600 }}>
+                    R {Math.round(routeData.fuel_cost_zar).toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Toll Cost:</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-success)', fontWeight: 600 }}>
+                    R {Math.round(routeData.toll_cost_zar).toLocaleString()}
+                  </span>
+                </div>
               </div>
             </div>
+          )}
 
-            {error && (
-              <div style={{ fontSize: 12, color: 'var(--status-danger)', padding: '10px 12px', background: 'var(--status-danger-bg)', borderRadius: 2 }}>{error}</div>
-            )}
-            <button type="submit" className="btn-action" style={{ width: '100%', padding: '12px 16px', fontSize: 12 }} disabled={mutation.isPending}>
-              {mutation.isPending ? 'CREATING...' : 'CREATE QUOTE'}
-            </button>
-            <button type="button" onClick={() => navigate('/quotes')} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '10px 16px', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', width: '100%' }}>
-              CANCEL
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setCurrentStep(2)}
+              disabled={!canGoToStep2}
+              className="btn-action"
+              style={{ minWidth: 120 }}
+            >
+              NEXT →
             </button>
           </div>
         </div>
-      </form>
+      )}
+
+      {/* STEP 2: Freight Details */}
+      {currentStep === 2 && (
+        <div className="card" style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+          <div className="card-title" style={{ marginBottom: 16 }}>Step 2: Freight Details</div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+            <div>
+              {label('Weight (kg)')}
+              <input
+                type="number"
+                placeholder="15000"
+                value={weight}
+                onChange={e => setWeight(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              {label('Vehicle Type')}
+              <select
+                value={vehicleType}
+                onChange={e => setVehicleType(e.target.value as VehicleType)}
+                style={inputStyle}
+              >
+                <option value="Flatbed">Flatbed</option>
+                <option value="Tautliner">Tautliner</option>
+                <option value="Refrigerated">Refrigerated</option>
+                <option value="Box Truck">Box Truck</option>
+                <option value="Tanker">Tanker</option>
+              </select>
+            </div>
+            <div>
+              {label('Base Rate per KM (R/km)')}
+              <input
+                type="number"
+                placeholder="10"
+                value={baseRatePerKm}
+                onChange={e => setBaseRatePerKm(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          {/* Live cost breakdown */}
+          <div style={{ padding: '16px', background: 'var(--bg-surface-hover)', borderRadius: 2, marginBottom: 16 }}>
+            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 10 }}>
+              COST BREAKDOWN
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Base Cost ({Math.round(distanceKm)} km × R{baseRatePerKm}/km):</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(baseCost).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Fuel Surcharge:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(fuelCost).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Toll Charges:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(tollCost).toLocaleString()}</span>
+              </div>
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Total:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--accent-primary)' }}>
+                  R {Math.round(total).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <button
+              onClick={() => setCurrentStep(1)}
+              className="btn-action"
+              style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', minWidth: 120 }}
+            >
+              ← BACK
+            </button>
+            <button
+              onClick={() => setCurrentStep(3)}
+              disabled={!canGoToStep3}
+              className="btn-action"
+              style={{ minWidth: 120 }}
+            >
+              NEXT →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3: Customer & Summary */}
+      {currentStep === 3 && (
+        <div className="card" style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+          <div className="card-title" style={{ marginBottom: 16 }}>Step 3: Quote Summary</div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+            <div>
+              {label('Customer')}
+              <select
+                value={customerId}
+                onChange={e => setCustomerId(e.target.value)}
+                style={inputStyle}
+              >
+                <option value="">Select customer...</option>
+                {customers.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              {label('Notes (Optional)')}
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Additional notes..."
+                rows={3}
+                style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
+              />
+            </div>
+            <div>
+              {label('Status')}
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value as 'DRAFT' | 'SENT')}
+                style={inputStyle}
+              >
+                <option value="DRAFT">Draft</option>
+                <option value="SENT">Send to Customer</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Full cost breakdown */}
+          <div style={{ padding: '16px', background: 'var(--bg-surface-hover)', borderRadius: 2, marginBottom: 16 }}>
+            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 10 }}>
+              FINAL COST BREAKDOWN
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Route:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{pickupLocation} → {deliveryLocation}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Distance:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{Math.round(distanceKm)} km</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Cargo:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{weight}kg {vehicleType}</span>
+              </div>
+            </div>
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Base Cost:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(baseCost).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Fuel Surcharge:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(fuelCost).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Toll Charges:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(tollCost).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Driver Allowance:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {driverAllowance.toLocaleString()}</span>
+              </div>
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}>Quote Total:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: 'var(--accent-primary)' }}>
+                  R {Math.round(total).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <div style={{ padding: '10px 12px', background: 'var(--bg-surface)', border: '1px solid var(--status-danger)', borderRadius: 2, color: 'var(--status-danger)', fontSize: 12, marginBottom: 16 }}>
+              {error}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <button
+              onClick={() => setCurrentStep(2)}
+              className="btn-action"
+              style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', minWidth: 120 }}
+            >
+              ← BACK
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={mutation.isPending || !customerId}
+              className="btn-action"
+              style={{ minWidth: 140 }}
+            >
+              {mutation.isPending ? 'SAVING...' : 'SAVE QUOTE'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

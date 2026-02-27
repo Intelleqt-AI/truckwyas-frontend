@@ -5,23 +5,20 @@ import { fetchData, patchData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
 
 const STATUS_COLOR: Record<string, string> = {
-  IN_TRANSIT: 'var(--accent-primary)',
-  DELIVERED: '#22c55e',
-  SCHEDULED: 'var(--text-secondary)',
-  LOADING: 'var(--status-warning)',
-  DELAYED: 'var(--status-danger)',
   DRAFT: 'var(--text-tertiary)',
   SENT: 'var(--status-warning)',
   ACCEPTED: '#22c55e',
-  EXPIRED: 'var(--status-danger)',
+  IT: 'var(--accent-primary)',
+  COMPLETED: '#22c55e',
 };
 
-const COLUMNS = ['SCHEDULED', 'LOADING', 'IN_TRANSIT', 'DELIVERED'];
+const COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'IT', 'COMPLETED'];
 const COLUMN_LABELS: Record<string, string> = {
-  SCHEDULED: 'Scheduled',
-  LOADING: 'Loading',
-  IN_TRANSIT: 'In Transit',
-  DELIVERED: 'Delivered',
+  DRAFT: 'Draft',
+  SENT: 'Sent',
+  ACCEPTED: 'Accepted',
+  IT: 'In-Transit',
+  COMPLETED: 'Completed',
 };
 
 export function QuotesList() {
@@ -59,15 +56,15 @@ export function QuotesList() {
     q.customer_name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const loadsByStatus = COLUMNS.reduce((acc, col) => {
-    acc[col] = filteredLoads.filter(l => l.status === col || (col === 'DELIVERED' && l.status === 'DELIVERED'));
+  const quotesByStatus = COLUMNS.reduce((acc, col) => {
+    acc[col] = filteredQuotes.filter(q => q.status === col);
     return acc;
   }, {} as Record<string, any[]>);
 
-  // Fill unrecognised statuses into IN_TRANSIT
-  filteredLoads.forEach(l => {
-    if (!COLUMNS.includes(l.status)) {
-      loadsByStatus['IN_TRANSIT'].push(l);
+  // Drop unrecognised statuses into DRAFT
+  filteredQuotes.forEach(q => {
+    if (!COLUMNS.includes(q.status)) {
+      quotesByStatus['DRAFT'].push(q);
     }
   });
 
@@ -110,71 +107,42 @@ export function QuotesList() {
           <span>{loads.length} loads</span>
           <span>{quotes.length} quotes</span>
         </div>
+
       </div>
 
       {/* Tabs */}
       {view === 'board' ? (
         <>
-          {/* Loads Kanban */}
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 12 }}>ACTIVE LOADS PIPELINE</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
+          {/* Quotes Kanban */}
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 12 }}>QUOTES PIPELINE</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 28 }}>
             {COLUMNS.map(col => (
               <div key={col}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '0 2px' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[col] || 'var(--text-secondary)', letterSpacing: '0.08em' }}>{COLUMN_LABELS[col]}</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2 }}>{loadsByStatus[col]?.length || 0}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2 }}>{quotesByStatus[col]?.length || 0}</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {(loadsByStatus[col] || []).map((load: any) => (
-                    <div key={load.id} className="card" style={{ padding: 14, cursor: 'pointer', borderLeft: `2px solid ${STATUS_COLOR[load.status] || 'var(--border-subtle)'}` }} onClick={() => navigate(`/bookings/${load.id}`)}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6 }}>{load.load_number}</div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{load.customer_name}</div>
+                  {(quotesByStatus[col] || []).map((q: any) => (
+                    <div key={q.id} className="card" style={{ padding: 14, cursor: 'pointer', borderLeft: `2px solid ${STATUS_COLOR[q.status] || 'var(--border-subtle)'}` }} onClick={() => navigate(`/bookings/pipeline/${q.id}`)}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6 }}>{q.quote_number}</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{q.customer_name}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                        {load.pickup_location?.split(' ').slice(0,2).join(' ')} → {load.delivery_location?.split(' ').slice(0,2).join(' ')}
+                        {q.origin} → {q.destination}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent-primary)' }}>{formatCurrency(parseFloat(load.total_amount || '0'))}</span>
-                        <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>{load.driver_name}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent-primary)' }}>{formatCurrency(parseFloat(q.total_amount || '0'))}</span>
+                        <span style={{ fontSize: 10, color: q.confidence === 'HIGH' ? '#22c55e' : q.confidence === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)' }}>{q.confidence}</span>
                       </div>
                     </div>
                   ))}
-                  {(loadsByStatus[col] || []).length === 0 && (
+                  {(quotesByStatus[col] || []).length === 0 && (
                     <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12, border: '1px dashed var(--border-subtle)', borderRadius: 2 }}>—</div>
                   )}
                 </div>
               </div>
             ))}
           </div>
-
-          {/* Quotes section */}
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 12 }}>QUOTES</div>
-          {quotes.length === 0 ? (
-            <div className="card" style={{ padding: 32, textAlign: 'center' }}>
-              <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 12 }}>No quotes yet. Create one to start the pipeline.</div>
-              <button className="btn-action" onClick={() => navigate('/quotes/new')}>+ NEW QUOTE</button>
-            </div>
-          ) : (
-            <div className="card table-card">
-              <table className="data-table">
-                <thead>
-                  <tr><th>Quote #</th><th>Customer</th><th>Route</th><th>Amount</th><th>Status</th><th>Confidence</th><th className="text-right">Actions</th></tr>
-                </thead>
-                <tbody>
-                  {filteredQuotes.map((q: any) => (
-                    <tr key={q.id}>
-                      <td className="mono">{q.quote_number}</td>
-                      <td>{q.customer_name}</td>
-                      <td style={{ color: 'var(--text-secondary)' }}>{q.origin} → {q.destination}</td>
-                      <td>{formatCurrency(parseFloat(q.total_amount || '0'))}</td>
-                      <td><span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[q.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>{q.status}</span></td>
-                      <td style={{ color: q.confidence === 'HIGH' ? '#22c55e' : q.confidence === 'MEDIUM' ? 'var(--status-warning)' : 'var(--status-danger)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{q.confidence}</td>
-                      <td className="text-right"><button className="btn-action" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => navigate(`/bookings/pipeline/${q.id}`)}>VIEW</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </>
       ) : (
         /* List view — all loads */

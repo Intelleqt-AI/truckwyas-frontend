@@ -10,7 +10,6 @@ import { OSLayout } from "./components/os/OSLayout";
 import Overview from "./pages/Overview";
 import { QuotesList } from "./pages/QuotesList";
 import NewQuote from "./pages/NewQuote";
-import QuoteCopilot from "./pages/QuoteCopilot";
 import { BookingsList } from "./pages/BookingsList";
 import Bookings from "./pages/Bookings";
 import LoadsList from "./pages/LoadsList";
@@ -54,7 +53,6 @@ const App = () => (
             {/* All other pages — wrapped in OSLayout (header + nav + content) */}
             <Route path="/quotes" element={<OSLayout><QuotesList /></OSLayout>} />
             <Route path="/quotes/new" element={<OSLayout><NewQuote /></OSLayout>} />
-            <Route path="/quotes/copilot" element={<OSLayout><QuoteCopilot /></OSLayout>} />
             <Route path="/bookings" element={<OSLayout><LoadsList /></OSLayout>} />
             <Route path="/bookings/:id" element={<OSLayout><Bookings /></OSLayout>} />
             <Route path="/bookings/list" element={<OSLayout><BookingsList /></OSLayout>} />

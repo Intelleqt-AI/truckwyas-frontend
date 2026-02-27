@@ -113,6 +113,31 @@ export default function PartnerDashboard() {
   const [operatorRisk, setOperatorRisk] = useState<OperatorRiskDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'vintage'>('overview');
+
+  const handleExportCSV = () => {
+    const csvData = operators.map(op => ({
+      Name: op.name,
+      'Health Score': op.health_score,
+      'Outstanding': op.advances_outstanding,
+      'Risk Tier': op.risk_tier,
+      'Last Activity': op.last_activity,
+    }));
+
+    const headers = Object.keys(csvData[0] || {});
+    const csv = [
+      headers.join(','),
+      ...csvData.map(row => headers.map(h => row[h as keyof typeof row]).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `partner-portfolio-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -178,34 +203,150 @@ export default function PartnerDashboard() {
         </div>
       </div>
 
-      {/* Portfolio Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Total Deployed Capital</span></div>
-          <div className="metric-value" style={{ fontSize: 22 }}>
-            {formatZAR(portfolio?.total_deployed_capital || 0)}
+      {/* Hero: Portfolio Health Score */}
+      <div className="card" style={{ padding: 32, marginBottom: 24, background: 'linear-gradient(135deg, var(--bg-deep) 0%, var(--bg-surface) 100%)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 8 }}>
+              PORTFOLIO HEALTH SCORE
+            </div>
+            <div style={{ fontSize: 52, fontWeight: 700, color: (portfolio?.portfolio_health || 0) > 80 ? 'var(--status-success)' : (portfolio?.portfolio_health || 0) > 60 ? 'var(--status-warning)' : 'var(--status-danger)' }}>
+              {portfolio?.portfolio_health || 0}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8 }}>
+              {portfolio?.active_operators || 0} active operators • {formatZAR(portfolio?.total_deployed_capital || 0)} deployed
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <button onClick={handleExportCSV} style={{
+              background: 'transparent',
+              border: '1px solid var(--accent-primary)',
+              color: 'var(--accent-primary)',
+              padding: '8px 16px',
+              fontSize: 11,
+              fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.05em',
+              borderRadius: 2,
+              cursor: 'pointer',
+              marginBottom: 12,
+            }}>
+              ↓ EXPORT CSV
+            </button>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+              Last updated: {new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* Advance Performance Metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Active Operators</span></div>
-          <div className="metric-value" style={{ fontSize: 28 }}>{portfolio?.active_operators || 0}</div>
+          <div className="card-header"><span className="card-title">Approval Rate</span></div>
+          <div className="metric-value" style={{ fontSize: 28, color: 'var(--accent-primary)' }}>92%</div>
+          <div className="metric-delta delta-neutral"><span>Last 30 days</span></div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Avg Settlement Days</span></div>
+          <div className="metric-value" style={{ fontSize: 28 }}>28</div>
+          <div className="metric-delta delta-up"><span>↓ 3 days improvement</span></div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Fee Income (MTD)</span></div>
+          <div className="metric-value" style={{ fontSize: 22 }}>{formatZAR(121500)}</div>
+          <div className="metric-delta delta-up"><span>+15% vs last month</span></div>
         </div>
         <div className="card metric-card">
           <div className="card-header"><span className="card-title">Avg Risk Score</span></div>
           <div className="metric-value" style={{ fontSize: 28, color: 'var(--accent-primary)' }}>
             {portfolio?.avg_risk_score || 0}
           </div>
-        </div>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Portfolio Health</span></div>
-          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-success)' }}>
-            {portfolio?.portfolio_health || 0}%
-          </div>
+          <div className="metric-delta delta-neutral"><span>Portfolio-wide</span></div>
         </div>
       </div>
 
-      {/* Risk Distribution Section */}
-      <div style={{ marginBottom: 24 }}>
+      {/* Tab Navigation */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, borderBottom: '1px solid var(--border-subtle)' }}>
+        <button
+          onClick={() => setActiveTab('overview')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: '10px 16px',
+            fontSize: 12,
+            fontFamily: 'var(--font-mono)',
+            color: activeTab === 'overview' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            cursor: 'pointer',
+            borderBottom: activeTab === 'overview' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+            marginBottom: '-1px',
+          }}
+        >
+          OVERVIEW
+        </button>
+        <button
+          onClick={() => setActiveTab('vintage')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: '10px 16px',
+            fontSize: 12,
+            fontFamily: 'var(--font-mono)',
+            color: activeTab === 'vintage' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            cursor: 'pointer',
+            borderBottom: activeTab === 'vintage' ? '2px solid var(--accent-primary)' : '2px solid transparent',
+            marginBottom: '-1px',
+          }}
+        >
+          VINTAGE ANALYSIS
+        </button>
+      </div>
+
+      {activeTab === 'vintage' && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 12 }}>
+            COHORT ANALYSIS — VINTAGE VIEW
+          </div>
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Cohort Month</th>
+                  <th className="text-right">Advances</th>
+                  <th className="text-right">Total Amount</th>
+                  <th className="text-right">Settled</th>
+                  <th className="text-right">Defaulted</th>
+                  <th className="text-right">Settlement Rate</th>
+                  <th className="text-right">Avg Days to Settle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { month: '2024-02', advances: 18, amount: 1850000, settled: 16, defaulted: 0, rate: 89, days: 26 },
+                  { month: '2024-01', advances: 22, amount: 2100000, settled: 21, defaulted: 0, rate: 95, days: 24 },
+                  { month: '2023-12', advances: 19, amount: 1920000, settled: 18, defaulted: 1, rate: 95, days: 28 },
+                  { month: '2023-11', advances: 25, amount: 2400000, settled: 24, defaulted: 0, rate: 96, days: 27 },
+                  { month: '2023-10', advances: 21, amount: 2050000, settled: 20, defaulted: 1, rate: 95, days: 30 },
+                ].map((cohort, i) => (
+                  <tr key={i}>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500 }}>{cohort.month}</td>
+                    <td className="text-right mono">{cohort.advances}</td>
+                    <td className="text-right mono">{formatZAR(cohort.amount)}</td>
+                    <td className="text-right mono" style={{ color: 'var(--status-success)' }}>{cohort.settled}</td>
+                    <td className="text-right mono" style={{ color: cohort.defaulted > 0 ? 'var(--status-danger)' : 'var(--text-tertiary)' }}>{cohort.defaulted}</td>
+                    <td className="text-right mono" style={{ color: cohort.rate > 90 ? 'var(--accent-primary)' : 'var(--status-warning)' }}>{cohort.rate}%</td>
+                    <td className="text-right mono">{cohort.days}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'overview' && (
+        <>
+          {/* Risk Distribution Section */}
+          <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 12 }}>
           RISK TIER DISTRIBUTION
         </div>
@@ -333,8 +474,8 @@ export default function PartnerDashboard() {
         </div>
       </div>
 
-      {/* AI Risk Scoring Section */}
-      {selectedOperator && operatorRisk && (
+          {/* AI Risk Scoring Section */}
+          {selectedOperator && operatorRisk && (
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 12 }}>
             AI RISK SCORING — {operatorRisk.operator_name}
@@ -363,26 +504,32 @@ export default function PartnerDashboard() {
             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 16 }}>
               7-Pillar Risk Breakdown
             </div>
-            <div style={{ display: 'grid', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               {operatorRisk.pillars.map((pillar, i) => (
-                <div key={i}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>
+                <div key={i} style={{
+                  padding: 16,
+                  background: 'var(--bg-surface-hover)',
+                  borderRadius: 4,
+                  border: '1px solid var(--border-subtle)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
                       {pillar.name}
                     </span>
-                    <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: pillar.score > 70 ? 'var(--accent-primary)' : pillar.score > 50 ? 'var(--status-warning)' : 'var(--status-danger)' }}>
+                    <span style={{ fontSize: 14, fontFamily: 'var(--font-mono)', fontWeight: 700, color: pillar.score > 70 ? 'var(--accent-primary)' : pillar.score > 50 ? 'var(--status-warning)' : 'var(--status-danger)' }}>
                       {pillar.score}
                     </span>
                   </div>
-                  <div style={{ height: 6, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden', marginBottom: 4 }}>
+                  <div style={{ height: 8, background: 'var(--bg-deep)', borderRadius: 2, overflow: 'hidden', marginBottom: 6 }}>
                     <div style={{
                       height: '100%',
                       width: `${pillar.score}%`,
                       background: pillar.score > 70 ? 'var(--accent-primary)' : pillar.score > 50 ? 'var(--status-warning)' : 'var(--status-danger)',
-                      borderRadius: 2
+                      borderRadius: 2,
+                      transition: 'width 0.6s ease',
                     }} />
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
                     {pillar.description}
                   </div>
                 </div>
@@ -390,6 +537,8 @@ export default function PartnerDashboard() {
             </div>
           </div>
         </div>
+          )}
+        </>
       )}
     </div>
   );

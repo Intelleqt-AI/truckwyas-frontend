@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchData, patchData } from "@/lib/Api";
+import { fetchData, patchData, postData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
 import {
   DndContext,
@@ -38,7 +38,7 @@ const COLUMN_LABELS: Record<string, string> = {
 };
 
 // Draggable Quote Card Component
-function DraggableQuoteCard({ quote, onClick }: { quote: any; onClick: () => void }) {
+function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; onClick: () => void; onConvertToLoad?: (e: React.MouseEvent, quote: any) => void }) {
   const {
     attributes,
     listeners,
@@ -70,10 +70,19 @@ function DraggableQuoteCard({ quote, onClick }: { quote: any; onClick: () => voi
         <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
           {quote.origin} → {quote.destination}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: quote.status === 'ACCEPTED' ? 8 : 0 }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent-primary)' }}>{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
           <span style={{ fontSize: 10, color: quote.confidence === 'HIGH' ? '#22c55e' : quote.confidence === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)' }}>{quote.confidence}</span>
         </div>
+        {quote.status === 'ACCEPTED' && onConvertToLoad && (
+          <button
+            onClick={(e) => onConvertToLoad(e, quote)}
+            className="btn-action"
+            style={{ width: '100%', fontSize: 9, padding: '6px 8px', background: 'var(--status-success)', border: 'none', pointerEvents: 'auto' }}
+          >
+            ✓ CONVERT TO BOOKING
+          </button>
+        )}
       </div>
     </div>
   );
@@ -131,6 +140,39 @@ export function QuotesList() {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
     },
   });
+
+  const convertToLoadMutation = useMutation({
+    mutationFn: (quote: any) =>
+      postData({
+        url: 'api/loads/',
+        data: {
+          customer: quote.customer,
+          customer_name: quote.customer_name,
+          pickup_location: quote.pickup_location,
+          delivery_location: quote.delivery_location,
+          cargo_description: quote.cargo_description || 'General Freight',
+          weight: quote.weight || 0,
+          quote_id: quote.id,
+          quote_number: quote.quote_number,
+          total_amount: quote.total_amount,
+          status: 'PENDING',
+        },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['loads'] });
+      alert('Quote converted to booking successfully!');
+    },
+    onError: () => {
+      alert('Failed to convert quote to booking');
+    },
+  });
+
+  const handleConvertToLoad = (e: React.MouseEvent, quote: any) => {
+    e.stopPropagation();
+    if (confirm(`Convert quote ${quote.quote_number} to a booking/load?`)) {
+      convertToLoadMutation.mutate(quote);
+    }
+  };
 
   const filteredLoads = loads.filter(l =>
     !search ||
@@ -247,6 +289,7 @@ export function QuotesList() {
                       key={q.id}
                       quote={q}
                       onClick={() => navigate(`/quotes/${q.id}`)}
+                      onConvertToLoad={handleConvertToLoad}
                     />
                   ))}
                   {(quotesByStatus[col] || []).length === 0 && (

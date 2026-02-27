@@ -51,9 +51,9 @@ export default function Drivers() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetchData('/api/v1/drivers/'),
-      fetchData('/api/v1/drivers/overview/'),
-      fetchData('/api/v1/drivers/leaderboard/')
+      fetchData('api/v1/drivers/'),
+      fetchData('api/v1/drivers/overview/'),
+      fetchData('api/v1/drivers/leaderboard/')
     ])
       .then(([driversData, overviewData, leaderboardData]) => {
         setDrivers(driversData || []);

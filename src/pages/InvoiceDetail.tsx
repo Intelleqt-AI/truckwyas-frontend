@@ -18,17 +18,18 @@ export default function InvoiceDetail() {
   const [downloading, setDownloading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const { data: invoice, isLoading, refetch } = useQuery({
+  const { data: invoice, isLoading, isError, refetch } = useQuery({
     queryKey: ['invoice', id],
-    queryFn: () => fetchData(`/api/v1/invoices/${id}/`),
+    queryFn: () => fetchData(`api/v1/invoices/${id}/`),
     enabled: !!id,
+    retry: 2,
   });
 
   const handleSendInvoice = async () => {
     if (!id) return;
     setSending(true);
     try {
-      await postData({ url: `/api/v1/invoices/${id}/send_invoice/` });
+      await postData({ url: `api/v1/invoices/${id}/send_invoice/` });
       setToast('Invoice sent!');
       setTimeout(() => setToast(null), 3000);
       refetch();
@@ -54,7 +55,7 @@ export default function InvoiceDetail() {
   };
 
   if (isLoading) return <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>;
-  if (!invoice) return <div style={{ padding: 40 }}><div style={{ color: 'var(--text-tertiary)' }}>Invoice not found.</div><button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/invoices')}>← BACK</button></div>;
+  if (isError || !invoice) return <div style={{ padding: 40 }}><div style={{ color: 'var(--text-tertiary)' }}>Invoice not found.</div><button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/finance/invoices')}>← BACK</button></div>;
 
   return (
     <div>
@@ -121,7 +122,7 @@ export default function InvoiceDetail() {
                 {downloading ? 'DOWNLOADING...' : 'DOWNLOAD PDF'}
               </button>
             )}
-            {invoice.fast_pay_eligible && invoice.status !== 'PAID' && (
+            {(invoice.fast_pay_eligible || invoice.early_pay_eligible) && invoice.status !== 'PAID' && (
               <button onClick={() => navigate('/capital')} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>REQUEST FAST PAY</button>
             )}
           </div>

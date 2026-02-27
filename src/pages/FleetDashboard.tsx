@@ -35,8 +35,8 @@ export default function FleetDashboard() {
 
   useEffect(() => {
     Promise.all([
-      fetchData('/api/v1/vehicles/'),
-      fetchData('/api/v1/drivers/')
+      fetchData('api/v1/vehicles/'),
+      fetchData('api/v1/drivers/')
     ])
       .then(([vehiclesData, driversData]) => {
         setVehicles(vehiclesData || []);

@@ -32,24 +32,24 @@ export default function Capital() {
       setError(null);
       try {
         // Load facility data
-        const facilityData = await fetchData('/api/v1/facilities/');
+        const facilityData = await fetchData('api/v1/facilities/');
         setFacility(Array.isArray(facilityData) ? facilityData[0] : facilityData);
 
         // Load active advances (FUNDED or ACTIVE status)
-        const advancesData = await fetchData('/api/v1/advances/');
+        const advancesData = await fetchData('api/v1/advances/');
         const active = Array.isArray(advancesData) ? advancesData.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED') : [];
         setAdvances(active);
 
         // Load eligible invoices - try fast_pay_eligible query param first
         try {
-          const eligibleData = await fetchData('/api/v1/invoices/?fast_pay_eligible=true');
+          const eligibleData = await fetchData('api/v1/invoices/?fast_pay_eligible=true');
           const eligible = Array.isArray(eligibleData) ? eligibleData.filter((inv: any) =>
             (inv.risk_tier === 'prime' || inv.risk_tier === 'standard')
           ) : [];
           setEligibleInvoices(eligible);
         } catch {
           // Fallback: filter client-side
-          const allInvoices = await fetchData('/api/v1/invoices/?status=SENT');
+          const allInvoices = await fetchData('api/v1/invoices/?status=SENT');
           const eligible = Array.isArray(allInvoices) ? allInvoices.filter((inv: any) =>
             inv.fast_pay_eligible && (inv.risk_tier === 'prime' || inv.risk_tier === 'standard')
           ) : [];

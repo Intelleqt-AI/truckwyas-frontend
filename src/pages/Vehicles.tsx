@@ -59,9 +59,9 @@ export default function Vehicles() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetchData('/api/v1/vehicles/'),
-      fetchData('/api/v1/fleet/overview/'),
-      fetchData('/api/v1/fleet/intelligence/')
+      fetchData('api/v1/vehicles/'),
+      fetchData('api/v1/fleet/overview/'),
+      fetchData('api/v1/fleet/intelligence/')
     ])
       .then(([vehData, overviewData, insightsData]) => {
         setVehicles(vehData || []);

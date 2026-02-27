@@ -27,7 +27,7 @@ export default function AdvanceDetail() {
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchData(`/api/v1/advances/${id}/`);
+        const data = await fetchData(`api/v1/advances/${id}/`);
         setAdvance(data);
       } catch (err) {
         console.error('Failed to load advance:', err);

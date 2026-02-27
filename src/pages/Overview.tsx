@@ -15,9 +15,9 @@ export default function Overview() {
       setLoading(true);
       try {
         const [finance, insightsData, advancesData] = await Promise.all([
-          fetchData('/api/v1/dashboard/finance/').catch(() => null),
-          fetchData('/api/v1/dashboard/insights/').catch(() => []),
-          fetchData('/api/v1/advances/').catch(() => []),
+          fetchData('api/v1/dashboard/finance/').catch(() => null),
+          fetchData('api/v1/dashboard/insights/').catch(() => []),
+          fetchData('api/v1/advances/').catch(() => []),
         ]);
         setFinanceData(finance);
         setInsights(Array.isArray(insightsData) ? insightsData : []);

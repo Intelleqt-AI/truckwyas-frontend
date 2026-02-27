@@ -60,8 +60,8 @@ export default function Expenses() {
   const loadData = () => {
     setLoading(true);
     Promise.all([
-      fetchData('/api/v1/expenses/'),
-      fetchData('/api/v1/vehicles/')
+      fetchData('api/v1/expenses/'),
+      fetchData('api/v1/vehicles/')
     ])
       .then(([expData, vehData]) => {
         setExpenses(expData || []);

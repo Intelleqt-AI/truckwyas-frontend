@@ -59,7 +59,7 @@ export default function Insights() {
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   useEffect(() => {
-    fetchData('/api/v1/dashboard/insights/')
+    fetchData('api/v1/dashboard/insights/')
       .then(setData)
       .catch(() => {
         setError('Failed to load insights');

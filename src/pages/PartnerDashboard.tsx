@@ -117,9 +117,9 @@ export default function PartnerDashboard() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetchData('/api/v1/partner/operators/'),
-      fetchData('/api/v1/partner/advances/'),
-      fetchData('/api/v1/partner/risk/')
+      fetchData('api/v1/partner/operators/'),
+      fetchData('api/v1/partner/advances/'),
+      fetchData('api/v1/partner/risk/')
     ])
       .then(([operatorsData, advancesData, riskDataRes]) => {
         // Use API data if available, fallback to mocks
@@ -141,7 +141,7 @@ export default function PartnerDashboard() {
 
   useEffect(() => {
     if (selectedOperator) {
-      fetchData(`/api/v1/partner/risk/${selectedOperator}/`)
+      fetchData(`api/v1/partner/risk/${selectedOperator}/`)
         .then(setOperatorRisk)
         .catch(() => setOperatorRisk(MOCK_RISK_DETAIL));
     }

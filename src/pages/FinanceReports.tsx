@@ -29,12 +29,12 @@ export default function FinanceReports() {
       setError(null);
       try {
         const [finance, cashflow, cust, aging, fac, adv] = await Promise.all([
-          fetchData('/api/v1/dashboard/finance/').catch(() => null),
-          fetchData('/api/v1/dashboard/cashflow/').catch(() => null),
-          fetchData('/api/v1/customers/').catch(() => []),
-          fetchData('/api/v1/invoices/aging/').catch(() => null),
-          fetchData('/api/v1/facilities/').catch(() => null),
-          fetchData('/api/v1/advances/').catch(() => []),
+          fetchData('api/v1/dashboard/finance/').catch(() => null),
+          fetchData('api/v1/dashboard/cashflow/').catch(() => null),
+          fetchData('api/v1/customers/').catch(() => []),
+          fetchData('api/v1/invoices/aging/').catch(() => null),
+          fetchData('api/v1/facilities/').catch(() => null),
+          fetchData('api/v1/advances/').catch(() => []),
         ]);
         setFinanceData(finance);
         setCashflowData(cashflow);

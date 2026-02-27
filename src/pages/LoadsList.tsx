@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchData } from '@/lib/Api';
+import { fetchData, postData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
 
 interface Load {
@@ -29,7 +29,39 @@ export default function LoadsList() {
   const [loads, setLoads] = useState<Load[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [convertingIds, setConvertingIds] = useState<Set<number>>(new Set());
   const navigate = useNavigate();
+
+  const handleConvertToInvoice = async (load: Load, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConvertingIds(prev => new Set(prev).add(load.id));
+
+    try {
+      const response = await postData({
+        url: '/api/v1/invoices/',
+        data: {
+          load_id: load.id,
+          customer_id: load.customer_name, // Backend should resolve this
+          issue_date: new Date().toISOString().split('T')[0],
+          due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        }
+      });
+
+      // Navigate to the created invoice
+      if (response?.id) {
+        navigate(`/finance/invoices/${response.id}`);
+      }
+    } catch (err) {
+      console.error('Failed to convert load to invoice:', err);
+      alert('Failed to create invoice. Please try again.');
+    } finally {
+      setConvertingIds(prev => {
+        const next = new Set(prev);
+        next.delete(load.id);
+        return next;
+      });
+    }
+  };
 
   useEffect(() => {
     fetchData('/api/v1/loads/')
@@ -102,6 +134,7 @@ export default function LoadsList() {
               <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.1em' }}>VEHICLE</th>
               <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.1em' }}>STATUS</th>
               <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.1em' }}>AMOUNT</th>
+              <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.1em' }}>ACTION</th>
             </tr>
           </thead>
           <tbody>
@@ -138,6 +171,29 @@ export default function LoadsList() {
                 </td>
                 <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600 }}>
                   {formatCurrency(parseFloat(load.total_amount || '0'))}
+                </td>
+                <td style={{ padding: '14px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                  {load.status === 'DELIVERED' && load.status !== 'INVOICED' && (
+                    <button
+                      onClick={(e) => handleConvertToInvoice(load, e)}
+                      disabled={convertingIds.has(load.id)}
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid var(--accent-primary)',
+                        color: 'var(--accent-primary)',
+                        padding: '4px 10px',
+                        fontSize: 10,
+                        fontFamily: 'var(--font-mono)',
+                        letterSpacing: '0.05em',
+                        borderRadius: 2,
+                        cursor: convertingIds.has(load.id) ? 'not-allowed' : 'pointer',
+                        opacity: convertingIds.has(load.id) ? 0.5 : 1,
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {convertingIds.has(load.id) ? 'CREATING...' : '→ INVOICE'}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

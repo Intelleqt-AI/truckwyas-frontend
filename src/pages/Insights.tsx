@@ -42,6 +42,14 @@ const MOCK_FALLBACK: InsightsResponse = {
 
 const CATEGORIES = ['All', 'Route Intelligence', 'Customer Intel', 'Cash Alerts', 'Fleet Performance'];
 
+const ROUTE_DATA = [
+  { route: 'JHB → CPT', trips: 28, avg_revenue: 24800, avg_cost: 18200, margin: 26.6 },
+  { route: 'JHB → DBN', trips: 34, avg_revenue: 18400, avg_cost: 13100, margin: 28.8 },
+  { route: 'CPT → PE', trips: 12, avg_revenue: 11200, avg_cost: 9800, margin: 12.5 },
+  { route: 'DBN → PE', trips: 8, avg_revenue: 13600, avg_cost: 11200, margin: 17.6 },
+  { route: 'JHB → Msuto', trips: 6, avg_revenue: 9800, avg_cost: 9200, margin: 6.1 },
+];
+
 function getSignalColor(type: string): string {
   switch (type.toUpperCase()) {
     case 'CRITICAL': return 'var(--status-danger)';
@@ -297,6 +305,44 @@ export default function Insights() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Route Intelligence Table */}
+      <div style={{ marginTop: 24 }}>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Route Intelligence</div>
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', borderBottom: '1px solid var(--border-subtle)' }}>ROUTE</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', borderBottom: '1px solid var(--border-subtle)' }}>TRIPS</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', borderBottom: '1px solid var(--border-subtle)' }}>AVG REVENUE</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', borderBottom: '1px solid var(--border-subtle)' }}>AVG COST</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', borderBottom: '1px solid var(--border-subtle)' }}>NET MARGIN</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ROUTE_DATA.map((r, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid var(--border-row)' }}>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.route}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>{r.trips}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>R {r.avg_revenue.toLocaleString()}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>R {r.avg_cost.toLocaleString()}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: r.margin >= 25 ? 'var(--status-success)' : r.margin >= 15 ? 'var(--status-warning)' : 'var(--status-danger)',
+                    }}>
+                      {r.margin.toFixed(1)}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

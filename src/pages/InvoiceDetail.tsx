@@ -17,6 +17,12 @@ export default function InvoiceDetail() {
   const [sending, setSending] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('EFT');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [recordingPayment, setRecordingPayment] = useState(false);
 
   const { data: invoice, isLoading, isError, refetch } = useQuery({
     queryKey: ['invoice', id],

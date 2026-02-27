@@ -116,6 +116,18 @@ export function IntegrationsSettings() {
     }
   };
 
+  const loadAPIKeys = async () => {
+    try {
+      const data = await fetchData('api/v1/integration-keys/');
+      const list = Array.isArray(data) ? data : (data?.results || []);
+      setApiKeys(list);
+    } catch (err) {
+      console.error('Failed to load API keys:', err);
+    } finally {
+      setLoadingKeys(false);
+    }
+  };
+
   const handleCreateWebhook = async () => {
     if (!newWebhookUrl || selectedEvents.length === 0) {
       alert('Please enter a URL and select at least one event');
@@ -168,6 +180,37 @@ export function IntegrationsSettings() {
     } catch (err) {
       console.error('Failed to delete webhook:', err);
       alert('Failed to delete webhook');
+    }
+  };
+
+  const handleCreateAPIKey = async () => {
+    if (!newKeyName.trim()) {
+      alert('Please enter a name for the API key');
+      return;
+    }
+    try {
+      const created = await postData({
+        url: 'api/v1/integration-keys/',
+        data: { name: newKeyName, permissions: [] },
+      });
+      setCreatedKey(created.key);
+      setNewKeyName('');
+      setShowAddKey(false);
+      await loadAPIKeys();
+    } catch (err) {
+      console.error('Failed to create API key:', err);
+      alert('Failed to create API key');
+    }
+  };
+
+  const handleRevokeAPIKey = async (id: number) => {
+    if (!confirm('Revoke this API key? This cannot be undone and will break any integrations using it.')) return;
+    try {
+      await deleteData({ url: `api/v1/integration-keys/${id}/` });
+      await loadAPIKeys();
+    } catch (err) {
+      console.error('Failed to revoke API key:', err);
+      alert('Failed to revoke API key');
     }
   };
 
@@ -428,6 +471,172 @@ export function IntegrationsSettings() {
                 }}
               >
                 DELETE
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* API Keys Section */}
+      <div style={sectionStyle}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={sectionTitleStyle}>API Keys</span>
+          <button
+            onClick={() => setShowAddKey(!showAddKey)}
+            style={{
+              background: 'var(--accent-primary)',
+              border: 'none',
+              color: 'var(--btn-action-color)',
+              padding: '4px 12px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9,
+              borderRadius: 2,
+              cursor: 'pointer',
+              letterSpacing: '0.06em',
+            }}
+          >
+            + ADD API KEY
+          </button>
+        </div>
+
+        {/* Add API Key Form */}
+        {showAddKey && (
+          <div style={{ padding: 20, borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-surface-hover)' }}>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, letterSpacing: '0.06em' }}>KEY NAME</label>
+              <input
+                type="text"
+                value={newKeyName}
+                onChange={(e) => setNewKeyName(e.target.value)}
+                placeholder="Production Server Integration"
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 2,
+                  color: 'var(--text-primary)',
+                  fontSize: 12,
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={handleCreateAPIKey}
+                style={{
+                  background: 'var(--accent-primary)',
+                  border: 'none',
+                  color: 'var(--btn-action-color)',
+                  padding: '8px 16px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                }}
+              >
+                CREATE
+              </button>
+              <button
+                onClick={() => setShowAddKey(false)}
+                style={{
+                  background: 'none',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)',
+                  padding: '8px 16px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* API Key Display Modal */}
+        {createdKey && (
+          <div style={{ padding: 20, borderBottom: '1px solid var(--border-subtle)', background: 'var(--status-success-bg)' }}>
+            <div style={{ fontSize: 11, color: 'var(--status-success)', fontWeight: 600, marginBottom: 8 }}>✓ API Key Created</div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>Copy this key now — it won't be shown again:</div>
+            <div style={{ padding: 12, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-primary)', wordBreak: 'break-all' }}>
+              {createdKey}
+            </div>
+            <button
+              onClick={() => { navigator.clipboard.writeText(createdKey); setCreatedKey(null); }}
+              style={{
+                marginTop: 8,
+                background: 'var(--accent-primary)',
+                border: 'none',
+                color: 'var(--btn-action-color)',
+                padding: '6px 12px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9,
+                borderRadius: 2,
+                cursor: 'pointer',
+              }}
+            >
+              COPY & CLOSE
+            </button>
+          </div>
+        )}
+
+        {/* API Keys List */}
+        {loadingKeys ? (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>Loading API keys...</div>
+        ) : apiKeys.length === 0 ? (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>
+            No API keys created. Generate one to enable programmatic access.
+          </div>
+        ) : (
+          apiKeys.map((key, idx) => (
+            <div
+              key={key.id}
+              style={{
+                padding: '16px 20px',
+                borderBottom: idx < apiKeys.length - 1 ? '1px solid var(--border-row)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{key.name}</span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 9,
+                      padding: '2px 6px',
+                      background: 'var(--bg-surface-hover)',
+                      color: 'var(--text-secondary)',
+                      borderRadius: 2,
+                    }}
+                  >
+                    {key.prefix}...
+                  </span>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                  Created: {new Date(key.created_at).toLocaleDateString()}
+                  {key.last_used_at && ` • Last used: ${new Date(key.last_used_at).toLocaleDateString()}`}
+                </div>
+              </div>
+              <button
+                onClick={() => handleRevokeAPIKey(key.id)}
+                style={{
+                  background: 'none',
+                  border: '1px solid var(--status-danger)',
+                  color: 'var(--status-danger)',
+                  padding: '4px 10px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                }}
+              >
+                REVOKE
               </button>
             </div>
           ))

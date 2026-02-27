@@ -109,6 +109,7 @@ export function QuotesList() {
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'board' | 'list'>('board');
   const [activeQuoteId, setActiveQuoteId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -120,13 +121,13 @@ export function QuotesList() {
 
   const { data: loadsData } = useQuery({
     queryKey: ['loads'],
-    queryFn: () => fetchData('api/loads/'),
+    queryFn: () => fetchData('api/v1/loads/'),
     retry: 1,
   });
 
   const { data: quotesData } = useQuery({
     queryKey: ['quotes'],
-    queryFn: () => fetchData('api/quotes/'),
+    queryFn: () => fetchData('api/v1/quotes/'),
     retry: 1,
   });
 
@@ -135,7 +136,7 @@ export function QuotesList() {
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      patchData({ url: `api/quotes/${id}/`, data: { status } }),
+      patchData({ url: `api/v1/quotes/${id}/`, data: { status } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
     },
@@ -144,7 +145,7 @@ export function QuotesList() {
   const convertToLoadMutation = useMutation({
     mutationFn: (quote: any) =>
       postData({
-        url: 'api/loads/',
+        url: 'api/v1/loads/',
         data: {
           customer: quote.customer,
           customer_name: quote.customer_name,
@@ -155,7 +156,7 @@ export function QuotesList() {
           quote_id: quote.id,
           quote_number: quote.quote_number,
           total_amount: quote.total_amount,
-          status: 'PENDING',
+          status: 'SCHEDULED',
         },
       }),
     onSuccess: () => {
@@ -182,11 +183,17 @@ export function QuotesList() {
     l.delivery_location?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const filteredQuotes = quotes.filter(q =>
-    !search ||
-    q.quote_number?.toLowerCase().includes(search.toLowerCase()) ||
-    q.customer_name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredQuotes = quotes.filter(q => {
+    const matchesSearch = !search ||
+      q.quote_number?.toLowerCase().includes(search.toLowerCase()) ||
+      q.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
+      q.pickup_location?.toLowerCase().includes(search.toLowerCase()) ||
+      q.delivery_location?.toLowerCase().includes(search.toLowerCase());
+
+    const matchesStatus = statusFilter === 'ALL' || q.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
 
   const quotesByStatus = COLUMNS.reduce((acc, col) => {
     acc[col] = filteredQuotes.filter(q => q.status === col);
@@ -318,28 +325,76 @@ export function QuotesList() {
           </DragOverlay>
         </DndContext>
       ) : (
-        /* List view — all loads */
-        <div className="card table-card">
-          <table className="data-table">
-            <thead>
-              <tr><th>Load #</th><th>Customer</th><th>Route</th><th>Driver</th><th>Status</th><th>Amount</th><th className="text-right">Pickup</th></tr>
-            </thead>
-            <tbody>
-              {filteredLoads.map((load: any) => (
-                <tr key={load.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/bookings/${load.id}`)}>
-                  <td className="mono">{load.load_number}</td>
-                  <td>{load.customer_name}</td>
-                  <td style={{ color: 'var(--text-secondary)' }}>{load.pickup_location?.split(' ').slice(0,2).join(' ')} → {load.delivery_location?.split(' ').slice(0,2).join(' ')}</td>
-                  <td style={{ color: 'var(--text-secondary)' }}>{load.driver_name}</td>
-                  <td><span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[load.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>{load.status?.replace('_', ' ')}</span></td>
-                  <td style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{formatCurrency(parseFloat(load.total_amount || '0'))}</td>
-                  <td className="text-right" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{load.pickup_date?.slice(0, 10)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filteredLoads.length === 0 && <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No loads found</div>}
-        </div>
+        /* List view — quotes table */
+        <>
+          {/* Status filter tabs */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            {['ALL', ...COLUMNS].map(status => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                style={{
+                  background: statusFilter === status ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                  border: `1px solid ${statusFilter === status ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+                  color: statusFilter === status ? '#000' : 'var(--text-secondary)',
+                  padding: '6px 12px',
+                  borderRadius: 2,
+                  fontSize: 10,
+                  fontFamily: 'var(--font-mono)',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {status === 'ALL' ? 'ALL' : COLUMN_LABELS[status]} ({status === 'ALL' ? quotes.length : quotesByStatus[status]?.length || 0})
+              </button>
+            ))}
+          </div>
+
+          <div className="card table-card">
+            <table className="data-table">
+              <thead>
+                <tr><th>Quote #</th><th>Customer</th><th>Route</th><th>Total</th><th>Status</th><th className="text-right">Created</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+                {filteredQuotes.map((quote: any) => (
+                  <tr key={quote.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/quotes/${quote.id}`)}>
+                    <td className="mono">{quote.quote_number}</td>
+                    <td>{quote.customer_name}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{quote.origin} → {quote.destination}</td>
+                    <td style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{formatCurrency(parseFloat(quote.total_amount || '0'))}</td>
+                    <td>
+                      <span style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 10,
+                        color: STATUS_COLOR[quote.status] || 'var(--text-secondary)',
+                        padding: '2px 6px',
+                        background: 'var(--bg-surface-hover)',
+                        borderRadius: 2
+                      }}>
+                        {COLUMN_LABELS[quote.status] || quote.status}
+                      </span>
+                    </td>
+                    <td className="text-right" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                      {quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      {quote.status === 'ACCEPTED' && (
+                        <button
+                          onClick={(e) => handleConvertToLoad(e, quote)}
+                          className="btn-action"
+                          style={{ fontSize: 9, padding: '4px 8px', background: 'var(--status-success)', border: 'none' }}
+                        >
+                          → BOOKING
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredQuotes.length === 0 && <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No quotes found</div>}
+          </div>
+        </>
       )}
     </div>
   );

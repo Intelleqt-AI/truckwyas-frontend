@@ -1,21 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-const MOCK_VEHICLES = [
-  { id: 1, registration: 'CA 123-456', make: 'Volvo', model: 'FH16', status: 'IN_TRANSIT', driver: 'S. Nkosi', route: 'JHB → CPT', fuel: 82 },
-  { id: 2, registration: 'GP 789-012', make: 'Mercedes', model: 'Actros', status: 'LOADING', driver: 'J. Dlamini', route: 'DBN → JHB', fuel: 65 },
-  { id: 3, registration: 'KZN 345-678', make: 'MAN', model: 'TGX', status: 'IDLE', driver: 'P. Botha', route: '—', fuel: 91 },
-  { id: 4, registration: 'WC 901-234', make: 'DAF', model: 'XF', status: 'MAINTENANCE', driver: '—', route: '—', fuel: 45 },
-  { id: 5, registration: 'GP 567-890', make: 'Volvo', model: 'FH13', status: 'IN_TRANSIT', driver: 'M. Moyo', route: 'PE → JHB', fuel: 74 },
-];
-
-const MOCK_DRIVERS = [
-  { id: 1, name: 'S. Nkosi', code: 'DRV-001', trips: 42, onTime: 96, rating: 4.8, status: 'ACTIVE' },
-  { id: 2, name: 'J. Dlamini', code: 'DRV-002', trips: 38, onTime: 89, rating: 4.5, status: 'ACTIVE' },
-  { id: 3, name: 'P. Botha', code: 'DRV-003', trips: 55, onTime: 94, rating: 4.7, status: 'IDLE' },
-  { id: 4, name: 'M. Moyo', code: 'DRV-004', trips: 31, onTime: 82, rating: 4.2, status: 'ACTIVE' },
-  { id: 5, name: 'L. Zulu', code: 'DRV-005', trips: 27, onTime: 91, rating: 4.6, status: 'OFF' },
-];
+import { fetchData } from "@/lib/Api";
 
 const STATUS_COLOR: Record<string, string> = {
   IN_TRANSIT: 'var(--accent-primary)',
@@ -43,11 +28,61 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
 export default function FleetDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<'vehicles' | 'drivers'>('vehicles');
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const activeVehicles = MOCK_VEHICLES.filter(v => v.status === 'IN_TRANSIT' || v.status === 'LOADING').length;
-  const idleVehicles = MOCK_VEHICLES.filter(v => v.status === 'IDLE').length;
-  const inMaintenance = MOCK_VEHICLES.filter(v => v.status === 'MAINTENANCE').length;
-  const activeDrivers = MOCK_DRIVERS.filter(d => d.status === 'ACTIVE').length;
+  useEffect(() => {
+    Promise.all([
+      fetchData('/api/v1/vehicles/'),
+      fetchData('/api/v1/drivers/')
+    ])
+      .then(([vehiclesData, driversData]) => {
+        setVehicles(vehiclesData || []);
+        setDrivers(driversData || []);
+      })
+      .catch(() => {
+        setError('Failed to load fleet data');
+        setVehicles([]);
+        setDrivers([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const activeVehicles = vehicles.filter(v => v.status === 'IN_TRANSIT' || v.status === 'LOADING').length;
+  const idleVehicles = vehicles.filter(v => v.status === 'IDLE').length;
+  const inMaintenance = vehicles.filter(v => v.status === 'MAINTENANCE').length;
+  const activeDrivers = drivers.filter(d => d.status === 'ACTIVE').length;
+
+  if (loading) {
+    return (
+      <div>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
+        </div>
+        <div className="card" style={{ padding: 24 }}>
+          <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
+          <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
+        </div>
+        <div className="card" style={{ padding: 24, color: 'var(--status-danger)' }}>
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -65,7 +100,7 @@ export default function FleetDashboard() {
       {/* Stats — always visible */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 24 }}>
         {[
-          { label: 'Total Vehicles', value: MOCK_VEHICLES.length, color: 'var(--text-primary)' },
+          { label: 'Total Vehicles', value: vehicles.length, color: 'var(--text-primary)' },
           { label: 'Active', value: activeVehicles, color: 'var(--accent-primary)' },
           { label: 'Idle', value: idleVehicles, color: 'var(--text-secondary)' },
           { label: 'Maintenance', value: inMaintenance, color: 'var(--status-danger)' },
@@ -94,20 +129,20 @@ export default function FleetDashboard() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_VEHICLES.map(v => (
+              {vehicles.map(v => (
                 <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/vehicles/${v.id}`)}>
-                  <td className="mono">{v.registration}</td>
-                  <td>{v.make} {v.model}</td>
-                  <td>{v.driver}</td>
+                  <td className="mono">{v.registration || '—'}</td>
+                  <td>{v.make || ''} {v.model || ''}</td>
+                  <td>{v.driver || '—'}</td>
                   <td>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[v.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-                      {v.status.replace('_', ' ')}
+                      {v.status ? v.status.replace('_', ' ') : '—'}
                     </span>
                   </td>
-                  <td style={{ color: 'var(--text-secondary)' }}>{v.route}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{v.route || '—'}</td>
                   <td className="text-right">
                     <span style={{ fontFamily: 'var(--font-mono)', color: v.fuel < 50 ? 'var(--status-danger)' : v.fuel < 70 ? 'var(--status-warning)' : 'var(--text-primary)' }}>
-                      {v.fuel}%
+                      {v.fuel !== undefined ? `${v.fuel}%` : '—'}
                     </span>
                   </td>
                 </tr>
@@ -127,16 +162,20 @@ export default function FleetDashboard() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_DRIVERS.map(d => (
+              {drivers.map(d => (
                 <tr key={d.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/drivers/${d.id}`)}>
-                  <td>{d.name}</td>
-                  <td className="mono">{d.code}</td>
-                  <td className="mono">{d.trips}</td>
-                  <td style={{ color: d.onTime >= 90 ? 'var(--accent-primary)' : d.onTime >= 80 ? 'var(--status-warning)' : 'var(--status-danger)', fontFamily: 'var(--font-mono)' }}>{d.onTime}%</td>
-                  <td style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>★ {d.rating}</td>
+                  <td>{d.name || '—'}</td>
+                  <td className="mono">{d.code || '—'}</td>
+                  <td className="mono">{d.trips !== undefined ? d.trips : '—'}</td>
+                  <td style={{ color: d.onTime >= 90 ? 'var(--accent-primary)' : d.onTime >= 80 ? 'var(--status-warning)' : 'var(--status-danger)', fontFamily: 'var(--font-mono)' }}>
+                    {d.onTime !== undefined ? `${d.onTime}%` : '—'}
+                  </td>
+                  <td style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
+                    {d.rating !== undefined ? `★ ${d.rating}` : '—'}
+                  </td>
                   <td className="text-right">
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[d.status], padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-                      {d.status}
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[d.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
+                      {d.status || '—'}
                     </span>
                   </td>
                 </tr>

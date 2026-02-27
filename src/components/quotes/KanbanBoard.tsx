@@ -51,7 +51,7 @@ const COLUMNS = [
   { id: "Draft", title: "Drafts", bgColor: "bg-muted/20" },
   { id: "Sent", title: "Quoted", bgColor: "bg-primary/5" },
   { id: "Accepted", title: "Accepted", bgColor: "bg-success/5" },
-  { id: "It", title: "In-Transit", bgColor: "bg-warning/5" },
+  { id: "In-Transit", title: "In-Transit", bgColor: "bg-warning/5" },
   { id: "Completed", title: "Completed", bgColor: "bg-neutral-100" },
 ];
 

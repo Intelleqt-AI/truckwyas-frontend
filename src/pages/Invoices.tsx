@@ -175,7 +175,11 @@ export default function Invoices() {
               const invNumber = inv.invoice_number || inv.invoiceNumber;
               const custName = inv.customer_name || inv.customerName;
               const dueDate = inv.due_date || inv.dueDate;
-              const isFastPayEligible = inv.fast_pay_eligible || inv.fastPay;
+              const isFastPayEligible = inv.fast_pay_eligible || inv.early_pay_eligible || inv.fastPay;
+              // Aging indicator
+              const ageDays = dueDate ? Math.floor((Date.now() - new Date(dueDate).getTime()) / 86400000) : 0;
+              const agingColor = ageDays <= 0 ? 'var(--status-success)' : ageDays <= 30 ? 'var(--status-warning)' : ageDays <= 60 ? 'var(--accent-primary)' : 'var(--status-danger)';
+              const agingLabel = ageDays <= 0 ? `Due in ${Math.abs(ageDays)}d` : `${ageDays}d overdue`;
 
               return (
                 <tr
@@ -191,7 +195,16 @@ export default function Invoices() {
                       {invStatus}
                     </span>
                   </td>
-                  <td style={{ color: invStatus === 'OVERDUE' ? 'var(--status-danger)' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{dueDate}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: invStatus === 'OVERDUE' ? 'var(--status-danger)' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{dueDate}</span>
+                      {invStatus !== 'PAID' && dueDate && (
+                        <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: agingColor, padding: '1px 5px', border: `1px solid ${agingColor}`, borderRadius: 2, whiteSpace: 'nowrap' }}>
+                          {agingLabel}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: TIER_COLOR[tier], padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2, textTransform: 'uppercase' }}>
                       {tier}

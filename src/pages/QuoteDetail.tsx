@@ -347,6 +347,38 @@ export default function QuoteDetail() {
               >
                 {deleteMutation.isPending ? 'DELETING...' : 'DELETE QUOTE'}
               </button>
+
+              {/* PDF Download */}
+              <button
+                onClick={() => {
+                  const token = localStorage.getItem('access');
+                  const url = `http://localhost:3700/api/v1/quotes/${id}/generate_pdf/`;
+                  fetch(url, { headers: { Authorization: `Token ${token}` } })
+                    .then(r => r.blob())
+                    .then(blob => {
+                      const a = document.createElement('a');
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `Quote-${quote?.quote_number || id}.pdf`;
+                      a.click();
+                    });
+                }}
+                style={{
+                  padding: '10px 16px',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--accent-primary)',
+                  color: 'var(--accent-primary)',
+                  borderRadius: 2,
+                  fontSize: 11,
+                  fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase' as const,
+                  cursor: 'pointer',
+                  width: '100%',
+                  marginTop: 8,
+                }}
+              >
+                ↓ DOWNLOAD PDF
+              </button>
             </div>
           </div>
         </div>

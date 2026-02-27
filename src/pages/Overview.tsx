@@ -18,15 +18,38 @@ export default function Overview() {
       try {
         const [finance, insightsData, advancesData, quotesData, loadsData] = await Promise.all([
           fetchData('api/v1/dashboard/finance/').catch(() => null),
-          fetchData('api/v1/dashboard/insights/').catch(() => []),
+          fetchData('api/v1/dashboard/signals/').catch(() => fetchData('api/v1/dashboard/insights/').catch(() => [])),
           fetchData('api/v1/advances/').catch(() => []),
           fetchData('api/v1/quotes/?limit=5').catch(() => []),
           fetchData('api/v1/loads/').catch(() => []),
         ]);
         setFinanceData(finance);
         // dashboard/insights/ may not exist — handle gracefully, signals come as array or {signals:[]}
+        // dashboard/signals returns {signals:[]} — extract
         const insightsArr = Array.isArray(insightsData) ? insightsData : (insightsData?.signals || []);
-        setInsights(insightsArr);
+        setInsights(insightsArr.map((s: any) => ({
+          category: s.category || s.type || 'Update',
+          title: s.title || '',
+          body: s.body || s.message || '',
+          action: s.action || 'VIEW',
+          severity: s.severity || 'low',
+          type: s.type || 'INFO',
+        })));
+        // Auto-refresh signals every 60s
+        const timer = setInterval(() => {
+          fetchData('api/v1/dashboard/signals/').then((fresh: any) => {
+            const arr = Array.isArray(fresh) ? fresh : (fresh?.signals || []);
+            setInsights(arr.map((s: any) => ({
+              category: s.category || s.type || 'Update',
+              title: s.title || '',
+              body: s.body || s.message || '',
+              action: s.action || 'VIEW',
+              severity: s.severity || 'low',
+              type: s.type || 'INFO',
+            })));
+          }).catch(() => {});
+        }, 60000);
+        return () => clearInterval(timer);
         setAdvances(Array.isArray(advancesData) ? advancesData : (advancesData?.results || []));
 
         const quotes = quotesData?.results || quotesData || [];

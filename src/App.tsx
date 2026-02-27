@@ -61,7 +61,7 @@ const App = () => (
           <Sonner />
           <Routes>
             {/* Homepage — has its own full OS layout with agent sidebar */}
-            <Route path="/" element={<Overview />} />
+            <Route path="/" element={<OSLayout><Overview /></OSLayout>} />
 
             {/* All other pages — wrapped in OSLayout (header + nav + content) */}
             <Route path="/quotes" element={<OSLayout><QuotesList /></OSLayout>} />

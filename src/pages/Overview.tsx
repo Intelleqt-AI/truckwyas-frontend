@@ -32,7 +32,7 @@ export default function Overview() {
   }, []);
 
   return (
-    <div style={{ display: 'flex', gap: 0, margin: -24, minHeight: 'calc(100% + 48px)' }}>
+    <div style={{ display: 'flex', gap: 24, alignItems: 'start' }}>
       {/* MAIN WORKSPACE */}
       <div style={{
         flex: 1,
@@ -41,7 +41,6 @@ export default function Overview() {
         gridTemplateColumns: 'repeat(3, 1fr)',
         gap: 20,
         alignContent: 'start',
-        padding: 24,
       }}>
         {/* Metric cards */}
         <div className="card metric-card">
@@ -81,13 +80,13 @@ export default function Overview() {
           <div className="metric-delta delta-neutral"><span>{advances.length} advances</span></div>
         </div>
 
-        {/* Chart card — Revenue vs Fuel Cost trend */}
+        {/* Chart card */}
         <div className="card chart-card">
           <div className="card-header">
             <span className="card-title">Revenue vs Fuel Cost (Last 30 Days)</span>
             <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-secondary)' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 20, height: 2, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1 }}/>Revenue</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 20, height: 2, background: 'var(--status-danger)', display: 'inline-block', borderRadius: 1, borderTop: '1px dashed var(--status-danger)' }}/>Fuel Cost</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 20, height: 2, background: 'var(--status-danger)', display: 'inline-block', borderRadius: 1 }}/>Fuel Cost</span>
             </div>
           </div>
           {(() => {
@@ -184,13 +183,13 @@ export default function Overview() {
 
       {/* AGENT SIDEBAR */}
       <aside style={{
-        width: 280,
+        width: 260,
         flexShrink: 0,
-        borderLeft: '1px solid var(--border-subtle)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--card-radius)',
         background: 'var(--bg-sidebar)',
         display: 'flex',
         flexDirection: 'column',
-        overflowY: 'auto',
       }}>
         <div className="agent-header">
           <div className="live-dot" />
@@ -248,7 +247,7 @@ export default function Overview() {
             </>
           )}
         </div>
-        <div style={{ padding: 20, borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-surface)', marginTop: 'auto' }}>
+        <div style={{ padding: 20, borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-surface)', borderRadius: '0 0 var(--card-radius) var(--card-radius)' }}>
           <div className="card-title" style={{ marginBottom: 12 }}>Quick Quote</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
             <input type="text" placeholder="Origin" style={{ background: 'var(--bg-surface-hover)', border: '1px solid var(--border-subtle)', padding: 8, color: 'var(--text-primary)', borderRadius: 2, fontSize: 11, outline: 'none' }} />

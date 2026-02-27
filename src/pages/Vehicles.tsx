@@ -208,36 +208,87 @@ export default function Vehicles() {
         </div>
       </div>
 
+      {/* Revenue Ranking */}
+      <div className="card" style={{ padding: 24, marginBottom: 24 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, color: 'var(--text-primary)' }}>Revenue Ranking</div>
+        {(() => {
+          const topVehicles = [...vehicles]
+            .filter(v => v.revenue_this_month && v.revenue_this_month > 0)
+            .sort((a, b) => (b.revenue_this_month || 0) - (a.revenue_this_month || 0))
+            .slice(0, 5);
+          const maxRevenue = topVehicles.length > 0 ? topVehicles[0].revenue_this_month || 1 : 1;
+
+          if (topVehicles.length === 0) {
+            return <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>No revenue data available</div>;
+          }
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {topVehicles.map((v, idx) => {
+                const widthPercent = ((v.revenue_this_month || 0) / maxRevenue) * 100;
+                return (
+                  <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 30, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
+                      #{idx + 1}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', marginBottom: 4, color: 'var(--text-primary)' }}>
+                        {v.registration} — {[v.make, v.model].filter(Boolean).join(' ')}
+                      </div>
+                      <div style={{ position: 'relative', height: 24, background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
+                        <div style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: `${widthPercent}%`,
+                          background: 'var(--accent-primary)',
+                          borderRadius: 2,
+                          transition: 'width 0.3s ease'
+                        }} />
+                      </div>
+                    </div>
+                    <div style={{ width: 100, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {formatZAR(v.revenue_this_month || 0)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
         {/* Vehicle Table */}
         <div>
-          {/* Filters */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              style={{
-                background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                color: 'var(--text-primary)', padding: '7px 12px',
-                fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
-              }}
-            >
-              <option value="All">All Status</option>
-              <option value="ACTIVE">Active</option>
-              <option value="MAINTENANCE">Maintenance</option>
-              <option value="INACTIVE">Inactive</option>
-            </select>
-            <select
-              value={sortBy}
-              onChange={e => setSortBy(e.target.value)}
-              style={{
-                background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                color: 'var(--text-primary)', padding: '7px 12px',
-                fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
-              }}
-            >
-              <option value="revenue">Sort by Revenue</option>
-            </select>
+          {/* Status Filter Tabs */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            {['All', 'ACTIVE', 'MAINTENANCE', 'INACTIVE'].map(status => {
+              const isActive = statusFilter === status;
+              return (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  style={{
+                    background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                    padding: '7px 14px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    borderRadius: 2,
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    fontWeight: isActive ? 600 : 400,
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+                </button>
+              );
+            })}
           </div>
 
           {/* Table */}
@@ -245,7 +296,7 @@ export default function Vehicles() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Registration', 'Make / Model', 'Type', 'Status', 'Revenue MTD', 'Trips MTD', 'Efficiency'].map(h => (
+                  {['Registration', 'Make / Model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency'].map(h => (
                     <th key={h} style={{
                       padding: '10px 20px', textAlign: 'left',
                       fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
@@ -257,36 +308,54 @@ export default function Vehicles() {
               </thead>
               <tbody>
                 {sorted.length === 0 ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles found</td></tr>
-                ) : sorted.map((v, idx) => (
-                  <tr
-                    key={v.id}
-                    style={{ cursor: 'pointer', borderBottom: idx < sorted.length - 1 ? '1px solid var(--border-row)' : 'none' }}
-                    onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  >
-                    <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
-                      {v.plate || v.registration || '—'}
-                    </td>
-                    <td style={{ padding: '13px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
-                      {[v.make, v.model].filter(Boolean).join(' ') || '—'}
-                    </td>
-                    <td style={{ padding: '13px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
-                      {v.vehicle_type_name || v.vehicle_type || '—'}
-                    </td>
-                    <td style={{ padding: '13px 20px' }}>{getStatusBadge(v.status)}</td>
-                    <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                      {v.revenue_this_month ? formatZAR(v.revenue_this_month) : '—'}
-                    </td>
-                    <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                      {v.trips_this_month ?? 0}
-                    </td>
-                    <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                      {v.fuel_efficiency ? `${parseFloat(v.fuel_efficiency as any).toFixed(1)} L/100km` : '—'}
-                    </td>
-                  </tr>
-                ))}
+                  <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles found</td></tr>
+                ) : sorted.map((v, idx) => {
+                  const utilizationPercent = ((v.trips_this_month || 0) / 20) * 100;
+                  const utilizationColor = utilizationPercent > 70 ? 'var(--status-success)' : utilizationPercent >= 40 ? 'var(--status-warning)' : 'var(--status-danger)';
+
+                  return (
+                    <tr
+                      key={v.id}
+                      style={{ cursor: 'pointer', borderBottom: idx < sorted.length - 1 ? '1px solid var(--border-row)' : 'none' }}
+                      onClick={() => navigate(`/fleet/vehicle/${v.id}`)}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
+                        {v.plate || v.registration || '—'}
+                      </td>
+                      <td style={{ padding: '13px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                        {[v.make, v.model].filter(Boolean).join(' ') || '—'}
+                      </td>
+                      <td style={{ padding: '13px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                        {v.vehicle_type_name || v.vehicle_type || '—'}
+                      </td>
+                      <td style={{ padding: '13px 20px' }}>{getStatusBadge(v.status)}</td>
+                      <td style={{ padding: '13px 20px' }}>
+                        <span style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 11,
+                          color: utilizationColor,
+                          padding: '3px 8px',
+                          background: 'var(--bg-surface-hover)',
+                          borderRadius: 2,
+                          fontWeight: 600
+                        }}>
+                          {Math.min(utilizationPercent, 100).toFixed(0)}%
+                        </span>
+                      </td>
+                      <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {v.revenue_this_month ? formatZAR(v.revenue_this_month) : '—'}
+                      </td>
+                      <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {v.trips_this_month ?? 0}
+                      </td>
+                      <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {v.fuel_efficiency ? `${parseFloat(v.fuel_efficiency as any).toFixed(1)} L/100km` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -217,27 +217,34 @@ export default function Overview() {
         {/* Quick Actions */}
         <div className="card" style={{ padding: 20 }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Quick Actions</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button
-              onClick={() => navigate('/quotes/new')}
-              className="btn-action"
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 12px', fontSize: 12 }}
-            >
-              + NEW QUOTE
-            </button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <button
               onClick={() => navigate('/finance/invoices/new')}
               className="btn-action"
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 12px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+              style={{ width: '100%', justifyContent: 'center', padding: '10px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}
             >
-              + NEW INVOICE
+              Create Invoice
             </button>
             <button
-              onClick={() => navigate('/fleet')}
+              onClick={() => navigate('/capital')}
               className="btn-action"
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 12px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+              style={{ width: '100%', justifyContent: 'center', padding: '10px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
             >
-              → VIEW FLEET
+              Request Advance
+            </button>
+            <button
+              onClick={() => navigate('/expenses')}
+              className="btn-action"
+              style={{ width: '100%', justifyContent: 'center', padding: '10px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+            >
+              Add Expense
+            </button>
+            <button
+              onClick={() => navigate('/finance-reports')}
+              className="btn-action"
+              style={{ width: '100%', justifyContent: 'center', padding: '10px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+            >
+              View Reports
             </button>
           </div>
           <div style={{ marginTop: 16, padding: '12px', background: 'var(--bg-surface-hover)', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

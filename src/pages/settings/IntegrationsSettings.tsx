@@ -60,6 +60,14 @@ interface Webhook {
   created_at: string;
 }
 
+interface APIKey {
+  id: number;
+  name: string;
+  prefix: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
 const EVENT_OPTIONS = [
   { value: 'load.created', label: 'Load Created' },
   { value: 'load.updated', label: 'Load Updated' },
@@ -84,8 +92,16 @@ export function IntegrationsSettings() {
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
   const [testingWebhook, setTestingWebhook] = useState<number | null>(null);
 
+  // API Key state
+  const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
+  const [loadingKeys, setLoadingKeys] = useState(true);
+  const [showAddKey, setShowAddKey] = useState(false);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
+
   useEffect(() => {
     loadWebhooks();
+    loadAPIKeys();
   }, []);
 
   const loadWebhooks = async () => {

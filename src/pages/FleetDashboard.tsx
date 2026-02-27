@@ -69,7 +69,7 @@ export default function FleetDashboard() {
           { label: 'Active', value: activeVehicles, color: 'var(--accent-primary)' },
           { label: 'Idle', value: idleVehicles, color: 'var(--text-secondary)' },
           { label: 'Maintenance', value: inMaintenance, color: 'var(--status-danger)' },
-          { label: 'Drivers On Duty', value: activeDrivers, color: '#22c55e' },
+          { label: 'Drivers On Duty', value: activeDrivers, color: 'var(--status-success)' },
         ].map(m => (
           <div key={m.label} className="card metric-card">
             <div className="card-header"><span className="card-title">{m.label}</span></div>

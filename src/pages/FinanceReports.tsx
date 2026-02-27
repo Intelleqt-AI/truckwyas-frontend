@@ -38,10 +38,11 @@ export default function FinanceReports() {
         ]);
         setFinanceData(finance);
         setCashflowData(cashflow);
-        setCustomers(Array.isArray(cust) ? cust : []);
+        setCustomers(Array.isArray(cust) ? cust : (cust?.results || []));
         setAgingData(aging);
-        setFacilities(Array.isArray(fac) ? fac[0] : fac);
-        setAdvances(Array.isArray(adv) ? adv : []);
+        const facList = Array.isArray(fac) ? fac : (fac?.results || []);
+        setFacilities(facList[0] || null);
+        setAdvances(Array.isArray(adv) ? adv : (adv?.results || []));
       } catch (err) {
         console.error('Failed to load finance reports:', err);
         setError('Failed to load data');

@@ -24,8 +24,10 @@ export default function Overview() {
           fetchData('api/v1/loads/').catch(() => []),
         ]);
         setFinanceData(finance);
-        setInsights(Array.isArray(insightsData) ? insightsData : []);
-        setAdvances(Array.isArray(advancesData) ? advancesData : []);
+        // dashboard/insights/ may not exist — handle gracefully, signals come as array or {signals:[]}
+        const insightsArr = Array.isArray(insightsData) ? insightsData : (insightsData?.signals || []);
+        setInsights(insightsArr);
+        setAdvances(Array.isArray(advancesData) ? advancesData : (advancesData?.results || []));
 
         const quotes = quotesData?.results || quotesData || [];
         setRecentQuotes(quotes.slice(0, 5));

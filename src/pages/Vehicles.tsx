@@ -19,19 +19,37 @@ interface Vehicle {
 }
 
 interface FleetOverview {
-  total_vehicles: number;
-  active_vehicles: number;
-  maintenance_vehicles: number;
-  revenue_this_month: number;
+  header?: any;
+  banner?: any;
+  kpi_cards?: Array<{
+    label: string;
+    value: string | number;
+    change?: string;
+    trend?: string;
+  }>;
+  // Legacy support
+  total_vehicles?: number;
+  active_vehicles?: number;
+  maintenance_vehicles?: number;
+  revenue_this_month?: number;
 }
 
 interface FleetInsight {
+  id?: number;
   vehicle_id?: number;
   vehicle_registration?: string;
   type: string;
   title: string;
   message: string;
   severity?: string;
+  category?: string;
+  icon?: string;
+}
+
+interface FleetIntelligence {
+  title?: string;
+  active_count?: number;
+  opportunities?: FleetInsight[];
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -64,9 +82,17 @@ export default function Vehicles() {
       fetchData('api/v1/fleet/intelligence/')
     ])
       .then(([vehData, overviewData, insightsData]) => {
-        setVehicles(vehData || []);
+        // Handle paginated response for vehicles
+        const vehiclesArray = Array.isArray(vehData) ? vehData : (vehData?.results || []);
+        setVehicles(vehiclesArray);
+
+        // Overview data comes in {header, banner, kpi_cards} format
         setOverview(overviewData);
-        setInsights(insightsData || []);
+
+        // Intelligence data comes in {title, active_count, opportunities} format
+        const insightsArray = Array.isArray(insightsData) ? insightsData : (insightsData?.opportunities || []);
+        setInsights(insightsArray);
+
         setError(null);
       })
       .catch(() => {
@@ -137,28 +163,39 @@ export default function Vehicles() {
 
       {/* Fleet Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Total Vehicles</span></div>
-          <div className="metric-value" style={{ fontSize: 28 }}>{overview?.total_vehicles || vehicles.length}</div>
-        </div>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Active</span></div>
-          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-success)' }}>
-            {overview?.active_vehicles || vehicles.filter(v => v.status === 'ACTIVE' || v.status === 'IN_USE').length}
-          </div>
-        </div>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">In Maintenance</span></div>
-          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-warning)' }}>
-            {overview?.maintenance_vehicles || vehicles.filter(v => v.status === 'MAINTENANCE').length}
-          </div>
-        </div>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Revenue This Month</span></div>
-          <div className="metric-value" style={{ fontSize: 22 }}>
-            {formatZAR(overview?.revenue_this_month || vehicles.reduce((sum, v) => sum + (v.revenue_this_month || 0), 0))}
-          </div>
-        </div>
+        {overview?.kpi_cards && overview.kpi_cards.length > 0 ? (
+          overview.kpi_cards.map((card, idx) => (
+            <div key={idx} className="card metric-card">
+              <div className="card-header"><span className="card-title">{card.label}</span></div>
+              <div className="metric-value" style={{ fontSize: 28 }}>{card.value}</div>
+            </div>
+          ))
+        ) : (
+          <>
+            <div className="card metric-card">
+              <div className="card-header"><span className="card-title">Total Vehicles</span></div>
+              <div className="metric-value" style={{ fontSize: 28 }}>{overview?.total_vehicles || vehicles.length}</div>
+            </div>
+            <div className="card metric-card">
+              <div className="card-header"><span className="card-title">Active</span></div>
+              <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-success)' }}>
+                {overview?.active_vehicles || vehicles.filter(v => v.status === 'ACTIVE' || v.status === 'IN_USE').length}
+              </div>
+            </div>
+            <div className="card metric-card">
+              <div className="card-header"><span className="card-title">In Maintenance</span></div>
+              <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-warning)' }}>
+                {overview?.maintenance_vehicles || vehicles.filter(v => v.status === 'MAINTENANCE').length}
+              </div>
+            </div>
+            <div className="card metric-card">
+              <div className="card-header"><span className="card-title">Revenue This Month</span></div>
+              <div className="metric-value" style={{ fontSize: 22 }}>
+                {formatZAR(overview?.revenue_this_month || vehicles.reduce((sum, v) => sum + (v.revenue_this_month || 0), 0))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>

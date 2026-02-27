@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { INVOICES } from "@/mocks/simple-invoice-data";
 import { formatCurrency } from "@/lib/formatters";
 import { fetchData, postData } from "@/lib/Api";
 
@@ -31,10 +30,11 @@ export default function Invoices() {
       setLoading(true);
       try {
         const data = await fetchData('/api/v1/invoices/');
-        setInvoices(Array.isArray(data) ? data : []);
+        // API returns paginated {count, results} — extract results
+        setInvoices(Array.isArray(data) ? data : (data?.results || []));
       } catch (error) {
-        console.error('Failed to load invoices, using mock fallback:', error);
-        setInvoices(INVOICES);
+        console.error('Failed to load invoices:', error);
+        setInvoices([]);
       } finally {
         setLoading(false);
       }
@@ -69,7 +69,8 @@ export default function Invoices() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const allInvoices = invoices.length > 0 ? invoices : INVOICES;
+  // Never fall back to mock data — show empty state if API returns nothing
+  const allInvoices = invoices;
 
   const filtered = allInvoices.filter(inv => {
     const invStatus = inv.status?.toUpperCase();

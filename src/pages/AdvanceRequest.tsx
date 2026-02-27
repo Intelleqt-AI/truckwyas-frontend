@@ -39,18 +39,15 @@ export default function AdvanceRequest() {
       try {
         // Load eligible invoices
         try {
-          const data = await fetchData('api/v1/invoices/?fast_pay_eligible=true');
-          const eligible = Array.isArray(data) ? data.filter((inv: any) =>
-            (inv.risk_tier === 'prime' || inv.risk_tier === 'standard')
-          ) : [];
+          const data = await fetchData('api/v1/invoices/');
+          // Paginated response: {count, results}
+          const allList = Array.isArray(data) ? data : (data?.results || []);
+          const eligible = allList.filter((inv: any) =>
+            (inv.fast_pay_eligible || inv.risk_tier === 'prime' || inv.risk_tier === 'standard') && inv.status !== 'PAID'
+          );
           setInvoices(eligible);
         } catch {
-          // Fallback: client-side filter
-          const allData = await fetchData('api/v1/invoices/?status=SENT');
-          const eligible = Array.isArray(allData) ? allData.filter((inv: any) =>
-            inv.fast_pay_eligible && (inv.risk_tier === 'prime' || inv.risk_tier === 'standard')
-          ) : [];
-          setInvoices(eligible);
+          setInvoices([]);
         }
       } catch (err) {
         console.error('Failed to load invoices:', err);

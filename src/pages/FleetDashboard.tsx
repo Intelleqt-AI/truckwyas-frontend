@@ -39,8 +39,8 @@ export default function FleetDashboard() {
       fetchData('api/v1/drivers/')
     ])
       .then(([vehiclesData, driversData]) => {
-        setVehicles(vehiclesData || []);
-        setDrivers(driversData || []);
+        setVehicles(Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.results || []));
+        setDrivers(Array.isArray(driversData) ? driversData : (driversData?.results || []));
       })
       .catch(() => {
         setError('Failed to load fleet data');

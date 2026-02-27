@@ -31,30 +31,24 @@ export default function Capital() {
       setLoading(true);
       setError(null);
       try {
-        // Load facility data
+        // Load facility data — paginated {count, results}
         const facilityData = await fetchData('api/v1/facilities/');
-        setFacility(Array.isArray(facilityData) ? facilityData[0] : facilityData);
+        const facilityList = Array.isArray(facilityData) ? facilityData : (facilityData?.results || []);
+        setFacility(facilityList[0] || null);
 
-        // Load active advances (FUNDED or ACTIVE status)
+        // Load active advances — paginated {count, results}
         const advancesData = await fetchData('api/v1/advances/');
-        const active = Array.isArray(advancesData) ? advancesData.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED') : [];
+        const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
+        const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
         setAdvances(active);
 
-        // Load eligible invoices - try fast_pay_eligible query param first
-        try {
-          const eligibleData = await fetchData('api/v1/invoices/?fast_pay_eligible=true');
-          const eligible = Array.isArray(eligibleData) ? eligibleData.filter((inv: any) =>
-            (inv.risk_tier === 'prime' || inv.risk_tier === 'standard')
-          ) : [];
-          setEligibleInvoices(eligible);
-        } catch {
-          // Fallback: filter client-side
-          const allInvoices = await fetchData('api/v1/invoices/?status=SENT');
-          const eligible = Array.isArray(allInvoices) ? allInvoices.filter((inv: any) =>
-            inv.fast_pay_eligible && (inv.risk_tier === 'prime' || inv.risk_tier === 'standard')
-          ) : [];
-          setEligibleInvoices(eligible);
-        }
+        // Load eligible invoices — paginated {count, results}
+        const eligibleData = await fetchData('api/v1/invoices/');
+        const allInvoicesList = Array.isArray(eligibleData) ? eligibleData : (eligibleData?.results || []);
+        const eligible = allInvoicesList.filter((inv: any) =>
+          (inv.fast_pay_eligible || inv.risk_tier === 'prime' || inv.risk_tier === 'standard') && inv.status !== 'PAID'
+        );
+        setEligibleInvoices(eligible);
       } catch (err) {
         console.error('Failed to load capital data:', err);
         setError('Failed to load capital data');

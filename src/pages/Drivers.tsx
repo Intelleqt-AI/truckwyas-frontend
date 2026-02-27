@@ -56,9 +56,33 @@ export default function Drivers() {
       fetchData('api/v1/drivers/leaderboard/')
     ])
       .then(([driversData, overviewData, leaderboardData]) => {
-        setDrivers(driversData || []);
-        setOverview(overviewData);
-        setLeaderboard(leaderboardData || []);
+        // API returns paginated {count, results}
+        setDrivers(Array.isArray(driversData) ? driversData : (driversData?.results || []));
+        // overview returns {header, banner, kpi_cards} — extract into flat shape
+        if (overviewData?.kpi_cards) {
+          const cards = overviewData.kpi_cards as any[];
+          const findVal = (keyword: string) => {
+            const card = cards.find((c: any) => (c.key || c.label || '').toString().toLowerCase().includes(keyword));
+            return card?.value || 0;
+          };
+          setOverview({
+            total_drivers: findVal('total') || findVal('driver') || driversData?.count || 0,
+            active_drivers: findVal('active') || 0,
+            avg_revenue_per_driver: findVal('revenue') || findVal('avg') || 0,
+          });
+        } else {
+          setOverview(overviewData);
+        }
+        // leaderboard returns {title, columns, data: [...], total_count}
+        const lbData = Array.isArray(leaderboardData) ? leaderboardData : (leaderboardData?.data || []);
+        setLeaderboard(lbData.map((d: any, i: number) => ({
+          driver_id: d.id || d.driver_id || i,
+          driver_name: d.driver_name || d.name || `Driver ${d.id}`,
+          revenue: d.revenue || d.revenue_generated || 0,
+          trips: d.trips || d.trips_completed || 0,
+          efficiency_score: d.efficiency_score || d.on_time_percentage || 0,
+          rank: d.rank || i + 1,
+        })));
         setError(null);
       })
       .catch(() => {

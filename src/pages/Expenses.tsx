@@ -64,8 +64,8 @@ export default function Expenses() {
       fetchData('api/v1/vehicles/')
     ])
       .then(([expData, vehData]) => {
-        setExpenses(expData || []);
-        setVehicles(vehData || []);
+        setExpenses(Array.isArray(expData) ? expData : (expData?.results || []));
+        setVehicles(Array.isArray(vehData) ? vehData : (vehData?.results || []));
         setError(null);
       })
       .catch(() => {

@@ -196,7 +196,10 @@ export default function Capital() {
       <div className="card table-card">
         <div className="card-header" style={{ marginBottom: 16 }}>
           <span className="card-title">Fast Pay NOW — Eligible Invoices</span>
-          <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{eligibleInvoices.length} INVOICES · {formatCurrency(eligibleTotal)} AVAILABLE</span>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{eligibleInvoices.length} INVOICES · {formatCurrency(eligibleTotal)} AVAILABLE</span>
+            <button onClick={() => navigate('/capital/risk-scores')} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '3px 10px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>RISK SCORES →</button>
+          </div>
         </div>
         {eligibleInvoices.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>

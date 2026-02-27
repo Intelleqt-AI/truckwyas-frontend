@@ -33,9 +33,12 @@ export default function VehicleDigitalTwin() {
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{vehicle.make} {vehicle.model} <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>{vehicle.plate}</span></div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{vehicle.vehicle_type_name} · {vehicle.year} · {vehicle.fuel_type}</div>
           </div>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: STATUS_COLOR[vehicle.status] || 'var(--text-secondary)', padding: '6px 12px', border: `1px solid ${STATUS_COLOR[vehicle.status] || 'var(--border-subtle)'}`, borderRadius: 2 }}>
-            {vehicle.status?.replace('_', ' ')}
-          </span>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button onClick={() => navigate(`/fleet/vehicles/${id}/financial`)} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '6px 12px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>FINANCIAL PROFILE</button>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: STATUS_COLOR[vehicle.status] || 'var(--text-secondary)', padding: '6px 12px', border: `1px solid ${STATUS_COLOR[vehicle.status] || 'var(--border-subtle)'}`, borderRadius: 2 }}>
+              {vehicle.status?.replace('_', ' ')}
+            </span>
+          </div>
         </div>
       </div>
 

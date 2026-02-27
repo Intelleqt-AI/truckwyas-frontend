@@ -33,6 +33,10 @@ import Settings from "./pages/Settings";
 import XeroIntegration from "./pages/settings/XeroIntegration";
 import FleetImport from "./pages/settings/FleetImport";
 import NotFound from "./pages/NotFound";
+import PasswordReset from "./pages/PasswordReset";
+import VehicleFinancialProfile from "./pages/VehicleFinancialProfile";
+import RiskScoreView from "./pages/RiskScoreView";
+import FleetHeatmap from "./pages/FleetHeatmap";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -82,6 +86,11 @@ const App = () => (
             <Route path="/settings/:section?" element={<OSLayout><Settings /></OSLayout>} />
             <Route path="/settings/integrations/xero" element={<OSLayout><XeroIntegration /></OSLayout>} />
             <Route path="/settings/integrations/fleet" element={<OSLayout><FleetImport /></OSLayout>} />
+            {/* New Sprint 5+6 pages */}
+            <Route path="/password-reset" element={<PasswordReset />} />
+            <Route path="/fleet/vehicles/:id/financial" element={<OSLayout><VehicleFinancialProfile /></OSLayout>} />
+            <Route path="/capital/risk-scores" element={<OSLayout><RiskScoreView /></OSLayout>} />
+            <Route path="/fleet/heatmap" element={<OSLayout><FleetHeatmap /></OSLayout>} />
             <Route path="*" element={<OSLayout><NotFound /></OSLayout>} />
           </Routes>
         </TooltipProvider>

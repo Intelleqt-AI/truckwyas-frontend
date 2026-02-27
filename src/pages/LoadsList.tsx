@@ -32,7 +32,11 @@ export default function LoadsList() {
 
   useEffect(() => {
     fetchData('/api/v1/loads/')
-      .then(setLoads)
+      .then((data: any) => {
+        // Handle both paginated and non-paginated responses
+        const loadsData = data?.results || data || [];
+        setLoads(loadsData);
+      })
       .catch(() => {
         setError('Failed to load bookings');
         setLoads([]);

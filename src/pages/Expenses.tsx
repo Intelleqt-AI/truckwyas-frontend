@@ -7,6 +7,7 @@ interface Expense {
   description: string;
   amount: number;
   date: string;
+  expense_date?: string;
   vehicle?: number;
   vehicle_registration?: string;
   status?: string;
@@ -20,15 +21,20 @@ interface Vehicle {
 const formatZAR = (v: number) =>
   'R ' + v.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' });
+};
+
 const CATS = [
-  { value: 'All', label: 'All Categories' },
-  { value: 'FUEL', label: '⛽ Fuel' },
-  { value: 'TOLLS', label: '🛣️ Tolls' },
-  { value: 'MAINTENANCE', label: '🔧 Maintenance' },
-  { value: 'DRIVER', label: '👤 Driver' },
-  { value: 'INSURANCE', label: '🛡️ Insurance' },
-  { value: 'OVERHEAD', label: '📋 Overhead' },
-  { value: 'OTHER', label: '📋 Other' },
+  { value: 'All', label: 'All Categories', icon: '📊' },
+  { value: 'FUEL', label: 'Fuel', icon: '⛽' },
+  { value: 'TOLLS', label: 'Tolls', icon: '🛣️' },
+  { value: 'MAINTENANCE', label: 'Maintenance', icon: '🔧' },
+  { value: 'DRIVER', label: 'Driver', icon: '👤' },
+  { value: 'INSURANCE', label: 'Insurance', icon: '🛡️' },
+  { value: 'OVERHEAD', label: 'Overhead', icon: '📋' },
+  { value: 'OTHER', label: 'Other', icon: '📋' },
 ];
 
 const DATE_FILTERS = [
@@ -39,7 +45,12 @@ const DATE_FILTERS = [
 
 function getCategoryLabel(cat: string) {
   const c = CATS.find(x => x.value === cat);
-  return c?.label || cat;
+  return c ? `${c.icon} ${c.label}` : cat;
+}
+
+function getCategoryIcon(cat: string) {
+  const c = CATS.find(x => x.value === cat);
+  return c?.icon || '📋';
 }
 
 export default function Expenses() {
@@ -49,12 +60,15 @@ export default function Expenses() {
   const [error, setError] = useState<string | null>(null);
 
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [vehicleFilter, setVehicleFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('this_month');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const perPage = 10;
 
   const loadData = () => {
@@ -96,35 +110,34 @@ export default function Expenses() {
   // Filter expenses
   const filtered = expenses.filter(e => {
     const catOk = categoryFilter === 'All' || e.category === categoryFilter;
+    const vehOk = vehicleFilter === 'All' || (e.vehicle && e.vehicle.toString() === vehicleFilter);
     const srchOk = !search || e.description?.toLowerCase().includes(search.toLowerCase());
 
     let dateOk = true;
     if (startDate && endDate) {
-      const eDate = new Date(e.date);
+      const eDate = new Date(e.expense_date || e.date);
       dateOk = eDate >= startDate && eDate <= endDate;
     }
 
-    return catOk && srchOk && dateOk;
+    return catOk && vehOk && srchOk && dateOk;
   });
 
   // Sort by date desc
-  const sorted = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const sorted = [...filtered].sort((a, b) => new Date(b.expense_date || b.date).getTime() - new Date(a.expense_date || a.date).getTime());
 
-  // Summary calculations
-  const thisMonth = expenses.filter(e => {
-    const d = new Date(e.date);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-  const totalMTD = thisMonth.reduce((s, e) => s + e.amount, 0);
-
-  // Top 3 categories by spend this month
-  const categoryTotals = thisMonth.reduce((acc, e) => {
+  // Summary calculations - ALL categories breakdown
+  const allCategoryTotals = expenses.reduce((acc, e) => {
     acc[e.category] = (acc[e.category] || 0) + e.amount;
     return acc;
   }, {} as Record<string, number>);
-  const topCategories = Object.entries(categoryTotals)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3);
+
+  // Get all category breakdowns in order
+  const categoryBreakdown = CATS.slice(1).map(cat => ({
+    category: cat.value,
+    label: cat.label,
+    icon: cat.icon,
+    total: allCategoryTotals[cat.value] || 0,
+  })).filter(c => c.total > 0).sort((a, b) => b.total - a.total);
 
   const totalPages = Math.ceil(sorted.length / perPage);
   const rows = sorted.slice((page - 1) * perPage, page * perPage);
@@ -147,6 +160,99 @@ export default function Expenses() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} selected expense(s)?`)) return;
+
+    setBulkDeleting(true);
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map(id =>
+          fetch(`/api/v1/expenses/${id}/`, { method: 'DELETE' })
+        )
+      );
+      setSelectedIds(new Set());
+      loadData();
+    } catch (err) {
+      alert('Some expenses failed to delete');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === rows.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(rows.map(e => e.id)));
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['Date', 'Category', 'Description', 'Vehicle', 'Amount', 'Status'];
+    const csvRows = [
+      headers.join(','),
+      ...sorted.map(e => [
+        formatDate(e.expense_date || e.date),
+        e.category,
+        `"${e.description}"`,
+        e.vehicle_registration || '',
+        e.amount,
+        e.status || 'PENDING',
+      ].join(','))
+    ];
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `expenses-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const getStatusBadge = (status?: string) => {
+    const s = status?.toUpperCase() || 'PENDING';
+    let color = 'var(--status-warning)';
+    let bg = 'var(--status-warning-bg)';
+
+    if (s === 'APPROVED') {
+      color = 'var(--accent-primary)';
+      bg = 'var(--status-success-bg)';
+    } else if (s === 'REJECTED') {
+      color = 'var(--status-danger)';
+      bg = 'var(--status-danger-bg)';
+    }
+
+    return (
+      <span style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '2px 8px',
+        borderRadius: '100px',
+        background: bg,
+        fontSize: 10,
+        color: color,
+        fontWeight: 600,
+        fontFamily: 'var(--font-mono)',
+        textTransform: 'uppercase',
+      }}>
+        {s}
+      </span>
+    );
+  };
+
   if (loading) return (
     <div style={{ padding: 40 }}>
       <div className="card" style={{ padding: 24, marginBottom: 16 }}>
@@ -156,6 +262,8 @@ export default function Expenses() {
     </div>
   );
 
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+
   return (
     <div>
       {/* Header */}
@@ -164,63 +272,110 @@ export default function Expenses() {
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Finance</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Expenses</div>
         </div>
-        <button className="btn-action" onClick={() => setShowAdd(true)}>+ ADD EXPENSE</button>
-      </div>
-
-      {/* Summary Strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Total This Month</span></div>
-          <div className="metric-value" style={{ fontSize: 22 }}>{formatZAR(totalMTD)}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
-            {thisMonth.length} expenses
-          </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button
+            className="btn-action"
+            onClick={handleExportCSV}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            EXPORT CSV
+          </button>
+          <button className="btn-action" onClick={() => setShowAdd(true)}>+ ADD EXPENSE</button>
         </div>
-        {topCategories.map(([cat, amt], i) => (
-          <div key={cat} className="card metric-card">
-            <div className="card-header"><span className="card-title">{getCategoryLabel(cat)}</span></div>
-            <div className="metric-value" style={{ fontSize: 18 }}>{formatZAR(amt)}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
-              {totalMTD > 0 ? ((amt / totalMTD) * 100).toFixed(1) : 0}% of total
-            </div>
-          </div>
-        ))}
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-        <select
-          value={categoryFilter}
-          onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
-          style={{
-            background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            color: 'var(--text-primary)', padding: '7px 12px',
-            fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
-          }}
-        >
-          {CATS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-        </select>
-        <select
-          value={dateFilter}
-          onChange={e => { setDateFilter(e.target.value); setPage(1); }}
-          style={{
-            background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            color: 'var(--text-primary)', padding: '7px 12px',
-            fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
-          }}
-        >
-          {DATE_FILTERS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-        </select>
-        <input
-          placeholder="Search expenses..."
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1); }}
-          style={{
-            background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            color: 'var(--text-primary)', padding: '7px 12px',
-            fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, width: 240,
-          }}
-        />
+      {/* Category Breakdown Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+        {categoryBreakdown.map(cat => {
+          const percentage = totalExpenses > 0 ? (cat.total / totalExpenses * 100).toFixed(1) : '0.0';
+          return (
+            <div key={cat.category} className="card metric-card">
+              <div className="card-header">
+                <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 14 }}>{cat.icon}</span>
+                  {cat.label}
+                </span>
+              </div>
+              <div className="metric-value" style={{ fontSize: 20 }}>{formatZAR(cat.total)}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+                {percentage}% of total
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Filters & Actions */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <select
+            value={categoryFilter}
+            onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
+            style={{
+              background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+              color: 'var(--text-primary)', padding: '7px 12px',
+              fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
+            }}
+          >
+            {CATS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+          </select>
+          <select
+            value={vehicleFilter}
+            onChange={e => { setVehicleFilter(e.target.value); setPage(1); }}
+            style={{
+              background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+              color: 'var(--text-primary)', padding: '7px 12px',
+              fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
+            }}
+          >
+            <option value="All">All Vehicles</option>
+            {vehicles.map(v => <option key={v.id} value={v.id}>{v.registration}</option>)}
+          </select>
+          <select
+            value={dateFilter}
+            onChange={e => { setDateFilter(e.target.value); setPage(1); }}
+            style={{
+              background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+              color: 'var(--text-primary)', padding: '7px 12px',
+              fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
+            }}
+          >
+            {DATE_FILTERS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+          </select>
+          <input
+            placeholder="Search expenses..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            style={{
+              background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+              color: 'var(--text-primary)', padding: '7px 12px',
+              fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, width: 240,
+            }}
+          />
+        </div>
+        {selectedIds.size > 0 && (
+          <button
+            onClick={handleBulkDelete}
+            disabled={bulkDeleting}
+            style={{
+              fontSize: 11,
+              padding: '7px 12px',
+              background: 'var(--status-danger)',
+              border: 'none',
+              color: 'white',
+              fontFamily: 'var(--font-mono)',
+              cursor: bulkDeleting ? 'not-allowed' : 'pointer',
+              borderRadius: 2,
+              fontWeight: 600,
+            }}
+          >
+            {bulkDeleting ? 'DELETING...' : `DELETE ${selectedIds.size} SELECTED`}
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -228,23 +383,41 @@ export default function Expenses() {
         <table className="data-table">
           <thead>
             <tr>
+              <th style={{ width: 40 }}>
+                <input
+                  type="checkbox"
+                  checked={rows.length > 0 && selectedIds.size === rows.length}
+                  onChange={toggleSelectAll}
+                  style={{ cursor: 'pointer' }}
+                />
+              </th>
               <th>Date</th>
               <th>Category</th>
               <th>Description</th>
               <th>Vehicle</th>
+              <th>Status</th>
               <th className="text-right">Amount</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No expenses found</td></tr>
+              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No expenses found</td></tr>
             ) : rows.map(exp => (
               <tr key={exp.id}>
-                <td className="mono">{new Date(exp.date).toLocaleDateString('en-ZA')}</td>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(exp.id)}
+                    onChange={() => toggleSelect(exp.id)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                </td>
+                <td className="mono">{formatDate(exp.expense_date || exp.date)}</td>
                 <td>{getCategoryLabel(exp.category)}</td>
                 <td>{exp.description}</td>
                 <td className="mono">{exp.vehicle_registration || '—'}</td>
+                <td>{getStatusBadge(exp.status)}</td>
                 <td className="text-right mono">{formatZAR(exp.amount)}</td>
                 <td>
                   <div style={{ display: 'flex', gap: 8 }}>

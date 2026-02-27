@@ -1,23 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
 
 export default function Overview() {
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('tw-theme') as 'dark' | 'light') || 'dark';
-  });
   const navigate = useNavigate();
-  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [financeData, setFinanceData] = useState<any>(null);
   const [insights, setInsights] = useState<any[]>([]);
   const [advances, setAdvances] = useState<any[]>([]);
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('tw-theme', theme);
-  }, [theme]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -40,91 +31,18 @@ export default function Overview() {
     loadData();
   }, []);
 
-  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
-
-  const isActive = (path: string) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
-
   return (
-    <div className="os-container">
-      {/* Ambient glow */}
-      <div className="ambient-glow" />
-
-      {/* HEADER */}
-      <header className="os-header">
-        <div className="logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-          <img
-            src="/brand/truckwys-logo.png"
-            alt="Truckwys"
-            style={{
-              height: 24,
-              width: 'auto',
-              display: 'block',
-              filter: theme === 'dark' ? 'invert(1) brightness(2)' : 'none',
-            }}
-          />
-          TRUCKWYS<span>OS</span>
-        </div>
-
-        <div className="agent-command">
-          <div className="agent-icon" />
-          <input
-            type="text"
-            className="agent-input"
-            placeholder="Ask Agent to analyze route profitability or generate quote..."
-            defaultValue="Agent, show me margin leaks on the JHB-CPT route"
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <div className="status-badge active">
-            <span style={{ width: 6, height: 6, background: 'currentColor', borderRadius: '50%', display: 'inline-block' }} />
-            SYSTEMS ONLINE
-          </div>
-          <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
-            {theme === 'dark' ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-              </svg>
-            )}
-          </button>
-          <div style={{ width: 32, height: 32, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>TW</div>
-        </div>
-      </header>
-
-      {/* LEFT NAV */}
-      <nav className="os-nav">
-        <div className={`nav-item${isActive('/') ? ' active' : ''}`} title="Home" onClick={() => navigate('/')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        </div>
-        <div className="nav-item" title="Bookings" onClick={() => navigate('/quotes')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        </div>
-        <div className="nav-item" title="Fleet" onClick={() => navigate('/vehicles')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-        </div>
-        <div className="nav-item" title="Finance" onClick={() => navigate('/invoices')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        </div>
-        <div className="nav-item" title="Capital" onClick={() => navigate('/capital')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-        </div>
-        <div className="nav-item" title="Insights" onClick={() => navigate('/insights')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        </div>
-        <div className="nav-item" title="Settings" onClick={() => navigate('/settings')} style={{ marginTop: 'auto', marginBottom: 24 }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </div>
-      </nav>
-
+    <div style={{ display: 'flex', gap: 0, margin: -24, minHeight: 'calc(100% + 48px)' }}>
       {/* MAIN WORKSPACE */}
-      <main className="workspace">
+      <div style={{
+        flex: 1,
+        minWidth: 0,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 20,
+        alignContent: 'start',
+        padding: 24,
+      }}>
         {/* Metric cards */}
         <div className="card metric-card">
           <div className="card-header">
@@ -262,10 +180,18 @@ export default function Overview() {
             </tbody>
           </table>
         </div>
-      </main>
+      </div>
 
       {/* AGENT SIDEBAR */}
-      <aside className="agent-sidebar">
+      <aside style={{
+        width: 280,
+        flexShrink: 0,
+        borderLeft: '1px solid var(--border-subtle)',
+        background: 'var(--bg-sidebar)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflowY: 'auto',
+      }}>
         <div className="agent-header">
           <div className="live-dot" />
           Agent Activity Stream
@@ -322,13 +248,13 @@ export default function Overview() {
             </>
           )}
         </div>
-        <div style={{ padding: 20, borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}>
+        <div style={{ padding: 20, borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-surface)', marginTop: 'auto' }}>
           <div className="card-title" style={{ marginBottom: 12 }}>Quick Quote</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
             <input type="text" placeholder="Origin" style={{ background: 'var(--bg-surface-hover)', border: '1px solid var(--border-subtle)', padding: 8, color: 'var(--text-primary)', borderRadius: 2, fontSize: 11, outline: 'none' }} />
             <input type="text" placeholder="Dest" style={{ background: 'var(--bg-surface-hover)', border: '1px solid var(--border-subtle)', padding: 8, color: 'var(--text-primary)', borderRadius: 2, fontSize: 11, outline: 'none' }} />
           </div>
-          <button className="btn-action" style={{ background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}>GENERATE PREVIEW</button>
+          <button className="btn-action" onClick={() => navigate('/quotes/new')} style={{ background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}>GENERATE PREVIEW</button>
         </div>
       </aside>
     </div>

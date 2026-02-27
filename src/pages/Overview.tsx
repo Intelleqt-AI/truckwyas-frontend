@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { fetchData } from '@/lib/api';
+import { fetchData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
 
 export default function Overview() {
@@ -51,8 +51,17 @@ export default function Overview() {
 
       {/* HEADER */}
       <header className="os-header">
-        <div className="logo">
-          <img src="/brand/logo.svg" alt="Truckwys" style={{ height: 24, width: 'auto', display: 'block' }} onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
+        <div className="logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
+          <img
+            src="/brand/truckwys-logo.png"
+            alt="Truckwys"
+            style={{
+              height: 24,
+              width: 'auto',
+              display: 'block',
+              filter: theme === 'dark' ? 'invert(1) brightness(2)' : 'none',
+            }}
+          />
           TRUCKWYS<span>OS</span>
         </div>
 

@@ -25,6 +25,7 @@ import { QuotesList } from "./pages/QuotesList";
 import NewQuote from "./pages/NewQuote";
 import { BookingsList } from "./pages/BookingsList";
 import Bookings from "./pages/Bookings";
+import LoadsList from "./pages/LoadsList";
 import Vehicles from "./pages/Vehicles";
 import VehicleDigitalTwin from "./pages/VehicleDigitalTwin";
 import Drivers from "./pages/Drivers";
@@ -65,7 +66,7 @@ const App = () => (
             {/* All other pages — wrapped in OSLayout (header + nav + content) */}
             <Route path="/quotes" element={<OSLayout><QuotesList /></OSLayout>} />
             <Route path="/quotes/new" element={<OSLayout><NewQuote /></OSLayout>} />
-            <Route path="/bookings" element={<OSLayout><Bookings /></OSLayout>} />
+            <Route path="/bookings" element={<OSLayout><LoadsList /></OSLayout>} />
             <Route path="/bookings/:id" element={<OSLayout><Bookings /></OSLayout>} />
             <Route path="/bookings/list" element={<OSLayout><BookingsList /></OSLayout>} />
             <Route path="/bookings/pipeline" element={<OSLayout><QuotesList /></OSLayout>} />

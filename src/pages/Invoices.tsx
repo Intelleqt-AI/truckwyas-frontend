@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { INVOICES } from "@/mocks/simple-invoice-data";
 import { formatCurrency } from "@/lib/formatters";
-import { fetchData, postData } from "@/lib/api";
+import { fetchData, postData } from "@/lib/Api";
 
 const STATUS_COLOR: Record<string, string> = {
   PAID: 'var(--status-success)', SENT: 'var(--status-warning)',

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "@/lib/formatters";
-import { fetchData } from "@/lib/api";
+import { fetchData } from "@/lib/Api";
 
 const TIER_COLOR: Record<string, string> = {
   prime: 'var(--accent-primary)', standard: 'var(--status-success)',

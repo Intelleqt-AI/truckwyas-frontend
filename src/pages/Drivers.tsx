@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchData } from '../lib/api';
+import { fetchData } from '../lib/Api';
 
 interface Driver {
   id: number;

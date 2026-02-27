@@ -83,8 +83,8 @@ export const patchData = async ({ url, data }) => {
 };
 
 export const loginUser = async ({ username, password }: { username: string; password: string }) => {
-  const res = await api.post('api/auth/login/', { username, password });
-  return res.data; // { access, refresh, user }
+  const res = await api.post('v1/auth/login/', { username, password });
+  return res.data; // { token }
 };
 
 // api.interceptors.response.use(

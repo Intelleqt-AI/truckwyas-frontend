@@ -9,7 +9,7 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="min-h-screen flex w-full bg-[#FAFAFA]">
+      <div className="min-h-screen flex w-full bg-muted/30">
         {/* Dark Sidebar - Fixed Left */}
         <LeftNav />
 

@@ -149,8 +149,8 @@ export function LeftNav() {
   };
 
   return (
-    <Sidebar className="border-r-0 bg-[#0F172A]" style={{ "--sidebar-width": "240px" } as React.CSSProperties}>
-      <SidebarContent className="bg-[#0F172A]">
+    <Sidebar className="border-r-0 bg-sidebar" style={{ "--sidebar-width": "240px" } as React.CSSProperties}>
+      <SidebarContent className="bg-sidebar">
         {/* TruckWys Logo at Top */}
         <div className="p-6 border-b border-slate-800">
           <div className="flex items-center justify-center">
@@ -193,8 +193,8 @@ export function LeftNav() {
                             "flex items-center justify-between cursor-pointer rounded-md px-3 py-2.5 text-sm transition-all",
                             "border-l-3 border-transparent",
                             isItemActive
-                              ? "bg-[#1E293B] text-white border-l-[#2563EB] border-l-3"
-                              : "text-[#94A3B8] hover:bg-[#1E293B]/50 hover:text-white"
+                              ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-primary border-l-3"
+                              : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                           )}
                         >
                           <div className="flex items-center gap-3">
@@ -219,8 +219,8 @@ export function LeftNav() {
                               "flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-sm transition-all",
                               "border-l-3 border-transparent",
                               isActive('href' in item ? item.href : '#')
-                                ? "bg-[#1E293B] text-white border-l-[#2563EB] border-l-3"
-                                : "text-[#94A3B8] hover:bg-[#1E293B]/50 hover:text-white"
+                                ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-primary border-l-3"
+                                : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                             )}
                           >
                             <div className="flex items-center gap-3">
@@ -230,7 +230,7 @@ export function LeftNav() {
                               )}
                             </div>
                             {!collapsed && showBadge && (
-                              <span className="flex items-center justify-center w-5 h-5 bg-[#2563EB] text-white text-xs font-bold rounded-full">
+                              <span className="flex items-center justify-center w-5 h-5 bg-primary text-white text-xs font-bold rounded-full">
                                 {eligibleCount}
                               </span>
                             )}
@@ -249,8 +249,8 @@ export function LeftNav() {
                               className={cn(
                                 "flex items-center px-3 py-2 text-sm rounded-md transition-all",
                                 isActive(child.href)
-                                  ? "bg-[#1E293B] text-white font-medium"
-                                  : "text-[#94A3B8] hover:bg-[#1E293B]/50 hover:text-white"
+                                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                               )}
                             >
                               <span className="truncate">{child.label}</span>
@@ -274,16 +274,16 @@ export function LeftNav() {
             return (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-3 w-full hover:bg-[#1E293B]/50 p-2 rounded-lg transition-all text-left">
-                    <div className="w-8 h-8 bg-[#2563EB] rounded-full flex items-center justify-center shrink-0">
+                  <button className="flex items-center gap-3 w-full hover:bg-sidebar-accent/50 p-2 rounded-lg transition-all text-left">
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center shrink-0">
                       <span className="text-xs font-medium text-white">{initials}</span>
                     </div>
                     {!collapsed && (
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-white truncate capitalize">
+                        <div className="text-sm font-medium text-sidebar-accent-foreground truncate capitalize">
                           {user?.username || "User"}
                         </div>
-                        <div className="text-xs text-[#94A3B8] truncate">
+                        <div className="text-xs text-sidebar-foreground/70 truncate">
                           {user?.role || "Profile"}
                         </div>
                       </div>

@@ -88,10 +88,10 @@ export function TopBar() {
       {isOpen && (
         <div className="fixed inset-0 bg-black/20 z-[40] transition-all duration-300" />
       )}
-      <header className="h-16 bg-white border-b border-[#F1F5F9] flex items-center justify-between px-8 sticky top-0 z-40">
+      <header className="h-16 bg-background border-b border-border flex items-center justify-between px-8 sticky top-0 z-40">
         {/* Left Section - Page Title/Breadcrumb */}
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-semibold text-[#0F172A]">{pageTitle}</h1>
+          <h1 className="text-2xl font-semibold text-foreground">{pageTitle}</h1>
         </div>
 
         {/* Right Section - Notifications & User */}
@@ -100,21 +100,21 @@ export function TopBar() {
           <DropdownMenu onOpenChange={setIsOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative hover:bg-slate-100">
-                <Bell className="w-5 h-5 text-slate-600" />
+                <Bell className="w-5 h-5 text-muted-foreground" />
                 {notificationList.filter(n => n.unread).length > 0 && (
-                  <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center bg-[#2563EB] text-white text-xs border-2 border-white">
+                  <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center bg-primary text-white text-xs border-2 border-background">
                     {notificationList.filter(n => n.unread).length}
                   </Badge>
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 bg-white border-slate-200 p-0 shadow-xl">
-              <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+            <DropdownMenuContent align="end" className="w-80 bg-background border-border p-0 shadow-xl">
+              <div className="p-4 border-b border-border flex items-center justify-between">
                 <DropdownMenuLabel className="p-0 font-semibold text-sm">Notifications</DropdownMenuLabel>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-auto p-0 text-xs text-[#2563EB] hover:bg-transparent hover:text-[#1D4ED8]"
+                  className="h-auto p-0 text-xs text-primary hover:bg-transparent hover:text-primary/80"
                   onClick={handleMarkAllAsRead}
                 >
                   Mark all as read
@@ -126,33 +126,33 @@ export function TopBar() {
                     notificationList.map((notification) => (
                       <DropdownMenuItem
                         key={notification.id}
-                        className="flex flex-col items-start gap-1 p-4 cursor-pointer border-b border-slate-100 last:border-0 focus:bg-slate-50"
+                        className="flex flex-col items-start gap-1 p-4 cursor-pointer border-b border-border last:border-0 focus:bg-muted/20"
                         onClick={() => notification.unread && handleMarkAsRead(notification.id)}
                       >
                         <div className="flex items-center justify-between w-full gap-2">
                           <div className="flex items-center gap-2">
-                            {notification.type === 'success' && <CheckCircle2 className="w-4 h-4 text-[#10B981]" />}
-                            {notification.type === 'warning' && <AlertCircle className="w-4 h-4 text-[#F59E0B]" />}
-                            {notification.type === 'info' && <Info className="w-4 h-4 text-[#2563EB]" />}
-                            <span className={cn("text-sm", notification.unread ? "font-semibold text-[#0F172A]" : "font-normal text-[#64748B]")}>
+                            {notification.type === 'success' && <CheckCircle2 className="w-4 h-4 text-success" />}
+                            {notification.type === 'warning' && <AlertCircle className="w-4 h-4 text-warning" />}
+                            {notification.type === 'info' && <Info className="w-4 h-4 text-primary" />}
+                            <span className={cn("text-sm", notification.unread ? "font-semibold text-foreground" : "font-normal text-muted-foreground")}>
                               {notification.title}
                             </span>
                           </div>
                           {notification.unread && (
-                            <div className="w-2 h-2 bg-[#2563EB] rounded-full" />
+                            <div className="w-2 h-2 bg-primary rounded-full" />
                           )}
                         </div>
-                        <p className="text-xs text-[#64748B] line-clamp-2">
+                        <p className="text-xs text-muted-foreground line-clamp-2">
                           {notification.description}
                         </p>
                         <div className="flex items-center gap-1 mt-1">
-                          <Clock className="w-3 h-3 text-[#94A3B8]" />
-                          <span className="text-[10px] text-[#94A3B8]">{notification.time}</span>
+                          <Clock className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-[10px] text-muted-foreground">{notification.time}</span>
                         </div>
                       </DropdownMenuItem>
                     ))
                   ) : (
-                    <div className="p-8 text-center text-[#64748B]">
+                    <div className="p-8 text-center text-muted-foreground">
                       <p className="text-sm">No notifications</p>
                     </div>
                   )}

@@ -9,22 +9,22 @@ interface StatusBadgeProps {
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const statusConfig = {
     // Invoice statuses
-    DRAFT: { label: "Draft", color: "bg-[#94A3B8] text-white" },
-    SENT: { label: "Sent", color: "bg-[#2563EB] text-white" },
-    PAID: { label: "Paid", color: "bg-[#10B981] text-white" },
-    OVERDUE: { label: "Overdue", color: "bg-[#EF4444] text-white" },
-    PARTIALLY_PAID: { label: "Partially Paid", color: "bg-[#F59E0B] text-white" },
-    CANCELLED: { label: "Cancelled", color: "bg-[#64748B] text-white" },
+    DRAFT: { label: "Draft", color: "bg-muted-foreground text-white" },
+    SENT: { label: "Sent", color: "bg-primary text-white" },
+    PAID: { label: "Paid", color: "bg-success text-white" },
+    OVERDUE: { label: "Overdue", color: "bg-destructive text-white" },
+    PARTIALLY_PAID: { label: "Partially Paid", color: "bg-warning text-white" },
+    CANCELLED: { label: "Cancelled", color: "bg-muted-foreground text-white" },
 
     // Expense statuses
-    PENDING: { label: "Pending", color: "bg-[#F59E0B] text-white" },
-    APPROVED: { label: "Approved", color: "bg-[#10B981] text-white" },
-    REJECTED: { label: "Rejected", color: "bg-[#EF4444] text-white" },
+    PENDING: { label: "Pending", color: "bg-warning text-white" },
+    APPROVED: { label: "Approved", color: "bg-success text-white" },
+    REJECTED: { label: "Rejected", color: "bg-destructive text-white" },
   };
 
   const config = statusConfig[status as keyof typeof statusConfig] || {
     label: status,
-    color: "bg-[#94A3B8] text-white",
+    color: "bg-muted-foreground text-white",
   };
 
   return (

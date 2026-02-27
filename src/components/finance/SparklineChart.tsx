@@ -3,7 +3,7 @@ interface SparklineChartProps {
   color?: string;
 }
 
-export function SparklineChart({ data, color = "#2563EB" }: SparklineChartProps) {
+export function SparklineChart({ data, color = "hsl(var(--primary))" }: SparklineChartProps) {
   const max = Math.max(...data);
   const min = Math.min(...data);
   const range = max - min;

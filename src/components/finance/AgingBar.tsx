@@ -12,7 +12,7 @@ export function AgingBar({ currentDays, days30, days60, days90Plus, className }:
   const total = currentDays + days30 + days60 + days90Plus;
 
   if (total === 0) {
-    return <div className={cn("h-2 w-full bg-[#F1F5F9] rounded", className)} />;
+    return <div className={cn("h-2 w-full bg-muted rounded", className)} />;
   }
 
   const currentPercent = (currentDays / total) * 100;
@@ -24,28 +24,28 @@ export function AgingBar({ currentDays, days30, days60, days90Plus, className }:
     <div className={cn("flex h-2 w-full overflow-hidden rounded", className)}>
       {currentPercent > 0 && (
         <div
-          className="bg-[#10B981]"
+          className="bg-success"
           style={{ width: `${currentPercent}%` }}
           title={`Current: ${currentDays}`}
         />
       )}
       {days30Percent > 0 && (
         <div
-          className="bg-[#2563EB]"
+          className="bg-primary"
           style={{ width: `${days30Percent}%` }}
           title={`1-30 days: ${days30}`}
         />
       )}
       {days60Percent > 0 && (
         <div
-          className="bg-[#F59E0B]"
+          className="bg-warning"
           style={{ width: `${days60Percent}%` }}
           title={`31-60 days: ${days60}`}
         />
       )}
       {days90Percent > 0 && (
         <div
-          className="bg-[#EF4444]"
+          className="bg-destructive"
           style={{ width: `${days90Percent}%` }}
           title={`60+ days: ${days90Plus}`}
         />

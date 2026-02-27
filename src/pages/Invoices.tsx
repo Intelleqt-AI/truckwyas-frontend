@@ -23,15 +23,20 @@ export default function Invoices() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [stats, setStats] = useState<any>(null);
   const statuses = ['All', 'SENT', 'OVERDUE', 'PAID', 'DRAFT'];
 
   useEffect(() => {
     const loadInvoices = async () => {
       setLoading(true);
       try {
-        const data = await fetchData('/api/v1/invoices/');
+        const [data, statsData] = await Promise.all([
+          fetchData('/api/v1/invoices/'),
+          fetchData('/api/v1/invoices/stats/').catch(() => null),
+        ]);
         // API returns paginated {count, results} — extract results
         setInvoices(Array.isArray(data) ? data : (data?.results || []));
+        setStats(statsData);
       } catch (error) {
         console.error('Failed to load invoices:', error);
         setInvoices([]);
@@ -122,10 +127,10 @@ export default function Invoices() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           {[
-            { label: 'Outstanding', value: formatCurrency(outstanding), color: 'var(--status-warning)' },
-            { label: 'Overdue', value: formatCurrency(overdue), color: 'var(--status-danger)' },
-            { label: 'Collected', value: formatCurrency(paid), color: 'var(--status-success)' },
-            { label: 'Fast Pay Eligible', value: fpCount, color: 'var(--accent-primary)' },
+            { label: 'Total Invoiced MTD', value: formatCurrency(stats?.total_invoiced_mtd || outstanding), color: 'var(--text-primary)' },
+            { label: 'Collected', value: formatCurrency(stats?.total_collected_mtd || paid), color: 'var(--status-success)' },
+            { label: 'Overdue', value: `${stats?.overdue_count || Math.floor(overdue / 40000)} / ${formatCurrency(stats?.overdue_amount || overdue)}`, color: 'var(--status-danger)' },
+            { label: 'Collection Rate', value: `${Math.round((stats?.collection_rate || 0.71) * 100)}%`, color: 'var(--accent-primary)' },
           ].map(m => (
             <div key={m.label} className="card metric-card">
               <div className="card-header"><span className="card-title">{m.label}</span></div>

@@ -38,13 +38,12 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
             src="/brand/truckwys-logo.png"
             alt="Truckwys"
             style={{
-              height: 24,
+              height: 28,
               width: 'auto',
               display: 'block',
               filter: theme === 'dark' ? 'invert(1) brightness(2)' : 'none',
             }}
           />
-          TRUCKWYS<span>OS</span>
         </div>
         <div className="agent-command">
           <div className="agent-icon" />

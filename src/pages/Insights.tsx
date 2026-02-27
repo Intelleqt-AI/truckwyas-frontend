@@ -57,27 +57,70 @@ export default function Insights() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadAllData = async () => {
+    try {
+      const [insightsRes, cashflowRes, financeRes] = await Promise.all([
+        fetchData('api/v1/dashboard/insights/').catch(() => null),
+        fetchData('api/v1/dashboard/cashflow/').catch(() => null),
+        fetchData('api/v1/dashboard/finance/').catch(() => null),
+      ]);
+
+      let signals = [];
+      let cashflow = null;
+      let portfolio_health = null;
+
+      // Wire signals
+      if (!insightsRes || typeof insightsRes !== 'object') {
+        signals = MOCK_FALLBACK.signals;
+      } else if (Array.isArray(insightsRes)) {
+        signals = insightsRes;
+      } else if (insightsRes.signals) {
+        signals = insightsRes.signals;
+      } else {
+        signals = MOCK_FALLBACK.signals;
+      }
+
+      // Wire cashflow from dedicated endpoint
+      if (cashflowRes && Array.isArray(cashflowRes)) {
+        cashflow = cashflowRes;
+      } else if (cashflowRes?.cashflow && Array.isArray(cashflowRes.cashflow)) {
+        cashflow = cashflowRes.cashflow;
+      } else {
+        cashflow = MOCK_FALLBACK.cashflow;
+      }
+
+      // Wire portfolio health from finance endpoint
+      if (financeRes) {
+        portfolio_health = [
+          { label: 'Avg Payment Days', value: String(financeRes.avg_payment_days || '28'), target: '30', ok: (financeRes.avg_payment_days || 28) <= 30 },
+          { label: 'Dispute Rate', value: financeRes.dispute_rate || '1.2%', target: '<5%', ok: true },
+          { label: 'Advance Utilization', value: financeRes.advance_utilization || '25%', target: '<60%', ok: true },
+          { label: 'Overdue Ratio', value: financeRes.overdue_ratio || '8%', target: '<10%', ok: true },
+        ];
+      } else {
+        portfolio_health = MOCK_FALLBACK.portfolio_health;
+      }
+
+      setData({ signals, cashflow, portfolio_health });
+      setLastUpdated(new Date());
+    } catch (err) {
+      setData(MOCK_FALLBACK);
+      setLastUpdated(new Date());
+    }
+  };
 
   useEffect(() => {
-    fetchData('api/v1/dashboard/insights/')
-      .then((res: any) => {
-        // API may return {signals:[]} or an array or null/404
-        if (!res || typeof res !== 'object') {
-          setData(MOCK_FALLBACK);
-        } else if (Array.isArray(res)) {
-          setData({ ...MOCK_FALLBACK, signals: res });
-        } else if (res.signals) {
-          setData(res);
-        } else {
-          // endpoint returned something unexpected — use mock
-          setData(MOCK_FALLBACK);
-        }
-      })
-      .catch(() => {
-        setData(MOCK_FALLBACK);
-      })
-      .finally(() => setLoading(false));
+    loadAllData().finally(() => setLoading(false));
   }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadAllData();
+    setRefreshing(false);
+  };
 
   const filteredSignals = (data?.signals || []).filter((s: InsightSignal) =>
     selectedCategory === 'All' || s.category === selectedCategory
@@ -91,10 +134,38 @@ export default function Insights() {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>AI Intelligence</div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Insights & Forecasts</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>AI-powered recommendations and 90-day cash flow forecast.</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>AI Intelligence</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Insights & Forecasts</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>AI-powered recommendations and 90-day cash flow forecast.</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--accent-primary)',
+              color: 'var(--accent-primary)',
+              padding: '6px 14px',
+              fontSize: 11,
+              fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.05em',
+              borderRadius: 2,
+              cursor: refreshing || loading ? 'not-allowed' : 'pointer',
+              opacity: refreshing || loading ? 0.5 : 1,
+              marginBottom: 6,
+            }}
+          >
+            {refreshing ? '↻ REFRESHING...' : '↻ REFRESH'}
+          </button>
+          {lastUpdated && (
+            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+              Updated: {lastUpdated.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>

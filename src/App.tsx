@@ -42,20 +42,21 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
-  const [ready, setReady] = useState(!!localStorage.getItem('access'));
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!localStorage.getItem('access')) {
-      loginUser({ username: 'admin', password: 'admin123' })
-        .then(data => {
-          if (data?.token) localStorage.setItem('access', data.token);
-        })
-        .catch(() => {})
-        .finally(() => setReady(true));
-    }
+    // Always get a fresh token on startup — don't trust stale localStorage
+    loginUser({ username: 'admin', password: 'admin123' })
+      .then(data => {
+        if (data?.token) localStorage.setItem('access', data.token);
+      })
+      .catch(() => {
+        // Login failed — still render, pages will show their own errors
+      })
+      .finally(() => setReady(true));
   }, []);
 
-  if (!ready) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0e1a', color: '#4B6CB7', fontFamily: 'monospace', fontSize: 13 }}>CONNECTING...</div>;
+  if (!ready) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0e1a', color: '#4B6CB7', fontFamily: 'monospace', fontSize: 13, letterSpacing: '0.1em' }}>CONNECTING...</div>;
 
   return (
   <BrowserRouter>

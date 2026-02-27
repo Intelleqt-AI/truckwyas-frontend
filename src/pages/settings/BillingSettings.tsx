@@ -1,245 +1,193 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
-import { CreditCard, Download, Receipt, AlertCircle, CheckCircle } from "lucide-react";
-import { toast } from "sonner";
+
+const sectionStyle: React.CSSProperties = {
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--card-radius)',
+  marginBottom: 16,
+};
+
+const sectionHeaderStyle: React.CSSProperties = {
+  padding: '14px 20px',
+  borderBottom: '1px solid var(--border-subtle)',
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--text-secondary)',
+  fontWeight: 600,
+};
+
+const PLAN = {
+  name: 'Professional',
+  price: 2499,
+  billing: 'monthly',
+  users: 15,
+  maxUsers: 25,
+  features: [
+    'AI-powered quote optimisation',
+    'Advanced analytics & reporting',
+    'Fast Pay capital access',
+    'Unlimited loads and invoices',
+    'Fleet intelligence dashboard',
+    'API access',
+  ],
+};
+
+const INVOICES = [
+  { id: 'INV-2025-001', date: '1 Jan 2025', amount: 2499, status: 'paid' },
+  { id: 'INV-2024-012', date: '1 Dec 2024', amount: 2499, status: 'paid' },
+  { id: 'INV-2024-011', date: '1 Nov 2024', amount: 2499, status: 'paid' },
+];
 
 export function BillingSettings() {
-  const [currentPlan] = useState({
-    name: "Professional",
-    price: 2499,
-    billing: "monthly",
-    users: 15,
-    maxUsers: 25,
-    features: [
-      "AI-powered quote optimization",
-      "Advanced analytics & reporting",
-      "Fleet management",
-      "API integrations",
-      "Priority support"
-    ]
-  });
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const usagePct = Math.round((PLAN.users / PLAN.maxUsers) * 100);
 
-  const invoices = [
-    {
-      id: "INV-2024-003",
-      date: "2024-09-01",
-      amount: 2499,
-      status: "paid",
-      downloadUrl: "#"
-    },
-    {
-      id: "INV-2024-002", 
-      date: "2024-08-01",
-      amount: 2499,
-      status: "paid",
-      downloadUrl: "#"
-    },
-    {
-      id: "INV-2024-001",
-      date: "2024-07-01", 
-      amount: 2499,
-      status: "paid",
-      downloadUrl: "#"
-    }
-  ];
-
-  const handleDownloadInvoice = (invoiceId: string) => {
-    toast.success(`Downloading ${invoiceId}`);
-  };
-
-  const handleUpdatePayment = () => {
-    toast.success("Payment method updated");
+  const handleDownload = (id: string) => {
+    setDownloading(id);
+    setTimeout(() => setDownloading(null), 1000);
   };
 
   return (
-    <div className="space-y-4 max-w-5xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-heading text-foreground">Billing & Subscription</h1>
-        <p className="text-caption text-muted-foreground">
-          Manage your subscription, payment methods, and billing history
-        </p>
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Billing</div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Manage your subscription and payment history</div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Current Plan */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-body-medium">
-              <span>Current Plan</span>
-              <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Active
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-body-medium">{currentPlan.name} Plan</h3>
-                <p className="text-caption text-muted-foreground">
-                  R{currentPlan.price.toLocaleString()}/{currentPlan.billing}
-                </p>
+      {/* Current Plan */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>💳 Current Plan</span></div>
+        <div style={{ padding: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>{PLAN.name}</span>
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 7px',
+                  background: 'var(--status-success-bg)', color: 'var(--accent-primary)',
+                  borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
+                }}>Active</span>
               </div>
-              <div className="text-right">
-                <p className="text-caption text-muted-foreground">Next billing</p>
-                <p className="text-body">Oct 1, 2024</p>
+              <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                R {PLAN.price.toLocaleString()} / {PLAN.billing}
               </div>
             </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-caption">
-                <span>Users ({currentPlan.users}/{currentPlan.maxUsers})</span>
-                <span>{Math.round((currentPlan.users / currentPlan.maxUsers) * 100)}%</span>
-              </div>
-              <Progress value={(currentPlan.users / currentPlan.maxUsers) * 100} className="h-2" />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={{
+                background: 'none', border: '1px solid var(--border-subtle)',
+                color: 'var(--text-secondary)', padding: '7px 14px',
+                fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+              }}>CANCEL PLAN</button>
+              <button className="btn-action">UPGRADE</button>
             </div>
+          </div>
 
-            <div className="space-y-1">
-              <p className="text-body">Plan Features:</p>
-              <ul className="space-y-0.5">
-                {currentPlan.features.slice(0, 3).map((feature, index) => (
-                  <li key={index} className="text-caption text-muted-foreground flex items-center gap-2">
-                    <CheckCircle className="w-3 h-3 text-success" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
+          {/* Usage bar */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Users</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-secondary)' }}>{PLAN.users} / {PLAN.maxUsers}</span>
             </div>
-
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">Change Plan</Button>
-              <Button variant="outline" size="sm">Cancel</Button>
+            <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
+              <div style={{ height: '100%', width: `${usagePct}%`, background: 'var(--accent-primary)', borderRadius: 2 }} />
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Payment Method & Usage */}
-        <div className="space-y-4">
-          {/* Payment Method */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-body-medium">
-                <CreditCard className="w-4 h-4" />
-                Payment Method
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-6 bg-gradient-to-r from-blue-600 to-blue-400 rounded flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">VISA</span>
-                  </div>
-                  <div>
-                    <p className="text-body">•••• 4242</p>
-                    <p className="text-caption text-muted-foreground">Expires 12/26</p>
-                  </div>
-                </div>
-                <Button variant="outline" size="sm" onClick={handleUpdatePayment}>
-                  Update
-                </Button>
+          {/* Features */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {PLAN.features.map(f => (
+              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+                <span style={{ color: 'var(--accent-primary)', fontSize: 14 }}>✓</span>
+                {f}
               </div>
-            </CardContent>
-          </Card>
+            ))}
+          </div>
+        </div>
+      </div>
 
-          {/* Usage & Limits */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-body-medium">Usage & Limits</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-caption">API Calls</span>
-                  <span className="text-caption text-muted-foreground text-tabular">8,234 / 10,000</span>
-                </div>
-                <Progress value={82.34} className="h-1.5" />
-              </div>
-              
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-caption">Data Storage</span>
-                  <span className="text-caption text-muted-foreground text-tabular">15.2 GB / 25 GB</span>
-                </div>
-                <Progress value={60.8} className="h-1.5" />
-              </div>
-              
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-caption">Integrations</span>
-                  <span className="text-caption text-muted-foreground text-tabular">3 / 5</span>
-                </div>
-                <Progress value={60} className="h-1.5" />
-              </div>
-            </CardContent>
-          </Card>
+      {/* Payment Method */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>💳 Payment Method</span></div>
+        <div style={{ padding: 20 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 14,
+            padding: '12px 16px', border: '1px solid var(--border-active)',
+            borderRadius: 2, marginBottom: 12,
+          }}>
+            <div style={{
+              width: 40, height: 26, background: 'var(--bg-surface-hover)',
+              border: '1px solid var(--border-active)', borderRadius: 2,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-tertiary)',
+            }}>VISA</div>
+            <div>
+              <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>•••• •••• •••• 4242</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Expires 12/2026</div>
+            </div>
+            <span style={{
+              marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 7px',
+              background: 'var(--status-success-bg)', color: 'var(--accent-primary)',
+              borderRadius: 2, textTransform: 'uppercase' as const,
+            }}>Default</span>
+          </div>
+          <button style={{
+            background: 'none', border: '1px solid var(--border-subtle)',
+            color: 'var(--text-secondary)', padding: '7px 14px',
+            fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+          }}>+ ADD PAYMENT METHOD</button>
         </div>
       </div>
 
       {/* Billing History */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-body-medium">
-            <Receipt className="w-4 h-4" />
-            Billing History
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="space-y-3">
-            {invoices.slice(0, 3).map((invoice, index) => (
-              <div key={invoice.id}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-body">{invoice.id}</p>
-                      <Badge 
-                        variant="outline" 
-                        className="bg-success/10 text-success border-success/20"
-                      >
-                        Paid
-                      </Badge>
-                    </div>
-                    <p className="text-caption text-muted-foreground">
-                      {new Date(invoice.date).toLocaleDateString('en-ZA', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-body text-tabular">
-                      R{invoice.amount.toLocaleString()}
-                    </span>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleDownloadInvoice(invoice.id)}
-                      className="gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download
-                    </Button>
-                  </div>
-                </div>
-                {index < 2 && <Separator className="mt-2" />}
-              </div>
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>🧾 Billing History</span></div>
+        <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+          <thead>
+            <tr>
+              {['Invoice', 'Date', 'Amount', 'Status', ''].map(h => (
+                <th key={h} style={{
+                  padding: '10px 20px', textAlign: 'left' as const,
+                  fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
+                  letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                  borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {INVOICES.map((inv, i) => (
+              <tr key={inv.id} style={{ borderBottom: i < INVOICES.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
+                <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>{inv.id}</td>
+                <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>{inv.date}</td>
+                <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>
+                  R {inv.amount.toLocaleString()}
+                </td>
+                <td style={{ padding: '12px 20px' }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent-primary)',
+                    textTransform: 'uppercase' as const,
+                  }}>{inv.status}</span>
+                </td>
+                <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
+                  <button
+                    onClick={() => handleDownload(inv.id)}
+                    style={{
+                      background: 'none', border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-tertiary)', padding: '4px 10px',
+                      fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                    }}
+                  >{downloading === inv.id ? '↓...' : '↓ PDF'}</button>
+                </td>
+              </tr>
             ))}
-          </div>
-          
-          <div className="flex items-start gap-2 text-caption text-muted-foreground mt-3 pt-2 border-t border-border">
-            <AlertCircle className="w-3 h-3 mt-0.5" />
-            <span>
-              Need help? Contact <strong>billing@truckwys.com</strong> or <strong>+27 11 123 4567</strong>
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

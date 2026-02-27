@@ -1,400 +1,236 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table";
-import { Users, Plus, Search, MoreVertical, Mail, Shield, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import useFetch from "@/hooks/useFetch";
-import { usePatch } from "@/hooks/usePatch";
-import { useDelete } from "@/hooks/useDelete";
-import { useQueryClient } from "@tanstack/react-query";
-import { InviteUserModal } from "@/components/settings/InviteUserModal";
-import { DeleteDialog } from "@/components/DeleteDialog";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
+import { fetchData } from "@/lib/Api";
+
+const sectionStyle: React.CSSProperties = {
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--card-radius)',
+  marginBottom: 16,
+};
+
+const sectionHeaderStyle: React.CSSProperties = {
+  padding: '14px 20px',
+  borderBottom: '1px solid var(--border-subtle)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--text-secondary)',
+  fontWeight: 600,
+};
+
+const ROLE_COLORS: Record<string, string> = {
+  admin: 'var(--status-danger)',
+  manager: 'var(--accent-primary)',
+  operator: 'var(--status-warning)',
+  viewer: 'var(--text-tertiary)',
+};
 
 interface User {
   id: number;
-  username: string;
-  email: string;
-  first_name: string;
-  last_name: string;
   name: string;
-  job_title: string;
+  email: string;
   role: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'PENDING';
-  phone: string;
-  address: string;
-  timezone: string;
-  language: string;
-  date_format: string;
-  avatar: string | null;
-  last_active: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  status: string;
+  last_active?: string;
 }
 
-interface PaginatedResponse<T> {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-}
-
-// Mock data removed as backend is now integrated
-
-const roleColors: Record<string, string> = {
-  ADMIN: "bg-destructive/10 text-destructive border-destructive/20",
-  MANAGER: "bg-warning/10 text-warning border-warning/20",
-  OPERATOR: "bg-primary/10 text-primary border-primary/20",
-  VIEWER: "bg-muted text-muted-foreground border-border",
-  DISPATCHER: "bg-info/10 text-info border-info/20"
-};
-
-const statusColors = {
-  ACTIVE: "bg-success/10 text-success border-success/20",
-  INACTIVE: "bg-muted text-muted-foreground border-border",
-  PENDING: "bg-warning/10 text-warning border-warning/20"
-};
+const MOCK_USERS: User[] = [
+  { id: 1, name: 'Admin User', email: 'admin@truckwys.co.za', role: 'admin', status: 'active', last_active: 'Now' },
+];
 
 export function UsersPermissions() {
-  const queryClient = useQueryClient();
-  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState<number | string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [users, setUsers] = useState<User[]>(MOCK_USERS);
+  const [search, setSearch] = useState('');
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('operator');
 
-  const { data: usersData, isLoading: isFetching } = useFetch<PaginatedResponse<User>>("api/users/");
-  const users = usersData?.results || [];
+  useEffect(() => {
+    fetchData('api/users/').then((d: any) => {
+      const arr = Array.isArray(d) ? d : (d?.results || []);
+      if (arr.length) setUsers(arr);
+    }).catch(() => {});
+  }, []);
 
-  const { mutate: updateUser } = usePatch({
-    onSuccess: () => {
-      toast.success("User updated successfully");
-      queryClient.invalidateQueries({ queryKey: ["api/users/"] });
-    },
-    onError: () => {
-      toast.error("Failed to update user");
-    },
-  });
-
-  const { mutate: deleteUser } = useDelete({
-    onSuccess: () => {
-      toast.success("User removed successfully");
-      queryClient.invalidateQueries({ queryKey: ["api/users/"] });
-      setIsDeleteDialogOpen(false);
-    },
-    onError: () => {
-      toast.error("Failed to remove user");
-    },
-  });
-
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filtered = users.filter(u =>
+    u.name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleUserAction = (action: string, userId: number | string) => {
-    switch (action) {
-      case 'deactivate':
-        updateUser({ url: `api/users/${userId}/`, data: { status: 'INACTIVE' } });
-        break;
-      case 'activate':
-        updateUser({ url: `api/users/${userId}/`, data: { status: 'ACTIVE' } });
-        break;
-      case 'remove':
-        setSelectedUserId(userId);
-        setIsDeleteDialogOpen(true);
-        break;
-      case 'resend_invitation':
-        // Assuming there's an endpoint for this
-        toast.info("Resending invitation...");
-        break;
-      default:
-        break;
-    }
-  };
-
-  const handleConfirmDelete = () => {
-    if (selectedUserId) {
-      deleteUser({ url: `api/users/${selectedUserId}/` });
-    }
-  };
+  const roleColor = (role: string) => ROLE_COLORS[role?.toLowerCase()] || 'var(--text-tertiary)';
 
   return (
-    <div className="space-y-4 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-heading text-foreground">Users & Permissions</h1>
-          <p className="text-caption text-muted-foreground">
-            Manage team members and their access levels
-          </p>
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Users & Permissions</div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Manage team access and roles</div>
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <span style={sectionTitleStyle}>👥 Team Members</span>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search users..."
+              style={{
+                background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
+                borderRadius: 2, padding: '6px 10px', color: 'var(--text-primary)',
+                fontSize: 12, outline: 'none', width: 180,
+              }}
+            />
+            <button className="btn-action" onClick={() => setShowInvite(!showInvite)}>+ INVITE</button>
+          </div>
         </div>
-        <Button onClick={() => setIsInviteModalOpen(true)} size="sm" className="gap-2">
-          <Plus className="w-4 h-4" />
-          Invite User
-        </Button>
+
+        {/* Invite form */}
+        {showInvite && (
+          <div style={{
+            padding: '16px 20px',
+            borderBottom: '1px solid var(--border-subtle)',
+            background: 'var(--bg-surface-hover)',
+            display: 'flex', gap: 12, alignItems: 'flex-end',
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
+                letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: 6,
+              }}>Email</div>
+              <input
+                style={{
+                  width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
+                  borderRadius: 2, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13, outline: 'none',
+                }}
+                type="email"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                placeholder="user@company.co.za"
+              />
+            </div>
+            <div>
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
+                letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: 6,
+              }}>Role</div>
+              <select style={{
+                background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
+                borderRadius: 2, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 12,
+                outline: 'none', cursor: 'pointer',
+              }}
+                value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+                <option value="operator">Operator</option>
+                <option value="viewer">Viewer</option>
+              </select>
+            </div>
+            <button className="btn-action" onClick={() => { setShowInvite(false); setInviteEmail(''); }}>
+              SEND INVITE
+            </button>
+          </div>
+        )}
+
+        {/* Table */}
+        <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+          <thead>
+            <tr>
+              {['User', 'Role', 'Status', 'Last Active', ''].map(h => (
+                <th key={h} style={{
+                  padding: '10px 20px', textAlign: 'left' as const,
+                  fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
+                  letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                  borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan={5} style={{ textAlign: 'center' as const, padding: 32, color: 'var(--text-tertiary)', fontSize: 13 }}>No users found</td></tr>
+            ) : filtered.map(u => (
+              <tr key={u.id} style={{ borderBottom: '1px solid var(--border-row)' }}>
+                <td style={{ padding: '12px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{
+                      width: 30, height: 30, borderRadius: '50%',
+                      background: 'var(--accent-dim)', display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 11,
+                      color: 'var(--accent-primary)', flexShrink: 0,
+                    }}>
+                      {u.name?.charAt(0).toUpperCase() || '?'}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{u.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{u.email}</div>
+                    </div>
+                  </div>
+                </td>
+                <td style={{ padding: '12px 20px' }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 7px',
+                    border: `1px solid ${roleColor(u.role)}`,
+                    color: roleColor(u.role), borderRadius: 2,
+                    textTransform: 'uppercase' as const, letterSpacing: '0.06em',
+                  }}>{u.role}</span>
+                </td>
+                <td style={{ padding: '12px 20px' }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 10,
+                    color: u.status === 'active' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                    textTransform: 'uppercase' as const,
+                  }}>{u.status}</span>
+                </td>
+                <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-tertiary)' }}>
+                  {u.last_active || '—'}
+                </td>
+                <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
+                  <button style={{
+                    background: 'none', border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-tertiary)', padding: '4px 8px',
+                    fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                  }}>···</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {/* Stats Cards & Table Combined */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Stats Cards */}
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Users className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-body-medium text-foreground text-tabular">{users?.length || 0}</p>
-                <p className="text-caption text-muted-foreground">Total Users</p>
-              </div>
+      {/* Roles Reference */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <span style={sectionTitleStyle}>🔒 Role Permissions</span>
+        </div>
+        <div style={{ padding: '8px 0 4px' }}>
+          {[
+            { role: 'Admin', color: ROLE_COLORS.admin, desc: 'Full platform access including billing and user management' },
+            { role: 'Manager', color: ROLE_COLORS.manager, desc: 'View and manage quotes, bookings, invoices, and fleet' },
+            { role: 'Operator', color: ROLE_COLORS.operator, desc: 'Create quotes and update bookings; no billing or admin access' },
+            { role: 'Viewer', color: ROLE_COLORS.viewer, desc: 'Read-only access to all modules' },
+          ].map((r, i, arr) => (
+            <div key={r.role} style={{
+              display: 'flex', alignItems: 'center', gap: 16,
+              padding: '12px 20px',
+              borderBottom: i < arr.length - 1 ? '1px solid var(--border-row)' : 'none',
+            }}>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 8px',
+                border: `1px solid ${r.color}`, color: r.color,
+                borderRadius: 2, textTransform: 'uppercase' as const, width: 80, textAlign: 'center' as const,
+              }}>{r.role}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.desc}</span>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center">
-                <Shield className="w-4 h-4 text-success" />
-              </div>
-              <div>
-                <p className="text-body-medium text-foreground text-tabular">{users?.filter(u => u.status === 'ACTIVE').length || 0}</p>
-                <p className="text-caption text-muted-foreground">Active</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-warning/10 rounded-lg flex items-center justify-center">
-                <Mail className="w-4 h-4 text-warning" />
-              </div>
-              <div>
-                <p className="text-body-medium text-foreground text-tabular">{users?.filter(u => u.status === 'PENDING').length || 0}</p>
-                <p className="text-caption text-muted-foreground">Pending</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-destructive/10 rounded-lg flex items-center justify-center">
-                <Shield className="w-4 h-4 text-destructive" />
-              </div>
-              <div>
-                <p className="text-body-medium text-foreground text-tabular">{users?.filter(u => u.role?.toLowerCase() === 'admin').length || 0}</p>
-                <p className="text-caption text-muted-foreground">Admins</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          ))}
+        </div>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Users Table */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-body-medium">Team Members</CardTitle>
-              <div className="relative w-64">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                <Input
-                  placeholder="Search users..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-7 h-8 text-caption"
-                />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-caption">User</TableHead>
-                  <TableHead className="text-caption">Role</TableHead>
-                  <TableHead className="text-caption">Status</TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isFetching ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center">
-                      <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Loading users...
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : filteredUsers.length > 0 ? (
-                  filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar className="w-6 h-6">
-                            <AvatarImage src={user.avatar} />
-                            <AvatarFallback className="text-xs">
-                              {user.name.split(' ').map(n => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-body">{user.name}</p>
-                            <p className="text-caption text-muted-foreground">{user.email}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={roleColors[user.role?.toUpperCase()] || roleColors.VIEWER}
-                        >
-                          {user.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={statusColors[user.status]}
-                        >
-                          {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6">
-                              <MoreVertical className="h-3 w-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-background border-border">
-                            <DropdownMenuItem onClick={() => handleUserAction('edit', user.id)}>
-                              Edit User
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleUserAction('permissions', user.id)}>
-                              Change Permissions
-                            </DropdownMenuItem>
-                            {user.status === 'ACTIVE' ? (
-                              <DropdownMenuItem onClick={() => handleUserAction('deactivate', user.id)}>
-                                Deactivate
-                              </DropdownMenuItem>
-                            ) : user.status === 'INACTIVE' ? (
-                              <DropdownMenuItem onClick={() => handleUserAction('activate', user.id)}>
-                                Activate
-                              </DropdownMenuItem>
-                            ) : null}
-                            {user.status === 'PENDING' && (
-                              <DropdownMenuItem onClick={() => handleUserAction('resend_invitation', user.id)}>
-                                Resend Invitation
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleUserAction('remove', user.id)}
-                            >
-                              Remove User
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                      No users found.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Role Permissions */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-body-medium">Role Permissions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Badge variant="outline" className={roleColors.admin}>Admin</Badge>
-              <ul className="text-caption space-y-0.5 text-muted-foreground">
-                <li>• Full system access</li>
-                <li>• User management</li>
-                <li>• Billing & settings</li>
-                <li>• All integrations</li>
-              </ul>
-            </div>
-
-            <div className="space-y-2">
-              <Badge variant="outline" className={roleColors.manager}>Manager</Badge>
-              <ul className="text-caption space-y-0.5 text-muted-foreground">
-                <li>• Quote management</li>
-                <li>• Fleet operations</li>
-                <li>• Financial reports</li>
-                <li>• Team oversight</li>
-              </ul>
-            </div>
-
-            <div className="space-y-2">
-              <Badge variant="outline" className={roleColors.operator}>Operator</Badge>
-              <ul className="text-caption space-y-0.5 text-muted-foreground">
-                <li>• Create & edit quotes</li>
-                <li>• Manage bookings</li>
-                <li>• Update deliveries</li>
-                <li>• Basic reporting</li>
-              </ul>
-            </div>
-
-            <div className="space-y-2">
-              <Badge variant="outline" className={roleColors.viewer}>Viewer</Badge>
-              <ul className="text-caption space-y-0.5 text-muted-foreground">
-                <li>• View-only access</li>
-                <li>• Basic reports</li>
-                <li>• Dashboard access</li>
-                <li>• No edit permissions</li>
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <InviteUserModal
-        isOpen={isInviteModalOpen}
-        onClose={() => setIsInviteModalOpen(false)}
-      />
-
-      <DeleteDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        onConfirm={handleConfirmDelete}
-        title="Remove User"
-        description="Are you sure you want to remove this user? This action cannot be undone."
-      />
     </div>
   );
 }

@@ -241,36 +241,49 @@ export default function Vehicles() {
           </div>
 
           {/* Table */}
-          <div className="card" style={{ padding: 0 }}>
-            <table className="data-table">
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th>Registration</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th className="text-right">Revenue MTD</th>
-                  <th className="text-right">Trips MTD</th>
-                  <th className="text-right">Efficiency</th>
+                  {['Registration', 'Make / Model', 'Type', 'Status', 'Revenue MTD', 'Trips MTD', 'Efficiency'].map(h => (
+                    <th key={h} style={{
+                      padding: '10px 20px', textAlign: 'left',
+                      fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
+                      letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                      borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                    }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {sorted.length === 0 ? (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles found</td></tr>
-                ) : sorted.map(v => (
-                  <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/vehicles/${v.id}`)}>
-                    <td className="mono" style={{ fontWeight: 500 }}>{v.plate || v.registration || '—'}</td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles found</td></tr>
+                ) : sorted.map((v, idx) => (
+                  <tr
+                    key={v.id}
+                    style={{ cursor: 'pointer', borderBottom: idx < sorted.length - 1 ? '1px solid var(--border-row)' : 'none' }}
+                    onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
+                      {v.plate || v.registration || '—'}
+                    </td>
+                    <td style={{ padding: '13px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      {[v.make, v.model].filter(Boolean).join(' ') || '—'}
+                    </td>
+                    <td style={{ padding: '13px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
                       {v.vehicle_type_name || v.vehicle_type || '—'}
                     </td>
-                    <td>{getStatusBadge(v.status)}</td>
-                    <td className="text-right mono" style={{ fontSize: 12 }}>
+                    <td style={{ padding: '13px 20px' }}>{getStatusBadge(v.status)}</td>
+                    <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
                       {v.revenue_this_month ? formatZAR(v.revenue_this_month) : '—'}
                     </td>
-                    <td className="text-right mono" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                      {v.trips_this_month || 0}
+                    <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                      {v.trips_this_month ?? 0}
                     </td>
-                    <td className="text-right mono" style={{ fontSize: 12 }}>
-                      {v.fuel_efficiency ? `${v.fuel_efficiency.toFixed(1)} L/100km` : '—'}
+                    <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                      {v.fuel_efficiency ? `${parseFloat(v.fuel_efficiency as any).toFixed(1)} L/100km` : '—'}
                     </td>
                   </tr>
                 ))}

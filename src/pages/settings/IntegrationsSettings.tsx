@@ -1,15 +1,21 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { Zap, CheckCircle, AlertCircle, Settings, ExternalLink, ArrowRight } from "lucide-react";
-import { toast } from "sonner";
+
+const sectionStyle: React.CSSProperties = {
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--card-radius)',
+  marginBottom: 16,
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--text-secondary)',
+  fontWeight: 600,
+};
 
 interface Integration {
   id: string;
@@ -18,436 +24,113 @@ interface Integration {
   category: string;
   status: 'connected' | 'disconnected' | 'error';
   logo: string;
-  lastSync?: string;
-  enabled: boolean;
+  xeroRoute?: boolean;
 }
 
-const integrations: Integration[] = [
-  {
-    id: 'xero',
-    name: 'Xero',
-    description: 'Sync invoices and financial data with your accounting system',
-    category: 'Accounting',
-    status: 'connected',
-    logo: '💼',
-    lastSync: '2 hours ago',
-    enabled: true
-  },
-  {
-    id: 'sap',
-    name: 'SAP',
-    description: 'Enterprise resource planning integration',
-    category: 'ERP',
-    status: 'connected',
-    logo: '🏢',
-    lastSync: '1 day ago',
-    enabled: true
-  },
-  {
-    id: 'quickbooks',
-    name: 'QuickBooks',
-    description: 'Alternative accounting software integration',
-    category: 'Accounting',
-    status: 'disconnected',
-    logo: '📊',
-    enabled: false
-  },
-  {
-    id: 'sage',
-    name: 'Sage',
-    description: 'Business management software integration',
-    category: 'ERP',
-    status: 'error',
-    logo: '🌿',
-    lastSync: 'Failed',
-    enabled: false
-  },
-  {
-    id: 'fleet-complete',
-    name: 'Fleet Complete',
-    description: 'Fleet tracking and telematics data',
-    category: 'Telematics',
-    status: 'connected',
-    logo: '📍',
-    lastSync: '15 minutes ago',
-    enabled: true
-  },
-  {
-    id: 'mixtelematics',
-    name: 'MiX Telematics',
-    description: 'Advanced fleet management and driver behavior',
-    category: 'Telematics',
-    status: 'disconnected',
-    logo: '🚛',
-    enabled: false
-  }
+const INTEGRATIONS: Integration[] = [
+  { id: 'xero', name: 'Xero', description: 'Sync invoices and payments with Xero accounting', category: 'Accounting', status: 'disconnected', logo: 'XR', xeroRoute: true },
+  { id: 'stripe', name: 'Stripe', description: 'Accept online payments from customers', category: 'Payments', status: 'disconnected', logo: 'ST' },
+  { id: 'tomtom', name: 'TomTom', description: 'Route optimisation and distance calculations', category: 'Maps', status: 'connected', logo: 'TT' },
+  { id: 'sap', name: 'SAP', description: 'Enterprise resource planning integration', category: 'ERP', status: 'disconnected', logo: 'SA' },
+  { id: 'slack', name: 'Slack', description: 'Team notifications and alerts via Slack', category: 'Notifications', status: 'disconnected', logo: 'SL' },
+  { id: 'whatsapp', name: 'WhatsApp Business', description: 'Customer communication via WhatsApp', category: 'Communication', status: 'disconnected', logo: 'WA' },
 ];
+
+const STATUS_COLOR: Record<string, string> = {
+  connected: 'var(--accent-primary)',
+  disconnected: 'var(--text-tertiary)',
+  error: 'var(--status-danger)',
+};
+
+const STATUS_BG: Record<string, string> = {
+  connected: 'var(--status-success-bg)',
+  disconnected: 'var(--bg-surface-hover)',
+  error: 'var(--status-danger-bg)',
+};
 
 export function IntegrationsSettings() {
   const navigate = useNavigate();
-  const [integrationsList, setIntegrationsList] = useState(integrations);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [integrations, setIntegrations] = useState(INTEGRATIONS);
+  const [connecting, setConnecting] = useState<string | null>(null);
 
-  const categories = ['all', ...Array.from(new Set(integrations.map(i => i.category)))];
-
-  const filteredIntegrations = selectedCategory === 'all'
-    ? integrationsList
-    : integrationsList.filter(i => i.category === selectedCategory);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'connected':
-        return 'bg-success/10 text-success border-success/20';
-      case 'error':
-        return 'bg-destructive/10 text-destructive border-destructive/20';
-      default:
-        return 'bg-muted text-muted-foreground border-border';
-    }
+  const handleConnect = (id: string) => {
+    const intg = integrations.find(i => i.id === id);
+    if (intg?.xeroRoute) { navigate('/settings/xero'); return; }
+    setConnecting(id);
+    setTimeout(() => {
+      setIntegrations(prev => prev.map(i =>
+        i.id === id ? { ...i, status: i.status === 'connected' ? 'disconnected' : 'connected' } : i
+      ));
+      setConnecting(null);
+    }, 800);
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'connected':
-        return <CheckCircle className="w-4 h-4" />;
-      case 'error':
-        return <AlertCircle className="w-4 h-4" />;
-      default:
-        return null;
-    }
-  };
-
-  const handleConnect = (integrationId: string) => {
-    setIntegrationsList(prev => 
-      prev.map(integration => 
-        integration.id === integrationId 
-          ? { ...integration, status: 'connected' as const, enabled: true, lastSync: 'Just now' }
-          : integration
-      )
-    );
-    toast.success("Integration connected successfully");
-  };
-
-  const handleDisconnect = (integrationId: string) => {
-    setIntegrationsList(prev => 
-      prev.map(integration => 
-        integration.id === integrationId 
-          ? { ...integration, status: 'disconnected' as const, enabled: false, lastSync: undefined }
-          : integration
-      )
-    );
-    toast.success("Integration disconnected");
-  };
-
-  const handleToggle = (integrationId: string) => {
-    const integration = integrationsList.find(i => i.id === integrationId);
-    if (integration?.status === 'connected') {
-      setIntegrationsList(prev => 
-        prev.map(i => 
-          i.id === integrationId 
-            ? { ...i, enabled: !i.enabled }
-            : i
-        )
-      );
-      toast.success(integration.enabled ? "Integration paused" : "Integration resumed");
-    }
-  };
+  const categories = [...new Set(INTEGRATIONS.map(i => i.category))];
 
   return (
-    <div className="space-y-4 max-w-6xl">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-heading text-foreground">Integrations</h1>
-          <p className="text-caption text-muted-foreground">
-            Connect Truckwys with your existing tools and systems
-          </p>
-        </div>
-        
-        {/* Category Filter */}
-        <div className="flex gap-2">
-          {categories.slice(0, 4).map((category) => (
-            <Button
-              key={category}
-              variant={selectedCategory === category ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedCategory(category)}
-            >
-              {category === 'all' ? 'All' : category}
-            </Button>
-          ))}
-        </div>
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Integrations</div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Connect Truckwys to your existing tools and services</div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Zap className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-body-medium text-foreground text-tabular">
-                  {integrationsList.filter(i => i.status === 'connected').length}
-                </p>
-                <p className="text-caption text-muted-foreground">Active</p>
-              </div>
+      {categories.map(cat => {
+        const items = integrations.filter(i => i.category === cat);
+        return (
+          <div key={cat} style={sectionStyle}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+              <span style={sectionTitleStyle}>{cat}</span>
             </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center">
-                <CheckCircle className="w-4 h-4 text-success" />
-              </div>
-              <div>
-                <p className="text-body-medium text-foreground text-tabular">
-                  {integrationsList.filter(i => i.enabled).length}
-                </p>
-                <p className="text-caption text-muted-foreground">Enabled</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-destructive/10 rounded-lg flex items-center justify-center">
-                <AlertCircle className="w-4 h-4 text-destructive" />
-              </div>
-              <div>
-                <p className="text-body-medium text-foreground text-tabular">
-                  {integrationsList.filter(i => i.status === 'error').length}
-                </p>
-                <p className="text-caption text-muted-foreground">Issues</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* API Keys Card */}
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-warning/10 rounded-lg flex items-center justify-center">
-                <Settings className="w-4 h-4 text-warning" />
-              </div>
-              <div>
-                <p className="text-body-medium text-foreground">API Keys</p>
-                <p className="text-caption text-muted-foreground">Manage</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Featured Integration Cards - Xero and Fleet Import */}
-      <div>
-        <h3 className="text-base font-semibold text-foreground mb-3">
-          Featured Integrations
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Xero Integration */}
-          <Card className="border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center text-2xl">
-                    💼
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">Xero Accounting</CardTitle>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Sync invoices and payments
-                    </p>
-                  </div>
+            {items.map((intg, idx) => (
+              <div key={intg.id} style={{
+                display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px',
+                borderBottom: idx < items.length - 1 ? '1px solid var(--border-row)' : 'none',
+              }}>
+                {/* Logo */}
+                <div style={{
+                  width: 40, height: 40, borderRadius: 2,
+                  background: 'var(--bg-surface-hover)',
+                  border: '1px solid var(--border-subtle)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)',
+                  flexShrink: 0, fontWeight: 600,
+                }}>
+                  {intg.logo}
                 </div>
+
+                {/* Info */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{intg.name}</span>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 6px',
+                      background: STATUS_BG[intg.status], color: STATUS_COLOR[intg.status],
+                      borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
+                    }}>{intg.status}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{intg.description}</div>
+                </div>
+
+                {/* Action */}
+                <button
+                  onClick={() => handleConnect(intg.id)}
+                  disabled={connecting === intg.id}
+                  style={{
+                    background: intg.status === 'connected' ? 'none' : 'var(--accent-primary)',
+                    border: intg.status === 'connected' ? '1px solid var(--border-subtle)' : 'none',
+                    color: intg.status === 'connected' ? 'var(--text-secondary)' : 'var(--btn-action-color)',
+                    padding: '6px 14px', fontFamily: 'var(--font-mono)', fontSize: 10,
+                    borderRadius: 2, cursor: 'pointer', letterSpacing: '0.05em',
+                    opacity: connecting === intg.id ? 0.6 : 1,
+                  }}
+                >
+                  {connecting === intg.id ? '...' : intg.status === 'connected' ? 'DISCONNECT' : 'CONNECT'}
+                </button>
               </div>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Connect your Xero account to automatically sync invoices and payments between TruckWys and Xero.
-              </p>
-              <Button
-                onClick={() => navigate("/settings/integrations/xero")}
-                className="w-full"
-              >
-                Manage Xero Integration
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Fleet Import */}
-          <Card className="border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-warning/20 rounded-lg flex items-center justify-center text-2xl">
-                    🚛
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">Fleet Data Import</CardTitle>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Import trip data from CSV/Excel
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Upload CSV or Excel files to bulk import trip data, fuel usage, and other fleet information.
-              </p>
-              <Button
-                onClick={() => navigate("/settings/integrations/fleet")}
-                className="w-full"
-              >
-                Import Fleet Data
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Integrations Grid */}
-      <div>
-        <h3 className="text-base font-semibold text-foreground mb-3">
-          All Integrations
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredIntegrations.slice(0, 6).map((integration) => (
-            <Card key={integration.id} className="relative">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="text-lg">{integration.logo}</div>
-                    <div>
-                      <CardTitle className="text-body-medium">{integration.name}</CardTitle>
-                      <Badge variant="outline" className="mt-1 text-xs">
-                        {integration.category}
-                      </Badge>
-                    </div>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={getStatusColor(integration.status)}
-                  >
-                    {getStatusIcon(integration.status)}
-                    {integration.status.charAt(0).toUpperCase() + integration.status.slice(1)}
-                  </Badge>
-                </div>
-              </CardHeader>
-
-              <CardContent className="pt-0 space-y-3">
-                <p className="text-caption text-muted-foreground">
-                  {integration.description}
-                </p>
-
-                {integration.status === 'connected' && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-caption">Enable Integration</span>
-                      <Switch
-                        checked={integration.enabled}
-                        onCheckedChange={() => handleToggle(integration.id)}
-                      />
-                    </div>
-
-                    {integration.lastSync && (
-                      <div className="text-caption text-muted-foreground">
-                        Last sync: {integration.lastSync}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center pt-2 border-t border-border">
-                  <div className="flex gap-1">
-                    {integration.status === 'connected' ? (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1 h-7 px-2"
-                          onClick={() => {
-                            if (integration.id === 'xero') {
-                              navigate("/settings/integrations/xero");
-                            }
-                          }}
-                        >
-                          <Settings className="w-3 h-3" />
-                          Config
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDisconnect(integration.id)}
-                          className="h-7 px-2"
-                        >
-                          Disconnect
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          if (integration.id === 'xero') {
-                            navigate("/settings/integrations/xero");
-                          } else {
-                            handleConnect(integration.id);
-                          }
-                        }}
-                        className="h-7 px-3"
-                      >
-                        Connect
-                      </Button>
-                    )}
-                  </div>
-
-                  <Button variant="ghost" size="sm" className="gap-1 h-7 px-2">
-                    <ExternalLink className="w-3 h-3" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* API Keys Section */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-body-medium">API Keys</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-3">
-          <div className="space-y-1">
-            <Label htmlFor="apiKey" className="text-caption">Production API Key</Label>
-            <div className="flex gap-2">
-              <Input 
-                id="apiKey"
-                value="tw_live_********************************"
-                readOnly
-                className="font-mono text-caption"
-              />
-              <Button variant="outline" size="sm">Copy</Button>
-              <Button variant="outline" size="sm">Regenerate</Button>
-            </div>
+            ))}
           </div>
-          
-          <div className="bg-muted/20 p-3 rounded-lg">
-            <p className="text-caption text-foreground mb-1">⚠️ Security Notice</p>
-            <p className="text-caption text-muted-foreground">
-              Keep your API keys secure and never share them publicly. 
-              Regenerate keys if you suspect they have been compromised.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+        );
+      })}
     </div>
   );
 }

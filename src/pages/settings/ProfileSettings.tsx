@@ -1,237 +1,225 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { User, Camera, Save } from "lucide-react";
-import { toast } from "sonner";
-import useFetch from "@/hooks/useFetch";
-import { usePatch } from "@/hooks/usePatch";
-import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { fetchData, patchData } from "@/lib/Api";
+
+const sectionStyle: React.CSSProperties = {
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--card-radius)',
+  marginBottom: 16,
+};
+
+const sectionHeaderStyle: React.CSSProperties = {
+  padding: '16px 20px 12px',
+  borderBottom: '1px solid var(--border-subtle)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--text-secondary)',
+  fontWeight: 600,
+};
+
+const sectionBodyStyle: React.CSSProperties = {
+  padding: '20px',
+};
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  fontFamily: 'var(--font-mono)',
+  fontSize: 10,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--text-tertiary)',
+  marginBottom: 6,
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: 'var(--input-bg)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 2,
+  padding: '8px 12px',
+  color: 'var(--text-primary)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 13,
+  outline: 'none',
+  transition: 'border-color 0.15s',
+};
+
+const selectStyle: React.CSSProperties = {
+  ...inputStyle,
+  cursor: 'pointer',
+  appearance: 'auto' as const,
+};
+
+const gridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 16,
+};
 
 export function ProfileSettings() {
-  const queryClient = useQueryClient();
-  const { data: profileData, isLoading: isFetching } = useFetch("api/auth/me/");
-
-  const [formData, setFormData] = useState({
-    first_name: "",
-    last_name: "",
-    email: "",
-    job_title: "",
-    phone: "",
-    timezone: "Africa/Johannesburg",
-    language: "en",
-    date_format: "DD/MM/YYYY"
+  const [form, setForm] = useState({
+    first_name: '', last_name: '', email: '',
+    job_title: '', phone: '',
+    timezone: 'Africa/Johannesburg',
+    language: 'en',
+    date_format: 'DD/MM/YYYY',
   });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (profileData) {
-      setFormData({
-        first_name: profileData.first_name || "",
-        last_name: profileData.last_name || "",
-        email: profileData.email || "",
-        job_title: profileData.job_title || "",
-        phone: profileData.phone || "",
-        timezone: profileData.timezone || "Africa/Johannesburg",
-        language: profileData.language || "en",
-        date_format: profileData.date_format || "DD/MM/YYYY"
+    fetchData('api/auth/me/').then((d: any) => {
+      if (d) setForm({
+        first_name: d.first_name || '',
+        last_name: d.last_name || '',
+        email: d.email || '',
+        job_title: d.job_title || '',
+        phone: d.phone || '',
+        timezone: d.timezone || 'Africa/Johannesburg',
+        language: d.language || 'en',
+        date_format: d.date_format || 'DD/MM/YYYY',
       });
-    }
-  }, [profileData]);
+    }).catch(() => {});
+  }, []);
 
-  const { mutate: updateProfile, isPending: isUpdating } = usePatch({
-    onSuccess: (data) => {
-      toast.success("Profile updated successfully");
-      queryClient.invalidateQueries({ queryKey: ["api/auth/me/"] });
-      // Update local storage for sidebar
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        localStorage.setItem("user", JSON.stringify({ ...user, ...data }));
-        // Trigger a storage event or just rely on the next page load/state update
-        window.dispatchEvent(new Event('storage'));
-      }
-    },
-    onError: () => {
-      toast.error("Failed to update profile");
-    },
-  });
+  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
-  const handleSave = () => {
-    updateProfile({ url: "api/auth/me/", data: formData });
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await patchData({ url: 'api/auth/me/', data: form });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {}
+    setSaving(false);
   };
-
-  const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  if (isFetching) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Loading profile...</p>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-4 max-w-5xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-heading text-foreground">Profile Settings</h1>
-        <p className="text-caption text-muted-foreground">
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
+          Profile Settings
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
           Manage your personal information and account preferences
-        </p>
+        </div>
       </div>
 
       {/* Profile Picture */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-body-medium">
-            <User className="w-4 h-4" />
-            Profile Picture
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex items-center gap-4">
-            <Avatar className="w-16 h-16">
-              <AvatarImage src="/placeholder-avatar.jpg" />
-              <AvatarFallback className="text-body-medium bg-primary/10 text-primary">
-                {formData.first_name?.[0] || ""}{formData.last_name?.[0] || ""}
-              </AvatarFallback>
-            </Avatar>
-            <div className="space-y-1">
-              <Button variant="outline" size="sm" className="gap-2">
-                <Camera className="w-4 h-4" />
-                Change Picture
-              </Button>
-              <p className="text-caption text-muted-foreground">
-                JPG, GIF or PNG. Max size 2MB.
-              </p>
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <span style={sectionTitleStyle}>Profile Picture</span>
+        </div>
+        <div style={{ ...sectionBodyStyle, display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: '50%',
+            background: 'var(--accent-dim)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 600,
+            color: 'var(--accent-primary)', flexShrink: 0,
+          }}>
+            {(form.first_name[0] || '') + (form.last_name[0] || '') || 'AU'}
+          </div>
+          <div>
+            <button style={{
+              background: 'none', border: '1px solid var(--border-subtle)',
+              color: 'var(--text-secondary)', padding: '6px 12px',
+              fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
+              cursor: 'pointer', letterSpacing: '0.05em',
+            }}>CHANGE PICTURE</button>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
+              JPG, GIF or PNG. Max size 2MB.
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Personal Information */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-body-medium">Personal Information</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="first_name" className="text-caption">First Name</Label>
-              <Input
-                id="first_name"
-                value={formData.first_name}
-                onChange={(e) => handleChange('first_name', e.target.value)}
-              />
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <span style={sectionTitleStyle}>Personal Information</span>
+        </div>
+        <div style={sectionBodyStyle}>
+          <div style={{ ...gridStyle, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>First Name</label>
+              <input style={inputStyle} value={form.first_name} onChange={e => set('first_name', e.target.value)} />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="last_name" className="text-caption">Last Name</Label>
-              <Input
-                id="last_name"
-                value={formData.last_name}
-                onChange={(e) => handleChange('last_name', e.target.value)}
-              />
+            <div>
+              <label style={labelStyle}>Last Name</label>
+              <input style={inputStyle} value={form.last_name} onChange={e => set('last_name', e.target.value)} />
             </div>
           </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="email" className="text-caption">Email Address</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleChange('email', e.target.value)}
-            />
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Email Address</label>
+            <input style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="job_title" className="text-caption">Job Title</Label>
-              <Input
-                id="job_title"
-                value={formData.job_title}
-                onChange={(e) => handleChange('job_title', e.target.value)}
-              />
+          <div style={gridStyle}>
+            <div>
+              <label style={labelStyle}>Job Title</label>
+              <input style={inputStyle} value={form.job_title} onChange={e => set('job_title', e.target.value)} />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="phone" className="text-caption">Phone Number</Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => handleChange('phone', e.target.value)}
-              />
+            <div>
+              <label style={labelStyle}>Phone Number</label>
+              <input style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Preferences */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-body-medium">Preferences</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="timezone" className="text-caption">Timezone</Label>
-              <Select value={formData.timezone} onValueChange={(value) => handleChange('timezone', value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-background border-border">
-                  <SelectItem value="Africa/Johannesburg">South Africa (UTC+2)</SelectItem>
-                  <SelectItem value="UTC">UTC</SelectItem>
-                  <SelectItem value="Europe/London">London (UTC+0)</SelectItem>
-                  <SelectItem value="America/New_York">New York (UTC-5)</SelectItem>
-                </SelectContent>
-              </Select>
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <span style={sectionTitleStyle}>Preferences</span>
+        </div>
+        <div style={sectionBodyStyle}>
+          <div style={{ ...gridStyle, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>Timezone</label>
+              <select style={selectStyle} value={form.timezone} onChange={e => set('timezone', e.target.value)}>
+                <option value="Africa/Johannesburg">South Africa (UTC+2)</option>
+                <option value="UTC">UTC</option>
+                <option value="Europe/London">London (UTC+0)</option>
+                <option value="America/New_York">New York (UTC-5)</option>
+              </select>
             </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="language" className="text-caption">Language</Label>
-              <Select value={formData.language} onValueChange={(value) => handleChange('language', value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-background border-border">
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="af">Afrikaans</SelectItem>
-                  <SelectItem value="zu">Zulu</SelectItem>
-                </SelectContent>
-              </Select>
+            <div>
+              <label style={labelStyle}>Language</label>
+              <select style={selectStyle} value={form.language} onChange={e => set('language', e.target.value)}>
+                <option value="en">English</option>
+                <option value="af">Afrikaans</option>
+                <option value="zu">Zulu</option>
+              </select>
             </div>
           </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="date_format" className="text-caption">Date Format</Label>
-            <Select value={formData.date_format} onValueChange={(value) => handleChange('date_format', value)}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-background border-border">
-                <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
-                <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
-                <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
-              </SelectContent>
-            </Select>
+          <div style={{ marginBottom: 20, maxWidth: 240 }}>
+            <label style={labelStyle}>Date Format</label>
+            <select style={selectStyle} value={form.date_format} onChange={e => set('date_format', e.target.value)}>
+              <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+              <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+            </select>
           </div>
-
-          <div className="flex justify-end pt-2">
-            <Button onClick={handleSave} disabled={isUpdating} size="sm" className="gap-2">
-              <Save className="w-4 h-4" />
-              {isUpdating ? "Saving..." : "Save Changes"}
-            </Button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              className="btn-action"
+              onClick={handleSave}
+              disabled={saving}
+              style={{ opacity: saving ? 0.6 : 1 }}
+            >
+              {saved ? '✓ SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
+            </button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

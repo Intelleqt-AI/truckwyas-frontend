@@ -6,8 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { OSLayout } from "./components/os/OSLayout";
-import { loginUser } from "./lib/Api";
-
 // Pages
 import Overview from "./pages/Overview";
 import { QuotesList } from "./pages/QuotesList";
@@ -37,28 +35,11 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1, throwOnError: false, refetchOnWindowFocus: false },
+    queries: { retry: 2, throwOnError: false, refetchOnWindowFocus: false, staleTime: 0 },
   },
 });
 
-const App = () => {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    // Always get a fresh token on startup — don't trust stale localStorage
-    loginUser({ username: 'admin', password: 'admin123' })
-      .then(data => {
-        if (data?.token) localStorage.setItem('access', data.token);
-      })
-      .catch(() => {
-        // Login failed — still render, pages will show their own errors
-      })
-      .finally(() => setReady(true));
-  }, []);
-
-  if (!ready) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0e1a', color: '#4B6CB7', fontFamily: 'monospace', fontSize: 13, letterSpacing: '0.1em' }}>CONNECTING...</div>;
-
-  return (
+const App = () => (
   <BrowserRouter>
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
@@ -104,7 +85,6 @@ const App = () => {
       </ErrorBoundary>
     </QueryClientProvider>
   </BrowserRouter>
-  );
-};
+);
 
 export default App;

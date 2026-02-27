@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "@/lib/formatters";
-import { fetchData } from "@/lib/Api";
+import { fetchData, postData } from "@/lib/Api";
 
 const TIER_COLOR: Record<string, string> = {
   prime: 'var(--accent-primary)', standard: 'var(--status-success)',
@@ -19,6 +19,77 @@ export default function Capital() {
   const [facility, setFacility] = useState<any>(null);
   const [advances, setAdvances] = useState<any[]>([]);
   const [eligibleInvoices, setEligibleInvoices] = useState<any[]>([]);
+  const [requestingIds, setRequestingIds] = useState<Set<number>>(new Set());
+  const [settlingIds, setSettlingIds] = useState<Set<number>>(new Set());
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const handleRequestAdvance = async (invoice: any) => {
+    setRequestingIds(prev => new Set(prev).add(invoice.id));
+    setSuccessMessage(null);
+
+    try {
+      const amount = invoice.total_amount || invoice.amount || 0;
+      await postData({
+        url: '/api/v1/advances/',
+        data: {
+          invoice: invoice.id,
+          amount: amount,
+        }
+      });
+
+      setSuccessMessage(`Advance request submitted for ${invoice.invoice_number}`);
+      // Reload data
+      const advancesData = await fetchData('api/v1/advances/');
+      const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
+      const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
+      setAdvances(active);
+
+      const eligibleData = await fetchData('api/v1/capital/eligible/');
+      const eligible = eligibleData?.invoices || [];
+      setEligibleInvoices(eligible);
+
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('Failed to request advance:', err);
+      alert('Failed to request advance. Please try again.');
+    } finally {
+      setRequestingIds(prev => {
+        const next = new Set(prev);
+        next.delete(invoice.id);
+        return next;
+      });
+    }
+  };
+
+  const handleSettleAdvance = async (advance: any) => {
+    setSettlingIds(prev => new Set(prev).add(advance.id));
+    setSuccessMessage(null);
+
+    try {
+      await postData({
+        url: `/api/v1/advances/${advance.id}/settle/`,
+        data: {}
+      });
+
+      setSuccessMessage(`Advance ${advance.invoice_number} settled successfully`);
+      // Reload data
+      const advancesData = await fetchData('api/v1/advances/');
+      const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
+      const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
+      setAdvances(active);
+
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('Failed to settle advance:', err);
+      alert('Failed to settle advance. Please try again.');
+    } finally {
+      setSettlingIds(prev => {
+        const next = new Set(prev);
+        next.delete(advance.id);
+        return next;
+      });
+    }
+  };
 
   const eligibleTotal = eligibleInvoices.reduce((sum, inv) => sum + (inv.total_amount || inv.amount || 0), 0);
   const outstanding = facility?.outstanding_advances || 0;
@@ -102,6 +173,23 @@ export default function Capital() {
         <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Early payment on eligible invoices — binary YES/NO, no partial advances.</div>
       </div>
 
+      {successMessage && (
+        <div style={{
+          background: 'var(--status-success)',
+          color: 'var(--bg-deep)',
+          padding: '12px 16px',
+          borderRadius: 4,
+          marginBottom: 16,
+          fontSize: 12,
+          fontFamily: 'var(--font-mono)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          ✓ {successMessage}
+        </div>
+      )}
+
       {/* Facility overview */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
@@ -171,7 +259,7 @@ export default function Capital() {
                   <td className="mono" style={{ color: 'var(--accent-primary)' }}>{formatCurrency(adv.net_amount || adv.advanced_amount || adv.advancedAmount)}</td>
                   <td className="mono" style={{ color: 'var(--text-secondary)' }}>{formatCurrency(adv.fee_amount || adv.fee)}</td>
                   <td className="mono">{adv.repayment_date || adv.due_date || adv.dueDate}</td>
-                  <td className="text-right">
+                  <td className="text-right" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
                     <span style={{
                       fontFamily: 'var(--font-mono)',
                       fontSize: 10,
@@ -181,6 +269,26 @@ export default function Capital() {
                       borderRadius: 2,
                       textTransform: 'uppercase'
                     }}>{adv.status || 'FUNDED'}</span>
+                    {adv.status === 'DISBURSED' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleSettleAdvance(adv); }}
+                        disabled={settlingIds.has(adv.id)}
+                        style={{
+                          background: 'transparent',
+                          border: '1px solid var(--status-success)',
+                          color: 'var(--status-success)',
+                          padding: '4px 10px',
+                          fontSize: 10,
+                          fontFamily: 'var(--font-mono)',
+                          letterSpacing: '0.05em',
+                          borderRadius: 2,
+                          cursor: settlingIds.has(adv.id) ? 'not-allowed' : 'pointer',
+                          opacity: settlingIds.has(adv.id) ? 0.5 : 1,
+                        }}
+                      >
+                        {settlingIds.has(adv.id) ? 'SETTLING...' : 'SETTLE'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -230,10 +338,22 @@ export default function Capital() {
                     <td className="text-right">
                       <button
                         className="btn-action"
-                        style={{ fontSize: 10, padding: '4px 12px', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontWeight: 600 }}
-                        onClick={() => navigate(`/capital/request?invoice_id=${inv.id}`)}
+                        disabled={requestingIds.has(inv.id)}
+                        style={{
+                          fontSize: 10,
+                          padding: '4px 12px',
+                          background: requestingIds.has(inv.id) ? 'var(--border-subtle)' : 'var(--accent-primary)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 2,
+                          cursor: requestingIds.has(inv.id) ? 'not-allowed' : 'pointer',
+                          fontFamily: 'var(--font-mono)',
+                          fontWeight: 600,
+                          opacity: requestingIds.has(inv.id) ? 0.6 : 1,
+                        }}
+                        onClick={() => handleRequestAdvance(inv)}
                       >
-                        REQUEST
+                        {requestingIds.has(inv.id) ? 'REQUESTING...' : 'REQUEST'}
                       </button>
                     </td>
                   </tr>

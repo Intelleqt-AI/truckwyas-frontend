@@ -179,44 +179,33 @@ export default function Vehicles() {
         <button style={tabStyle(location.pathname.includes('/drivers'))} onClick={() => navigate('/fleet/drivers')}>Drivers</button>
       </div>
 
-      {/* Fleet Summary */}
+      {/* Fleet Summary — always computed from real vehicle data */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        {overview?.kpi_cards && overview.kpi_cards.length > 0 ? (
-          overview.kpi_cards.map((card, idx) => (
-            <div key={idx} className="card metric-card">
-              <div className="card-header"><span className="card-title">{card.label}</span></div>
-              <div className="metric-value" style={{ fontSize: 28 }}>{card.value}</div>
-            </div>
-          ))
-        ) : (
-          <>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Total Vehicles</span></div>
-              <div className="metric-value" style={{ fontSize: 28 }}>{overview?.total_vehicles || vehicles.length}</div>
-            </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Active</span></div>
-              <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-success)' }}>
-                {overview?.active_vehicles || vehicles.filter(v => v.status === 'ACTIVE' || v.status === 'IN_USE').length}
-              </div>
-            </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">In Maintenance</span></div>
-              <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-warning)' }}>
-                {overview?.maintenance_vehicles || vehicles.filter(v => v.status === 'MAINTENANCE').length}
-              </div>
-            </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Revenue This Month</span></div>
-              <div className="metric-value" style={{ fontSize: 22 }}>
-                {formatZAR(overview?.revenue_this_month || vehicles.reduce((sum, v) => sum + (v.revenue_this_month || 0), 0))}
-              </div>
-            </div>
-          </>
-        )}
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Total Vehicles</span></div>
+          <div className="metric-value" style={{ fontSize: 28 }}>{vehicles.length}</div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Available</span></div>
+          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-success)' }}>
+            {vehicles.filter(v => v.status === 'AVAILABLE' || v.status === 'ACTIVE' || v.status === 'IN_USE').length}
+          </div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">In Maintenance</span></div>
+          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-warning)' }}>
+            {vehicles.filter(v => v.status === 'MAINTENANCE').length}
+          </div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Vehicle Types</span></div>
+          <div className="metric-value" style={{ fontSize: 28 }}>
+            {new Set(vehicles.map(v => v.vehicle_type_name || v.type)).size}
+          </div>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
         {/* Vehicle Table */}
         <div>
           {/* Filters */}
@@ -265,8 +254,8 @@ export default function Vehicles() {
                 {sorted.length === 0 ? (
                   <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles found</td></tr>
                 ) : sorted.map(v => (
-                  <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/vehicles/${v.id}`)}>
-                    <td className="mono" style={{ fontWeight: 500 }}>{v.registration}</td>
+                  <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/vehicles/${v.id}`)}>
+                    <td className="mono" style={{ fontWeight: 500 }}>{v.plate || v.registration || '—'}</td>
                     <td style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
                       {v.vehicle_type_name || v.vehicle_type || '—'}
                     </td>
@@ -287,34 +276,6 @@ export default function Vehicles() {
           </div>
         </div>
 
-        {/* Intelligence Sidebar */}
-        <div>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 12 }}>
-            FLEET INTELLIGENCE
-          </div>
-
-          {insights.length === 0 ? (
-            <div className="card" style={{ padding: 20, textAlign: 'center' }}>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                No fleet alerts at this time
-              </div>
-            </div>
-          ) : insights.map((insight, i) => (
-            <div key={i} className="card" style={{ marginBottom: 12, padding: 14, borderLeft: `2px solid ${insight.severity === 'high' ? 'var(--status-danger)' : insight.severity === 'medium' ? 'var(--status-warning)' : 'var(--accent-primary)'}` }}>
-              {insight.vehicle_registration && (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                  {insight.vehicle_registration}
-                </div>
-              )}
-              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
-                {insight.title}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                {insight.message}
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );

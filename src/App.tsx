@@ -15,7 +15,6 @@ import { BookingsList } from "./pages/BookingsList";
 import Bookings from "./pages/Bookings";
 import LoadsList from "./pages/LoadsList";
 import Vehicles from "./pages/Vehicles";
-import VehicleDigitalTwin from "./pages/VehicleDigitalTwin";
 import Drivers from "./pages/Drivers";
 import DriverProfile from "./pages/DriverProfile";
 import FleetDashboard from "./pages/FleetDashboard";
@@ -67,7 +66,7 @@ const App = () => (
             <Route path="/fleet" element={<OSLayout><Vehicles /></OSLayout>} />
             <Route path="/fleet/overview" element={<OSLayout><FleetDashboard /></OSLayout>} />
             <Route path="/fleet/vehicles" element={<OSLayout><Vehicles /></OSLayout>} />
-            <Route path="/fleet/vehicles/:id" element={<OSLayout><VehicleDigitalTwin /></OSLayout>} />
+            <Route path="/fleet/vehicles/:id" element={<OSLayout><VehicleFinancialProfile /></OSLayout>} />
             <Route path="/fleet/drivers" element={<OSLayout><Drivers /></OSLayout>} />
             <Route path="/fleet/drivers/:driverId" element={<OSLayout><DriverProfile /></OSLayout>} />
             <Route path="/vehicles" element={<OSLayout><Vehicles /></OSLayout>} />

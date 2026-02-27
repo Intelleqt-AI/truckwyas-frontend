@@ -1,467 +1,366 @@
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import useFetch from "@/hooks/useFetch";
-import { usePost } from "@/hooks/usePost";
-import { formatZAR, calculateDaysAge } from "@/lib/constants";
-import { RiskScoreCard } from "@/components/capital/RiskScoreCard";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { fetchData, postData } from "@/lib/api";
+import { formatCurrency } from "@/lib/formatters";
 
-interface EligibleInvoice {
-  id: string;
-  invoice_number: string;
-  customer_name: string;
-  total_amount: number;
-  invoice_date: string;
-  due_date: string;
-  age_days: number;
-}
-
-interface RiskScoreResult {
-  score: number;
-  tier: string;
-  factors: Array<{
-    name: string;
-    score: number;
-    max: number;
-  }>;
-  fee_percent: number;
-  fee_amount: number;
-  net_amount: number;
-  gross_amount: number;
-  estimated_turnaround_days: string;
-}
+const TIER_COLOR: Record<string, string> = {
+  prime: 'var(--accent-primary)', standard: 'var(--status-success)',
+  elevated: 'var(--status-warning)', high: 'var(--status-danger)',
+};
+const TIER_FEE: Record<string, number> = {
+  prime: 0.02, standard: 0.025, elevated: 0.035, high: 0.045,
+};
 
 export default function AdvanceRequest() {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const preSelectedId = searchParams.get('invoice_id');
+
   const [step, setStep] = useState(1);
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
-  const [riskScore, setRiskScore] = useState<RiskScoreResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch eligible invoices
-  const { data: invoices, isLoading: loadingInvoices } = useFetch<EligibleInvoice[]>(
-    '/api/invoices/?early_pay_eligible=true'
-  );
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(preSelectedId);
+  const [bankAccount, setBankAccount] = useState(''); // Placeholder for now
 
-  // Risk score mutation
-  const { mutate: scoreInvoice, isPending: scoring } = usePost({
-    onSuccess: (data) => {
-      setRiskScore(data);
-      setStep(2);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Risk Scoring Failed",
-        description: error?.response?.data?.detail || "Could not score this invoice. Please try again.",
-        variant: "destructive",
-      });
-    }
-  });
+  const selectedInvoice = invoices.find(inv => inv.id === selectedInvoiceId);
+  const tier = selectedInvoice?.risk_tier || selectedInvoice?.tier || 'standard';
+  const amount = selectedInvoice?.total_amount || selectedInvoice?.amount || 0;
+  const feeRate = TIER_FEE[tier] || 0.025;
+  const feeAmount = amount * feeRate;
+  const netReceived = amount - feeAmount;
 
-  // Advance request mutation
-  const { mutate: requestAdvance, isPending: requesting } = usePost({
-    onSuccess: (data) => {
-      toast({
-        title: "Advance Requested",
-        description: "Your early payment request has been submitted successfully.",
-      });
-      navigate('/capital');
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Request Failed",
-        description: error?.response?.data?.detail || "Could not submit your request. Please try again.",
-        variant: "destructive",
-      });
-    }
-  });
+  useEffect(() => {
+    const loadInvoices = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // Load eligible invoices
+        try {
+          const data = await fetchData('/api/v1/invoices/?fast_pay_eligible=true');
+          const eligible = Array.isArray(data) ? data.filter((inv: any) =>
+            (inv.risk_tier === 'prime' || inv.risk_tier === 'standard')
+          ) : [];
+          setInvoices(eligible);
+        } catch {
+          // Fallback: client-side filter
+          const allData = await fetchData('/api/v1/invoices/?status=SENT');
+          const eligible = Array.isArray(allData) ? allData.filter((inv: any) =>
+            inv.fast_pay_eligible && (inv.risk_tier === 'prime' || inv.risk_tier === 'standard')
+          ) : [];
+          setInvoices(eligible);
+        }
+      } catch (err) {
+        console.error('Failed to load invoices:', err);
+        setError('Failed to load eligible invoices');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const selectedInvoice = invoices?.find(inv => inv.id === selectedInvoiceId);
+    loadInvoices();
+  }, []);
 
-  const handleSelectInvoice = (invoiceId: string) => {
-    setSelectedInvoiceId(invoiceId);
-  };
-
-  const handleGetRiskScore = () => {
+  const handleSubmit = async () => {
     if (!selectedInvoiceId) return;
-    scoreInvoice({
-      url: '/api/risk/score/',
-      data: { invoice_id: selectedInvoiceId }
-    });
+    setSubmitting(true);
+    setError(null);
+    try {
+      await postData({
+        url: '/api/v1/advances/',
+        data: { invoice_id: selectedInvoiceId }
+      });
+      // Success - navigate to success view (step 4) or back to capital
+      setStep(4);
+    } catch (err: any) {
+      console.error('Advance request failed:', err);
+      setError(err?.response?.data?.detail || 'Failed to submit advance request. Please try again.');
+      setSubmitting(false);
+    }
   };
 
-  const handleConfirmRequest = () => {
-    if (!selectedInvoiceId) return;
-    requestAdvance({
-      url: '/api/advances/',
-      data: { invoice_id: selectedInvoiceId }
-    });
-  };
+  if (loading) {
+    return (
+      <div>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Request Advance</div>
+        </div>
+        <div className="card" style={{ padding: 40, textAlign: 'center' }}>
+          <div style={{ color: 'var(--text-secondary)' }}>Loading eligible invoices...</div>
+        </div>
+      </div>
+    );
+  }
 
-  const renderStep1 = () => (
-    <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Select Invoice</h2>
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Choose an eligible invoice to request early payment
-        </p>
-
-        {loadingInvoices ? (
-          <div className="py-12 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+  // Step 4 - Success screen
+  if (step === 4) {
+    return (
+      <div>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Request Submitted</div>
+        </div>
+        <div className="card" style={{ padding: 40, textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>✓</div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--status-success)', marginBottom: 8 }}>
+            Your {formatCurrency(netReceived)} is being processed
           </div>
-        ) : !invoices || invoices.length === 0 ? (
-          <div className="py-12 text-center" style={{ color: 'var(--text-secondary)' }}>
-            No eligible invoices found. Check back later.
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24 }}>
+            Estimated disbursement: <strong>4 hours</strong>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b" style={{ borderColor: 'var(--border-subtle)' }}>
-                  <th className="w-12 py-3 px-4"></th>
-                  <th className="text-left py-3 px-4 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
-                    Invoice #
-                  </th>
-                  <th className="text-left py-3 px-4 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
-                    Customer
-                  </th>
-                  <th className="text-right py-3 px-4 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
-                    Amount
-                  </th>
-                  <th className="text-right py-3 px-4 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
-                    Age (days)
-                  </th>
-                  <th className="text-right py-3 px-4 text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
-                    Due Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((invoice) => (
-                  <tr
-                    key={invoice.id}
-                    className="border-b last:border-0 cursor-pointer transition-colors"
-                    style={{
-                      borderColor: 'var(--border-subtle)',
-                      background: selectedInvoiceId === invoice.id ? 'var(--accent-dim)' : 'transparent'
-                    }}
-                    onClick={() => handleSelectInvoice(invoice.id)}
-                  >
-                    <td className="py-3 px-4">
-                      <div
-                        className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                        style={{
-                          borderColor: selectedInvoiceId === invoice.id ? 'var(--accent-primary)' : 'var(--border-subtle)',
-                          background: selectedInvoiceId === invoice.id ? 'var(--accent-primary)' : 'transparent'
-                        }}
-                      >
-                        {selectedInvoiceId === invoice.id && (
-                          <Check className="w-3 h-3 text-white" />
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-sm font-mono" style={{ color: 'var(--accent-primary)' }}>
-                      {invoice.invoice_number}
-                    </td>
-                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-primary)' }}>
-                      {invoice.customer_name}
-                    </td>
-                    <td className="py-3 px-4 text-sm font-mono text-right" style={{ color: 'var(--text-primary)' }}>
-                      {formatZAR(invoice.total_amount)}
-                    </td>
-                    <td className="py-3 px-4 text-sm font-mono text-right" style={{ color: 'var(--text-secondary)' }}>
-                      {invoice.age_days || calculateDaysAge(invoice.invoice_date)}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-right" style={{ color: 'var(--text-secondary)' }}>
-                      {new Date(invoice.due_date).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <div className="flex justify-between pt-4">
-          <Button
-            variant="outline"
+          <button
+            className="btn-action"
+            style={{ padding: '10px 24px', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12 }}
             onClick={() => navigate('/capital')}
-            className="gap-2"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Capital
-          </Button>
-          <Button
-            onClick={handleGetRiskScore}
-            disabled={!selectedInvoiceId || scoring}
-            className="gap-2"
-            style={{ background: 'var(--accent-primary)' }}
-          >
-            {scoring ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Calculating...
-              </>
-            ) : (
-              <>
-                Continue to Risk Score
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-    </Card>
-  );
-
-  const renderStep2 = () => {
-    if (!riskScore || !selectedInvoice) return null;
-
-    return (
-      <div className="space-y-6">
-        {/* Selected Invoice Info */}
-        <Card className="p-6 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                {selectedInvoice.invoice_number}
-              </h3>
-              <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                {selectedInvoice.customer_name} • {formatZAR(selectedInvoice.total_amount)}
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setStep(1);
-                setRiskScore(null);
-              }}
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Change Invoice
-            </Button>
-          </div>
-        </Card>
-
-        {/* Risk Score Card */}
-        <RiskScoreCard
-          score={riskScore.score}
-          tier={riskScore.tier}
-          factors={riskScore.factors}
-          fee={riskScore.fee_percent}
-          feeAmount={riskScore.fee_amount}
-          netAmount={riskScore.net_amount}
-        />
-
-        {/* Estimated Turnaround */}
-        <Card className="p-6 bg-gradient-to-r from-green-50 to-white border border-green-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-              <Check className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                Estimated Turnaround
-              </p>
-              <p className="text-2xl font-bold text-green-600 mt-1">
-                {riskScore.estimated_turnaround_days}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <div className="flex justify-between pt-4">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setStep(1);
-              setRiskScore(null);
-            }}
-            className="gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
-          <Button
-            onClick={() => setStep(3)}
-            className="gap-2"
-            style={{ background: 'var(--accent-primary)' }}
-          >
-            Continue to Confirm
-            <ArrowRight className="w-4 h-4" />
-          </Button>
+            BACK TO CAPITAL
+          </button>
         </div>
       </div>
     );
-  };
-
-  const renderStep3 = () => {
-    if (!riskScore || !selectedInvoice) return null;
-
-    return (
-      <div className="space-y-6">
-        <Card className="p-8 bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div className="space-y-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                Confirm Your Request
-              </h2>
-              <p className="mt-2" style={{ color: 'var(--text-secondary)' }}>
-                Review the details below before submitting
-              </p>
-            </div>
-
-            {/* Summary */}
-            <div className="border-t border-b py-6 space-y-4" style={{ borderColor: 'var(--border-subtle)' }}>
-              <div className="flex justify-between items-center">
-                <span style={{ color: 'var(--text-secondary)' }}>Invoice</span>
-                <span className="font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
-                  {selectedInvoice.invoice_number}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span style={{ color: 'var(--text-secondary)' }}>Customer</span>
-                <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                  {selectedInvoice.customer_name}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span style={{ color: 'var(--text-secondary)' }}>Invoice Amount</span>
-                <span className="font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
-                  {formatZAR(riskScore.gross_amount)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span style={{ color: 'var(--text-secondary)' }}>Risk Tier</span>
-                <Badge className={`${
-                  riskScore.tier.toLowerCase() === 'excellent'
-                    ? 'bg-green-50 text-green-700 border-green-200'
-                    : riskScore.tier.toLowerCase() === 'good'
-                    ? 'bg-blue-50 text-blue-700 border-blue-200'
-                    : riskScore.tier.toLowerCase() === 'fair'
-                    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                    : 'bg-red-50 text-red-700 border-red-200'
-                } border font-medium`}>
-                  {riskScore.tier}
-                </Badge>
-              </div>
-              <div className="flex justify-between items-center">
-                <span style={{ color: 'var(--text-secondary)' }}>Fee ({riskScore.fee_percent}%)</span>
-                <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>
-                  -{formatZAR(riskScore.fee_amount)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pt-4 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
-                <span className="font-semibold text-lg" style={{ color: 'var(--text-primary)' }}>
-                  Net Payout
-                </span>
-                <span className="text-3xl font-mono font-bold" style={{ color: 'var(--accent-primary)' }}>
-                  {formatZAR(riskScore.net_amount)}
-                </span>
-              </div>
-            </div>
-
-            <div className="border rounded-lg p-4" style={{ background: 'var(--accent-dim)', borderColor: 'var(--accent-primary)' }}>
-              <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                By submitting this request, you authorize TruckWys to advance funds for this invoice.
-                Payment will be processed within {riskScore.estimated_turnaround_days}.
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <div className="flex justify-between pt-4">
-          <Button
-            variant="outline"
-            onClick={() => setStep(2)}
-            disabled={requesting}
-            className="gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
-          <Button
-            onClick={handleConfirmRequest}
-            disabled={requesting}
-            className="gap-2"
-            style={{ background: 'var(--accent-primary)' }}
-          >
-            {requesting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              <>
-                Request Early Payment
-                <Check className="w-4 h-4" />
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-    );
-  };
+  }
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div>
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>
-          <button
-            onClick={() => navigate('/capital')}
-            className="transition-colors"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            Capital
-          </button>
-          <span>/</span>
-          <span>Request Advance</span>
-        </div>
-        <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>Request Early Payment</h1>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Request Advance</div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Fast payment on eligible invoices — 3 steps.</div>
       </div>
 
-      {/* Progress Steps */}
-      <div className="flex items-center justify-center gap-4">
-        {[1, 2, 3].map((stepNum) => (
-          <div key={stepNum} className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm"
-                style={{
-                  background: step >= stepNum ? 'var(--accent-primary)' : 'var(--border-subtle)',
-                  color: step >= stepNum ? 'white' : 'var(--text-secondary)'
-                }}
-              >
-                {step > stepNum ? <Check className="w-4 h-4" /> : stepNum}
-              </div>
-              <span
-                className="text-sm font-medium"
-                style={{ color: step >= stepNum ? 'var(--text-primary)' : 'var(--text-secondary)' }}
-              >
-                {stepNum === 1 ? 'Select' : stepNum === 2 ? 'Risk Score' : 'Confirm'}
-              </span>
+      {/* Step counter */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 32 }}>
+        {[1, 2, 3].map(s => (
+          <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: step >= s ? 'var(--accent-primary)' : 'var(--bg-surface)',
+              color: step >= s ? 'white' : 'var(--text-tertiary)',
+              fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600,
+              border: step === s ? '2px solid var(--accent-primary)' : 'none'
+            }}>
+              {s}
             </div>
-            {stepNum < 3 && (
-              <div
-                className="w-12 h-0.5"
-                style={{ background: step > stepNum ? 'var(--accent-primary)' : 'var(--border-subtle)' }}
-              />
-            )}
+            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: step >= s ? 'var(--text-primary)' : 'var(--text-tertiary)', textTransform: 'uppercase' }}>
+              {s === 1 ? 'Select' : s === 2 ? 'Review' : 'Confirm'}
+            </span>
+            {s < 3 && <div style={{ width: 40, height: 2, background: step > s ? 'var(--accent-primary)' : 'var(--border-subtle)' }} />}
           </div>
         ))}
       </div>
 
-      {/* Step Content */}
-      {step === 1 && renderStep1()}
-      {step === 2 && renderStep2()}
-      {step === 3 && renderStep3()}
+      {error && (
+        <div className="card" style={{ padding: 16, marginBottom: 20, background: 'var(--status-danger)', color: 'white', fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+
+      {/* STEP 1: Invoice selector */}
+      {step === 1 && (
+        <div className="card table-card">
+          <div className="card-header" style={{ marginBottom: 16 }}>
+            <span className="card-title">Step 1: Select Invoice</span>
+            <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{invoices.length} ELIGIBLE</span>
+          </div>
+          {invoices.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>
+              No eligible invoices available.
+            </div>
+          ) : (
+            <>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 40 }}></th>
+                    <th>Invoice #</th><th>Customer</th><th>Amount</th><th>Tier</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map(inv => (
+                    <tr
+                      key={inv.id}
+                      style={{ cursor: 'pointer', background: selectedInvoiceId === inv.id ? 'var(--bg-surface-hover)' : 'transparent' }}
+                      onClick={() => setSelectedInvoiceId(inv.id)}
+                    >
+                      <td>
+                        <input
+                          type="radio"
+                          checked={selectedInvoiceId === inv.id}
+                          onChange={() => setSelectedInvoiceId(inv.id)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
+                      <td className="mono">{inv.invoice_number || inv.invoiceNumber}</td>
+                      <td>{inv.customer_name || inv.customerName}</td>
+                      <td className="mono">{formatCurrency(inv.total_amount || inv.amount)}</td>
+                      <td>
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 10,
+                          color: TIER_COLOR[inv.risk_tier || inv.tier || 'standard'],
+                          background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase'
+                        }}>
+                          {inv.risk_tier || inv.tier || 'standard'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 0 0' }}>
+                <button
+                  className="btn-action"
+                  style={{ padding: '8px 16px', background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11 }}
+                  onClick={() => navigate('/capital')}
+                >
+                  CANCEL
+                </button>
+                <button
+                  className="btn-action"
+                  disabled={!selectedInvoiceId}
+                  style={{
+                    padding: '8px 16px',
+                    background: selectedInvoiceId ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                    color: selectedInvoiceId ? 'white' : 'var(--text-tertiary)',
+                    border: 'none', borderRadius: 2,
+                    cursor: selectedInvoiceId ? 'pointer' : 'not-allowed',
+                    fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600
+                  }}
+                  onClick={() => selectedInvoiceId && setStep(2)}
+                >
+                  CONTINUE →
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* STEP 2: Fee breakdown */}
+      {step === 2 && selectedInvoice && (
+        <div className="card" style={{ padding: 24 }}>
+          <div className="card-header" style={{ marginBottom: 20 }}>
+            <span className="card-title">Step 2: Fee Breakdown</span>
+          </div>
+          <div style={{ marginBottom: 24, padding: 16, background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>SELECTED INVOICE</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedInvoice.invoice_number}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{selectedInvoice.customer_name}</div>
+          </div>
+
+          <div style={{ display: 'grid', gap: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Invoice Amount</span>
+              <span style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(amount)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Risk Tier</span>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 11,
+                color: TIER_COLOR[tier],
+                background: 'var(--bg-surface-hover)', padding: '4px 8px', borderRadius: 2, textTransform: 'uppercase', fontWeight: 600
+              }}>
+                {tier}
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Fee ({(feeRate * 100).toFixed(1)}%)</span>
+              <span style={{ fontSize: 16, fontFamily: 'var(--font-mono)', color: 'var(--status-danger)' }}>-{formatCurrency(feeAmount)}</span>
+            </div>
+            <div style={{ height: 1, background: 'var(--border-subtle)' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>You Receive</span>
+              <span style={{ fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--status-success)' }}>{formatCurrency(netReceived)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Estimated Repayment Date</span>
+              <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                {selectedInvoice.due_date ? new Date(selectedInvoice.due_date).toLocaleDateString() : 'On invoice due date'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Bank Account</span>
+              <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Default account on file</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 32 }}>
+            <button
+              className="btn-action"
+              style={{ padding: '10px 20px', background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11 }}
+              onClick={() => setStep(1)}
+            >
+              ← BACK
+            </button>
+            <button
+              className="btn-action"
+              style={{ padding: '10px 20px', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600 }}
+              onClick={() => setStep(3)}
+            >
+              CONTINUE →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3: Confirmation */}
+      {step === 3 && selectedInvoice && (
+        <div className="card" style={{ padding: 24 }}>
+          <div className="card-header" style={{ marginBottom: 20 }}>
+            <span className="card-title">Step 3: Confirm Request</span>
+          </div>
+
+          <div style={{ padding: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, marginBottom: 24 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>You are requesting an advance of:</div>
+            <div style={{ fontSize: 32, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: 8 }}>{formatCurrency(netReceived)}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>on invoice <strong>{selectedInvoice.invoice_number}</strong></div>
+          </div>
+
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 24, padding: 16, background: 'var(--bg-surface)', borderRadius: 2 }}>
+            By confirming, you authorize Truckwys to advance the net amount to your registered bank account.
+            The advance will be repaid automatically when the customer pays the invoice.
+            <strong style={{ color: 'var(--text-primary)' }}> Estimated disbursement: 4 hours.</strong>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+            <button
+              className="btn-action"
+              disabled={submitting}
+              style={{
+                padding: '10px 20px',
+                background: 'var(--bg-surface)',
+                color: submitting ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 2,
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                fontFamily: 'var(--font-mono)', fontSize: 11
+              }}
+              onClick={() => !submitting && setStep(2)}
+            >
+              ← BACK
+            </button>
+            <button
+              className="btn-action"
+              disabled={submitting}
+              style={{
+                padding: '10px 20px',
+                background: submitting ? 'var(--bg-surface)' : 'var(--status-success)',
+                color: submitting ? 'var(--text-tertiary)' : 'white',
+                border: 'none', borderRadius: 2,
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600
+              }}
+              onClick={handleSubmit}
+            >
+              {submitting ? 'SUBMITTING...' : 'CONFIRM REQUEST ✓'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

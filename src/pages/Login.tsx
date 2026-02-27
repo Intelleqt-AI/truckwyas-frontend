@@ -35,7 +35,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ backgroundColor: '#FAFAFA' }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-muted/30">
       <div className="mb-8">
         <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" className="h-10 w-auto" />
       </div>

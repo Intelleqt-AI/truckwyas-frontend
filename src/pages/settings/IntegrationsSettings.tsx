@@ -246,7 +246,7 @@ export function IntegrationsSettings() {
 
       {/* Featured Integration Cards - Xero and Fleet Import */}
       <div>
-        <h3 className="text-base font-semibold text-[#0F172A] mb-3">
+        <h3 className="text-base font-semibold text-foreground mb-3">
           Featured Integrations
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -255,12 +255,12 @@ export function IntegrationsSettings() {
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-[#13B5EA] rounded-lg flex items-center justify-center text-2xl">
+                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center text-2xl">
                     💼
                   </div>
                   <div>
                     <CardTitle className="text-base">Xero Accounting</CardTitle>
-                    <p className="text-xs text-[#64748B] mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       Sync invoices and payments
                     </p>
                   </div>
@@ -268,12 +268,12 @@ export function IntegrationsSettings() {
               </div>
             </CardHeader>
             <CardContent className="pt-0 space-y-3">
-              <p className="text-sm text-[#64748B]">
+              <p className="text-sm text-muted-foreground">
                 Connect your Xero account to automatically sync invoices and payments between TruckWys and Xero.
               </p>
               <Button
                 onClick={() => navigate("/settings/integrations/xero")}
-                className="w-full bg-[#2563EB] hover:bg-[#1D4ED8]"
+                className="w-full"
               >
                 Manage Xero Integration
                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -286,12 +286,12 @@ export function IntegrationsSettings() {
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-[#F59E0B] rounded-lg flex items-center justify-center text-2xl">
+                  <div className="w-12 h-12 bg-warning/20 rounded-lg flex items-center justify-center text-2xl">
                     🚛
                   </div>
                   <div>
                     <CardTitle className="text-base">Fleet Data Import</CardTitle>
-                    <p className="text-xs text-[#64748B] mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       Import trip data from CSV/Excel
                     </p>
                   </div>
@@ -299,12 +299,12 @@ export function IntegrationsSettings() {
               </div>
             </CardHeader>
             <CardContent className="pt-0 space-y-3">
-              <p className="text-sm text-[#64748B]">
+              <p className="text-sm text-muted-foreground">
                 Upload CSV or Excel files to bulk import trip data, fuel usage, and other fleet information.
               </p>
               <Button
                 onClick={() => navigate("/settings/integrations/fleet")}
-                className="w-full bg-[#2563EB] hover:bg-[#1D4ED8]"
+                className="w-full"
               >
                 Import Fleet Data
                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -316,7 +316,7 @@ export function IntegrationsSettings() {
 
       {/* Integrations Grid */}
       <div>
-        <h3 className="text-base font-semibold text-[#0F172A] mb-3">
+        <h3 className="text-base font-semibold text-foreground mb-3">
           All Integrations
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

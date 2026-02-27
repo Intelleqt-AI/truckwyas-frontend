@@ -190,11 +190,11 @@ export default function FleetImport() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "success":
-        return <CheckCircle2 className="w-5 h-5 text-[#10B981]" />;
+        return <CheckCircle2 className="w-5 h-5 text-success" />;
       case "error":
-        return <XCircle className="w-5 h-5 text-[#EF4444]" />;
+        return <XCircle className="w-5 h-5 text-destructive" />;
       case "processing":
-        return <AlertCircle className="w-5 h-5 text-[#F59E0B] animate-pulse" />;
+        return <AlertCircle className="w-5 h-5 text-warning animate-pulse" />;
       default:
         return null;
     }
@@ -204,19 +204,19 @@ export default function FleetImport() {
     switch (status) {
       case "success":
         return (
-          <Badge className="bg-[#10B981] text-white hover:bg-[#10B981]">
+          <Badge className="bg-success text-white hover:bg-success">
             Success
           </Badge>
         );
       case "error":
         return (
-          <Badge className="bg-[#EF4444] text-white hover:bg-[#EF4444]">
+          <Badge className="bg-destructive text-white hover:bg-destructive">
             Error
           </Badge>
         );
       case "processing":
         return (
-          <Badge className="bg-[#F59E0B] text-white hover:bg-[#F59E0B]">
+          <Badge className="bg-warning text-white hover:bg-warning">
             Processing
           </Badge>
         );
@@ -229,10 +229,10 @@ export default function FleetImport() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-semibold text-[#0F172A]">
+        <h2 className="text-2xl font-semibold text-foreground">
           Import Trip Data
         </h2>
-        <p className="text-sm text-[#64748B] mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Upload CSV or Excel files to import trip data into your fleet
         </p>
       </div>
@@ -254,8 +254,8 @@ export default function FleetImport() {
               transition-colors
               ${
                 isDragging
-                  ? "border-[#2563EB] bg-[#EFF6FF]"
-                  : "border-[#E2E8F0] hover:border-[#2563EB] hover:bg-[#F8FAFC]"
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary hover:bg-muted/30"
               }
             `}
           >
@@ -267,19 +267,19 @@ export default function FleetImport() {
               className="hidden"
             />
             <div className="flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#EFF6FF] flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                 {selectedFile ? (
-                  <FileSpreadsheet className="w-6 h-6 text-[#2563EB]" />
+                  <FileSpreadsheet className="w-6 h-6 text-primary" />
                 ) : (
-                  <Upload className="w-6 h-6 text-[#2563EB]" />
+                  <Upload className="w-6 h-6 text-primary" />
                 )}
               </div>
               {selectedFile ? (
                 <>
-                  <p className="text-sm font-medium text-[#0F172A]">
+                  <p className="text-sm font-medium text-foreground">
                     {selectedFile.name}
                   </p>
-                  <p className="text-xs text-[#64748B]">
+                  <p className="text-xs text-muted-foreground">
                     {(selectedFile.size / 1024).toFixed(2)} KB
                   </p>
                   <Button
@@ -297,10 +297,10 @@ export default function FleetImport() {
                 </>
               ) : (
                 <>
-                  <p className="text-sm font-medium text-[#0F172A]">
+                  <p className="text-sm font-medium text-foreground">
                     Drop your file here, or click to browse
                   </p>
-                  <p className="text-xs text-[#64748B]">
+                  <p className="text-xs text-muted-foreground">
                     Supports CSV and Excel files (.csv, .xlsx, .xls)
                   </p>
                 </>
@@ -312,13 +312,13 @@ export default function FleetImport() {
           {previewData && previewData.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-[#0F172A]">
+                <h3 className="text-sm font-medium text-foreground">
                   Preview (First 3 rows)
                 </h3>
                 <a
                   href="/assets/fleet-import-template.csv"
                   download
-                  className="text-xs text-[#2563EB] hover:underline flex items-center gap-1"
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
                 >
                   <Download className="w-3 h-3" />
                   Download Template
@@ -327,12 +327,12 @@ export default function FleetImport() {
               <div className="border rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-[#F8FAFC] border-b">
+                    <thead className="bg-muted/30 border-b">
                       <tr>
                         {Object.keys(previewData[0]).map((header) => (
                           <th
                             key={header}
-                            className="px-4 py-3 text-left text-xs font-medium text-[#64748B] uppercase"
+                            className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase"
                           >
                             {header}
                           </th>
@@ -341,11 +341,11 @@ export default function FleetImport() {
                     </thead>
                     <tbody className="divide-y">
                       {previewData.map((row, index) => (
-                        <tr key={index} className="hover:bg-[#F8FAFC]">
+                        <tr key={index} className="hover:bg-muted/20">
                           {Object.values(row).map((value, colIndex) => (
                             <td
                               key={colIndex}
-                              className="px-4 py-3 text-[#0F172A]"
+                              className="px-4 py-3 text-foreground"
                             >
                               {value}
                             </td>
@@ -364,7 +364,7 @@ export default function FleetImport() {
             <Button
               onClick={handleImport}
               disabled={isUploading}
-              className="w-full bg-[#2563EB] hover:bg-[#1D4ED8]"
+              className="w-full"
             >
               {isUploading ? (
                 <>
@@ -389,7 +389,7 @@ export default function FleetImport() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-sm text-[#64748B]">Loading history...</div>
+            <div className="text-sm text-muted-foreground">Loading history...</div>
           ) : importHistory && importHistory.length > 0 ? (
             <div className="space-y-3">
               {importHistory.map((item) => (
@@ -400,10 +400,10 @@ export default function FleetImport() {
                   <div className="flex items-center gap-3">
                     {getStatusIcon(item.status)}
                     <div>
-                      <p className="text-sm font-medium text-[#0F172A]">
+                      <p className="text-sm font-medium text-foreground">
                         {item.filename}
                       </p>
-                      <p className="text-xs text-[#64748B]">
+                      <p className="text-xs text-muted-foreground">
                         {item.status === "success"
                           ? `${item.records_imported} records imported`
                           : item.status === "error"
@@ -414,7 +414,7 @@ export default function FleetImport() {
                   </div>
                   <div className="flex items-center gap-3">
                     {getStatusBadge(item.status)}
-                    <span className="text-xs text-[#64748B]">
+                    <span className="text-xs text-muted-foreground">
                       {formatDate(item.uploaded_at)}
                     </span>
                   </div>
@@ -422,7 +422,7 @@ export default function FleetImport() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-sm text-[#64748B]">
+            <div className="text-center py-8 text-sm text-muted-foreground">
               No import history yet. Upload your first file to get started.
             </div>
           )}

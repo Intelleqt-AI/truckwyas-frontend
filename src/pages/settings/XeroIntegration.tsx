@@ -156,10 +156,10 @@ export default function XeroIntegration() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-semibold text-[#0F172A]">
+        <h2 className="text-2xl font-semibold text-foreground">
           Xero Integration
         </h2>
-        <p className="text-sm text-[#64748B] mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Connect your Xero account to automatically sync invoices and payments
         </p>
       </div>
@@ -170,14 +170,14 @@ export default function XeroIntegration() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Connection Status</CardTitle>
             {connection?.is_connected ? (
-              <Badge className="bg-[#10B981] text-white hover:bg-[#10B981]">
+              <Badge className="bg-success text-white hover:bg-success">
                 <CheckCircle2 className="w-3 h-3 mr-1" />
                 Connected
               </Badge>
             ) : (
               <Badge
                 variant="secondary"
-                className="bg-[#E2E8F0] text-[#64748B]"
+                className="bg-muted text-muted-foreground"
               >
                 <XCircle className="w-3 h-3 mr-1" />
                 Not Connected
@@ -191,16 +191,16 @@ export default function XeroIntegration() {
               {/* Connected Info */}
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
-                  <Building2 className="w-4 h-4 text-[#64748B]" />
-                  <span className="text-[#64748B]">Organization:</span>
-                  <span className="font-medium text-[#0F172A]">
+                  <Building2 className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Organization:</span>
+                  <span className="font-medium text-foreground">
                     {connection.tenant_name || "Unknown"}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                  <Clock className="w-4 h-4 text-[#64748B]" />
-                  <span className="text-[#64748B]">Connected since:</span>
-                  <span className="font-medium text-[#0F172A]">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Connected since:</span>
+                  <span className="font-medium text-foreground">
                     {formatDate(connection.connected_since)}
                   </span>
                 </div>
@@ -208,7 +208,7 @@ export default function XeroIntegration() {
 
               {/* Sync Controls */}
               <div className="border-t pt-6">
-                <h3 className="text-sm font-medium text-[#0F172A] mb-4">
+                <h3 className="text-sm font-medium text-foreground mb-4">
                   Sync Data
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -217,7 +217,7 @@ export default function XeroIntegration() {
                     <Button
                       onClick={handleSyncInvoices}
                       disabled={isSyncing === "invoices"}
-                      className="w-full bg-[#2563EB] hover:bg-[#1D4ED8]"
+                      className="w-full"
                     >
                       <RefreshCw
                         className={`w-4 h-4 mr-2 ${
@@ -226,7 +226,7 @@ export default function XeroIntegration() {
                       />
                       Sync Invoices
                     </Button>
-                    <p className="text-xs text-[#64748B]">
+                    <p className="text-xs text-muted-foreground">
                       Last synced: {formatDate(connection.last_invoice_sync)}
                     </p>
                   </div>
@@ -236,7 +236,7 @@ export default function XeroIntegration() {
                     <Button
                       onClick={handleSyncPayments}
                       disabled={isSyncing === "payments"}
-                      className="w-full bg-[#2563EB] hover:bg-[#1D4ED8]"
+                      className="w-full"
                     >
                       <RefreshCw
                         className={`w-4 h-4 mr-2 ${
@@ -245,7 +245,7 @@ export default function XeroIntegration() {
                       />
                       Sync Payments
                     </Button>
-                    <p className="text-xs text-[#64748B]">
+                    <p className="text-xs text-muted-foreground">
                       Last synced: {formatDate(connection.last_payment_sync)}
                     </p>
                   </div>
@@ -257,7 +257,7 @@ export default function XeroIntegration() {
                 <Button
                   onClick={handleDisconnect}
                   variant="destructive"
-                  className="bg-[#EF4444] hover:bg-[#DC2626]"
+                  className=""
                 >
                   <LogOut className="w-4 h-4 mr-2" />
                   Disconnect from Xero
@@ -268,19 +268,19 @@ export default function XeroIntegration() {
             <>
               {/* Not Connected State */}
               <div className="text-center py-6">
-                <div className="w-16 h-16 rounded-full bg-[#EFF6FF] flex items-center justify-center mx-auto mb-4">
-                  <Building2 className="w-8 h-8 text-[#2563EB]" />
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <Building2 className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-lg font-medium text-[#0F172A] mb-2">
+                <h3 className="text-lg font-medium text-foreground mb-2">
                   Connect to Xero
                 </h3>
-                <p className="text-sm text-[#64748B] mb-6 max-w-md mx-auto">
+                <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                   Link your Xero account to automatically sync invoices and
                   payments between TruckWys and Xero.
                 </p>
                 <Button
                   onClick={handleConnect}
-                  className="bg-[#2563EB] hover:bg-[#1D4ED8]"
+                  className=""
                 >
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                   Connect to Xero
@@ -306,24 +306,24 @@ export default function XeroIntegration() {
                 >
                   <div className="flex items-center gap-3">
                     {log.status === "success" ? (
-                      <CheckCircle2 className="w-5 h-5 text-[#10B981]" />
+                      <CheckCircle2 className="w-5 h-5 text-success" />
                     ) : (
-                      <XCircle className="w-5 h-5 text-[#EF4444]" />
+                      <XCircle className="w-5 h-5 text-destructive" />
                     )}
                     <div>
-                      <p className="text-sm font-medium text-[#0F172A]">
+                      <p className="text-sm font-medium text-foreground">
                         {log.sync_type === "invoice"
                           ? "Invoice Sync"
                           : "Payment Sync"}
                       </p>
-                      <p className="text-xs text-[#64748B]">
+                      <p className="text-xs text-muted-foreground">
                         {log.status === "success"
                           ? `${log.records_synced} records synced`
                           : log.error_message || "Sync failed"}
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs text-[#64748B]">
+                  <span className="text-xs text-muted-foreground">
                     {formatDate(log.timestamp)}
                   </span>
                 </div>

@@ -19,12 +19,20 @@ export default function QuoteDetail() {
 
   const { data: quote, isLoading, error } = useQuery({
     queryKey: ['quote', id],
-    queryFn: () => fetchData(`api/quotes/${id}/`),
+    queryFn: () => fetchData(`api/v1/quotes/${id}/`),
     retry: 1,
   });
 
+  const statusMutation = useMutation({
+    mutationFn: (newStatus: string) => patchData({ url: `api/v1/quotes/${id}/`, data: { status: newStatus } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quote', id] });
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+    },
+  });
+
   const deleteMutation = useMutation({
-    mutationFn: () => deleteData({ url: `api/quotes/${id}/` }),
+    mutationFn: () => deleteData({ url: `api/v1/quotes/${id}/` }),
     onSuccess: () => {
       navigate('/quotes');
     },
@@ -33,7 +41,7 @@ export default function QuoteDetail() {
   const convertToLoadMutation = useMutation({
     mutationFn: () =>
       postData({
-        url: 'api/loads/',
+        url: 'api/v1/loads/',
         data: {
           customer: quote.customer,
           customer_name: quote.customer_name,
@@ -44,7 +52,7 @@ export default function QuoteDetail() {
           quote_id: quote.id,
           quote_number: quote.quote_number,
           total_amount: quote.total_amount,
-          status: 'PENDING',
+          status: 'SCHEDULED',
         },
       }),
     onSuccess: () => {
@@ -184,18 +192,22 @@ export default function QuoteDetail() {
           {/* Cargo Details */}
           <div className="card" style={{ padding: 20 }}>
             <div className="card-title" style={{ marginBottom: 16 }}>Cargo Details</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 {label('Description')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.cargo_description || '—'}</div>
               </div>
               <div>
+                {label('Vehicle Type')}
+                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.vehicle_type || '—'}</div>
+              </div>
+              <div>
                 {label('Weight (kg)')}
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.weight || '—'}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.weight ? parseFloat(quote.weight).toLocaleString() : '—'}</div>
               </div>
               <div>
                 {label('Distance (km)')}
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.distance || '—'}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.distance ? Math.round(parseFloat(quote.distance)).toLocaleString() : '—'}</div>
               </div>
             </div>
           </div>
@@ -241,14 +253,25 @@ export default function QuoteDetail() {
           {/* Metadata */}
           <div className="card" style={{ padding: 20 }}>
             <div className="card-title" style={{ marginBottom: 12 }}>Quote Info</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 {label('Quote Number')}
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>{quote.quote_number}</div>
               </div>
               <div>
                 {label('Status')}
-                <div style={{ fontSize: 12, color: STATUS_COLOR[quote.status] || 'var(--text-secondary)' }}>{quote.status}</div>
+                <select
+                  value={quote.status}
+                  onChange={(e) => statusMutation.mutate(e.target.value)}
+                  disabled={statusMutation.isPending}
+                  style={inputStyle}
+                >
+                  <option value="DRAFT">Draft</option>
+                  <option value="SENT">Sent</option>
+                  <option value="ACCEPTED">Accepted</option>
+                  <option value="IT">In-Transit</option>
+                  <option value="COMPLETED">Completed</option>
+                </select>
               </div>
               <div>
                 {label('Confidence')}
@@ -256,6 +279,23 @@ export default function QuoteDetail() {
                   {quote.confidence}
                 </div>
               </div>
+              <div>
+                {label('Margin')}
+                <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>{quote.margin_percentage || 0}%</div>
+              </div>
+              {quote.valid_until && (
+                <div>
+                  {label('Valid Until')}
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                    {new Date(quote.valid_until).toLocaleDateString()}
+                    {new Date(quote.valid_until).getTime() - Date.now() < 48 * 60 * 60 * 1000 && (
+                      <span style={{ color: 'var(--status-danger)', marginLeft: 8 }}>
+                        ({Math.ceil((new Date(quote.valid_until).getTime() - Date.now()) / (1000 * 60 * 60))}h left)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
               {quote.created_at && (
                 <div>
                   {label('Created')}

@@ -197,7 +197,7 @@ export default function Overview() {
                       <span style={{
                         fontFamily: 'var(--font-mono)',
                         fontSize: 10,
-                        color: quote.status === 'ACCEPTED' ? '#22c55e' : quote.status === 'SENT' ? 'var(--status-warning)' : 'var(--text-tertiary)',
+                        color: quote.status === 'ACCEPTED' ? 'var(--status-success)' : quote.status === 'SENT' ? 'var(--status-warning)' : 'var(--text-tertiary)',
                         padding: '2px 6px',
                         background: 'var(--bg-surface-hover)',
                         borderRadius: 2

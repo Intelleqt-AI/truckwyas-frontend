@@ -5,9 +5,9 @@ import { formatCurrency } from '@/lib/formatters';
 
 const TIER_COLOR: Record<string, string> = {
   EXCELLENT: 'var(--status-success)',
-  GOOD: '#22d3ee',
+  GOOD: 'var(--accent-primary)',
   FAIR: 'var(--status-warning)',
-  ELEVATED: '#f97316',
+  ELEVATED: 'var(--status-warning)',
   INELIGIBLE: 'var(--status-danger)',
 };
 

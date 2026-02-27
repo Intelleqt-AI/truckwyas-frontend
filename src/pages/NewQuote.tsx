@@ -7,7 +7,7 @@ import { postData, fetchData } from "@/lib/Api";
 const DEFAULT_BASE_RATE_PER_KM = 10;
 const FUEL_PRICE_PER_LITRE = 21.7;
 
-type VehicleType = 'Flatbed' | 'Tautliner' | 'Refrigerated' | 'Box Truck' | 'Tanker';
+type VehicleType = 'Flatbed' | 'Tautliner' | 'Refrigerated' | 'Box Truck' | 'Tanker' | 'Danger Load';
 
 interface RouteData {
   distance_km: number;
@@ -35,11 +35,22 @@ export default function NewQuote() {
   const [weight, setWeight] = useState('');
   const [vehicleType, setVehicleType] = useState<VehicleType>('Flatbed');
   const [baseRatePerKm, setBaseRatePerKm] = useState(String(DEFAULT_BASE_RATE_PER_KM));
+  const [cargoDescription, setCargoDescription] = useState('');
+  const [driverAllowanceInput, setDriverAllowanceInput] = useState('0');
+  const [editableFuelCost, setEditableFuelCost] = useState<number | null>(null);
+  const [editableTollCost, setEditableTollCost] = useState<number | null>(null);
 
   // Step 3: Customer & Summary
   const [customerId, setCustomerId] = useState('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<'DRAFT' | 'SENT'>('DRAFT');
+  const [confidence, setConfidence] = useState<'HIGH' | 'MEDIUM' | 'LOW'>('MEDIUM');
+  const [slaHours, setSlaHours] = useState('48');
+  const [validUntil, setValidUntil] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 7);
+    return date.toISOString().split('T')[0];
+  });
 
   const { data: customersData } = useQuery({
     queryKey: ['customers'],
@@ -82,10 +93,22 @@ export default function NewQuote() {
   // Cost calculations
   const distanceKm = routeData?.distance_km || 0;
   const baseCost = distanceKm * parseFloat(baseRatePerKm || '0');
-  const fuelCost = routeData?.fuel_cost_zar || 0;
-  const tollCost = routeData?.toll_cost_zar || 0;
-  const driverAllowance = 0; // default 0
+  const fuelCost = editableFuelCost !== null ? editableFuelCost : (routeData?.fuel_cost_zar || 0);
+  const tollCost = editableTollCost !== null ? editableTollCost : (routeData?.toll_cost_zar || 0);
+  const driverAllowance = parseFloat(driverAllowanceInput || '0');
   const total = baseCost + fuelCost + tollCost + driverAllowance;
+
+  // Extract origin and destination codes
+  const extractCode = (location: string) => {
+    const upper = location.trim().toUpperCase();
+    if (upper.includes('JHB') || upper.includes('JOHANNESBURG')) return 'JHB';
+    if (upper.includes('CPT') || upper.includes('CAPE TOWN')) return 'CPT';
+    if (upper.includes('DUR') || upper.includes('DURBAN')) return 'DUR';
+    if (upper.includes('PE') || upper.includes('PORT ELIZABETH')) return 'PE';
+    if (upper.includes('BFN') || upper.includes('BLOEMFONTEIN')) return 'BFN';
+    if (upper.includes('PTA') || upper.includes('PRETORIA')) return 'PTA';
+    return location.substring(0, 3).toUpperCase();
+  };
 
   const mutation = useMutation({
     mutationFn: (data: any) => postData({ url: 'api/v1/quotes/', data }),
@@ -99,23 +122,27 @@ export default function NewQuote() {
       return;
     }
     mutation.mutate({
-      customer: customerId,
+      customer: parseInt(customerId),
       pickup_location: pickupLocation,
       delivery_location: deliveryLocation,
-      origin: pickupLocation,
-      destination: deliveryLocation,
-      cargo_description: `${weight}kg ${vehicleType}`,
+      origin: extractCode(pickupLocation),
+      destination: extractCode(deliveryLocation),
+      cargo_description: cargoDescription || `${weight}kg ${vehicleType}`,
       weight: parseFloat(weight || '0'),
-      distance: Math.round(distanceKm),
-      base_rate: Math.round(baseCost),
-      fuel_surcharge: Math.round(fuelCost),
-      toll_charges: Math.round(tollCost),
+      distance: distanceKm,
+      vehicle_type: vehicleType,
+      base_rate: baseCost,
+      fuel_surcharge: fuelCost,
+      toll_charges: tollCost,
       driver_allowance: driverAllowance,
       additional_charges: 0,
-      total_amount: Math.round(total),
+      total_amount: total,
+      margin_percentage: 15.0,
       notes,
       status,
-      confidence: 'MEDIUM',
+      confidence,
+      sla_hours: parseInt(slaHours),
+      valid_until: validUntil,
     });
   };
 
@@ -325,7 +352,18 @@ export default function NewQuote() {
                 <option value="Refrigerated">Refrigerated</option>
                 <option value="Box Truck">Box Truck</option>
                 <option value="Tanker">Tanker</option>
+                <option value="Danger Load">Danger Load</option>
               </select>
+            </div>
+            <div>
+              {label('Cargo Description')}
+              <input
+                type="text"
+                placeholder="e.g. General Freight - Palletized Goods"
+                value={cargoDescription}
+                onChange={e => setCargoDescription(e.target.value)}
+                style={inputStyle}
+              />
             </div>
             <div>
               {label('Base Rate per KM (R/km)')}
@@ -342,20 +380,40 @@ export default function NewQuote() {
           {/* Live cost breakdown */}
           <div style={{ padding: '16px', background: 'var(--bg-surface-hover)', borderRadius: 2, marginBottom: 16 }}>
             <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 10 }}>
-              COST BREAKDOWN
+              COST BREAKDOWN (EDITABLE)
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Base Cost ({Math.round(distanceKm)} km × R{baseRatePerKm}/km):</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(baseCost).toLocaleString()}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Fuel Surcharge:</span>
-                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(fuelCost).toLocaleString()}</span>
+                <input
+                  type="number"
+                  value={editableFuelCost !== null ? editableFuelCost : Math.round(fuelCost)}
+                  onChange={e => setEditableFuelCost(parseFloat(e.target.value) || 0)}
+                  style={{ ...inputStyle, width: 100, padding: '4px 8px', fontSize: 12 }}
+                />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Toll Charges:</span>
-                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(tollCost).toLocaleString()}</span>
+                <input
+                  type="number"
+                  value={editableTollCost !== null ? editableTollCost : Math.round(tollCost)}
+                  onChange={e => setEditableTollCost(parseFloat(e.target.value) || 0)}
+                  style={{ ...inputStyle, width: 100, padding: '4px 8px', fontSize: 12 }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Driver Allowance:</span>
+                <input
+                  type="number"
+                  value={driverAllowanceInput}
+                  onChange={e => setDriverAllowanceInput(e.target.value)}
+                  placeholder="0"
+                  style={{ ...inputStyle, width: 100, padding: '4px 8px', fontSize: 12 }}
+                />
               </div>
               <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Total:</span>
@@ -415,16 +473,51 @@ export default function NewQuote() {
                 style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
               />
             </div>
-            <div>
-              {label('Status')}
-              <select
-                value={status}
-                onChange={e => setStatus(e.target.value as 'DRAFT' | 'SENT')}
-                style={inputStyle}
-              >
-                <option value="DRAFT">Draft</option>
-                <option value="SENT">Send to Customer</option>
-              </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                {label('Status')}
+                <select
+                  value={status}
+                  onChange={e => setStatus(e.target.value as 'DRAFT' | 'SENT')}
+                  style={inputStyle}
+                >
+                  <option value="DRAFT">Draft</option>
+                  <option value="SENT">Send to Customer</option>
+                </select>
+              </div>
+              <div>
+                {label('Confidence')}
+                <select
+                  value={confidence}
+                  onChange={e => setConfidence(e.target.value as 'HIGH' | 'MEDIUM' | 'LOW')}
+                  style={inputStyle}
+                >
+                  <option value="HIGH">High</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="LOW">Low</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                {label('SLA (Hours)')}
+                <input
+                  type="number"
+                  value={slaHours}
+                  onChange={e => setSlaHours(e.target.value)}
+                  placeholder="48"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                {label('Valid Until')}
+                <input
+                  type="date"
+                  value={validUntil}
+                  onChange={e => setValidUntil(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
             </div>
           </div>
 

@@ -42,12 +42,9 @@ export default function Capital() {
         const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
         setAdvances(active);
 
-        // Load eligible invoices — paginated {count, results}
-        const eligibleData = await fetchData('api/v1/invoices/');
-        const allInvoicesList = Array.isArray(eligibleData) ? eligibleData : (eligibleData?.results || []);
-        const eligible = allInvoicesList.filter((inv: any) =>
-          (inv.fast_pay_eligible || inv.risk_tier === 'prime' || inv.risk_tier === 'standard') && inv.status !== 'PAID'
-        );
+        // Load eligible invoices from dedicated endpoint
+        const eligibleData = await fetchData('api/v1/capital/eligible/');
+        const eligible = eligibleData?.invoices || [];
         setEligibleInvoices(eligible);
       } catch (err) {
         console.error('Failed to load capital data:', err);

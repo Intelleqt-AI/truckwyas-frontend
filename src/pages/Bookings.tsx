@@ -9,10 +9,11 @@ const STATUS_COLOR: Record<string, string> = {
   ASSIGNED: 'var(--status-warning)',
   IN_TRANSIT: 'var(--accent-primary)',
   DELIVERED: 'var(--status-success)',
+  INVOICED: 'var(--accent-primary)',
   CANCELLED: 'var(--status-danger)',
 };
 
-const STATUS_CHOICES = ['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED'];
+const STATUS_CHOICES = ['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED', 'CANCELLED'];
 
 export default function Bookings() {
   const { id } = useParams();

@@ -183,7 +183,7 @@ export default function DriverProfile() {
                   <td style={{ padding: '10px 16px' }}>
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
-                      color: load.status === 'DELIVERED' ? 'var(--accent-primary)' : load.status === 'IN_TRANSIT' ? 'var(--status-warning)' : 'var(--text-tertiary)',
+                      color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--accent-primary)' : load.status === 'IN_TRANSIT' ? 'var(--status-warning)' : 'var(--text-tertiary)',
                     }}>{load.status?.replace('_', ' ')}</span>
                   </td>
                   <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>

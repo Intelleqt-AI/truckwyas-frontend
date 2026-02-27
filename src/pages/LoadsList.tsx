@@ -19,6 +19,7 @@ interface Load {
 const STATUS_COLOR: Record<string, string> = {
   IN_TRANSIT: 'var(--accent-primary)',
   DELIVERED: 'var(--status-success)',
+  INVOICED: 'var(--accent-primary)',
   LOADING: 'var(--status-warning)',
   SCHEDULED: 'var(--text-secondary)',
   DELAYED: 'var(--status-error)',

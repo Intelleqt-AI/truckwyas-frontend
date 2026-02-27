@@ -103,8 +103,6 @@ const App = () => {
       </ErrorBoundary>
     </QueryClientProvider>
   </BrowserRouter>
-);
-
   );
 };
 

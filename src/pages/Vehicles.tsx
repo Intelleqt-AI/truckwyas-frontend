@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { fetchData } from '../lib/Api';
 
 interface Vehicle {
@@ -66,6 +66,7 @@ const formatZAR = (v: number) =>
 
 export default function Vehicles() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [overview, setOverview] = useState<FleetOverview | null>(null);
   const [insights, setInsights] = useState<FleetInsight[]>([]);
@@ -154,11 +155,28 @@ export default function Vehicles() {
     );
   }
 
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    background: 'none', border: 'none',
+    borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
+    color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+    fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em',
+    textTransform: 'uppercase', padding: '10px 18px', cursor: 'pointer', marginBottom: -1,
+  });
+
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Vehicles</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
+          <button className="btn-action" onClick={() => navigate('/fleet/vehicles/new')}>+ ADD VEHICLE</button>
+        </div>
+      </div>
+
+      {/* Fleet sub-tabs */}
+      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 20, display: 'flex' }}>
+        <button style={tabStyle(!location.pathname.includes('/drivers'))} onClick={() => navigate('/fleet/vehicles')}>Vehicles</button>
+        <button style={tabStyle(location.pathname.includes('/drivers'))} onClick={() => navigate('/fleet/drivers')}>Drivers</button>
       </div>
 
       {/* Fleet Summary */}

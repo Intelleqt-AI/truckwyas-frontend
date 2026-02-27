@@ -8,7 +8,7 @@ export default function DriverProfile() {
 
   const { data: driver, isLoading } = useQuery({
     queryKey: ['driver', driverId],
-    queryFn: () => fetchData(`api/drivers/${driverId}/`),
+    queryFn: () => fetchData(`api/v1/drivers/${driverId}/`),
     enabled: !!driverId,
   });
 

@@ -15,11 +15,11 @@ export default function CreateInvoice() {
   });
   const [error, setError] = useState('');
 
-  const { data: customersData } = useQuery({ queryKey: ['customers'], queryFn: () => fetchData('api/customers/') });
+  const { data: customersData } = useQuery({ queryKey: ['customers'], queryFn: () => fetchData('api/v1/customers/') });
   const customers = customersData?.results || customersData || [];
 
   const mutation = useMutation({
-    mutationFn: (data: any) => postData({ url: 'api/invoices/', data }),
+    mutationFn: (data: any) => postData({ url: 'api/v1/invoices/', data }),
     onSuccess: () => navigate('/invoices'),
     onError: (e: any) => setError(e?.message || 'Failed to create invoice'),
   });

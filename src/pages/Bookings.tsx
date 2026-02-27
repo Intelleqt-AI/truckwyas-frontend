@@ -17,7 +17,7 @@ export default function Bookings() {
 
   const { data: load, isLoading } = useQuery({
     queryKey: ['load', id],
-    queryFn: () => fetchData(`api/loads/${id}/`),
+    queryFn: () => fetchData(`api/v1/loads/${id}/`),
     enabled: !!id,
   });
 

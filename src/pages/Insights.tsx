@@ -60,17 +60,28 @@ export default function Insights() {
 
   useEffect(() => {
     fetchData('api/v1/dashboard/insights/')
-      .then(setData)
+      .then((res: any) => {
+        // API may return {signals:[]} or an array or null/404
+        if (!res || typeof res !== 'object') {
+          setData(MOCK_FALLBACK);
+        } else if (Array.isArray(res)) {
+          setData({ ...MOCK_FALLBACK, signals: res });
+        } else if (res.signals) {
+          setData(res);
+        } else {
+          // endpoint returned something unexpected — use mock
+          setData(MOCK_FALLBACK);
+        }
+      })
       .catch(() => {
-        setError('Failed to load insights');
         setData(MOCK_FALLBACK);
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredSignals = data?.signals.filter(s =>
+  const filteredSignals = (data?.signals || []).filter((s: InsightSignal) =>
     selectedCategory === 'All' || s.category === selectedCategory
-  ) || [];
+  );
 
   const cashflow = data?.cashflow || MOCK_FALLBACK.cashflow;
   const portfolioHealth = data?.portfolio_health || MOCK_FALLBACK.portfolio_health;

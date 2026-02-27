@@ -60,7 +60,8 @@ const App = () => (
             <Route path="/bookings/list" element={<OSLayout><BookingsList /></OSLayout>} />
             <Route path="/bookings/pipeline" element={<OSLayout><QuotesList /></OSLayout>} />
             <Route path="/bookings/pipeline/:id" element={<OSLayout><NewQuote /></OSLayout>} />
-            <Route path="/fleet" element={<OSLayout><FleetDashboard /></OSLayout>} />
+            <Route path="/fleet" element={<OSLayout><Vehicles /></OSLayout>} />
+            <Route path="/fleet/overview" element={<OSLayout><FleetDashboard /></OSLayout>} />
             <Route path="/fleet/vehicles" element={<OSLayout><Vehicles /></OSLayout>} />
             <Route path="/fleet/vehicles/:id" element={<OSLayout><VehicleDigitalTwin /></OSLayout>} />
             <Route path="/fleet/drivers" element={<OSLayout><Drivers /></OSLayout>} />

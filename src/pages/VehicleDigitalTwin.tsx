@@ -16,12 +16,12 @@ export default function VehicleDigitalTwin() {
 
   const { data: vehicle, isLoading } = useQuery({
     queryKey: ['vehicle', id],
-    queryFn: () => fetchData(`api/vehicles/${id}/`),
+    queryFn: () => fetchData(`api/v1/vehicles/${id}/`),
     enabled: !!id,
   });
 
   if (isLoading) return <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>;
-  if (!vehicle) return <div style={{ padding: 40 }}><div style={{ color: 'var(--text-tertiary)' }}>Vehicle not found.</div><button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/vehicles')}>← BACK</button></div>;
+  if (!vehicle) return <div style={{ padding: 40 }}><div style={{ color: 'var(--text-tertiary)' }}>Vehicle not found.</div><button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/fleet/vehicles')}>← BACK TO FLEET</button></div>;
 
   return (
     <div>

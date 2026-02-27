@@ -63,7 +63,29 @@ export default function Drivers() {
       fetchData('api/v1/drivers/leaderboard/').catch(() => null),
     ]).then(([driversData, overviewData, leaderboardData]) => {
       const driverList = Array.isArray(driversData) ? driversData : (driversData?.results || []);
-      setDrivers(driverList);
+
+      // Parse leaderboard data
+      const lbData = Array.isArray(leaderboardData) ? leaderboardData : (leaderboardData?.data || []);
+      const leaderboardEntries = lbData.map((d: any, i: number) => ({
+        driver_id: d.id || d.driver_id || i,
+        driver_name: d.driver_name || d.name || `Driver ${d.id}`,
+        revenue: d.revenue || d.revenue_generated || 0,
+        trips: d.trips || d.trips_completed || 0,
+        efficiency_score: d.efficiency_score || d.on_time_percentage || 0,
+        rank: d.rank || i + 1,
+      }));
+
+      // Merge leaderboard data into driver list
+      const driversWithPerformance = driverList.map((driver: Driver) => {
+        const leaderboardEntry = leaderboardEntries.find((lb: LeaderboardEntry) => lb.driver_id === driver.id);
+        if (leaderboardEntry && !driver.efficiency_score) {
+          return { ...driver, efficiency_score: leaderboardEntry.efficiency_score };
+        }
+        return driver;
+      });
+
+      setDrivers(driversWithPerformance);
+      setLeaderboard(leaderboardEntries);
 
       if (overviewData?.kpi_cards) {
         const cards = overviewData.kpi_cards as any[];
@@ -85,16 +107,6 @@ export default function Drivers() {
           avg_revenue_per_driver: 0,
         });
       }
-
-      const lbData = Array.isArray(leaderboardData) ? leaderboardData : (leaderboardData?.data || []);
-      setLeaderboard(lbData.map((d: any, i: number) => ({
-        driver_id: d.id || d.driver_id || i,
-        driver_name: d.driver_name || d.name || `Driver ${d.id}`,
-        revenue: d.revenue || d.revenue_generated || 0,
-        trips: d.trips || d.trips_completed || 0,
-        efficiency_score: d.efficiency_score || d.on_time_percentage || 0,
-        rank: d.rank || i + 1,
-      })));
     }).catch(() => {
       setDrivers([]);
     }).finally(() => setLoading(false));
@@ -207,7 +219,7 @@ export default function Drivers() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['Name', 'License', 'Status', 'Trips MTD', 'Revenue Generated', 'Efficiency'].map(h => (
+              {['Name', 'License', 'Status', 'Trips MTD', 'Revenue Generated', 'Performance'].map(h => (
                 <th key={h} style={{
                   padding: '10px 20px', textAlign: 'left',
                   fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
@@ -220,40 +232,71 @@ export default function Drivers() {
           <tbody>
             {filtered.length === 0 ? (
               <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40, fontSize: 13 }}>No drivers found</td></tr>
-            ) : filtered.map((d, idx) => (
-              <tr
-                key={d.id}
-                style={{ cursor: 'pointer', borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}
-                onClick={() => navigate(`/fleet/drivers/${d.id}`)}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                <td style={{ padding: '13px 20px', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
-                  {getDriverName(d)}
-                </td>
-                <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
-                  {d.license_number || '—'}
-                </td>
-                <td style={{ padding: '13px 20px' }}>
-                  <span style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 10,
-                    color: STATUS_COLOR[d.status] || 'var(--text-secondary)',
-                    textTransform: 'uppercase',
-                  }}>
-                    {d.status?.replace('_', ' ')}
-                  </span>
-                </td>
-                <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                  {d.trips_this_month ?? 0}
-                </td>
-                <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                  {d.revenue_generated ? formatZAR(d.revenue_generated) : '—'}
-                </td>
-                <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                  {d.efficiency_score ?? '—'}
-                </td>
-              </tr>
-            ))}
+            ) : filtered.map((d, idx) => {
+              const statusDotColor = d.status === 'ACTIVE' ? 'var(--status-success)' : d.status === 'ON_LEAVE' ? 'var(--status-warning)' : 'var(--text-tertiary)';
+              const efficiencyScore = d.efficiency_score || 0;
+
+              return (
+                <tr
+                  key={d.id}
+                  style={{ cursor: 'pointer', borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}
+                  onClick={() => navigate(`/drivers/${d.id}`)}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <td style={{ padding: '13px 20px', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: statusDotColor,
+                        flexShrink: 0
+                      }} />
+                      {getDriverName(d)}
+                    </div>
+                  </td>
+                  <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                    {d.license_number || '—'}
+                  </td>
+                  <td style={{ padding: '13px 20px' }}>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 10,
+                      color: STATUS_COLOR[d.status] || 'var(--text-secondary)',
+                      textTransform: 'uppercase',
+                    }}>
+                      {d.status?.replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                    {d.trips_this_month ?? 0}
+                  </td>
+                  <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                    {d.revenue_generated ? formatZAR(d.revenue_generated) : '—'}
+                  </td>
+                  <td style={{ padding: '13px 20px' }}>
+                    {efficiencyScore > 0 ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, maxWidth: 120, height: 6, background: 'var(--bg-surface-hover)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{
+                            width: `${Math.min(efficiencyScore, 100)}%`,
+                            height: '100%',
+                            background: 'var(--accent-primary)',
+                            borderRadius: 3,
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-primary)', fontWeight: 600, minWidth: 32, textAlign: 'right' }}>
+                          {efficiencyScore}
+                        </span>
+                      </div>
+                    ) : (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

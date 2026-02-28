@@ -263,56 +263,122 @@ export default function FinanceReports() {
 
           {/* TAB 3: Customer */}
           {tab === 'customer' && (
-            <div className="card table-card">
-              <div className="card-header" style={{ marginBottom: 16 }}>
-                <span className="card-title">Customer Analysis</span>
-                <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                  {customers.length} customers
-                </span>
-              </div>
-              {customers.length > 0 ? (
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Customer Name</th>
-                      <th className="text-right">Revenue</th>
-                      <th className="text-right">Avg Payment Days</th>
-                      <th className="text-right">DSO</th>
-                      <th className="text-right">Outstanding</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {customers
-                      .sort((a, b) => (b.total_revenue || 0) - (a.total_revenue || 0))
-                      .map(cust => (
-                        <tr key={cust.id}>
-                          <td>{cust.name || cust.customer_name}</td>
-                          <td className="mono text-right" style={{ color: 'var(--accent-primary)' }}>
-                            {formatCurrency(cust.total_revenue || 0)}
-                          </td>
-                          <td className="mono text-right">{cust.avg_payment_days || 0}d</td>
-                          <td className="mono text-right">{cust.dso || 0}d</td>
-                          <td className="mono text-right">{formatCurrency(cust.outstanding_balance || 0)}</td>
-                        </tr>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Top customer metrics */}
+              {(() => {
+                const topCustomers = financeData?.top_customers || customers
+                  .map((c: any) => ({
+                    customer_id: c.id,
+                    customer_name: c.name || c.customer_name,
+                    revenue: c.total_revenue || 0,
+                    invoice_count: c.invoice_count || 0
+                  }))
+                  .sort((a: any, b: any) => b.revenue - a.revenue)
+                  .slice(0, 10);
+
+                const totalRevenue = topCustomers.reduce((sum: number, c: any) => sum + (c.revenue || 0), 0);
+                const totalInvoices = topCustomers.reduce((sum: number, c: any) => sum + (c.invoice_count || 0), 0);
+
+                return (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                      {[
+                        { label: 'Total Customers', value: customers.length, color: 'var(--text-primary)' },
+                        { label: 'Top 10 Revenue', value: formatCurrency(totalRevenue), color: 'var(--accent-primary)' },
+                        { label: 'Invoices (Top 10)', value: totalInvoices, color: 'var(--status-success)' },
+                      ].map(m => (
+                        <div key={m.label} className="card metric-card">
+                          <div className="card-header"><span className="card-title">{m.label}</span></div>
+                          <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+                        </div>
                       ))}
-                  </tbody>
-                </table>
-              ) : (
-                <EmptyState message="No customer data available" />
-              )}
+                    </div>
+
+                    {/* Top customers ranked by revenue */}
+                    <div className="card table-card">
+                      <div className="card-header" style={{ marginBottom: 16 }}>
+                        <span className="card-title">Top Customers by Revenue</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                          Ranked by total revenue
+                        </span>
+                      </div>
+                      {topCustomers.length > 0 ? (
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th style={{ width: 40 }}>Rank</th>
+                              <th>Customer Name</th>
+                              <th className="text-right">Revenue</th>
+                              <th className="text-right">Invoice Count</th>
+                              <th className="text-right">Avg Payment Days</th>
+                              <th className="text-right">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {topCustomers.map((cust: any, idx: number) => {
+                              const matchingCustomer = customers.find((c: any) =>
+                                c.id === cust.customer_id || c.name === cust.customer_name
+                              );
+                              const avgPaymentDays = matchingCustomer?.avg_payment_days || 0;
+                              const dso = avgPaymentDays;
+
+                              return (
+                                <tr key={idx} style={{ cursor: 'pointer' }}>
+                                  <td className="mono text-right" style={{
+                                    color: idx < 3 ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                                    fontWeight: idx < 3 ? 600 : 400
+                                  }}>
+                                    #{idx + 1}
+                                  </td>
+                                  <td style={{ fontWeight: idx < 3 ? 500 : 400 }}>{cust.customer_name}</td>
+                                  <td className="mono text-right" style={{
+                                    color: 'var(--accent-primary)',
+                                    fontWeight: 600
+                                  }}>
+                                    {formatCurrency(cust.revenue || 0)}
+                                  </td>
+                                  <td className="mono text-right">{cust.invoice_count || 0}</td>
+                                  <td className="mono text-right" style={{
+                                    color: dso > 60 ? 'var(--status-danger)' : dso > 30 ? 'var(--status-warning)' : 'var(--status-success)'
+                                  }}>
+                                    {dso}d
+                                  </td>
+                                  <td className="text-right">
+                                    <span style={{
+                                      fontFamily: 'var(--font-mono)',
+                                      fontSize: 10,
+                                      color: dso <= 30 ? 'var(--status-success)' : dso <= 60 ? 'var(--status-warning)' : 'var(--status-danger)',
+                                      padding: '2px 6px',
+                                      background: 'var(--bg-surface-hover)',
+                                      borderRadius: 2
+                                    }}>
+                                      {dso <= 30 ? 'EXCELLENT' : dso <= 60 ? 'GOOD' : 'WATCH'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <EmptyState message="No customer data available" />
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           )}
 
           {/* TAB 4: Aging */}
           {tab === 'aging' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Aging buckets */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+              {/* Header metrics */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                 {[
-                  { label: 'Current', value: formatCurrency(agingData?.current || 0), color: 'var(--status-success)' },
-                  { label: '30-60 Days', value: formatCurrency(agingData?.['30_60_days'] || 0), color: 'var(--status-warning)' },
-                  { label: '60-90 Days', value: formatCurrency(agingData?.['60_90_days'] || 0), color: 'var(--status-danger)' },
-                  { label: '90+ Days', value: formatCurrency(agingData?.['90_plus_days'] || 0), color: 'var(--status-danger)' },
+                  { label: 'Total Outstanding', value: formatCurrency(agingData?.summary?.total_outstanding || 0), color: 'var(--accent-primary)' },
+                  { label: 'Overdue Amount', value: formatCurrency(agingData?.summary?.total_overdue || 0), color: 'var(--status-danger)' },
+                  { label: 'DSO (Days)', value: Math.round(agingData?.summary?.dso || 0), color: 'var(--text-primary)' },
                 ].map(m => (
                   <div key={m.label} className="card metric-card">
                     <div className="card-header"><span className="card-title">{m.label}</span></div>
@@ -320,6 +386,67 @@ export default function FinanceReports() {
                   </div>
                 ))}
               </div>
+
+              {/* Aging waterfall bars */}
+              {(() => {
+                const buckets = agingData?.buckets || [
+                  { label: 'Current', amount: 0, count: 0, color: 'var(--status-success)' },
+                  { label: '1-30 Days', amount: 0, count: 0, color: 'var(--status-warning)' },
+                  { label: '31-60 Days', amount: 0, count: 0, color: 'var(--status-warning)' },
+                  { label: '61-90 Days', amount: 0, count: 0, color: 'var(--status-danger)' },
+                  { label: '90+ Days', amount: 0, count: 0, color: 'var(--status-danger)' },
+                ];
+                const totalAmount = buckets.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+
+                return (
+                  <div className="card" style={{ padding: 24 }}>
+                    <div className="card-header" style={{ marginBottom: 20 }}>
+                      <span className="card-title">Aging Analysis</span>
+                    </div>
+                    {buckets.map((bucket: any, idx: number) => {
+                      const pct = totalAmount > 0 ? (bucket.amount / totalAmount) * 100 : 0;
+                      const colorMap: Record<string, string> = {
+                        'Current': 'var(--status-success)',
+                        '1-30 Days': 'var(--status-warning)',
+                        '31-60 Days': '#ff8c00',
+                        '61-90 Days': 'var(--status-danger)',
+                        '90+ Days': '#8b0000'
+                      };
+                      const barColor = colorMap[bucket.label] || 'var(--text-secondary)';
+
+                      return (
+                        <div key={idx} style={{ marginBottom: 16 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <div>
+                              <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{bucket.label}</span>
+                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 8, fontFamily: 'var(--font-mono)' }}>
+                                ({bucket.count || 0} {(bucket.count || 0) === 1 ? 'invoice' : 'invoices'})
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
+                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                                {pct.toFixed(1)}%
+                              </span>
+                              <span style={{ fontSize: 15, fontWeight: 600, color: barColor, fontFamily: 'var(--font-mono)' }}>
+                                {formatCurrency(bucket.amount || 0)}
+                              </span>
+                            </div>
+                          </div>
+                          <div style={{ height: 24, background: 'var(--bg-surface-hover)', borderRadius: 4, overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%',
+                              width: `${pct}%`,
+                              background: barColor,
+                              borderRadius: 4,
+                              transition: 'width 0.3s ease'
+                            }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
               {/* Overdue invoice list */}
               {agingData?.overdue_invoices && agingData.overdue_invoices.length > 0 ? (

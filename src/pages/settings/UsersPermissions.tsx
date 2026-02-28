@@ -41,22 +41,24 @@ interface User {
   last_active?: string;
 }
 
-const MOCK_USERS: User[] = [
-  { id: 1, name: 'Admin User', email: 'admin@truckwys.co.za', role: 'admin', status: 'active', last_active: 'Now' },
-];
-
 export function UsersPermissions() {
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('operator');
 
   useEffect(() => {
-    fetchData('api/users/').then((d: any) => {
-      const arr = Array.isArray(d) ? d : (d?.results || []);
-      if (arr.length) setUsers(arr);
-    }).catch(() => {});
+    fetchData('api/users/')
+      .then((d: any) => {
+        const arr = Array.isArray(d) ? d : (d?.results || []);
+        setUsers(arr);
+      })
+      .catch(() => {
+        setUsers([]);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const filtered = users.filter(u =>
@@ -139,23 +141,30 @@ export function UsersPermissions() {
         )}
 
         {/* Table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
-          <thead>
-            <tr>
-              {['User', 'Role', 'Status', 'Last Active', ''].map(h => (
-                <th key={h} style={{
-                  padding: '10px 20px', textAlign: 'left' as const,
-                  fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                  letterSpacing: '0.08em', color: 'var(--text-tertiary)',
-                  borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
-                }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan={5} style={{ textAlign: 'center' as const, padding: 32, color: 'var(--text-tertiary)', fontSize: 13 }}>No users found</td></tr>
-            ) : filtered.map(u => (
+        {loading ? (
+          <div style={{ padding: 24 }}>
+            <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
+            <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '40%' }} />
+            <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+            <thead>
+              <tr>
+                {['User', 'Role', 'Status', 'Last Active', ''].map(h => (
+                  <th key={h} style={{
+                    padding: '10px 20px', textAlign: 'left' as const,
+                    fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
+                    letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                    borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr><td colSpan={5} style={{ textAlign: 'center' as const, padding: 32, color: 'var(--text-tertiary)', fontSize: 13 }}>No users found</td></tr>
+              ) : filtered.map(u => (
               <tr key={u.id} style={{ borderBottom: '1px solid var(--border-row)' }}>
                 <td style={{ padding: '12px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -200,8 +209,9 @@ export function UsersPermissions() {
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Roles Reference */}

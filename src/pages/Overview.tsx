@@ -12,6 +12,7 @@ export default function Overview() {
   const [recentQuotes, setRecentQuotes] = useState<any[]>([]);
   const [activeLoadsCount, setActiveLoadsCount] = useState(0);
   const [totalVehicles, setTotalVehicles] = useState(0);
+  const [activeVehicles, setActiveVehicles] = useState(0);
   const [activity, setActivity] = useState<any[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
 
@@ -19,7 +20,7 @@ export default function Overview() {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [finance, insightsData, advancesData, quotesData, loadsData, activityData, vehiclesData] = await Promise.all([
+        const [finance, insightsData, advancesData, quotesData, loadsData, activityData, vehiclesData, fleetData] = await Promise.all([
           fetchData('api/v1/dashboard/finance/').catch(() => null),
           fetchData('api/v1/dashboard/signals/').catch(() => fetchData('api/v1/dashboard/insights/').catch(() => [])),
           fetchData('api/v1/advances/').catch(() => []),
@@ -27,6 +28,7 @@ export default function Overview() {
           fetchData('api/v1/loads/').catch(() => []),
           fetchData('api/v1/activity/').catch(() => []),
           fetchData('api/v1/vehicles/').catch(() => []),
+          fetchData('api/v1/fleet/overview/').catch(() => null),
         ]);
         setFinanceData(finance);
         // dashboard/insights/ may not exist — handle gracefully, signals come as array or {signals:[]}
@@ -65,6 +67,10 @@ export default function Overview() {
         setActiveLoadsCount(activeLoads.length);
         const vehicles = vehiclesData?.results || vehiclesData || [];
         setTotalVehicles(vehicles.length);
+
+        // Get active vehicles count from fleet overview or calculate from vehicle data
+        const activeVehicleCount = fleetData?.active_vehicles || vehicles.filter((v: any) => v.status === 'AVAILABLE' || v.status === 'IN_USE').length || 0;
+        setActiveVehicles(activeVehicleCount);
 
         setActivity(Array.isArray(activityData) ? activityData : (activityData?.results || []));
         setActivityLoading(false);
@@ -127,13 +133,28 @@ export default function Overview() {
 
         <div className="card metric-card">
           <div className="card-header">
-            <span className="card-title">{loading ? 'Loading...' : 'Capital In Use'}</span>
+            <span className="card-title">{loading ? 'Loading...' : 'Outstanding'}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="card-action"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </div>
-          <div className="metric-value">
-            {loading ? '...' : formatCurrency(advances.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED').reduce((sum: number, a: any) => sum + (a.advanced_amount || 0), 0) || 0)}
+          <div className="metric-value" style={{ color: 'var(--status-warning)' }}>
+            {loading ? '...' : formatCurrency(financeData?.outstanding_invoices_total || 0)}
           </div>
-          <div className="metric-delta delta-neutral"><span>{advances.length} advances</span></div>
+          <div className="metric-delta delta-neutral">
+            <span>DSO: {loading ? '—' : Math.round(financeData?.dso || 0)} days</span>
+          </div>
+        </div>
+
+        <div className="card metric-card">
+          <div className="card-header">
+            <span className="card-title">{loading ? 'Loading...' : 'Fleet Active'}</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="card-action"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+          </div>
+          <div className="metric-value" style={{ color: 'var(--status-success)' }}>
+            {loading ? '...' : activeVehicles}
+          </div>
+          <div className="metric-delta delta-neutral">
+            <span>{totalVehicles} total</span>
+          </div>
         </div>
 
         {/* Chart card */}

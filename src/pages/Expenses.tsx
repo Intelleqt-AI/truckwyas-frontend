@@ -271,6 +271,14 @@ export default function Expenses() {
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Finance</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Expenses</div>
+          {categoryBreakdown.length > 0 && (
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>{categoryBreakdown[0].icon}</span>
+              <strong style={{ color: 'var(--accent-primary)' }}>{categoryBreakdown[0].label}</strong>
+              <span>is your #1 expense this month</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>({formatZAR(categoryBreakdown[0].total)})</span>
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <button

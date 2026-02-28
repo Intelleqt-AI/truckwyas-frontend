@@ -102,25 +102,25 @@ export function BookingsList() {
       >
         <Card>
           <CardContent className="p-4">
-            <div className="text-display-h3 font-display-bold text-foreground text-tabular">3</div>
+            <div className="text-display-h3 font-display-bold text-foreground text-tabular">{loadingData ? '...' : bookings.length}</div>
             <p className="text-caption text-muted-foreground">Total Bookings</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-display-h3 font-display-bold text-primary text-tabular">1</div>
+            <div className="text-display-h3 font-display-bold text-primary text-tabular">{loadingData ? '...' : bookings.filter(b => b.status === 'En-route').length}</div>
             <p className="text-caption text-muted-foreground">En-route</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-display-h3 font-display-bold text-success text-tabular">1</div>
+            <div className="text-display-h3 font-display-bold text-success text-tabular">{loadingData ? '...' : bookings.filter(b => b.status === 'Delivered').length}</div>
             <p className="text-caption text-muted-foreground">Delivered</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-display-h3 font-display-bold text-warning text-tabular">1</div>
+            <div className="text-display-h3 font-display-bold text-warning text-tabular">{loadingData ? '...' : bookings.filter(b => b.invoiceStatus === 'Not Raised').length}</div>
             <p className="text-caption text-muted-foreground">Invoice Pending</p>
           </CardContent>
         </Card>

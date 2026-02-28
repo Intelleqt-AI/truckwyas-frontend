@@ -60,23 +60,6 @@ const TIER_COLOR: Record<string, string> = {
   HIGH: 'var(--status-danger)',
 };
 
-const MOCK_RISK_DETAIL: OperatorRiskDetail = {
-  operator_id: 1,
-  operator_name: 'Truckwys Logistics',
-  overall_score: 85,
-  risk_tier: 'PRIME',
-  confidence_interval: '82-88',
-  fee_rate: 2.2,
-  pillars: [
-    { name: 'Invoice Quality', score: 92, description: 'Consistent invoice patterns, low dispute rate' },
-    { name: 'Payment History', score: 88, description: 'Avg payment within 25 days, 2% default rate' },
-    { name: 'Customer Concentration', score: 78, description: 'Top 3 customers = 45% revenue (moderate risk)' },
-    { name: 'Revenue Trend', score: 85, description: '12% YoY growth, stable month-over-month' },
-    { name: 'Facility Ratio', score: 90, description: 'Using 28% of facility (healthy utilization)' },
-    { name: 'Booking Consistency', score: 82, description: 'Predictable booking volume, low volatility' },
-    { name: 'External Risk', score: 80, description: 'Industry stable, no adverse credit events' },
-  ],
-};
 
 export default function PartnerDashboard() {
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
@@ -141,7 +124,9 @@ export default function PartnerDashboard() {
     if (selectedOperator) {
       fetchData(`api/v1/partner/risk/${selectedOperator}/`)
         .then(setOperatorRisk)
-        .catch(() => setOperatorRisk(MOCK_RISK_DETAIL));
+        .catch(() => setOperatorRisk(null));
+    } else {
+      setOperatorRisk(null);
     }
   }, [selectedOperator]);
 
@@ -448,6 +433,19 @@ export default function PartnerDashboard() {
       </div>
 
           {/* AI Risk Scoring Section */}
+          {selectedOperator && !operatorRisk && (
+            <div>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 12 }}>
+                AI RISK SCORING
+              </div>
+              <div className="card" style={{ padding: 32, textAlign: 'center' }}>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                  Risk scoring data not yet available for this operator.
+                </div>
+              </div>
+            </div>
+          )}
+
           {selectedOperator && operatorRisk && (
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 12 }}>

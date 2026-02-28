@@ -16,29 +16,6 @@ interface InsightsResponse {
   portfolio_health?: Array<{ label: string; value: string; target: string; ok: boolean }>;
 }
 
-const MOCK_FALLBACK: InsightsResponse = {
-  signals: [
-    { type: 'CRITICAL', title: 'Margin Leak — JHB-CPT', body: 'Fuel costs 12% above baseline on Truck 42. Reroute via N1 Alternate saves ~R 1,840/trip.', action: 'APPLY FIX', category: 'Route Intelligence' },
-    { type: 'OPPORTUNITY', title: 'Invoice Chasing — INV-2024-09', body: 'Client opened email 3x. Payment probability today: 85%. Recommend follow-up call.', action: 'CALL NOW', category: 'Cash Alerts' },
-    { type: 'WARNING', title: '3 Trucks Idle — Depot 4', body: 'TRK-774, TRK-811, TRK-829 idle 18+ hours. Estimated revenue loss: R 54,000/day.', action: 'REASSIGN', category: 'Fleet Performance' },
-    { type: 'INFO', title: 'LogiCorp — New Load Available', body: 'CPT → JHB, 24T, R 48,000. Matches your fleet capacity. 3 competitors have quoted.', action: 'QUOTE', category: 'Customer Intel' },
-    { type: 'OPPORTUNITY', title: 'Fast Pay — 4 Invoices Ready', body: 'R 182,000 in eligible invoices. Advance at 2–2.5% fee. Cash in 4 hours.', action: 'FAST PAY', category: 'Cash Alerts' },
-  ],
-  cashflow: [
-    { label: 'Week 1', confirmed: 420000, expected: 680000 },
-    { label: 'Week 2', confirmed: 310000, expected: 520000 },
-    { label: 'Week 3', confirmed: 180000, expected: 440000 },
-    { label: 'Week 4', confirmed: 90000, expected: 380000 },
-    { label: 'Week 5', confirmed: 0, expected: 290000 },
-    { label: 'Week 6', confirmed: 0, expected: 210000 },
-  ],
-  portfolio_health: [
-    { label: 'Avg Payment Days', value: '28', target: '30', ok: true },
-    { label: 'Dispute Rate', value: '1.2%', target: '<5%', ok: true },
-    { label: 'Advance Utilization', value: '25%', target: '<60%', ok: true },
-    { label: 'Overdue Ratio', value: '8%', target: '<10%', ok: true },
-  ],
-};
 
 const CATEGORIES = ['All', 'Route Intelligence', 'Customer Intel', 'Cash Alerts', 'Fleet Performance'];
 
@@ -76,19 +53,17 @@ export default function Insights() {
         fetchData('api/v1/dashboard/finance/').catch(() => null),
       ]);
 
-      let signals = [];
-      let cashflow = null;
-      let portfolio_health = null;
+      let signals: InsightSignal[] = [];
+      let cashflow: Array<{ label: string; confirmed: number; expected: number }> = [];
+      let portfolio_health: Array<{ label: string; value: string; target: string; ok: boolean }> = [];
 
       // Wire signals
-      if (!insightsRes || typeof insightsRes !== 'object') {
-        signals = MOCK_FALLBACK.signals;
-      } else if (Array.isArray(insightsRes)) {
-        signals = insightsRes;
-      } else if (insightsRes.signals) {
-        signals = insightsRes.signals;
-      } else {
-        signals = MOCK_FALLBACK.signals;
+      if (insightsRes && typeof insightsRes === 'object') {
+        if (Array.isArray(insightsRes)) {
+          signals = insightsRes;
+        } else if (insightsRes.signals) {
+          signals = insightsRes.signals;
+        }
       }
 
       // Wire cashflow from dedicated endpoint
@@ -96,26 +71,24 @@ export default function Insights() {
         cashflow = cashflowRes;
       } else if (cashflowRes?.cashflow && Array.isArray(cashflowRes.cashflow)) {
         cashflow = cashflowRes.cashflow;
-      } else {
-        cashflow = MOCK_FALLBACK.cashflow;
       }
 
       // Wire portfolio health from finance endpoint
       if (financeRes) {
         portfolio_health = [
-          { label: 'Avg Payment Days', value: String(financeRes.avg_payment_days || '28'), target: '30', ok: (financeRes.avg_payment_days || 28) <= 30 },
-          { label: 'Dispute Rate', value: financeRes.dispute_rate || '1.2%', target: '<5%', ok: true },
-          { label: 'Advance Utilization', value: financeRes.advance_utilization || '25%', target: '<60%', ok: true },
-          { label: 'Overdue Ratio', value: financeRes.overdue_ratio || '8%', target: '<10%', ok: true },
+          { label: 'Avg Payment Days', value: String(financeRes.avg_payment_days || '—'), target: '30', ok: (financeRes.avg_payment_days || 0) <= 30 },
+          { label: 'Dispute Rate', value: financeRes.dispute_rate || '—', target: '<5%', ok: true },
+          { label: 'Advance Utilization', value: financeRes.advance_utilization || '—', target: '<60%', ok: true },
+          { label: 'Overdue Ratio', value: financeRes.overdue_ratio || '—', target: '<10%', ok: true },
         ];
-      } else {
-        portfolio_health = MOCK_FALLBACK.portfolio_health;
       }
 
       setData({ signals, cashflow, portfolio_health });
       setLastUpdated(new Date());
+      setError(null);
     } catch (err) {
-      setData(MOCK_FALLBACK);
+      setData({ signals: [], cashflow: [], portfolio_health: [] });
+      setError('Failed to load insights data');
       setLastUpdated(new Date());
     }
   };
@@ -134,11 +107,11 @@ export default function Insights() {
     selectedCategory === 'All' || s.category === selectedCategory
   );
 
-  const cashflow = data?.cashflow || MOCK_FALLBACK.cashflow;
-  const portfolioHealth = data?.portfolio_health || MOCK_FALLBACK.portfolio_health;
-  const maxVal = Math.max(...(cashflow?.map(c => c.expected) || [800000]));
-  const totalExpected = cashflow?.reduce((sum, c) => sum + c.expected, 0) || 0;
-  const totalConfirmed = cashflow?.reduce((sum, c) => sum + c.confirmed, 0) || 0;
+  const cashflow = data?.cashflow || [];
+  const portfolioHealth = data?.portfolio_health || [];
+  const maxVal = cashflow.length > 0 ? Math.max(...cashflow.map(c => c.expected)) : 1;
+  const totalExpected = cashflow.reduce((sum, c) => sum + c.expected, 0);
+  const totalConfirmed = cashflow.reduce((sum, c) => sum + c.confirmed, 0);
 
   return (
     <div>
@@ -249,7 +222,15 @@ export default function Insights() {
             </div>
           )}
 
-          {!loading && (
+          {!loading && cashflow.length === 0 && (
+            <div className="card" style={{ padding: 32, textAlign: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                Cash flow forecast data not yet available.
+              </div>
+            </div>
+          )}
+
+          {!loading && cashflow.length > 0 && (
             <div className="card" style={{ padding: 20, marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Total Expected</span>
@@ -263,7 +244,7 @@ export default function Insights() {
                   R {totalConfirmed.toLocaleString()}
                 </span>
               </div>
-              {cashflow?.map((row, i) => (
+              {cashflow.map((row, i) => (
                 <div key={i} style={{ marginBottom: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{row.label}</span>
@@ -291,10 +272,18 @@ export default function Insights() {
             </div>
           )}
 
-          {!loading && (
+          {!loading && portfolioHealth.length === 0 && (
+            <div className="card" style={{ padding: 32, textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                Portfolio health data not yet available.
+              </div>
+            </div>
+          )}
+
+          {!loading && portfolioHealth.length > 0 && (
             <div className="card" style={{ padding: 20 }}>
               <div className="card-header" style={{ marginBottom: 16 }}><span className="card-title">Portfolio Health</span></div>
-              {portfolioHealth?.map(r => (
+              {portfolioHealth.map(r => (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
                   <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.label}</span>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>

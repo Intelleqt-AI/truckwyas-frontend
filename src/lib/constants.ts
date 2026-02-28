@@ -146,12 +146,12 @@ export const INVOICE_STATUS = {
 } as const;
 
 export const INVOICE_STATUS_COLORS = {
-  DRAFT: { bg: '#94A3B8', text: '#FFFFFF' },
-  SENT: { bg: '#2563EB', text: '#FFFFFF' },
-  PAID: { bg: '#10B981', text: '#FFFFFF' },
-  OVERDUE: { bg: '#EF4444', text: '#FFFFFF' },
-  PARTIALLY_PAID: { bg: '#F59E0B', text: '#FFFFFF' },
-  CANCELLED: { bg: '#64748B', text: '#FFFFFF' }
+  DRAFT: { bg: 'var(--text-tertiary)', text: 'var(--bg-deep)' },
+  SENT: { bg: 'var(--accent-primary)', text: 'var(--bg-deep)' },
+  PAID: { bg: 'var(--status-success)', text: 'var(--bg-deep)' },
+  OVERDUE: { bg: 'var(--status-danger)', text: 'var(--bg-deep)' },
+  PARTIALLY_PAID: { bg: 'var(--status-warning)', text: 'var(--bg-deep)' },
+  CANCELLED: { bg: 'var(--text-secondary)', text: 'var(--bg-deep)' }
 } as const;
 
 // Expense Status Configuration
@@ -163,12 +163,12 @@ export const EXPENSE_STATUS = {
 
 // Expense Category Configuration
 export const EXPENSE_CATEGORIES = {
-  FUEL: { label: 'Fuel', icon: '⛽', color: '#F59E0B' },
-  TOLLS: { label: 'Tolls', icon: '🛣️', color: '#2563EB' },
-  MAINTENANCE: { label: 'Maintenance', icon: '🔧', color: '#EF4444' },
-  DRIVER: { label: 'Driver', icon: '👤', color: '#10B981' },
-  INSURANCE: { label: 'Insurance', icon: '🛡️', color: '#8B5CF6' },
-  OVERHEAD: { label: 'Overhead', icon: '📋', color: '#64748B' }
+  FUEL: { label: 'Fuel', icon: '⛽', color: 'var(--status-warning)' },
+  TOLLS: { label: 'Tolls', icon: '🛣️', color: 'var(--accent-primary)' },
+  MAINTENANCE: { label: 'Maintenance', icon: '🔧', color: 'var(--status-danger)' },
+  DRIVER: { label: 'Driver', icon: '👤', color: 'var(--status-success)' },
+  INSURANCE: { label: 'Insurance', icon: '🛡️', color: 'var(--accent-primary)' },
+  OVERHEAD: { label: 'Overhead', icon: '📋', color: 'var(--text-secondary)' }
 } as const;
 
 // Currency Formatter Utility

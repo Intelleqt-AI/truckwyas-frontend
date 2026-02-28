@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { fetchData } from "@/lib/Api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,52 +10,32 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Search, Truck, User, MapPin, Clock } from "lucide-react";
 import { formatDate } from "@/lib/formatters";
 
-// Mock data
-const mockBookings = [
-  {
-    id: "B-901",
-    quoteId: "Q-1001",
-    customer: "Makana Foods",
-    origin: "JHB",
-    destination: "CPT",
-    slaHours: 48,
-    vehicle: "V-04",
-    driver: "D-12",
-    status: "Planned",
-    invoiceStatus: "Not Raised",
-    pickupDate: "2025-09-07"
-  },
-  {
-    id: "B-902",
-    quoteId: "Q-1002", 
-    customer: "Tiger Brands",
-    origin: "DUR",
-    destination: "JHB",
-    slaHours: 24,
-    vehicle: "V-08",
-    driver: "D-03",
-    status: "En-route",
-    invoiceStatus: "Raised",
-    pickupDate: "2025-09-06"
-  },
-  {
-    id: "B-903",
-    quoteId: "Q-1000",
-    customer: "Shoprite",
-    origin: "CPT",
-    destination: "JHB", 
-    slaHours: 48,
-    vehicle: "V-12",
-    driver: "D-07",
-    status: "Delivered",
-    invoiceStatus: "Paid",
-    pickupDate: "2025-09-03"
-  }
-];
+
 
 export function BookingsList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  useEffect(() => {
+    fetchData('api/v1/loads/?limit=100').then(d => {
+      const raw = d?.results || d || [];
+      setBookings(raw.map((l: any) => ({
+        id: l.load_number || `L-${l.id}`,
+        quoteId: l.quote || '—',
+        customer: l.customer_name || l.customer || '—',
+        origin: l.pickup_location || '—',
+        destination: l.delivery_location || '—',
+        slaHours: l.sla_hours || 48,
+        vehicle: l.vehicle || '—',
+        driver: l.driver || '—',
+        status: l.status === 'IN_TRANSIT' ? 'En-route' : l.status === 'DELIVERED' ? 'Delivered' : l.status === 'LOADING' ? 'Loading' : 'Planned',
+        invoiceStatus: l.invoices?.length > 0 ? 'Raised' : 'Not Raised',
+        pickupDate: l.pickup_date || l.created_at?.split('T')[0] || '',
+      })));
+    }).catch(() => setBookings([])).finally(() => setLoadingData(false));
+  }, []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -74,7 +55,7 @@ export function BookingsList() {
     }
   };
 
-  const filteredBookings = mockBookings.filter(booking => 
+  const filteredBookings = bookings.filter(booking => 
     booking.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
     `${booking.origin} → ${booking.destination}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     booking.vehicle.toLowerCase().includes(searchTerm.toLowerCase())

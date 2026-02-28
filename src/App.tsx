@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { OSLayout } from "./components/os/OSLayout";
 // Pages
@@ -90,6 +90,10 @@ const App = () => (
             <Route path="/fleet/vehicles/:id/financial" element={<OSLayout><VehicleFinancialProfile /></OSLayout>} />
             <Route path="/capital/risk-scores" element={<OSLayout><RiskScoreView /></OSLayout>} />
             <Route path="/fleet/heatmap" element={<OSLayout><FleetHeatmap /></OSLayout>} />
+            {/* Route aliases */}
+            <Route path="/overview" element={<Navigate to="/" replace />} />
+            <Route path="/expenses" element={<Navigate to="/finance/expenses" replace />} />
+            <Route path="/partner" element={<Navigate to="/partner-dashboard" replace />} />
             <Route path="*" element={<OSLayout><NotFound /></OSLayout>} />
           </Routes>
         </TooltipProvider>

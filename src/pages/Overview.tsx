@@ -11,6 +11,7 @@ export default function Overview() {
   const [advances, setAdvances] = useState<any[]>([]);
   const [recentQuotes, setRecentQuotes] = useState<any[]>([]);
   const [activeLoadsCount, setActiveLoadsCount] = useState(0);
+  const [totalVehicles, setTotalVehicles] = useState(0);
   const [activity, setActivity] = useState<any[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
 
@@ -18,13 +19,14 @@ export default function Overview() {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [finance, insightsData, advancesData, quotesData, loadsData, activityData] = await Promise.all([
+        const [finance, insightsData, advancesData, quotesData, loadsData, activityData, vehiclesData] = await Promise.all([
           fetchData('api/v1/dashboard/finance/').catch(() => null),
           fetchData('api/v1/dashboard/signals/').catch(() => fetchData('api/v1/dashboard/insights/').catch(() => [])),
           fetchData('api/v1/advances/').catch(() => []),
           fetchData('api/v1/quotes/?limit=5').catch(() => []),
           fetchData('api/v1/loads/').catch(() => []),
           fetchData('api/v1/activity/').catch(() => []),
+          fetchData('api/v1/vehicles/').catch(() => []),
         ]);
         setFinanceData(finance);
         // dashboard/insights/ may not exist — handle gracefully, signals come as array or {signals:[]}
@@ -61,6 +63,8 @@ export default function Overview() {
         const loads = loadsData?.results || loadsData || [];
         const activeLoads = loads.filter((l: any) => l.status === 'IN_TRANSIT' || l.status === 'LOADING');
         setActiveLoadsCount(activeLoads.length);
+        const vehicles = vehiclesData?.results || vehiclesData || [];
+        setTotalVehicles(vehicles.length);
 
         setActivity(Array.isArray(activityData) ? activityData : (activityData?.results || []));
         setActivityLoading(false);
@@ -100,7 +104,7 @@ export default function Overview() {
             <span className="card-title">{loading ? 'Loading...' : 'Total Revenue'}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="card-action"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </div>
-          <div className="metric-value">{loading ? '...' : formatCurrency(financeData?.total_revenue || 18450)}</div>
+          <div className="metric-value">{loading ? '...' : formatCurrency(financeData?.total_revenue || 0)}</div>
           <div className="metric-delta delta-up">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="18 15 12 9 6 15"/></svg>
             <span>+12.5% vs avg</span>
@@ -113,7 +117,7 @@ export default function Overview() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="card-action"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </div>
           <div className="metric-value" style={{ color: 'var(--accent-primary)' }}>
-            {loading ? '...' : formatPercent(financeData?.net_margin_percent || 24.8)}
+            {loading ? '...' : formatPercent(financeData?.net_margin_percent || 0)}
           </div>
           <div className="metric-delta delta-up">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="18 15 12 9 6 15"/></svg>
@@ -142,30 +146,34 @@ export default function Overview() {
             </div>
           </div>
           {(() => {
-            const rev =  [42,48,51,45,58,62,55,68,72,65,80,76,71,85,90,82,78,88,92,86,95,100,94,88,96,102,98,104,108,112];
-            const fuel = [18,20,19,21,22,20,24,22,25,23,28,26,24,27,30,28,26,29,31,28,32,34,31,30,33,35,32,34,36,37];
-            const maxV = 120;
-            const pts = (arr: number[]) => arr.map((v, i) => `${(i / (arr.length - 1)) * 100},${100 - (v / maxV) * 100}`).join(' ');
+            const trend = financeData?.monthly_trend || [];
+            const rev = trend.length > 0 ? trend.map((m: any) => m.revenue / 1000) : [0];
+            const fuel = trend.length > 0 ? trend.map((m: any) => m.expenses / 1000) : [0];
+            const maxV = Math.max(...rev, ...fuel, 1) * 1.1;
+            const pts = (arr: number[]) => arr.map((v, i) => `${(i / Math.max(arr.length - 1, 1)) * 100},${100 - (v / maxV) * 100}`).join(' ');
+            const labels = trend.map((m: any) => m.month?.slice(5) || '');
             return (
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: 120, display: 'block', marginTop: 8 }}>
-                <defs>
-                  <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.15"/>
-                    <stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0"/>
-                  </linearGradient>
-                </defs>
-                <polygon points={`0,100 ${pts(rev)} 100,100`} fill="url(#revGrad)" />
-                <polyline points={pts(rev)} fill="none" stroke="var(--accent-primary)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-                <polyline points={pts(fuel)} fill="none" stroke="var(--status-danger)" strokeWidth="1.2" strokeDasharray="3,2" vectorEffect="non-scaling-stroke" />
-              </svg>
+              <>
+                <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: 120, display: 'block', marginTop: 8 }}>
+                  <defs>
+                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.15"/>
+                      <stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  <polygon points={`0,100 ${pts(rev)} 100,100`} fill="url(#revGrad)" />
+                  <polyline points={pts(rev)} fill="none" stroke="var(--accent-primary)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                  <polyline points={pts(fuel)} fill="none" stroke="var(--status-danger)" strokeWidth="1.2" strokeDasharray="3,2" vectorEffect="non-scaling-stroke" />
+                </svg>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>
+                  {labels.slice(-4).map((l: string, i: number) => <span key={i}>{l}</span>)}
+                </div>
+              </>
             );
           })()}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>
-            <span>01 Feb</span><span>10 Feb</span><span>20 Feb</span><span>26 Feb</span>
-          </div>
           <div style={{ display: 'flex', gap: 20, marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-            <span>Net Margin <span style={{ color: 'var(--accent-primary)' }}>72.1%</span></span>
-            <span>Fuel/Rev ratio <span style={{ color: 'var(--status-warning)' }}>28%</span></span>
+            <span>Net Margin <span style={{ color: 'var(--accent-primary)' }}>{financeData?.net_margin_percent != null ? `${financeData.net_margin_percent.toFixed(1)}%` : '—'}</span></span>
+            <span>Fuel/Rev ratio <span style={{ color: 'var(--status-warning)' }}>{financeData?.monthly_trend?.length > 0 ? `${Math.round((financeData.monthly_trend.at(-1).expenses / Math.max(financeData.monthly_trend.at(-1).revenue, 1)) * 100)}%` : '—'}</span></span>
             <span>Trend <span style={{ color: 'var(--status-success)' }}>↑ improving</span></span>
           </div>
         </div>
@@ -174,15 +182,15 @@ export default function Overview() {
         <div className="card utilization-card">
           <div className="card-header"><span className="card-title">Fleet Utilization</span></div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <span style={{ fontSize: 24, fontWeight: 500, color: 'var(--text-primary)' }}>88%</span>
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>High Demand</span>
+            <span style={{ fontSize: 24, fontWeight: 500, color: 'var(--text-primary)' }}>{totalVehicles > 0 ? `${Math.round((activeLoadsCount / totalVehicles) * 100)}%` : '—'}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{activeLoadsCount} active loads</span>
           </div>
           <div className="heatmap-grid">
             {['low','med','high','low','high','high','low','high','high','med','high','low','high','high','high','med','high','high','high','high','med','med','med','low','low','med','low','low'].map((v, i) => (
               <div key={i} className={`heat-cell heat-${v}`} />
             ))}
           </div>
-          <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-tertiary)' }}>3 trucks idle in Depot 4</div>
+          <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-tertiary)' }}>{totalVehicles > 0 ? `${totalVehicles - activeLoadsCount} vehicle${totalVehicles - activeLoadsCount !== 1 ? 's' : ''} available` : 'Loading...'}</div>
         </div>
 
         {/* Recent Quotes */}

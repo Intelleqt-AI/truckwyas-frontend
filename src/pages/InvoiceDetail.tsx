@@ -60,6 +60,41 @@ export default function InvoiceDetail() {
     }, 3000);
   };
 
+  const handleRecordPayment = async () => {
+    if (!id || !paymentAmount || !paymentDate) {
+      setToast('Please fill in all required fields');
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+
+    setRecordingPayment(true);
+    try {
+      await postData({
+        url: 'api/v1/payments/',
+        data: {
+          invoice: id,
+          amount: parseFloat(paymentAmount),
+          payment_date: paymentDate,
+          payment_method: paymentMethod,
+          reference: paymentReference
+        }
+      });
+      setToast('Payment recorded!');
+      setShowPaymentForm(false);
+      setPaymentAmount('');
+      setPaymentDate('');
+      setPaymentReference('');
+      setTimeout(() => setToast(null), 3000);
+      refetch();
+    } catch (error) {
+      console.error('Failed to record payment:', error);
+      setToast('Failed to record payment');
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setRecordingPayment(false);
+    }
+  };
+
   if (isLoading) return <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>;
   if (isError || !invoice) return <div style={{ padding: 40 }}><div style={{ color: 'var(--text-tertiary)' }}>Invoice not found.</div><button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/finance/invoices')}>← BACK</button></div>;
 
@@ -128,10 +163,69 @@ export default function InvoiceDetail() {
                 {downloading ? 'DOWNLOADING...' : 'DOWNLOAD PDF'}
               </button>
             )}
+            {(invoice.status === 'SENT' || invoice.status === 'OVERDUE' || invoice.status === 'PARTIALLY_PAID') && !showPaymentForm && (
+              <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>RECORD PAYMENT</button>
+            )}
             {(invoice.fast_pay_eligible || invoice.early_pay_eligible) && invoice.status !== 'PAID' && (
               <button onClick={() => navigate('/capital')} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>REQUEST FAST PAY</button>
             )}
           </div>
+
+          {showPaymentForm && (
+            <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--border-subtle)' }}>
+              <div className="card-title" style={{ marginBottom: 12, fontSize: 12 }}>Record Payment</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Amount"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  style={{ padding: '8px', fontSize: 12, border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+                />
+                <input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  style={{ padding: '8px', fontSize: 12, border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+                />
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  style={{ padding: '8px', fontSize: 12, border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+                >
+                  <option value="EFT">EFT</option>
+                  <option value="CASH">Cash</option>
+                  <option value="CARD">Card</option>
+                  <option value="CHEQUE">Cheque</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Reference (optional)"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  style={{ padding: '8px', fontSize: 12, border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={handleRecordPayment}
+                    disabled={recordingPayment}
+                    className="btn-action"
+                    style={{ flex: 1, padding: '10px', fontSize: 12, background: 'var(--accent-primary)', border: 'none', color: 'black' }}
+                  >
+                    {recordingPayment ? 'RECORDING...' : 'SAVE'}
+                  </button>
+                  <button
+                    onClick={() => setShowPaymentForm(false)}
+                    className="btn-action"
+                    style={{ flex: 1, padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+                  >
+                    CANCEL
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

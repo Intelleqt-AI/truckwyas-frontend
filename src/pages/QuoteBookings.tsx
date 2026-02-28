@@ -1,25 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  Search, 
-  Filter, 
-  ChevronDown, 
-  ChevronRight, 
-  Truck, 
-  User, 
+import {
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronRight,
+  Truck,
+  User,
   MapPin,
   CheckCircle,
   AlertCircle,
   Clock
 } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
+import { fetchData } from "@/lib/Api";
 
-// Mock booking data - these are accepted quotes that became jobs
-const mockBookings = [
+const emptyBookings = [
   {
     id: "Q-1003",
     customer: "Shoprite Holdings",
@@ -73,8 +73,36 @@ const mockBookings = [
 export function QuoteBookings() {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedBooking, setExpandedBooking] = useState<string | null>(null);
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredBookings = mockBookings.filter(booking => 
+  useEffect(() => {
+    fetchData('api/v1/loads/?status=IN_TRANSIT,DELIVERED,LOADING&limit=100')
+      .then(d => {
+        const raw = d?.results || d || [];
+        const mapped = raw.map((l: any) => ({
+          id: l.load_number || `Q-${l.id}`,
+          customer: l.customer_name || l.customer || 'Unknown',
+          origin: l.pickup_location?.substring(0, 20) || 'Unknown',
+          destination: l.delivery_location?.substring(0, 20) || 'Unknown',
+          slaHours: l.sla_hours || 36,
+          price: parseFloat(l.total_amount || l.amount || '0'),
+          vehicle: l.vehicle_name || l.vehicle || 'Unassigned',
+          driver: l.driver_name || l.driver || 'Unassigned',
+          status: l.status === 'IN_TRANSIT' ? 'In Transit' : l.status === 'DELIVERED' ? 'Delivered' : l.status === 'LOADING' ? 'Pickup Scheduled' : 'Planned',
+          invoiceStatus: l.invoice_status || 'Pending',
+          podVerified: l.status === 'DELIVERED',
+          pickupDate: l.pickup_date || l.created_at?.split('T')[0] || '',
+          deliveryDate: l.delivery_date || '',
+          nextSteps: ['Verify POD upon delivery', 'Submit invoice within 24h']
+        }));
+        setBookings(mapped);
+      })
+      .catch(() => setBookings(emptyBookings))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredBookings = bookings.filter(booking => 
     booking.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
     booking.origin.toLowerCase().includes(searchTerm.toLowerCase()) ||
     booking.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -131,7 +159,7 @@ export function QuoteBookings() {
         <Card className="border-[#E2E8F0] bg-white rounded-md">
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-semibold text-[#2563EB] font-mono tabular-nums">
-              {mockBookings.length}
+              {loading ? '...' : bookings.length}
             </div>
             <div className="text-xs text-[#94A3B8] mt-1">Total Bookings</div>
           </CardContent>
@@ -140,7 +168,7 @@ export function QuoteBookings() {
         <Card className="border-[#E2E8F0] bg-white rounded-md">
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-semibold text-[#F59E0B] font-mono tabular-nums">
-              {mockBookings.filter(b => b.status === "In Transit").length}
+              {loading ? '...' : bookings.filter(b => b.status === "In Transit").length}
             </div>
             <div className="text-xs text-[#94A3B8] mt-1">In Transit</div>
           </CardContent>
@@ -149,7 +177,7 @@ export function QuoteBookings() {
         <Card className="border-[#E2E8F0] bg-white rounded-md">
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-semibold text-[#10B981] font-mono tabular-nums">
-              {mockBookings.filter(b => b.podVerified).length}
+              {loading ? '...' : bookings.filter(b => b.podVerified).length}
             </div>
             <div className="text-xs text-[#94A3B8] mt-1">POD Verified</div>
           </CardContent>
@@ -158,7 +186,7 @@ export function QuoteBookings() {
         <Card className="border-[#E2E8F0] bg-white rounded-md">
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-semibold text-[#0F172A] font-mono tabular-nums">
-              {formatCurrency(mockBookings.reduce((sum, b) => sum + b.price, 0))}
+              {loading ? '...' : formatCurrency(bookings.reduce((sum, b) => sum + b.price, 0))}
             </div>
             <div className="text-xs text-[#94A3B8] mt-1">Total Value</div>
           </CardContent>

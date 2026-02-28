@@ -10,6 +10,15 @@ interface InsightSignal {
   category?: string;
 }
 
+interface RouteData {
+  route: string;
+  trips: number;
+  avg_revenue: number;
+  avg_cost: number;
+  margin_pct: number;
+  has_expense_data?: boolean;
+}
+
 interface InsightsResponse {
   signals: InsightSignal[];
   cashflow?: Array<{ label: string; confirmed: number; expected: number }>;
@@ -18,14 +27,6 @@ interface InsightsResponse {
 
 
 const CATEGORIES = ['All', 'Route Intelligence', 'Customer Intel', 'Cash Alerts', 'Fleet Performance'];
-
-const ROUTE_DATA = [
-  { route: 'JHB → CPT', trips: 28, avg_revenue: 24800, avg_cost: 18200, margin: 26.6 },
-  { route: 'JHB → DBN', trips: 34, avg_revenue: 18400, avg_cost: 13100, margin: 28.8 },
-  { route: 'CPT → PE', trips: 12, avg_revenue: 11200, avg_cost: 9800, margin: 12.5 },
-  { route: 'DBN → PE', trips: 8, avg_revenue: 13600, avg_cost: 11200, margin: 17.6 },
-  { route: 'JHB → Msuto', trips: 6, avg_revenue: 9800, avg_cost: 9200, margin: 6.1 },
-];
 
 function getSignalColor(type: string): string {
   switch (type.toUpperCase()) {
@@ -39,6 +40,7 @@ function getSignalColor(type: string): string {
 
 export default function Insights() {
   const [data, setData] = useState<InsightsResponse | null>(null);
+  const [routeData, setRouteData] = useState<RouteData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -47,10 +49,11 @@ export default function Insights() {
 
   const loadAllData = async () => {
     try {
-      const [insightsRes, cashflowRes, financeRes] = await Promise.all([
+      const [insightsRes, cashflowRes, financeRes, routesRes] = await Promise.all([
         fetchData('api/v1/dashboard/insights/').catch(() => null),
         fetchData('api/v1/dashboard/cashflow/').catch(() => null),
         fetchData('api/v1/dashboard/finance/').catch(() => null),
+        fetchData('api/v1/dashboard/routes/').catch(() => null),
       ]);
 
       let signals: InsightSignal[] = [];
@@ -83,11 +86,19 @@ export default function Insights() {
         ];
       }
 
+      // Wire route data from backend
+      if (routesRes?.routes && Array.isArray(routesRes.routes)) {
+        setRouteData(routesRes.routes);
+      } else {
+        setRouteData([]);
+      }
+
       setData({ signals, cashflow, portfolio_health });
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
       setData({ signals: [], cashflow: [], portfolio_health: [] });
+      setRouteData([]);
       setError('Failed to load insights data');
       setLastUpdated(new Date());
     }
@@ -312,7 +323,21 @@ export default function Insights() {
               </tr>
             </thead>
             <tbody>
-              {ROUTE_DATA.map((r, i) => (
+              {loading && [1, 2, 3].map(i => (
+                <tr key={i} style={{ borderBottom: '1px solid var(--border-row)' }}>
+                  <td colSpan={5} style={{ padding: '12px 16px' }}>
+                    <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4 }} />
+                  </td>
+                </tr>
+              ))}
+              {!loading && routeData.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ padding: 32, textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
+                    No route data available
+                  </td>
+                </tr>
+              )}
+              {!loading && routeData.map((r, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid var(--border-row)' }}>
                   <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.route}</td>
                   <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>{r.trips}</td>
@@ -323,9 +348,9 @@ export default function Insights() {
                       fontFamily: 'var(--font-mono)',
                       fontSize: 12,
                       fontWeight: 600,
-                      color: r.margin >= 25 ? 'var(--status-success)' : r.margin >= 15 ? 'var(--status-warning)' : 'var(--status-danger)',
+                      color: r.margin_pct >= 20 ? 'var(--status-success)' : r.margin_pct >= 10 ? 'var(--status-warning)' : 'var(--status-danger)',
                     }}>
-                      {r.margin.toFixed(1)}%
+                      {r.margin_pct.toFixed(1)}%
                     </span>
                   </td>
                 </tr>

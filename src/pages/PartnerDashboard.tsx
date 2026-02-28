@@ -60,32 +60,6 @@ const TIER_COLOR: Record<string, string> = {
   HIGH: 'var(--status-danger)',
 };
 
-const MOCK_PORTFOLIO: PortfolioSummary = {
-  total_deployed_capital: 4850000,
-  active_operators: 12,
-  avg_risk_score: 72,
-  portfolio_health: 85,
-};
-
-const MOCK_RISK: RiskData = {
-  prime_percentage: 35,
-  standard_percentage: 45,
-  elevated_percentage: 15,
-  high_percentage: 5,
-};
-
-const MOCK_OPERATORS: Operator[] = [
-  { id: 1, name: 'Truckwys Logistics', health_score: 85, advances_outstanding: 450000, risk_tier: 'PRIME', last_activity: '2024-02-20' },
-  { id: 2, name: 'FastFreight SA', health_score: 72, advances_outstanding: 280000, risk_tier: 'STANDARD', last_activity: '2024-02-19' },
-  { id: 3, name: 'Cape Haulers', health_score: 58, advances_outstanding: 180000, risk_tier: 'ELEVATED', last_activity: '2024-02-18' },
-];
-
-const MOCK_ADVANCES: Advance[] = [
-  { id: 1, operator_name: 'Truckwys Logistics', amount: 120000, risk_score: 85, fee_rate: 2.2, status: 'ACTIVE', created_at: '2024-02-15' },
-  { id: 2, operator_name: 'FastFreight SA', amount: 80000, risk_score: 72, fee_rate: 2.8, status: 'ACTIVE', created_at: '2024-02-14' },
-  { id: 3, operator_name: 'Cape Haulers', amount: 60000, risk_score: 58, fee_rate: 3.5, status: 'REPAID', created_at: '2024-02-10' },
-];
-
 const MOCK_RISK_DETAIL: OperatorRiskDetail = {
   operator_id: 1,
   operator_name: 'Truckwys Logistics',
@@ -147,19 +121,18 @@ export default function PartnerDashboard() {
       fetchData('api/v1/partner/risk/')
     ])
       .then(([operatorsData, advancesData, riskDataRes]) => {
-        // Use API data if available, fallback to mocks
-        setOperators(operatorsData?.operators || MOCK_OPERATORS);
-        setAdvances(advancesData?.advances || MOCK_ADVANCES);
-        setRiskData(riskDataRes?.risk_distribution || MOCK_RISK);
-        setPortfolio(operatorsData?.portfolio_summary || MOCK_PORTFOLIO);
+        setOperators(operatorsData?.operators || []);
+        setAdvances(advancesData?.advances || []);
+        setRiskData(riskDataRes?.risk_distribution || null);
+        setPortfolio(operatorsData?.portfolio_summary || null);
         setError(null);
       })
       .catch(() => {
         setError('Failed to load partner data');
-        setOperators(MOCK_OPERATORS);
-        setAdvances(MOCK_ADVANCES);
-        setRiskData(MOCK_RISK);
-        setPortfolio(MOCK_PORTFOLIO);
+        setOperators([]);
+        setAdvances([]);
+        setRiskData(null);
+        setPortfolio(null);
       })
       .finally(() => setLoading(false));
   }, []);

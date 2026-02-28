@@ -173,56 +173,91 @@ export default function FinanceReports() {
           {/* TAB 2: Cash Flow */}
           {tab === 'cashflow' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-                {[
-                  { label: '30-Day Projected', value: formatCurrency(cashflowData?.projected_30_day || 0), color: 'var(--accent-primary)' },
-                  { label: '60-Day Projected', value: formatCurrency(cashflowData?.projected_60_day || 0), color: 'var(--status-warning)' },
-                  { label: '90-Day Projected', value: formatCurrency(cashflowData?.projected_90_day || 0), color: 'var(--text-primary)' },
-                  { label: 'Outstanding Total', value: formatCurrency(cashflowData?.outstanding_total || 0), color: 'var(--status-danger)' },
-                ].map(m => (
-                  <div key={m.label} className="card metric-card">
-                    <div className="card-header"><span className="card-title">{m.label}</span></div>
-                    <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
-                  </div>
-                ))}
-              </div>
+              {(() => {
+                const forecast = cashflowData?.forecast || [];
+                // Calculate next 30 days summary
+                const next30Days = forecast.slice(0, 4); // ~4 weeks
+                const totalIn = next30Days.reduce((sum: number, f: any) => sum + (f.expected_in || 0), 0);
+                const totalOut = next30Days.reduce((sum: number, f: any) => sum + (f.expected_out || 0), 0);
+                const netPosition = totalIn - totalOut;
 
-              {cashflowData?.outstanding_invoices && cashflowData.outstanding_invoices.length > 0 ? (
-                <div className="card table-card">
-                  <div className="card-header" style={{ marginBottom: 16 }}>
-                    <span className="card-title">Outstanding Invoices</span>
-                    <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                      {cashflowData.outstanding_invoices.length} invoices
-                    </span>
-                  </div>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Invoice #</th>
-                        <th>Customer</th>
-                        <th className="text-right">Amount</th>
-                        <th className="text-right">Due Date</th>
-                        <th className="text-right">Days Outstanding</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cashflowData.outstanding_invoices.slice(0, 10).map((inv: any) => (
-                        <tr key={inv.id}>
-                          <td className="mono">{inv.invoice_number}</td>
-                          <td>{inv.customer_name}</td>
-                          <td className="mono text-right">{formatCurrency(inv.total_amount || 0)}</td>
-                          <td className="mono text-right">{inv.due_date}</td>
-                          <td className="mono text-right" style={{ color: inv.days_outstanding > 30 ? 'var(--status-danger)' : 'var(--text-primary)' }}>
-                            {inv.days_outstanding || 0}
-                          </td>
-                        </tr>
+                return (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                      {[
+                        { label: 'Expected In (30d)', value: formatCurrency(totalIn), color: 'var(--status-success)' },
+                        { label: 'Expected Out (30d)', value: formatCurrency(totalOut), color: 'var(--status-danger)' },
+                        { label: 'Net Cash Position', value: formatCurrency(netPosition), color: netPosition >= 0 ? 'var(--accent-primary)' : 'var(--status-danger)' },
+                      ].map(m => (
+                        <div key={m.label} className="card metric-card">
+                          <div className="card-header"><span className="card-title">{m.label}</span></div>
+                          <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <EmptyState message="No outstanding invoices" />
-              )}
+                    </div>
+
+                    {forecast.length > 0 ? (
+                      <div className="card table-card">
+                        <div className="card-header" style={{ marginBottom: 16 }}>
+                          <span className="card-title">Weekly Cash Flow Forecast</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                            Next {forecast.length} weeks
+                          </span>
+                        </div>
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>Period</th>
+                              <th>Week Starting</th>
+                              <th className="text-right">Expected In</th>
+                              <th className="text-right">Expected Out</th>
+                              <th className="text-right">Net</th>
+                              <th className="text-right">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {forecast.map((f: any, idx: number) => {
+                              const net = (f.expected_in || 0) - (f.expected_out || 0);
+                              return (
+                                <tr key={idx}>
+                                  <td className="mono">{f.period}</td>
+                                  <td className="mono">{f.start_date}</td>
+                                  <td className="mono text-right" style={{ color: 'var(--status-success)' }}>
+                                    {formatCurrency(f.expected_in || 0)}
+                                  </td>
+                                  <td className="mono text-right" style={{ color: 'var(--status-danger)' }}>
+                                    {formatCurrency(f.expected_out || 0)}
+                                  </td>
+                                  <td className="mono text-right" style={{
+                                    color: net >= 0 ? 'var(--accent-primary)' : 'var(--status-danger)',
+                                    fontWeight: 600
+                                  }}>
+                                    {formatCurrency(net)}
+                                  </td>
+                                  <td className="text-right">
+                                    <span style={{
+                                      fontFamily: 'var(--font-mono)',
+                                      fontSize: 10,
+                                      color: net >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                                      padding: '2px 6px',
+                                      background: 'var(--bg-surface-hover)',
+                                      borderRadius: 2
+                                    }}>
+                                      {net >= 0 ? 'POSITIVE' : 'NEGATIVE'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <EmptyState message="No cash flow forecast data available" />
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
 

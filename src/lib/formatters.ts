@@ -1,32 +1,41 @@
 // UK English formatting utilities for Truckwys
 
 export const formatCurrency = (
-  amount: number,
+  amount: number | null | undefined,
   options: Intl.NumberFormatOptions = {}
 ): string => {
+  if (amount == null || isNaN(Number(amount))) {
+    return 'R0.00';
+  }
   return new Intl.NumberFormat('en-ZA', {
     style: 'currency',
     currency: 'ZAR',
     ...options
-  }).format(amount);
+  }).format(Number(amount));
 };
 
 export const formatNumber = (
-  value: number,
+  value: number | null | undefined,
   options: Intl.NumberFormatOptions = {}
 ): string => {
-  return new Intl.NumberFormat('en-GB', options).format(value);
+  if (value == null || isNaN(Number(value))) {
+    return '0';
+  }
+  return new Intl.NumberFormat('en-GB', options).format(Number(value));
 };
 
 export const formatPercentage = (
-  value: number,
+  value: number | null | undefined,
   decimals: number = 1
 ): string => {
+  if (value == null || isNaN(Number(value))) {
+    return '0.0%';
+  }
   return new Intl.NumberFormat('en-GB', {
     style: 'percent',
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals
-  }).format(value);
+  }).format(Number(value));
 };
 
 export const formatDistance = (kilometres: number): string => {
@@ -102,6 +111,9 @@ export const formatCompactNumber = (value: number): string => {
   return formatNumber(value);
 };
 
-export const formatPercent = (value: number, decimals: number = 1): string => {
-  return `${value.toFixed(decimals)}%`;
+export const formatPercent = (value: number | null | undefined, decimals: number = 1): string => {
+  if (value == null || isNaN(Number(value))) {
+    return '0.0%';
+  }
+  return `${Number(value).toFixed(decimals)}%`;
 };

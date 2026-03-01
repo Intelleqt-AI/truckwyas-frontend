@@ -289,7 +289,7 @@ export default function Overview() {
               Add Expense
             </button>
             <button
-              onClick={() => navigate('/finance-reports')}
+              onClick={() => navigate('/finance/reports')}
               className="btn-action"
               style={{ width: '100%', justifyContent: 'center', padding: '10px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
             >

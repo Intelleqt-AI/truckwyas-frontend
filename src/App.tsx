@@ -93,6 +93,7 @@ const App = () => (
             {/* Route aliases */}
             <Route path="/overview" element={<Navigate to="/" replace />} />
             <Route path="/expenses" element={<Navigate to="/finance/expenses" replace />} />
+            <Route path="/finance-reports" element={<Navigate to="/finance/reports" replace />} />
             <Route path="/partner" element={<Navigate to="/partner-dashboard" replace />} />
             <Route path="*" element={<OSLayout><NotFound /></OSLayout>} />
           </Routes>

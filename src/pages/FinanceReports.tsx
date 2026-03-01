@@ -408,9 +408,9 @@ export default function FinanceReports() {
                       const colorMap: Record<string, string> = {
                         'Current': 'var(--status-success)',
                         '1-30 Days': 'var(--status-warning)',
-                        '31-60 Days': '#ff8c00',
+                        '31-60 Days': 'var(--status-warning)',
                         '61-90 Days': 'var(--status-danger)',
-                        '90+ Days': '#8b0000'
+                        '90+ Days': 'var(--status-danger)'
                       };
                       const barColor = colorMap[bucket.label] || 'var(--text-secondary)';
 

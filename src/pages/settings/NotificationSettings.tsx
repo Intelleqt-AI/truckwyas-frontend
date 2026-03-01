@@ -52,7 +52,7 @@ function ToggleRow({ label, description, checked, onChange }: ToggleRowProps) {
       >
         <span style={{
           position: 'absolute', top: 2, left: checked ? 18 : 2,
-          width: 16, height: 16, borderRadius: '50%', background: '#fff',
+          width: 16, height: 16, borderRadius: '50%', background: 'var(--bg-surface)',
           transition: 'left 0.2s',
         }} />
       </button>

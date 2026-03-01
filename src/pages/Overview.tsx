@@ -42,21 +42,7 @@ export default function Overview() {
           severity: s.severity || 'low',
           type: s.type || 'INFO',
         })));
-        // Auto-refresh signals every 60s
-        const timer = setInterval(() => {
-          fetchData('api/v1/dashboard/signals/').then((fresh: any) => {
-            const arr = Array.isArray(fresh) ? fresh : (fresh?.signals || []);
-            setInsights(arr.map((s: any) => ({
-              category: s.category || s.type || 'Update',
-              title: s.title || '',
-              body: s.body || s.message || '',
-              action: s.action || 'VIEW',
-              severity: s.severity || 'low',
-              type: s.type || 'INFO',
-            })));
-          }).catch(() => {});
-        }, 60000);
-        return () => clearInterval(timer);
+
         setAdvances(Array.isArray(advancesData) ? advancesData : (advancesData?.results || []));
 
         const quotes = quotesData?.results || quotesData || [];
@@ -74,6 +60,23 @@ export default function Overview() {
 
         setActivity(Array.isArray(activityData) ? activityData : (activityData?.results || []));
         setActivityLoading(false);
+
+        // Auto-refresh signals every 60s
+        const timer = setInterval(() => {
+          fetchData('api/v1/dashboard/signals/').then((fresh: any) => {
+            const arr = Array.isArray(fresh) ? fresh : (fresh?.signals || []);
+            setInsights(arr.map((s: any) => ({
+              category: s.category || s.type || 'Update',
+              title: s.title || '',
+              body: s.body || s.message || '',
+              action: s.action || 'VIEW',
+              severity: s.severity || 'low',
+              type: s.type || 'INFO',
+            })));
+          }).catch(() => {});
+        }, 60000);
+
+        return () => clearInterval(timer);
       } catch (error) {
         console.error('Failed to load overview data:', error);
       } finally {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,42 +6,58 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { OSLayout } from "./components/os/OSLayout";
-// Pages
+// Eager load — Overview for fast first load
 import Overview from "./pages/Overview";
-import { QuotesList } from "./pages/QuotesList";
-import NewQuote from "./pages/NewQuote";
-import QuoteDetail from "./pages/QuoteDetail";
-import { BookingsList } from "./pages/BookingsList";
-import Bookings from "./pages/Bookings";
-import LoadsList from "./pages/LoadsList";
-import Vehicles from "./pages/Vehicles";
-import Drivers from "./pages/Drivers";
-import DriverProfile from "./pages/DriverProfile";
-import FleetDashboard from "./pages/FleetDashboard";
-import Invoices from "./pages/Invoices";
-import InvoiceDetail from "./pages/InvoiceDetail";
-import CreateInvoice from "./pages/CreateInvoice";
-import Expenses from "./pages/Expenses";
-import FinanceReports from "./pages/FinanceReports";
-import Capital from "./pages/Capital";
-import AdvanceRequest from "./pages/AdvanceRequest";
-import AdvanceDetail from "./pages/AdvanceDetail";
-import Insights from "./pages/Insights";
-import PartnerDashboard from "./pages/PartnerDashboard";
-import Settings from "./pages/Settings";
-import XeroIntegration from "./pages/settings/XeroIntegration";
-import FleetImport from "./pages/settings/FleetImport";
-import NotFound from "./pages/NotFound";
-import PasswordReset from "./pages/PasswordReset";
-import VehicleFinancialProfile from "./pages/VehicleFinancialProfile";
-import RiskScoreView from "./pages/RiskScoreView";
-import FleetHeatmap from "./pages/FleetHeatmap";
+// Lazy load all other pages for code splitting
+const QuotesList = lazy(() => import("./pages/QuotesList").then(m => ({ default: m.QuotesList })));
+const NewQuote = lazy(() => import("./pages/NewQuote"));
+const QuoteDetail = lazy(() => import("./pages/QuoteDetail"));
+const BookingsList = lazy(() => import("./pages/BookingsList").then(m => ({ default: m.BookingsList })));
+const Bookings = lazy(() => import("./pages/Bookings"));
+const LoadsList = lazy(() => import("./pages/LoadsList"));
+const Vehicles = lazy(() => import("./pages/Vehicles"));
+const Drivers = lazy(() => import("./pages/Drivers"));
+const DriverProfile = lazy(() => import("./pages/DriverProfile"));
+const FleetDashboard = lazy(() => import("./pages/FleetDashboard"));
+const Invoices = lazy(() => import("./pages/Invoices"));
+const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
+const CreateInvoice = lazy(() => import("./pages/CreateInvoice"));
+const Expenses = lazy(() => import("./pages/Expenses"));
+const FinanceReports = lazy(() => import("./pages/FinanceReports"));
+const Capital = lazy(() => import("./pages/Capital"));
+const AdvanceRequest = lazy(() => import("./pages/AdvanceRequest"));
+const AdvanceDetail = lazy(() => import("./pages/AdvanceDetail"));
+const Insights = lazy(() => import("./pages/Insights"));
+const PartnerDashboard = lazy(() => import("./pages/PartnerDashboard"));
+const Settings = lazy(() => import("./pages/Settings"));
+const XeroIntegration = lazy(() => import("./pages/settings/XeroIntegration"));
+const FleetImport = lazy(() => import("./pages/settings/FleetImport"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const PasswordReset = lazy(() => import("./pages/PasswordReset"));
+const VehicleFinancialProfile = lazy(() => import("./pages/VehicleFinancialProfile"));
+const RiskScoreView = lazy(() => import("./pages/RiskScoreView"));
+const FleetHeatmap = lazy(() => import("./pages/FleetHeatmap"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 2, throwOnError: false, refetchOnWindowFocus: false, staleTime: 0 },
   },
 });
+
+// Loading fallback for code splitting
+const LoadingFallback = () => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    background: 'var(--bg-deep)',
+    color: 'var(--text-tertiary)',
+    fontSize: 14
+  }}>
+    Loading...
+  </div>
+);
 
 const App = () => (
   <BrowserRouter>
@@ -50,7 +66,8 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <Routes>
+          <Suspense fallback={<LoadingFallback />}>
+            <Routes>
             {/* Homepage — has its own full OS layout with agent sidebar */}
             <Route path="/" element={<OSLayout><Overview /></OSLayout>} />
 
@@ -97,6 +114,7 @@ const App = () => (
             <Route path="/partner" element={<Navigate to="/partner-dashboard" replace />} />
             <Route path="*" element={<OSLayout><NotFound /></OSLayout>} />
           </Routes>
+          </Suspense>
         </TooltipProvider>
       </ErrorBoundary>
     </QueryClientProvider>

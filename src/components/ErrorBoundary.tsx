@@ -26,11 +26,40 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-          <div className="bg-white rounded-xl shadow-sm p-8 max-w-md text-center space-y-4">
-            <div className="text-4xl">⚠️</div>
-            <h2 className="text-xl font-semibold text-slate-900">Something went wrong</h2>
-            <p className="text-sm text-slate-500">
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          background: 'var(--bg-deep)',
+          padding: 24
+        }}>
+          <div style={{
+            background: 'var(--bg-surface)',
+            borderRadius: 12,
+            border: '1px solid var(--border-subtle)',
+            padding: 32,
+            maxWidth: 480,
+            textAlign: 'center'
+          }}>
+            <div style={{
+              fontSize: 48,
+              marginBottom: 16
+            }}>⚠️</div>
+            <h2 style={{
+              fontSize: 20,
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              marginBottom: 12
+            }}>
+              Something went wrong
+            </h2>
+            <p style={{
+              fontSize: 14,
+              color: 'var(--text-secondary)',
+              marginBottom: 24,
+              lineHeight: 1.5
+            }}>
               {this.state.error?.message || 'An unexpected error occurred'}
             </p>
             <button
@@ -38,7 +67,16 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 this.setState({ hasError: false, error: undefined });
                 window.location.href = '/';
               }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              style={{
+                background: 'var(--accent-primary)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 6,
+                padding: '12px 24px',
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
             >
               Return to Dashboard
             </button>

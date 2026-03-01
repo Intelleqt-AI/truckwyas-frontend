@@ -27,6 +27,10 @@ export default function Invoices() {
   const statuses = ['All', 'SENT', 'OVERDUE', 'PAID', 'DRAFT'];
 
   useEffect(() => {
+    document.title = 'Invoices - TruckWys';
+  }, []);
+
+  useEffect(() => {
     const loadInvoices = async () => {
       setLoading(true);
       try {

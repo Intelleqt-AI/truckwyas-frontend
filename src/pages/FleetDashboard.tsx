@@ -34,6 +34,10 @@ export default function FleetDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    document.title = 'Fleet - TruckWys';
+  }, []);
+
+  useEffect(() => {
     Promise.all([
       fetchData('api/v1/vehicles/'),
       fetchData('api/v1/drivers/')

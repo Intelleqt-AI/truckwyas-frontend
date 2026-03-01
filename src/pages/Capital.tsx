@@ -98,6 +98,10 @@ export default function Capital() {
   const utilization = Math.round((outstanding / facilityLimit) * 100);
 
   useEffect(() => {
+    document.title = 'Capital - TruckWys';
+  }, []);
+
+  useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       setError(null);

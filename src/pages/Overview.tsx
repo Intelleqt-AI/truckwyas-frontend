@@ -17,6 +17,10 @@ export default function Overview() {
   const [activityLoading, setActivityLoading] = useState(true);
 
   useEffect(() => {
+    document.title = 'Overview - TruckWys';
+  }, []);
+
+  useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
 
     const loadData = async () => {

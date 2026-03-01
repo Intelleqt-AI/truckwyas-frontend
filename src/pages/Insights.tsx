@@ -125,6 +125,10 @@ export default function Insights() {
   };
 
   useEffect(() => {
+    document.title = 'Insights - TruckWys';
+  }, []);
+
+  useEffect(() => {
     loadAllData().finally(() => setLoading(false));
 
     // Auto-refresh every 30 seconds

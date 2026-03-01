@@ -7,9 +7,9 @@ import { formatCurrency } from '@/lib/formatters';
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',
   SENT: 'var(--status-warning)',
-  ACCEPTED: '#22c55e',
+  ACCEPTED: 'var(--status-success)',
   IT: 'var(--accent-primary)',
-  COMPLETED: '#22c55e',
+  COMPLETED: 'var(--status-success)',
 };
 
 export default function QuoteDetail() {
@@ -275,7 +275,7 @@ export default function QuoteDetail() {
               </div>
               <div>
                 {label('Confidence')}
-                <div style={{ fontSize: 12, color: quote.confidence === 'HIGH' ? '#22c55e' : quote.confidence === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)' }}>
+                <div style={{ fontSize: 12, color: quote.confidence === 'HIGH' ? 'var(--status-success)' : quote.confidence === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)' }}>
                   {quote.confidence}
                 </div>
               </div>

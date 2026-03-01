@@ -1630,36 +1630,36 @@ export function getRiskTierInfo(tier: RiskTier): {
     case 'prime':
       return {
         label: 'PRIME',
-        color: '#10B981',
-        bgColor: '#D1FAE5',
+        color: 'var(--status-success)',
+        bgColor: 'var(--bg-success-subtle)',
         description: 'Very low risk, premium pricing, fast turnaround',
       };
     case 'standard':
       return {
         label: 'STANDARD',
-        color: '#2563EB',
-        bgColor: '#DBEAFE',
+        color: 'var(--accent-primary)',
+        bgColor: 'var(--bg-info-subtle)',
         description: 'Low risk, competitive pricing',
       };
     case 'elevated':
       return {
         label: 'ELEVATED',
-        color: '#F59E0B',
-        bgColor: '#FEF3C7',
+        color: 'var(--status-warning)',
+        bgColor: 'var(--bg-warning-subtle)',
         description: 'Moderate risk, standard pricing',
       };
     case 'high':
       return {
         label: 'HIGH',
-        color: '#EF4444',
-        bgColor: '#FEE2E2',
+        color: 'var(--status-danger)',
+        bgColor: 'var(--bg-danger-subtle)',
         description: 'High risk, premium pricing required',
       };
     case 'ineligible':
       return {
         label: 'INELIGIBLE',
-        color: '#64748B',
-        bgColor: '#F1F5F9',
+        color: 'var(--text-secondary)',
+        bgColor: 'var(--bg-surface)',
         description: 'Does not meet eligibility criteria',
       };
   }

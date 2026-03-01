@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { fetchData, postData } from "@/lib/api";
+import { fetchData, postData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
 
 const TIER_COLOR: Record<string, string> = {

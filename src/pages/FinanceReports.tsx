@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchData } from "@/lib/api";
+import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 
 const TABS = [

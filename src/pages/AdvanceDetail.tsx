@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { fetchData } from "@/lib/api";
+import { fetchData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
 
 const STATUS_COLOR: Record<string, string> = {

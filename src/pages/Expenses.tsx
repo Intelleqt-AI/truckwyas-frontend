@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchData, postData } from '../lib/api';
+import { fetchData, postData } from '@/lib/Api';
 
 interface Expense {
   id: number;

@@ -17,6 +17,8 @@ export default function Overview() {
   const [activityLoading, setActivityLoading] = useState(true);
 
   useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+
     const loadData = async () => {
       setLoading(true);
       try {
@@ -31,8 +33,6 @@ export default function Overview() {
           fetchData('api/v1/fleet/overview/').catch(() => null),
         ]);
         setFinanceData(finance);
-        // dashboard/insights/ may not exist — handle gracefully, signals come as array or {signals:[]}
-        // dashboard/signals returns {signals:[]} — extract
         const insightsArr = Array.isArray(insightsData) ? insightsData : (insightsData?.signals || []);
         setInsights(insightsArr.map((s: any) => ({
           category: s.category || s.type || 'Update',
@@ -54,7 +54,6 @@ export default function Overview() {
         const vehicles = vehiclesData?.results || vehiclesData || [];
         setTotalVehicles(vehicles.length);
 
-        // Get active vehicles count from fleet overview or calculate from vehicle data
         const activeVehicleCount = fleetData?.active_vehicles || vehicles.filter((v: any) => v.status === 'AVAILABLE' || v.status === 'IN_USE').length || 0;
         setActiveVehicles(activeVehicleCount);
 
@@ -62,7 +61,7 @@ export default function Overview() {
         setActivityLoading(false);
 
         // Auto-refresh signals every 60s
-        const timer = setInterval(() => {
+        timer = setInterval(() => {
           fetchData('api/v1/dashboard/signals/').then((fresh: any) => {
             const arr = Array.isArray(fresh) ? fresh : (fresh?.signals || []);
             setInsights(arr.map((s: any) => ({
@@ -75,8 +74,6 @@ export default function Overview() {
             })));
           }).catch(() => {});
         }, 60000);
-
-        return () => clearInterval(timer);
       } catch (error) {
         console.error('Failed to load overview data:', error);
       } finally {
@@ -84,6 +81,10 @@ export default function Overview() {
       }
     };
     loadData();
+
+    return () => {
+      if (timer) clearInterval(timer);
+    };
   }, []);
 
   const timeAgo = (dateStr: string) => {

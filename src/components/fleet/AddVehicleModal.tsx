@@ -123,7 +123,6 @@ export function AddVehicleModal({ onSuccess, vehicle, trigger, open: externalOpe
   const { data: vehicleTypesData, isLoading: vehicleTypesLoading, refetch } = useFetch("api/vehicle-types/");
   const drivers = driversData?.data || [];
   const vehicleTypes = vehicleTypesData?.results || [];
-  console.log(vehicleTypes)
 
   useEffect(() => {
     if (vehicle && open) {

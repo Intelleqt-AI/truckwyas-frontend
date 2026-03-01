@@ -446,7 +446,7 @@ export default function Drivers() {
                 <tr
                   key={d.id}
                   style={{ cursor: 'pointer', borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}
-                  onClick={() => navigate(`/drivers/${d.id}`)}
+                  onClick={() => navigate(`/fleet/drivers/${d.id}`)}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >

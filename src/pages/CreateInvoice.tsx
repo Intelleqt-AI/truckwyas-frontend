@@ -20,7 +20,7 @@ export default function CreateInvoice() {
 
   const mutation = useMutation({
     mutationFn: (data: any) => postData({ url: 'api/v1/invoices/', data }),
-    onSuccess: () => navigate('/invoices'),
+    onSuccess: () => navigate('/finance/invoices'),
     onError: (e: any) => setError(e?.message || 'Failed to create invoice'),
   });
 
@@ -48,7 +48,7 @@ export default function CreateInvoice() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <button onClick={() => navigate('/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← BACK</button>
+        <button onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← BACK</button>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Finance</div>
         <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>New Invoice</div>
       </div>
@@ -115,7 +115,7 @@ export default function CreateInvoice() {
             <button type="submit" className="btn-action" style={{ width: '100%', padding: '12px', fontSize: 12 }} disabled={mutation.isPending}>
               {mutation.isPending ? 'CREATING...' : 'CREATE INVOICE'}
             </button>
-            <button type="button" onClick={() => navigate('/invoices')} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '10px', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', width: '100%' }}>
+            <button type="button" onClick={() => navigate('/finance/invoices')} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '10px', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', width: '100%' }}>
               CANCEL
             </button>
           </div>

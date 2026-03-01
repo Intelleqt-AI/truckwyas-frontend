@@ -505,7 +505,7 @@ export default function Vehicles() {
                     <tr
                       key={v.id}
                       style={{ cursor: 'pointer', borderBottom: idx < sorted.length - 1 ? '1px solid var(--border-row)' : 'none' }}
-                      onClick={() => navigate(`/fleet/vehicle/${v.id}`)}
+                      onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >

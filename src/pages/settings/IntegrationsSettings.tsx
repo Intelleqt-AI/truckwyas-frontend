@@ -216,7 +216,7 @@ export function IntegrationsSettings() {
 
   const handleConnect = (id: string) => {
     const intg = integrations.find(i => i.id === id);
-    if (intg?.xeroRoute) { navigate('/settings/xero'); return; }
+    if (intg?.xeroRoute) { navigate('/settings/integrations/xero'); return; }
     setConnecting(id);
     setTimeout(() => {
       setIntegrations(prev => prev.map(i =>

@@ -260,79 +260,271 @@ export default function PartnerDashboard() {
       </div>
 
       {activeTab === 'vintage' && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 12 }}>
-            COHORT ANALYSIS — VINTAGE VIEW
+        <>
+          {/* Vintage Performance Chart */}
+          <div className="card" style={{ padding: 20, marginBottom: 24 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+              Cohort Performance Over Time
+            </div>
+            <svg width="100%" height="250" style={{ overflow: 'visible' }}>
+              {(() => {
+                const cohorts = [
+                  { month: 'Oct 23', rate: 95 },
+                  { month: 'Nov 23', rate: 96 },
+                  { month: 'Dec 23', rate: 95 },
+                  { month: 'Jan 24', rate: 95 },
+                  { month: 'Feb 24', rate: 89 },
+                ];
+
+                const maxRate = 100;
+                const chartHeight = 200;
+                const chartWidth = 100;
+                const pointSpacing = chartWidth / (cohorts.length - 1);
+
+                return (
+                  <>
+                    {/* Grid lines */}
+                    {[100, 95, 90, 85, 80].map((value, i) => {
+                      const y = chartHeight - ((value - 80) / 20) * chartHeight;
+                      return (
+                        <g key={i}>
+                          <line
+                            x1="0%"
+                            y1={y}
+                            x2="100%"
+                            y2={y}
+                            stroke="var(--border-subtle)"
+                            strokeWidth="1"
+                            strokeDasharray={value === 90 ? "4,4" : "0"}
+                          />
+                          <text
+                            x="-15"
+                            y={y + 4}
+                            fontSize="10"
+                            fill="var(--text-tertiary)"
+                            fontFamily="var(--font-mono)"
+                            textAnchor="end"
+                          >
+                            {value}%
+                          </text>
+                        </g>
+                      );
+                    })}
+
+                    {/* Line chart */}
+                    <polyline
+                      points={cohorts.map((c, i) => {
+                        const x = (i * pointSpacing);
+                        const y = chartHeight - ((c.rate - 80) / 20) * chartHeight;
+                        return `${x}%,${y}`;
+                      }).join(' ')}
+                      fill="none"
+                      stroke="var(--accent-primary)"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+
+                    {/* Data points */}
+                    {cohorts.map((c, i) => {
+                      const x = (i * pointSpacing);
+                      const y = chartHeight - ((c.rate - 80) / 20) * chartHeight;
+
+                      return (
+                        <g key={i}>
+                          <circle
+                            cx={`${x}%`}
+                            cy={y}
+                            r="5"
+                            fill="var(--accent-primary)"
+                            stroke="var(--bg-deep)"
+                            strokeWidth="2"
+                          />
+                          <text
+                            x={`${x}%`}
+                            y={y - 12}
+                            textAnchor="middle"
+                            fontSize="11"
+                            fill="var(--text-primary)"
+                            fontFamily="var(--font-mono)"
+                            fontWeight="600"
+                          >
+                            {c.rate}%
+                          </text>
+                          <text
+                            x={`${x}%`}
+                            y={chartHeight + 20}
+                            textAnchor="middle"
+                            fontSize="10"
+                            fill="var(--text-tertiary)"
+                            fontFamily="var(--font-mono)"
+                          >
+                            {c.month}
+                          </text>
+                        </g>
+                      );
+                    })}
+
+                    {/* Target line annotation */}
+                    <text
+                      x="102%"
+                      y={chartHeight - ((90 - 80) / 20) * chartHeight + 4}
+                      fontSize="10"
+                      fill="var(--text-tertiary)"
+                      fontFamily="var(--font-mono)"
+                    >
+                      Target
+                    </text>
+                  </>
+                );
+              })()}
+            </svg>
           </div>
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Cohort Month</th>
-                  <th className="text-right">Advances</th>
-                  <th className="text-right">Total Amount</th>
-                  <th className="text-right">Settled</th>
-                  <th className="text-right">Defaulted</th>
-                  <th className="text-right">Settlement Rate</th>
-                  <th className="text-right">Avg Days to Settle</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { month: '2024-02', advances: 18, amount: 1850000, settled: 16, defaulted: 0, rate: 89, days: 26 },
-                  { month: '2024-01', advances: 22, amount: 2100000, settled: 21, defaulted: 0, rate: 95, days: 24 },
-                  { month: '2023-12', advances: 19, amount: 1920000, settled: 18, defaulted: 1, rate: 95, days: 28 },
-                  { month: '2023-11', advances: 25, amount: 2400000, settled: 24, defaulted: 0, rate: 96, days: 27 },
-                  { month: '2023-10', advances: 21, amount: 2050000, settled: 20, defaulted: 1, rate: 95, days: 30 },
-                ].map((cohort, i) => (
-                  <tr key={i}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500 }}>{cohort.month}</td>
-                    <td className="text-right mono">{cohort.advances}</td>
-                    <td className="text-right mono">{formatZAR(cohort.amount)}</td>
-                    <td className="text-right mono" style={{ color: 'var(--status-success)' }}>{cohort.settled}</td>
-                    <td className="text-right mono" style={{ color: cohort.defaulted > 0 ? 'var(--status-danger)' : 'var(--text-tertiary)' }}>{cohort.defaulted}</td>
-                    <td className="text-right mono" style={{ color: cohort.rate > 90 ? 'var(--accent-primary)' : 'var(--status-warning)' }}>{cohort.rate}%</td>
-                    <td className="text-right mono">{cohort.days}</td>
+
+          {/* Vintage Analysis Table */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 12 }}>
+              COHORT ANALYSIS — VINTAGE VIEW
+            </div>
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Cohort Month</th>
+                    <th className="text-right">Advances</th>
+                    <th className="text-right">Total Amount</th>
+                    <th className="text-right">Settled</th>
+                    <th className="text-right">Defaulted</th>
+                    <th className="text-right">Settlement Rate</th>
+                    <th className="text-right">Avg Days to Settle</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {[
+                    { month: '2024-02', advances: 18, amount: 1850000, settled: 16, defaulted: 0, rate: 89, days: 26 },
+                    { month: '2024-01', advances: 22, amount: 2100000, settled: 21, defaulted: 0, rate: 95, days: 24 },
+                    { month: '2023-12', advances: 19, amount: 1920000, settled: 18, defaulted: 1, rate: 95, days: 28 },
+                    { month: '2023-11', advances: 25, amount: 2400000, settled: 24, defaulted: 0, rate: 96, days: 27 },
+                    { month: '2023-10', advances: 21, amount: 2050000, settled: 20, defaulted: 1, rate: 95, days: 30 },
+                  ].map((cohort, i) => (
+                    <tr key={i}>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500 }}>{cohort.month}</td>
+                      <td className="text-right mono">{cohort.advances}</td>
+                      <td className="text-right mono">{formatZAR(cohort.amount)}</td>
+                      <td className="text-right mono" style={{ color: 'var(--status-success)' }}>{cohort.settled}</td>
+                      <td className="text-right mono" style={{ color: cohort.defaulted > 0 ? 'var(--status-danger)' : 'var(--text-tertiary)' }}>{cohort.defaulted}</td>
+                      <td className="text-right mono" style={{ color: cohort.rate > 90 ? 'var(--accent-primary)' : 'var(--status-warning)' }}>{cohort.rate}%</td>
+                      <td className="text-right mono">{cohort.days}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {activeTab === 'overview' && (
         <>
           {/* Risk Distribution Section */}
           <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 12 }}>
-          RISK TIER DISTRIBUTION
-        </div>
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-            {[
-              { tier: 'PRIME', percentage: riskData?.prime_percentage || 0, color: TIER_COLOR.PRIME },
-              { tier: 'STANDARD', percentage: riskData?.standard_percentage || 0, color: TIER_COLOR.STANDARD },
-              { tier: 'ELEVATED', percentage: riskData?.elevated_percentage || 0, color: TIER_COLOR.ELEVATED },
-              { tier: 'HIGH', percentage: riskData?.high_percentage || 0, color: TIER_COLOR.HIGH },
-            ].map(t => (
-              <div key={t.tier}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                    {t.tier}
-                  </span>
-                  <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {t.percentage}%
-                  </span>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 12 }}>
+              RISK TIER DISTRIBUTION
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20 }}>
+              {/* Pie Chart Visualization */}
+              <div className="card" style={{ padding: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+                  Portfolio Breakdown
                 </div>
-                <div style={{ height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${t.percentage}%`, background: t.color, borderRadius: 2 }} />
+                <svg width="100%" height="200" viewBox="0 0 200 200">
+                  {(() => {
+                    const tiers = [
+                      { tier: 'PRIME', percentage: riskData?.prime_percentage || 35, color: TIER_COLOR.PRIME },
+                      { tier: 'STANDARD', percentage: riskData?.standard_percentage || 40, color: TIER_COLOR.STANDARD },
+                      { tier: 'ELEVATED', percentage: riskData?.elevated_percentage || 20, color: TIER_COLOR.ELEVATED },
+                      { tier: 'HIGH', percentage: riskData?.high_percentage || 5, color: TIER_COLOR.HIGH },
+                    ];
+
+                    let cumulativePercent = 0;
+                    const total = tiers.reduce((sum, t) => sum + t.percentage, 0);
+
+                    return (
+                      <>
+                        {tiers.map((t, i) => {
+                          const percent = (t.percentage / total) * 100;
+                          const angle = (percent / 100) * 360;
+                          const startAngle = (cumulativePercent / 100) * 360;
+                          cumulativePercent += percent;
+
+                          const startRad = (startAngle - 90) * (Math.PI / 180);
+                          const endRad = (startAngle + angle - 90) * (Math.PI / 180);
+
+                          const x1 = 100 + 70 * Math.cos(startRad);
+                          const y1 = 100 + 70 * Math.sin(startRad);
+                          const x2 = 100 + 70 * Math.cos(endRad);
+                          const y2 = 100 + 70 * Math.sin(endRad);
+
+                          const largeArc = angle > 180 ? 1 : 0;
+
+                          return (
+                            <path
+                              key={i}
+                              d={`M 100 100 L ${x1} ${y1} A 70 70 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                              fill={t.color}
+                              opacity={0.9}
+                            />
+                          );
+                        })}
+                        <circle cx="100" cy="100" r="45" fill="var(--bg-deep)" />
+                        <text x="100" y="95" textAnchor="middle" fontSize="10" fill="var(--text-tertiary)" fontFamily="var(--font-mono)">
+                          PORTFOLIO
+                        </text>
+                        <text x="100" y="110" textAnchor="middle" fontSize="18" fill="var(--text-primary)" fontWeight="700">
+                          {operators.length}
+                        </text>
+                        <text x="100" y="125" textAnchor="middle" fontSize="9" fill="var(--text-tertiary)" fontFamily="var(--font-mono)">
+                          OPERATORS
+                        </text>
+                      </>
+                    );
+                  })()}
+                </svg>
+              </div>
+
+              {/* Risk Tier Bars */}
+              <div className="card" style={{ padding: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+                  {[
+                    { tier: 'PRIME', percentage: riskData?.prime_percentage || 35, color: TIER_COLOR.PRIME },
+                    { tier: 'STANDARD', percentage: riskData?.standard_percentage || 40, color: TIER_COLOR.STANDARD },
+                    { tier: 'ELEVATED', percentage: riskData?.elevated_percentage || 20, color: TIER_COLOR.ELEVATED },
+                    { tier: 'HIGH', percentage: riskData?.high_percentage || 5, color: TIER_COLOR.HIGH },
+                  ].map(t => {
+                    const count = Math.round((t.percentage / 100) * operators.length);
+                    return (
+                      <div key={t.tier}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                            {t.tier}
+                          </span>
+                          <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 500 }}>
+                            {t.percentage}%
+                          </span>
+                        </div>
+                        <div style={{ height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden', marginBottom: 4 }}>
+                          <div style={{ height: '100%', width: `${t.percentage}%`, background: t.color, borderRadius: 2 }} />
+                        </div>
+                        <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                          {count} operators
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
         {/* Operator Table */}

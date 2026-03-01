@@ -264,6 +264,32 @@ export default function Expenses() {
 
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
 
+  // Calculate monthly trend data (last 6 months)
+  const monthlyTrend = (() => {
+    const months: Record<string, number> = {};
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    expenses.forEach(e => {
+      const date = new Date(e.expense_date || e.date);
+      const key = `${monthNames[date.getMonth()]} ${date.getFullYear().toString().slice(-2)}`;
+      months[key] = (months[key] || 0) + e.amount;
+    });
+
+    const allMonths = Object.entries(months).slice(-6);
+    return allMonths;
+  })();
+
+  const maxMonthlyAmount = monthlyTrend.length > 0 ? Math.max(...monthlyTrend.map(([_, amt]) => amt)) : 1;
+
+  // Budget vs Actual (mock budgets for now)
+  const budgetData = [
+    { category: 'FUEL', budget: 150000, actual: allCategoryTotals['FUEL'] || 0 },
+    { category: 'MAINTENANCE', budget: 80000, actual: allCategoryTotals['MAINTENANCE'] || 0 },
+    { category: 'TOLLS', budget: 40000, actual: allCategoryTotals['TOLLS'] || 0 },
+    { category: 'DRIVER', budget: 60000, actual: allCategoryTotals['DRIVER'] || 0 },
+    { category: 'INSURANCE', budget: 50000, actual: allCategoryTotals['INSURANCE'] || 0 },
+  ];
+
   return (
     <div>
       {/* Header */}
@@ -315,6 +341,189 @@ export default function Expenses() {
             </div>
           );
         })}
+      </div>
+
+      {/* Analytics Section: Monthly Trend + Category Breakdown + Budget vs Actual */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 24 }}>
+        {/* Monthly Trend Chart */}
+        <div className="card" style={{ padding: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+            Monthly Expense Trend (Last 6 Months)
+          </div>
+          {monthlyTrend.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 12 }}>
+              No monthly data available
+            </div>
+          ) : (
+            <svg width="100%" height="200" style={{ overflow: 'visible' }}>
+              {monthlyTrend.map(([month, amount], i) => {
+                const barHeight = (amount / maxMonthlyAmount) * 160;
+                const barWidth = Math.min(60, (100 / monthlyTrend.length) - 10);
+                const x = i * (100 / monthlyTrend.length) + (100 / monthlyTrend.length / 2) - (barWidth / 2);
+
+                return (
+                  <g key={i}>
+                    <rect
+                      x={`${x}%`}
+                      y={180 - barHeight}
+                      width={barWidth}
+                      height={barHeight}
+                      fill="var(--accent-primary)"
+                      rx="2"
+                    />
+                    <text
+                      x={`${x + barWidth / 2}%`}
+                      y="195"
+                      textAnchor="middle"
+                      fontSize="10"
+                      fill="var(--text-tertiary)"
+                      fontFamily="var(--font-mono)"
+                    >
+                      {month}
+                    </text>
+                    <text
+                      x={`${x + barWidth / 2}%`}
+                      y={175 - barHeight}
+                      textAnchor="middle"
+                      fontSize="11"
+                      fill="var(--text-primary)"
+                      fontFamily="var(--font-mono)"
+                      fontWeight="600"
+                    >
+                      {(amount / 1000).toFixed(0)}K
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          )}
+        </div>
+
+        {/* Category Breakdown Donut Chart */}
+        <div className="card" style={{ padding: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+            Category Breakdown
+          </div>
+          {categoryBreakdown.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 12 }}>
+              No category data
+            </div>
+          ) : (
+            <div>
+              <svg width="100%" height="180" viewBox="0 0 200 180">
+                {(() => {
+                  const colors = ['var(--accent-primary)', 'var(--status-success)', 'var(--status-warning)', 'var(--status-danger)', 'var(--text-secondary)'];
+                  let cumulativePercent = 0;
+
+                  return categoryBreakdown.slice(0, 5).map((cat, i) => {
+                    const percent = (cat.total / totalExpenses) * 100;
+                    const angle = (percent / 100) * 360;
+                    const startAngle = (cumulativePercent / 100) * 360;
+                    cumulativePercent += percent;
+
+                    const startRad = (startAngle - 90) * (Math.PI / 180);
+                    const endRad = (startAngle + angle - 90) * (Math.PI / 180);
+
+                    const x1 = 100 + 70 * Math.cos(startRad);
+                    const y1 = 90 + 70 * Math.sin(startRad);
+                    const x2 = 100 + 70 * Math.cos(endRad);
+                    const y2 = 90 + 70 * Math.sin(endRad);
+
+                    const largeArc = angle > 180 ? 1 : 0;
+
+                    return (
+                      <path
+                        key={i}
+                        d={`M 100 90 L ${x1} ${y1} A 70 70 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                        fill={colors[i % colors.length]}
+                        opacity={0.9}
+                      />
+                    );
+                  });
+                })()}
+                <circle cx="100" cy="90" r="40" fill="var(--bg-deep)" />
+                <text x="100" y="85" textAnchor="middle" fontSize="20" fill="var(--text-primary)" fontWeight="700">
+                  {formatZAR(totalExpenses).replace('R ', '')}
+                </text>
+                <text x="100" y="100" textAnchor="middle" fontSize="10" fill="var(--text-tertiary)" fontFamily="var(--font-mono)">
+                  TOTAL
+                </text>
+              </svg>
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {categoryBreakdown.slice(0, 5).map((cat, i) => {
+                  const colors = ['var(--accent-primary)', 'var(--status-success)', 'var(--status-warning)', 'var(--status-danger)', 'var(--text-secondary)'];
+                  const percent = (cat.total / totalExpenses) * 100;
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: colors[i % colors.length] }} />
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)', flex: 1 }}>{cat.label}</span>
+                      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 600 }}>
+                        {percent.toFixed(1)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Budget vs Actual Section */}
+      <div className="card" style={{ padding: 20, marginBottom: 24 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+          Budget vs Actual
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {budgetData.map((item, i) => {
+            const percentUsed = item.budget > 0 ? (item.actual / item.budget) * 100 : 0;
+            const isOverBudget = percentUsed > 100;
+            const catInfo = CATS.find(c => c.value === item.category);
+
+            return (
+              <div key={i}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14 }}>{catInfo?.icon}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{catInfo?.label}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>ACTUAL</div>
+                      <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: isOverBudget ? 'var(--status-danger)' : 'var(--text-primary)', fontWeight: 600 }}>
+                        {formatZAR(item.actual)}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>BUDGET</div>
+                      <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                        {formatZAR(item.budget)}
+                      </div>
+                    </div>
+                    <div style={{
+                      fontSize: 11,
+                      fontFamily: 'var(--font-mono)',
+                      color: isOverBudget ? 'var(--status-danger)' : percentUsed > 80 ? 'var(--status-warning)' : 'var(--status-success)',
+                      fontWeight: 600,
+                      minWidth: 50,
+                      textAlign: 'right'
+                    }}>
+                      {percentUsed.toFixed(0)}%
+                    </div>
+                  </div>
+                </div>
+                <div style={{ height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${Math.min(percentUsed, 100)}%`,
+                    background: isOverBudget ? 'var(--status-danger)' : percentUsed > 80 ? 'var(--status-warning)' : 'var(--accent-primary)',
+                    borderRadius: 2,
+                  }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Filters & Actions */}

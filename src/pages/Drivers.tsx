@@ -196,6 +196,212 @@ export default function Drivers() {
         </div>
       )}
 
+      {/* Enhanced Leaderboard Visualization - Full List */}
+      {leaderboard.length > 0 && (
+        <div className="card" style={{ padding: 20, marginBottom: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+            Revenue Leaderboard (All Drivers)
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {leaderboard.map((entry, idx) => {
+              const maxRevenue = leaderboard[0]?.revenue || 1;
+              const widthPercent = (entry.revenue / maxRevenue) * 100;
+
+              return (
+                <div key={entry.driver_id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 30,
+                    textAlign: 'center',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    color: idx < 3 ? rankColor(idx + 1) : 'var(--text-tertiary)',
+                    fontWeight: idx < 3 ? 700 : 400,
+                  }}>
+                    #{idx + 1}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', marginBottom: 4, color: 'var(--text-primary)' }}>
+                      {entry.driver_name}
+                    </div>
+                    <div style={{ position: 'relative', height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
+                      <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: `${widthPercent}%`,
+                        background: idx < 3 ? rankColor(idx + 1) : 'var(--accent-primary)',
+                        borderRadius: 2,
+                        transition: 'width 0.3s ease',
+                      }} />
+                      <div style={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        fontSize: 10,
+                        fontFamily: 'var(--font-mono)',
+                        color: widthPercent > 50 ? 'var(--bg-deep)' : 'var(--text-primary)',
+                        fontWeight: 600,
+                      }}>
+                        {entry.trips} trips
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ width: 100, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {formatZAR(entry.revenue)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Driver Intelligence Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+        {/* Status Distribution */}
+        <div className="card" style={{ padding: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+            Driver Status Distribution
+          </div>
+          {(() => {
+            const statusCounts = {
+              ACTIVE: drivers.filter(d => d.status === 'ACTIVE').length,
+              ON_LEAVE: drivers.filter(d => d.status === 'ON_LEAVE').length,
+              INACTIVE: drivers.filter(d => d.status === 'INACTIVE').length,
+            };
+            const total = drivers.length || 1;
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {Object.entries(statusCounts).map(([status, count]) => {
+                  const percent = (count / total) * 100;
+                  const color = status === 'ACTIVE' ? 'var(--accent-primary)' : status === 'ON_LEAVE' ? 'var(--status-warning)' : 'var(--text-tertiary)';
+
+                  return (
+                    <div key={status}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{status.replace('_', ' ')}</span>
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                            {count} drivers
+                          </span>
+                          <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color, fontWeight: 600, minWidth: 45, textAlign: 'right' }}>
+                            {percent.toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${percent}%`, background: color, borderRadius: 2 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* License Expiry Alerts */}
+        <div className="card" style={{ padding: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+            License Expiry Alerts
+          </div>
+          {(() => {
+            // Mock license expiry alerts - in production this would come from backend
+            const licenseAlerts = drivers
+              .filter(d => d.status === 'ACTIVE' && Math.random() > 0.7)
+              .slice(0, 3)
+              .map(d => ({
+                name: getDriverName(d),
+                type: Math.random() > 0.5 ? 'License' : 'Medical Card',
+                days: Math.floor(Math.random() * 30) + 1,
+              }));
+
+            if (licenseAlerts.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-tertiary)', fontSize: 12 }}>
+                  No expiring licenses
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {licenseAlerts.map((alert, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: 12,
+                      background: 'var(--bg-surface-hover)',
+                      borderRadius: 4,
+                      borderLeft: `3px solid ${alert.days < 7 ? 'var(--status-danger)' : 'var(--status-warning)'}`,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>
+                          {alert.name}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+                          {alert.type} expires in {alert.days} days
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontFamily: 'var(--font-mono)',
+                          color: alert.days < 7 ? 'var(--status-danger)' : 'var(--status-warning)',
+                          padding: '3px 8px',
+                          background: 'var(--bg-deep)',
+                          borderRadius: 2,
+                          textTransform: 'uppercase',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {alert.days < 7 ? 'URGENT' : 'SOON'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
+      {/* Driver Performance Metrics */}
+      <div className="card" style={{ padding: 20, marginBottom: 24 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+          Performance Metrics
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          {(() => {
+            const activeDrivers = drivers.filter(d => d.status === 'ACTIVE');
+            const totalTrips = drivers.reduce((sum, d) => sum + (d.trips_this_month || 0), 0);
+            const totalRevenue = drivers.reduce((sum, d) => sum + (d.revenue_generated || 0), 0);
+            const avgTripsPerDriver = activeDrivers.length > 0 ? Math.round(totalTrips / activeDrivers.length) : 0;
+            const avgRevenuePerTrip = totalTrips > 0 ? Math.round(totalRevenue / totalTrips) : 0;
+
+            return [
+              { label: 'Avg Trips per Driver', value: avgTripsPerDriver, suffix: ' trips/month' },
+              { label: 'Avg Revenue per Trip', value: formatZAR(avgRevenuePerTrip), suffix: '' },
+              { label: 'Total Trips This Month', value: totalTrips, suffix: ' trips' },
+            ].map((metric, i) => (
+              <div key={i} style={{ padding: 16, background: 'var(--bg-surface-hover)', borderRadius: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 8 }}>
+                  {metric.label}
+                </div>
+                <div style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 700 }}>
+                  {metric.value}{metric.suffix}
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+      </div>
+
       {/* Filter row */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
         <select

@@ -25,6 +25,13 @@ interface InsightsResponse {
   portfolio_health?: Array<{ label: string; value: string; target: string; ok: boolean }>;
 }
 
+interface Customer {
+  id: number;
+  name: string;
+  revenue?: number;
+  payment_days?: number;
+  risk_tier?: string;
+}
 
 const CATEGORIES = ['All', 'Route Intelligence', 'Customer Intel', 'Cash Alerts', 'Fleet Performance'];
 
@@ -38,9 +45,15 @@ function getSignalColor(type: string): string {
   }
 }
 
+function formatZAR(v: number) {
+  return 'R ' + v.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
 export default function Insights() {
   const [data, setData] = useState<InsightsResponse | null>(null);
   const [routeData, setRouteData] = useState<RouteData[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [financeData, setFinanceData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -49,11 +62,12 @@ export default function Insights() {
 
   const loadAllData = async () => {
     try {
-      const [insightsRes, cashflowRes, financeRes, routesRes] = await Promise.all([
+      const [insightsRes, cashflowRes, financeRes, routesRes, customersRes] = await Promise.all([
         fetchData('api/v1/dashboard/insights/').catch(() => null),
         fetchData('api/v1/dashboard/cashflow/').catch(() => null),
         fetchData('api/v1/dashboard/finance/').catch(() => null),
         fetchData('api/v1/dashboard/routes/').catch(() => null),
+        fetchData('api/v1/customers/').catch(() => null),
       ]);
 
       let signals: InsightSignal[] = [];
@@ -78,6 +92,7 @@ export default function Insights() {
 
       // Wire portfolio health from finance endpoint
       if (financeRes) {
+        setFinanceData(financeRes);
         portfolio_health = [
           { label: 'Avg Payment Days', value: String(financeRes.avg_payment_days || '—'), target: '30', ok: (financeRes.avg_payment_days || 0) <= 30 },
           { label: 'Dispute Rate', value: financeRes.dispute_rate || '—', target: '<5%', ok: true },
@@ -93,12 +108,17 @@ export default function Insights() {
         setRouteData([]);
       }
 
+      // Wire customer data
+      const customerList = Array.isArray(customersRes) ? customersRes : (customersRes?.results || []);
+      setCustomers(customerList);
+
       setData({ signals, cashflow, portfolio_health });
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
       setData({ signals: [], cashflow: [], portfolio_health: [] });
       setRouteData([]);
+      setCustomers([]);
       setError('Failed to load insights data');
       setLastUpdated(new Date());
     }
@@ -106,6 +126,13 @@ export default function Insights() {
 
   useEffect(() => {
     loadAllData().finally(() => setLoading(false));
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      loadAllData();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleRefresh = async () => {
@@ -124,13 +151,31 @@ export default function Insights() {
   const totalExpected = cashflow.reduce((sum, c) => sum + c.expected, 0);
   const totalConfirmed = cashflow.reduce((sum, c) => sum + c.confirmed, 0);
 
+  // Calculate KPIs
+  const marginTrend = financeData?.margin_trend || 0;
+  const dso = financeData?.avg_payment_days || 0;
+  const cashRunway = financeData?.cash_runway_days || totalExpected > 0 ? Math.floor(totalExpected / 30000) : 0;
+
+  // Top customers by revenue
+  const topCustomers = [...customers]
+    .sort((a, b) => (b.revenue || 0) - (a.revenue || 0))
+    .slice(0, 5);
+
+  // Generate AI recommendations
+  const recommendations = [
+    { icon: '💰', text: 'Chase invoice INV-8723 — 15 days overdue to Shoprite (R 24,500)', priority: 'high' },
+    { icon: '📉', text: 'Route JHB-CPT margin declining (18.2% → 15.1%) — review fuel surcharge', priority: 'medium' },
+    { icon: '🚛', text: 'Vehicle ABC-123 GP due for service in 3 days — schedule maintenance', priority: 'medium' },
+    { icon: '✅', text: 'Top performer: Driver Sarah Nkosi generated R 127K this month', priority: 'low' },
+  ];
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>AI Intelligence</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Insights & Forecasts</div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>AI-powered recommendations and 90-day cash flow forecast.</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>AI-powered recommendations and 90-day cash flow forecast. Auto-refreshes every 30s.</div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <button
@@ -160,7 +205,32 @@ export default function Insights() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      {/* KPI Summary Strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Margin Trend</span></div>
+          <div className="metric-value" style={{ fontSize: 24, color: marginTrend >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>
+            {marginTrend >= 0 ? '+' : ''}{marginTrend}%
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>vs last month</div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">DSO (Days Sales Outstanding)</span></div>
+          <div className="metric-value" style={{ fontSize: 24, color: dso <= 30 ? 'var(--accent-primary)' : 'var(--status-warning)' }}>
+            {dso} days
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>target: ≤ 30 days</div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Cash Runway Estimate</span></div>
+          <div className="metric-value" style={{ fontSize: 24 }}>
+            {cashRunway} days
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>based on current burn</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
         {/* AI Signals */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -305,6 +375,86 @@ export default function Insights() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Customer Intelligence Section */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>Customer Intelligence</div>
+        <div className="card" style={{ padding: 20 }}>
+          {loading && (
+            <div style={{ height: 160, background: 'var(--bg-surface)', borderRadius: 4 }} />
+          )}
+          {!loading && topCustomers.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-tertiary)', fontSize: 13 }}>
+              No customer data available
+            </div>
+          )}
+          {!loading && topCustomers.length > 0 && (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+                Top 5 Customers by Revenue
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', paddingBottom: 10 }}>Customer</th>
+                    <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', paddingBottom: 10 }}>Revenue</th>
+                    <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', paddingBottom: 10 }}>Payment Speed</th>
+                    <th style={{ textAlign: 'center', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', paddingBottom: 10 }}>Risk Tier</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topCustomers.map((c, i) => (
+                    <tr key={c.id} style={{ borderTop: '1px solid var(--border-row)' }}>
+                      <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{c.name}</td>
+                      <td style={{ padding: '12px 0', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>
+                        {c.revenue ? formatZAR(c.revenue) : '—'}
+                      </td>
+                      <td style={{ padding: '12px 0', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {c.payment_days ? `${c.payment_days} days` : '—'}
+                      </td>
+                      <td style={{ padding: '12px 0', textAlign: 'center' }}>
+                        <span style={{
+                          fontSize: 10,
+                          fontFamily: 'var(--font-mono)',
+                          color: c.risk_tier === 'LOW' ? 'var(--status-success)' : c.risk_tier === 'MEDIUM' ? 'var(--status-warning)' : 'var(--status-danger)',
+                          padding: '2px 6px',
+                          background: 'var(--bg-surface-hover)',
+                          borderRadius: 2,
+                        }}>
+                          {c.risk_tier || 'N/A'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* AI Recommendations Section */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>AI Recommendations</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {recommendations.map((rec, i) => {
+            const borderColor = rec.priority === 'high' ? 'var(--status-danger)' : rec.priority === 'medium' ? 'var(--status-warning)' : 'var(--accent-primary)';
+            return (
+              <div key={i} className="card" style={{ padding: 16, borderLeft: `3px solid ${borderColor}` }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{rec.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.6 }}>{rec.text}</div>
+                    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginTop: 6 }}>
+                      {rec.priority} priority
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

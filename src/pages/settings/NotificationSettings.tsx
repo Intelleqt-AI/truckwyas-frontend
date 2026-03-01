@@ -72,7 +72,7 @@ export function NotificationSettings() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetchData('api/notifications/settings/').then((d: any) => {
+    fetchData('/api/v1/notifications/settings/').then((d: any) => {
       if (d) setSettings({ ...DEFAULTS, ...d });
     }).catch(() => {});
   }, []);
@@ -83,7 +83,7 @@ export function NotificationSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await patchData({ url: 'api/notifications/settings/', data: settings });
+      await patchData({ url: '/api/v1/notifications/settings/', data: settings });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {}

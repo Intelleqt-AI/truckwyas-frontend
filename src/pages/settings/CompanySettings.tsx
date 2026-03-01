@@ -59,7 +59,7 @@ export function CompanySettings() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetchData('api/company/profile/').then((d: any) => {
+    fetchData('/api/v1/company/profile/').then((d: any) => {
       if (d) setForm({
         company_name: d.company_name || '',
         registration_number: d.registration_number || '',
@@ -84,7 +84,7 @@ export function CompanySettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await patchData({ url: 'api/company/profile/', data: {
+      await patchData({ url: '/api/v1/company/profile/', data: {
         company_name: form.company_name,
         registration_number: form.registration_number,
         vat_number: form.vat_number,

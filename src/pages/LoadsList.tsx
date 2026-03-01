@@ -38,13 +38,8 @@ export default function LoadsList() {
 
     try {
       const response = await postData({
-        url: '/api/v1/invoices/',
-        data: {
-          load_id: load.id,
-          customer_id: load.customer_name, // Backend should resolve this
-          issue_date: new Date().toISOString().split('T')[0],
-          due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        }
+        url: `/api/v1/loads/${load.id}/convert_to_invoice/`,
+        data: {}
       });
 
       // Navigate to the created invoice

@@ -132,6 +132,103 @@ export default function InvoiceDetail() {
         ))}
       </div>
 
+      {/* Line Items */}
+      {invoice.items && invoice.items.length > 0 && (
+        <div className="card table-card" style={{ marginBottom: 24 }}>
+          <div className="card-header" style={{ marginBottom: 16 }}>
+            <span className="card-title">Line Items</span>
+            <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+              {invoice.items.length} item{invoice.items.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th className="text-right">Quantity</th>
+                <th className="text-right">Unit Price</th>
+                <th className="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoice.items.map((item: any, idx: number) => (
+                <tr key={idx}>
+                  <td>{item.description || item.item_description || '—'}</td>
+                  <td className="mono text-right">{item.quantity || 1}</td>
+                  <td className="mono text-right">{formatCurrency(item.unit_price || item.price || 0)}</td>
+                  <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+                    {formatCurrency((item.quantity || 1) * (item.unit_price || item.price || 0))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '2px solid var(--border-subtle)' }}>
+                <td colSpan={3} style={{ textAlign: 'right', fontWeight: 600, padding: '12px 0', fontSize: 13 }}>Total:</td>
+                <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 700, fontSize: 16, padding: '12px 0' }}>
+                  {formatCurrency(parseFloat(invoice.total_amount || invoice.amount || '0'))}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {/* Payment History */}
+      {invoice.payments && invoice.payments.length > 0 && (
+        <div className="card table-card" style={{ marginBottom: 24 }}>
+          <div className="card-header" style={{ marginBottom: 16 }}>
+            <span className="card-title">Payment History</span>
+            <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+              {invoice.payments.length} payment{invoice.payments.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Method</th>
+                <th>Reference</th>
+                <th className="text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoice.payments.map((payment: any, idx: number) => (
+                <tr key={idx}>
+                  <td className="mono">{payment.payment_date?.slice(0, 10) || payment.date?.slice(0, 10) || '—'}</td>
+                  <td>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 10,
+                      padding: '2px 6px',
+                      background: 'var(--bg-surface-hover)',
+                      borderRadius: 2,
+                      color: 'var(--text-secondary)'
+                    }}>
+                      {payment.payment_method || payment.method || 'EFT'}
+                    </span>
+                  </td>
+                  <td className="mono" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                    {payment.reference || '—'}
+                  </td>
+                  <td className="mono text-right" style={{ color: 'var(--status-success)', fontWeight: 600 }}>
+                    {formatCurrency(payment.amount || 0)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '2px solid var(--border-subtle)' }}>
+                <td colSpan={3} style={{ textAlign: 'right', fontWeight: 600, padding: '12px 0', fontSize: 13 }}>Total Paid:</td>
+                <td className="mono text-right" style={{ color: 'var(--status-success)', fontWeight: 700, fontSize: 16, padding: '12px 0' }}>
+                  {formatCurrency(invoice.payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0))}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         <div className="card" style={{ padding: 20 }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Invoice Details</div>

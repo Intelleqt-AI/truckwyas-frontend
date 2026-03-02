@@ -164,18 +164,21 @@ export default function FleetHeatmap() {
           {isLoading ? (
             <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <div style={{ display: 'flex', gap: 2, marginBottom: 4, marginLeft: 40 }}>
-                {HOURS.filter((_, i) => i % 3 === 0).map(h => (
-                  <div key={h} style={{ width: 24, fontSize: 9, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', textAlign: 'center', flexShrink: 0 }}>{h}h</div>
+            <div>
+              {/* Hour labels */}
+              <div style={{ display: 'grid', gridTemplateColumns: '40px repeat(24, 1fr)', gap: 3, marginBottom: 4 }}>
+                <div />
+                {HOURS.map(h => (
+                  <div key={h} style={{ fontSize: 9, color: h % 3 === 0 ? 'var(--text-tertiary)' : 'transparent', fontFamily: 'var(--font-mono)', textAlign: 'center' }}>{h}h</div>
                 ))}
               </div>
+              {/* Heatmap grid */}
               {DAYS.map((day, di) => (
-                <div key={day} style={{ display: 'flex', alignItems: 'center', gap: 2, marginBottom: 3 }}>
-                  <div style={{ width: 36, fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{day}</div>
+                <div key={day} style={{ display: 'grid', gridTemplateColumns: '40px repeat(24, 1fr)', gap: 3, marginBottom: 3 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center' }}>{day}</div>
                   {heatmap[di].map((val, hi) => (
-                    <div key={hi} title={`${day} ${hi}:00 — ${val}%`} style={{ width: 16, height: 16, background: getUtilColor(val), borderRadius: 2, flexShrink: 0, cursor: 'default', transition: 'transform 0.1s' }}
-                      onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.3)')}
+                    <div key={hi} title={`${day} ${hi}:00 — ${val}%`} style={{ aspectRatio: '1', background: getUtilColor(val), borderRadius: 2, cursor: 'default', transition: 'transform 0.1s', minHeight: 0 }}
+                      onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.2)')}
                       onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
                     />
                   ))}

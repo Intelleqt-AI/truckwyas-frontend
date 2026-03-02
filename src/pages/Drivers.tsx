@@ -246,7 +246,7 @@ export default function Drivers() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['Name', 'License', 'Status', 'Trips MTD', 'Revenue Generated', 'Performance'].map(h => (
+              {['Name', 'License', 'Status', 'Trips MTD', 'Revenue Generated', 'Performance', ''].map(h => (
                 <th key={h} style={{
                   padding: '10px 20px', textAlign: 'left',
                   fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
@@ -258,7 +258,7 @@ export default function Drivers() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40, fontSize: 13 }}>No drivers found</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40, fontSize: 13 }}>No drivers found</td></tr>
             ) : filtered.map((d, idx) => {
               const statusDotColor = d.status === 'ACTIVE' ? 'var(--status-success)' : d.status === 'ON_LEAVE' ? 'var(--status-warning)' : 'var(--text-tertiary)';
               const efficiencyScore = d.efficiency_score || 0;
@@ -267,19 +267,7 @@ export default function Drivers() {
                 <tr
                   key={d.id}
                   style={{ cursor: 'pointer', borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}
-                  onClick={() => {
-                    setEditDriver(d);
-                    setEditForm({
-                      license_number: d.license_number || '',
-                      license_expiry: d.license_expiry || '',
-                      license_state: d.license_state || 'GP',
-                      medical_card_expiry: d.medical_card_expiry || '',
-                      hire_date: d.hire_date || '',
-                      status: d.status || 'ACTIVE',
-                      emergency_contact: d.emergency_contact || '',
-                      emergency_phone: d.emergency_phone || d.phone || '',
-                    });
-                  }}
+                  onClick={() => navigate(`/fleet/drivers/${d.id}`)}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
@@ -332,6 +320,25 @@ export default function Drivers() {
                     ) : (
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                     )}
+                  </td>
+                  <td style={{ padding: '13px 20px', textAlign: 'right' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditDriver(d);
+                        setEditForm({
+                          license_number: d.license_number || '',
+                          license_expiry: d.license_expiry || '',
+                          license_state: d.license_state || 'GP',
+                          medical_card_expiry: d.medical_card_expiry || '',
+                          hire_date: d.hire_date || '',
+                          status: d.status || 'ACTIVE',
+                          emergency_contact: d.emergency_contact || '',
+                          emergency_phone: d.emergency_phone || d.phone || '',
+                        });
+                      }}
+                      style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
+                    >EDIT</button>
                   </td>
                 </tr>
               );

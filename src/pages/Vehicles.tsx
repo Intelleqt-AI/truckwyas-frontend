@@ -265,7 +265,7 @@ export default function Vehicles() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Registration', 'Make / Model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency'].map(h => (
+                  {['Registration', 'Make / Model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency', ''].map(h => (
                     <th key={h} style={{
                       padding: '10px 20px', textAlign: 'left',
                       fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
@@ -277,7 +277,7 @@ export default function Vehicles() {
               </thead>
               <tbody>
                 {sorted.length === 0 ? (
-                  <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles found</td></tr>
+                  <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles found</td></tr>
                 ) : sorted.map((v, idx) => {
                   const utilizationPercent = ((v.trips_this_month || 0) / 20) * 100;
                   const utilizationColor = utilizationPercent > 70 ? 'var(--status-success)' : utilizationPercent >= 40 ? 'var(--status-warning)' : 'var(--status-danger)';
@@ -286,25 +286,7 @@ export default function Vehicles() {
                     <tr
                       key={v.id}
                       style={{ cursor: 'pointer', borderBottom: idx < sorted.length - 1 ? '1px solid var(--border-row)' : 'none' }}
-                      onClick={() => {
-                        setEditVehicle(v);
-                        setEditForm({
-                          vin: v.vin || '',
-                          make: v.make || '',
-                          model: v.model || '',
-                          year: v.year || new Date().getFullYear(),
-                          plate: v.plate || v.registration || '',
-                          type: v.vehicle_type || 'Rigid Truck',
-                          capacity: v.capacity || '',
-                          fuel_type: v.fuel_type || 'Diesel',
-                          status: v.status || 'AVAILABLE',
-                          mileage: v.mileage || '',
-                          insurance_expiry: v.insurance_expiry || '',
-                          registration_expiry: v.registration_expiry || '',
-                          last_maintenance_date: v.last_maintenance_date || '',
-                          next_maintenance_due: v.next_maintenance_due || '',
-                        });
-                      }}
+                      onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
@@ -339,6 +321,31 @@ export default function Vehicles() {
                       </td>
                       <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
                         {v.fuel_efficiency ? `${parseFloat(v.fuel_efficiency as any).toFixed(1)} L/100km` : '—'}
+                      </td>
+                      <td style={{ padding: '13px 20px', textAlign: 'right' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditVehicle(v);
+                            setEditForm({
+                              vin: v.vin || '',
+                              make: v.make || '',
+                              model: v.model || '',
+                              year: v.year || new Date().getFullYear(),
+                              plate: v.plate || v.registration || '',
+                              type: v.vehicle_type || 'Rigid Truck',
+                              capacity: v.capacity || '',
+                              fuel_type: v.fuel_type || 'Diesel',
+                              status: v.status || 'AVAILABLE',
+                              mileage: v.mileage || '',
+                              insurance_expiry: v.insurance_expiry || '',
+                              registration_expiry: v.registration_expiry || '',
+                              last_maintenance_date: v.last_maintenance_date || '',
+                              next_maintenance_due: v.next_maintenance_due || '',
+                            });
+                          }}
+                          style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
+                        >EDIT</button>
                       </td>
                     </tr>
                   );

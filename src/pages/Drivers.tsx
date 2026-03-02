@@ -318,7 +318,6 @@ export default function Drivers() {
           </tbody>
         </table>
       </div>
-    </div>
 
       {/* Add Driver Slide-out */}
       {showAddForm && (
@@ -414,5 +413,6 @@ export default function Drivers() {
           </div>
         </div>
       )}
+    </div>
   );
 }

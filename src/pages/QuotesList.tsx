@@ -145,26 +145,15 @@ export function QuotesList() {
   const convertToLoadMutation = useMutation({
     mutationFn: (quote: any) =>
       postData({
-        url: 'api/v1/loads/',
-        data: {
-          customer: quote.customer,
-          customer_name: quote.customer_name,
-          pickup_location: quote.pickup_location,
-          delivery_location: quote.delivery_location,
-          cargo_description: quote.cargo_description || 'General Freight',
-          weight: quote.weight || 0,
-          quote_id: quote.id,
-          quote_number: quote.quote_number,
-          total_amount: quote.total_amount,
-          status: 'SCHEDULED',
-        },
+        url: `api/v1/quotes/${quote.id}/convert_to_load/`,
+        data: {},
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['loads'] });
-      alert('Quote converted to booking successfully!');
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
     },
     onError: () => {
-      alert('Failed to convert quote to booking');
+      // Error handling - could add state here if needed
     },
   });
 

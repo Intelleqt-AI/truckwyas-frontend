@@ -396,7 +396,7 @@ export default function Drivers() {
                   try {
                     // Create user first, then driver
                     const username = `${addForm.first_name.toLowerCase()}.${addForm.last_name.toLowerCase()}`.replace(/\s+/g, '');
-                    const user = await postData({ url: 'api/users/', data: {
+                    const user = await postData({ url: 'api/v1/users/', data: {
                       username,
                       email: addForm.email || `${username}@truckwys.co.za`,
                       first_name: addForm.first_name,

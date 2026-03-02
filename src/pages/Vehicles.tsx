@@ -22,6 +22,7 @@ interface Vehicle {
   insurance_expiry?: string;
   registration_expiry?: string;
   fuel_type?: string;
+  type?: string;
   last_maintenance_date?: string;
   next_maintenance_due?: string;
 }

@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/formatters";
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: 'var(--text-tertiary)',
+  LOADING: 'var(--status-warning)',
   ASSIGNED: 'var(--status-warning)',
   IN_TRANSIT: 'var(--accent-primary)',
   DELIVERED: 'var(--status-success)',
@@ -13,7 +14,7 @@ const STATUS_COLOR: Record<string, string> = {
   CANCELLED: 'var(--status-danger)',
 };
 
-const STATUS_CHOICES = ['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED', 'CANCELLED'];
+const STATUS_CHOICES = ['PENDING', 'LOADING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED', 'CANCELLED'];
 
 export default function Bookings() {
   const { id } = useParams();

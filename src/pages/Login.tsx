@@ -1,10 +1,5 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
 import { useLogin } from "@/hooks/useLogin";
 
 const Login = () => {
@@ -14,9 +9,11 @@ const Login = () => {
     username: "",
     password: "",
   });
+  const [error, setError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -24,75 +21,151 @@ const Login = () => {
 
     login(formData, {
       onSuccess: () => {
-        toast.success("Logged in successfully");
         navigate("/");
       },
       onError: (error: any) => {
         console.error("Login error:", error);
-        toast.error(error.message || "Failed to login. Please check your credentials.");
+        setError(error.message || "Invalid credentials");
       }
     });
   };
 
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border-subtle)',
+    padding: '12px 14px',
+    color: 'var(--text-primary)',
+    borderRadius: 2,
+    fontSize: 13,
+    outline: 'none',
+    width: '100%',
+    fontFamily: 'var(--font-sans)',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 10,
+    fontFamily: 'var(--font-mono)',
+    color: 'var(--text-tertiary)',
+    marginBottom: 8,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  };
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-muted/30">
-      <div className="mb-8">
-        <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" className="h-10 w-auto" />
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'var(--bg-deep)',
+      padding: 24
+    }}>
+      <div style={{ marginBottom: 32 }}>
+        <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 40, width: 'auto' }} />
       </div>
-      <Card className="w-full max-w-md bg-white rounded-xl shadow-lg border border-slate-100">
-        <CardHeader className="space-y-1 pb-4">
-          <CardTitle className="text-xl font-semibold text-center text-slate-900">Sign in to your account</CardTitle>
-          <CardDescription className="text-center text-slate-500">
-            Enter your credentials to access the dashboard
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                name="username"
-                type="text"
-                placeholder="username"
-                required
-                value={formData.username}
-                onChange={handleChange}
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link
-                  to="/password-reset"
-                  className="text-sm text-primary hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-              />
-            </div>
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-11 text-sm font-medium" disabled={isPending}>
-              {isPending ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <div className="text-sm text-muted-foreground">
-            Don't have an account?{" "}
-            <Link to="/signup" className="text-primary hover:underline font-medium">
-              Sign up
-            </Link>
+
+      <div style={{
+        width: '100%',
+        maxWidth: 400,
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 2,
+        padding: 32,
+      }}>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
+            Sign in to your account
           </div>
-        </CardFooter>
-      </Card>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            Enter your credentials to access the dashboard
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div>
+            <label htmlFor="username" style={labelStyle}>Username</label>
+            <input
+              id="username"
+              name="username"
+              type="text"
+              placeholder="username"
+              required
+              value={formData.username}
+              onChange={handleChange}
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <label htmlFor="password" style={{ ...labelStyle, marginBottom: 0 }}>Password</label>
+              <Link
+                to="/password-reset"
+                style={{
+                  fontSize: 11,
+                  color: 'var(--accent-primary)',
+                  textDecoration: 'none',
+                }}
+              >
+                Forgot password?
+              </Link>
+            </div>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              value={formData.password}
+              onChange={handleChange}
+              style={inputStyle}
+            />
+          </div>
+
+          {error && (
+            <div style={{
+              padding: '10px 14px',
+              background: 'var(--status-danger-bg)',
+              border: '1px solid var(--status-danger)',
+              borderRadius: 2,
+              color: 'var(--status-danger)',
+              fontSize: 12,
+            }}>
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="btn-action"
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              fontSize: 11,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: isPending ? 'wait' : 'pointer',
+              opacity: isPending ? 0.6 : 1,
+            }}
+            disabled={isPending}
+          >
+            {isPending ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
+
+        <div style={{
+          marginTop: 24,
+          textAlign: 'center',
+          fontSize: 13,
+          color: 'var(--text-secondary)'
+        }}>
+          Don't have an account?{" "}
+          <Link to="/signup" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+            Sign up
+          </Link>
+        </div>
+      </div>
     </div>
   );
 };

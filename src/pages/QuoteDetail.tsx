@@ -16,6 +16,8 @@ export default function QuoteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [convertSuccess, setConvertSuccess] = useState<any>(null);
+  const [convertError, setConvertError] = useState<string | null>(null);
 
   const { data: quote, isLoading, error } = useQuery({
     queryKey: ['quote', id],
@@ -41,24 +43,20 @@ export default function QuoteDetail() {
   const convertToLoadMutation = useMutation({
     mutationFn: () =>
       postData({
-        url: 'api/v1/loads/',
-        data: {
-          customer: quote.customer,
-          customer_name: quote.customer_name,
-          pickup_location: quote.pickup_location,
-          delivery_location: quote.delivery_location,
-          cargo_description: quote.cargo_description || 'General Freight',
-          weight: quote.weight || 0,
-          quote_id: quote.id,
-          quote_number: quote.quote_number,
-          total_amount: quote.total_amount,
-          status: 'SCHEDULED',
-        },
+        url: `api/v1/quotes/${id}/convert_to_load/`,
+        data: {},
       }),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['loads'] });
-      alert('Quote converted to booking successfully!');
-      navigate('/bookings');
+      setConvertSuccess(data);
+      setConvertError(null);
+      if (data?.id) {
+        navigate(`/bookings/${data.id}`);
+      }
+    },
+    onError: (error: any) => {
+      setConvertError(error?.message || 'Failed to convert quote to booking');
+      setConvertSuccess(null);
     },
   });
 
@@ -320,14 +318,42 @@ export default function QuoteDetail() {
               </button>
 
               {quote.status === 'ACCEPTED' && (
-                <button
-                  className="btn-action"
-                  onClick={handleConvertToLoad}
-                  style={{ width: '100%', fontSize: 11, padding: '10px 16px', background: 'var(--status-success)', border: 'none' }}
-                  disabled={convertToLoadMutation.isPending}
-                >
-                  {convertToLoadMutation.isPending ? 'CONVERTING...' : '✓ CONVERT TO BOOKING'}
-                </button>
+                <>
+                  <button
+                    className="btn-action"
+                    onClick={handleConvertToLoad}
+                    style={{ width: '100%', fontSize: 11, padding: '10px 16px', background: 'var(--status-success)', border: 'none' }}
+                    disabled={convertToLoadMutation.isPending}
+                  >
+                    {convertToLoadMutation.isPending ? 'CONVERTING...' : '✓ CONVERT TO BOOKING'}
+                  </button>
+                  {convertSuccess && (
+                    <div style={{
+                      padding: '10px 14px',
+                      borderRadius: 2,
+                      background: 'var(--status-success-bg)',
+                      border: '1px solid var(--status-success)',
+                      fontSize: 12,
+                      color: 'var(--status-success)',
+                      fontFamily: 'var(--font-mono)',
+                    }}>
+                      ✓ Quote converted to booking successfully
+                    </div>
+                  )}
+                  {convertError && (
+                    <div style={{
+                      padding: '10px 14px',
+                      borderRadius: 2,
+                      background: 'var(--status-danger-bg)',
+                      border: '1px solid var(--status-danger)',
+                      fontSize: 12,
+                      color: 'var(--status-danger)',
+                      fontFamily: 'var(--font-mono)',
+                    }}>
+                      ❌ {convertError}
+                    </div>
+                  )}
+                </>
               )}
 
               <button

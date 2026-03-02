@@ -1,15 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
 import { postData } from "@/lib/Api";
 
 const Signup = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -19,109 +15,196 @@ const Signup = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match");
+      setError("Passwords do not match");
       return;
     }
 
     setLoading(true);
+    setError(null);
 
     try {
-      // Assuming there is a register endpoint, otherwise this will fail or needs adjustment
+      const nameParts = formData.name.split(' ');
+      const first_name = nameParts[0];
+      const last_name = nameParts.slice(1).join(' ');
+
       await postData({
-        url: '/user/register/',
+        url: 'api/v1/auth/register/',
         data: {
-          name: formData.name,
+          username: formData.email,
           email: formData.email,
-          password: formData.password
+          password: formData.password,
+          first_name,
+          last_name,
         }
       });
 
-      toast.success("Account created successfully! Please sign in.");
       navigate("/login");
     } catch (error: any) {
       console.error("Signup error:", error);
-      toast.error(error.message || "Failed to create account. Please try again.");
+      setError(error.message || "Failed to create account. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border-subtle)',
+    padding: '12px 14px',
+    color: 'var(--text-primary)',
+    borderRadius: 2,
+    fontSize: 13,
+    outline: 'none',
+    width: '100%',
+    fontFamily: 'var(--font-sans)',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 10,
+    fontFamily: 'var(--font-mono)',
+    color: 'var(--text-tertiary)',
+    marginBottom: 8,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-dashboard-bg p-4">
-      <Card className="w-full max-w-md border-border/50 shadow-modal">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Create an account</CardTitle>
-          <CardDescription className="text-center">
-            Enter your information to get started
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input
-                id="name"
-                name="name"
-                placeholder="John Doe"
-                required
-                value={formData.name}
-                onChange={handleChange}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="name@example.com"
-                required
-                value={formData.email}
-                onChange={handleChange}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Sign up"}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <div className="text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link to="/login" className="text-primary hover:underline font-medium">
-              Sign in
-            </Link>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'var(--bg-deep)',
+      padding: 24
+    }}>
+      <div style={{ marginBottom: 32 }}>
+        <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 40, width: 'auto' }} />
+      </div>
+
+      <div style={{
+        width: '100%',
+        maxWidth: 400,
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 2,
+        padding: 32,
+      }}>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
+            Create an account
           </div>
-        </CardFooter>
-      </Card>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            Enter your information to get started
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div>
+            <label htmlFor="name" style={labelStyle}>Full Name</label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              placeholder="John Doe"
+              required
+              value={formData.name}
+              onChange={handleChange}
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="email" style={labelStyle}>Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              placeholder="name@example.com"
+              required
+              value={formData.email}
+              onChange={handleChange}
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" style={labelStyle}>Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              value={formData.password}
+              onChange={handleChange}
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="confirmPassword" style={labelStyle}>Confirm Password</label>
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              required
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              style={inputStyle}
+            />
+          </div>
+
+          {error && (
+            <div style={{
+              padding: '10px 14px',
+              background: 'var(--status-danger-bg)',
+              border: '1px solid var(--status-danger)',
+              borderRadius: 2,
+              color: 'var(--status-danger)',
+              fontSize: 12,
+            }}>
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="btn-action"
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              fontSize: 11,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: loading ? 'wait' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+            }}
+            disabled={loading}
+          >
+            {loading ? "Creating account..." : "Sign up"}
+          </button>
+        </form>
+
+        <div style={{
+          marginTop: 24,
+          textAlign: 'center',
+          fontSize: 13,
+          color: 'var(--text-secondary)'
+        }}>
+          Already have an account?{" "}
+          <Link to="/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+            Sign in
+          </Link>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { fetchData } from "@/lib/Api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchData, patchData } from "@/lib/Api";
+
+const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] as const;
 
 const formatZAR = (v: number) =>
   'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -26,6 +29,8 @@ const Row = ({ label, value, mono = true, alert = false }: { label: string; valu
 export default function DriverProfile() {
   const { driverId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [updating, setUpdating] = useState(false);
 
   const { data: driver, isLoading } = useQuery({
     queryKey: ['driver', driverId],
@@ -88,13 +93,39 @@ export default function DriverProfile() {
               </div>
             )}
           </div>
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 11,
-            color: statusColor, padding: '6px 12px',
-            border: `1px solid ${statusColor}`, borderRadius: 2,
-          }}>
-            {driver.status?.replace('_', ' ') || 'ACTIVE'}
-          </span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {DRIVER_STATUSES.map(s => {
+              const isCurrentStatus = driver.status === s;
+              const btnColor = STATUS_COLOR[s] || 'var(--text-tertiary)';
+              return (
+                <button
+                  key={s}
+                  disabled={isCurrentStatus || updating}
+                  onClick={async () => {
+                    setUpdating(true);
+                    try {
+                      await patchData({ url: `api/v1/drivers/${driverId}/`, data: { status: s } });
+                      queryClient.invalidateQueries({ queryKey: ['driver', driverId] });
+                    } catch (e) { console.error(e); }
+                    setUpdating(false);
+                  }}
+                  style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 10,
+                    color: isCurrentStatus ? 'var(--bg-deep)' : btnColor,
+                    background: isCurrentStatus ? btnColor : 'transparent',
+                    padding: '5px 10px',
+                    border: `1px solid ${btnColor}`, borderRadius: 2,
+                    cursor: isCurrentStatus || updating ? 'default' : 'pointer',
+                    opacity: updating && !isCurrentStatus ? 0.5 : 1,
+                    letterSpacing: '0.04em',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {s.replace('_', ' ')}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 

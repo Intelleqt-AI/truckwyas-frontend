@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { fetchData } from '@/lib/Api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchData, patchData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
+
+const VEHICLE_STATUSES = ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'OUT_OF_SERVICE'] as const;
 
 const ScoreBar = ({ label, value, max = 100, color = 'var(--accent-primary)' }: any) => (
   <div style={{ marginBottom: 14 }}>
@@ -26,7 +29,9 @@ export default function VehicleFinancialProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const isFinancial = location.pathname.endsWith('/financial');
+  const [updating, setUpdating] = useState(false);
 
   const { data: vehicle, isLoading } = useQuery({
     queryKey: ['vehicle', id],
@@ -88,13 +93,39 @@ export default function VehicleFinancialProfile() {
               {vehicle.vehicle_type_name} · {vehicle.year} · {vehicle.fuel_type}
             </div>
           </div>
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 11,
-            color: statusColor, padding: '6px 12px',
-            border: `1px solid ${statusColor}`, borderRadius: 2,
-          }}>
-            {vehicle.status?.replace('_', ' ')}
-          </span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {VEHICLE_STATUSES.map(s => {
+              const isCurrentStatus = vehicle.status === s;
+              const btnColor = STATUS_COLOR[s] || 'var(--text-tertiary)';
+              return (
+                <button
+                  key={s}
+                  disabled={isCurrentStatus || updating}
+                  onClick={async () => {
+                    setUpdating(true);
+                    try {
+                      await patchData({ url: `api/v1/vehicles/${id}/`, data: { status: s } });
+                      queryClient.invalidateQueries({ queryKey: ['vehicle', id] });
+                    } catch (e) { console.error(e); }
+                    setUpdating(false);
+                  }}
+                  style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 10,
+                    color: isCurrentStatus ? 'var(--bg-deep)' : btnColor,
+                    background: isCurrentStatus ? btnColor : 'transparent',
+                    padding: '5px 10px',
+                    border: `1px solid ${btnColor}`, borderRadius: 2,
+                    cursor: isCurrentStatus || updating ? 'default' : 'pointer',
+                    opacity: updating && !isCurrentStatus ? 0.5 : 1,
+                    letterSpacing: '0.04em',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {s.replace('_', ' ')}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 

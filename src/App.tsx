@@ -8,6 +8,20 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { OSLayout } from "./components/os/OSLayout";
 // Eager load — Overview for fast first load
 import Overview from "./pages/Overview";
+
+// Auth guard — redirects to /login if no token
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access') : null;
+  if (!token) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+// Public route — redirects to / if already logged in
+function PublicOnly({ children }: { children: React.ReactNode }) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access') : null;
+  if (token) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
 // Lazy load all other pages for code splitting
 const QuotesList = lazy(() => import("./pages/QuotesList").then(m => ({ default: m.QuotesList })));
 const NewQuote = lazy(() => import("./pages/NewQuote"));
@@ -32,6 +46,8 @@ const PartnerDashboard = lazy(() => import("./pages/PartnerDashboard"));
 const Settings = lazy(() => import("./pages/Settings"));
 const XeroIntegration = lazy(() => import("./pages/settings/XeroIntegration"));
 const FleetImport = lazy(() => import("./pages/settings/FleetImport"));
+const Login = lazy(() => import("./pages/Login"));
+const Signup = lazy(() => import("./pages/Signup"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PasswordReset = lazy(() => import("./pages/PasswordReset"));
 const VehicleFinancialProfile = lazy(() => import("./pages/VehicleFinancialProfile"));

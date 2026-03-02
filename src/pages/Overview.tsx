@@ -16,9 +16,18 @@ export default function Overview() {
   const [activeVehicles, setActiveVehicles] = useState(0);
   const [activity, setActivity] = useState<any[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [heatmapData, setHeatmapData] = useState<number[]>([]);
 
   useEffect(() => {
     document.title = 'Overview - TruckWys';
+
+    // Real-time clock update
+    const clockInterval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(clockInterval);
   }, []);
 
   useEffect(() => {
@@ -63,6 +72,24 @@ export default function Overview() {
         const activeVehicleCount = fleetData?.active_vehicles || vehicles.filter((v: any) => v.status === 'AVAILABLE' || v.status === 'IN_USE').length || 0;
         setActiveVehicles(activeVehicleCount);
 
+        // Generate heatmap data from last 28 days of load activity
+        const heatmap = new Array(28).fill(0);
+        const now = Date.now();
+        const dayMs = 24 * 60 * 60 * 1000;
+
+        loads.forEach((load: any) => {
+          const createdAt = load.created_at || load.pickup_date;
+          if (createdAt) {
+            const loadTime = new Date(createdAt).getTime();
+            const daysAgo = Math.floor((now - loadTime) / dayMs);
+            if (daysAgo >= 0 && daysAgo < 28) {
+              heatmap[27 - daysAgo]++;
+            }
+          }
+        });
+
+        setHeatmapData(heatmap);
+
         setActivity(Array.isArray(activityData) ? activityData : (activityData?.results || []));
         setActivityLoading(false);
 
@@ -103,6 +130,36 @@ export default function Overview() {
     return `${Math.floor(h / 24)}d ago`;
   };
 
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-ZA', {
+      timeZone: 'Africa/Johannesburg',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-ZA', {
+      timeZone: 'Africa/Johannesburg',
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const getHeatClass = (count: number) => {
+    if (count === 0) return '';
+    const max = Math.max(...heatmapData, 1);
+    const ratio = count / max;
+    if (ratio >= 0.75) return 'heat-high';
+    if (ratio >= 0.5) return 'heat-med';
+    if (ratio > 0) return 'heat-low';
+    return '';
+  };
+
   return (
     <div style={{ display: 'flex', gap: 24, alignItems: 'start' }}>
       {/* MAIN WORKSPACE */}
@@ -114,6 +171,27 @@ export default function Overview() {
         gap: 20,
         alignContent: 'start',
       }}>
+        {/* Real-time Clock */}
+        <div className="card" style={{ gridColumn: 'span 3', padding: '14px 20px', background: 'var(--bg-surface)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                {formatDate(currentTime)}
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+                {formatTime(currentTime)} <span style={{ fontSize: 14, color: 'var(--text-secondary)', marginLeft: 8 }}>SAST</span>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>SYSTEM STATUS</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                <div className="live-dot" />
+                <span style={{ fontSize: 12, color: 'var(--status-success)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>OPERATIONAL</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Metric cards */}
         <div className="card metric-card">
           <div className="card-header">
@@ -198,17 +276,25 @@ export default function Overview() {
 
         {/* Utilization card */}
         <div className="card utilization-card">
-          <div className="card-header"><span className="card-title">Fleet Utilization</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <span style={{ fontSize: 24, fontWeight: 500, color: 'var(--text-primary)' }}>{totalVehicles > 0 ? `${Math.round((activeLoadsCount / totalVehicles) * 100)}%` : '—'}</span>
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{activeLoadsCount} active loads</span>
+          <div className="card-header"><span className="card-title">Fleet Utilization (Last 28 Days)</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 24, fontWeight: 500, color: 'var(--text-primary)' }}>{totalVehicles > 0 ? `${Math.round((activeVehicles / totalVehicles) * 100)}%` : '—'}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{activeVehicles} of {totalVehicles} vehicles active</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Active Loads</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{activeLoadsCount}</div>
+            </div>
           </div>
           <div className="heatmap-grid">
-            {['low','med','high','low','high','high','low','high','high','med','high','low','high','high','high','med','high','high','high','high','med','med','med','low','low','med','low','low'].map((v, i) => (
-              <div key={i} className={`heat-cell heat-${v}`} />
+            {(heatmapData.length > 0 ? heatmapData : new Array(28).fill(0)).map((count, i) => (
+              <div key={i} className={`heat-cell ${getHeatClass(count)}`} title={`${count} load${count !== 1 ? 's' : ''}`} />
             ))}
           </div>
-          <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-tertiary)' }}>{totalVehicles > 0 ? `${totalVehicles - activeLoadsCount} vehicle${totalVehicles - activeLoadsCount !== 1 ? 's' : ''} available` : 'Loading...'}</div>
+          <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-tertiary)' }}>
+            {totalVehicles > 0 ? `${totalVehicles - activeVehicles} vehicle${totalVehicles - activeVehicles !== 1 ? 's' : ''} available` : 'Loading...'}
+          </div>
         </div>
 
         {/* Recent Quotes */}

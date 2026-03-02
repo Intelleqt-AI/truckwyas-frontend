@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { fetchData } from '../lib/Api';
+import { fetchData, postData } from '../lib/Api';
 
 interface Driver {
   id: number;
@@ -54,6 +54,13 @@ export default function Drivers() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('All');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [addForm, setAddForm] = useState({
+    first_name: '', last_name: '', email: '', phone: '',
+    license_number: '', license_expiry: '', license_state: 'GP',
+    hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE',
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -140,7 +147,7 @@ export default function Drivers() {
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
         </div>
-        <button className="btn-action">+ ADD DRIVER</button>
+        <button className="btn-action" onClick={() => setShowAddForm(true)}>+ ADD DRIVER</button>
       </div>
 
       {/* Tabs */}
@@ -312,5 +319,100 @@ export default function Drivers() {
         </table>
       </div>
     </div>
+
+      {/* Add Driver Slide-out */}
+      {showAddForm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowAddForm(false)} />
+          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Add Driver</div>
+              <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            {[
+              { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan' },
+              { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter' },
+              { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
+              { key: 'phone', label: 'Phone', placeholder: 'e.g. 082 123 4567' },
+              { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001' },
+              { key: 'license_expiry', label: 'License Expiry', type: 'date' },
+              { key: 'hire_date', label: 'Hire Date', type: 'date' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <input
+                  type={f.type || 'text'}
+                  placeholder={f.placeholder}
+                  value={(addForm as any)[f.key]}
+                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
+            {[
+              { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'] },
+              { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <select
+                  value={(addForm as any)[f.key]}
+                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                >
+                  {f.options.map(o => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}
+                </select>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+              <button
+                disabled={saving}
+                onClick={async () => {
+                  if (!addForm.first_name || !addForm.last_name || !addForm.license_number || !addForm.license_expiry) {
+                    alert('Please fill in all required fields');
+                    return;
+                  }
+                  setSaving(true);
+                  try {
+                    // Create user first, then driver
+                    const username = `${addForm.first_name.toLowerCase()}.${addForm.last_name.toLowerCase()}`.replace(/\s+/g, '');
+                    const user = await postData({ url: 'api/users/', data: {
+                      username,
+                      email: addForm.email || `${username}@truckwys.co.za`,
+                      first_name: addForm.first_name,
+                      last_name: addForm.last_name,
+                      password: 'TruckWys2026!',
+                    }});
+                    await postData({ url: 'api/v1/drivers/', data: {
+                      user: user.id,
+                      license_number: addForm.license_number,
+                      license_expiry: addForm.license_expiry,
+                      license_state: addForm.license_state,
+                      hire_date: addForm.hire_date,
+                      status: addForm.status,
+                      emergency_phone: addForm.phone,
+                    }});
+                    setShowAddForm(false);
+                    setAddForm({ first_name: '', last_name: '', email: '', phone: '', license_number: '', license_expiry: '', license_state: 'GP', hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE' });
+                    // Refresh
+                    const d = await fetchData('api/v1/drivers/');
+                    setDrivers(Array.isArray(d) ? d : d?.results || []);
+                  } catch (e: any) { alert(e?.message || 'Failed to create driver'); }
+                  setSaving(false);
+                }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+              >
+                {saving ? 'SAVING...' : 'CREATE DRIVER'}
+              </button>
+              <button
+                onClick={() => setShowAddForm(false)}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
   );
 }

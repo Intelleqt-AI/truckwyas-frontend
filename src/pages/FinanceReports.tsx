@@ -23,6 +23,78 @@ export default function FinanceReports() {
   const [facilities, setFacilities] = useState<any>(null);
   const [advances, setAdvances] = useState<any[]>([]);
 
+  const exportToCSV = () => {
+    let csvContent = '';
+    let filename = '';
+
+    switch(tab) {
+      case 'pl':
+        filename = 'PL_Report.csv';
+        csvContent = 'Metric,Value\n';
+        csvContent += `Total Revenue,${financeData?.total_revenue || 0}\n`;
+        csvContent += `Total Expenses,${financeData?.total_expenses || 0}\n`;
+        csvContent += `Net Margin %,${financeData?.net_margin_percent || 0}\n`;
+        csvContent += `Net Profit,${(financeData?.total_revenue || 0) - (financeData?.total_expenses || 0)}\n\n`;
+        csvContent += 'Category,Amount\n';
+        if (financeData?.expense_breakdown) {
+          Object.entries(financeData.expense_breakdown).forEach(([category, amount]: [string, any]) => {
+            csvContent += `${category},${amount}\n`;
+          });
+        }
+        break;
+
+      case 'cashflow':
+        filename = 'Cashflow_Forecast.csv';
+        csvContent = 'Period,Week Starting,Expected In,Expected Out,Net\n';
+        (cashflowData?.forecast || []).forEach((f: any) => {
+          const net = (f.expected_in || 0) - (f.expected_out || 0);
+          csvContent += `${f.period},${f.start_date},${f.expected_in || 0},${f.expected_out || 0},${net}\n`;
+        });
+        break;
+
+      case 'customer':
+        filename = 'Customer_Report.csv';
+        csvContent = 'Rank,Customer Name,Revenue,Invoice Count,Avg Payment Days\n';
+        const topCustomers = financeData?.top_customers || customers
+          .map((c: any) => ({ customer_name: c.name || c.customer_name, revenue: c.total_revenue || 0, invoice_count: c.invoice_count || 0 }))
+          .sort((a: any, b: any) => b.revenue - a.revenue)
+          .slice(0, 10);
+        topCustomers.forEach((c: any, idx: number) => {
+          const matchingCustomer = customers.find((cust: any) => cust.name === c.customer_name);
+          csvContent += `${idx + 1},${c.customer_name},${c.revenue},${c.invoice_count},${matchingCustomer?.avg_payment_days || 0}\n`;
+        });
+        break;
+
+      case 'aging':
+        filename = 'Aging_Report.csv';
+        csvContent = 'Category,Amount,Count,Percentage\n';
+        const totalAmount = (agingData?.buckets || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+        (agingData?.buckets || []).forEach((b: any) => {
+          const pct = totalAmount > 0 ? ((b.amount / totalAmount) * 100).toFixed(1) : '0.0';
+          csvContent += `${b.label},${b.amount || 0},${b.count || 0},${pct}\n`;
+        });
+        break;
+
+      case 'capital':
+        filename = 'Capital_Report.csv';
+        csvContent = 'Invoice #,Customer,Advanced,Fee,Date,Status\n';
+        advances.slice(0, 10).forEach((adv: any) => {
+          csvContent += `${adv.invoice_number},${adv.customer_name},${adv.advanced_amount || 0},${adv.fee_amount || 0},${adv.advanced_date || adv.created_at?.slice(0, 10)},${adv.status || 'ACTIVE'}\n`;
+        });
+        break;
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -89,7 +161,7 @@ export default function FinanceReports() {
               Comprehensive financial analytics • Last updated: {new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
-          <button className="btn-action">↓ EXPORT</button>
+          <button className="btn-action" onClick={exportToCSV}>↓ EXPORT CSV</button>
         </div>
       </div>
 
@@ -138,6 +210,59 @@ export default function FinanceReports() {
                   </div>
                 ))}
               </div>
+
+              {/* Monthly Trend Chart */}
+              {financeData?.monthly_trend && financeData.monthly_trend.length > 0 ? (
+                <div className="card" style={{ padding: 20 }}>
+                  <div className="card-header">
+                    <span className="card-title">Revenue vs Expenses Trend (Last 12 Months)</span>
+                    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-secondary)' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ width: 20, height: 2, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1 }}/>Revenue
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ width: 20, height: 2, background: 'var(--status-danger)', display: 'inline-block', borderRadius: 1 }}/>Expenses
+                      </span>
+                    </div>
+                  </div>
+                  {(() => {
+                    const trend = financeData.monthly_trend;
+                    const rev = trend.map((m: any) => m.revenue / 1000);
+                    const exp = trend.map((m: any) => m.expenses / 1000);
+                    const maxV = Math.max(...rev, ...exp, 1) * 1.1;
+                    const pts = (arr: number[]) => arr.map((v, i) => `${(i / Math.max(arr.length - 1, 1)) * 100},${100 - (v / maxV) * 100}`).join(' ');
+                    const labels = trend.map((m: any) => m.month?.slice(5) || '');
+
+                    return (
+                      <>
+                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: 140, display: 'block', marginTop: 16 }}>
+                          <defs>
+                            <linearGradient id="revGradPL" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.15"/>
+                              <stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0"/>
+                            </linearGradient>
+                            <linearGradient id="expGradPL" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="var(--status-danger)" stopOpacity="0.1"/>
+                              <stop offset="100%" stopColor="var(--status-danger)" stopOpacity="0"/>
+                            </linearGradient>
+                          </defs>
+                          <polygon points={`0,100 ${pts(rev)} 100,100`} fill="url(#revGradPL)" />
+                          <polygon points={`0,100 ${pts(exp)} 100,100`} fill="url(#expGradPL)" />
+                          <polyline points={pts(rev)} fill="none" stroke="var(--accent-primary)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                          <polyline points={pts(exp)} fill="none" stroke="var(--status-danger)" strokeWidth="1.5" strokeDasharray="3,2" vectorEffect="non-scaling-stroke" />
+                        </svg>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>
+                          {labels.slice(-6).map((l: string, i: number) => <span key={i}>{l}</span>)}
+                        </div>
+                        <div style={{ display: 'flex', gap: 24, marginTop: 16, fontSize: 11, color: 'var(--text-secondary)' }}>
+                          <span>Latest: <span style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(trend[trend.length - 1]?.revenue || 0)}</span> revenue</span>
+                          <span>vs <span style={{ color: 'var(--status-danger)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(trend[trend.length - 1]?.expenses || 0)}</span> expenses</span>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : null}
 
               {/* Expense breakdown */}
               {financeData?.expense_breakdown && Object.keys(financeData.expense_breakdown).length > 0 ? (

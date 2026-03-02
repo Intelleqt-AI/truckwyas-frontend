@@ -62,7 +62,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const formatZAR = (v: number) =>
-  'R ' + v.toLocaleString('en-ZA', { minimumFractionDigals: 0, maximumFractionDigits: 0 });
+  'R ' + v.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 export default function Vehicles() {
   const navigate = useNavigate();
@@ -320,7 +320,6 @@ export default function Vehicles() {
         </div>
 
       </div>
-    </div>
 
       {/* Add Vehicle Slide-out */}
       {showAddForm && (
@@ -395,5 +394,6 @@ export default function Vehicles() {
           </div>
         </div>
       )}
+    </div>
   );
 }

@@ -10,6 +10,7 @@ export default function Overview() {
   const [insights, setInsights] = useState<any[]>([]);
   const [advances, setAdvances] = useState<any[]>([]);
   const [recentQuotes, setRecentQuotes] = useState<any[]>([]);
+  const [recentLoads, setRecentLoads] = useState<any[]>([]);
   const [activeLoadsCount, setActiveLoadsCount] = useState(0);
   const [totalVehicles, setTotalVehicles] = useState(0);
   const [activeVehicles, setActiveVehicles] = useState(0);
@@ -55,6 +56,7 @@ export default function Overview() {
         const loads = loadsData?.results || loadsData || [];
         const activeLoads = loads.filter((l: any) => l.status === 'IN_TRANSIT' || l.status === 'LOADING');
         setActiveLoadsCount(activeLoads.length);
+        setRecentLoads(loads.slice(0, 5));
         const vehicles = vehiclesData?.results || vehiclesData || [];
         setTotalVehicles(vehicles.length);
 
@@ -149,19 +151,6 @@ export default function Overview() {
           </div>
           <div className="metric-delta delta-neutral">
             <span>DSO: {loading ? '—' : Math.round(financeData?.dso || 0)} days</span>
-          </div>
-        </div>
-
-        <div className="card metric-card">
-          <div className="card-header">
-            <span className="card-title">{loading ? 'Loading...' : 'Fleet Active'}</span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="card-action"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-          </div>
-          <div className="metric-value" style={{ color: 'var(--status-success)' }}>
-            {loading ? '...' : activeVehicles}
-          </div>
-          <div className="metric-delta delta-neutral">
-            <span>{totalVehicles} total</span>
           </div>
         </div>
 
@@ -264,6 +253,48 @@ export default function Overview() {
             </table>
           ) : (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)' }}>No recent quotes</div>
+          )}
+        </div>
+
+        {/* Recent Bookings */}
+        <div className="card table-card">
+          <div className="card-header">
+            <span className="card-title">Recent Bookings</span>
+            <button onClick={() => navigate('/orders')} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 8px', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>VIEW ALL</button>
+          </div>
+          {loading ? (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)' }}>Loading bookings...</div>
+          ) : recentLoads.length > 0 ? (
+            <table className="data-table">
+              <thead>
+                <tr><th>Load #</th><th>Customer</th><th>Route</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                {recentLoads.map((load: any) => (
+                  <tr key={load.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/orders/${load.id}`)}>
+                    <td className="mono">{load.load_number || `LD-${load.id}`}</td>
+                    <td>{load.customer_name || load.customer?.company_name || '—'}</td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                      {load.origin?.split(' ').slice(0, 2).join(' ') || '—'} → {load.destination?.split(' ').slice(0, 2).join(' ') || '—'}
+                    </td>
+                    <td>
+                      <span style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 10,
+                        color: load.status === 'DELIVERED' ? 'var(--status-success)' : load.status === 'IN_TRANSIT' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                        padding: '2px 6px',
+                        background: 'var(--bg-surface-hover)',
+                        borderRadius: 2
+                      }}>
+                        {load.status?.replace('_', ' ')}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)' }}>No recent bookings</div>
           )}
         </div>
 

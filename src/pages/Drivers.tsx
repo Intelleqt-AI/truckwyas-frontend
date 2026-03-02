@@ -196,68 +196,6 @@ export default function Drivers() {
         </div>
       )}
 
-      {/* Enhanced Leaderboard Visualization - Full List */}
-      {leaderboard.length > 0 && (
-        <div className="card" style={{ padding: 20, marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-            Revenue Leaderboard (All Drivers)
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {leaderboard.map((entry, idx) => {
-              const maxRevenue = leaderboard[0]?.revenue || 1;
-              const widthPercent = (entry.revenue / maxRevenue) * 100;
-
-              return (
-                <div key={entry.driver_id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{
-                    width: 30,
-                    textAlign: 'center',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
-                    color: idx < 3 ? rankColor(idx + 1) : 'var(--text-tertiary)',
-                    fontWeight: idx < 3 ? 700 : 400,
-                  }}>
-                    #{idx + 1}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', marginBottom: 4, color: 'var(--text-primary)' }}>
-                      {entry.driver_name}
-                    </div>
-                    <div style={{ position: 'relative', height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-                      <div style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: `${widthPercent}%`,
-                        background: idx < 3 ? rankColor(idx + 1) : 'var(--accent-primary)',
-                        borderRadius: 2,
-                        transition: 'width 0.3s ease',
-                      }} />
-                      <div style={{
-                        position: 'absolute',
-                        right: 8,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        fontSize: 10,
-                        fontFamily: 'var(--font-mono)',
-                        color: widthPercent > 50 ? 'var(--bg-deep)' : 'var(--text-primary)',
-                        fontWeight: 600,
-                      }}>
-                        {entry.trips} trips
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ width: 100, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {formatZAR(entry.revenue)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Driver Intelligence Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
         {/* Status Distribution */}

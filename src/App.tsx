@@ -84,45 +84,47 @@ const App = () => (
           <Sonner />
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
-            {/* Homepage — has its own full OS layout with agent sidebar */}
-            <Route path="/" element={<OSLayout><Overview /></OSLayout>} />
-
-            {/* All other pages — wrapped in OSLayout (header + nav + content) */}
-            <Route path="/quotes" element={<OSLayout><QuotesList /></OSLayout>} />
-            <Route path="/quotes/new" element={<OSLayout><NewQuote /></OSLayout>} />
-            <Route path="/quotes/:id" element={<OSLayout><QuoteDetail /></OSLayout>} />
-            <Route path="/bookings" element={<OSLayout><LoadsList /></OSLayout>} />
-            <Route path="/bookings/:id" element={<OSLayout><Bookings /></OSLayout>} />
-            <Route path="/bookings/list" element={<OSLayout><BookingsList /></OSLayout>} />
-            <Route path="/bookings/pipeline" element={<OSLayout><QuotesList /></OSLayout>} />
-            <Route path="/bookings/pipeline/:id" element={<OSLayout><NewQuote /></OSLayout>} />
-            <Route path="/fleet" element={<OSLayout><Vehicles /></OSLayout>} />
-            <Route path="/fleet/overview" element={<OSLayout><FleetDashboard /></OSLayout>} />
-            <Route path="/fleet/vehicles" element={<OSLayout><Vehicles /></OSLayout>} />
-            <Route path="/fleet/vehicles/:id" element={<OSLayout><VehicleFinancialProfile /></OSLayout>} />
-            <Route path="/fleet/drivers" element={<OSLayout><Drivers /></OSLayout>} />
-            <Route path="/fleet/drivers/:driverId" element={<OSLayout><DriverProfile /></OSLayout>} />
-            <Route path="/vehicles" element={<OSLayout><Vehicles /></OSLayout>} />
-            <Route path="/drivers" element={<OSLayout><Drivers /></OSLayout>} />
-            <Route path="/invoices" element={<OSLayout><Invoices /></OSLayout>} />
-            <Route path="/finance/invoices" element={<OSLayout><Invoices /></OSLayout>} />
-            <Route path="/finance/invoices/new" element={<OSLayout><CreateInvoice /></OSLayout>} />
-            <Route path="/finance/invoices/:id" element={<OSLayout><InvoiceDetail /></OSLayout>} />
-            <Route path="/finance/expenses" element={<OSLayout><Expenses /></OSLayout>} />
-            <Route path="/finance/reports" element={<OSLayout><FinanceReports /></OSLayout>} />
-            <Route path="/capital" element={<OSLayout><Capital /></OSLayout>} />
-            <Route path="/capital/request" element={<OSLayout><AdvanceRequest /></OSLayout>} />
-            <Route path="/capital/advances/:id" element={<OSLayout><AdvanceDetail /></OSLayout>} />
-            <Route path="/insights" element={<OSLayout><Insights /></OSLayout>} />
-            <Route path="/partner-dashboard" element={<OSLayout><PartnerDashboard /></OSLayout>} />
-            <Route path="/settings/:section?" element={<OSLayout><Settings /></OSLayout>} />
-            <Route path="/settings/integrations/xero" element={<OSLayout><XeroIntegration /></OSLayout>} />
-            <Route path="/settings/integrations/fleet" element={<OSLayout><FleetImport /></OSLayout>} />
-            {/* New Sprint 5+6 pages */}
+            {/* Public routes — no auth required */}
+            <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
+            <Route path="/signup" element={<PublicOnly><Signup /></PublicOnly>} />
             <Route path="/password-reset" element={<PasswordReset />} />
-            <Route path="/fleet/vehicles/:id/financial" element={<OSLayout><VehicleFinancialProfile /></OSLayout>} />
-            <Route path="/capital/risk-scores" element={<OSLayout><RiskScoreView /></OSLayout>} />
-            <Route path="/fleet/heatmap" element={<OSLayout><FleetHeatmap /></OSLayout>} />
+
+            {/* Protected routes — require auth token */}
+            <Route path="/" element={<RequireAuth><OSLayout><Overview /></OSLayout></RequireAuth>} />
+            <Route path="/quotes" element={<RequireAuth><OSLayout><QuotesList /></OSLayout></RequireAuth>} />
+            <Route path="/quotes/new" element={<RequireAuth><OSLayout><NewQuote /></OSLayout></RequireAuth>} />
+            <Route path="/quotes/:id" element={<RequireAuth><OSLayout><QuoteDetail /></OSLayout></RequireAuth>} />
+            <Route path="/bookings" element={<RequireAuth><OSLayout><LoadsList /></OSLayout></RequireAuth>} />
+            <Route path="/bookings/:id" element={<RequireAuth><OSLayout><Bookings /></OSLayout></RequireAuth>} />
+            <Route path="/bookings/list" element={<RequireAuth><OSLayout><BookingsList /></OSLayout></RequireAuth>} />
+            <Route path="/bookings/pipeline" element={<RequireAuth><OSLayout><QuotesList /></OSLayout></RequireAuth>} />
+            <Route path="/bookings/pipeline/:id" element={<RequireAuth><OSLayout><NewQuote /></OSLayout></RequireAuth>} />
+            <Route path="/fleet" element={<RequireAuth><OSLayout><Vehicles /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/overview" element={<RequireAuth><OSLayout><FleetDashboard /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/vehicles" element={<RequireAuth><OSLayout><Vehicles /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/vehicles/:id" element={<RequireAuth><OSLayout><VehicleFinancialProfile /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/drivers" element={<RequireAuth><OSLayout><Drivers /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/drivers/:driverId" element={<RequireAuth><OSLayout><DriverProfile /></OSLayout></RequireAuth>} />
+            <Route path="/vehicles" element={<RequireAuth><OSLayout><Vehicles /></OSLayout></RequireAuth>} />
+            <Route path="/drivers" element={<RequireAuth><OSLayout><Drivers /></OSLayout></RequireAuth>} />
+            <Route path="/invoices" element={<RequireAuth><OSLayout><Invoices /></OSLayout></RequireAuth>} />
+            <Route path="/finance/invoices" element={<RequireAuth><OSLayout><Invoices /></OSLayout></RequireAuth>} />
+            <Route path="/finance/invoices/new" element={<RequireAuth><OSLayout><CreateInvoice /></OSLayout></RequireAuth>} />
+            <Route path="/finance/invoices/:id" element={<RequireAuth><OSLayout><InvoiceDetail /></OSLayout></RequireAuth>} />
+            <Route path="/finance/expenses" element={<RequireAuth><OSLayout><Expenses /></OSLayout></RequireAuth>} />
+            <Route path="/finance/reports" element={<RequireAuth><OSLayout><FinanceReports /></OSLayout></RequireAuth>} />
+            <Route path="/capital" element={<RequireAuth><OSLayout><Capital /></OSLayout></RequireAuth>} />
+            <Route path="/capital/request" element={<RequireAuth><OSLayout><AdvanceRequest /></OSLayout></RequireAuth>} />
+            <Route path="/capital/advances/:id" element={<RequireAuth><OSLayout><AdvanceDetail /></OSLayout></RequireAuth>} />
+            <Route path="/insights" element={<RequireAuth><OSLayout><Insights /></OSLayout></RequireAuth>} />
+            <Route path="/partner-dashboard" element={<RequireAuth><OSLayout><PartnerDashboard /></OSLayout></RequireAuth>} />
+            <Route path="/settings/:section?" element={<RequireAuth><OSLayout><Settings /></OSLayout></RequireAuth>} />
+            <Route path="/settings/integrations/xero" element={<RequireAuth><OSLayout><XeroIntegration /></OSLayout></RequireAuth>} />
+            <Route path="/settings/integrations/fleet" element={<RequireAuth><OSLayout><FleetImport /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/vehicles/:id/financial" element={<RequireAuth><OSLayout><VehicleFinancialProfile /></OSLayout></RequireAuth>} />
+            <Route path="/capital/risk-scores" element={<RequireAuth><OSLayout><RiskScoreView /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/heatmap" element={<RequireAuth><OSLayout><FleetHeatmap /></OSLayout></RequireAuth>} />
+
             {/* Route aliases */}
             <Route path="/overview" element={<Navigate to="/" replace />} />
             <Route path="/expenses" element={<Navigate to="/finance/expenses" replace />} />

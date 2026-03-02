@@ -77,7 +77,7 @@ export function UsersPermissions() {
 
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>👥 Team Members</span>
+          <span style={sectionTitleStyle}>Team Members</span>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <input
               value={search}
@@ -217,7 +217,7 @@ export function UsersPermissions() {
       {/* Roles Reference */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>🔒 Role Permissions</span>
+          <span style={sectionTitleStyle}>Role Permissions</span>
         </div>
         <div style={{ padding: '8px 0 4px' }}>
           {[

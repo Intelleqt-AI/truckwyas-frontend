@@ -118,7 +118,7 @@ export function NotificationSettings() {
       {/* Push */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>🔔 Push Notifications</span>
+          <span style={sectionTitleStyle}>Push Notifications</span>
         </div>
         <div style={sectionBodyStyle}>
           <ToggleRow label="New bookings" checked={settings.push.new_bookings} onChange={v => setChannel('push', 'new_bookings', v)} />
@@ -131,7 +131,7 @@ export function NotificationSettings() {
       {/* SMS */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>📱 SMS Notifications</span>
+          <span style={sectionTitleStyle}>SMS Notifications</span>
         </div>
         <div style={sectionBodyStyle}>
           <ToggleRow label="Critical alerts only" description="System-wide urgent notifications" checked={settings.sms.critical_alerts} onChange={v => setChannel('sms', 'critical_alerts', v)} />

@@ -108,7 +108,7 @@ export function CompanySettings() {
 
       {/* Business Info */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>🏢 Business Information</span></div>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Business Information</span></div>
         <div style={{ padding: 20 }}>
           <div style={{ ...grid2, marginBottom: 16 }}>
             <div>

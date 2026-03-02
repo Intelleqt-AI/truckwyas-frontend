@@ -125,7 +125,7 @@ export function SecuritySettings() {
       {/* Change Password */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>🔑 Change Password</span>
+          <span style={sectionTitleStyle}>Change Password</span>
         </div>
         <div style={{ padding: 20 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
@@ -165,7 +165,7 @@ export function SecuritySettings() {
       {/* Active Sessions */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>💻 Active Sessions</span>
+          <span style={sectionTitleStyle}>Active Sessions</span>
         </div>
         <div>
           {sessions.map((s, i) => (

@@ -61,7 +61,7 @@ export function BillingSettings() {
 
       {/* Current Plan */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>💳 Current Plan</span></div>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Current Plan</span></div>
         <div style={{ padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
             <div>
@@ -112,7 +112,7 @@ export function BillingSettings() {
 
       {/* Payment Method */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>💳 Payment Method</span></div>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Payment Method</span></div>
         <div style={{ padding: 20 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 14,
@@ -145,7 +145,7 @@ export function BillingSettings() {
 
       {/* Billing History */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>🧾 Billing History</span></div>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Billing History</span></div>
         <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
           <thead>
             <tr>

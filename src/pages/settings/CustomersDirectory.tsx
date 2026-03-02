@@ -66,7 +66,7 @@ export function CustomersDirectory() {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-secondary)', fontWeight: 600 }}>
-            🏢 Customers ({customers.length})
+            Customers ({customers.length})
           </span>
           <div style={{ display: 'flex', gap: 10 }}>
             <input

@@ -179,7 +179,7 @@ export default function Insights() {
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>AI Intelligence</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Insights & Forecasts</div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>AI-powered recommendations and 90-day cash flow forecast. Auto-refreshes every 30s.</div>
+
         </div>
         <div style={{ textAlign: 'right' }}>
           <button

@@ -28,12 +28,10 @@ export default function Capital() {
     setSuccessMessage(null);
 
     try {
-      const amount = invoice.total_amount || invoice.amount || 0;
       await postData({
-        url: '/api/v1/advances/',
+        url: 'api/v1/advances/',
         data: {
-          invoice: invoice.id,
-          amount: amount,
+          invoice_id: invoice.id,
         }
       });
 
@@ -49,9 +47,11 @@ export default function Capital() {
       setEligibleInvoices(eligible);
 
       setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (err) {
-      console.error('Failed to request advance:', err);
-      alert('Failed to request advance. Please try again.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.response?.data?.invoice_id?.[0] || err?.message || 'Request failed';
+      setSuccessMessage(null);
+      setErrorMessage(msg);
+      setTimeout(() => setErrorMessage(null), 5000);
     } finally {
       setRequestingIds(prev => {
         const next = new Set(prev);

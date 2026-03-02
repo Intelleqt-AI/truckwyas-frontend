@@ -33,7 +33,7 @@ export function CustomersDirectory() {
 
   const load = () => {
     setLoading(true);
-    fetchData('api/customers/').then((d: any) => {
+    fetchData('api/v1/customers/').then((d: any) => {
       setCustomers(Array.isArray(d) ? d : (d?.results || []));
     }).catch(() => setCustomers([])).finally(() => setLoading(false));
   };
@@ -48,7 +48,7 @@ export function CustomersDirectory() {
 
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this customer?')) return;
-    await deleteData({ url: `api/customers/${id}/` }).catch(() => {});
+    await deleteData({ url: `api/v1/customers/${id}/` }).catch(() => {});
     load();
   };
 

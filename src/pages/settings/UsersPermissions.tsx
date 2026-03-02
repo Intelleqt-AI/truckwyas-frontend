@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchData } from "@/lib/Api";
+import { fetchData, postData } from "@/lib/Api";
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -48,9 +48,10 @@ export function UsersPermissions() {
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('operator');
+  const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
-    fetchData('api/users/')
+    fetchData('api/v1/users/')
       .then((d: any) => {
         const arr = Array.isArray(d) ? d : (d?.results || []);
         setUsers(arr);
@@ -67,6 +68,29 @@ export function UsersPermissions() {
   );
 
   const roleColor = (role: string) => ROLE_COLORS[role?.toLowerCase()] || 'var(--text-tertiary)';
+
+  const handleInvite = async () => {
+    if (!inviteEmail) { alert('Please enter an email'); return; }
+    setInviting(true);
+    try {
+      await postData({
+        url: 'api/v1/users/',
+        data: { email: inviteEmail, role: inviteRole },
+      });
+      setShowInvite(false);
+      setInviteEmail('');
+      setInviteRole('operator');
+      // Reload users
+      const d = await fetchData('api/v1/users/');
+      const arr = Array.isArray(d) ? d : (d?.results || []);
+      setUsers(arr);
+    } catch (err) {
+      console.error('Failed to invite user:', err);
+      alert('Failed to send invite');
+    } finally {
+      setInviting(false);
+    }
+  };
 
   return (
     <div style={{ maxWidth: 720 }}>
@@ -134,8 +158,8 @@ export function UsersPermissions() {
                 <option value="viewer">Viewer</option>
               </select>
             </div>
-            <button className="btn-action" onClick={() => { setShowInvite(false); setInviteEmail(''); }}>
-              SEND INVITE
+            <button className="btn-action" onClick={handleInvite} disabled={inviting}>
+              {inviting ? 'SENDING...' : 'SEND INVITE'}
             </button>
           </div>
         )}

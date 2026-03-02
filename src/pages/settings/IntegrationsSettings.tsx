@@ -31,7 +31,7 @@ interface Integration {
 const INTEGRATIONS: Integration[] = [
   { id: 'xero', name: 'Xero', description: 'Sync invoices and payments with Xero accounting', category: 'Accounting', status: 'disconnected', logo: 'XR', xeroRoute: true },
   { id: 'stripe', name: 'Stripe', description: 'Accept online payments from customers', category: 'Payments', status: 'disconnected', logo: 'ST' },
-  { id: 'tomtom', name: 'TomTom', description: 'Route optimisation and distance calculations', category: 'Maps', status: 'connected', logo: 'TT' },
+  { id: 'tomtom', name: 'TomTom', description: 'Route optimisation and distance calculations', category: 'Maps', status: 'disconnected', logo: 'TT' },
   { id: 'sap', name: 'SAP', description: 'Enterprise resource planning integration', category: 'ERP', status: 'disconnected', logo: 'SA' },
   { id: 'slack', name: 'Slack', description: 'Team notifications and alerts via Slack', category: 'Notifications', status: 'disconnected', logo: 'SL' },
   { id: 'whatsapp', name: 'WhatsApp Business', description: 'Customer communication via WhatsApp', category: 'Communication', status: 'disconnected', logo: 'WA' },
@@ -217,13 +217,8 @@ export function IntegrationsSettings() {
   const handleConnect = (id: string) => {
     const intg = integrations.find(i => i.id === id);
     if (intg?.xeroRoute) { navigate('/settings/integrations/xero'); return; }
-    setConnecting(id);
-    setTimeout(() => {
-      setIntegrations(prev => prev.map(i =>
-        i.id === id ? { ...i, status: i.status === 'connected' ? 'disconnected' : 'connected' } : i
-      ));
-      setConnecting(null);
-    }, 800);
+    // Integration connections not yet implemented (Phase 3)
+    alert('Integration setup coming soon');
   };
 
   const categories = [...new Set(INTEGRATIONS.map(i => i.category))];

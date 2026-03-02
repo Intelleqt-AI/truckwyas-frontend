@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { fetchData, postData } from "@/lib/Api";
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -96,20 +97,38 @@ export function SecuritySettings() {
   const [loginAlerts, setLoginAlerts] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pwForm, setPwForm] = useState({ current: '', new1: '', new2: '' });
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+
+  useEffect(() => {
+    fetchData('api/v1/auth/sessions/')
+      .then((d: any) => {
+        setSessions(Array.isArray(d) ? d : (d?.results || []));
+      })
+      .catch(() => {
+        setSessions([]);
+      })
+      .finally(() => setLoadingSessions(false));
+  }, []);
 
   const handleChangePassword = async () => {
     if (!pwForm.current || !pwForm.new1) return;
     if (pwForm.new1 !== pwForm.new2) { alert('Passwords do not match'); return; }
     setSaving(true);
-    await new Promise(r => setTimeout(r, 800));
-    setSaving(false);
-    setPwForm({ current: '', new1: '', new2: '' });
+    try {
+      await postData({
+        url: 'api/v1/auth/password-reset/',
+        data: { current_password: pwForm.current, new_password: pwForm.new1 },
+      });
+      setPwForm({ current: '', new1: '', new2: '' });
+      alert('Password updated successfully');
+    } catch (err) {
+      console.error('Password change failed:', err);
+      alert('Failed to update password');
+    } finally {
+      setSaving(false);
+    }
   };
-
-  const sessions = [
-    { device: 'Chrome on macOS', location: 'Johannesburg, ZA', time: 'Active now', current: true },
-    { device: 'Safari on iPhone', location: 'Cape Town, ZA', time: '2 hours ago', current: false },
-  ];
 
   return (
     <div style={{ maxWidth: 720 }}>
@@ -167,7 +186,12 @@ export function SecuritySettings() {
         <div style={sectionHeaderStyle}>
           <span style={sectionTitleStyle}>Active Sessions</span>
         </div>
-        <div>
+        {loadingSessions ? (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>Loading sessions...</div>
+        ) : sessions.length === 0 ? (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>No active sessions</div>
+        ) : (
+          <div>
           {sessions.map((s, i) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -196,7 +220,8 @@ export function SecuritySettings() {
               )}
             </div>
           ))}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

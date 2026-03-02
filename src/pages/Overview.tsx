@@ -427,14 +427,7 @@ export default function Overview() {
             </>
           )}
         </div>
-        <div style={{ padding: 20, borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-surface)', borderRadius: '0 0 var(--card-radius) var(--card-radius)' }}>
-          <div className="card-title" style={{ marginBottom: 12 }}>Quick Quote</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-            <input type="text" placeholder="Origin" style={{ background: 'var(--bg-surface-hover)', border: '1px solid var(--border-subtle)', padding: 8, color: 'var(--text-primary)', borderRadius: 2, fontSize: 11, outline: 'none' }} />
-            <input type="text" placeholder="Dest" style={{ background: 'var(--bg-surface-hover)', border: '1px solid var(--border-subtle)', padding: 8, color: 'var(--text-primary)', borderRadius: 2, fontSize: 11, outline: 'none' }} />
-          </div>
-          <button className="btn-action" onClick={() => navigate('/quotes/new')} style={{ background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}>GENERATE PREVIEW</button>
-        </div>
+
       </aside>
     </div>
   );

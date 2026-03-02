@@ -197,7 +197,7 @@ export default function Capital() {
 
       {errorMessage && (
         <div style={{
-          background: 'rgba(239,68,68,0.12)',
+          background: 'var(--status-danger-bg)',
           color: 'var(--status-danger)',
           padding: '12px 16px',
           borderRadius: 4,
@@ -207,7 +207,8 @@ export default function Capital() {
           display: 'flex',
           alignItems: 'center',
           gap: 8,
-          border: '1px solid rgba(239,68,68,0.25)',
+          border: '1px solid var(--status-danger)',
+          borderOpacity: 0.25,
         }}>
           ✕ {errorMessage}
         </div>
@@ -366,7 +367,7 @@ export default function Capital() {
                           fontSize: 10,
                           padding: '4px 12px',
                           background: requestingIds.has(inv.id) ? 'var(--border-subtle)' : 'var(--accent-primary)',
-                          color: 'white',
+                          color: 'var(--btn-action-color)',
                           border: 'none',
                           borderRadius: 2,
                           cursor: requestingIds.has(inv.id) ? 'not-allowed' : 'pointer',

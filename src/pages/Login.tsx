@@ -10,14 +10,43 @@ const Login = () => {
     password: "",
   });
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError(null);
+    // Clear validation error for this field
+    setValidationErrors(prev => ({ ...prev, [e.target.name]: '' }));
+  };
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.username.trim()) {
+      errors.username = 'Email is required';
+    } else if (!emailRegex.test(formData.username)) {
+      errors.username = 'Invalid email format';
+    }
+
+    // Password validation
+    if (!formData.password) {
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
 
     login(formData, {
       onSuccess: () => {
@@ -85,17 +114,25 @@ const Login = () => {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
-            <label htmlFor="username" style={labelStyle}>Username</label>
+            <label htmlFor="username" style={labelStyle}>Email</label>
             <input
               id="username"
               name="username"
               type="text"
-              placeholder="username"
+              placeholder="name@example.com"
               required
               value={formData.username}
               onChange={handleChange}
-              style={inputStyle}
+              style={{
+                ...inputStyle,
+                borderColor: validationErrors.username ? 'var(--status-danger)' : 'var(--border-subtle)',
+              }}
             />
+            {validationErrors.username && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+                {validationErrors.username}
+              </div>
+            )}
           </div>
 
           <div>
@@ -119,8 +156,16 @@ const Login = () => {
               required
               value={formData.password}
               onChange={handleChange}
-              style={inputStyle}
+              style={{
+                ...inputStyle,
+                borderColor: validationErrors.password ? 'var(--status-danger)' : 'var(--border-subtle)',
+              }}
             />
+            {validationErrors.password && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+                {validationErrors.password}
+              </div>
+            )}
           </div>
 
           {error && (

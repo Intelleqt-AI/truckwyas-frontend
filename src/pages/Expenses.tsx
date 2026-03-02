@@ -741,7 +741,7 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-backdrop)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div className="card" style={{ padding: 28, width: 480, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>

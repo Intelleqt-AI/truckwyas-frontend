@@ -99,7 +99,7 @@ export const QuoteCopilot: React.FC = () => {
               <div
                 style={{
                   padding: 16,
-                  background: 'rgba(34, 197, 94, 0.1)',
+                  background: 'var(--status-success-bg)',
                   border: '1px solid var(--status-success)',
                   borderRadius: 6,
                   marginBottom: 20,
@@ -141,7 +141,7 @@ export const QuoteCopilot: React.FC = () => {
               <div
                 style={{
                   padding: 12,
-                  background: 'rgba(220, 38, 38, 0.1)',
+                  background: 'var(--status-danger-bg)',
                   border: '1px solid var(--status-danger)',
                   borderRadius: 6,
                   color: 'var(--status-danger)',
@@ -259,7 +259,7 @@ export const QuoteCopilot: React.FC = () => {
                 <div
                   style={{
                     padding: 16,
-                    background: 'rgba(59, 130, 246, 0.05)',
+                    background: 'var(--alert-bg)',
                     border: '1px solid var(--border-subtle)',
                     borderRadius: 6,
                   }}

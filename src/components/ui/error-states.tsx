@@ -139,14 +139,14 @@ export function NotFoundError({ onGoBack }: { onGoBack?: () => void }) {
 }
 
 // Inline error banner for forms and specific sections
-export function InlineError({ 
-  message, 
-  onRetry, 
+export function InlineError({
+  message,
+  onRetry,
   onDismiss,
-  className 
-}: { 
-  message: string; 
-  onRetry?: () => void; 
+  className
+}: {
+  message: string;
+  onRetry?: () => void;
   onDismiss?: () => void;
   className?: string;
 }) {
@@ -159,9 +159,9 @@ export function InlineError({
         </div>
         <div className="flex gap-2 flex-shrink-0">
           {onRetry && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onRetry}
               className="h-auto p-1 text-xs hover:bg-destructive/10"
             >
@@ -170,9 +170,9 @@ export function InlineError({
             </Button>
           )}
           {onDismiss && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onDismiss}
               className="h-auto p-1 text-xs hover:bg-destructive/10"
             >
@@ -182,5 +182,49 @@ export function InlineError({
         </div>
       </div>
     </div>
+  );
+}
+
+// Empty state for when there's no data
+export function EmptyState({
+  icon: Icon = Database,
+  title,
+  description,
+  action,
+  onAction,
+  className
+}: {
+  icon?: any;
+  title: string;
+  description?: string;
+  action?: string;
+  onAction?: () => void;
+  className?: string;
+}) {
+  return (
+    <Card className={cn("border-2", className)}>
+      <CardContent className="p-6 text-center">
+        <div className="space-y-4">
+          <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto">
+            <Icon className="w-6 h-6 text-muted-foreground" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-heading font-body-medium text-foreground">
+              {title}
+            </h3>
+            {description && (
+              <p className="text-body text-muted-foreground">
+                {description}
+              </p>
+            )}
+          </div>
+          {action && onAction && (
+            <Button onClick={onAction}>
+              {action}
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

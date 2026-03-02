@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from './toast';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -18,7 +19,14 @@ api.interceptors.response.use(
   res => res,
   error => {
     if (error.response?.status === 401) {
+      // Show toast notification
+      toast.error('Session expired');
+
+      // Clear all auth-related localStorage keys
       localStorage.removeItem('access');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         window.location.href = '/login';
       }

@@ -238,7 +238,7 @@ export default function FleetImport() {
       </div>
 
       {/* Upload Card */}
-      <Card className="border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg">Upload File</CardTitle>
         </CardHeader>
@@ -383,7 +383,7 @@ export default function FleetImport() {
       </Card>
 
       {/* Import History */}
-      <Card className="border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg">Import History</CardTitle>
         </CardHeader>

@@ -15,6 +15,7 @@
   --bg-surface: #0A0A0A;
   --bg-surface-hover: #121212;
   --bg-sidebar: rgba(10, 10, 10, 0.5);
+  --modal-backdrop: rgba(0, 0, 0, 0.6);
 
   /* Borders */
   --border-subtle: #1F1F1F;
@@ -114,6 +115,7 @@
   --bg-surface: #FFFFFF;
   --bg-surface-hover: #F9FAFB;
   --bg-sidebar: #FFFFFF;
+  --modal-backdrop: rgba(0, 0, 0, 0.5);
 
   /* Borders */
   --border-subtle: #E5E7EB;

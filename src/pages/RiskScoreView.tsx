@@ -12,11 +12,11 @@ const TIER_COLOR: Record<string, string> = {
 };
 
 const TIER_BG: Record<string, string> = {
-  EXCELLENT: 'rgba(34,197,94,0.08)',
-  GOOD: 'rgba(34,211,238,0.08)',
-  FAIR: 'rgba(234,179,8,0.08)',
-  ELEVATED: 'rgba(249,115,22,0.08)',
-  INELIGIBLE: 'rgba(239,68,68,0.08)',
+  EXCELLENT: 'var(--status-success-bg)',
+  GOOD: 'var(--status-success-bg)',
+  FAIR: 'var(--status-warning-bg)',
+  ELEVATED: 'var(--status-warning-bg)',
+  INELIGIBLE: 'var(--status-danger-bg)',
 };
 
 const ScoreRing = ({ score, tier }: { score: number; tier: string }) => {

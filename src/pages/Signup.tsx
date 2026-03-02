@@ -6,6 +6,7 @@ const Signup = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -16,13 +17,48 @@ const Signup = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError(null);
+    // Clear validation error for this field
+    setValidationErrors(prev => ({ ...prev, [e.target.name]: '' }));
+  };
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+
+    // Name validation
+    if (!formData.name.trim()) {
+      errors.name = 'Full name is required';
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!emailRegex.test(formData.email)) {
+      errors.email = 'Invalid email format';
+    }
+
+    // Password validation
+    if (!formData.password) {
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters';
+    }
+
+    // Confirm password validation
+    if (!formData.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
+    if (!validateForm()) {
       return;
     }
 
@@ -118,8 +154,16 @@ const Signup = () => {
               required
               value={formData.name}
               onChange={handleChange}
-              style={inputStyle}
+              style={{
+                ...inputStyle,
+                borderColor: validationErrors.name ? 'var(--status-danger)' : 'var(--border-subtle)',
+              }}
             />
+            {validationErrors.name && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+                {validationErrors.name}
+              </div>
+            )}
           </div>
 
           <div>
@@ -132,8 +176,16 @@ const Signup = () => {
               required
               value={formData.email}
               onChange={handleChange}
-              style={inputStyle}
+              style={{
+                ...inputStyle,
+                borderColor: validationErrors.email ? 'var(--status-danger)' : 'var(--border-subtle)',
+              }}
             />
+            {validationErrors.email && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+                {validationErrors.email}
+              </div>
+            )}
           </div>
 
           <div>
@@ -145,8 +197,16 @@ const Signup = () => {
               required
               value={formData.password}
               onChange={handleChange}
-              style={inputStyle}
+              style={{
+                ...inputStyle,
+                borderColor: validationErrors.password ? 'var(--status-danger)' : 'var(--border-subtle)',
+              }}
             />
+            {validationErrors.password && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+                {validationErrors.password}
+              </div>
+            )}
           </div>
 
           <div>
@@ -158,8 +218,16 @@ const Signup = () => {
               required
               value={formData.confirmPassword}
               onChange={handleChange}
-              style={inputStyle}
+              style={{
+                ...inputStyle,
+                borderColor: validationErrors.confirmPassword ? 'var(--status-danger)' : 'var(--border-subtle)',
+              }}
             />
+            {validationErrors.confirmPassword && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+                {validationErrors.confirmPassword}
+              </div>
+            )}
           </div>
 
           {error && (

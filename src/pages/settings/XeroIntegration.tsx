@@ -165,7 +165,7 @@ export default function XeroIntegration() {
       </div>
 
       {/* Connection Status Card */}
-      <Card className="border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <Card className="border-0 shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Connection Status</CardTitle>
@@ -293,7 +293,7 @@ export default function XeroIntegration() {
 
       {/* Sync Log */}
       {connection?.is_connected && syncLogs && syncLogs.length > 0 && (
-        <Card className="border-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Recent Sync Activity</CardTitle>
           </CardHeader>

@@ -8,11 +8,11 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 function getUtilColor(value: number) {
-  if (value === 0) return 'var(--bg-surface-hover)';
-  if (value < 30) return 'rgba(37,99,235,0.15)';
-  if (value < 60) return 'rgba(37,99,235,0.40)';
-  if (value < 80) return 'rgba(37,99,235,0.65)';
-  return 'rgba(37,99,235,0.90)';
+  if (value === 0) return 'var(--heat-empty)';
+  if (value < 30) return 'var(--heat-low)';
+  if (value < 60) return 'var(--heat-medium)';
+  if (value < 80) return 'var(--heat-high)';
+  return 'var(--heat-max)';
 }
 
 // Deterministic fake heatmap seeded from vehicle/load data

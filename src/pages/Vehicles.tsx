@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { fetchData, postData } from '../lib/Api';
+import { fetchData, postData, patchData } from '../lib/Api';
 
 interface Vehicle {
   id: number;
@@ -16,6 +16,14 @@ interface Vehicle {
   trips_this_month?: number;
   fuel_efficiency?: number;
   ai_health_score?: number;
+  plate?: string;
+  vin?: string;
+  mileage?: number;
+  insurance_expiry?: string;
+  registration_expiry?: string;
+  fuel_type?: string;
+  last_maintenance_date?: string;
+  next_maintenance_due?: string;
 }
 
 interface FleetOverview {
@@ -80,6 +88,8 @@ export default function Vehicles() {
     vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '',
     type: 'Rigid Truck', capacity: '', fuel_type: 'Diesel', status: 'AVAILABLE',
   });
+  const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
 
   useEffect(() => {
     setLoading(true);
@@ -275,7 +285,25 @@ export default function Vehicles() {
                     <tr
                       key={v.id}
                       style={{ cursor: 'pointer', borderBottom: idx < sorted.length - 1 ? '1px solid var(--border-row)' : 'none' }}
-                      onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
+                      onClick={() => {
+                        setEditVehicle(v);
+                        setEditForm({
+                          vin: v.vin || '',
+                          make: v.make || '',
+                          model: v.model || '',
+                          year: v.year || new Date().getFullYear(),
+                          plate: v.plate || v.registration || '',
+                          type: v.vehicle_type || 'Rigid Truck',
+                          capacity: v.capacity || '',
+                          fuel_type: v.fuel_type || 'Diesel',
+                          status: v.status || 'AVAILABLE',
+                          mileage: v.mileage || '',
+                          insurance_expiry: v.insurance_expiry || '',
+                          registration_expiry: v.registration_expiry || '',
+                          last_maintenance_date: v.last_maintenance_date || '',
+                          next_maintenance_due: v.next_maintenance_due || '',
+                        });
+                      }}
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
@@ -386,6 +414,98 @@ export default function Vehicles() {
               </button>
               <button
                 onClick={() => setShowAddForm(false)}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Vehicle Slide-out */}
+      {editVehicle && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} onClick={() => setEditVehicle(null)} />
+          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Vehicle</div>
+              <button onClick={() => setEditVehicle(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            {error && (
+              <div style={{ padding: 12, background: 'var(--status-danger)', color: 'var(--bg-deep)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+                {error}
+              </div>
+            )}
+            {[
+              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. 1HGBH41JXMN109186' },
+              { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz' },
+              { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
+              { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
+              { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
+              { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
+              { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
+              { key: 'insurance_expiry', label: 'Insurance Expiry', type: 'date' },
+              { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
+              { key: 'last_maintenance_date', label: 'Last Maintenance', type: 'date' },
+              { key: 'next_maintenance_due', label: 'Next Maintenance Due', type: 'date' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <input
+                  type={f.type || 'text'}
+                  placeholder={f.placeholder}
+                  value={(editForm as any)[f.key]}
+                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
+            {[
+              { key: 'type', label: 'Vehicle Type', options: ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck'] },
+              { key: 'fuel_type', label: 'Fuel Type', options: ['Diesel', 'Petrol', 'Electric', 'Hybrid'] },
+              { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE', 'OUT_OF_SERVICE'] },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <select
+                  value={(editForm as any)[f.key]}
+                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                >
+                  {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+              <button
+                disabled={saving}
+                onClick={async () => {
+                  setSaving(true);
+                  setError(null);
+                  try {
+                    const payload = {
+                      ...editForm,
+                      year: editForm.year ? Number(editForm.year) : undefined,
+                      capacity: editForm.capacity ? Number(editForm.capacity) : undefined,
+                      mileage: editForm.mileage ? Number(editForm.mileage) : undefined,
+                    };
+                    await patchData({ url: `api/v1/vehicles/${editVehicle.id}/`, data: payload });
+                    setEditVehicle(null);
+                    setEditForm({});
+                    const d = await fetchData('api/v1/vehicles/');
+                    setVehicles(Array.isArray(d) ? d : d?.results || []);
+                  } catch (e: any) {
+                    setError(e?.message || 'Failed to update vehicle');
+                  }
+                  setSaving(false);
+                }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+              >
+                {saving ? 'SAVING...' : 'UPDATE VEHICLE'}
+              </button>
+              <button
+                onClick={() => setEditVehicle(null)}
                 style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
               >
                 CANCEL

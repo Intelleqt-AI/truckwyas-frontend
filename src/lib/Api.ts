@@ -65,6 +65,6 @@ export const patchData = async ({ url, data }: { url: string; data: any }) => {
 };
 
 export const loginUser = async ({ username, password }: { username: string; password: string }) => {
-  const res = await api.post('v1/auth/login/', { username, password });
+  const res = await api.post('api/v1/auth/login/', { username, password });
   return res.data;
 };

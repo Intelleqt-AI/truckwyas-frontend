@@ -22,6 +22,7 @@ export default function Capital() {
   const [requestingIds, setRequestingIds] = useState<Set<number>>(new Set());
   const [settlingIds, setSettlingIds] = useState<Set<number>>(new Set());
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleRequestAdvance = async (invoice: any) => {
     setRequestingIds(prev => new Set(prev).add(invoice.id));
@@ -191,6 +192,24 @@ export default function Capital() {
           gap: 8,
         }}>
           ✓ {successMessage}
+        </div>
+      )}
+
+      {errorMessage && (
+        <div style={{
+          background: 'rgba(239,68,68,0.12)',
+          color: 'var(--status-danger)',
+          padding: '12px 16px',
+          borderRadius: 4,
+          marginBottom: 16,
+          fontSize: 12,
+          fontFamily: 'var(--font-mono)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          border: '1px solid rgba(239,68,68,0.25)',
+        }}>
+          ✕ {errorMessage}
         </div>
       )}
 

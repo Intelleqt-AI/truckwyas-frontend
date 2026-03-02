@@ -196,22 +196,33 @@ export default function Drivers() {
         </div>
       )}
 
-      {/* Filter row */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          style={{
-            background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            color: 'var(--text-primary)', padding: '7px 12px',
-            fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
-          }}
-        >
-          <option value="All">All Status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="INACTIVE">Inactive</option>
-          <option value="ON_LEAVE">On Leave</option>
-        </select>
+      {/* Status Filter Tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {['All', 'ACTIVE', 'INACTIVE', 'ON_LEAVE'].map(status => {
+          const isActive = statusFilter === status;
+          return (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              style={{
+                background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                padding: '7px 14px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                borderRadius: 2,
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                fontWeight: isActive ? 600 : 400,
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+            </button>
+          );
+        })}
       </div>
 
       {/* Table */}

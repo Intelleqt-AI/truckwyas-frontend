@@ -47,8 +47,8 @@ interface FinanceData {
   net_margin_period: number;
   net_margin_percent_period: number;
   dso: number;
-  outstanding_invoices?: number;
-  overdue_invoices?: number;
+  outstanding_invoices_total?: number;
+  overdue_invoices_total?: number;
   fuel_cost_ratio?: number;
   cash_flow_forecast: CashFlowForecast;
   monthly_trend: { month: string; revenue: number; expenses: number; margin: number }[];
@@ -61,6 +61,12 @@ interface FinanceData {
       margin_pct: number;
     };
   };
+}
+
+interface ExpenseCategory {
+  category: string;
+  total: number;
+  count: number;
 }
 
 interface VehicleInsight {
@@ -82,7 +88,7 @@ interface DriverLeaderboard {
 }
 
 type TabType = 'overview' | 'customers' | 'routes' | 'assets' | 'costs';
-type PeriodType = 'month' | '3months' | 'ytd' | '12months';
+type PeriodType = 'month' | '3months' | 'ytd' | '12months' | 'custom';
 type AssetsSubTab = 'vehicles' | 'drivers';
 type SortField = string;
 type SortDirection = 'asc' | 'desc';
@@ -112,7 +118,11 @@ const getMarginColor = (margin: number): string => {
   return 'var(--status-danger)';
 };
 
-const getPeriodDates = (period: PeriodType): { from: string; to: string } => {
+const getPeriodDates = (period: PeriodType, customFrom?: string, customTo?: string): { from: string; to: string } => {
+  if (period === 'custom' && customFrom && customTo) {
+    return { from: customFrom, to: customTo };
+  }
+
   const now = new Date();
   const to = now.toISOString().split('T')[0];
   let from: Date;
@@ -130,6 +140,9 @@ const getPeriodDates = (period: PeriodType): { from: string; to: string } => {
     case '12months':
       from = new Date(now.getFullYear(), now.getMonth() - 12, 1);
       break;
+    case 'custom':
+      from = new Date(now.getFullYear(), now.getMonth(), 1);
+      break;
   }
 
   return { from: from.toISOString().split('T')[0], to };
@@ -141,6 +154,7 @@ const getPeriodLabel = (period: PeriodType): string => {
     case '3months': return 'Last 3 Months';
     case 'ytd': return 'YTD';
     case '12months': return 'Last 12 Months';
+    case 'custom': return 'Custom';
   }
 };
 
@@ -161,6 +175,8 @@ export default function Insights() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [period, setPeriod] = useState<PeriodType>('month');
   const [assetsSubTab, setAssetsSubTab] = useState<AssetsSubTab>('vehicles');
+  const [customFrom, setCustomFrom] = useState<string>('');
+  const [customTo, setCustomTo] = useState<string>('');
 
   // Data states
   const [loading, setLoading] = useState(true);
@@ -173,6 +189,7 @@ export default function Insights() {
   const [driverLeaderboard, setDriverLeaderboard] = useState<DriverLeaderboard[]>([]);
   const [allRoutes, setAllRoutes] = useState<RouteData[]>([]);
   const [allCustomers, setAllCustomers] = useState<CustomerHealthData[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
 
   // Sorting states
   const [customerSort, setCustomerSort] = useState<{ field: SortField; direction: SortDirection }>({ field: 'revenue', direction: 'desc' });
@@ -181,12 +198,12 @@ export default function Insights() {
   useEffect(() => {
     document.title = 'Insights - TruckWys';
     loadData();
-  }, [period]);
+  }, [period, customFrom, customTo]);
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
-    const { from, to } = getPeriodDates(period);
+    const { from, to } = getPeriodDates(period, customFrom, customTo);
     const dateParams = `from=${from}&to=${to}`;
 
     try {
@@ -211,6 +228,14 @@ export default function Insights() {
       ).slice(0, 5));
       setVehicleInsights(vehiclesRes?.vehicles || []);
       setDriverLeaderboard(driversRes?.drivers || []);
+
+      // Fetch expense breakdown - use the most recent month from the period
+      const fromDate = new Date(from);
+      const expenseMonth = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}`;
+      const expenseRes = await fetchData(`api/v1/expenses/report/?month=${expenseMonth}`).catch(() => null);
+      if (expenseRes?.by_category) {
+        setExpenseCategories(expenseRes.by_category);
+      }
     } catch (err) {
       setError('Failed to load insights data');
       console.error(err);
@@ -285,11 +310,11 @@ export default function Insights() {
         </div>
 
         {/* Date Range Filter */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginRight: 4 }}>
             Period:
           </span>
-          {(['month', '3months', 'ytd', '12months'] as PeriodType[]).map((p) => (
+          {(['month', '3months', 'ytd', '12months', 'custom'] as PeriodType[]).map((p) => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
@@ -321,6 +346,39 @@ export default function Insights() {
               {getPeriodLabel(p)}
             </button>
           ))}
+          {period === 'custom' && (
+            <>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-primary)',
+                  padding: '6px 10px',
+                  fontSize: 11,
+                  fontFamily: 'var(--font-mono)',
+                  borderRadius: 4,
+                }}
+              />
+              <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>to</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-primary)',
+                  padding: '6px 10px',
+                  fontSize: 11,
+                  fontFamily: 'var(--font-mono)',
+                  borderRadius: 4,
+                }}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -1090,7 +1148,7 @@ export default function Insights() {
       {activeTab === 'costs' && (
         <div>
           {/* Cost Summary Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 32 }}>
             <div style={{
               background: 'var(--bg-surface)',
               border: '1px solid var(--border-subtle)',
@@ -1162,6 +1220,80 @@ export default function Insights() {
                 </div>
               )}
             </div>
+
+            <div style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--card-radius)',
+              padding: 24,
+            }}>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
+                Fuel Cost Ratio
+              </div>
+              {loading ? (
+                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+              ) : (
+                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                  {formatPercent(finance?.fuel_cost_ratio || 0, 1)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Expense Breakdown by Category */}
+          <div style={{
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--card-radius)',
+            padding: 24,
+            marginBottom: 32,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+              Expense Breakdown by Category
+            </div>
+            {loading ? (
+              <div style={{ height: 200, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+            ) : expenseCategories.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>
+                No expense data available
+              </div>
+            ) : (
+              <div>
+                {(() => {
+                  const maxTotal = Math.max(...expenseCategories.map(c => c.total), 1);
+                  const categoryColors: { [key: string]: string } = {
+                    'FUEL': 'var(--accent-primary)',
+                    'MAINTENANCE': 'var(--status-warning)',
+                    'DRIVER_COST': 'var(--status-success)',
+                    'TOLLS': '#9333ea',
+                    'INSURANCE': 'var(--text-secondary)',
+                    'OVERHEAD': 'var(--text-secondary)',
+                    'OTHER': 'var(--text-secondary)',
+                  };
+                  return expenseCategories.map((cat, i) => (
+                    <div key={i} style={{ marginBottom: i < expenseCategories.length - 1 ? 16 : 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>
+                          {cat.category.replace('_', ' ')} ({cat.count})
+                        </span>
+                        <span style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                          {formatCurrency(cat.total)}
+                        </span>
+                      </div>
+                      <div style={{ height: 10, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${(cat.total / maxTotal) * 100}%`,
+                          background: categoryColors[cat.category] || 'var(--text-secondary)',
+                          borderRadius: 2,
+                          transition: 'width 0.3s ease',
+                        }} />
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            )}
           </div>
 
           {/* Monthly Cost Trend */}
@@ -1243,7 +1375,7 @@ export default function Insights() {
               ) : (
                 <div>
                   <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: '-0.02em' }}>
-                    {formatCurrency(finance?.outstanding_invoices || 0)}
+                    {formatCurrency(finance?.outstanding_invoices_total || 0)}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                     Awaiting payment
@@ -1266,7 +1398,7 @@ export default function Insights() {
               ) : (
                 <div>
                   <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--status-danger)', marginBottom: 8, letterSpacing: '-0.02em' }}>
-                    {formatCurrency(finance?.overdue_invoices || 0)}
+                    {formatCurrency(finance?.overdue_invoices_total || 0)}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                     Past due date

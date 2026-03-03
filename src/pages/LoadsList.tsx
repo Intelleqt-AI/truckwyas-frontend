@@ -262,7 +262,7 @@ export default function LoadsList() {
 
       {/* QUOTES TAB */}
       {activeTab === 'quotes' && (
-        <QuotesList />
+        <QuotesList embedded={true} />
       )}
 
       {/* ORDERS TAB */}

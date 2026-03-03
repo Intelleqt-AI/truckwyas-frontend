@@ -103,7 +103,7 @@ function DroppableColumn({ columnId, items, children }: { columnId: string; item
   );
 }
 
-export function QuotesList() {
+export function QuotesList({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -223,19 +223,21 @@ export function QuotesList() {
 
   return (
     <div>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Loads & Quotes</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn-action" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={() => navigate('/quotes/new')}>
-              + NEW QUOTE
-            </button>
-            <button className="btn-action" onClick={() => navigate('/quotes/new')}>+ NEW LOAD</button>
+      {/* Header — hidden when embedded in Bookings tabs */}
+      {!embedded && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Loads & Quotes</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-action" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={() => navigate('/quotes/new')}>
+                + NEW QUOTE
+              </button>
+              <button className="btn-action" onClick={() => navigate('/quotes/new')}>+ NEW LOAD</button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Controls */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center' }}>

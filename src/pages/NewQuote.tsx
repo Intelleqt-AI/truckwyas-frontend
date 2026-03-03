@@ -173,7 +173,7 @@ export default function NewQuote() {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <button
-          onClick={() => navigate('/quotes')}
+          onClick={() => navigate(-1)}
           style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}
         >
           ← BACK

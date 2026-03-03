@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchData, postData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
+import QuotesList from './QuotesList';
 
 interface Load {
   id: number;
@@ -14,15 +15,28 @@ interface Load {
   vehicle_info?: string;
   pickup_date?: string;
   customer_name?: string;
+  quote_number?: string;
 }
 
 const STATUS_COLOR: Record<string, string> = {
+  PENDING: 'var(--text-secondary)',
+  ASSIGNED: 'var(--status-warning)',
   IN_TRANSIT: 'var(--accent-primary)',
+  LOADING: 'var(--status-warning)',
   DELIVERED: 'var(--status-success)',
   INVOICED: 'var(--accent-primary)',
-  LOADING: 'var(--status-warning)',
-  SCHEDULED: 'var(--text-secondary)',
-  DELAYED: 'var(--status-error)',
+  CANCELLED: 'var(--status-error)',
+};
+
+type BookingTab = 'quotes' | 'orders' | 'history';
+
+const ACTIVE_STATUSES = ['PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'];
+const HISTORY_STATUSES = ['DELIVERED', 'INVOICED', 'CANCELLED'];
+
+const TAB_SUBTITLES: Record<BookingTab, string> = {
+  quotes: 'Sales Pipeline',
+  orders: 'Active Orders',
+  history: 'Completed & Archived',
 };
 
 export default function LoadsList() {
@@ -30,7 +44,10 @@ export default function LoadsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [convertingIds, setConvertingIds] = useState<Set<number>>(new Set());
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [activeTab, setActiveTab] = useState<BookingTab>('orders');
+  const [orderFilter, setOrderFilter] = useState('All');
+  const [historyFilter, setHistoryFilter] = useState('All');
+  const [historySearch, setHistorySearch] = useState('');
   const navigate = useNavigate();
 
   const handleConvertToInvoice = async (load: Load, e: React.MouseEvent) => {
@@ -43,7 +60,6 @@ export default function LoadsList() {
         data: {}
       });
 
-      // Navigate to the created invoice
       if (response?.id) {
         navigate(`/finance/invoices/${response.id}`);
       }
@@ -62,7 +78,6 @@ export default function LoadsList() {
   useEffect(() => {
     fetchData('/api/v1/loads/')
       .then((data: any) => {
-        // Handle both paginated and non-paginated responses
         const loadsData = data?.results || data || [];
         setLoads(loadsData);
       })
@@ -73,10 +88,105 @@ export default function LoadsList() {
       .finally(() => setLoading(false));
   }, []);
 
+  const activeLoads = loads.filter(l => ACTIVE_STATUSES.includes(l.status));
+  const historyLoads = loads.filter(l => HISTORY_STATUSES.includes(l.status));
+
+  const filteredOrders = activeLoads.filter(l => orderFilter === 'All' || l.status === orderFilter);
+  const filteredHistory = historyLoads.filter(l => {
+    const matchStatus = historyFilter === 'All' || l.status === historyFilter;
+    const matchSearch = !historySearch || 
+      (l.customer_name || '').toLowerCase().includes(historySearch.toLowerCase()) ||
+      (l.load_number || '').toLowerCase().includes(historySearch.toLowerCase()) ||
+      (l.pickup_location || '').toLowerCase().includes(historySearch.toLowerCase()) ||
+      (l.delivery_location || '').toLowerCase().includes(historySearch.toLowerCase());
+    return matchStatus && matchSearch;
+  });
+
+  const renderTable = (data: Load[], showInvoiceAction: boolean) => (
+    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)' }}>
+            {['LOAD #', 'CUSTOMER', 'ROUTE', 'DRIVER', 'VEHICLE', 'STATUS', 'AMOUNT', 'ACTION'].map(h => (
+              <th key={h} style={{
+                padding: '12px 16px',
+                textAlign: h === 'AMOUNT' ? 'right' : h === 'ACTION' ? 'center' : 'left',
+                fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
+                fontWeight: 600, letterSpacing: '0.1em'
+              }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((load, idx) => (
+            <tr
+              key={load.id}
+              onClick={() => navigate(`/bookings/${load.id}`)}
+              style={{
+                borderBottom: idx < data.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                cursor: 'pointer',
+                transition: 'background 0.15s ease',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            >
+              <td style={{ padding: '14px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 600 }}>{load.load_number}</td>
+              <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-primary)' }}>{load.customer_name || '—'}</td>
+              <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                {load.pickup_location} → {load.delivery_location}
+              </td>
+              <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>{load.driver_name || '—'}</td>
+              <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{load.vehicle_info || '—'}</td>
+              <td style={{ padding: '14px 16px' }}>
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10,
+                  color: STATUS_COLOR[load.status] || 'var(--text-secondary)',
+                  padding: '4px 8px',
+                  border: `1px solid ${STATUS_COLOR[load.status] || 'var(--border-subtle)'}`,
+                  borderRadius: 2,
+                }}>
+                  {load.status?.replace('_', ' ')}
+                </span>
+              </td>
+              <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600 }}>
+                {formatCurrency(parseFloat(load.total_amount || '0'))}
+              </td>
+              <td style={{ padding: '14px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                {showInvoiceAction && load.status === 'DELIVERED' && (
+                  <button
+                    onClick={(e) => handleConvertToInvoice(load, e)}
+                    disabled={convertingIds.has(load.id)}
+                    style={{
+                      background: 'transparent',
+                      border: '1px solid var(--accent-primary)',
+                      color: 'var(--accent-primary)',
+                      padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)',
+                      letterSpacing: '0.05em', borderRadius: 2,
+                      cursor: convertingIds.has(load.id) ? 'not-allowed' : 'pointer',
+                      opacity: convertingIds.has(load.id) ? 0.5 : 1,
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {convertingIds.has(load.id) ? 'CREATING...' : '→ INVOICE'}
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {data.length === 0 && (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
+          No loads found
+        </div>
+      )}
+    </div>
+  );
+
   if (loading) {
     return (
       <div style={{ padding: 40 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 20 }}>Loads / Bookings</div>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 20 }}>Bookings</div>
         <div className="card" style={{ padding: 24 }}>
           <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
           <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
@@ -97,140 +207,169 @@ export default function LoadsList() {
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Loads / Bookings</div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>All Active Loads</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{loads.length} loads in system</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Bookings</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{TAB_SUBTITLES[activeTab]}</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => navigate('/bookings/pipeline')}
+            style={{
+              background: 'var(--accent-primary)', border: 'none', color: 'var(--bg-deep)',
+              padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono)',
+              fontWeight: 600, letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer',
+            }}
+          >+ NEW QUOTE</button>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        {[
-          { label: 'Total Loads', value: loads.length, color: 'var(--text-primary)' },
-          { label: 'In Transit', value: loads.filter(l => l.status === 'IN_TRANSIT').length, color: 'var(--accent-primary)' },
-          { label: 'Delivered', value: loads.filter(l => l.status === 'DELIVERED').length, color: 'var(--status-success)' },
-          { label: 'Total Revenue', value: formatCurrency(loads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--accent-primary)' },
-        ].map(m => (
-          <div key={m.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{m.label}</span></div>
-            <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
-          </div>
+      {/* Tab Navigation */}
+      <div style={{ display: 'flex', gap: 24, borderBottom: '1px solid var(--border-subtle)', marginBottom: 24 }}>
+        {([
+          { id: 'quotes' as BookingTab, label: 'Quotes' },
+          { id: 'orders' as BookingTab, label: 'Orders' },
+          { id: 'history' as BookingTab, label: 'History' },
+        ]).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+              padding: '12px 0',
+              fontSize: 13,
+              fontWeight: activeTab === tab.id ? 600 : 400,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              fontFamily: 'var(--font-mono)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+            onMouseEnter={(e) => {
+              if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--text-primary)';
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--text-secondary)';
+            }}
+          >
+            {tab.label}
+          </button>
         ))}
       </div>
 
-      {/* Status Filter */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {['All', 'IN_TRANSIT', 'DELIVERED', 'ASSIGNED', 'LOADING', 'CANCELLED'].map(status => {
-          const isActive = statusFilter === status;
-          return (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              style={{
-                background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                padding: '7px 14px',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                borderRadius: 2,
-                cursor: 'pointer',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                fontWeight: isActive ? 600 : 400,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {status === 'All' ? 'ALL' : status.replace('_', ' ')}
-            </button>
-          );
-        })}
-      </div>
+      {/* QUOTES TAB */}
+      {activeTab === 'quotes' && (
+        <QuotesList />
+      )}
 
-      {/* Loads Table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)' }}>
-              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.1em' }}>LOAD #</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.1em' }}>CUSTOMER</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.1em' }}>ROUTE</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.1em' }}>DRIVER</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.1em' }}>VEHICLE</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.1em' }}>STATUS</th>
-              <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.1em' }}>AMOUNT</th>
-              <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.1em' }}>ACTION</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loads.filter(l => statusFilter === 'All' || l.status === statusFilter).map((load, idx) => (
-              <tr
-                key={load.id}
-                onClick={() => navigate(`/bookings/${load.id}`)}
-                style={{
-                  borderBottom: idx < loads.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                  cursor: 'pointer',
-                  transition: 'background 0.15s ease',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-              >
-                <td style={{ padding: '14px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 600 }}>{load.load_number}</td>
-                <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-primary)' }}>{load.customer_name || '—'}</td>
-                <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>
-                  {load.pickup_location} → {load.delivery_location}
-                </td>
-                <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>{load.driver_name || '—'}</td>
-                <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{load.vehicle_info || '—'}</td>
-                <td style={{ padding: '14px 16px' }}>
-                  <span style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 10,
-                    color: STATUS_COLOR[load.status] || 'var(--text-secondary)',
-                    padding: '4px 8px',
-                    border: `1px solid ${STATUS_COLOR[load.status] || 'var(--border-subtle)'}`,
-                    borderRadius: 2,
-                  }}>
-                    {load.status?.replace('_', ' ')}
-                  </span>
-                </td>
-                <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600 }}>
-                  {formatCurrency(parseFloat(load.total_amount || '0'))}
-                </td>
-                <td style={{ padding: '14px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                  {load.status === 'DELIVERED' && load.status !== 'INVOICED' && (
-                    <button
-                      onClick={(e) => handleConvertToInvoice(load, e)}
-                      disabled={convertingIds.has(load.id)}
-                      style={{
-                        background: 'transparent',
-                        border: '1px solid var(--accent-primary)',
-                        color: 'var(--accent-primary)',
-                        padding: '4px 10px',
-                        fontSize: 10,
-                        fontFamily: 'var(--font-mono)',
-                        letterSpacing: '0.05em',
-                        borderRadius: 2,
-                        cursor: convertingIds.has(load.id) ? 'not-allowed' : 'pointer',
-                        opacity: convertingIds.has(load.id) ? 0.5 : 1,
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      {convertingIds.has(load.id) ? 'CREATING...' : '→ INVOICE'}
-                    </button>
-                  )}
-                </td>
-              </tr>
+      {/* ORDERS TAB */}
+      {activeTab === 'orders' && (
+        <div>
+          {/* Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+            {[
+              { label: 'Active Orders', value: activeLoads.length, color: 'var(--text-primary)' },
+              { label: 'In Transit', value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length, color: 'var(--accent-primary)' },
+              { label: 'Loading', value: activeLoads.filter(l => l.status === 'LOADING').length, color: 'var(--status-warning)' },
+              { label: 'Revenue (Active)', value: formatCurrency(activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--accent-primary)' },
+            ].map(m => (
+              <div key={m.label} className="card metric-card">
+                <div className="card-header"><span className="card-title">{m.label}</span></div>
+                <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+              </div>
             ))}
-          </tbody>
-        </table>
-
-        {loads.length === 0 && (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
-            No loads found
           </div>
-        )}
-      </div>
+
+          {/* Order Status Filter */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            {['All', 'PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].map(status => {
+              const isActive = orderFilter === status;
+              return (
+                <button
+                  key={status}
+                  onClick={() => setOrderFilter(status)}
+                  style={{
+                    background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                    padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 11,
+                    borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase',
+                    letterSpacing: '0.06em', fontWeight: isActive ? 600 : 400,
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+                </button>
+              );
+            })}
+          </div>
+
+          {renderTable(filteredOrders, false)}
+        </div>
+      )}
+
+      {/* HISTORY TAB */}
+      {activeTab === 'history' && (
+        <div>
+          {/* Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+            {[
+              { label: 'Completed', value: historyLoads.filter(l => l.status === 'DELIVERED' || l.status === 'INVOICED').length, color: 'var(--status-success)' },
+              { label: 'Invoiced', value: historyLoads.filter(l => l.status === 'INVOICED').length, color: 'var(--accent-primary)' },
+              { label: 'Cancelled', value: historyLoads.filter(l => l.status === 'CANCELLED').length, color: 'var(--status-error)' },
+              { label: 'Total Revenue', value: formatCurrency(historyLoads.filter(l => l.status !== 'CANCELLED').reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--accent-primary)' },
+            ].map(m => (
+              <div key={m.label} className="card metric-card">
+                <div className="card-header"><span className="card-title">{m.label}</span></div>
+                <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* History Filters */}
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+            <input
+              type="text" placeholder="Search history..."
+              value={historySearch} onChange={e => setHistorySearch(e.target.value)}
+              style={{
+                background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                padding: '8px 12px', color: 'var(--text-primary)', borderRadius: 2,
+                fontSize: 12, outline: 'none', width: 220, fontFamily: 'var(--font-sans)',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 4 }}>
+              {['All', 'DELIVERED', 'INVOICED', 'CANCELLED'].map(status => {
+                const isActive = historyFilter === status;
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setHistoryFilter(status)}
+                    style={{
+                      background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                      border: '1px solid var(--border-subtle)',
+                      color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                      padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 11,
+                      borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase',
+                      letterSpacing: '0.06em', fontWeight: isActive ? 600 : 400,
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {status === 'All' ? 'ALL' : status}
+                  </button>
+                );
+              })}
+            </div>
+            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
+              {filteredHistory.length} records
+            </span>
+          </div>
+
+          {renderTable(filteredHistory, true)}
+        </div>
+      )}
     </div>
   );
 }

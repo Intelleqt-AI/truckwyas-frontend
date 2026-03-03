@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "@/lib/formatters";
 import { fetchData, postData } from "@/lib/Api";
+import Expenses from './Expenses';
+import FinanceReports from './FinanceReports';
 
 const STATUS_COLOR: Record<string, string> = {
   PAID: 'var(--status-success)', SENT: 'var(--status-warning)',
@@ -14,8 +16,11 @@ const TIER_COLOR: Record<string, string> = {
 
 const PAGE_SIZE = 10;
 
+type FinanceTab = 'invoices' | 'expenses' | 'reports';
+
 export default function Invoices() {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<FinanceTab>('invoices');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [page, setPage] = useState(1);
@@ -109,17 +114,72 @@ export default function Invoices() {
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Finance</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Invoices</div>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>
+              {activeTab === 'invoices' ? 'Invoices' : activeTab === 'expenses' ? 'Expenses' : 'Reports'}
+            </div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
               Last updated: {new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
-          <button className="btn-action" onClick={() => navigate('/finance/invoices/new')}>+ NEW INVOICE</button>
+          {activeTab === 'invoices' && (
+            <button className="btn-action" onClick={() => navigate('/finance/invoices/new')}>+ NEW INVOICE</button>
+          )}
         </div>
       </div>
 
-      {/* KPIs */}
-      {loading ? (
+      {/* Tab Navigation */}
+      <div style={{
+        borderBottom: '1px solid var(--border-subtle)',
+        marginBottom: 32,
+        display: 'flex',
+        gap: 32,
+      }}>
+        {([
+          { id: 'invoices', label: 'Invoices' },
+          { id: 'expenses', label: 'Expenses' },
+          { id: 'reports', label: 'Reports' },
+        ] as { id: FinanceTab; label: string }[]).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+              padding: '12px 0',
+              fontSize: 13,
+              fontWeight: activeTab === tab.id ? 600 : 400,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              fontFamily: 'var(--font-mono)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+            onMouseEnter={(e) => {
+              if (activeTab !== tab.id) {
+                e.currentTarget.style.color = 'var(--text-primary)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== tab.id) {
+                e.currentTarget.style.color = 'var(--text-secondary)';
+              }
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'expenses' && <Expenses />}
+      {activeTab === 'reports' && <FinanceReports />}
+
+      {activeTab === 'invoices' && (
+        <>
+          {/* KPIs */}
+          {loading ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="card" style={{ padding: 20 }}>
@@ -255,6 +315,8 @@ export default function Invoices() {
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

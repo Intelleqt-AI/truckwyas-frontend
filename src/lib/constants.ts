@@ -40,18 +40,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     id: 'bookings',
     label: 'Bookings',
     icon: 'FileText',
-    children: [
-      {
-        id: 'bookings-pipeline',
-        label: 'Pipeline',
-        href: '/bookings/pipeline'
-      },
-      {
-        id: 'bookings-orders',
-        label: 'Orders',
-        href: '/bookings'
-      }
-    ]
+    href: '/bookings'
   },
   {
     id: 'fleet',

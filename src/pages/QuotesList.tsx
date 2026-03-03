@@ -264,8 +264,7 @@ export function QuotesList() {
             }}>{v}</button>
           ))}
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 16, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
-          <span>{loads.length} loads</span>
+        <div style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
           <span>{quotes.length} quotes</span>
         </div>
 

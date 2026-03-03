@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchData, postData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
-import QuotesList from './QuotesList';
+import { QuotesList } from './QuotesList';
 
 interface Load {
   id: number;

@@ -179,39 +179,6 @@ export default function Drivers() {
         ))}
       </div>
 
-      {/* Top performers */}
-      {leaderboard.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 12 }}>TOP PERFORMERS THIS MONTH</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            {leaderboard.slice(0, 3).map(entry => (
-              <div
-                key={entry.driver_id}
-                className="card"
-                style={{ padding: 16, borderLeft: `3px solid ${rankColor(entry.rank)}`, cursor: 'pointer' }}
-                onClick={() => navigate(`/fleet/drivers/${entry.driver_id}`)}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: rankColor(entry.rank) }}>#{entry.rank}</span>
-                  <span style={{ fontSize: 18 }}>{entry.rank === 1 ? '🏆' : entry.rank === 2 ? '🥈' : '🥉'}</span>
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>{entry.driver_name}</div>
-                {[
-                  { label: 'Revenue', value: formatZAR(entry.revenue) },
-                  { label: 'Trips', value: entry.trips },
-                  { label: 'Efficiency', value: entry.efficiency_score || '—' },
-                ].map(r => (
-                  <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{r.label}</span>
-                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{r.value}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Status Filter Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         {['All', 'ACTIVE', 'INACTIVE', 'ON_LEAVE'].map(status => {

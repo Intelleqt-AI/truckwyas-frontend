@@ -30,6 +30,7 @@ export default function LoadsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [convertingIds, setConvertingIds] = useState<Set<number>>(new Set());
+  const [statusFilter, setStatusFilter] = useState('All');
   const navigate = useNavigate();
 
   const handleConvertToInvoice = async (load: Load, e: React.MouseEvent) => {
@@ -117,6 +118,35 @@ export default function LoadsList() {
         ))}
       </div>
 
+      {/* Status Filter */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {['All', 'IN_TRANSIT', 'DELIVERED', 'ASSIGNED', 'LOADING', 'CANCELLED'].map(status => {
+          const isActive = statusFilter === status;
+          return (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              style={{
+                background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                padding: '7px 14px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                borderRadius: 2,
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                fontWeight: isActive ? 600 : 400,
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Loads Table */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -133,7 +163,7 @@ export default function LoadsList() {
             </tr>
           </thead>
           <tbody>
-            {loads.map((load, idx) => (
+            {loads.filter(l => statusFilter === 'All' || l.status === statusFilter).map((load, idx) => (
               <tr
                 key={load.id}
                 onClick={() => navigate(`/bookings/${load.id}`)}

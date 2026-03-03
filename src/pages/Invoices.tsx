@@ -748,30 +748,25 @@ export default function Invoices() {
                 fontFamily: 'var(--font-sans)',
               }}
             />
-            <div style={{ display: 'flex', gap: 4 }}>
+            <select
+              value={categoryFilter}
+              onChange={e => { setCategoryFilter(e.target.value); setExpensePage(1); }}
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                padding: '7px 12px',
+                color: 'var(--text-primary)',
+                borderRadius: 2,
+                fontSize: 11,
+                fontFamily: 'var(--font-mono)',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
               {expenseCategories.map(c => (
-                <button
-                  key={c}
-                  onClick={() => { setCategoryFilter(c); setExpensePage(1); }}
-                  style={{
-                    background: categoryFilter === c ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    color: categoryFilter === c ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                    padding: '7px 14px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    fontWeight: categoryFilter === c ? 600 : 400,
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {c}
-                </button>
+                <option key={c} value={c}>{c === 'All' ? 'All Categories' : c.replace('_', ' ')}</option>
               ))}
-            </div>
+            </select>
             <div style={{ display: 'flex', gap: 4 }}>
               {expenseStatuses.map(s => (
                 <button

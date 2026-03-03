@@ -17,6 +17,7 @@ export function BookingsList() {
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('All');
 
   useEffect(() => {
     fetchData('api/v1/loads/?limit=100').then(d => {
@@ -55,11 +56,13 @@ export function BookingsList() {
     }
   };
 
-  const filteredBookings = bookings.filter(booking => 
-    booking.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    `${booking.origin} → ${booking.destination}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    booking.vehicle.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredBookings = bookings.filter(booking => {
+    const matchesSearch = booking.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      `${booking.origin} → ${booking.destination}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      booking.vehicle.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'All' || booking.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const handleRowClick = (booking: any) => {
     setSelectedBooking(booking);
@@ -92,6 +95,35 @@ export function BookingsList() {
           className="pl-10"
         />
       </motion.div>
+
+      {/* Status Filter Buttons */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {['All', 'En-route', 'Delivered', 'Loading', 'Planned'].map(status => {
+          const isActive = statusFilter === status;
+          return (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              style={{
+                background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                padding: '7px 14px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                borderRadius: 2,
+                cursor: 'pointer',
+                textTransform: 'uppercase' as const,
+                letterSpacing: '0.06em',
+                fontWeight: isActive ? 600 : 400,
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {status === 'All' ? 'ALL' : status.toUpperCase()}
+            </button>
+          );
+        })}
+      </div>
 
       {/* Stats Cards */}
       <motion.div

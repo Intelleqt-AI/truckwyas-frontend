@@ -19,13 +19,13 @@ const EXPENSE_STATUS_COLOR: Record<string, string> = {
 };
 
 const CATEGORY_ICONS: Record<string, string> = {
-  FUEL: '⛽',
-  TOLLS: '🛣️',
-  MAINTENANCE: '🔧',
-  DRIVER_COST: '👤',
-  INSURANCE: '🛡️',
-  OVERHEAD: '📋',
-  OTHER: '📋',
+  FUEL: '',
+  TOLLS: '',
+  MAINTENANCE: '',
+  DRIVER_COST: '',
+  INSURANCE: '',
+  OVERHEAD: '',
+  OTHER: '',
 };
 
 const PAGE_SIZE = 10;
@@ -431,13 +431,13 @@ export default function Invoices() {
                         fontFamily: 'var(--font-sans)',
                       }}
                     >
-                      <option value="FUEL">⛽ Fuel</option>
-                      <option value="TOLLS">🛣️ Tolls</option>
-                      <option value="MAINTENANCE">🔧 Maintenance</option>
-                      <option value="DRIVER_COST">👤 Driver Cost</option>
-                      <option value="INSURANCE">🛡️ Insurance</option>
-                      <option value="OVERHEAD">📋 Overhead</option>
-                      <option value="OTHER">📋 Other</option>
+                      <option value="FUEL">Fuel</option>
+                      <option value="TOLLS">Tolls</option>
+                      <option value="MAINTENANCE">Maintenance</option>
+                      <option value="DRIVER_COST">Driver Cost</option>
+                      <option value="INSURANCE">Insurance</option>
+                      <option value="OVERHEAD">Overhead</option>
+                      <option value="OTHER">Other</option>
                     </select>
                   </div>
 
@@ -707,7 +707,7 @@ export default function Invoices() {
                   categoryTotals[e.category] = (categoryTotals[e.category] || 0) + parseFloat(e.amount || 0);
                 });
                 const topCategoryEntry = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
-                const topCategory = topCategoryEntry ? `${CATEGORY_ICONS[topCategoryEntry[0]]} ${topCategoryEntry[0]}` : 'N/A';
+                const topCategory = topCategoryEntry ? topCategoryEntry[0].replace('_', ' ') : 'N/A';
                 const topCategoryAmount = topCategoryEntry ? topCategoryEntry[1] : 0;
 
                 return (
@@ -755,16 +755,20 @@ export default function Invoices() {
                   onClick={() => { setCategoryFilter(c); setExpensePage(1); }}
                   style={{
                     background: categoryFilter === c ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    border: `1px solid ${categoryFilter === c ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-                    color: categoryFilter === c ? 'var(--text-on-accent)' : 'var(--text-secondary)',
-                    padding: '6px 10px',
-                    borderRadius: 2,
-                    fontSize: 10,
+                    border: '1px solid var(--border-subtle)',
+                    color: categoryFilter === c ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                    padding: '7px 14px',
                     fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    borderRadius: 2,
                     cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    fontWeight: categoryFilter === c ? 600 : 400,
+                    transition: 'all 0.2s ease'
                   }}
                 >
-                  {c === 'All' ? c : `${CATEGORY_ICONS[c]} ${c}`}
+                  {c}
                 </button>
               ))}
             </div>
@@ -775,13 +779,17 @@ export default function Invoices() {
                   onClick={() => { setExpenseStatusFilter(s); setExpensePage(1); }}
                   style={{
                     background: expenseStatusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    border: `1px solid ${expenseStatusFilter === s ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-                    color: expenseStatusFilter === s ? 'var(--text-on-accent)' : 'var(--text-secondary)',
-                    padding: '6px 10px',
-                    borderRadius: 2,
-                    fontSize: 10,
+                    border: '1px solid var(--border-subtle)',
+                    color: expenseStatusFilter === s ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                    padding: '7px 14px',
                     fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    borderRadius: 2,
                     cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    fontWeight: expenseStatusFilter === s ? 600 : 400,
+                    transition: 'all 0.2s ease'
                   }}
                 >
                   {s}
@@ -845,7 +853,7 @@ export default function Invoices() {
                             </td>
                             <td style={{ fontSize: 12 }}>
                               <span style={{ fontFamily: 'var(--font-sans)' }}>
-                                {CATEGORY_ICONS[exp.category]} {exp.category}
+                                {exp.category.replace('_', ' ')}
                               </span>
                             </td>
                             <td style={{ fontSize: 12 }}>{exp.description}</td>
@@ -1007,9 +1015,17 @@ export default function Invoices() {
           {statuses.map(s => (
             <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }} style={{
               background: statusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
-              border: `1px solid ${statusFilter === s ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-              color: statusFilter === s ? 'var(--text-on-accent)' : 'var(--text-secondary)',
-              padding: '6px 10px', borderRadius: 2, fontSize: 10, fontFamily: 'var(--font-mono)', cursor: 'pointer',
+              border: '1px solid var(--border-subtle)',
+              color: statusFilter === s ? 'var(--bg-deep)' : 'var(--text-secondary)',
+              padding: '7px 14px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              borderRadius: 2,
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              fontWeight: statusFilter === s ? 600 : 400,
+              transition: 'all 0.2s ease'
             }}>{s}</button>
           ))}
         </div>

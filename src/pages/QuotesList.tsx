@@ -324,14 +324,17 @@ export function QuotesList() {
                 onClick={() => setStatusFilter(status)}
                 style={{
                   background: statusFilter === status ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                  border: `1px solid ${statusFilter === status ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-                  color: statusFilter === status ? '#000' : 'var(--text-secondary)',
-                  padding: '6px 12px',
+                  border: '1px solid var(--border-subtle)',
+                  color: statusFilter === status ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                  padding: '7px 14px',
                   borderRadius: 2,
-                  fontSize: 10,
+                  fontSize: 11,
                   fontFamily: 'var(--font-mono)',
                   cursor: 'pointer',
-                  textTransform: 'uppercase',
+                  textTransform: 'uppercase' as const,
+                  letterSpacing: '0.06em',
+                  fontWeight: statusFilter === status ? 600 : 400,
+                  transition: 'all 0.2s ease',
                 }}
               >
                 {status === 'ALL' ? 'ALL' : COLUMN_LABELS[status]} ({status === 'ALL' ? quotes.length : quotesByStatus[status]?.length || 0})

@@ -1265,7 +1265,7 @@ export default function Insights() {
                     'FUEL': 'var(--accent-primary)',
                     'MAINTENANCE': 'var(--status-warning)',
                     'DRIVER_COST': 'var(--status-success)',
-                    'TOLLS': '#9333ea',
+                    'TOLLS': 'var(--status-danger)',
                     'INSURANCE': 'var(--text-secondary)',
                     'OVERHEAD': 'var(--text-secondary)',
                     'OTHER': 'var(--text-secondary)',

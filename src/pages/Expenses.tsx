@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchData, postData } from '@/lib/Api';
+import { fetchData, postData, deleteData } from '@/lib/Api';
 
 interface Expense {
   id: number;
@@ -146,16 +146,11 @@ export default function Expenses() {
     if (!window.confirm('Delete this expense?')) return;
     setDeletingId(id);
     try {
-      const response = await fetch(`/api/v1/expenses/${id}/`, { method: 'DELETE' });
-      if (response.ok) {
-        loadData();
-        setDeletingId(null);
-      } else {
-        alert('Failed to delete expense');
-        setDeletingId(null);
-      }
+      await deleteData({ url: `/api/v1/expenses/${id}/` });
+      loadData();
     } catch (err) {
       alert('Failed to delete expense');
+    } finally {
       setDeletingId(null);
     }
   };
@@ -168,7 +163,7 @@ export default function Expenses() {
     try {
       await Promise.all(
         Array.from(selectedIds).map(id =>
-          fetch(`/api/v1/expenses/${id}/`, { method: 'DELETE' })
+          deleteData({ url: `/api/v1/expenses/${id}/` })
         )
       );
       setSelectedIds(new Set());
@@ -717,18 +712,10 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
 
     try {
       if (expense) {
-        // Update existing
-        const response = await fetch(`/api/v1/expenses/${expense.id}/`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        if (response.ok) {
-          onClose();
-        } else {
-          alert('Failed to update expense');
-          setSubmitting(false);
-        }
+        // Update existing via Api wrapper (includes auth token)
+        const { putData } = await import('@/lib/Api');
+        await putData({ url: `/api/v1/expenses/${expense.id}/`, data });
+        onClose();
       } else {
         // Create new
         await postData('/api/v1/expenses/', data);

@@ -23,12 +23,6 @@ interface RouteData {
   margin_pct: number;
 }
 
-interface CashFlowPeriod {
-  label: string;
-  confirmed: number;
-  expected: number;
-}
-
 interface CustomerHealthData {
   customer_name: string;
   customer_id: number;
@@ -41,33 +35,29 @@ interface CustomerHealthData {
   concentration_pct: number;
 }
 
+interface CashFlowForecast {
+  next_30_days: number;
+  next_60_days: number;
+  next_90_days: number;
+}
+
 interface FinanceData {
   revenue_period: number;
   expenses_period: number;
   net_margin_period: number;
   net_margin_percent_period: number;
   dso: number;
-  active_customers?: number;
-  total_loads?: number;
+  cash_flow_forecast: CashFlowForecast;
+  monthly_trend: { month: string; revenue: number; expenses: number; margin: number }[];
+  top_customers: { customer_id: number; customer_name: string; revenue: number; invoice_count: number }[];
   previous_period?: {
     revenue: number;
     margin_percent: number;
-    active_customers?: number;
-    total_loads?: number;
     deltas: {
       revenue_pct: number;
       margin_pct: number;
-      customers_pct?: number;
-      loads_pct?: number;
     };
   };
-}
-
-interface InsightsData {
-  finance: FinanceData;
-  top_routes: RouteData[];
-  customer_health: CustomerHealthData[];
-  cash_flow_forecast: CashFlowPeriod[];
 }
 
 // ========== HELPER FUNCTIONS ==========
@@ -78,8 +68,10 @@ const getRiskTierColor = (tier: string): string => {
       return 'var(--status-success)';
     case 'STANDARD':
       return 'var(--accent-primary)';
+    case 'ELEVATED':
     case 'WATCH':
       return 'var(--status-warning)';
+    case 'HIGH':
     case 'CRITICAL':
       return 'var(--status-danger)';
     default:
@@ -110,7 +102,9 @@ export default function Insights() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [signals, setSignals] = useState<Signal[]>([]);
-  const [insightsData, setInsightsData] = useState<InsightsData | null>(null);
+  const [finance, setFinance] = useState<FinanceData | null>(null);
+  const [topRoutes, setTopRoutes] = useState<RouteData[]>([]);
+  const [customerHealth, setCustomerHealth] = useState<CustomerHealthData[]>([]);
 
   useEffect(() => {
     document.title = 'Insights - TruckWys';
@@ -121,11 +115,15 @@ export default function Insights() {
     setLoading(true);
     setError(null);
     try {
-      const [insightsRes, signalsRes] = await Promise.all([
-        fetchData('/api/v1/dashboard/insights/'),
-        fetchData('/api/v1/dashboard/signals/'),
+      const [financeRes, routesRes, customerRes, signalsRes] = await Promise.all([
+        fetchData('/dashboard/finance/?compare=previous_period'),
+        fetchData('/dashboard/routes/'),
+        fetchData('/dashboard/customer-health/'),
+        fetchData('/dashboard/signals/'),
       ]);
-      setInsightsData(insightsRes);
+      setFinance(financeRes);
+      setTopRoutes(routesRes?.routes || []);
+      setCustomerHealth(customerRes?.customers || []);
       setSignals((signalsRes?.signals || []).filter((s: Signal) =>
         s.severity.toLowerCase() === 'high' || s.severity.toLowerCase() === 'critical'
       ).slice(0, 5));
@@ -145,19 +143,15 @@ export default function Insights() {
     );
   }
 
-  const finance = insightsData?.finance;
   const revenue = finance?.revenue_period || 0;
   const margin = finance?.net_margin_percent_period || 0;
-  const activeCustomers = finance?.active_customers || 0;
-  const totalLoads = finance?.total_loads || 0;
+  const activeCustomers = customerHealth.length;
+  const dso = finance?.dso || 0;
   const revenueDelta = finance?.previous_period?.deltas?.revenue_pct || 0;
   const marginDelta = finance?.previous_period?.deltas?.margin_pct || 0;
-  const customersDelta = finance?.previous_period?.deltas?.customers_pct || 0;
-  const loadsDelta = finance?.previous_period?.deltas?.loads_pct || 0;
 
-  const topRoutes = insightsData?.top_routes || [];
-  const customerHealth = insightsData?.customer_health || [];
-  const cashFlow = insightsData?.cash_flow_forecast || [];
+  const cashFlow = finance?.cash_flow_forecast;
+  const monthlyTrend = finance?.monthly_trend || [];
 
   return (
     <div>
@@ -237,16 +231,13 @@ export default function Insights() {
           {loading ? (
             <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 8 }} />
           ) : (
-            <>
-              <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: '-0.02em' }}>
-                {activeCustomers}
-              </div>
-              <TrendIndicator value={customersDelta} />
-            </>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+              {activeCustomers}
+            </div>
           )}
         </div>
 
-        {/* Total Loads */}
+        {/* DSO */}
         <div style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--border-subtle)',
@@ -254,22 +245,20 @@ export default function Insights() {
           padding: 24,
         }}>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
-            Total Loads
+            Days Sales Outstanding
           </div>
           {loading ? (
             <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 8 }} />
           ) : (
-            <>
-              <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: '-0.02em' }}>
-                {totalLoads}
-              </div>
-              <TrendIndicator value={loadsDelta} />
-            </>
+            <div style={{ fontSize: 28, fontWeight: 700, color: dso > 45 ? 'var(--status-danger)' : dso > 30 ? 'var(--status-warning)' : 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+              {Math.round(dso)}
+              <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-tertiary)', marginLeft: 4 }}>days</span>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Section 2: Revenue & Margin Trend (placeholder for now - can add charting later) */}
+      {/* Section 2: Revenue & Margin Trend */}
       <div style={{
         background: 'var(--bg-surface)',
         border: '1px solid var(--border-subtle)',
@@ -278,13 +267,62 @@ export default function Insights() {
         marginBottom: 32,
       }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-          Revenue & Margin Trend
+          Revenue & Margin Trend (6 Months)
         </div>
         {loading ? (
           <div style={{ height: 200, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-        ) : (
+        ) : monthlyTrend.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-tertiary)', fontSize: 13 }}>
-            Trend visualization coming soon
+            No trend data available
+          </div>
+        ) : (
+          <div>
+            {/* Bar chart */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 160, marginBottom: 12 }}>
+              {(() => {
+                const maxRevenue = Math.max(...monthlyTrend.map(m => m.revenue), 1);
+                return monthlyTrend.map((month, i) => (
+                  <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                      {formatCompactNumber(month.revenue)}
+                    </div>
+                    <div style={{
+                      width: '100%',
+                      maxWidth: 60,
+                      height: `${(month.revenue / maxRevenue) * 120}px`,
+                      background: month.margin >= 0 ? 'var(--accent-dim)' : 'var(--status-danger-bg)',
+                      borderRadius: '2px 2px 0 0',
+                      position: 'relative',
+                    }}>
+                      {/* Margin overlay */}
+                      <div style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: `${Math.min((month.margin / month.revenue) * 100, 100)}%`,
+                        background: 'var(--accent-primary)',
+                        borderRadius: '0 0 0 0',
+                        opacity: 0.6,
+                      }} />
+                    </div>
+                    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                      {month.month.slice(5)}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+            <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--text-tertiary)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 12, height: 3, background: 'var(--accent-dim)', display: 'inline-block', borderRadius: 1 }} />
+                Revenue
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 12, height: 3, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1, opacity: 0.6 }} />
+                Margin
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -424,65 +462,41 @@ export default function Insights() {
         marginBottom: 32,
       }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-          Cash Flow Forecast (30/60/90 Days)
+          Cash Flow Forecast — Expected Receivables
         </div>
-        {loading ? (
-          <div style={{ height: 160, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-        ) : cashFlow.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>
-            No cash flow data available
-          </div>
+        {loading || !cashFlow ? (
+          <div style={{ height: 100, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
         ) : (
           <div>
-            {cashFlow.map((period, i) => {
-              const maxVal = Math.max(...cashFlow.map(c => c.expected));
-              return (
-                <div key={i} style={{ marginBottom: i < cashFlow.length - 1 ? 16 : 0 }}>
+            {(() => {
+              const periods = [
+                { label: 'Next 30 Days', value: cashFlow.next_30_days },
+                { label: '31–60 Days', value: cashFlow.next_60_days },
+                { label: '61–90 Days', value: cashFlow.next_90_days },
+              ];
+              const maxVal = Math.max(...periods.map(p => p.value), 1);
+              return periods.map((period, i) => (
+                <div key={i} style={{ marginBottom: i < 2 ? 16 : 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                       {period.label}
                     </span>
                     <span style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                      {formatCompactNumber(period.expected)}
+                      {formatCurrency(period.value)}
                     </span>
                   </div>
-                  <div style={{ height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        height: '100%',
-                        width: `${(period.expected / maxVal) * 100}%`,
-                        background: 'var(--accent-dim)',
-                        borderRadius: 2,
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        height: '100%',
-                        width: `${period.confirmed ? (period.confirmed / maxVal) * 100 : 0}%`,
-                        background: 'var(--accent-primary)',
-                        borderRadius: 2,
-                      }}
-                    />
+                  <div style={{ height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${(period.value / maxVal) * 100}%`,
+                      background: i === 0 ? 'var(--accent-primary)' : i === 1 ? 'var(--accent-dim)' : 'var(--text-tertiary)',
+                      borderRadius: 2,
+                      transition: 'width 0.3s ease',
+                    }} />
                   </div>
                 </div>
-              );
-            })}
-            <div style={{ display: 'flex', gap: 16, marginTop: 16, fontSize: 11, color: 'var(--text-tertiary)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 12, height: 3, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1 }} />
-                Confirmed
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 12, height: 3, background: 'var(--accent-dim)', display: 'inline-block', borderRadius: 1 }} />
-                Expected
-              </span>
-            </div>
+              ));
+            })()}
           </div>
         )}
       </div>

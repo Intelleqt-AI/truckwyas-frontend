@@ -116,16 +116,16 @@ export default function Insights() {
     setError(null);
     try {
       const [financeRes, routesRes, customerRes, signalsRes] = await Promise.all([
-        fetchData('/dashboard/finance/?compare=previous_period'),
-        fetchData('/dashboard/routes/'),
-        fetchData('/dashboard/customer-health/'),
-        fetchData('/dashboard/signals/'),
+        fetchData('api/v1/dashboard/finance/?compare=previous_period').catch(() => null),
+        fetchData('api/v1/dashboard/routes/').catch(() => null),
+        fetchData('api/v1/dashboard/customer-health/').catch(() => null),
+        fetchData('api/v1/dashboard/signals/').catch(() => null),
       ]);
-      setFinance(financeRes);
+      if (financeRes) setFinance(financeRes);
       setTopRoutes(routesRes?.routes || []);
       setCustomerHealth(customerRes?.customers || []);
       setSignals((signalsRes?.signals || []).filter((s: Signal) =>
-        s.severity.toLowerCase() === 'high' || s.severity.toLowerCase() === 'critical'
+        s.severity?.toLowerCase() === 'high' || s.severity?.toLowerCase() === 'critical'
       ).slice(0, 5));
     } catch (err) {
       setError('Failed to load insights data');

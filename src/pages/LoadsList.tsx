@@ -214,7 +214,7 @@ export default function LoadsList() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={() => navigate('/bookings/pipeline')}
+            onClick={() => navigate('/quotes/new')}
             style={{
               background: 'var(--accent-primary)', border: 'none', color: 'var(--bg-deep)',
               padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono)',

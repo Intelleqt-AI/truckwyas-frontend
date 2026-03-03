@@ -250,9 +250,17 @@ export function QuotesList() {
           {(['board', 'list'] as const).map(v => (
             <button key={v} onClick={() => setView(v)} style={{
               background: view === v ? 'var(--accent-primary)' : 'var(--bg-surface)',
-              border: `1px solid ${view === v ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-              color: view === v ? '#000' : 'var(--text-secondary)',
-              padding: '6px 12px', borderRadius: 2, fontSize: 10, fontFamily: 'var(--font-mono)', cursor: 'pointer', textTransform: 'uppercase',
+              border: '1px solid var(--border-subtle)',
+              color: view === v ? 'var(--bg-deep)' : 'var(--text-secondary)',
+              padding: '7px 14px',
+              borderRadius: 2,
+              fontSize: 11,
+              fontFamily: 'var(--font-mono)',
+              cursor: 'pointer',
+              textTransform: 'uppercase' as const,
+              letterSpacing: '0.06em',
+              fontWeight: view === v ? 600 : 400,
+              transition: 'all 0.2s ease',
             }}>{v}</button>
           ))}
         </div>

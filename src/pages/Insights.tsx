@@ -1,297 +1,327 @@
-import { useState, useEffect } from 'react';
-import { fetchData } from '@/lib/Api';
-import { formatCurrency, formatPercent, formatCompactNumber } from '@/lib/formatters';
+import { useState } from 'react';
+import {
+  operators,
+  allCustomers,
+  allInvoices,
+  saRoutes,
+  currentMacroData,
+  getPortfolioSummary,
+} from '@/mocks/risk-mock-data';
 
-// ========== INTERFACES ==========
+// ========== TYPES ==========
 
-interface Signal {
-  type: string;
-  category: string;
+type InsightCategory = 'Operational' | 'Financial' | 'Risk' | 'Network';
+type InsightSeverity = 'critical' | 'warning' | 'opportunity' | 'info';
+
+interface Insight {
+  id: string;
+  category: InsightCategory;
+  severity: InsightSeverity;
   title: string;
   body: string;
+  metric?: string;
   action?: string;
-  action_url?: string;
-  severity: string;
-  created_at: string;
+  timestamp: string;
 }
 
-interface RouteData {
-  route: string;
-  trips: number;
-  avg_revenue: number;
-  avg_cost: number;
-  margin_pct: number;
-}
+// ========== GENERATE INSIGHTS FROM MOCK DATA ==========
 
-interface CustomerHealthData {
-  customer_name: string;
-  customer_id: number;
-  revenue: number;
-  invoice_count: number;
-  avg_payment_days: number;
-  dso: number;
-  overdue_count: number;
-  risk_tier: string;
-  concentration_pct: number;
-}
+function generateInsights(): Insight[] {
+  const portfolio = getPortfolioSummary();
+  const insights: Insight[] = [];
 
-interface CashFlowForecast {
-  next_30_days: number;
-  next_60_days: number;
-  next_90_days: number;
-}
+  // --- CRITICAL ---
 
-interface FinanceData {
-  revenue_period: number;
-  expenses_period: number;
-  net_margin_period: number;
-  net_margin_percent_period: number;
-  dso: number;
-  outstanding_invoices_total?: number;
-  overdue_invoices_total?: number;
-  fuel_cost_ratio?: number;
-  cash_flow_forecast: CashFlowForecast;
-  monthly_trend: { month: string; revenue: number; expenses: number; margin: number }[];
-  top_customers: { customer_id: number; customer_name: string; revenue: number; invoice_count: number }[];
-  previous_period?: {
-    revenue: number;
-    margin_percent: number;
-    deltas: {
-      revenue_pct: number;
-      margin_pct: number;
-    };
-  };
-}
-
-interface ExpenseCategory {
-  category: string;
-  total: number;
-  count: number;
-}
-
-interface VehicleInsight {
-  vehicle_id: number;
-  registration: string;
-  revenue: number;
-  trips: number;
-  utilization: number;
-  avg_margin: number;
-}
-
-interface DriverLeaderboard {
-  driver_id: number;
-  driver_name: string;
-  trips: number;
-  revenue: number;
-  avg_rating: number;
-  on_time_pct: number;
-}
-
-type TabType = 'overview' | 'customers' | 'routes' | 'assets' | 'costs';
-type PeriodType = 'month' | '3months' | 'ytd' | '12months' | 'custom';
-type AssetsSubTab = 'vehicles' | 'drivers';
-type SortField = string;
-type SortDirection = 'asc' | 'desc';
-
-// ========== HELPER FUNCTIONS ==========
-
-const getRiskTierColor = (tier: string): string => {
-  switch (tier.toUpperCase()) {
-    case 'PRIME':
-      return 'var(--status-success)';
-    case 'STANDARD':
-      return 'var(--accent-primary)';
-    case 'ELEVATED':
-    case 'WATCH':
-      return 'var(--status-warning)';
-    case 'HIGH':
-    case 'CRITICAL':
-      return 'var(--status-danger)';
-    default:
-      return 'var(--text-secondary)';
-  }
-};
-
-const getMarginColor = (margin: number): string => {
-  if (margin >= 15) return 'var(--status-success)';
-  if (margin >= 10) return 'var(--status-warning)';
-  return 'var(--status-danger)';
-};
-
-const getPeriodDates = (period: PeriodType, customFrom?: string, customTo?: string): { from: string; to: string } => {
-  if (period === 'custom' && customFrom && customTo) {
-    return { from: customFrom, to: customTo };
-  }
-
-  const now = new Date();
-  const to = now.toISOString().split('T')[0];
-  let from: Date;
-
-  switch (period) {
-    case 'month':
-      from = new Date(now.getFullYear(), now.getMonth(), 1);
-      break;
-    case '3months':
-      from = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-      break;
-    case 'ytd':
-      from = new Date(now.getFullYear(), 0, 1);
-      break;
-    case '12months':
-      from = new Date(now.getFullYear(), now.getMonth() - 12, 1);
-      break;
-    case 'custom':
-      from = new Date(now.getFullYear(), now.getMonth(), 1);
-      break;
-  }
-
-  return { from: from.toISOString().split('T')[0], to };
-};
-
-const getPeriodLabel = (period: PeriodType): string => {
-  switch (period) {
-    case 'month': return 'This Month';
-    case '3months': return 'Last 3 Months';
-    case 'ytd': return 'YTD';
-    case '12months': return 'Last 12 Months';
-    case 'custom': return 'Custom';
-  }
-};
-
-const TrendIndicator = ({ value, showArrow = true }: { value: number; showArrow?: boolean }) => {
-  const isPositive = value >= 0;
-  const color = isPositive ? 'var(--status-success)' : 'var(--status-danger)';
-  return (
-    <span style={{ color, fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600 }}>
-      {showArrow && (isPositive ? '↑ ' : '↓ ')}
-      {Math.abs(value).toFixed(1)}%
-    </span>
+  // Overdue high-value invoices
+  const overdueInvoices = allInvoices.filter(
+    (inv) => inv.invoice.daysUntilDue < 0 && inv.invoice.amount > 30000
   );
+  if (overdueInvoices.length > 0) {
+    const totalOverdue = overdueInvoices.reduce((s, i) => s + i.invoice.amount, 0);
+    const worstCustomer = overdueInvoices.sort((a, b) => a.invoice.daysUntilDue - b.invoice.daysUntilDue)[0];
+    insights.push({
+      id: 'crit-overdue',
+      category: 'Financial',
+      severity: 'critical',
+      title: `R${(totalOverdue / 1000).toFixed(0)}k in overdue invoices across ${overdueInvoices.length} line items`,
+      body: `Worst: ${worstCustomer.customer.customerName} — ${Math.abs(worstCustomer.invoice.daysUntilDue)} days past due on R${(worstCustomer.invoice.amount / 1000).toFixed(0)}k. Platform avg days-to-pay for this debtor: ${worstCustomer.customer.debtorCredit.platformAvgDaysToPay}d.`,
+      metric: `${overdueInvoices.length} invoices`,
+      action: 'Review overdue',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // SARS non-compliance
+  const nonCompliantOps = operators.filter((op) => !op.clientFinancial.hasTaxCompliance);
+  if (nonCompliantOps.length > 0) {
+    insights.push({
+      id: 'crit-sars',
+      category: 'Risk',
+      severity: 'critical',
+      title: `${nonCompliantOps[0].operatorName} — SARS tax clearance lapsed`,
+      body: `Hard stop: all new advances frozen until valid TCC submitted. Current facility utilisation at ${nonCompliantOps[0].clientFinancial.advanceUtilizationRate}%. Outstanding invoices ratio: ${nonCompliantOps[0].clientFinancial.outstandingInvoicesRatio}x monthly turnover.`,
+      metric: 'Ineligible',
+      action: 'View operator',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Ineligible customer exposure
+  const edconInvoices = allInvoices.filter(
+    (inv) => inv.customer.customerName === 'Edcon Holdings (Edgars)'
+  );
+  if (edconInvoices.length > 0) {
+    const exposure = edconInvoices.reduce((s, i) => s + i.invoice.amount, 0);
+    insights.push({
+      id: 'crit-edcon',
+      category: 'Risk',
+      severity: 'critical',
+      title: `Edcon (business rescue) — R${(exposure / 1000).toFixed(0)}k exposure across ${edconInvoices.length} invoices`,
+      body: `Credit rating D. Platform avg payment: ${edconInvoices[0].customer.debtorCredit.platformAvgDaysToPay}d. Dispute rate: ${edconInvoices[0].customer.debtorCredit.disputeRate}%. All invoices auto-ineligible.`,
+      metric: `R${(exposure / 1000).toFixed(0)}k`,
+      action: 'Review exposure',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // --- WARNING ---
+
+  // High facility utilisation operators
+  const highUtilOps = operators.filter(
+    (op) => op.clientFinancial.advanceUtilizationRate > 75 && op.clientFinancial.hasTaxCompliance
+  );
+  highUtilOps.forEach((op) => {
+    insights.push({
+      id: `warn-util-${op.operatorId}`,
+      category: 'Financial',
+      severity: 'warning',
+      title: `${op.operatorName} — facility ${op.clientFinancial.advanceUtilizationRate}% utilised`,
+      body: `R${((op.facilityLimit * (1 - op.clientFinancial.advanceUtilizationRate / 100)) / 1000).toFixed(0)}k headroom remaining on R${(op.facilityLimit / 1000).toFixed(0)}k limit. Advance frequency: ${op.clientFinancial.advanceFrequency.replace('_', ' ')}. Revenue concentration: ${op.clientFinancial.revenueConcentration}%.`,
+      metric: `${op.clientFinancial.advanceUtilizationRate}%`,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // Hijacking hotspot route
+  const hotspotRoutes = saRoutes.filter((r) => r.routeRiskLevel === 'very_high');
+  const hotspotInvoices = allInvoices.filter(
+    (inv) => inv.routeData.routeRiskLevel === 'very_high'
+  );
+  if (hotspotInvoices.length > 0) {
+    const hotspotValue = hotspotInvoices.reduce((s, i) => s + i.invoice.amount, 0);
+    insights.push({
+      id: 'warn-hotspot',
+      category: 'Operational',
+      severity: 'warning',
+      title: `${hotspotRoutes[0]?.routeName || 'High-risk route'} — hijacking hotspot, R${(hotspotValue / 1000).toFixed(0)}k in transit`,
+      body: `${hotspotInvoices.length} active invoices on very-high-risk routes. Cargo: ${hotspotRoutes[0]?.typicalCargo}. GPS tracking confirmed on ${hotspotInvoices.filter((i) => i.pod.hasGPSTracking).length}/${hotspotInvoices.length} loads.`,
+      metric: `${hotspotInvoices.length} loads`,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Cross-operator late payment flags
+  const flaggedCustomers = allCustomers.filter(
+    (c) => c.debtorCredit.hasCrossOperatorLatePaymentFlag
+  );
+  if (flaggedCustomers.length > 0) {
+    insights.push({
+      id: 'warn-cross-op',
+      category: 'Network',
+      severity: 'warning',
+      title: `${flaggedCustomers.length} debtors flagged for late payment across the platform`,
+      body: `${flaggedCustomers.map((c) => c.customerName).join(', ')} — paying late on other operators' invoices. Combined outstanding: R${(flaggedCustomers.reduce((s, c) => s + c.debtorCredit.customerOutstandingBalance, 0) / 1e6).toFixed(1)}M.`,
+      metric: `${flaggedCustomers.length} debtors`,
+      action: 'View debtors',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Declining turnover operators
+  const decliningOps = operators.filter(
+    (op) => op.clientFinancial.turnoverTrend6Mo === 'declining'
+  );
+  decliningOps.forEach((op) => {
+    insights.push({
+      id: `warn-decline-${op.operatorId}`,
+      category: 'Financial',
+      severity: 'warning',
+      title: `${op.operatorName} — turnover declining, margin under pressure`,
+      body: `6-month trend: declining. Turnover volatility: ${(op.clientFinancial.turnoverVolatility * 100).toFixed(0)}%. Fleet ${op.clientIdentity.fleetGrowthRate && op.clientIdentity.fleetGrowthRate < 0 ? `shrinking ${Math.abs(op.clientIdentity.fleetGrowthRate)}%` : 'stable'}. Sector: ${op.clientIdentity.subSector}.`,
+      metric: `R${(op.clientFinancial.monthlyTurnover / 1e6).toFixed(1)}M/mo`,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // --- OPPORTUNITY ---
+
+  // Prime invoices eligible for fast advance
+  const primeEligible = allInvoices.filter(
+    (inv) => inv.riskScore.riskTier === 'prime' && inv.riskScore.isEligible
+  );
+  if (primeEligible.length > 0) {
+    const totalPrime = primeEligible.reduce((s, i) => s + i.invoice.amount, 0);
+    const avgFee = primeEligible.reduce((s, i) => s + i.riskScore.feePercentage, 0) / primeEligible.length;
+    insights.push({
+      id: 'opp-prime-advance',
+      category: 'Financial',
+      severity: 'opportunity',
+      title: `R${(totalPrime / 1000).toFixed(0)}k in PRIME invoices eligible for fast advance at ${avgFee.toFixed(1)}% avg fee`,
+      body: `${primeEligible.length} invoices from ${new Set(primeEligible.map((i) => i.operator.operatorName)).size} operators. Top debtor: ${primeEligible[0].customer.customerName} (PAYDEX ${primeEligible[0].customer.debtorCredit.paydexScore || 'N/A'}).`,
+      metric: `${avgFee.toFixed(1)}% fee`,
+      action: 'Review eligible',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Cross-border SADC opportunity
+  const crossBorderInvoices = allInvoices.filter(
+    (inv) => inv.routeData.fromCity === 'Nelspruit' || inv.routeData.toCity === 'Maputo'
+  );
+  if (crossBorderInvoices.length > 0) {
+    insights.push({
+      id: 'opp-sadc',
+      category: 'Operational',
+      severity: 'opportunity',
+      title: `SADC corridor active — ${crossBorderInvoices.length} Nelspruit→Maputo loads this period`,
+      body: `Cross-border freight with customs clearance. ZAR volatility at ${currentMacroData.zarVolatility30d}% (30d). Consider hedging exposure on R${(crossBorderInvoices.reduce((s, i) => s + i.invoice.amount, 0) / 1000).toFixed(0)}k outstanding.`,
+      metric: `${crossBorderInvoices.length} loads`,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // New operator with good trajectory
+  const newGrowingOps = operators.filter(
+    (op) => op.clientIdentity.companyAgeYears <= 2 && op.clientFinancial.turnoverTrend6Mo === 'growing'
+  );
+  newGrowingOps.forEach((op) => {
+    insights.push({
+      id: `opp-new-${op.operatorId}`,
+      category: 'Network',
+      severity: 'opportunity',
+      title: `${op.operatorName} — new entrant, growing trajectory`,
+      body: `${op.clientIdentity.companyAgeYears}yr old, ${op.clientIdentity.fleetSize} trucks, R${(op.clientFinancial.monthlyTurnover / 1000).toFixed(0)}k/mo turnover trending up. Operating across ${op.clientIdentity.provinceCount} provinces. Potential for facility increase.`,
+      metric: `${op.clientIdentity.fleetSize} trucks`,
+      action: 'Review profile',
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // --- INFO ---
+
+  // Portfolio health summary
+  insights.push({
+    id: 'info-portfolio',
+    category: 'Financial',
+    severity: 'info',
+    title: `Portfolio health: ${portfolio.avgRiskScore}/100 avg score across ${portfolio.eligibleCount} eligible invoices`,
+    body: `Tier breakdown — PRIME: ${portfolio.tierDistribution.prime}, STANDARD: ${portfolio.tierDistribution.standard}, ELEVATED: ${portfolio.tierDistribution.elevated}, HIGH: ${portfolio.tierDistribution.high}, INELIGIBLE: ${portfolio.tierDistribution.ineligible}. Total eligible: R${(portfolio.totalEligibleAmount / 1e6).toFixed(1)}M.`,
+    metric: `${portfolio.avgRiskScore}/100`,
+    timestamp: new Date().toISOString(),
+  });
+
+  // Macro conditions
+  insights.push({
+    id: 'info-macro',
+    category: 'Risk',
+    severity: 'info',
+    title: `SARB repo rate at ${currentMacroData.sarbRepoRate}% — freight demand index ${currentMacroData.freightDemandIndex}/100`,
+    body: `ZAR 30d volatility: ${currentMacroData.zarVolatility30d}%. Fuel trend: ${currentMacroData.fuelPriceTrend3Mo}. Load shedding impact: ${currentMacroData.loadSheddingImpactIndex}/100. PMI: ${currentMacroData.pmiIndex} (${currentMacroData.pmiIndex > 50 ? 'expansion' : 'contraction'}).`,
+    metric: `${currentMacroData.sarbRepoRate}%`,
+    timestamp: new Date().toISOString(),
+  });
+
+  // E-POD adoption
+  const ePodCount = allInvoices.filter(
+    (i) => i.pod.podType === 'e_signature' || i.pod.podType === 'geo_photo'
+  ).length;
+  const ePodPct = ((ePodCount / allInvoices.length) * 100).toFixed(0);
+  insights.push({
+    id: 'info-epod',
+    category: 'Operational',
+    severity: 'info',
+    title: `E-POD adoption at ${ePodPct}% — ${ePodCount}/${allInvoices.length} invoices with digital proof`,
+    body: `E-signature: ${allInvoices.filter((i) => i.pod.podType === 'e_signature').length}, Geo-photo: ${allInvoices.filter((i) => i.pod.podType === 'geo_photo').length}, Scanned: ${allInvoices.filter((i) => i.pod.podType === 'scanned').length}, Manual: ${allInvoices.filter((i) => i.pod.podType === 'manual').length}, None: ${allInvoices.filter((i) => i.pod.podType === 'none').length}. Digital PODs attract lower fees.`,
+    metric: `${ePodPct}%`,
+    timestamp: new Date().toISOString(),
+  });
+
+  return insights;
+}
+
+// ========== SEVERITY CONFIG ==========
+
+const SEVERITY_CONFIG: Record<InsightSeverity, { color: string; bg: string; border: string; icon: string; label: string }> = {
+  critical: {
+    color: 'var(--status-danger)',
+    bg: 'rgba(239, 68, 68, 0.08)',
+    border: 'var(--status-danger)',
+    icon: '●',
+    label: 'CRITICAL',
+  },
+  warning: {
+    color: 'var(--status-warning)',
+    bg: 'rgba(245, 158, 11, 0.08)',
+    border: 'var(--status-warning)',
+    icon: '▲',
+    label: 'WARNING',
+  },
+  opportunity: {
+    color: 'var(--status-success)',
+    bg: 'rgba(34, 197, 94, 0.08)',
+    border: 'var(--status-success)',
+    icon: '◆',
+    label: 'OPPORTUNITY',
+  },
+  info: {
+    color: 'var(--accent-primary)',
+    bg: 'rgba(59, 130, 246, 0.06)',
+    border: 'var(--border-subtle)',
+    icon: '○',
+    label: 'INFO',
+  },
 };
 
-// ========== MAIN COMPONENT ==========
+const CATEGORY_COLORS: Record<InsightCategory, string> = {
+  Operational: '#8B5CF6',
+  Financial: '#3B82F6',
+  Risk: '#EF4444',
+  Network: '#10B981',
+};
+
+// ========== COMPONENT ==========
 
 export default function Insights() {
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [period, setPeriod] = useState<PeriodType>('month');
-  const [assetsSubTab, setAssetsSubTab] = useState<AssetsSubTab>('vehicles');
-  const [customFrom, setCustomFrom] = useState<string>('');
-  const [customTo, setCustomTo] = useState<string>('');
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [filterCategory, setFilterCategory] = useState<InsightCategory | 'All'>('All');
+  const [filterSeverity, setFilterSeverity] = useState<InsightSeverity | 'All'>('All');
 
-  // Data states
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [signals, setSignals] = useState<Signal[]>([]);
-  const [finance, setFinance] = useState<FinanceData | null>(null);
-  const [topRoutes, setTopRoutes] = useState<RouteData[]>([]);
-  const [customerHealth, setCustomerHealth] = useState<CustomerHealthData[]>([]);
-  const [vehicleInsights, setVehicleInsights] = useState<VehicleInsight[]>([]);
-  const [driverLeaderboard, setDriverLeaderboard] = useState<DriverLeaderboard[]>([]);
-  const [allRoutes, setAllRoutes] = useState<RouteData[]>([]);
-  const [allCustomers, setAllCustomers] = useState<CustomerHealthData[]>([]);
-  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const allInsights = generateInsights();
+  const activeInsights = allInsights.filter((i) => !dismissedIds.has(i.id));
 
-  // Sorting states
-  const [customerSort, setCustomerSort] = useState<{ field: SortField; direction: SortDirection }>({ field: 'revenue', direction: 'desc' });
-  const [routeSort, setRouteSort] = useState<{ field: SortField; direction: SortDirection }>({ field: 'margin_pct', direction: 'desc' });
+  const filteredInsights = activeInsights.filter((i) => {
+    if (filterCategory !== 'All' && i.category !== filterCategory) return false;
+    if (filterSeverity !== 'All' && i.severity !== filterSeverity) return false;
+    return true;
+  });
 
-  useEffect(() => {
-    document.title = 'Insights - TruckWys';
-    loadData();
-  }, [period, customFrom, customTo]);
+  // Sort: critical first, then warning, opportunity, info
+  const severityOrder: InsightSeverity[] = ['critical', 'warning', 'opportunity', 'info'];
+  const sortedInsights = [...filteredInsights].sort(
+    (a, b) => severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity)
+  );
 
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
-    const { from, to } = getPeriodDates(period, customFrom, customTo);
-    const dateParams = `from=${from}&to=${to}`;
-
-    try {
-      const [financeRes, routesRes, customerRes, signalsRes, vehiclesRes, driversRes] = await Promise.all([
-        fetchData(`api/v1/dashboard/finance/?compare=previous_period&${dateParams}`).catch(() => null),
-        fetchData(`api/v1/dashboard/routes/?${dateParams}`).catch(() => null),
-        fetchData(`api/v1/dashboard/customer-health/?${dateParams}`).catch(() => null),
-        fetchData('api/v1/dashboard/signals/').catch(() => null),
-        fetchData('api/v1/fleet/insights/').catch(() => null),
-        fetchData('api/v1/drivers/leaderboard/').catch(() => null),
-      ]);
-
-      if (financeRes) setFinance(financeRes);
-      const routes = routesRes?.routes || [];
-      setTopRoutes(routes.slice(0, 8));
-      setAllRoutes(routes);
-      const customers = customerRes?.customers || [];
-      setCustomerHealth(customers.slice(0, 8));
-      setAllCustomers(customers);
-      setSignals((signalsRes?.signals || []).filter((s: Signal) =>
-        s.severity?.toLowerCase() === 'high' || s.severity?.toLowerCase() === 'critical'
-      ).slice(0, 5));
-      setVehicleInsights(vehiclesRes?.vehicles || []);
-      setDriverLeaderboard(driversRes?.drivers || []);
-
-      // Fetch expense breakdown - use the most recent month from the period
-      const fromDate = new Date(from);
-      const expenseMonth = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}`;
-      const expenseRes = await fetchData(`api/v1/expenses/report/?month=${expenseMonth}`).catch(() => null);
-      if (expenseRes?.by_category) {
-        setExpenseCategories(expenseRes.by_category);
-      }
-    } catch (err) {
-      setError('Failed to load insights data');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+  const handleDismiss = (id: string) => {
+    setDismissedIds((prev) => new Set([...prev, id]));
   };
 
-  const handleCustomerSort = (field: SortField) => {
-    const direction = customerSort.field === field && customerSort.direction === 'desc' ? 'asc' : 'desc';
-    setCustomerSort({ field, direction });
-  };
-
-  const handleRouteSort = (field: SortField) => {
-    const direction = routeSort.field === field && routeSort.direction === 'desc' ? 'asc' : 'desc';
-    setRouteSort({ field, direction });
-  };
-
-  const getSortedCustomers = () => {
-    return [...allCustomers].sort((a, b) => {
-      const aVal = a[customerSort.field as keyof CustomerHealthData];
-      const bVal = b[customerSort.field as keyof CustomerHealthData];
-      const modifier = customerSort.direction === 'asc' ? 1 : -1;
-      return aVal < bVal ? -modifier : modifier;
-    });
-  };
-
-  const getSortedRoutes = () => {
-    return [...allRoutes].sort((a, b) => {
-      const aVal = a[routeSort.field as keyof RouteData];
-      const bVal = b[routeSort.field as keyof RouteData];
-      const modifier = routeSort.direction === 'asc' ? 1 : -1;
-      return aVal < bVal ? -modifier : modifier;
-    });
-  };
-
-  if (error) {
-    return (
-      <div style={{ padding: 24 }}>
-        <div style={{ color: 'var(--status-danger)', fontSize: 14 }}>{error}</div>
-      </div>
-    );
-  }
-
-  const revenue = finance?.revenue_period || 0;
-  const margin = finance?.net_margin_percent_period || 0;
-  const activeCustomers = customerHealth.length;
-  const dso = finance?.dso || 0;
-  const revenueDelta = finance?.previous_period?.deltas?.revenue_pct || 0;
-  const marginDelta = finance?.previous_period?.deltas?.margin_pct || 0;
-  const cashFlow = finance?.cash_flow_forecast;
-  const monthlyTrend = finance?.monthly_trend || [];
+  const criticalCount = activeInsights.filter((i) => i.severity === 'critical').length;
+  const warningCount = activeInsights.filter((i) => i.severity === 'warning').length;
+  const oppCount = activeInsights.filter((i) => i.severity === 'opportunity').length;
 
   return (
     <div>
-      {/* Page Header with Date Filter */}
+      {/* Header */}
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{
@@ -300,1113 +330,289 @@ export default function Insights() {
             color: 'var(--text-tertiary)',
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
-            marginBottom: 6
+            marginBottom: 6,
           }}>
-            INTELLIGENCE DASHBOARD
+            INTELLIGENCE FEED
           </div>
           <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)' }}>
-            Business Insights
+            Insights
           </div>
         </div>
 
-        {/* Date Range Filter */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginRight: 4 }}>
-            Period:
-          </span>
-          {(['month', '3months', 'ytd', '12months', 'custom'] as PeriodType[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              style={{
-                background: period === p ? 'var(--accent-primary)' : 'transparent',
-                border: `1px solid ${period === p ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-                color: period === p ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                padding: '6px 12px',
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
-                borderRadius: 4,
-                cursor: 'pointer',
-                fontWeight: period === p ? 600 : 400,
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (period !== p) {
-                  e.currentTarget.style.borderColor = 'var(--accent-dim)';
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (period !== p) {
-                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-                }
-              }}
-            >
-              {getPeriodLabel(p)}
-            </button>
-          ))}
-          {period === 'custom' && (
-            <>
-              <input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                style={{
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  color: 'var(--text-primary)',
-                  padding: '6px 10px',
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
-                  borderRadius: 4,
-                }}
-              />
-              <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>to</span>
-              <input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                style={{
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  color: 'var(--text-primary)',
-                  padding: '6px 10px',
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
-                  borderRadius: 4,
-                }}
-              />
-            </>
+        {/* Summary strip */}
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          {criticalCount > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: SEVERITY_CONFIG.critical.color, fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                {criticalCount} CRITICAL
+              </span>
+            </div>
           )}
+          {warningCount > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: SEVERITY_CONFIG.warning.color, fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                {warningCount} WARNING
+              </span>
+            </div>
+          )}
+          {oppCount > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: SEVERITY_CONFIG.opportunity.color, fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                {oppCount} OPP
+              </span>
+            </div>
+          )}
+          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+            {activeInsights.length} active · {dismissedIds.size} dismissed
+          </span>
         </div>
       </div>
 
-      {/* Tab Navigation */}
+      {/* Filters */}
       <div style={{
-        borderBottom: '1px solid var(--border-subtle)',
-        marginBottom: 32,
         display: 'flex',
-        gap: 32,
+        gap: 8,
+        marginBottom: 24,
+        flexWrap: 'wrap',
+        alignItems: 'center',
       }}>
-        {([
-          { id: 'overview', label: 'Overview' },
-          { id: 'customers', label: 'Customers' },
-          { id: 'routes', label: 'Routes' },
-          { id: 'assets', label: 'Assets' },
-          { id: 'costs', label: 'Costs' },
-        ] as { id: TabType; label: string }[]).map((tab) => (
+        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginRight: 4 }}>
+          Category:
+        </span>
+        {(['All', 'Operational', 'Financial', 'Risk', 'Network'] as const).map((cat) => (
           <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            key={cat}
+            onClick={() => setFilterCategory(cat)}
             style={{
-              background: 'transparent',
-              border: 'none',
-              borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
-              color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-              padding: '12px 0',
-              fontSize: 13,
-              fontWeight: activeTab === tab.id ? 600 : 400,
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
+              background: filterCategory === cat ? (cat === 'All' ? 'var(--accent-primary)' : CATEGORY_COLORS[cat as InsightCategory]) : 'transparent',
+              border: `1px solid ${filterCategory === cat ? 'transparent' : 'var(--border-subtle)'}`,
+              color: filterCategory === cat ? '#fff' : 'var(--text-secondary)',
+              padding: '5px 12px',
+              fontSize: 11,
               fontFamily: 'var(--font-mono)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-            }}
-            onMouseEnter={(e) => {
-              if (activeTab !== tab.id) {
-                e.currentTarget.style.color = 'var(--text-primary)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== tab.id) {
-                e.currentTarget.style.color = 'var(--text-secondary)';
-              }
+              borderRadius: 3,
+              cursor: 'pointer',
+              fontWeight: filterCategory === cat ? 600 : 400,
+              transition: 'all 0.15s ease',
             }}
           >
-            {tab.label}
+            {cat}
+          </button>
+        ))}
+
+        <span style={{ width: 1, height: 20, background: 'var(--border-subtle)', margin: '0 8px' }} />
+
+        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginRight: 4 }}>
+          Severity:
+        </span>
+        {(['All', 'critical', 'warning', 'opportunity', 'info'] as const).map((sev) => (
+          <button
+            key={sev}
+            onClick={() => setFilterSeverity(sev)}
+            style={{
+              background: filterSeverity === sev ? (sev === 'All' ? 'var(--accent-primary)' : SEVERITY_CONFIG[sev as InsightSeverity].color) : 'transparent',
+              border: `1px solid ${filterSeverity === sev ? 'transparent' : 'var(--border-subtle)'}`,
+              color: filterSeverity === sev ? (sev === 'info' ? '#fff' : sev === 'All' ? '#fff' : '#fff') : 'var(--text-secondary)',
+              padding: '5px 12px',
+              fontSize: 11,
+              fontFamily: 'var(--font-mono)',
+              borderRadius: 3,
+              cursor: 'pointer',
+              fontWeight: filterSeverity === sev ? 600 : 400,
+              transition: 'all 0.15s ease',
+              textTransform: 'uppercase',
+            }}
+          >
+            {sev === 'All' ? 'All' : SEVERITY_CONFIG[sev as InsightSeverity].label}
           </button>
         ))}
       </div>
 
-      {/* Tab Content */}
-      {activeTab === 'overview' && (
-        <div>
-          {/* Section 1: Business Pulse - 4 KPI Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
-            {/* Monthly Net Revenue */}
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
-                Monthly Net Revenue
-              </div>
-              {loading ? (
-                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 8 }} />
-              ) : (
-                <>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: '-0.02em' }}>
-                    {formatCurrency(revenue)}
-                  </div>
-                  <TrendIndicator value={revenueDelta} />
-                </>
-              )}
-            </div>
-
-            {/* Gross Margin % */}
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
-                Gross Margin
-              </div>
-              {loading ? (
-                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 8 }} />
-              ) : (
-                <>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: '-0.02em' }}>
-                    {formatPercent(margin, 1)}
-                  </div>
-                  <TrendIndicator value={marginDelta} />
-                </>
-              )}
-            </div>
-
-            {/* Active Customers */}
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
-                Active Customers
-              </div>
-              {loading ? (
-                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 8 }} />
-              ) : (
-                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-                  {activeCustomers}
-                </div>
-              )}
-            </div>
-
-            {/* DSO */}
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
-                Days Sales Outstanding
-              </div>
-              {loading ? (
-                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 8 }} />
-              ) : (
-                <div style={{ fontSize: 28, fontWeight: 700, color: dso > 45 ? 'var(--status-danger)' : dso > 30 ? 'var(--status-warning)' : 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-                  {Math.round(dso)}
-                  <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-tertiary)', marginLeft: 4 }}>days</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Section 2: Revenue & Margin Trend */}
+      {/* Insights list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {sortedInsights.length === 0 ? (
           <div style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--card-radius)',
-            padding: 24,
-            marginBottom: 32,
+            textAlign: 'center',
+            padding: 60,
+            color: 'var(--text-tertiary)',
+            fontSize: 13,
           }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-              Revenue & Margin Trend (6 Months)
-            </div>
-            {loading ? (
-              <div style={{ height: 200, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-            ) : monthlyTrend.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-tertiary)', fontSize: 13 }}>
-                No trend data available
-              </div>
-            ) : (
-              <div>
-                {/* Bar chart */}
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 160, marginBottom: 12 }}>
-                  {(() => {
-                    const maxRevenue = Math.max(...monthlyTrend.map(m => m.revenue), 1);
-                    return monthlyTrend.map((month, i) => (
-                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                        <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                          {formatCompactNumber(month.revenue)}
-                        </div>
-                        <div style={{
-                          width: '100%',
-                          maxWidth: 60,
-                          height: `${(month.revenue / maxRevenue) * 120}px`,
-                          background: month.margin >= 0 ? 'var(--accent-dim)' : 'var(--status-danger-bg)',
-                          borderRadius: '2px 2px 0 0',
-                          position: 'relative',
-                        }}>
-                          {/* Margin overlay */}
-                          <div style={{
-                            position: 'absolute',
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            height: `${Math.min((month.margin / month.revenue) * 100, 100)}%`,
-                            background: 'var(--accent-primary)',
-                            borderRadius: '0 0 0 0',
-                            opacity: 0.6,
-                          }} />
-                        </div>
-                        <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                          {month.month.slice(5)}
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-                <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--text-tertiary)' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 12, height: 3, background: 'var(--accent-dim)', display: 'inline-block', borderRadius: 1 }} />
-                    Revenue
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 12, height: 3, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1, opacity: 0.6 }} />
-                    Margin
-                  </span>
-                </div>
-              </div>
-            )}
+            {dismissedIds.size > 0 ? 'All insights acknowledged' : 'No insights match filters'}
           </div>
+        ) : (
+          sortedInsights.map((insight) => {
+            const config = SEVERITY_CONFIG[insight.severity];
+            const catColor = CATEGORY_COLORS[insight.category];
 
-          {/* Section 3: Two-Column Layout */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 32 }}>
-            {/* Left: Top Performing Routes */}
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-                Top Performing Routes
-              </div>
-              {loading ? (
-                <div style={{ height: 240, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-              ) : topRoutes.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>
-                  No route data available
+            return (
+              <div
+                key={insight.id}
+                style={{
+                  background: config.bg,
+                  border: `1px solid ${config.border}`,
+                  borderLeft: `3px solid ${config.border}`,
+                  borderRadius: 'var(--card-radius)',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 14,
+                  transition: 'opacity 0.2s ease',
+                }}
+              >
+                {/* Severity icon */}
+                <div style={{
+                  fontSize: 14,
+                  color: config.color,
+                  marginTop: 2,
+                  flexShrink: 0,
+                  width: 16,
+                  textAlign: 'center',
+                }}>
+                  {config.icon}
                 </div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Route
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Trips
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Revenue
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Margin
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topRoutes.slice(0, 8).map((route, i) => (
-                      <tr key={i} style={{ borderBottom: i < topRoutes.slice(0, 8).length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                        <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                          {route.route}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                          {route.trips}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>
-                          {formatCurrency(route.avg_revenue)}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: getMarginColor(route.margin_pct), textAlign: 'right' }}>
-                          {route.margin_pct.toFixed(1)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
 
-            {/* Right: Customer Health */}
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-                Customer Health
-              </div>
-              {loading ? (
-                <div style={{ height: 240, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-              ) : customerHealth.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>
-                  No customer data available
-                </div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Customer
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Revenue
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        DSO
-                      </th>
-                      <th style={{ textAlign: 'center', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Risk
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {customerHealth.slice(0, 8).map((customer, i) => (
-                      <tr key={i} style={{ borderBottom: i < customerHealth.slice(0, 8).length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                        <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                          {customer.customer_name}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>
-                          {formatCurrency(customer.revenue)}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                          {Math.round(customer.dso)}d
-                        </td>
-                        <td style={{ padding: '12px 0', textAlign: 'center' }}>
-                          <span style={{
-                            fontSize: 10,
-                            fontFamily: 'var(--font-mono)',
-                            color: getRiskTierColor(customer.risk_tier),
-                            padding: '3px 8px',
-                            background: 'var(--bg-surface-hover)',
-                            borderRadius: 2,
-                            fontWeight: 600,
-                            textTransform: 'uppercase',
-                          }}>
-                            {customer.risk_tier}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* Top row: badges + metric */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                    {/* Category badge */}
+                    <span style={{
+                      fontSize: 9,
+                      fontFamily: 'var(--font-mono)',
+                      color: catColor,
+                      padding: '2px 8px',
+                      background: `${catColor}18`,
+                      borderRadius: 2,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}>
+                      {insight.category}
+                    </span>
 
-          {/* Section 4: Cash Flow Forecast */}
-          <div style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--card-radius)',
-            padding: 24,
-            marginBottom: 32,
-          }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-              Cash Flow Forecast — Expected Receivables
-            </div>
-            {loading || !cashFlow ? (
-              <div style={{ height: 100, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-            ) : (
-              <div>
-                {(() => {
-                  const periods = [
-                    { label: 'Next 30 Days', value: cashFlow.next_30_days },
-                    { label: '31–60 Days', value: cashFlow.next_60_days },
-                    { label: '61–90 Days', value: cashFlow.next_90_days },
-                  ];
-                  const maxVal = Math.max(...periods.map(p => p.value), 1);
-                  return periods.map((period, i) => (
-                    <div key={i} style={{ marginBottom: i < 2 ? 16 : 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                          {period.label}
-                        </span>
-                        <span style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                          {formatCurrency(period.value)}
-                        </span>
-                      </div>
-                      <div style={{ height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${(period.value / maxVal) * 100}%`,
-                          background: i === 0 ? 'var(--accent-primary)' : i === 1 ? 'var(--accent-dim)' : 'var(--text-tertiary)',
-                          borderRadius: 2,
-                          transition: 'width 0.3s ease',
-                        }} />
-                      </div>
-                    </div>
-                  ));
-                })()}
-              </div>
-            )}
-          </div>
+                    {/* Severity label */}
+                    <span style={{
+                      fontSize: 9,
+                      fontFamily: 'var(--font-mono)',
+                      color: config.color,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}>
+                      {config.label}
+                    </span>
 
-          {/* Section 5: Action Items */}
-          {signals.length > 0 && (
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-                Action Items
-              </div>
-              <div style={{ display: 'grid', gap: 12 }}>
-                {signals.map((signal, i) => {
-                  const severityColor = signal.severity.toLowerCase() === 'critical' ? 'var(--status-danger)' : 'var(--status-warning)';
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        background: 'var(--bg-surface)',
-                        border: '1px solid var(--border-subtle)',
-                        borderLeft: `3px solid ${severityColor}`,
-                        borderRadius: 'var(--card-radius)',
-                        padding: 16,
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 12,
-                      }}
-                    >
-                      <div style={{ fontSize: 18, marginTop: 2 }}>⚠️</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-                          {signal.title}
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: signal.action ? 8 : 0 }}>
-                          {signal.body}
-                        </div>
-                        {signal.action && (
-                          <button style={{
-                            background: 'transparent',
-                            border: '1px solid var(--accent-primary)',
-                            color: 'var(--accent-primary)',
-                            padding: '4px 10px',
-                            fontSize: 11,
-                            fontFamily: 'var(--font-mono)',
-                            borderRadius: 2,
-                            cursor: 'pointer',
-                          }}>
-                            {signal.action}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'customers' && (
-        <div>
-          <div style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--card-radius)',
-            padding: 24,
-          }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-              Customer Performance — {getPeriodLabel(period)}
-            </div>
-            {loading ? (
-              <div style={{ height: 400, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-            ) : allCustomers.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-tertiary)', fontSize: 13 }}>
-                No customer data available
-              </div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th onClick={() => handleCustomerSort('customer_name')} style={{ textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      Customer {customerSort.field === 'customer_name' && (customerSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleCustomerSort('revenue')} style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      Revenue {customerSort.field === 'revenue' && (customerSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleCustomerSort('invoice_count')} style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      Invoices {customerSort.field === 'invoice_count' && (customerSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleCustomerSort('avg_payment_days')} style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      Avg Days {customerSort.field === 'avg_payment_days' && (customerSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleCustomerSort('dso')} style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      DSO {customerSort.field === 'dso' && (customerSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleCustomerSort('overdue_count')} style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      Overdue {customerSort.field === 'overdue_count' && (customerSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleCustomerSort('risk_tier')} style={{ textAlign: 'center', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      Risk {customerSort.field === 'risk_tier' && (customerSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleCustomerSort('concentration_pct')} style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      Conc. % {customerSort.field === 'concentration_pct' && (customerSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getSortedCustomers().map((customer, i) => (
-                    <tr key={i} style={{ borderBottom: i < allCustomers.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                      <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                        {customer.customer_name}
-                      </td>
-                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>
-                        {formatCurrency(customer.revenue)}
-                      </td>
-                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {customer.invoice_count}
-                      </td>
-                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {Math.round(customer.avg_payment_days)}
-                      </td>
-                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {Math.round(customer.dso)}
-                      </td>
-                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: customer.overdue_count > 0 ? 'var(--status-danger)' : 'var(--text-secondary)', textAlign: 'right', fontWeight: customer.overdue_count > 0 ? 600 : 400 }}>
-                        {customer.overdue_count}
-                      </td>
-                      <td style={{ padding: '12px 0', textAlign: 'center' }}>
-                        <span style={{
-                          fontSize: 10,
-                          fontFamily: 'var(--font-mono)',
-                          color: getRiskTierColor(customer.risk_tier),
-                          padding: '3px 8px',
-                          background: 'var(--bg-surface-hover)',
-                          borderRadius: 2,
-                          fontWeight: 600,
-                          textTransform: 'uppercase',
-                        }}>
-                          {customer.risk_tier}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {customer.concentration_pct.toFixed(1)}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'routes' && (
-        <div>
-          <div style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--card-radius)',
-            padding: 24,
-          }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-              Route Performance — {getPeriodLabel(period)}
-            </div>
-            {loading ? (
-              <div style={{ height: 400, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-            ) : allRoutes.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-tertiary)', fontSize: 13 }}>
-                No route data available
-              </div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th onClick={() => handleRouteSort('route')} style={{ textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      Route {routeSort.field === 'route' && (routeSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleRouteSort('trips')} style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      Trips {routeSort.field === 'trips' && (routeSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleRouteSort('avg_revenue')} style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      Avg Revenue {routeSort.field === 'avg_revenue' && (routeSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleRouteSort('avg_cost')} style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      Avg Cost {routeSort.field === 'avg_cost' && (routeSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleRouteSort('margin_pct')} style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
-                      Margin % {routeSort.field === 'margin_pct' && (routeSort.direction === 'asc' ? '↑' : '↓')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getSortedRoutes().map((route, i) => (
-                    <tr key={i} style={{ borderBottom: i < allRoutes.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                      <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                        {route.route}
-                      </td>
-                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {route.trips}
-                      </td>
-                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>
-                        {formatCurrency(route.avg_revenue)}
-                      </td>
-                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {formatCurrency(route.avg_cost)}
-                      </td>
-                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: getMarginColor(route.margin_pct), textAlign: 'right' }}>
-                        {route.margin_pct.toFixed(1)}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'assets' && (
-        <div>
-          {/* Sub-tab toggle */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-            <button
-              onClick={() => setAssetsSubTab('vehicles')}
-              style={{
-                background: assetsSubTab === 'vehicles' ? 'var(--accent-primary)' : 'transparent',
-                border: `1px solid ${assetsSubTab === 'vehicles' ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-                color: assetsSubTab === 'vehicles' ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                padding: '8px 16px',
-                fontSize: 12,
-                fontFamily: 'var(--font-mono)',
-                borderRadius: 4,
-                cursor: 'pointer',
-                fontWeight: assetsSubTab === 'vehicles' ? 600 : 400,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}
-            >
-              Vehicles
-            </button>
-            <button
-              onClick={() => setAssetsSubTab('drivers')}
-              style={{
-                background: assetsSubTab === 'drivers' ? 'var(--accent-primary)' : 'transparent',
-                border: `1px solid ${assetsSubTab === 'drivers' ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-                color: assetsSubTab === 'drivers' ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                padding: '8px 16px',
-                fontSize: 12,
-                fontFamily: 'var(--font-mono)',
-                borderRadius: 4,
-                cursor: 'pointer',
-                fontWeight: assetsSubTab === 'drivers' ? 600 : 400,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}
-            >
-              Drivers
-            </button>
-          </div>
-
-          {assetsSubTab === 'vehicles' && (
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-                Vehicle Performance
-              </div>
-              {loading ? (
-                <div style={{ height: 400, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-              ) : vehicleInsights.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-tertiary)', fontSize: 13 }}>
-                  No vehicle data available
-                </div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Registration
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Revenue
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Trips
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Utilization
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Avg Margin
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {vehicleInsights.map((vehicle, i) => (
-                      <tr key={i} style={{ borderBottom: i < vehicleInsights.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                        <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                          {vehicle.registration}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>
-                          {formatCurrency(vehicle.revenue)}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                          {vehicle.trips}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                          {vehicle.utilization.toFixed(1)}%
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: getMarginColor(vehicle.avg_margin), textAlign: 'right' }}>
-                          {vehicle.avg_margin.toFixed(1)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          {assetsSubTab === 'drivers' && (
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-                Driver Leaderboard
-              </div>
-              {loading ? (
-                <div style={{ height: 400, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-              ) : driverLeaderboard.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-tertiary)', fontSize: 13 }}>
-                  No driver data available
-                </div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Driver
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Trips
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Revenue
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Rating
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        On-Time %
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {driverLeaderboard.map((driver, i) => (
-                      <tr key={i} style={{ borderBottom: i < driverLeaderboard.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                        <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                          {driver.driver_name}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                          {driver.trips}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>
-                          {formatCurrency(driver.revenue)}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                          {driver.avg_rating.toFixed(1)} ★
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: driver.on_time_pct >= 90 ? 'var(--status-success)' : driver.on_time_pct >= 75 ? 'var(--status-warning)' : 'var(--status-danger)', textAlign: 'right', fontWeight: 600 }}>
-                          {driver.on_time_pct.toFixed(1)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'costs' && (
-        <div>
-          {/* Cost Summary Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 32 }}>
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
-                Total Revenue
-              </div>
-              {loading ? (
-                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-              ) : (
-                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-                  {formatCurrency(finance?.revenue_period || 0)}
-                </div>
-              )}
-            </div>
-
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
-                Total Expenses
-              </div>
-              {loading ? (
-                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-              ) : (
-                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--status-danger)', letterSpacing: '-0.02em' }}>
-                  {formatCurrency(finance?.expenses_period || 0)}
-                </div>
-              )}
-            </div>
-
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
-                Net Margin
-              </div>
-              {loading ? (
-                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-              ) : (
-                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--status-success)', letterSpacing: '-0.02em' }}>
-                  {formatCurrency(finance?.net_margin_period || 0)}
-                </div>
-              )}
-            </div>
-
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
-                Margin %
-              </div>
-              {loading ? (
-                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-              ) : (
-                <div style={{ fontSize: 28, fontWeight: 700, color: getMarginColor(finance?.net_margin_percent_period || 0), letterSpacing: '-0.02em' }}>
-                  {formatPercent(finance?.net_margin_percent_period || 0, 1)}
-                </div>
-              )}
-            </div>
-
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
-                Fuel Cost Ratio
-              </div>
-              {loading ? (
-                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-              ) : (
-                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-                  {formatPercent(finance?.fuel_cost_ratio || 0, 1)}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Expense Breakdown by Category */}
-          <div style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--card-radius)',
-            padding: 24,
-            marginBottom: 32,
-          }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-              Expense Breakdown by Category
-            </div>
-            {loading ? (
-              <div style={{ height: 200, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-            ) : expenseCategories.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>
-                No expense data available
-              </div>
-            ) : (
-              <div>
-                {(() => {
-                  const maxTotal = Math.max(...expenseCategories.map(c => c.total), 1);
-                  const categoryColors: { [key: string]: string } = {
-                    'FUEL': 'var(--accent-primary)',
-                    'MAINTENANCE': 'var(--status-warning)',
-                    'DRIVER_COST': 'var(--status-success)',
-                    'TOLLS': 'var(--status-danger)',
-                    'INSURANCE': 'var(--text-secondary)',
-                    'OVERHEAD': 'var(--text-secondary)',
-                    'OTHER': 'var(--text-secondary)',
-                  };
-                  return expenseCategories.map((cat, i) => (
-                    <div key={i} style={{ marginBottom: i < expenseCategories.length - 1 ? 16 : 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>
-                          {cat.category.replace('_', ' ')} ({cat.count})
-                        </span>
-                        <span style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                          {formatCurrency(cat.total)}
-                        </span>
-                      </div>
-                      <div style={{ height: 10, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${(cat.total / maxTotal) * 100}%`,
-                          background: categoryColors[cat.category] || 'var(--text-secondary)',
-                          borderRadius: 2,
-                          transition: 'width 0.3s ease',
-                        }} />
-                      </div>
-                    </div>
-                  ));
-                })()}
-              </div>
-            )}
-          </div>
-
-          {/* Monthly Cost Trend */}
-          <div style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--card-radius)',
-            padding: 24,
-            marginBottom: 32,
-          }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-              Revenue vs Expenses Trend
-            </div>
-            {loading ? (
-              <div style={{ height: 200, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-            ) : monthlyTrend.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-tertiary)', fontSize: 13 }}>
-                No trend data available
-              </div>
-            ) : (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 160, marginBottom: 12 }}>
-                  {(() => {
-                    const maxVal = Math.max(...monthlyTrend.map(m => Math.max(m.revenue, m.expenses)), 1);
-                    return monthlyTrend.map((month, i) => (
-                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                        <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                          {formatCompactNumber(month.revenue)}
-                        </div>
-                        <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 120, width: '100%', maxWidth: 60 }}>
-                          <div style={{
-                            flex: 1,
-                            height: `${(month.revenue / maxVal) * 120}px`,
-                            background: 'var(--accent-primary)',
-                            borderRadius: '2px 2px 0 0',
-                          }} />
-                          <div style={{
-                            flex: 1,
-                            height: `${(month.expenses / maxVal) * 120}px`,
-                            background: 'var(--status-danger)',
-                            borderRadius: '2px 2px 0 0',
-                            opacity: 0.7,
-                          }} />
-                        </div>
-                        <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                          {month.month.slice(5)}
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-                <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--text-tertiary)' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 12, height: 3, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1 }} />
-                    Revenue
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 12, height: 3, background: 'var(--status-danger)', display: 'inline-block', borderRadius: 1, opacity: 0.7 }} />
-                    Expenses
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Invoice Summary */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-                Outstanding Invoices
-              </div>
-              {loading ? (
-                <div style={{ height: 100, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-              ) : (
-                <div>
-                  <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: '-0.02em' }}>
-                    {formatCurrency(finance?.outstanding_invoices_total || 0)}
+                    {/* Metric */}
+                    {insight.metric && (
+                      <span style={{
+                        fontSize: 11,
+                        fontFamily: 'var(--font-mono)',
+                        color: 'var(--text-secondary)',
+                        marginLeft: 'auto',
+                        fontWeight: 600,
+                      }}>
+                        {insight.metric}
+                      </span>
+                    )}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                    Awaiting payment
-                  </div>
-                </div>
-              )}
-            </div>
 
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-                Overdue Invoices
-              </div>
-              {loading ? (
-                <div style={{ height: 100, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-              ) : (
-                <div>
-                  <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--status-danger)', marginBottom: 8, letterSpacing: '-0.02em' }}>
-                    {formatCurrency(finance?.overdue_invoices_total || 0)}
+                  {/* Title */}
+                  <div style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    marginBottom: 4,
+                    lineHeight: 1.4,
+                  }}>
+                    {insight.title}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                    Past due date
+
+                  {/* Body */}
+                  <div style={{
+                    fontSize: 12,
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1.5,
+                    marginBottom: insight.action ? 10 : 0,
+                  }}>
+                    {insight.body}
                   </div>
+
+                  {/* Action */}
+                  {insight.action && (
+                    <button style={{
+                      background: 'transparent',
+                      border: `1px solid ${config.color}`,
+                      color: config.color,
+                      padding: '4px 12px',
+                      fontSize: 11,
+                      fontFamily: 'var(--font-mono)',
+                      borderRadius: 3,
+                      cursor: 'pointer',
+                      fontWeight: 500,
+                      transition: 'all 0.15s ease',
+                    }}>
+                      {insight.action} →
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
+
+                {/* Dismiss button */}
+                <button
+                  onClick={() => handleDismiss(insight.id)}
+                  title="Dismiss"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-tertiary)',
+                    fontSize: 16,
+                    cursor: 'pointer',
+                    padding: '2px 6px',
+                    borderRadius: 3,
+                    lineHeight: 1,
+                    flexShrink: 0,
+                    transition: 'color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)'; }}
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Dismissed count / restore */}
+      {dismissedIds.size > 0 && (
+        <div style={{
+          marginTop: 20,
+          textAlign: 'center',
+        }}>
+          <button
+            onClick={() => setDismissedIds(new Set())}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-tertiary)',
+              padding: '6px 16px',
+              fontSize: 11,
+              fontFamily: 'var(--font-mono)',
+              borderRadius: 3,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'var(--accent-dim)';
+              e.currentTarget.style.color = 'var(--text-secondary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--border-subtle)';
+              e.currentTarget.style.color = 'var(--text-tertiary)';
+            }}
+          >
+            Restore {dismissedIds.size} dismissed insight{dismissedIds.size !== 1 ? 's' : ''}
+          </button>
         </div>
       )}
     </div>

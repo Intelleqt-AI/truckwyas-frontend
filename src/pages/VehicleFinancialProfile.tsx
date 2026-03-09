@@ -46,12 +46,44 @@ export default function VehicleFinancialProfile() {
   });
 
   if (isLoading) return (
-    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ height: 10, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 8, width: '12%' }} />
+        <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 8, width: '10%' }} />
+        <div style={{ height: 24, background: 'var(--bg-surface)', borderRadius: 4, width: '30%' }} />
+      </div>
+      <div style={{ height: 1, background: 'var(--border-subtle)', marginBottom: 24 }} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="card" style={{ padding: 20 }}>
+            <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
+            <div style={{ height: 26, background: 'var(--bg-surface)', borderRadius: 4, width: '50%' }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        {[1, 2].map(i => (
+          <div key={i} className="card" style={{ padding: 20 }}>
+            <div style={{ height: 14, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 16, width: '35%' }} />
+            {[1, 2, 3, 4, 5].map(j => (
+              <div key={j} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
+                <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, width: '35%' }} />
+                <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, width: '25%' }} />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
   );
   if (!vehicle) return (
-    <div style={{ padding: 40 }}>
-      <div style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Vehicle not found.</div>
-      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/fleet')}>← BACK TO FLEET</button>
+    <div style={{ padding: 48, textAlign: 'center' }}>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" style={{ margin: '0 auto 16px', display: 'block', opacity: 0.5 }}>
+        <rect x="1" y="3" width="15" height="13" rx="2" /><path d="M16 8h4l3 3v5a2 2 0 0 1-2 2h-1" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
+      </svg>
+      <div style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 4 }}>Vehicle not found</div>
+      <div style={{ color: 'var(--text-tertiary)', fontSize: 12, marginBottom: 20 }}>This vehicle may have been removed or the link is incorrect</div>
+      <button className="btn-action" onClick={() => navigate('/fleet')}>← BACK TO FLEET</button>
     </div>
   );
 
@@ -106,7 +138,7 @@ export default function VehicleFinancialProfile() {
                     try {
                       await patchData({ url: `api/v1/vehicles/${id}/`, data: { status: s } });
                       queryClient.invalidateQueries({ queryKey: ['vehicle', id] });
-                    } catch (e) { console.error(e); }
+                    } catch (_) { /* handled by query invalidation */ }
                     setUpdating(false);
                   }}
                   style={{
@@ -295,7 +327,13 @@ export default function VehicleFinancialProfile() {
             <div className="card" style={{ padding: 24 }}>
               <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>RECENT LOADS ({loads.length})</div>
               {loads.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '20px 0', textAlign: 'center' }}>No loads recorded</div>
+                <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" style={{ margin: '0 auto 10px', display: 'block', opacity: 0.5 }}>
+                    <rect x="1" y="3" width="15" height="13" rx="2" /><path d="M16 8h4l3 3v5a2 2 0 0 1-2 2h-1" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
+                  </svg>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 4 }}>No loads recorded yet</div>
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>Loads assigned to this vehicle will appear here</div>
+                </div>
               ) : loads.slice(0, 8).map((load: any) => (
                 <div
                   key={load.id}

@@ -277,7 +277,13 @@ export default function Vehicles() {
               </thead>
               <tbody>
                 {sorted.length === 0 ? (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles found</td></tr>
+                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '48px 20px' }}>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" style={{ margin: '0 auto 12px', display: 'block', opacity: 0.5 }}>
+                      <rect x="1" y="3" width="15" height="13" rx="2" /><path d="M16 8h4l3 3v5a2 2 0 0 1-2 2h-1" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
+                    </svg>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 4 }}>No vehicles match this filter</div>
+                    <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>Try adjusting your status filter or add a new vehicle</div>
+                  </td></tr>
                 ) : sorted.map((v, idx) => {
                   const utilizationPercent = ((v.trips_this_month || 0) / 20) * 100;
                   const utilizationColor = utilizationPercent > 70 ? 'var(--status-success)' : utilizationPercent >= 40 ? 'var(--status-warning)' : 'var(--status-danger)';

@@ -45,12 +45,43 @@ export default function DriverProfile() {
   });
 
   if (isLoading) return (
-    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ height: 10, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 8, width: '12%' }} />
+        <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 8, width: '10%' }} />
+        <div style={{ height: 24, background: 'var(--bg-surface)', borderRadius: 4, width: '25%' }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="card" style={{ padding: 16 }}>
+            <div style={{ height: 10, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
+            <div style={{ height: 24, background: 'var(--bg-surface)', borderRadius: 4, width: '50%' }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        {[1, 2].map(i => (
+          <div key={i} className="card" style={{ padding: 20 }}>
+            <div style={{ height: 14, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 16, width: '30%' }} />
+            {[1, 2, 3, 4, 5].map(j => (
+              <div key={j} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-row)' }}>
+                <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, width: '35%' }} />
+                <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, width: '25%' }} />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
   );
   if (!driver) return (
-    <div style={{ padding: 40 }}>
-      <div style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Driver not found.</div>
-      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/fleet/drivers')}>← BACK</button>
+    <div style={{ padding: 48, textAlign: 'center' }}>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" style={{ margin: '0 auto 16px', display: 'block', opacity: 0.5 }}>
+        <circle cx="12" cy="12" r="10" /><path d="M16 16s-1.5-2-4-2-4 2-4 2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" />
+      </svg>
+      <div style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 4 }}>Driver not found</div>
+      <div style={{ color: 'var(--text-tertiary)', fontSize: 12, marginBottom: 20 }}>This driver may have been removed or the link is incorrect</div>
+      <button className="btn-action" onClick={() => navigate('/fleet/drivers')}>← BACK TO DRIVERS</button>
     </div>
   );
 
@@ -106,7 +137,7 @@ export default function DriverProfile() {
                     try {
                       await patchData({ url: `api/v1/drivers/${driverId}/`, data: { status: s } });
                       queryClient.invalidateQueries({ queryKey: ['driver', driverId] });
-                    } catch (e) { console.error(e); }
+                    } catch (_) { /* handled by query invalidation */ }
                     setUpdating(false);
                   }}
                   style={{
@@ -175,7 +206,13 @@ export default function DriverProfile() {
       <div className="card" style={{ padding: 20 }}>
         <div className="card-title" style={{ marginBottom: 16 }}>Recent Loads ({loads.length})</div>
         {loads.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No loads recorded</div>
+          <div style={{ textAlign: 'center', padding: '36px 0' }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" style={{ margin: '0 auto 10px', display: 'block', opacity: 0.5 }}>
+              <rect x="1" y="3" width="15" height="13" rx="2" /><path d="M16 8h4l3 3v5a2 2 0 0 1-2 2h-1" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
+            </svg>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 4 }}>No loads recorded yet</div>
+            <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>Loads assigned to this driver will appear here</div>
+          </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>

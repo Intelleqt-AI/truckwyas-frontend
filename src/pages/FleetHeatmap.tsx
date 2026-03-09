@@ -162,7 +162,22 @@ export default function FleetHeatmap() {
           </div>
 
           {isLoading ? (
-            <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>
+            <div style={{ padding: '20px 0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '40px repeat(24, 1fr)', gap: 3, marginBottom: 4 }}>
+                <div />
+                {HOURS.map(h => (
+                  <div key={h} style={{ fontSize: 9, color: h % 3 === 0 ? 'var(--text-tertiary)' : 'transparent', fontFamily: 'var(--font-mono)', textAlign: 'center' }}>{h}h</div>
+                ))}
+              </div>
+              {DAYS.map(day => (
+                <div key={day} style={{ display: 'grid', gridTemplateColumns: '40px repeat(24, 1fr)', gap: 3, marginBottom: 3 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center' }}>{day}</div>
+                  {HOURS.map(h => (
+                    <div key={h} style={{ aspectRatio: '1', background: 'var(--bg-surface)', borderRadius: 2, minHeight: 0 }} />
+                  ))}
+                </div>
+              ))}
+            </div>
           ) : (
             <div>
               {/* Hour labels */}
@@ -192,7 +207,13 @@ export default function FleetHeatmap() {
         <div className="card" style={{ padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>TOP ROUTES BY VOLUME</div>
           {topRoutes.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', textAlign: 'center', padding: '20px 0' }}>No route data yet</div>
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" style={{ margin: '0 auto 10px', display: 'block', opacity: 0.5 }}>
+                <circle cx="12" cy="10" r="3" /><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z" />
+              </svg>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 4 }}>No route data yet</div>
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>Route analytics populate as loads are completed</div>
+            </div>
           ) : topRoutes.map(([route, data]) => (
             <RouteBar key={route} route={route} count={data.count} revenue={data.revenue} />
           ))}

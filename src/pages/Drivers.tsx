@@ -145,7 +145,33 @@ export default function Drivers() {
   });
 
   if (loading) return (
-    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 8, width: '15%' }} />
+        <div style={{ height: 24, background: 'var(--bg-surface)', borderRadius: 4, width: '20%' }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+        {[1, 2, 3].map(i => (
+          <div key={i} className="card" style={{ padding: 20 }}>
+            <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
+            <div style={{ height: 28, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
+          </div>
+        ))}
+      </div>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
+          <div style={{ height: 10, background: 'var(--bg-surface)', borderRadius: 4, width: '80%' }} />
+        </div>
+        {[1, 2, 3, 4, 5].map(i => (
+          <div key={i} style={{ padding: '13px 20px', borderBottom: '1px solid var(--border-row)', display: 'flex', gap: 40 }}>
+            <div style={{ height: 14, background: 'var(--bg-surface)', borderRadius: 4, width: '18%' }} />
+            <div style={{ height: 14, background: 'var(--bg-surface)', borderRadius: 4, width: '15%' }} />
+            <div style={{ height: 14, background: 'var(--bg-surface)', borderRadius: 4, width: '10%' }} />
+            <div style={{ height: 14, background: 'var(--bg-surface)', borderRadius: 4, width: '8%' }} />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 
   return (
@@ -225,7 +251,13 @@ export default function Drivers() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40, fontSize: 13 }}>No drivers found</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', padding: '48px 20px' }}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" style={{ margin: '0 auto 12px', display: 'block', opacity: 0.5 }}>
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 4 }}>No drivers match this filter</div>
+                <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>Try adjusting your status filter or add a new driver</div>
+              </td></tr>
             ) : filtered.map((d, idx) => {
               const statusDotColor = d.status === 'ACTIVE' ? 'var(--status-success)' : d.status === 'ON_LEAVE' ? 'var(--status-warning)' : 'var(--text-tertiary)';
               const efficiencyScore = d.efficiency_score || 0;

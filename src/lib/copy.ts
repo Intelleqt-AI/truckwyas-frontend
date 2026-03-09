@@ -6,9 +6,7 @@ export const HERO_COPY = {
 } as const;
 
 export const MODULE_HEADINGS = {
-  revenueGuard: "Protect margin before the wheels move",
-  controlTower: "Smarter planning, measurable outcomes", 
-  financeHQ: "Your fleet's CFO-grade dashboard",
+  controlTower: "Smarter planning, measurable outcomes",
   capital: "Turn PODs into instant payment",
   fleetDirect: "Direct lanes. Fair economics."
 } as const;
@@ -17,25 +15,21 @@ export const CTA_LABELS = {
   requestDemo: "Request a demo",
   seeRoi: "See ROI in action",
   explorePlatform: "Explore the platform",
-  seeRevenueGuard: "See Revenue Guard",
-  seeControlTower: "See Control Tower", 
-  seeFinanceHQ: "See Finance HQ",
+  seeControlTower: "See Control Tower",
   seeCapital: "See Capital",
   seeFleetDirect: "See FleetDirect"
 } as const;
 
 export const KPI_LABELS = {
   marginUplift: "Margin uplift",
-  emptyKilometres: "Empty kilometres", 
+  emptyKilometres: "Empty kilometres",
   cashCycleDays: "Cash cycle days",
   quoteTime: "Quote time"
 } as const;
 
 export const PAGE_DESCRIPTIONS = {
   overview: "Real-time fleet intelligence dashboard with key performance indicators",
-  revenueGuard: "AI-powered quote builder and margin protection tools",
-  controlTower: "Route optimization and fleet planning with scenario analysis", 
-  financeHQ: "Financial performance tracking and cash flow management",
+  controlTower: "Route optimization and fleet planning with scenario analysis",
   capital: "Invoice advancement and working capital optimization",
   fleetDirect: "Direct shipper connections and load matching platform",
   reports: "Comprehensive analytics and executive reporting",

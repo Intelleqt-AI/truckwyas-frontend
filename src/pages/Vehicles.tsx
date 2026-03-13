@@ -277,7 +277,26 @@ export default function Vehicles() {
               </thead>
               <tbody>
                 {sorted.length === 0 ? (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles found</td></tr>
+                  vehicles.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ padding: 0 }}>
+                        <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🚛</div>
+                          <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>
+                            No vehicles yet
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+                            Get started by adding your first vehicle to your fleet
+                          </div>
+                          <button onClick={() => setShowAddForm(true)} className="btn-action">
+                            ADD VEHICLE
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles match your filters</td></tr>
+                  )
                 ) : sorted.map((v, idx) => {
                   const utilizationPercent = ((v.trips_this_month || 0) / 20) * 100;
                   const utilizationColor = utilizationPercent > 70 ? 'var(--status-success)' : utilizationPercent >= 40 ? 'var(--status-warning)' : 'var(--status-danger)';

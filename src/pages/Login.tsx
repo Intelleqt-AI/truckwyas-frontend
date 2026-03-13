@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLogin } from "@/hooks/useLogin";
+import { fetchData } from "@/lib/Api";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -49,7 +50,23 @@ const Login = () => {
     }
 
     login(formData, {
-      onSuccess: () => {
+      onSuccess: async () => {
+        // Check if onboarding is needed
+        const onboardingDone = localStorage.getItem('onboarding_done');
+        if (!onboardingDone) {
+          try {
+            // Check if company has any vehicles or loads
+            const overview = await fetchData('api/v1/fleet/overview/');
+            const vehicleCount = overview?.total_vehicles || 0;
+
+            if (vehicleCount === 0) {
+              navigate("/onboarding");
+              return;
+            }
+          } catch {
+            // If API fails, skip onboarding check
+          }
+        }
         navigate("/");
       },
       onError: (error: any) => {

@@ -1039,7 +1039,26 @@ export default function Invoices() {
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No invoices found</td></tr>
+              allInvoices.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: 0 }}>
+                    <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>📄</div>
+                      <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>
+                        No invoices yet
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+                        Invoices will be generated from completed bookings
+                      </div>
+                      <button onClick={() => navigate('/bookings/new')} className="btn-action">
+                        CREATE BOOKING
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No invoices match your filters</td></tr>
+              )
             ) : rows.map(inv => {
               const invStatus = inv.status?.toUpperCase();
               const tier = inv.risk_tier || inv.tier || 'standard';

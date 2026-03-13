@@ -263,9 +263,6 @@ export default function InvoiceDetail() {
             {(invoice.status === 'SENT' || invoice.status === 'OVERDUE' || invoice.status === 'PARTIALLY_PAID') && !showPaymentForm && (
               <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>RECORD PAYMENT</button>
             )}
-            {(invoice.fast_pay_eligible || invoice.early_pay_eligible) && invoice.status !== 'PAID' && (
-              <button onClick={() => navigate('/capital')} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>REQUEST FAST PAY</button>
-            )}
           </div>
 
           {showPaymentForm && (

@@ -7,10 +7,6 @@ const STATUS_COLOR: Record<string, string> = {
   PAID: 'var(--status-success)', SENT: 'var(--status-warning)',
   OVERDUE: 'var(--status-danger)', DRAFT: 'var(--text-tertiary)',
 };
-const TIER_COLOR: Record<string, string> = {
-  prime: 'var(--accent-primary)', standard: 'var(--status-success)',
-  elevated: 'var(--status-warning)', high: 'var(--status-danger)', ineligible: 'var(--text-tertiary)',
-};
 
 const EXPENSE_STATUS_COLOR: Record<string, string> = {
   PENDING: 'var(--status-warning)',
@@ -298,7 +294,6 @@ export default function Invoices() {
   const outstanding = allInvoices.filter(i => i.status === 'SENT').reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
   const overdue = allInvoices.filter(i => i.status === 'OVERDUE').reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
   const paid = allInvoices.filter(i => i.status === 'PAID').reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
-  const fpCount = allInvoices.filter(i => (i.fast_pay_eligible || i.fastPay) && i.status !== 'PAID').length;
 
   return (
     <div>
@@ -1034,7 +1029,7 @@ export default function Invoices() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Invoice #</th><th>Customer</th><th>Amount</th><th>Status</th><th>Due Date</th><th>Risk Tier</th><th className="text-right">Actions</th>
+              <th>Invoice #</th><th>Customer</th><th>Amount</th><th>Status</th><th>Due Date</th><th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1061,12 +1056,10 @@ export default function Invoices() {
               )
             ) : rows.map(inv => {
               const invStatus = inv.status?.toUpperCase();
-              const tier = inv.risk_tier || inv.tier || 'standard';
               const amount = parseFloat(inv.total_amount || inv.amount) || 0;
               const invNumber = inv.invoice_number || inv.invoiceNumber;
               const custName = inv.customer_name || inv.customerName;
               const dueDate = inv.due_date || inv.dueDate;
-              const isFastPayEligible = inv.fast_pay_eligible || inv.early_pay_eligible || inv.fastPay;
               // Aging indicator
               const ageDays = dueDate ? Math.floor((Date.now() - new Date(dueDate).getTime()) / 86400000) : 0;
               const agingColor = ageDays <= 0 ? 'var(--status-success)' : ageDays <= 30 ? 'var(--status-warning)' : ageDays <= 60 ? 'var(--accent-primary)' : 'var(--status-danger)';
@@ -1096,11 +1089,6 @@ export default function Invoices() {
                       )}
                     </div>
                   </td>
-                  <td>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: TIER_COLOR[tier], padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2, textTransform: 'uppercase' }}>
-                      {tier}
-                    </span>
-                  </td>
                   <td className="text-right" onClick={e => e.stopPropagation()}>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       {invStatus === 'DRAFT' && (
@@ -1112,9 +1100,6 @@ export default function Invoices() {
                         <button className="btn-action" style={{ fontSize: 10, padding: '4px 8px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={(e) => handleDownloadPDF(e, inv.id)}>
                           PDF
                         </button>
-                      )}
-                      {isFastPayEligible && invStatus !== 'PAID' && (
-                        <button className="btn-action" style={{ fontSize: 10, padding: '4px 8px' }} onClick={() => navigate('/capital')}>FAST PAY</button>
                       )}
                     </div>
                   </td>

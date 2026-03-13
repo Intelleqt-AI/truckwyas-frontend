@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { fetchData, postData } from "@/lib/Api";
+import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
+import { toast } from "@/lib/toast";
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -30,6 +31,7 @@ const ROLE_COLORS: Record<string, string> = {
   manager: 'var(--accent-primary)',
   operator: 'var(--status-warning)',
   viewer: 'var(--text-tertiary)',
+  driver: '#F59E0B', // amber for drivers
 };
 
 interface User {
@@ -41,16 +43,38 @@ interface User {
   last_active?: string;
 }
 
+interface PendingInvite {
+  id: number;
+  email: string;
+  role: string;
+  invited_at: string;
+}
+
+interface CurrentUser {
+  id: number;
+  role: string;
+}
+
 export function UsersPermissions() {
   const [users, setUsers] = useState<User[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingInvites, setLoadingInvites] = useState(true);
   const [search, setSearch] = useState('');
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('operator');
   const [inviting, setInviting] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   useEffect(() => {
+    loadUsers();
+    loadCurrentUser();
+    loadPendingInvites();
+  }, []);
+
+  const loadUsers = () => {
     fetchData('api/v1/users/')
       .then((d: any) => {
         const arr = Array.isArray(d) ? d : (d?.results || []);
@@ -58,9 +82,41 @@ export function UsersPermissions() {
       })
       .catch(() => {
         setUsers([]);
+        toast.error('Failed to load users');
       })
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  const loadCurrentUser = () => {
+    fetchData('api/v1/auth/me/')
+      .then((data: any) => setCurrentUser(data))
+      .catch(() => {
+        // Fallback: try to get from localStorage
+        const stored = localStorage.getItem('user');
+        if (stored) {
+          try {
+            setCurrentUser(JSON.parse(stored));
+          } catch {
+            setCurrentUser(null);
+          }
+        }
+      });
+  };
+
+  const loadPendingInvites = () => {
+    fetchData('api/v1/users/invite/')
+      .then((d: any) => {
+        const arr = Array.isArray(d) ? d : (d?.results || []);
+        setPendingInvites(arr);
+      })
+      .catch(() => {
+        // 404 is fine - endpoint might not exist yet
+        setPendingInvites([]);
+      })
+      .finally(() => setLoadingInvites(false));
+  };
+
+  const isAdmin = currentUser?.role?.toLowerCase() === 'admin';
 
   const filtered = users.filter(u =>
     u.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -70,25 +126,73 @@ export function UsersPermissions() {
   const roleColor = (role: string) => ROLE_COLORS[role?.toLowerCase()] || 'var(--text-tertiary)';
 
   const handleInvite = async () => {
-    if (!inviteEmail) { alert('Please enter an email'); return; }
+    if (!inviteEmail) {
+      toast.error('Please enter an email');
+      return;
+    }
     setInviting(true);
     try {
       await postData({
-        url: 'api/v1/users/',
+        url: 'api/v1/users/invite/',
         data: { email: inviteEmail, role: inviteRole },
       });
+      toast.success(`Invite sent to ${inviteEmail}`);
       setShowInvite(false);
       setInviteEmail('');
       setInviteRole('operator');
-      // Reload users
-      const d = await fetchData('api/v1/users/');
-      const arr = Array.isArray(d) ? d : (d?.results || []);
-      setUsers(arr);
+      loadPendingInvites();
     } catch (err) {
       console.error('Failed to invite user:', err);
-      alert('Failed to send invite');
+      toast.error('Failed to send invite');
     } finally {
       setInviting(false);
+    }
+  };
+
+  const handleRoleChange = async (userId: number, newRole: string) => {
+    if (!isAdmin) {
+      toast.error('Only admins can change roles');
+      return;
+    }
+    try {
+      await patchData({
+        url: `api/v1/users/${userId}/`,
+        data: { role: newRole },
+      });
+      toast.success('Role updated');
+      loadUsers();
+    } catch (err) {
+      console.error('Failed to update role:', err);
+      toast.error('Failed to update role');
+    }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
+    if (!isAdmin) {
+      toast.error('Only admins can remove users');
+      return;
+    }
+    try {
+      await deleteData({ url: `api/v1/users/${userId}/` });
+      toast.success('User removed');
+      setDeleteConfirm(null);
+      loadUsers();
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      toast.error('Failed to remove user');
+    }
+  };
+
+  const handleResendInvite = async (inviteId: number) => {
+    try {
+      await postData({
+        url: `api/v1/users/invite/${inviteId}/resend/`,
+        data: {},
+      });
+      toast.success('Invite resent');
+    } catch (err) {
+      console.error('Failed to resend invite:', err);
+      toast.error('Failed to resend invite');
     }
   };
 
@@ -156,6 +260,7 @@ export function UsersPermissions() {
                 <option value="manager">Manager</option>
                 <option value="operator">Operator</option>
                 <option value="viewer">Viewer</option>
+                <option value="driver">Driver</option>
               </select>
             </div>
             <button className="btn-action" onClick={handleInvite} disabled={inviting}>
@@ -167,9 +272,9 @@ export function UsersPermissions() {
         {/* Table */}
         {loading ? (
           <div style={{ padding: 24 }}>
-            <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
-            <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '40%' }} />
-            <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
+            <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
+            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12, width: '40%' }} />
+            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, width: '40%' }} />
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
@@ -207,12 +312,32 @@ export function UsersPermissions() {
                   </div>
                 </td>
                 <td style={{ padding: '12px 20px' }}>
-                  <span style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 7px',
-                    border: `1px solid ${roleColor(u.role)}`,
-                    color: roleColor(u.role), borderRadius: 2,
-                    textTransform: 'uppercase' as const, letterSpacing: '0.06em',
-                  }}>{u.role}</span>
+                  {isAdmin ? (
+                    <select
+                      value={u.role}
+                      onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                      style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 7px',
+                        border: `1px solid ${roleColor(u.role)}`,
+                        color: roleColor(u.role), borderRadius: 2,
+                        textTransform: 'uppercase' as const, letterSpacing: '0.06em',
+                        background: 'transparent', cursor: 'pointer', outline: 'none',
+                      }}
+                    >
+                      <option value="admin">ADMIN</option>
+                      <option value="manager">MANAGER</option>
+                      <option value="operator">OPERATOR</option>
+                      <option value="viewer">VIEWER</option>
+                      <option value="driver">DRIVER</option>
+                    </select>
+                  ) : (
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 7px',
+                      border: `1px solid ${roleColor(u.role)}`,
+                      color: roleColor(u.role), borderRadius: 2,
+                      textTransform: 'uppercase' as const, letterSpacing: '0.06em',
+                    }}>{u.role}</span>
+                  )}
                 </td>
                 <td style={{ padding: '12px 20px' }}>
                   <span style={{
@@ -225,11 +350,16 @@ export function UsersPermissions() {
                   {u.last_active || '—'}
                 </td>
                 <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
-                  <button style={{
-                    background: 'none', border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-tertiary)', padding: '4px 8px',
-                    fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                  }}>···</button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setDeleteConfirm(u.id)}
+                      style={{
+                        background: 'none', border: '1px solid var(--border-subtle)',
+                        color: 'var(--status-danger)', padding: '4px 10px',
+                        fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                      }}
+                    >REMOVE</button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -237,6 +367,57 @@ export function UsersPermissions() {
           </table>
         )}
       </div>
+
+      {/* Pending Invites */}
+      {!loadingInvites && pendingInvites.length > 0 && (
+        <div style={sectionStyle}>
+          <div style={sectionHeaderStyle}>
+            <span style={sectionTitleStyle}>Pending Invites</span>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+            <thead>
+              <tr>
+                {['Email', 'Role', 'Invited', ''].map(h => (
+                  <th key={h} style={{
+                    padding: '10px 20px', textAlign: 'left' as const,
+                    fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
+                    letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                    borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {pendingInvites.map((inv, i) => (
+                <tr key={inv.id} style={{ borderBottom: i < pendingInvites.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
+                  <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-primary)' }}>{inv.email}</td>
+                  <td style={{ padding: '12px 20px' }}>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 7px',
+                      border: `1px solid ${roleColor(inv.role)}`,
+                      color: roleColor(inv.role), borderRadius: 2,
+                      textTransform: 'uppercase' as const, letterSpacing: '0.06em',
+                    }}>{inv.role}</span>
+                  </td>
+                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-tertiary)' }}>
+                    {new Date(inv.invited_at).toLocaleDateString()}
+                  </td>
+                  <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
+                    <button
+                      onClick={() => handleResendInvite(inv.id)}
+                      style={{
+                        background: 'none', border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-tertiary)', padding: '4px 10px',
+                        fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                      }}
+                    >RESEND</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Roles Reference */}
       <div style={sectionStyle}>
@@ -249,6 +430,7 @@ export function UsersPermissions() {
             { role: 'Manager', color: ROLE_COLORS.manager, desc: 'View and manage quotes, bookings, invoices, and fleet' },
             { role: 'Operator', color: ROLE_COLORS.operator, desc: 'Create quotes and update bookings; no billing or admin access' },
             { role: 'Viewer', color: ROLE_COLORS.viewer, desc: 'Read-only access to all modules' },
+            { role: 'Driver', color: ROLE_COLORS.driver, desc: 'Mobile app access for trip management and updates' },
           ].map((r, i, arr) => (
             <div key={r.role} style={{
               display: 'flex', alignItems: 'center', gap: 16,
@@ -265,6 +447,42 @@ export function UsersPermissions() {
           ))}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000,
+        }} onClick={() => setDeleteConfirm(null)}>
+          <div style={{
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--card-radius)',
+            padding: 32,
+            maxWidth: 420,
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+              Remove User?
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24, lineHeight: 1.5 }}>
+              This will permanently remove this user's access. They will no longer be able to log in.
+            </div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button onClick={() => setDeleteConfirm(null)} style={{
+                background: 'none', border: '1px solid var(--border-subtle)',
+                color: 'var(--text-secondary)', padding: '7px 14px',
+                fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+              }}>CANCEL</button>
+              <button onClick={() => handleDeleteUser(deleteConfirm)} style={{
+                background: 'var(--status-danger)', border: 'none',
+                color: 'white', padding: '7px 14px',
+                fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+              }}>REMOVE</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

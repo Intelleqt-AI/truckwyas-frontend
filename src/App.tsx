@@ -42,7 +42,7 @@ const Capital = lazy(() => import("./pages/Capital"));
 const AdvanceRequest = lazy(() => import("./pages/AdvanceRequest"));
 const AdvanceDetail = lazy(() => import("./pages/AdvanceDetail"));
 const Insights = lazy(() => import("./pages/Insights"));
-const PartnerDashboard = lazy(() => import("./pages/PartnerDashboard"));
+// PartnerDashboard removed — moved to standalone partner portal
 const Settings = lazy(() => import("./pages/Settings"));
 const XeroIntegration = lazy(() => import("./pages/settings/XeroIntegration"));
 const FleetImport = lazy(() => import("./pages/settings/FleetImport"));
@@ -125,7 +125,7 @@ const App = () => (
             <Route path="/capital/request" element={<RequireAuth><OSLayout><AdvanceRequest /></OSLayout></RequireAuth>} />
             <Route path="/capital/advances/:id" element={<RequireAuth><OSLayout><AdvanceDetail /></OSLayout></RequireAuth>} />
             <Route path="/insights" element={<RequireAuth><OSLayout><Insights /></OSLayout></RequireAuth>} />
-            <Route path="/partner-dashboard" element={<RequireAuth><OSLayout><PartnerDashboard /></OSLayout></RequireAuth>} />
+            {/* /partner-dashboard removed — standalone partner portal */}
             <Route path="/settings/:section?" element={<RequireAuth><OSLayout><Settings /></OSLayout></RequireAuth>} />
             <Route path="/settings/integrations/xero" element={<RequireAuth><OSLayout><XeroIntegration /></OSLayout></RequireAuth>} />
             <Route path="/settings/integrations/fleet" element={<RequireAuth><OSLayout><FleetImport /></OSLayout></RequireAuth>} />
@@ -137,7 +137,7 @@ const App = () => (
             <Route path="/overview" element={<Navigate to="/" replace />} />
             <Route path="/expenses" element={<Navigate to="/finance/expenses" replace />} />
             <Route path="/finance-reports" element={<Navigate to="/finance/reports" replace />} />
-            <Route path="/partner" element={<Navigate to="/partner-dashboard" replace />} />
+            {/* /partner redirect removed */}
             <Route path="*" element={<OSLayout><NotFound /></OSLayout>} />
           </Routes>
           </Suspense>

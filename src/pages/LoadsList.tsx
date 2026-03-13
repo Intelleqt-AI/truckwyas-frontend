@@ -176,9 +176,24 @@ export default function LoadsList() {
         </tbody>
       </table>
       {data.length === 0 && (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
-          No loads found
-        </div>
+        loads.length === 0 ? (
+          <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>📦</div>
+            <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>
+              No loads yet
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+              Get started by creating your first quote or booking
+            </div>
+            <button onClick={() => navigate('/quotes/new')} className="btn-action">
+              CREATE QUOTE
+            </button>
+          </div>
+        ) : (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
+            No loads match your filters
+          </div>
+        )
       )}
     </div>
   );

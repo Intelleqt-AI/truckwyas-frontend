@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { fetchData } from "@/lib/Api";
+import { fetchData, postData } from "@/lib/Api";
+// postData signature: ({ url, data }) => Promise
 import { toast } from "@/lib/toast";
 
 const sectionStyle: React.CSSProperties = {
@@ -29,99 +30,86 @@ interface CompanyProfile {
   company_name?: string;
 }
 
-interface BillingInvoice {
+interface BillingTransaction {
   id: string;
-  invoice_number: string;
-  date: string;
+  pf_payment_id: string;
+  created_at: string;
   amount: number;
   status: string;
 }
 
-const PLAN_DETAILS: Record<string, { price: number; maxUsers: number; features: string[] }> = {
-  starter: {
-    price: 999,
-    maxUsers: 5,
-    features: [
-      'Basic load management',
-      'Invoice generation',
-      'Up to 5 users',
-      'Email support',
-    ],
-  },
-  professional: {
-    price: 2499,
-    maxUsers: 25,
-    features: [
-      'AI-powered quote optimisation',
-      'Advanced analytics & reporting',
-      'Fast Pay capital access',
-      'Unlimited loads and invoices',
-      'Fleet intelligence dashboard',
-      'API access',
-    ],
-  },
-  enterprise: {
-    price: 4999,
-    maxUsers: 100,
-    features: [
-      'Everything in Professional',
-      'Dedicated account manager',
-      'Custom integrations',
-      'Priority support',
-      'White-label options',
-      'SLA guarantees',
-    ],
-  },
+const PRO_PLAN = {
+  key: 'pro',
+  name: 'TruckWys Pro',
+  price: 4999,
+  features: [
+    'Unlimited loads & invoices',
+    'AI-powered quote optimisation',
+    'Fast Pay capital access',
+    'Advanced analytics & reporting',
+    'Fleet intelligence dashboard',
+    'Multi-user access',
+    'API & integrations',
+    'Priority support',
+  ],
 };
 
 export function BillingSettings() {
   const [profile, setProfile] = useState<CompanyProfile | null>(null);
-  const [billingHistory, setBillingHistory] = useState<BillingInvoice[]>([]);
+  const [billingHistory, setBillingHistory] = useState<BillingTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [billingError, setBillingError] = useState(false);
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [showComingSoon, setShowComingSoon] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
-    // Fetch company profile for subscription info
     fetchData('api/v1/company/profile/')
       .then((data) => setProfile(data))
-      .catch(() => {
-        toast.error('Failed to load subscription info');
-        setProfile(null);
-      })
+      .catch(() => setProfile(null))
       .finally(() => setLoading(false));
 
-    // Fetch billing history (may 404 if not yet implemented)
     fetchData('api/v1/billing/history/')
-      .then((data) => {
-        setBillingHistory(data.results || data);
-        setBillingError(false);
-      })
-      .catch(() => {
-        setBillingError(true);
-        setBillingHistory([]);
-      });
+      .then((data) => setBillingHistory(data.results || data || []))
+      .catch(() => setBillingHistory([]));
   }, []);
 
-  const handleDownload = (id: string) => {
-    setDownloading(id);
-    setTimeout(() => setDownloading(null), 1000);
+  const handleSubscribe = async () => {
+    setSubscribing(true);
+    try {
+      const data = await postData({ url: 'api/v1/billing/subscribe/', data: {
+        plan: 'pro',
+        return_url: `${window.location.origin}/settings/billing?success=1`,
+        cancel_url: `${window.location.origin}/settings/billing?cancelled=1`,
+        notify_url: `${window.location.origin}/api/v1/billing/itn/`,
+      }});
+      if (data.payment_url) {
+        window.location.href = data.payment_url;
+      } else {
+        toast.error('Could not initiate payment. Please try again.');
+      }
+    } catch {
+      toast.error('Failed to start subscription. Please try again.');
+    } finally {
+      setSubscribing(false);
+    }
   };
 
-  const handleUpgrade = () => {
-    setShowComingSoon(true);
+  const handleCancel = async () => {
+    if (!window.confirm('Are you sure you want to cancel your subscription?')) return;
+    setCancelling(true);
+    try {
+      await postData({ url: 'api/v1/billing/cancel/', data: {} });
+      toast.success('Subscription cancelled.');
+      setProfile(prev => prev ? { ...prev, subscription_status: 'cancelled' } : prev);
+    } catch {
+      toast.error('Failed to cancel subscription. Please contact support.');
+    } finally {
+      setCancelling(false);
+    }
   };
 
-  const handleCancel = () => {
-    setShowComingSoon(true);
-  };
-
-  // Determine plan details
   const planKey = profile?.subscription_plan?.toLowerCase() || 'free';
-  const planName = planKey === 'free' ? 'Free Plan' : (profile?.subscription_plan || 'Free Plan');
-  const planDetails = PLAN_DETAILS[planKey] || { price: 0, maxUsers: 3, features: ['Basic features', 'Limited support'] };
   const isActive = profile?.subscription_status === 'active';
+  const isPro = planKey === 'pro' && isActive;
 
   return (
     <div style={{ maxWidth: 720 }}>
@@ -130,7 +118,6 @@ export function BillingSettings() {
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Manage your subscription and payment history</div>
       </div>
 
-      {/* Loading state */}
       {loading && (
         <div style={sectionStyle}>
           <div style={{ padding: 20 }}>
@@ -140,93 +127,84 @@ export function BillingSettings() {
         </div>
       )}
 
-      {/* Current Plan */}
       {!loading && (
         <div style={sectionStyle}>
-          <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Current Plan</span></div>
+          <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Plan</span></div>
           <div style={{ padding: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                  <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>{planName}</span>
-                  {isActive ? (
+                  <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {isPro ? PRO_PLAN.name : 'Free Plan'}
+                  </span>
+                  {isPro && (
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 7px',
                       background: 'var(--status-success-bg)', color: 'var(--accent-primary)',
                       borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
                     }}>Active</span>
-                  ) : (
-                    <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 7px',
-                      background: 'var(--bg-surface-hover)', color: 'var(--text-tertiary)',
-                      borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
-                    }}>Inactive</span>
                   )}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
-                  {planDetails.price > 0 ? `R ${planDetails.price.toLocaleString()} / monthly` : 'No active subscription'}
+                  {isPro ? `R ${PRO_PLAN.price.toLocaleString()} / month` : 'No active subscription'}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                {isActive && planKey !== 'free' && (
-                  <button onClick={handleCancel} style={{
+                {isPro ? (
+                  <button onClick={handleCancel} disabled={cancelling} style={{
                     background: 'none', border: '1px solid var(--border-subtle)',
                     color: 'var(--text-secondary)', padding: '7px 14px',
                     fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                  }}>CANCEL PLAN</button>
+                    opacity: cancelling ? 0.6 : 1,
+                  }}>
+                    {cancelling ? 'CANCELLING...' : 'CANCEL PLAN'}
+                  </button>
+                ) : (
+                  <button onClick={handleSubscribe} disabled={subscribing} className="btn-action">
+                    {subscribing ? 'REDIRECTING...' : 'SUBSCRIBE — R4,999/MO'}
+                  </button>
                 )}
-                <button onClick={handleUpgrade} className="btn-action">
-                  {planKey === 'free' ? 'UPGRADE' : 'CHANGE PLAN'}
-                </button>
               </div>
             </div>
 
-            {/* Features */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              {planDetails.features.map(f => (
-                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-                  <span style={{ color: 'var(--accent-primary)', fontSize: 14 }}>✓</span>
+              {PRO_PLAN.features.map(f => (
+                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: isPro ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}>
+                  <span style={{ color: isPro ? 'var(--accent-primary)' : 'var(--border-subtle)', fontSize: 14 }}>✓</span>
                   {f}
                 </div>
               ))}
             </div>
 
-            {planKey === 'free' && (
+            {!isPro && (
               <div style={{
-                marginTop: 16,
-                padding: 12,
-                background: 'var(--bg-deep)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 2,
-                fontSize: 12,
-                color: 'var(--text-secondary)',
+                marginTop: 16, padding: 12,
+                background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
+                borderRadius: 2, fontSize: 12, color: 'var(--text-secondary)',
               }}>
-                <strong style={{ color: 'var(--accent-primary)' }}>Ready to unlock more features?</strong>
+                <strong style={{ color: 'var(--accent-primary)' }}>Unlock the full platform</strong>
                 <br />
-                Upgrade to Professional for AI-powered insights and capital access.
+                Subscribe to TruckWys Pro for AI-powered insights, Fast Pay capital access, and unlimited loads.
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Billing History */}
       {!loading && (
         <div style={sectionStyle}>
           <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Billing History</span></div>
-          {billingError || billingHistory.length === 0 ? (
+          {billingHistory.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}>
               <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>📄</div>
               <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 4 }}>No billing history yet</div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                Your invoices and payment records will appear here
-              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Payment records will appear here after your first transaction</div>
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
               <thead>
                 <tr>
-                  {['Invoice', 'Date', 'Amount', 'Status', ''].map(h => (
+                  {['Payment ID', 'Date', 'Amount', 'Status'].map(h => (
                     <th key={h} style={{
                       padding: '10px 20px', textAlign: 'left' as const,
                       fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
@@ -237,67 +215,29 @@ export function BillingSettings() {
                 </tr>
               </thead>
               <tbody>
-                {billingHistory.map((inv, i) => (
-                  <tr key={inv.id} style={{ borderBottom: i < billingHistory.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
+                {billingHistory.map((tx, i) => (
+                  <tr key={tx.id} style={{ borderBottom: i < billingHistory.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
                     <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>
-                      {inv.invoice_number}
+                      {tx.pf_payment_id || tx.id}
                     </td>
-                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>{inv.date}</td>
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      {new Date(tx.created_at).toLocaleDateString('en-ZA')}
+                    </td>
                     <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>
-                      R {inv.amount.toLocaleString()}
+                      R {Number(tx.amount).toLocaleString()}
                     </td>
                     <td style={{ padding: '12px 20px' }}>
                       <span style={{
                         fontFamily: 'var(--font-mono)', fontSize: 10,
-                        color: inv.status === 'paid' ? 'var(--accent-primary)' : 'var(--status-warning)',
+                        color: tx.status === 'complete' ? 'var(--accent-primary)' : 'var(--status-warning)',
                         textTransform: 'uppercase' as const,
-                      }}>{inv.status}</span>
-                    </td>
-                    <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
-                      <button
-                        onClick={() => handleDownload(inv.id)}
-                        style={{
-                          background: 'none', border: '1px solid var(--border-subtle)',
-                          color: 'var(--text-tertiary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                        }}
-                      >{downloading === inv.id ? '↓...' : '↓ PDF'}</button>
+                      }}>{tx.status}</span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
-        </div>
-      )}
-
-      {/* Coming Soon Modal */}
-      {showComingSoon && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000,
-        }} onClick={() => setShowComingSoon(false)}>
-          <div style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--card-radius)',
-            padding: 32,
-            maxWidth: 420,
-            textAlign: 'center',
-          }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 40, marginBottom: 16 }}>🚀</div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-              Payment Integration Coming Soon
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24, lineHeight: 1.5 }}>
-              Our PayFast integration is currently in development. To upgrade or modify your subscription,
-              please contact our support team at <strong style={{ color: 'var(--accent-primary)' }}>support@truckwys.co.za</strong>
-            </div>
-            <button onClick={() => setShowComingSoon(false)} className="btn-action">
-              GOT IT
-            </button>
-          </div>
         </div>
       )}
     </div>

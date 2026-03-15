@@ -81,8 +81,20 @@ export function BillingSettings() {
         cancel_url: `${window.location.origin}/settings/billing?cancelled=1`,
         notify_url: `${window.location.origin}/api/v1/billing/itn/`,
       }});
-      if (data.payment_url) {
-        window.location.href = data.payment_url;
+      if ((data.payfast_url || data.payment_url) && data.form_data) {
+        // PayFast requires a form POST — build and auto-submit a hidden form
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = data.payfast_url || data.payment_url;
+        Object.entries(data.form_data).forEach(([key, value]) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = String(value);
+          form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
       } else {
         toast.error('Could not initiate payment. Please try again.');
       }

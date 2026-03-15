@@ -826,11 +826,30 @@ export default function Invoices() {
                     </thead>
                     <tbody>
                       {expenseRows.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>
-                            No expenses found
-                          </td>
-                        </tr>
+                        expenses.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} style={{ padding: 0 }}>
+                              <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+                                <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>💰</div>
+                                <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>
+                                  No expenses yet
+                                </div>
+                                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+                                  Add your first expense to track costs and manage budgets
+                                </div>
+                                <button onClick={() => setShowExpenseForm(true)} className="btn-action">
+                                  ADD EXPENSE
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          <tr>
+                            <td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>
+                              No expenses match your filters
+                            </td>
+                          </tr>
+                        )
                       ) : expenseRows.map(exp => {
                         const vehicleName = vehicles.find(v => v.id === exp.vehicle)?.registration ||
                                           vehicles.find(v => v.id === exp.vehicle)?.vehicle_number ||

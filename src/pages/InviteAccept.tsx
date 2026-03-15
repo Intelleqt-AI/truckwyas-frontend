@@ -61,15 +61,16 @@ export function InviteAccept() {
     try {
       const result = await postData({
         url: `api/v1/auth/invite/${token}/accept/`,
-        data: { name, password },
+        data: { full_name: name, password },
       });
 
       // Save auth token
       localStorage.setItem('access', result.token);
+      localStorage.setItem('token', result.token);
       localStorage.setItem('user', JSON.stringify(result.user));
 
       toast.success('Welcome to Truckwys!');
-      navigate('/dashboard');
+      navigate('/');
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || 'Failed to accept invite');
     } finally {

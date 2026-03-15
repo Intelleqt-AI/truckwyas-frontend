@@ -27,11 +27,11 @@ const sectionTitleStyle: React.CSSProperties = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  admin: 'var(--status-danger)',
-  manager: 'var(--accent-primary)',
-  operator: 'var(--status-warning)',
-  viewer: 'var(--text-tertiary)',
-  driver: '#F59E0B', // amber for drivers
+  admin: 'var(--status-danger)', // red
+  manager: 'var(--status-warning)', // orange
+  operator: '#3B82F6', // blue
+  viewer: '#9CA3AF', // grey
+  driver: 'var(--status-success)', // green
 };
 
 interface User {
@@ -45,9 +45,11 @@ interface User {
 
 interface PendingInvite {
   id: number;
+  token: string;
   email: string;
   role: string;
   invited_at: string;
+  expires_at?: string;
 }
 
 interface CurrentUser {
@@ -104,7 +106,7 @@ export function UsersPermissions() {
   };
 
   const loadPendingInvites = () => {
-    fetchData('api/v1/users/invite/')
+    fetchData('api/v1/auth/invites/')
       .then((d: any) => {
         const arr = Array.isArray(d) ? d : (d?.results || []);
         setPendingInvites(arr);
@@ -133,7 +135,7 @@ export function UsersPermissions() {
     setInviting(true);
     try {
       await postData({
-        url: 'api/v1/users/invite/',
+        url: 'api/v1/auth/invites/',
         data: { email: inviteEmail, role: inviteRole },
       });
       toast.success(`Invite sent to ${inviteEmail}`);
@@ -183,16 +185,31 @@ export function UsersPermissions() {
     }
   };
 
-  const handleResendInvite = async (inviteId: number) => {
+  const handleResendInvite = async (token: string) => {
     try {
       await postData({
-        url: `api/v1/users/invite/${inviteId}/resend/`,
+        url: `api/v1/auth/invites/${token}/resend/`,
         data: {},
       });
       toast.success('Invite resent');
     } catch (err) {
       console.error('Failed to resend invite:', err);
       toast.error('Failed to resend invite');
+    }
+  };
+
+  const handleRevokeInvite = async (token: string) => {
+    if (!isAdmin) {
+      toast.error('Only admins can revoke invites');
+      return;
+    }
+    try {
+      await deleteData({ url: `api/v1/auth/invites/${token}/` });
+      toast.success('Invite revoked');
+      loadPendingInvites();
+    } catch (err) {
+      console.error('Failed to revoke invite:', err);
+      toast.error('Failed to revoke invite');
     }
   };
 
@@ -377,7 +394,7 @@ export function UsersPermissions() {
           <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
             <thead>
               <tr>
-                {['Email', 'Role', 'Invited', ''].map(h => (
+                {['Email', 'Role', 'Invited', 'Expires', ''].map(h => (
                   <th key={h} style={{
                     padding: '10px 20px', textAlign: 'left' as const,
                     fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
@@ -402,15 +419,30 @@ export function UsersPermissions() {
                   <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-tertiary)' }}>
                     {new Date(inv.invited_at).toLocaleDateString()}
                   </td>
+                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-tertiary)' }}>
+                    {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '—'}
+                  </td>
                   <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
-                    <button
-                      onClick={() => handleResendInvite(inv.id)}
-                      style={{
-                        background: 'none', border: '1px solid var(--border-subtle)',
-                        color: 'var(--text-tertiary)', padding: '4px 10px',
-                        fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                      }}
-                    >RESEND</button>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => handleResendInvite(inv.token)}
+                        style={{
+                          background: 'none', border: '1px solid var(--border-subtle)',
+                          color: 'var(--text-tertiary)', padding: '4px 10px',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                        }}
+                      >RESEND</button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleRevokeInvite(inv.token)}
+                          style={{
+                            background: 'none', border: '1px solid var(--border-subtle)',
+                            color: 'var(--status-danger)', padding: '4px 10px',
+                            fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                          }}
+                        >REVOKE</button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -1,276 +1,334 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ArrowLeft, Save, Send, FileText, Copy, Mic } from "lucide-react";
-import { CentralQuoteCard } from "@/components/quotes/CentralQuoteCard";
-import { PriceBandSlider } from "@/components/revenue/PriceBandSlider";
-import { CostWaterfall } from "@/components/revenue/CostWaterfall";
-import { WinCurve } from "@/components/revenue/WinCurve";
-import { ScenarioCanvas } from "@/components/quotes/ScenarioCanvas";
-import { QuoteContextChips } from "@/components/quotes/QuoteContextChips";
-import { AgentCard } from "@/components/agent/AgentCard";
+import React, { useState } from 'react';
+import { RouteCalculator } from '@/components/quotes/RouteCalculator';
+import { postData } from '@/lib/Api';
 
-// Mock quote data - in real app would fetch from API
-const mockQuote = {
-  id: "Q-1001",
-  customer: "Makana Foods", 
-  origin: "JHB",
-  destination: "CPT",
-  vehicleClass: "Superlink-30t",
-  weightTons: 30,
-  slaHours: 48,
-  price: 21500,
-  marginPct: 12.4,
-  guardrail: "Within" as const,
-  expiresAt: "2025-09-08T17:00:00Z",
-  confidence: 0.92
-};
+interface RouteAppliedData {
+  distance: number;
+  fuelCost: number;
+  tollCost: number;
+  totalCost: number;
+}
 
-export function QuoteCopilot() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [chatInput, setChatInput] = useState("");
-  const [isListening, setIsListening] = useState(false);
-  const [currentPrice, setCurrentPrice] = useState(mockQuote.price);
-  const [currentMargin, setCurrentMargin] = useState(mockQuote.marginPct);
+export const QuoteCopilot: React.FC = () => {
+  const [routeData, setRouteData] = useState<RouteAppliedData | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [description, setDescription] = useState('');
+  const [quoteAmount, setQuoteAmount] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const isNewQuote = id === 'new';
-  const quoteId = isNewQuote ? 'New Quote' : id || '';
+  const handleApply = (data: RouteAppliedData) => {
+    setRouteData(data);
+    // Auto-populate quote amount with suggested total cost
+    setQuoteAmount(data.totalCost.toFixed(2));
+  };
 
-  const handleSendMessage = () => {
-    if (chatInput.trim()) {
-      console.log("Sending message:", chatInput);
-      setChatInput("");
+  const handleSubmitQuote = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!customerName.trim() || !quoteAmount.trim()) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await postData('/api/v1/quotes/', {
+        customer_name: customerName.trim(),
+        description: description.trim() || 'Route calculated via Copilot',
+        amount: parseFloat(quoteAmount),
+        status: 'pending',
+        metadata: routeData
+          ? {
+              distance_km: routeData.distance,
+              fuel_cost_zar: routeData.fuelCost,
+              toll_cost_zar: routeData.tollCost,
+              calculated_cost_zar: routeData.totalCost,
+            }
+          : null,
+      });
+
+      setSuccess(true);
+      setCustomerName('');
+      setDescription('');
+      setQuoteAmount('');
+      setRouteData(null);
+    } catch (err) {
+      setError('Failed to create quote. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleVoiceInput = () => {
-    setIsListening(!isListening);
-  };
-
-  const handlePriceChange = (newPrice: number) => {
-    setCurrentPrice(newPrice);
-    // Calculate new margin based on price change
-    const baseCost = mockQuote.price * (1 - mockQuote.marginPct / 100);
-    const newMargin = ((newPrice - baseCost) / newPrice) * 100;
-    setCurrentMargin(newMargin);
-  };
-
-  const getGuardrail = (marginPct: number) => {
-    if (marginPct >= 15) return 'Within';
-    if (marginPct >= 12) return 'Near';
-    return 'Below';
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-ZA', {
+      style: 'currency',
+      currency: 'ZAR',
+      minimumFractionDigits: 2,
+    }).format(amount);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Bar */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="flex items-center justify-between"
-      >
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={() => navigate('/quotes')}
-            className="hover-lift"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-body-medium font-body-medium text-foreground">{quoteId}</h1>
-            <p className="text-caption text-muted-foreground">
-              {mockQuote.customer} • {mockQuote.origin} → {mockQuote.destination}
-            </p>
-          </div>
+    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+      <div style={{ marginBottom: 32 }}>
+        <h1 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)', fontSize: 28, fontWeight: 700 }}>
+          Quote Copilot
+        </h1>
+        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14 }}>
+          Calculate route costs and create quotes instantly
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
+        {/* Left Column: Route Calculator */}
+        <div>
+          <RouteCalculator onApply={handleApply} />
         </div>
-        
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="text-caption">
-            <Save className="w-3 h-3 mr-1.5" />
-            Save
-          </Button>
-          <Button variant="outline" size="sm" className="text-caption">
-            <FileText className="w-3 h-3 mr-1.5" />
-            PDF
-          </Button>
-          <Button variant="outline" size="sm" className="text-caption">
-            <Copy className="w-3 h-3 mr-1.5" />
-            Copy
-          </Button>
-          <Button size="sm" className="text-caption">
-            <Send className="w-3 h-3 mr-1.5" />
-            Send
-          </Button>
-        </div>
-      </motion.div>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left Column - Main Content */}
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="lg:col-span-8 space-y-4"
-        >
-          
-          {/* Central Quote Card */}
-          <CentralQuoteCard
-            quoteId={quoteId}
-            customer={mockQuote.customer}
-            lane={{ origin: mockQuote.origin, destination: mockQuote.destination }}
-            slaHours={mockQuote.slaHours}
-            price={currentPrice}
-            marginPct={currentMargin}
-            guardrail={getGuardrail(currentMargin)}
-            expiresAt={mockQuote.expiresAt}
-          />
+        {/* Right Column: Quote Form */}
+        <div>
+          <div className="card" style={{ padding: 24 }}>
+            <h3 style={{ margin: '0 0 20px 0', color: 'var(--text-primary)', fontSize: 18 }}>
+              Create Quote
+            </h3>
 
-          {/* Accordion Sections */}
-          <Accordion type="multiple" defaultValue={["price-band", "win-curve"]} className="space-y-2">
-            <AccordionItem value="price-band" className="border rounded-lg px-4 bg-card">
-              <AccordionTrigger className="text-caption text-muted-foreground py-3 hover:no-underline">
-                Price Band Optimiser
-              </AccordionTrigger>
-              <AccordionContent className="pb-4">
-                <PriceBandSlider />
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="cost-waterfall" className="border rounded-lg px-4 bg-card">
-              <AccordionTrigger className="text-caption text-muted-foreground py-3 hover:no-underline">
-                Cost Waterfall Analysis
-              </AccordionTrigger>
-              <AccordionContent className="pb-4">
-                <CostWaterfall />
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="scenario" className="border rounded-lg px-4 bg-card">
-              <AccordionTrigger className="text-caption text-muted-foreground py-3 hover:no-underline">
-                Scenario Planning
-              </AccordionTrigger>
-              <AccordionContent className="pb-4">
-                <ScenarioCanvas />
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="win-curve" className="border rounded-lg px-4 bg-card">
-              <AccordionTrigger className="text-caption text-muted-foreground py-3 hover:no-underline">
-                Win Probability Analysis
-              </AccordionTrigger>
-              <AccordionContent className="pb-4">
-                <WinCurve />
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </motion.div>
-
-        {/* Right Column - AI Assistant & Context */}
-        <motion.div 
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-          className="lg:col-span-4 space-y-4"
-        >
-          
-          {/* AI Assistant */}
-          <div className="space-y-3">
-            <h3 className="text-caption text-muted-foreground">AI Assistant</h3>
-            <div className="flex gap-2">
-              <Button
-                variant={isListening ? "default" : "outline"}
-                size="icon"
-                onClick={handleVoiceInput}
-                className={`w-8 h-8 ${isListening ? "bg-destructive animate-pulse" : ""}`}
+            {success && (
+              <div
+                style={{
+                  padding: 16,
+                  background: 'var(--status-success-bg)',
+                  border: '1px solid var(--status-success)',
+                  borderRadius: 6,
+                  marginBottom: 20,
+                }}
               >
-                <Mic className="w-3 h-3" />
-              </Button>
-              <Input
-                placeholder="Ask about this quote..."
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                className="flex-1 h-8 text-caption"
-              />
-              <Button size="icon" onClick={handleSendMessage} className="w-8 h-8">
-                <Send className="w-3 h-3" />
-              </Button>
-            </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--status-success)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--status-success)' }}>
+                    Quote created successfully!
+                  </span>
+                </div>
+                <a
+                  href="/quotes"
+                  style={{
+                    fontSize: 14,
+                    color: 'var(--accent-primary)',
+                    textDecoration: 'none',
+                    fontWeight: 500,
+                  }}
+                >
+                  View Quotes Board →
+                </a>
+              </div>
+            )}
+
+            {error && (
+              <div
+                style={{
+                  padding: 12,
+                  background: 'var(--status-danger-bg)',
+                  border: '1px solid var(--status-danger)',
+                  borderRadius: 6,
+                  color: 'var(--status-danger)',
+                  fontSize: 14,
+                  marginBottom: 20,
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitQuote} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label
+                  htmlFor="customer"
+                  style={{
+                    display: 'block',
+                    marginBottom: 8,
+                    fontSize: 14,
+                    color: 'var(--text-secondary)',
+                    fontWeight: 500,
+                  }}
+                >
+                  Customer Name *
+                </label>
+                <input
+                  id="customer"
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Enter customer name"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: 14,
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 6,
+                    background: 'var(--bg-surface)',
+                    color: 'var(--text-primary)',
+                  }}
+                  disabled={submitting}
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="description"
+                  style={{
+                    display: 'block',
+                    marginBottom: 8,
+                    fontSize: 14,
+                    color: 'var(--text-secondary)',
+                    fontWeight: 500,
+                  }}
+                >
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Quote details (optional)"
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: 14,
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 6,
+                    background: 'var(--bg-surface)',
+                    color: 'var(--text-primary)',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                  }}
+                  disabled={submitting}
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="amount"
+                  style={{
+                    display: 'block',
+                    marginBottom: 8,
+                    fontSize: 14,
+                    color: 'var(--text-secondary)',
+                    fontWeight: 500,
+                  }}
+                >
+                  Quote Amount (ZAR) *
+                </label>
+                <input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  value={quoteAmount}
+                  onChange={(e) => setQuoteAmount(e.target.value)}
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: 14,
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 6,
+                    background: 'var(--bg-surface)',
+                    color: 'var(--text-primary)',
+                  }}
+                  disabled={submitting}
+                  required
+                />
+              </div>
+
+              {routeData && (
+                <div
+                  style={{
+                    padding: 16,
+                    background: 'var(--alert-bg)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 6,
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 8, fontWeight: 600 }}>
+                    CALCULATED ROUTE BREAKDOWN
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Distance</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                        {routeData.distance.toFixed(2)} km
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Fuel Cost</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                        {formatCurrency(routeData.fuelCost)}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Toll Cost</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                        {formatCurrency(routeData.tollCost)}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: 13,
+                        paddingTop: 6,
+                        marginTop: 6,
+                        borderTop: '1px solid var(--border-subtle)',
+                      }}
+                    >
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Suggested Total</span>
+                      <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>
+                        {formatCurrency(routeData.totalCost)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{
+                  padding: '12px 24px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: 'white',
+                  background: submitting ? 'var(--text-tertiary)' : 'var(--accent-primary)',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  marginTop: 8,
+                }}
+              >
+                {submitting ? 'Creating Quote...' : 'Create Quote'}
+              </button>
+            </form>
           </div>
-
-          {/* Parsed Context */}
-          <div>
-            <h3 className="text-caption text-muted-foreground mb-3">Context</h3>
-            <QuoteContextChips quote={mockQuote} />
-          </div>
-
-          {/* Agent Feed */}
-          <div className="space-y-3">
-            <h3 className="text-caption text-muted-foreground">Agent Feed</h3>
-            
-            <div className="space-y-3">
-              <AgentCard
-                id="margin-analysis"
-                title="Margin Analysis"
-                what="Current margin at 12.4% is near policy floor. Fuel costs account for 22% of total cost base."
-                impactZAR={2650}
-                confidence={0.89}
-                why={[
-                  "Current margin at 12.4% is near policy floor",
-                  "Fuel costs account for 22% of total cost base"
-                ]}
-                actions={[
-                  { id: "evidence", label: "Evidence", type: "secondary" },
-                  { id: "pricing", label: "Adjust", type: "primary" }
-                ]}
-                className="text-caption"
-              />
-
-              <AgentCard
-                id="route-optimization"
-                title="Route Optimisation"
-                what="Route B shows +R550 profit delta via N1 bypass. 35min longer ETA but avoids peak traffic."
-                impactZAR={550}
-                confidence={0.74}
-                why={[
-                  "Route B shows +R550 profit delta via N1 bypass",
-                  "35min longer ETA but avoids peak traffic"
-                ]}
-                actions={[
-                  { id: "route", label: "Select", type: "primary" },
-                  { id: "map", label: "Map", type: "secondary" }
-                ]}
-                className="text-caption"
-              />
-
-              <AgentCard
-                id="vehicle-driver"
-                title="Vehicle & Driver"
-                what="V-04 + D-12 recommended pairing. Driver familiar with CPT route (8 trips YTD)."
-                impactZAR={0}
-                confidence={0.95}
-                why={[
-                  "V-04 + D-12 recommended pairing",
-                  "Driver familiar with CPT route (8 trips YTD)"
-                ]}
-                actions={[
-                  { id: "vehicle", label: "Assign", type: "primary" }
-                ]}
-                className="text-caption"
-              />
-            </div>
-          </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
-}
+};
+
+export default QuoteCopilot;

@@ -9,6 +9,7 @@ import {
   Truck,
   FileText,
   Settings,
+  Sparkles,
   ChevronDown,
   ChevronRight,
   LogOut,
@@ -35,6 +36,7 @@ import {
 import { NAVIGATION_ITEMS, type NavigationItem } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { usePost } from "@/hooks/usePost";
+import useFetch from "@/hooks/useFetch";
 
 const iconMap = {
   LayoutDashboard,
@@ -42,6 +44,7 @@ const iconMap = {
   Tower: Radio,
   Building2,
   Banknote,
+  Sparkles,
   Truck,
   FileText,
   Settings,
@@ -52,6 +55,12 @@ export function LeftNav() {
   const collapsed = state === 'collapsed';
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+
+  // Fetch eligible invoice count for Capital badge
+  const { data: capitalData } = useFetch<{ eligible_invoices_count: number }>(
+    '/api/dashboard/capital/',
+    { refetchInterval: 60000, retry: false } // Refresh every minute
+  );
 
   useEffect(() => {
     const loadUser = () => {
@@ -140,16 +149,39 @@ export function LeftNav() {
   };
 
   return (
-    <Sidebar className="border-r-0 bg-sidebar-background mt-16" style={{ "--sidebar-width": "14rem" } as React.CSSProperties}>
-      <SidebarContent>
+    <Sidebar className="border-r-0 bg-sidebar" style={{ "--sidebar-width": "240px" } as React.CSSProperties}>
+      <SidebarContent className="bg-sidebar">
+        {/* TruckWys Logo at Top */}
+        <div className="p-6 border-b border-slate-800">
+          <div className="flex items-center justify-center">
+            {!collapsed ? (
+              <img
+                src="/brand/truckwys-logo-transparent.png"
+                alt="TruckWys"
+                className="h-8 w-auto"
+              />
+            ) : (
+              <img
+                src="/favicon.png"
+                alt="TruckWys"
+                className="w-8 h-8"
+              />
+            )}
+          </div>
+        </div>
+
         {/* Navigation Menu */}
-        <SidebarGroup className="py-4 px-6">
+        <SidebarGroup className="py-4 px-3">
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {NAVIGATION_ITEMS.map((item) => {
                 const IconComponent = iconMap[item.icon as keyof typeof iconMap];
                 const hasChildren = 'children' in item;
                 const isExpanded = expandedMenu === item.id;
+                const isItemActive = isParentActive(item);
+
+                const eligibleCount = item.id === 'capital' && capitalData?.eligible_invoices_count ? capitalData.eligible_invoices_count : 0;
+                const showBadge = item.id === 'capital' && eligibleCount > 0;
 
                 return (
                   <div key={item.id}>
@@ -158,12 +190,15 @@ export function LeftNav() {
                         <div
                           onClick={() => handleMenuClick(item.id)}
                           className={cn(
-                            getParentClassName(item),
-                            "flex items-center justify-between cursor-pointer rounded-md px-2 py-2"
+                            "flex items-center justify-between cursor-pointer rounded-md px-3 py-2.5 text-sm transition-all",
+                            "border-l-3 border-transparent",
+                            isItemActive
+                              ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-primary border-l-3"
+                              : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                           )}
                         >
-                          <div className="flex items-center">
-                            <IconComponent className="w-5 h-5 mr-3 flex-shrink-0" />
+                          <div className="flex items-center gap-3">
+                            <IconComponent className="w-5 h-5 flex-shrink-0" />
                             {!collapsed && (
                               <span className="truncate flex-1">{item.label}</span>
                             )}
@@ -177,14 +212,27 @@ export function LeftNav() {
                           )}
                         </div>
                       ) : (
-                        <SidebarMenuButton asChild>
+                        <SidebarMenuButton asChild className="h-auto p-0">
                           <NavLink
                             to={'href' in item ? item.href : '#'}
-                            className={getNavClassName('href' in item ? item.href : '#')}
+                            className={cn(
+                              "flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-sm transition-all",
+                              "border-l-3 border-transparent",
+                              isActive('href' in item ? item.href : '#')
+                                ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-primary border-l-3"
+                                : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                            )}
                           >
-                            <IconComponent className="w-5 h-5 mr-3 flex-shrink-0" />
-                            {!collapsed && (
-                              <span className="truncate">{item.label}</span>
+                            <div className="flex items-center gap-3">
+                              <IconComponent className="w-5 h-5 flex-shrink-0" />
+                              {!collapsed && (
+                                <span className="truncate">{item.label}</span>
+                              )}
+                            </div>
+                            {!collapsed && showBadge && (
+                              <span className="flex items-center justify-center w-5 h-5 bg-primary text-white text-xs font-bold rounded-full">
+                                {eligibleCount}
+                              </span>
                             )}
                           </NavLink>
                         </SidebarMenuButton>
@@ -193,13 +241,13 @@ export function LeftNav() {
 
                     {/* Sub-menu */}
                     {hasChildren && isExpanded && !collapsed && (
-                      <div className="ml-8 mt-2 space-y-1">
+                      <div className="ml-11 mt-1 space-y-0.5">
                         {'children' in item && item.children.map((child) => (
-                          <div key={child.id} className="py-1">
+                          <div key={child.id}>
                             <NavLink
                               to={child.href}
                               className={cn(
-                                "flex items-center px-2 py-2 text-sm rounded-md transition-smooth",
+                                "flex items-center px-3 py-2 text-sm rounded-md transition-all",
                                 isActive(child.href)
                                   ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                                   : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
@@ -219,36 +267,36 @@ export function LeftNav() {
         </SidebarGroup>
 
         {/* User Info Footer */}
-        <div className="mt-auto p-4 border-t border-sidebar-border">
+        <div className="mt-auto p-4 border-t border-slate-800">
           {(() => {
             const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "US";
 
             return (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-3 w-full hover:bg-sidebar-accent/50 p-2 rounded-lg transition-smooth text-left">
-                    <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center shrink-0">
+                  <button className="flex items-center gap-3 w-full hover:bg-sidebar-accent/50 p-2 rounded-lg transition-all text-left">
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center shrink-0">
                       <span className="text-xs font-medium text-white">{initials}</span>
                     </div>
                     {!collapsed && (
                       <div className="min-w-0 flex-1">
-                        <div className="text-caption font-body-medium text-sidebar-foreground truncate capitalize">
+                        <div className="text-sm font-medium text-sidebar-accent-foreground truncate capitalize">
                           {user?.username || "User"}
                         </div>
-                        <div className="text-xs text-muted-foreground truncate">
+                        <div className="text-xs text-sidebar-foreground/70 truncate">
                           {user?.role || "Profile"}
                         </div>
                       </div>
                     )}
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-full bg-sidebar-background border-sidebar-border">
-                  <DropdownMenuItem className="cursor-pointer hover:bg-sidebar-accent" onClick={() => window.location.href = '/settings/profile'}>
+                <DropdownMenuContent align="end" className="w-56 bg-white border-slate-200">
+                  <DropdownMenuItem className="cursor-pointer hover:bg-slate-100" onClick={() => window.location.href = '/settings/profile'}>
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>View Profile</span>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-sidebar-border" />
-                  <DropdownMenuItem className="cursor-pointer text-destructive hover:bg-destructive/10" onClick={handleLogout}>
+                  <DropdownMenuSeparator className="bg-slate-200" />
+                  <DropdownMenuItem className="cursor-pointer text-red-600 hover:bg-red-50" onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
                   </DropdownMenuItem>

@@ -1,397 +1,515 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Users, ArrowUpDown, TrendingUp } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatCurrency } from "@/lib/formatters";
-import { DriverAICopilot } from "@/components/fleet/DriverAICopilot";
-import useFetch from "@/hooks/useFetch";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { fetchData, postData, patchData } from '../lib/Api';
 
 interface Driver {
   id: number;
-  driver_id: string;
-  driver_name: string;
-  vehicle: string;
-  on_time_percentage: number;
-  safety_score: number;
-  fuel_efficiency: number;
-  margin_per_trip: number;
-  avoidable_cost: number;
-  roi_score: number;
-  driver_status: string;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
   status: string;
+  trips_this_month?: number;
+  revenue_generated?: number;
+  efficiency_score?: number;
+  phone?: string;
+  license_number?: string;
+  license_expiry?: string;
+  license_state?: string;
+  medical_card_expiry?: string;
+  hire_date?: string;
+  emergency_contact?: string;
+  emergency_phone?: string;
 }
+
+interface DriverOverview {
+  total_drivers: number;
+  active_drivers: number;
+  avg_revenue_per_driver: number;
+}
+
+interface LeaderboardEntry {
+  driver_id: number;
+  driver_name: string;
+  revenue: number;
+  trips: number;
+  efficiency_score: number;
+  rank: number;
+}
+
+const STATUS_COLOR: Record<string, string> = {
+  ACTIVE: 'var(--accent-primary)',
+  INACTIVE: 'var(--text-tertiary)',
+  ON_LEAVE: 'var(--status-warning)',
+};
+
+const formatZAR = (v: number) =>
+  'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+const getDriverName = (d: Driver) => {
+  if (d.first_name && d.last_name) return `${d.first_name} ${d.last_name}`;
+  if (d.name) return d.name;
+  if (d.first_name) return d.first_name;
+  return `Driver ${d.id}`;
+};
 
 export default function Drivers() {
   const navigate = useNavigate();
-  const [sortField, setSortField] = useState<keyof Driver | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [filterStatus, setFilterStatus] = useState<"all" | "top" | "coaching" | "inactive">("all");
+  const location = useLocation();
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [overview, setOverview] = useState<DriverOverview | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [addForm, setAddForm] = useState({
+    first_name: '', last_name: '', email: '', phone: '',
+    license_number: '', license_expiry: '', license_state: 'GP',
+    hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE',
+  });
+  const [editDriver, setEditDriver] = useState<Driver | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: driversData, isLoading: driversLoading } = useFetch(`api/drivers/leaderboard/?filter=${filterStatus}`);
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      fetchData('api/v1/drivers/'),
+      fetchData('api/v1/drivers/overview/').catch(() => null),
+      fetchData('api/v1/drivers/leaderboard/').catch(() => null),
+    ]).then(([driversData, overviewData, leaderboardData]) => {
+      const driverList = Array.isArray(driversData) ? driversData : (driversData?.results || []);
 
-  const drivers: Driver[] = driversData?.data || [];
+      // Parse leaderboard data
+      const lbData = Array.isArray(leaderboardData) ? leaderboardData : (leaderboardData?.data || []);
+      const leaderboardEntries = lbData.map((d: any, i: number) => ({
+        driver_id: d.id || d.driver_id || i,
+        driver_name: d.driver_name || d.name || `Driver ${d.id}`,
+        revenue: d.revenue || d.revenue_generated || 0,
+        trips: d.trips || d.trips_completed || 0,
+        efficiency_score: d.efficiency_score || d.on_time_percentage || 0,
+        rank: d.rank || i + 1,
+      }));
 
-  const handleSort = (field: keyof Driver) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("desc");
-    }
+      // Merge leaderboard data into driver list
+      const driversWithPerformance = driverList.map((driver: Driver) => {
+        const leaderboardEntry = leaderboardEntries.find((lb: LeaderboardEntry) => lb.driver_id === driver.id);
+        if (leaderboardEntry && !driver.efficiency_score) {
+          return { ...driver, efficiency_score: leaderboardEntry.efficiency_score };
+        }
+        return driver;
+      });
+
+      setDrivers(driversWithPerformance);
+      setLeaderboard(leaderboardEntries);
+
+      if (overviewData?.kpi_cards) {
+        const cards = overviewData.kpi_cards as any[];
+        const findVal = (kw: string) => {
+          const c = cards.find((c: any) => (c.key || c.label || '').toString().toLowerCase().includes(kw));
+          return parseFloat(c?.value) || 0;
+        };
+        setOverview({
+          total_drivers: findVal('total') || driversData?.count || driverList.length,
+          active_drivers: findVal('active') || driverList.filter((d: any) => d.status === 'ACTIVE').length,
+          avg_revenue_per_driver: findVal('revenue') || findVal('avg') || 0,
+        });
+      } else if (overviewData) {
+        setOverview(overviewData);
+      } else {
+        setOverview({
+          total_drivers: driverList.length,
+          active_drivers: driverList.filter((d: any) => d.status === 'ACTIVE').length,
+          avg_revenue_per_driver: 0,
+        });
+      }
+    }).catch(() => {
+      setDrivers([]);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const filtered = drivers.filter(d => statusFilter === 'All' || d.status === statusFilter);
+
+  const rankColor = (rank: number) => {
+    if (rank === 1) return 'var(--accent-primary)';
+    if (rank === 2) return 'var(--status-warning)';
+    return 'var(--text-secondary)';
   };
 
-  // Client-side sorting for now
-  const sortedDrivers = [...drivers].sort((a, b) => {
-    if (!sortField) return 0;
-    const aVal = a[sortField];
-    const bVal = b[sortField];
-    // Handle undefined/null
-    if (aVal === undefined || aVal === null) return 1;
-    if (bVal === undefined || bVal === null) return -1;
-
-    const direction = sortDirection === "asc" ? 1 : -1;
-    return aVal > bVal ? direction : -direction;
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    background: 'none', border: 'none',
+    borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
+    color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+    fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em',
+    textTransform: 'uppercase', padding: '10px 18px', cursor: 'pointer', marginBottom: -1,
   });
 
-  const getROIColor = (score: number) => {
-    if (score >= 80) return "text-success";
-    if (score >= 70) return "text-warning";
-    return "text-destructive";
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status?.toUpperCase()) {
-      case "ACTIVE":
-        return "bg-success/10 text-success border-success/20";
-      case "OFF DUTY":
-        return "bg-muted text-muted-foreground border-muted";
-      case "ON LEAVE":
-        return "bg-warning/10 text-warning border-warning/20";
-      case "EXPIRING COMPLIANCE":
-        return "bg-danger/10 text-danger border-danger/20";
-      default:
-        return "bg-muted text-muted-foreground border-muted";
-    }
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return "text-success";
-    if (score >= 75) return "text-warning";
-    return "text-destructive";
-  };
-
-  // Calculations based on fetched data
-  const avgOnTime = drivers.length > 0 ? drivers.reduce((sum, d) => sum + (d.on_time_percentage || 0), 0) / drivers.length : 0;
-  const avgSafety = drivers.length > 0 ? drivers.reduce((sum, d) => sum + (d.safety_score || 0), 0) / drivers.length : 0;
-  const avgFuel = drivers.length > 0 ? drivers.reduce((sum, d) => sum + (d.fuel_efficiency || 0), 0) / drivers.length : 0;
-  const avgMargin = drivers.length > 0 ? drivers.reduce((sum, d) => sum + (d.margin_per_trip || 0), 0) / drivers.length : 0;
+  if (loading) return (
+    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div>
+      {/* Page header */}
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1 className="text-display-2 font-display-semibold text-foreground">
-            Driver Intelligence Hub
-          </h1>
-          <p className="text-caption text-muted-foreground mt-1">
-            Profit impact, efficiency, and coaching insights
-          </p>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
         </div>
-        <Badge className="bg-success/10 text-success border-success/20">
-          {driversData?.total_count || 0} Active Drivers
-        </Badge>
+        <button className="btn-action" onClick={() => setShowAddForm(true)}>+ ADD DRIVER</button>
       </div>
 
-      {/* Fleet KPIs */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <Card className="bg-card border-border hover:shadow-glow transition-smooth">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-caption text-muted-foreground">
-              Fleet Avg. On-Time %
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-body font-body-medium text-foreground text-tabular">
-              {avgOnTime.toFixed(1)}%
-            </div>
-            <p className="text-caption text-success mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" />
-              +2.3% vs last month
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border hover:shadow-glow transition-smooth">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-caption text-muted-foreground">
-              Fleet Avg. Safety
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-body font-body-medium text-foreground text-tabular">
-              {avgSafety.toFixed(0)}
-            </div>
-            <p className="text-caption text-success mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" />
-              +4 points vs baseline
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border hover:shadow-glow transition-smooth">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-caption text-muted-foreground">
-              Fleet Avg. Fuel Efficiency
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-body font-body-medium text-foreground text-tabular">
-              {avgFuel.toFixed(0)}
-            </div>
-            <p className="text-caption text-muted-foreground mt-1">km/L efficiency score</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border hover:shadow-glow transition-smooth">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-caption text-muted-foreground">
-              Fleet Avg. Margin
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-body font-body-medium text-foreground text-tabular">
-              {formatCurrency(avgMargin)}
-            </div>
-            <p className="text-caption text-muted-foreground mt-1">per trip, last 30 days</p>
-          </CardContent>
-        </Card>
+      {/* Tabs */}
+      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 20, display: 'flex' }}>
+        <button style={tabStyle(false)} onClick={() => navigate('/fleet/vehicles')}>Vehicles</button>
+        <button style={tabStyle(true)}>Drivers</button>
       </div>
 
-      {/* AI Summary Banner */}
-      <Card className="bg-gradient-to-r from-brand-500/10 to-brand-300/10 border-brand-500/20">
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-start gap-3">
-            <div className="bg-brand-500/20 p-2 rounded-lg">
-              <Users className="w-4 h-4 text-brand-500" />
-            </div>
-            <div className="flex-1">
-              <p className="text-body text-foreground">
-                Fleet performance improved by <span className="font-body-medium text-success">+3.8% margin</span> this month.
-                Top driver Mike Johnson saved <span className="font-body-medium text-success">{formatCurrency(4500)}</span> in fuel costs.
-                <span className="text-warning font-body-medium"> 2 drivers flagged</span> for coaching due to idle time increase.
-              </p>
-            </div>
+      {/* KPI strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+        {[
+          { label: 'Total Drivers', value: overview?.total_drivers ?? drivers.length, color: 'var(--text-primary)' },
+          { label: 'Active', value: overview?.active_drivers ?? drivers.filter(d => d.status === 'ACTIVE').length, color: 'var(--accent-primary)' },
+          { label: 'Avg Revenue per Driver', value: formatZAR(overview?.avg_revenue_per_driver ?? 0), color: 'var(--text-primary)' },
+        ].map(k => (
+          <div key={k.label} className="card metric-card">
+            <div className="card-header"><span className="card-title">{k.label}</span></div>
+            <div className="metric-value" style={{ fontSize: 28, color: k.color }}>{k.value}</div>
           </div>
-        </CardContent>
-      </Card>
+        ))}
+      </div>
 
-      {/* Leaderboard Table */}
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-muted-foreground flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Performance Leaderboard
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant={filterStatus === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilterStatus("all")}
-              >
-                All Drivers
-              </Button>
-              <Button
-                variant={filterStatus === "top" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilterStatus("top")}
-              >
-                Top Performers
-              </Button>
-              <Button
-                variant={filterStatus === "coaching" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilterStatus("coaching")}
-              >
-                Needs Coaching
-              </Button>
-              <Button
-                variant={filterStatus === "inactive" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilterStatus("inactive")}
-              >
-                Inactive
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-muted-foreground px-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSort("id")}
-                    className="flex items-center gap-1 hover:text-foreground h-7 px-2 text-xs"
-                  >
-                    ID
-                    <ArrowUpDown className="w-3 h-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className="text-muted-foreground px-2 text-xs">Name</TableHead>
-                <TableHead className="text-muted-foreground px-2 text-xs">Vehicle</TableHead>
-                <TableHead className="text-muted-foreground text-right px-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSort("on_time_percentage")}
-                    className="flex items-center gap-1 hover:text-foreground ml-auto h-7 px-2 text-xs"
-                  >
-                    On-Time
-                    <ArrowUpDown className="w-3 h-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className="text-muted-foreground text-right px-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSort("safety_score")}
-                    className="flex items-center gap-1 hover:text-foreground ml-auto h-7 px-2 text-xs"
-                  >
-                    Safety
-                    <ArrowUpDown className="w-3 h-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className="text-muted-foreground text-right px-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSort("fuel_efficiency")}
-                    className="flex items-center gap-1 hover:text-foreground ml-auto h-7 px-2 text-xs"
-                  >
-                    Fuel
-                    <ArrowUpDown className="w-3 h-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className="text-muted-foreground text-right px-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSort("margin_per_trip")}
-                    className="flex items-center gap-1 hover:text-foreground ml-auto h-7 px-2 text-xs"
-                  >
-                    Margin
-                    <ArrowUpDown className="w-3 h-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className="text-muted-foreground text-right px-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSort("avoidable_cost")}
-                    className="flex items-center gap-1 hover:text-foreground ml-auto h-7 px-2 text-xs"
-                  >
-                    Avoidable Cost
-                    <ArrowUpDown className="w-3 h-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className="text-muted-foreground text-right px-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSort("roi_score")}
-                    className="flex items-center gap-1 hover:text-foreground ml-auto h-7 px-2 text-xs"
-                  >
-                    ROI Score
-                    <ArrowUpDown className="w-3 h-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className="text-muted-foreground px-2 text-xs">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {driversLoading ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center py-10">
-                    Loading drivers...
-                  </TableCell>
-                </TableRow>
-              ) : sortedDrivers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center py-10">
-                    No drivers found.
-                  </TableCell>
-                </TableRow>
+      {/* Status Filter Tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {['All', 'ACTIVE', 'INACTIVE', 'ON_LEAVE'].map(status => {
+          const isActive = statusFilter === status;
+          return (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              style={{
+                background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                padding: '7px 14px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                borderRadius: 2,
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                fontWeight: isActive ? 600 : 400,
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              {['Name', 'License', 'Status', 'Trips MTD', 'Revenue Generated', 'Performance', ''].map(h => (
+                <th key={h} style={{
+                  padding: '10px 20px', textAlign: 'left',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
+                  letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                  borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              drivers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: 0 }}>
+                    <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>👤</div>
+                      <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>
+                        No drivers yet
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+                        Get started by adding your first driver to your team
+                      </div>
+                      <button onClick={() => setShowAddForm(true)} className="btn-action">
+                        ADD DRIVER
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               ) : (
-                sortedDrivers.map((driver) => (
-                  <TableRow
-                    key={driver.id}
-                    className="cursor-pointer hover:bg-muted/50 transition-smooth"
-                    onClick={() => navigate(`/fleet/drivers/${driver.id}`)}
-                  >
-                    <TableCell className="font-mono text-foreground font-medium px-2 py-3">
-                      {driver.id}
-                    </TableCell>
-                    <TableCell className="text-foreground px-2 py-3">
-                      {driver.driver_name.trim() || driver.driver_id}
-                    </TableCell>
-                    <TableCell className="font-mono text-foreground px-2 py-3">
-                      {driver.vehicle || "-"}
-                    </TableCell>
-                    <TableCell className="text-right text-tabular px-2 py-3">
-                      <span className={getScoreColor(driver.on_time_percentage || 0)}>
-                        {driver.on_time_percentage ? `${driver.on_time_percentage.toFixed(1)}%` : "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right text-tabular px-2 py-3">
-                      <span className={getScoreColor(driver.safety_score || 0)}>
-                        {driver.safety_score || "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right text-tabular px-2 py-3">
-                      <span className={getScoreColor(driver.fuel_efficiency || 0)}>
-                        {driver.fuel_efficiency || "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right text-tabular text-foreground px-2 py-3">
-                      {driver.margin_per_trip ? formatCurrency(driver.margin_per_trip) : "-"}
-                    </TableCell>
-                    <TableCell className="text-right text-tabular text-danger px-2 py-3">
-                      {driver.avoidable_cost ? `${formatCurrency(driver.avoidable_cost)}/mo` : "-"}
-                    </TableCell>
-                    <TableCell className="text-right text-tabular px-2 py-3">
-                      <span className={`font-body-medium ${getROIColor(driver.roi_score || 0)}`}>
-                        {driver.roi_score || "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-2 py-3">
-                      <Badge variant="outline" className={getStatusColor(driver.status)}>
-                        {driver.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40, fontSize: 13 }}>No drivers match your filters</td></tr>
+              )
+            ) : filtered.map((d, idx) => {
+              const statusDotColor = d.status === 'ACTIVE' ? 'var(--status-success)' : d.status === 'ON_LEAVE' ? 'var(--status-warning)' : 'var(--text-tertiary)';
+              const efficiencyScore = d.efficiency_score || 0;
 
-      {/* AI Copilot */}
-      <DriverAICopilot />
+              return (
+                <tr
+                  key={d.id}
+                  style={{ cursor: 'pointer', borderBottom: idx < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}
+                  onClick={() => navigate(`/fleet/drivers/${d.id}`)}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <td style={{ padding: '13px 20px', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: statusDotColor,
+                        flexShrink: 0
+                      }} />
+                      {getDriverName(d)}
+                    </div>
+                  </td>
+                  <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                    {d.license_number || '—'}
+                  </td>
+                  <td style={{ padding: '13px 20px' }}>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 10,
+                      color: STATUS_COLOR[d.status] || 'var(--text-secondary)',
+                      textTransform: 'uppercase',
+                    }}>
+                      {d.status?.replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                    {d.trips_this_month ?? 0}
+                  </td>
+                  <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                    {d.revenue_generated ? formatZAR(d.revenue_generated) : '—'}
+                  </td>
+                  <td style={{ padding: '13px 20px' }}>
+                    {efficiencyScore > 0 ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, maxWidth: 120, height: 6, background: 'var(--bg-surface-hover)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{
+                            width: `${Math.min(efficiencyScore, 100)}%`,
+                            height: '100%',
+                            background: 'var(--accent-primary)',
+                            borderRadius: 3,
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-primary)', fontWeight: 600, minWidth: 32, textAlign: 'right' }}>
+                          {efficiencyScore}
+                        </span>
+                      </div>
+                    ) : (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '13px 20px', textAlign: 'right' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditDriver(d);
+                        setEditForm({
+                          license_number: d.license_number || '',
+                          license_expiry: d.license_expiry || '',
+                          license_state: d.license_state || 'GP',
+                          medical_card_expiry: d.medical_card_expiry || '',
+                          hire_date: d.hire_date || '',
+                          status: d.status || 'ACTIVE',
+                          emergency_contact: d.emergency_contact || '',
+                          emergency_phone: d.emergency_phone || d.phone || '',
+                        });
+                      }}
+                      style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
+                    >EDIT</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Add Driver Slide-out */}
+      {showAddForm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setShowAddForm(false)} />
+          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Add Driver</div>
+              <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            {[
+              { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan' },
+              { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter' },
+              { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
+              { key: 'phone', label: 'Phone', placeholder: 'e.g. 082 123 4567' },
+              { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001' },
+              { key: 'license_expiry', label: 'License Expiry', type: 'date' },
+              { key: 'hire_date', label: 'Hire Date', type: 'date' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <input
+                  type={f.type || 'text'}
+                  placeholder={f.placeholder}
+                  value={(addForm as any)[f.key]}
+                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
+            {[
+              { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'] },
+              { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <select
+                  value={(addForm as any)[f.key]}
+                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                >
+                  {f.options.map(o => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}
+                </select>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+              <button
+                disabled={saving}
+                onClick={async () => {
+                  if (!addForm.first_name || !addForm.last_name || !addForm.license_number || !addForm.license_expiry) {
+                    alert('Please fill in all required fields');
+                    return;
+                  }
+                  setSaving(true);
+                  try {
+                    // Create user first, then driver
+                    const username = `${addForm.first_name.toLowerCase()}.${addForm.last_name.toLowerCase()}`.replace(/\s+/g, '');
+                    const user = await postData({ url: 'api/v1/users/', data: {
+                      username,
+                      email: addForm.email || `${username}@truckwys.co.za`,
+                      first_name: addForm.first_name,
+                      last_name: addForm.last_name,
+                      password: 'TruckWys2026!',
+                    }});
+                    await postData({ url: 'api/v1/drivers/', data: {
+                      user: user.id,
+                      license_number: addForm.license_number,
+                      license_expiry: addForm.license_expiry,
+                      license_state: addForm.license_state,
+                      hire_date: addForm.hire_date,
+                      status: addForm.status,
+                      emergency_phone: addForm.phone,
+                    }});
+                    setShowAddForm(false);
+                    setAddForm({ first_name: '', last_name: '', email: '', phone: '', license_number: '', license_expiry: '', license_state: 'GP', hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE' });
+                    // Refresh
+                    const d = await fetchData('api/v1/drivers/');
+                    setDrivers(Array.isArray(d) ? d : d?.results || []);
+                  } catch (e: any) { alert(e?.message || 'Failed to create driver'); }
+                  setSaving(false);
+                }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+              >
+                {saving ? 'SAVING...' : 'CREATE DRIVER'}
+              </button>
+              <button
+                onClick={() => setShowAddForm(false)}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Driver Slide-out */}
+      {editDriver && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditDriver(null)} />
+          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Driver</div>
+              <button onClick={() => setEditDriver(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 2, marginBottom: 16, fontSize: 12, color: 'var(--text-secondary)' }}>
+              <div style={{ marginBottom: 4 }}><strong>Name:</strong> {getDriverName(editDriver)}</div>
+              {editDriver.first_name && <div><strong>Email:</strong> {editDriver.first_name.toLowerCase()}.{editDriver.last_name?.toLowerCase()}@truckwys.co.za</div>}
+            </div>
+            {error && (
+              <div style={{ padding: 12, background: 'var(--status-danger)', color: 'var(--bg-deep)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+                {error}
+              </div>
+            )}
+            {[
+              { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001' },
+              { key: 'license_expiry', label: 'License Expiry', type: 'date' },
+              { key: 'medical_card_expiry', label: 'Medical Card Expiry', type: 'date' },
+              { key: 'emergency_contact', label: 'Emergency Contact', placeholder: 'e.g. Jane Doe' },
+              { key: 'emergency_phone', label: 'Emergency Phone', placeholder: 'e.g. 082 123 4567' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <input
+                  type={f.type || 'text'}
+                  placeholder={f.placeholder}
+                  value={(editForm as any)[f.key]}
+                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
+            {[
+              { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'] },
+              { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <select
+                  value={(editForm as any)[f.key]}
+                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                >
+                  {f.options.map(o => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}
+                </select>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+              <button
+                disabled={saving}
+                onClick={async () => {
+                  setSaving(true);
+                  setError(null);
+                  try {
+                    await patchData({ url: `api/v1/drivers/${editDriver.id}/`, data: editForm });
+                    setEditDriver(null);
+                    setEditForm({});
+                    const d = await fetchData('api/v1/drivers/');
+                    setDrivers(Array.isArray(d) ? d : d?.results || []);
+                  } catch (e: any) {
+                    setError(e?.message || 'Failed to update driver');
+                  }
+                  setSaving(false);
+                }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+              >
+                {saving ? 'SAVING...' : 'UPDATE DRIVER'}
+              </button>
+              <button
+                onClick={() => setEditDriver(null)}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

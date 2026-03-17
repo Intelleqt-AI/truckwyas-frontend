@@ -1,511 +1,721 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Download, ChevronDown, ChevronRight, Sparkles, FileText } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatCurrency, formatPercentage } from "@/lib/formatters";
-import financialReportsData from "@/mocks/financial-reports.json";
+import { useState, useEffect } from "react";
+import { fetchData } from "@/lib/Api";
+import { formatCurrency, formatPercent } from "@/lib/formatters";
 
-interface CollapsibleRowProps {
-  name: string;
-  actuals: number;
-  budget: number;
-  forecast: number;
-  children?: any[];
-  level?: number;
-  aiCommentary?: string;
-  isPercentage?: boolean;
-}
-
-function CollapsibleRow({ name, actuals, budget, forecast, children, level = 0, aiCommentary, isPercentage = false }: CollapsibleRowProps) {
-  const [isOpen, setIsOpen] = useState(level === 0);
-  const hasChildren = children && children.length > 0;
-  
-  const actualVsBudget = actuals - budget;
-  const actualVsBudgetPct = budget !== 0 ? (actualVsBudget / budget) : 0;
-  
-  const formatValue = (val: number) => isPercentage ? formatPercentage(val / 100, 1) : formatCurrency(val);
-  
-  return (
-    <>
-      <TableRow className={`${level === 0 ? 'bg-accent/30 font-display-semibold' : level === 1 ? 'bg-accent/10' : ''}`}>
-        <TableCell className={`${level > 0 ? `pl-${4 + level * 8}` : 'pl-4'}`}>
-          <div className="flex items-center gap-2">
-            {hasChildren && (
-              <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  </Button>
-                </CollapsibleTrigger>
-              </Collapsible>
-            )}
-            <span className={level === 0 ? 'text-foreground' : 'text-muted-foreground'}>{name}</span>
-            {aiCommentary && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Sparkles className="h-4 w-4 text-brand-500" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="text-caption">{aiCommentary}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-        </TableCell>
-        <TableCell className="text-right font-mono">{formatValue(actuals)}</TableCell>
-        <TableCell className="text-right font-mono text-muted-foreground">{formatValue(budget)}</TableCell>
-        <TableCell className="text-right font-mono text-muted-foreground">{formatValue(forecast)}</TableCell>
-        <TableCell className="text-right font-mono">
-          {isPercentage ? formatPercentage(actualVsBudgetPct, 1) : formatCurrency(actualVsBudget)}
-        </TableCell>
-        <TableCell className="text-right">
-          <span className={actualVsBudgetPct > 0 ? 'text-success-500' : actualVsBudgetPct < 0 ? 'text-danger-500' : 'text-muted-foreground'}>
-            {formatPercentage(actualVsBudgetPct, 1)}
-          </span>
-        </TableCell>
-      </TableRow>
-      {hasChildren && isOpen && children.map((child, idx) => (
-        <CollapsibleRow
-          key={idx}
-          name={child.name}
-          actuals={child.actuals}
-          budget={child.budget}
-          forecast={child.forecast}
-          children={child.children}
-          level={level + 1}
-          aiCommentary={child.aiCommentary}
-        />
-      ))}
-    </>
-  );
-}
+const TABS = [
+  { id: 'pl', label: 'P&L' },
+  { id: 'cashflow', label: 'Cash Flow' },
+  { id: 'customer', label: 'Customer' },
+  { id: 'aging', label: 'Aging' },
+  { id: 'capital', label: 'Capital' },
+];
 
 export default function FinanceReports() {
-  const data = financialReportsData;
-  
-  const [periodType, setPeriodType] = useState("Monthly");
-  const [selectedMonth, setSelectedMonth] = useState("Oct");
-  const [selectedYear, setSelectedYear] = useState("2025");
+  const [tab, setTab] = useState('pl');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const quarters = ["Q1", "Q2", "Q3", "Q4"];
-  const years = ["2023", "2024", "2025"];
-  
-  const getPeriodOptions = () => {
-    if (periodType === "Quarterly") return quarters;
-    if (periodType === "Yearly") return years;
-    return months;
+  // Data states
+  const [financeData, setFinanceData] = useState<any>(null);
+  const [cashflowData, setCashflowData] = useState<any>(null);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [agingData, setAgingData] = useState<any>(null);
+  const [facilities, setFacilities] = useState<any>(null);
+  const [advances, setAdvances] = useState<any[]>([]);
+
+  const exportToCSV = () => {
+    let csvContent = '';
+    let filename = '';
+
+    switch(tab) {
+      case 'pl':
+        filename = 'PL_Report.csv';
+        csvContent = 'Metric,Value\n';
+        csvContent += `Total Revenue,${financeData?.total_revenue || 0}\n`;
+        csvContent += `Total Expenses,${financeData?.total_expenses || 0}\n`;
+        csvContent += `Net Margin %,${financeData?.net_margin_percent || 0}\n`;
+        csvContent += `Net Profit,${(financeData?.total_revenue || 0) - (financeData?.total_expenses || 0)}\n\n`;
+        csvContent += 'Category,Amount\n';
+        if (financeData?.expense_breakdown) {
+          Object.entries(financeData.expense_breakdown).forEach(([category, amount]: [string, any]) => {
+            csvContent += `${category},${amount}\n`;
+          });
+        }
+        break;
+
+      case 'cashflow':
+        filename = 'Cashflow_Forecast.csv';
+        csvContent = 'Period,Week Starting,Expected In,Expected Out,Net\n';
+        (cashflowData?.forecast || []).forEach((f: any) => {
+          const net = (f.expected_in || 0) - (f.expected_out || 0);
+          csvContent += `${f.period},${f.start_date},${f.expected_in || 0},${f.expected_out || 0},${net}\n`;
+        });
+        break;
+
+      case 'customer':
+        filename = 'Customer_Report.csv';
+        csvContent = 'Rank,Customer Name,Revenue,Invoice Count,Avg Payment Days\n';
+        const topCustomers = financeData?.top_customers || customers
+          .map((c: any) => ({ customer_name: c.name || c.customer_name, revenue: c.total_revenue || 0, invoice_count: c.invoice_count || 0 }))
+          .sort((a: any, b: any) => b.revenue - a.revenue)
+          .slice(0, 10);
+        topCustomers.forEach((c: any, idx: number) => {
+          const matchingCustomer = customers.find((cust: any) => cust.name === c.customer_name);
+          csvContent += `${idx + 1},${c.customer_name},${c.revenue},${c.invoice_count},${matchingCustomer?.avg_payment_days || 0}\n`;
+        });
+        break;
+
+      case 'aging':
+        filename = 'Aging_Report.csv';
+        csvContent = 'Category,Amount,Count,Percentage\n';
+        const totalAmount = (agingData?.buckets || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+        (agingData?.buckets || []).forEach((b: any) => {
+          const pct = totalAmount > 0 ? ((b.amount / totalAmount) * 100).toFixed(1) : '0.0';
+          csvContent += `${b.label},${b.amount || 0},${b.count || 0},${pct}\n`;
+        });
+        break;
+
+      case 'capital':
+        filename = 'Capital_Report.csv';
+        csvContent = 'Invoice #,Customer,Advanced,Fee,Date,Status\n';
+        advances.slice(0, 10).forEach((adv: any) => {
+          csvContent += `${adv.invoice_number},${adv.customer_name},${adv.advanced_amount || 0},${adv.fee_amount || 0},${adv.advanced_date || adv.created_at?.slice(0, 10)},${adv.status || 'ACTIVE'}\n`;
+        });
+        break;
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-body-medium font-body-medium text-foreground flex items-center gap-2">
-            <FileText className="h-4 w-4 text-muted-foreground" />
-            Financial Reports
-          </h1>
-          <p className="text-caption text-muted-foreground">
-            Industry audit-quality reporting
-          </p>
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [finance, cashflow, cust, aging, fac, adv] = await Promise.all([
+          fetchData('api/v1/dashboard/finance/').catch(() => null),
+          fetchData('api/v1/dashboard/cashflow/').catch(() => null),
+          fetchData('api/v1/customers/').catch(() => []),
+          fetchData('api/v1/invoices/aging/').catch(() => null),
+          fetchData('api/v1/facilities/').catch(() => null),
+          fetchData('api/v1/advances/').catch(() => []),
+        ]);
+        setFinanceData(finance);
+        setCashflowData(cashflow);
+        setCustomers(Array.isArray(cust) ? cust : (cust?.results || []));
+        setAgingData(aging);
+        const facList = Array.isArray(fac) ? fac : (fac?.results || []);
+        setFacilities(facList[0] || null);
+        setAdvances(Array.isArray(adv) ? adv : (adv?.results || []));
+      } catch (err) {
+        console.error('Failed to load finance reports:', err);
+        setError('Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const LoadingSkeleton = () => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} className="card" style={{ padding: 20 }}>
+          <div style={{ height: 16, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 12, width: '50%' }} />
+          <div style={{ height: 24, background: 'var(--bg-surface-hover)', borderRadius: 4, width: '70%' }} />
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="w-4 h-4 mr-2" />
-            Export PDF
-          </Button>
-          <Button size="sm">
-            <Download className="w-4 h-4 mr-2" />
-            Export Excel
-          </Button>
+      ))}
+    </div>
+  );
+
+  const ErrorState = () => (
+    <div className="card" style={{ padding: 40, textAlign: 'center' }}>
+      <div style={{ color: 'var(--status-danger)', marginBottom: 16, fontSize: 14 }}>Failed to load data</div>
+      <button className="btn-action" onClick={() => window.location.reload()}>RETRY</button>
+    </div>
+  );
+
+  const EmptyState = ({ message }: { message: string }) => (
+    <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
+      {message}
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Finance</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Reports</div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
+              Comprehensive financial analytics • Last updated: {new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
+          <button className="btn-action" onClick={exportToCSV}>↓ EXPORT CSV</button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="pnl" className="w-full">
-        <TabsList>
-          <TabsTrigger value="pnl">P&L Statement</TabsTrigger>
-          <TabsTrigger value="balance">Balance Sheet</TabsTrigger>
-          <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
-        </TabsList>
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 2, marginBottom: 24, borderBottom: '1px solid var(--border-subtle)' }}>
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            style={{
+              background: 'none',
+              border: 'none',
+              borderBottom: tab === t.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              color: tab === t.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              padding: '10px 16px',
+              cursor: 'pointer',
+              marginBottom: -1,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Time Period Filter */}
-        <div className="flex items-center gap-0 w-fit mt-6">
-          <Select value={periodType} onValueChange={setPeriodType}>
-            <SelectTrigger className="w-[140px] rounded-r-none border-r-0 font-medium">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Monthly">Monthly</SelectItem>
-              <SelectItem value="Quarterly">Quarterly</SelectItem>
-              <SelectItem value="Yearly">Yearly</SelectItem>
-            </SelectContent>
-          </Select>
+      {/* Content */}
+      {loading ? <LoadingSkeleton /> : error ? <ErrorState /> : (
+        <>
+          {/* TAB 1: P&L */}
+          {tab === 'pl' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                {[
+                  { label: 'Total Revenue', value: formatCurrency(financeData?.total_revenue || 0), color: 'var(--accent-primary)' },
+                  { label: 'Total Expenses', value: formatCurrency(financeData?.total_expenses || 0), color: 'var(--status-danger)' },
+                  { label: 'Net Margin %', value: formatPercent(financeData?.net_margin_percent || 0), color: 'var(--status-success)' },
+                  { label: 'Net Profit', value: formatCurrency((financeData?.total_revenue || 0) - (financeData?.total_expenses || 0)), color: 'var(--text-primary)' },
+                ].map(m => (
+                  <div key={m.label} className="card metric-card">
+                    <div className="card-header"><span className="card-title">{m.label}</span></div>
+                    <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
 
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[100px] rounded-none border-r-0 font-medium">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {getPeriodOptions().map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              {/* Monthly Trend Chart */}
+              {financeData?.monthly_trend && financeData.monthly_trend.length > 0 ? (
+                <div className="card" style={{ padding: 20 }}>
+                  <div className="card-header">
+                    <span className="card-title">Revenue vs Expenses Trend (Last 12 Months)</span>
+                    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-secondary)' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ width: 20, height: 2, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1 }}/>Revenue
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ width: 20, height: 2, background: 'var(--status-danger)', display: 'inline-block', borderRadius: 1 }}/>Expenses
+                      </span>
+                    </div>
+                  </div>
+                  {(() => {
+                    const trend = financeData.monthly_trend;
+                    const rev = trend.map((m: any) => m.revenue / 1000);
+                    const exp = trend.map((m: any) => m.expenses / 1000);
+                    const maxV = Math.max(...rev, ...exp, 1) * 1.1;
+                    const pts = (arr: number[]) => arr.map((v, i) => `${(i / Math.max(arr.length - 1, 1)) * 100},${100 - (v / maxV) * 100}`).join(' ');
+                    const labels = trend.map((m: any) => m.month?.slice(5) || '');
 
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-[100px] rounded-l-none font-medium">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map((year) => (
-                <SelectItem key={year} value={year}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+                    return (
+                      <>
+                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: 140, display: 'block', marginTop: 16 }}>
+                          <defs>
+                            <linearGradient id="revGradPL" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.15"/>
+                              <stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0"/>
+                            </linearGradient>
+                            <linearGradient id="expGradPL" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="var(--status-danger)" stopOpacity="0.1"/>
+                              <stop offset="100%" stopColor="var(--status-danger)" stopOpacity="0"/>
+                            </linearGradient>
+                          </defs>
+                          <polygon points={`0,100 ${pts(rev)} 100,100`} fill="url(#revGradPL)" />
+                          <polygon points={`0,100 ${pts(exp)} 100,100`} fill="url(#expGradPL)" />
+                          <polyline points={pts(rev)} fill="none" stroke="var(--accent-primary)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                          <polyline points={pts(exp)} fill="none" stroke="var(--status-danger)" strokeWidth="1.5" strokeDasharray="3,2" vectorEffect="non-scaling-stroke" />
+                        </svg>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>
+                          {labels.slice(-6).map((l: string, i: number) => <span key={i}>{l}</span>)}
+                        </div>
+                        <div style={{ display: 'flex', gap: 24, marginTop: 16, fontSize: 11, color: 'var(--text-secondary)' }}>
+                          <span>Latest: <span style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(trend[trend.length - 1]?.revenue || 0)}</span> revenue</span>
+                          <span>vs <span style={{ color: 'var(--status-danger)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(trend[trend.length - 1]?.expenses || 0)}</span> expenses</span>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : null}
 
-        {/* P&L Statement */}
-        <TabsContent value="pnl" className="mt-6 space-y-4">
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-muted-foreground">Profit & Loss Statement</CardTitle>
-              <p className="text-caption text-muted-foreground mt-1">Detailed hierarchical breakdown with variance analysis</p>
-            </CardHeader>
-            <CardContent>
-            
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40%]">Line Item</TableHead>
-                    <TableHead className="text-right">Actuals</TableHead>
-                    <TableHead className="text-right">Budget</TableHead>
-                    <TableHead className="text-right">Forecast</TableHead>
-                    <TableHead className="text-right">Actuals vs Budget</TableHead>
-                    <TableHead className="text-right">Variance %</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <CollapsibleRow
-                    name="Revenue"
-                    actuals={data.pnl.revenue.actuals}
-                    budget={data.pnl.revenue.budget}
-                    forecast={data.pnl.revenue.forecast}
-                    children={data.pnl.revenue.children}
-                    aiCommentary={data.pnl.revenue.aiCommentary}
-                  />
-                  <CollapsibleRow
-                    name="Cost of Goods Sold"
-                    actuals={data.pnl.cogs.actuals}
-                    budget={data.pnl.cogs.budget}
-                    forecast={data.pnl.cogs.forecast}
-                    children={data.pnl.cogs.children}
-                    aiCommentary={data.pnl.cogs.aiCommentary}
-                  />
-                  <TableRow className="bg-brand-500/10 font-display-semibold">
-                    <TableCell className="pl-4">Gross Profit</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(data.pnl.grossProfit.actuals)}</TableCell>
-                    <TableCell className="text-right font-mono text-muted-foreground">{formatCurrency(data.pnl.grossProfit.budget)}</TableCell>
-                    <TableCell className="text-right font-mono text-muted-foreground">{formatCurrency(data.pnl.grossProfit.forecast)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(data.pnl.grossProfit.actuals - data.pnl.grossProfit.budget)}</TableCell>
-                    <TableCell className="text-right text-success-500">{formatPercentage((data.pnl.grossProfit.actuals - data.pnl.grossProfit.budget) / data.pnl.grossProfit.budget, 1)}</TableCell>
-                  </TableRow>
-                  <CollapsibleRow
-                    name="Gross Profit %"
-                    actuals={data.pnl.grossProfit.margin * 100}
-                    budget={65.9}
-                    forecast={69.4}
-                    isPercentage={true}
-                  />
-                  <CollapsibleRow
-                    name="Operating Expenses"
-                    actuals={data.pnl.opex.actuals}
-                    budget={data.pnl.opex.budget}
-                    forecast={data.pnl.opex.forecast}
-                    children={data.pnl.opex.children}
-                    aiCommentary={data.pnl.opex.aiCommentary}
-                  />
-                  <TableRow className="bg-brand-900/20 font-display-bold border-t-2 border-brand-500">
-                    <TableCell className="pl-4">Net Profit</TableCell>
-                    <TableCell className="text-right font-mono text-lg">{formatCurrency(data.pnl.netProfit.actuals)}</TableCell>
-                    <TableCell className="text-right font-mono text-muted-foreground">{formatCurrency(data.pnl.netProfit.budget)}</TableCell>
-                    <TableCell className="text-right font-mono text-muted-foreground">{formatCurrency(data.pnl.netProfit.forecast)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(data.pnl.netProfit.actuals - data.pnl.netProfit.budget)}</TableCell>
-                    <TableCell className="text-right">
-                      <span className="text-success-500">{formatPercentage((data.pnl.netProfit.actuals - data.pnl.netProfit.budget) / data.pnl.netProfit.budget, 1)}</span>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+              {/* Expense breakdown */}
+              {financeData?.expense_breakdown && Object.keys(financeData.expense_breakdown).length > 0 ? (
+                <div className="card" style={{ padding: 20 }}>
+                  <div className="card-header"><span className="card-title">Expense Breakdown by Category</span></div>
+                  <table className="data-table" style={{ marginTop: 16 }}>
+                    <thead>
+                      <tr>
+                        <th>Category</th>
+                        <th className="text-right">Amount</th>
+                        <th className="text-right">% of Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(financeData.expense_breakdown).map(([category, amount]: [string, any]) => (
+                        <tr key={category}>
+                          <td style={{ textTransform: 'capitalize' }}>{category.replace('_', ' ')}</td>
+                          <td className="mono text-right">{formatCurrency(amount)}</td>
+                          <td className="mono text-right">
+                            {((amount / financeData.total_expenses) * 100).toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyState message="No expense breakdown available" />
+              )}
             </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          )}
 
-        {/* Balance Sheet */}
-        <TabsContent value="balance" className="mt-6 space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Assets */}
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="text-muted-foreground">Assets</CardTitle>
-              </CardHeader>
-              <CardContent>
-              
-              <div className="space-y-6">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-body font-body-medium text-foreground">Current Assets</h4>
-                    <div className="text-right">
-                      <div className="text-display-sm font-display-bold tabular-nums">{formatCurrency(data.balanceSheet.assets.current.total)}</div>
-                      <div className={`text-caption ${data.balanceSheet.assets.current.delta > 0 ? 'text-success-500' : 'text-danger-500'}`}>
-                        {data.balanceSheet.assets.current.delta > 0 ? '+' : ''}{formatCurrency(data.balanceSheet.assets.current.delta)} vs last month
-                      </div>
+          {/* TAB 2: Cash Flow */}
+          {tab === 'cashflow' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {(() => {
+                const forecast = cashflowData?.forecast || [];
+                // Calculate next 30 days summary
+                const next30Days = forecast.slice(0, 4); // ~4 weeks
+                const totalIn = next30Days.reduce((sum: number, f: any) => sum + (f.expected_in || 0), 0);
+                const totalOut = next30Days.reduce((sum: number, f: any) => sum + (f.expected_out || 0), 0);
+                const netPosition = totalIn - totalOut;
+
+                return (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                      {[
+                        { label: 'Expected In (30d)', value: formatCurrency(totalIn), color: 'var(--status-success)' },
+                        { label: 'Expected Out (30d)', value: formatCurrency(totalOut), color: 'var(--status-danger)' },
+                        { label: 'Net Cash Position', value: formatCurrency(netPosition), color: netPosition >= 0 ? 'var(--accent-primary)' : 'var(--status-danger)' },
+                      ].map(m => (
+                        <div key={m.label} className="card metric-card">
+                          <div className="card-header"><span className="card-title">{m.label}</span></div>
+                          <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+                        </div>
+                      ))}
                     </div>
+
+                    {forecast.length > 0 ? (
+                      <div className="card table-card">
+                        <div className="card-header" style={{ marginBottom: 16 }}>
+                          <span className="card-title">Weekly Cash Flow Forecast</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                            Next {forecast.length} weeks
+                          </span>
+                        </div>
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>Period</th>
+                              <th>Week Starting</th>
+                              <th className="text-right">Expected In</th>
+                              <th className="text-right">Expected Out</th>
+                              <th className="text-right">Net</th>
+                              <th className="text-right">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {forecast.map((f: any, idx: number) => {
+                              const net = (f.expected_in || 0) - (f.expected_out || 0);
+                              return (
+                                <tr key={idx}>
+                                  <td className="mono">{f.period}</td>
+                                  <td className="mono">{f.start_date}</td>
+                                  <td className="mono text-right" style={{ color: 'var(--status-success)' }}>
+                                    {formatCurrency(f.expected_in || 0)}
+                                  </td>
+                                  <td className="mono text-right" style={{ color: 'var(--status-danger)' }}>
+                                    {formatCurrency(f.expected_out || 0)}
+                                  </td>
+                                  <td className="mono text-right" style={{
+                                    color: net >= 0 ? 'var(--accent-primary)' : 'var(--status-danger)',
+                                    fontWeight: 600
+                                  }}>
+                                    {formatCurrency(net)}
+                                  </td>
+                                  <td className="text-right">
+                                    <span style={{
+                                      fontFamily: 'var(--font-mono)',
+                                      fontSize: 10,
+                                      color: net >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                                      padding: '2px 6px',
+                                      background: 'var(--bg-surface-hover)',
+                                      borderRadius: 2
+                                    }}>
+                                      {net >= 0 ? 'POSITIVE' : 'NEGATIVE'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <EmptyState message="No cash flow forecast data available" />
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* TAB 3: Customer */}
+          {tab === 'customer' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Top customer metrics */}
+              {(() => {
+                const topCustomers = financeData?.top_customers || customers
+                  .map((c: any) => ({
+                    customer_id: c.id,
+                    customer_name: c.name || c.customer_name,
+                    revenue: c.total_revenue || 0,
+                    invoice_count: c.invoice_count || 0
+                  }))
+                  .sort((a: any, b: any) => b.revenue - a.revenue)
+                  .slice(0, 10);
+
+                const totalRevenue = topCustomers.reduce((sum: number, c: any) => sum + (c.revenue || 0), 0);
+                const totalInvoices = topCustomers.reduce((sum: number, c: any) => sum + (c.invoice_count || 0), 0);
+
+                return (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                      {[
+                        { label: 'Total Customers', value: customers.length, color: 'var(--text-primary)' },
+                        { label: 'Top 10 Revenue', value: formatCurrency(totalRevenue), color: 'var(--accent-primary)' },
+                        { label: 'Invoices (Top 10)', value: totalInvoices, color: 'var(--status-success)' },
+                      ].map(m => (
+                        <div key={m.label} className="card metric-card">
+                          <div className="card-header"><span className="card-title">{m.label}</span></div>
+                          <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Top customers ranked by revenue */}
+                    <div className="card table-card">
+                      <div className="card-header" style={{ marginBottom: 16 }}>
+                        <span className="card-title">Top Customers by Revenue</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                          Ranked by total revenue
+                        </span>
+                      </div>
+                      {topCustomers.length > 0 ? (
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th style={{ width: 40 }}>Rank</th>
+                              <th>Customer Name</th>
+                              <th className="text-right">Revenue</th>
+                              <th className="text-right">Invoice Count</th>
+                              <th className="text-right">Avg Payment Days</th>
+                              <th className="text-right">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {topCustomers.map((cust: any, idx: number) => {
+                              const matchingCustomer = customers.find((c: any) =>
+                                c.id === cust.customer_id || c.name === cust.customer_name
+                              );
+                              const avgPaymentDays = matchingCustomer?.avg_payment_days || 0;
+                              const dso = avgPaymentDays;
+
+                              return (
+                                <tr key={idx} style={{ cursor: 'pointer' }}>
+                                  <td className="mono text-right" style={{
+                                    color: idx < 3 ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                                    fontWeight: idx < 3 ? 600 : 400
+                                  }}>
+                                    #{idx + 1}
+                                  </td>
+                                  <td style={{ fontWeight: idx < 3 ? 500 : 400 }}>{cust.customer_name}</td>
+                                  <td className="mono text-right" style={{
+                                    color: 'var(--accent-primary)',
+                                    fontWeight: 600
+                                  }}>
+                                    {formatCurrency(cust.revenue || 0)}
+                                  </td>
+                                  <td className="mono text-right">{cust.invoice_count || 0}</td>
+                                  <td className="mono text-right" style={{
+                                    color: dso > 60 ? 'var(--status-danger)' : dso > 30 ? 'var(--status-warning)' : 'var(--status-success)'
+                                  }}>
+                                    {dso}d
+                                  </td>
+                                  <td className="text-right">
+                                    <span style={{
+                                      fontFamily: 'var(--font-mono)',
+                                      fontSize: 10,
+                                      color: dso <= 30 ? 'var(--status-success)' : dso <= 60 ? 'var(--status-warning)' : 'var(--status-danger)',
+                                      padding: '2px 6px',
+                                      background: 'var(--bg-surface-hover)',
+                                      borderRadius: 2
+                                    }}>
+                                      {dso <= 30 ? 'EXCELLENT' : dso <= 60 ? 'GOOD' : 'WATCH'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <EmptyState message="No customer data available" />
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* TAB 4: Aging */}
+          {tab === 'aging' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Header metrics */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                {[
+                  { label: 'Total Outstanding', value: formatCurrency(agingData?.summary?.total_outstanding || 0), color: 'var(--accent-primary)' },
+                  { label: 'Overdue Amount', value: formatCurrency(agingData?.summary?.total_overdue || 0), color: 'var(--status-danger)' },
+                  { label: 'DSO (Days)', value: Math.round(agingData?.summary?.dso || 0), color: 'var(--text-primary)' },
+                ].map(m => (
+                  <div key={m.label} className="card metric-card">
+                    <div className="card-header"><span className="card-title">{m.label}</span></div>
+                    <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
                   </div>
-                  <div className="space-y-3">
-                    {data.balanceSheet.assets.current.items.map((item) => (
-                      <div key={item.name} className="flex items-center justify-between py-2 border-b border-border/50">
-                        <span className="text-body text-muted-foreground">{item.name}</span>
-                        <div className="text-right">
-                          <div className="text-body font-mono">{formatCurrency(item.value)}</div>
-                          <div className={`text-caption ${item.delta > 0 ? 'text-success-500' : 'text-danger-500'}`}>
-                            {item.delta > 0 ? '+' : ''}{formatCurrency(item.delta)}
+                ))}
+              </div>
+
+              {/* Aging waterfall bars */}
+              {(() => {
+                const buckets = agingData?.buckets || [
+                  { label: 'Current', amount: 0, count: 0, color: 'var(--status-success)' },
+                  { label: '1-30 Days', amount: 0, count: 0, color: 'var(--status-warning)' },
+                  { label: '31-60 Days', amount: 0, count: 0, color: 'var(--status-warning)' },
+                  { label: '61-90 Days', amount: 0, count: 0, color: 'var(--status-danger)' },
+                  { label: '90+ Days', amount: 0, count: 0, color: 'var(--status-danger)' },
+                ];
+                const totalAmount = buckets.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+
+                return (
+                  <div className="card" style={{ padding: 24 }}>
+                    <div className="card-header" style={{ marginBottom: 20 }}>
+                      <span className="card-title">Aging Analysis</span>
+                    </div>
+                    {buckets.map((bucket: any, idx: number) => {
+                      const pct = totalAmount > 0 ? (bucket.amount / totalAmount) * 100 : 0;
+                      const colorMap: Record<string, string> = {
+                        'Current': 'var(--status-success)',
+                        '1-30 Days': 'var(--status-warning)',
+                        '31-60 Days': 'var(--status-warning)',
+                        '61-90 Days': 'var(--status-danger)',
+                        '90+ Days': 'var(--status-danger)'
+                      };
+                      const barColor = colorMap[bucket.label] || 'var(--text-secondary)';
+
+                      return (
+                        <div key={idx} style={{ marginBottom: 16 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <div>
+                              <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{bucket.label}</span>
+                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 8, fontFamily: 'var(--font-mono)' }}>
+                                ({bucket.count || 0} {(bucket.count || 0) === 1 ? 'invoice' : 'invoices'})
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
+                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                                {pct.toFixed(1)}%
+                              </span>
+                              <span style={{ fontSize: 15, fontWeight: 600, color: barColor, fontFamily: 'var(--font-mono)' }}>
+                                {formatCurrency(bucket.amount || 0)}
+                              </span>
+                            </div>
+                          </div>
+                          <div style={{ height: 24, background: 'var(--bg-surface-hover)', borderRadius: 4, overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%',
+                              width: `${pct}%`,
+                              background: barColor,
+                              borderRadius: 4,
+                              transition: 'width 0.3s ease'
+                            }} />
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                </div>
+                );
+              })()}
 
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-body font-body-medium text-foreground">Fixed Assets</h4>
-                    <div className="text-right">
-                      <div className="text-display-sm font-display-bold tabular-nums">{formatCurrency(data.balanceSheet.assets.fixed.total)}</div>
-                      <div className={`text-caption ${data.balanceSheet.assets.fixed.delta > 0 ? 'text-success-500' : 'text-danger-500'}`}>
-                        {data.balanceSheet.assets.fixed.delta > 0 ? '+' : ''}{formatCurrency(data.balanceSheet.assets.fixed.delta)} vs last month
-                      </div>
+              {/* Overdue invoice list */}
+              {agingData?.overdue_invoices && agingData.overdue_invoices.length > 0 ? (
+                <div className="card table-card">
+                  <div className="card-header" style={{ marginBottom: 16 }}>
+                    <span className="card-title">Overdue Invoices</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      {agingData.overdue_invoices.length} overdue
+                    </span>
+                  </div>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Invoice #</th>
+                        <th>Customer</th>
+                        <th className="text-right">Amount</th>
+                        <th className="text-right">Due Date</th>
+                        <th className="text-right">Days Overdue</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {agingData.overdue_invoices.map((inv: any) => (
+                        <tr key={inv.id}>
+                          <td className="mono">{inv.invoice_number}</td>
+                          <td>{inv.customer_name}</td>
+                          <td className="mono text-right">{formatCurrency(inv.total_amount || 0)}</td>
+                          <td className="mono text-right">{inv.due_date}</td>
+                          <td className="mono text-right" style={{ color: 'var(--status-danger)' }}>
+                            {inv.days_overdue || 0}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyState message="No overdue invoices" />
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: Capital */}
+          {tab === 'capital' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                {[
+                  { label: 'Facility Limit', value: formatCurrency(facilities?.facility_limit || 0), color: 'var(--accent-primary)' },
+                  { label: 'Available', value: formatCurrency((facilities?.facility_limit || 0) - (facilities?.outstanding_advances || 0)), color: 'var(--status-success)' },
+                  { label: 'In Use', value: formatCurrency(facilities?.outstanding_advances || 0), color: 'var(--status-warning)' },
+                  { label: 'Advances This Month', value: advances.filter((a: any) => {
+                    const date = new Date(a.created_at || a.advanced_date);
+                    const now = new Date();
+                    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+                  }).length, color: 'var(--text-primary)' },
+                ].map(m => (
+                  <div key={m.label} className="card metric-card">
+                    <div className="card-header"><span className="card-title">{m.label}</span></div>
+                    <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Fee summary */}
+              <div className="card" style={{ padding: 20 }}>
+                <div className="card-header"><span className="card-title">Fee Summary</span></div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20, marginTop: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>Total Fees Paid</div>
+                    <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {formatCurrency(advances.reduce((sum: number, a: any) => sum + (a.fee_amount || 0), 0))}
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    {data.balanceSheet.assets.fixed.items.map((item) => (
-                      <div key={item.name} className="flex items-center justify-between py-2 border-b border-border/50">
-                        <span className="text-body text-muted-foreground">{item.name}</span>
-                        <div className="text-right">
-                          <div className="text-body font-mono">{formatCurrency(item.value)}</div>
-                          <div className={`text-caption ${item.delta > 0 ? 'text-success-500' : 'text-danger-500'}`}>
-                            {item.delta > 0 ? '+' : ''}{formatCurrency(item.delta)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>Avg Fee Rate</div>
+                    <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {advances.length > 0
+                        ? ((advances.reduce((sum: number, a: any) => sum + (a.fee_amount || 0), 0) /
+                            advances.reduce((sum: number, a: any) => sum + (a.advanced_amount || 0), 0)) * 100).toFixed(2)
+                        : 0}%
+                    </div>
                   </div>
-                </div>
-
-                <div className="pt-4 border-t-2 border-brand-500">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-display-sm font-display-semibold text-foreground">Total Assets</h4>
-                    <div className="text-display-md font-display-bold tabular-nums text-brand-500">
-                      {formatCurrency(data.balanceSheet.assets.current.total + data.balanceSheet.assets.fixed.total)}
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>Total Advanced</div>
+                    <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {formatCurrency(advances.reduce((sum: number, a: any) => sum + (a.advanced_amount || 0), 0))}
                     </div>
                   </div>
                 </div>
               </div>
-              </CardContent>
-            </Card>
 
-            {/* Liabilities & Equity */}
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="text-muted-foreground">Liabilities & Equity</CardTitle>
-              </CardHeader>
-              <CardContent>
-              
-              <div className="space-y-6">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-body font-body-medium text-foreground">Current Liabilities</h4>
-                    <div className="text-right">
-                      <div className="text-display-sm font-display-bold tabular-nums">{formatCurrency(data.balanceSheet.liabilities.current.total)}</div>
-                      <div className={`text-caption ${data.balanceSheet.liabilities.current.delta > 0 ? 'text-danger-500' : 'text-success-500'}`}>
-                        {data.balanceSheet.liabilities.current.delta > 0 ? '+' : ''}{formatCurrency(data.balanceSheet.liabilities.current.delta)} vs last month
-                      </div>
-                    </div>
+              {/* Advances list */}
+              {advances.length > 0 ? (
+                <div className="card table-card">
+                  <div className="card-header" style={{ marginBottom: 16 }}>
+                    <span className="card-title">Recent Advances</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      {advances.length} total
+                    </span>
                   </div>
-                  <div className="space-y-3">
-                    {data.balanceSheet.liabilities.current.items.map((item) => (
-                      <div key={item.name} className="flex items-center justify-between py-2 border-b border-border/50">
-                        <span className="text-body text-muted-foreground">{item.name}</span>
-                        <div className="text-right">
-                          <div className="text-body font-mono">{formatCurrency(item.value)}</div>
-                          <div className={`text-caption ${item.delta > 0 ? 'text-danger-500' : 'text-success-500'}`}>
-                            {item.delta > 0 ? '+' : ''}{formatCurrency(item.delta)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Invoice #</th>
+                        <th>Customer</th>
+                        <th className="text-right">Advanced</th>
+                        <th className="text-right">Fee</th>
+                        <th className="text-right">Date</th>
+                        <th className="text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {advances.slice(0, 10).map((adv: any) => (
+                        <tr key={adv.id}>
+                          <td className="mono">{adv.invoice_number}</td>
+                          <td>{adv.customer_name}</td>
+                          <td className="mono text-right" style={{ color: 'var(--accent-primary)' }}>
+                            {formatCurrency(adv.advanced_amount || 0)}
+                          </td>
+                          <td className="mono text-right">{formatCurrency(adv.fee_amount || 0)}</td>
+                          <td className="mono text-right">{adv.advanced_date || adv.created_at?.slice(0, 10)}</td>
+                          <td className="text-right">
+                            <span style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 10,
+                              color: adv.status === 'FUNDED' || adv.status === 'ACTIVE' ? 'var(--status-warning)' : 'var(--status-success)',
+                              padding: '2px 6px',
+                              background: 'var(--bg-surface-hover)',
+                              borderRadius: 2
+                            }}>
+                              {adv.status || 'ACTIVE'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-body font-body-medium text-foreground">Long-term Liabilities</h4>
-                    <div className="text-right">
-                      <div className="text-display-sm font-display-bold tabular-nums">{formatCurrency(data.balanceSheet.liabilities.longTerm.total)}</div>
-                      <div className={`text-caption ${data.balanceSheet.liabilities.longTerm.delta > 0 ? 'text-danger-500' : 'text-success-500'}`}>
-                        {data.balanceSheet.liabilities.longTerm.delta > 0 ? '+' : ''}{formatCurrency(data.balanceSheet.liabilities.longTerm.delta)} vs last month
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    {data.balanceSheet.liabilities.longTerm.items.map((item) => (
-                      <div key={item.name} className="flex items-center justify-between py-2 border-b border-border/50">
-                        <span className="text-body text-muted-foreground">{item.name}</span>
-                        <div className="text-right">
-                          <div className="text-body font-mono">{formatCurrency(item.value)}</div>
-                          <div className={`text-caption ${item.delta > 0 ? 'text-danger-500' : 'text-success-500'}`}>
-                            {item.delta > 0 ? '+' : ''}{formatCurrency(item.delta)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-body font-body-medium text-foreground">Equity</h4>
-                    <div className="text-right">
-                      <div className="text-display-sm font-display-bold tabular-nums">{formatCurrency(data.balanceSheet.equity.total)}</div>
-                      <div className={`text-caption ${data.balanceSheet.equity.delta > 0 ? 'text-success-500' : 'text-danger-500'}`}>
-                        {data.balanceSheet.equity.delta > 0 ? '+' : ''}{formatCurrency(data.balanceSheet.equity.delta)} vs last month
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t-2 border-brand-500">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-display-sm font-display-semibold text-foreground">Total Liabilities & Equity</h4>
-                    <div className="text-display-md font-display-bold tabular-nums text-brand-500">
-                      {formatCurrency(data.balanceSheet.liabilities.current.total + data.balanceSheet.liabilities.longTerm.total + data.balanceSheet.equity.total)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Cash Flow Statement */}
-        <TabsContent value="cashflow" className="mt-6 space-y-4">
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-muted-foreground">Cash Flow Statement</CardTitle>
-                  <p className="text-caption text-muted-foreground mt-1">Real-time sync with bookings and capital activities</p>
-                </div>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-500/10">
-                        <Sparkles className="h-4 w-4 text-brand-500" />
-                        <span className="text-caption font-body-medium text-brand-500">AI Insight</span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-md">
-                      <p className="text-caption">{data.cashFlow.aiCommentary}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-              {/* Operating Activities */}
-              <div>
-                <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-brand-500/30">
-                  <h4 className="text-body font-display-semibold text-foreground">Operating Activities</h4>
-                  <div className="text-display-sm font-display-bold tabular-nums text-success-500">
-                    {formatCurrency(data.cashFlow.operating.total)}
-                  </div>
-                </div>
-                <div className="space-y-3 ml-4">
-                  {data.cashFlow.operating.items.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between py-2">
-                      <span className="text-body text-muted-foreground">{item.name}</span>
-                      <span className="text-body font-mono">{formatCurrency(item.value)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Investing Activities */}
-              <div>
-                <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-brand-500/30">
-                  <h4 className="text-body font-display-semibold text-foreground">Investing Activities</h4>
-                  <div className="text-display-sm font-display-bold tabular-nums text-danger-500">
-                    {formatCurrency(data.cashFlow.investing.total)}
-                  </div>
-                </div>
-                <div className="space-y-3 ml-4">
-                  {data.cashFlow.investing.items.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between py-2">
-                      <span className="text-body text-muted-foreground">{item.name}</span>
-                      <span className="text-body font-mono">{formatCurrency(item.value)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Financing Activities */}
-              <div>
-                <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-brand-500/30">
-                  <h4 className="text-body font-display-semibold text-foreground">Financing Activities</h4>
-                  <div className="text-display-sm font-display-bold tabular-nums text-danger-500">
-                    {formatCurrency(data.cashFlow.financing.total)}
-                  </div>
-                </div>
-                <div className="space-y-3 ml-4">
-                  {data.cashFlow.financing.items.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between py-2">
-                      <span className="text-body text-muted-foreground">{item.name}</span>
-                      <span className="text-body font-mono">{formatCurrency(item.value)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Net Change */}
-              <div className="pt-6 border-t-2 border-brand-500">
-                <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-brand-500/10 to-brand-300/10">
-                  <h4 className="text-display-sm font-display-bold text-foreground">Net Change in Cash</h4>
-                  <div className={`text-display-lg font-display-bold tabular-nums ${data.cashFlow.netChange > 0 ? 'text-success-500' : 'text-danger-500'}`}>
-                    {data.cashFlow.netChange > 0 ? '+' : ''}{formatCurrency(data.cashFlow.netChange)}
-                  </div>
-                </div>
-              </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              ) : (
+                <EmptyState message="No advances found" />
+              )}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -48,11 +48,11 @@ interface KanbanBoardProps {
 }
 
 const COLUMNS = [
-  { id: "Draft", title: "Drafts", bgColor: "bg-muted/20" },
-  { id: "Sent", title: "Quoted", bgColor: "bg-primary/5" },
-  { id: "Accepted", title: "Accepted", bgColor: "bg-success/5" },
-  { id: "It", title: "In-Transit", bgColor: "bg-warning/5" },
-  { id: "Completed", title: "Completed", bgColor: "bg-neutral-100" },
+  { id: "DRAFT", title: "Draft", bgColor: "bg-muted/20" },
+  { id: "SENT", title: "Sent to Client", bgColor: "bg-primary/5" },
+  { id: "ACCEPTED", title: "Accepted", bgColor: "bg-success/5" },
+  { id: "IT", title: "In Transit", bgColor: "bg-warning/5" },
+  { id: "COMPLETED", title: "Completed", bgColor: "bg-neutral-100" },
 ];
 
 function DroppableColumn({
@@ -110,18 +110,18 @@ function DroppableColumn({
               {columnQuotes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-[200px] text-center">
                   <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center mb-3">
-                    {column.id === "Draft" && <Plus className="w-6 h-6 text-muted-foreground" />}
-                    {column.id === "Sent" && <TrendingUp className="w-6 h-6 text-muted-foreground" />}
-                    {column.id === "Accepted" && <Truck className="w-6 h-6 text-muted-foreground" />}
-                    {column.id === "In-Transit" && <MapPin className="w-6 h-6 text-muted-foreground" />}
-                    {column.id === "Completed" && <TrendingUp className="w-6 h-6 text-muted-foreground" />}
+                    {column.id === "DRAFT" && <Plus className="w-6 h-6 text-muted-foreground" />}
+                    {column.id === "SENT" && <TrendingUp className="w-6 h-6 text-muted-foreground" />}
+                    {column.id === "ACCEPTED" && <Truck className="w-6 h-6 text-muted-foreground" />}
+                    {column.id === "IT" && <MapPin className="w-6 h-6 text-muted-foreground" />}
+                    {column.id === "COMPLETED" && <TrendingUp className="w-6 h-6 text-muted-foreground" />}
                   </div>
                   <p className="text-caption text-muted-foreground mb-1">
-                    {column.id === "Draft" && "No drafts yet"}
-                    {column.id === "Sent" && "No quotes sent"}
-                    {column.id === "Accepted" && "No accepted quotes"}
-                    {column.id === "In-Transit" && "No loads in transit"}
-                    {column.id === "Completed" && "No completed deliveries"}
+                    {column.id === "DRAFT" && "No drafts yet"}
+                    {column.id === "SENT" && "No quotes sent"}
+                    {column.id === "ACCEPTED" && "No accepted quotes"}
+                    {column.id === "IT" && "No loads in transit"}
+                    {column.id === "COMPLETED" && "No completed deliveries"}
                   </p>
                 </div>
               ) : (

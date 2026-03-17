@@ -1,243 +1,148 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Bell, Mail, Smartphone, Save } from "lucide-react";
-import { toast } from "sonner";
-import useFetch from "@/hooks/useFetch";
-import { usePatch } from "@/hooks/usePatch";
-import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { fetchData, patchData } from "@/lib/Api";
+
+const sectionStyle: React.CSSProperties = {
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--card-radius)',
+  marginBottom: 16,
+};
+
+const sectionHeaderStyle: React.CSSProperties = {
+  padding: '16px 20px 12px',
+  borderBottom: '1px solid var(--border-subtle)',
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--text-secondary)',
+  fontWeight: 600,
+};
+
+const sectionBodyStyle: React.CSSProperties = { padding: '4px 0 8px' };
+
+interface ToggleRowProps {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}
+
+function ToggleRow({ label, description, checked, onChange }: ToggleRowProps) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '12px 20px',
+      borderBottom: '1px solid var(--border-row)',
+    }}>
+      <div>
+        <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: description ? 2 : 0 }}>{label}</div>
+        {description && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{description}</div>}
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        style={{
+          width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer',
+          background: checked ? 'var(--accent-primary)' : 'var(--border-active)',
+          position: 'relative', flexShrink: 0, transition: 'background 0.2s',
+        }}
+      >
+        <span style={{
+          position: 'absolute', top: 2, left: checked ? 18 : 2,
+          width: 16, height: 16, borderRadius: '50%', background: 'var(--bg-surface)',
+          transition: 'left 0.2s',
+        }} />
+      </button>
+    </div>
+  );
+}
+
+const DEFAULTS = {
+  email: { quotes: true, invoices: true, payments: true, fleet_alerts: true, weekly_reports: false },
+  push: { new_bookings: true, payment_received: true, maintenance_due: true, driver_updates: false },
+  sms: { critical_alerts: false, payment_confirmations: false },
+};
 
 export function NotificationSettings() {
-  const queryClient = useQueryClient();
-  const { data: fetchedSettings, isLoading: isFetching } = useFetch("api/notifications/settings/");
-
-  const [settings, setSettings] = useState({
-    email: {
-      quotes: true,
-      bookings: true,
-      invoices: false,
-      alerts: true,
-      marketing: false
-    },
-    push: {
-      quotes: true,
-      bookings: true,
-      alerts: true,
-      messages: false
-    },
-    sms: {
-      alerts: true,
-      confirmations: false
-    }
-  });
+  const [settings, setSettings] = useState(DEFAULTS);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (fetchedSettings) {
-      setSettings(fetchedSettings);
-    }
-  }, [fetchedSettings]);
+    fetchData('/api/v1/notifications/settings/').then((d: any) => {
+      if (d) setSettings({ ...DEFAULTS, ...d });
+    }).catch(() => {});
+  }, []);
 
-  const { mutate: updateSettings, isPending: isUpdating } = usePatch({
-    onSuccess: () => {
-      toast.success("Notification preferences updated");
-      queryClient.invalidateQueries({ queryKey: ["api/notifications/settings/"] });
-    },
-    onError: () => {
-      toast.error("Failed to update preferences");
-    }
-  });
+  const setChannel = (channel: keyof typeof settings, key: string, val: boolean) =>
+    setSettings(p => ({ ...p, [channel]: { ...p[channel], [key]: val } }));
 
-  const handleSave = () => {
-    updateSettings({ url: "api/notifications/settings/", data: settings });
-  };
-
-  const updateSetting = (category: keyof typeof settings, key: string, value: boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      [category]: {
-        ...prev[category],
-        [key]: value
-      }
-    }));
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await patchData({ url: '/api/v1/notifications/settings/', data: settings });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {}
+    setSaving(false);
   };
 
   return (
-    <div className="space-y-4 max-w-5xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-heading text-foreground">Notification Settings</h1>
-        <p className="text-caption text-muted-foreground">
-          Configure how you want to receive notifications across different channels
-        </p>
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
+          Notification Settings
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          Choose what you get notified about and how
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Email Notifications */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-body-medium">
-              <Mail className="w-4 h-4" />
-              Email Notifications
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-3">
-            <div className="flex items-center justify-between py-1">
-              <div>
-                <Label htmlFor="email-quotes" className="text-body">Quote Updates</Label>
-                <p className="text-caption text-muted-foreground">Sent, accepted, or expired notifications</p>
-              </div>
-              <Switch
-                id="email-quotes"
-                checked={settings.email.quotes}
-                onCheckedChange={(checked) => updateSetting('email', 'quotes', checked)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between py-1">
-              <div>
-                <Label htmlFor="email-bookings" className="text-body">Booking Updates</Label>
-                <p className="text-caption text-muted-foreground">Status changes and delivery confirmations</p>
-              </div>
-              <Switch
-                id="email-bookings"
-                checked={settings.email.bookings}
-                onCheckedChange={(checked) => updateSetting('email', 'bookings', checked)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between py-1">
-              <div>
-                <Label htmlFor="email-invoices" className="text-body">Invoice Notifications</Label>
-                <p className="text-caption text-muted-foreground">Generated invoices and payment reminders</p>
-              </div>
-              <Switch
-                id="email-invoices"
-                checked={settings.email.invoices}
-                onCheckedChange={(checked) => updateSetting('email', 'invoices', checked)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between py-1">
-              <div>
-                <Label htmlFor="email-alerts" className="text-body">System Alerts</Label>
-                <p className="text-caption text-muted-foreground">Important system notifications</p>
-              </div>
-              <Switch
-                id="email-alerts"
-                checked={settings.email.alerts}
-                onCheckedChange={(checked) => updateSetting('email', 'alerts', checked)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between py-1">
-              <div>
-                <Label htmlFor="email-marketing" className="text-body">Marketing Updates</Label>
-                <p className="text-caption text-muted-foreground">Feature announcements and tips</p>
-              </div>
-              <Switch
-                id="email-marketing"
-                checked={settings.email.marketing}
-                onCheckedChange={(checked) => updateSetting('email', 'marketing', checked)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Push & SMS Notifications */}
-        <div className="space-y-4">
-          {/* Push Notifications */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-body-medium">
-                <Smartphone className="w-4 h-4" />
-                Push Notifications
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              <div className="flex items-center justify-between py-1">
-                <div>
-                  <Label htmlFor="push-quotes" className="text-body">Quote Activities</Label>
-                  <p className="text-caption text-muted-foreground">Instant quote notifications</p>
-                </div>
-                <Switch
-                  id="push-quotes"
-                  checked={settings.push.quotes}
-                  onCheckedChange={(checked) => updateSetting('push', 'quotes', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-1">
-                <div>
-                  <Label htmlFor="push-bookings" className="text-body">Booking Updates</Label>
-                  <p className="text-caption text-muted-foreground">Real-time booking changes</p>
-                </div>
-                <Switch
-                  id="push-bookings"
-                  checked={settings.push.bookings}
-                  onCheckedChange={(checked) => updateSetting('push', 'bookings', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-1">
-                <div>
-                  <Label htmlFor="push-alerts" className="text-body">Critical Alerts</Label>
-                  <p className="text-caption text-muted-foreground">Urgent system alerts</p>
-                </div>
-                <Switch
-                  id="push-alerts"
-                  checked={settings.push.alerts}
-                  onCheckedChange={(checked) => updateSetting('push', 'alerts', checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* SMS Notifications */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-body-medium">
-                <Bell className="w-4 h-4" />
-                SMS Notifications
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              <div className="flex items-center justify-between py-1">
-                <div>
-                  <Label htmlFor="sms-alerts" className="text-body">Critical Alerts</Label>
-                  <p className="text-caption text-muted-foreground">Emergency alerts only</p>
-                </div>
-                <Switch
-                  id="sms-alerts"
-                  checked={settings.sms.alerts}
-                  onCheckedChange={(checked) => updateSetting('sms', 'alerts', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-1">
-                <div>
-                  <Label htmlFor="sms-confirmations" className="text-body">Delivery Confirmations</Label>
-                  <p className="text-caption text-muted-foreground">SMS for completed deliveries</p>
-                </div>
-                <Switch
-                  id="sms-confirmations"
-                  checked={settings.sms.confirmations}
-                  onCheckedChange={(checked) => updateSetting('sms', 'confirmations', checked)}
-                />
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <Button onClick={handleSave} disabled={isUpdating} size="sm" className="gap-2">
-                  <Save className="w-4 h-4" />
-                  {isUpdating ? "Saving..." : "Save Preferences"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Email */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <span style={sectionTitleStyle}>✉ Email Notifications</span>
         </div>
+        <div style={sectionBodyStyle}>
+          <ToggleRow label="Quote activity" description="New quotes, updates, and expirations" checked={settings.email.quotes} onChange={v => setChannel('email', 'quotes', v)} />
+          <ToggleRow label="Invoice updates" description="When invoices are created or become overdue" checked={settings.email.invoices} onChange={v => setChannel('email', 'invoices', v)} />
+          <ToggleRow label="Payment received" description="Confirmation when payments clear" checked={settings.email.payments} onChange={v => setChannel('email', 'payments', v)} />
+          <ToggleRow label="Fleet alerts" description="Maintenance due and vehicle issues" checked={settings.email.fleet_alerts} onChange={v => setChannel('email', 'fleet_alerts', v)} />
+          <ToggleRow label="Weekly summary" description="Performance digest every Monday" checked={settings.email.weekly_reports} onChange={v => setChannel('email', 'weekly_reports', v)} />
+        </div>
+      </div>
+
+      {/* Push */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <span style={sectionTitleStyle}>Push Notifications</span>
+        </div>
+        <div style={sectionBodyStyle}>
+          <ToggleRow label="New bookings" checked={settings.push.new_bookings} onChange={v => setChannel('push', 'new_bookings', v)} />
+          <ToggleRow label="Payment received" checked={settings.push.payment_received} onChange={v => setChannel('push', 'payment_received', v)} />
+          <ToggleRow label="Maintenance due" checked={settings.push.maintenance_due} onChange={v => setChannel('push', 'maintenance_due', v)} />
+          <ToggleRow label="Driver status updates" checked={settings.push.driver_updates} onChange={v => setChannel('push', 'driver_updates', v)} />
+        </div>
+      </div>
+
+      {/* SMS */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <span style={sectionTitleStyle}>SMS Notifications</span>
+        </div>
+        <div style={sectionBodyStyle}>
+          <ToggleRow label="Critical alerts only" description="System-wide urgent notifications" checked={settings.sms.critical_alerts} onChange={v => setChannel('sms', 'critical_alerts', v)} />
+          <ToggleRow label="Payment confirmations" checked={settings.sms.payment_confirmations} onChange={v => setChannel('sms', 'payment_confirmations', v)} />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button className="btn-action" onClick={handleSave} disabled={saving} style={{ opacity: saving ? 0.6 : 1 }}>
+          {saved ? '✓ SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
+        </button>
       </div>
     </div>
   );

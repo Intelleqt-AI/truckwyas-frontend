@@ -8,14 +8,18 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-gradient-dashboard">
-        <TopBar />
+    <SidebarProvider defaultOpen={true}>
+      <div className="min-h-screen flex w-full bg-muted/30">
+        {/* Dark Sidebar - Fixed Left */}
         <LeftNav />
 
+        {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Clean Top Bar */}
+          <TopBar />
+
           {/* Main Content */}
-          <main className="flex-1 p-6 overflow-auto mt-16">
+          <main className="flex-1 p-8 overflow-auto">
             {children}
           </main>
         </div>

@@ -188,11 +188,11 @@ export function FleetTable({ data, maxRows = 10, className }: FleetTableProps) {
                     </span>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="h-8 px-3"
-                      onClick={() => navigate(`/fleet/vehicle/${vehicle.vehicleId}`)}
+                      onClick={() => navigate(`/fleet/vehicles/${vehicle.vehicleId}`)}
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       View

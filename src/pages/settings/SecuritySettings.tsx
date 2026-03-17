@@ -1,203 +1,227 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Shield, Key, Smartphone, AlertTriangle, CheckCircle } from "lucide-react";
-import { toast } from "sonner";
+import { useState, useEffect } from "react";
+import { fetchData, postData } from "@/lib/Api";
+
+const sectionStyle: React.CSSProperties = {
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--card-radius)',
+  marginBottom: 16,
+};
+
+const sectionHeaderStyle: React.CSSProperties = {
+  padding: '16px 20px 12px',
+  borderBottom: '1px solid var(--border-subtle)',
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--text-secondary)',
+  fontWeight: 600,
+};
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  fontFamily: 'var(--font-mono)',
+  fontSize: 10,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--text-tertiary)',
+  marginBottom: 6,
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: 'var(--input-bg)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 2,
+  padding: '8px 12px',
+  color: 'var(--text-primary)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 13,
+  outline: 'none',
+};
+
+interface ToggleRowProps {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  badge?: string;
+  badgeColor?: string;
+}
+
+function ToggleRow({ label, description, checked, onChange, badge, badgeColor }: ToggleRowProps) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '14px 20px', borderBottom: '1px solid var(--border-row)',
+    }}>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: description ? 2 : 0 }}>
+          <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{label}</span>
+          {badge && (
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 6px',
+              borderRadius: 2, background: badgeColor || 'var(--status-success-bg)',
+              color: badgeColor ? 'var(--bg-deep)' : 'var(--accent-primary)',
+              textTransform: 'uppercase', letterSpacing: '0.08em',
+            }}>{badge}</span>
+          )}
+        </div>
+        {description && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{description}</div>}
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        style={{
+          width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer',
+          background: checked ? 'var(--accent-primary)' : 'var(--border-active)',
+          position: 'relative', flexShrink: 0, transition: 'background 0.2s',
+        }}
+      >
+        <span style={{
+          position: 'absolute', top: 2, left: checked ? 18 : 2,
+          width: 16, height: 16, borderRadius: '50%', background: 'var(--bg-surface)',
+          transition: 'left 0.2s',
+        }} />
+      </button>
+    </div>
+  );
+}
 
 export function SecuritySettings() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
+  const [twoFactor, setTwoFactor] = useState(true);
   const [sessionTimeout, setSessionTimeout] = useState(true);
+  const [loginAlerts, setLoginAlerts] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: '', new1: '', new2: '' });
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+
+  useEffect(() => {
+    fetchData('api/v1/auth/sessions/')
+      .then((d: any) => {
+        setSessions(Array.isArray(d) ? d : (d?.results || []));
+      })
+      .catch(() => {
+        setSessions([]);
+      })
+      .finally(() => setLoadingSessions(false));
+  }, []);
 
   const handleChangePassword = async () => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast.success("Password changed successfully");
-    setIsLoading(false);
+    if (!pwForm.current || !pwForm.new1) return;
+    if (pwForm.new1 !== pwForm.new2) { alert('Passwords do not match'); return; }
+    setSaving(true);
+    try {
+      await postData({
+        url: 'api/v1/auth/password-reset/',
+        data: { current_password: pwForm.current, new_password: pwForm.new1 },
+      });
+      setPwForm({ current: '', new1: '', new2: '' });
+      alert('Password updated successfully');
+    } catch (err) {
+      console.error('Password change failed:', err);
+      alert('Failed to update password');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const sessions = [
-    {
-      id: 1,
-      device: "Chrome on Windows",
-      location: "Johannesburg, South Africa",
-      lastActive: "Current session",
-      current: true
-    },
-    {
-      id: 2,
-      device: "Safari on iPhone",
-      location: "Cape Town, South Africa", 
-      lastActive: "2 hours ago",
-      current: false
-    },
-    {
-      id: 3,
-      device: "Chrome on MacBook",
-      location: "Durban, South Africa",
-      lastActive: "1 day ago",
-      current: false
-    }
-  ];
-
   return (
-    <div className="space-y-4 max-w-5xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-heading text-foreground">Security Settings</h1>
-        <p className="text-caption text-muted-foreground">
-          Manage your account security and authentication preferences
-        </p>
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
+          Security Settings
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          Manage your account security and authentication methods
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Password */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-body-medium">
-              <Key className="w-4 h-4" />
-              Password
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="currentPassword" className="text-caption">Current Password</Label>
-              <Input id="currentPassword" type="password" />
+      {/* Change Password */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <span style={sectionTitleStyle}>Change Password</span>
+        </div>
+        <div style={{ padding: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>Current Password</label>
+              <input style={inputStyle} type="password" value={pwForm.current} onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))} />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="newPassword" className="text-caption">New Password</Label>
-              <Input id="newPassword" type="password" />
+            <div>
+              <label style={labelStyle}>New Password</label>
+              <input style={inputStyle} type="password" value={pwForm.new1} onChange={e => setPwForm(p => ({ ...p, new1: e.target.value }))} />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="confirmPassword" className="text-caption">Confirm New Password</Label>
-              <Input id="confirmPassword" type="password" />
+            <div>
+              <label style={labelStyle}>Confirm Password</label>
+              <input style={inputStyle} type="password" value={pwForm.new2} onChange={e => setPwForm(p => ({ ...p, new2: e.target.value }))} />
             </div>
-            <Button onClick={handleChangePassword} disabled={isLoading} size="sm" className="w-full">
-              {isLoading ? "Updating..." : "Update Password"}
-            </Button>
-          </CardContent>
-        </Card>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="btn-action" onClick={handleChangePassword} disabled={saving}>
+              {saving ? 'UPDATING...' : 'UPDATE PASSWORD'}
+            </button>
+          </div>
+        </div>
+      </div>
 
-        {/* Two-Factor Authentication */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-body-medium">
-              <Smartphone className="w-4 h-4" />
-              Two-Factor Authentication
-              {twoFactorEnabled && (
-                <Badge variant="outline" className="bg-success/10 text-success border-success/20 ml-auto">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Enabled
-                </Badge>
+      {/* Security Options */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <span style={sectionTitleStyle}>🛡 Security Options</span>
+        </div>
+        <div style={{ paddingBottom: 4 }}>
+          <ToggleRow label="Two-factor authentication" description="Require OTP on login in addition to password" checked={twoFactor} onChange={setTwoFactor} badge="Recommended" />
+          <ToggleRow label="Session timeout" description="Auto sign out after 30 minutes of inactivity" checked={sessionTimeout} onChange={setSessionTimeout} />
+          <ToggleRow label="Login alerts" description="Email me when a new device signs in" checked={loginAlerts} onChange={setLoginAlerts} />
+        </div>
+      </div>
+
+      {/* Active Sessions */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <span style={sectionTitleStyle}>Active Sessions</span>
+        </div>
+        {loadingSessions ? (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>Loading sessions...</div>
+        ) : sessions.length === 0 ? (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>No active sessions</div>
+        ) : (
+          <div>
+          {sessions.map((s, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '14px 20px', borderBottom: i < sessions.length - 1 ? '1px solid var(--border-row)' : 'none',
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{s.device}</span>
+                  {s.current && (
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 6px',
+                      borderRadius: 2, background: 'var(--status-success-bg)',
+                      color: 'var(--accent-primary)', textTransform: 'uppercase',
+                    }}>Current</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{s.location} · {s.time}</div>
+              </div>
+              {!s.current && (
+                <button style={{
+                  background: 'none', border: '1px solid var(--status-danger)',
+                  color: 'var(--status-danger)', padding: '5px 10px',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                  cursor: 'pointer', letterSpacing: '0.05em',
+                }}>REVOKE</button>
               )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-3">
-            <div className="flex items-center justify-between py-1">
-              <div>
-                <Label className="text-body">Enable 2FA</Label>
-                <p className="text-caption text-muted-foreground">
-                  Extra security using authenticator app
-                </p>
-              </div>
-              <Switch
-                checked={twoFactorEnabled}
-                onCheckedChange={setTwoFactorEnabled}
-              />
             </div>
-            
-            {twoFactorEnabled && (
-              <div className="bg-muted/20 p-3 rounded-lg space-y-2">
-                <p className="text-caption text-foreground">Authenticator App Connected</p>
-                <p className="text-caption text-muted-foreground">
-                  Protected with Google Authenticator
-                </p>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    Recovery Codes
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    Reconfigure
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Security Preferences & Active Sessions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Security Preferences */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-body-medium">
-              <Shield className="w-4 h-4" />
-              Security Preferences
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex items-center justify-between py-1">
-              <div>
-                <Label className="text-body">Auto Session Timeout</Label>
-                <p className="text-caption text-muted-foreground">
-                  Log out after 30 minutes of inactivity
-                </p>
-              </div>
-              <Switch
-                checked={sessionTimeout}
-                onCheckedChange={setSessionTimeout}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Active Sessions */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-body-medium">Active Sessions</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-3">
-              {sessions.slice(0, 2).map((session, index) => (
-                <div key={session.id}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-body">{session.device}</p>
-                        {session.current && (
-                          <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-                            Current
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-caption text-muted-foreground">
-                        {session.location} • {session.lastActive}
-                      </p>
-                    </div>
-                    {!session.current && (
-                      <Button variant="outline" size="sm">
-                        Revoke
-                      </Button>
-                    )}
-                  </div>
-                  {index === 0 && <div className="border-t border-border mt-2 pt-2" />}
-                </div>
-              ))}
-            </div>
-            
-            <div className="flex items-center gap-2 text-caption text-muted-foreground mt-3 pt-2 border-t border-border">
-              <AlertTriangle className="w-3 h-3" />
-              <span>Report suspicious activity immediately</span>
-            </div>
-          </CardContent>
-        </Card>
+          ))}
+          </div>
+        )}
       </div>
     </div>
   );

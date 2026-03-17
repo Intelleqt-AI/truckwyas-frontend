@@ -1,420 +1,217 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Upload, Save, Edit, X, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import useFetch from "@/hooks/useFetch";
-import { usePatch } from "@/hooks/usePatch";
-import { usePost } from "@/hooks/usePost";
-import { useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { fetchData, patchData } from "@/lib/Api";
+
+const sectionStyle: React.CSSProperties = {
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--card-radius)',
+  marginBottom: 16,
+};
+
+const sectionHeaderStyle: React.CSSProperties = {
+  padding: '16px 20px 12px',
+  borderBottom: '1px solid var(--border-subtle)',
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--text-secondary)',
+  fontWeight: 600,
+};
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  fontFamily: 'var(--font-mono)',
+  fontSize: 10,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--text-tertiary)',
+  marginBottom: 6,
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: 'var(--input-bg)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 2,
+  padding: '8px 12px',
+  color: 'var(--text-primary)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 13,
+  outline: 'none',
+};
+
+const selectStyle: React.CSSProperties = { ...inputStyle, cursor: 'pointer' };
+const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 };
+const grid3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 };
 
 export function CompanySettings() {
-  const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isEditing, setIsEditing] = useState(false);
-
-  const { data: companyData, isLoading: isFetching } = useFetch("api/company/profile/");
-
-  const [formData, setFormData] = useState({
-    company_name: "",
-    registration_number: "",
-    vat_number: "",
-    industry: "logistics",
-    website: "",
-    description: "",
-    logo_url: "",
-    address: {
-      street: "",
-      city: "",
-      province: "",
-      postal_code: "",
-      country: "South Africa"
-    },
-    contact: {
-      phone: "",
-      email: "",
-      support_email: ""
-    }
+  const [form, setForm] = useState({
+    company_name: '', registration_number: '', vat_number: '',
+    industry: 'logistics', website: '', description: '',
+    street: '', city: '', province: '', postal_code: '', country: 'South Africa',
+    phone: '', email: '', support_email: '',
   });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (companyData) {
-      setFormData({
-        company_name: companyData.company_name || "",
-        registration_number: companyData.registration_number || "",
-        vat_number: companyData.vat_number || "",
-        industry: companyData.industry || "logistics",
-        website: companyData.website || "",
-        description: companyData.description || "",
-        logo_url: companyData.logo_url || "",
-        address: {
-          street: companyData.address?.street || "",
-          city: companyData.address?.city || "",
-          province: companyData.address?.province || "",
-          postal_code: companyData.address?.postal_code || "",
-          country: companyData.address?.country || "South Africa"
-        },
-        contact: {
-          phone: companyData.contact?.phone || "",
-          email: companyData.contact?.email || "",
-          support_email: companyData.contact?.support_email || ""
-        }
+    fetchData('/api/v1/company/profile/').then((d: any) => {
+      if (d) setForm({
+        company_name: d.company_name || '',
+        registration_number: d.registration_number || '',
+        vat_number: d.vat_number || '',
+        industry: d.industry || 'logistics',
+        website: d.website || '',
+        description: d.description || '',
+        street: d.address?.street || '',
+        city: d.address?.city || '',
+        province: d.address?.province || '',
+        postal_code: d.address?.postal_code || '',
+        country: d.address?.country || 'South Africa',
+        phone: d.contact?.phone || '',
+        email: d.contact?.email || '',
+        support_email: d.contact?.support_email || '',
       });
-    }
-  }, [companyData]);
+    }).catch(() => {});
+  }, []);
 
-  const { mutate: updateProfile, isPending: isUpdating } = usePatch({
-    onSuccess: () => {
-      toast.success("Company details updated successfully");
-      queryClient.invalidateQueries({ queryKey: ["api/company/profile/"] });
-      setIsEditing(false);
-    },
-    onError: () => {
-      toast.error("Failed to update company details");
-    },
-  });
+  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
-  const { mutate: uploadLogo, isPending: isUploading } = usePost({
-    onSuccess: (data) => {
-      toast.success("Logo uploaded successfully");
-      setFormData(prev => ({ ...prev, logo_url: data.logo_url }));
-      queryClient.invalidateQueries({ queryKey: ["api/company/profile/"] });
-    },
-    onError: () => {
-      toast.error("Failed to upload logo");
-    },
-  });
-
-  const handleSave = () => {
-    updateProfile({ url: "api/company/profile/", data: formData });
-  };
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const uploadData = new FormData();
-      uploadData.append('logo', file);
-      uploadLogo({
-        url: "api/company/logo/",
-        data: uploadData,
-        config: {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      });
-    }
-  };
-
-  const handleChange = (field: string, value: string, nested?: string) => {
-    if (nested) {
-      setFormData(prev => ({
-        ...prev,
-        [nested]: {
-          ...prev[nested as keyof typeof prev] as any,
-          [field]: value
-        }
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
-    }
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await patchData({ url: '/api/v1/company/profile/', data: {
+        company_name: form.company_name,
+        registration_number: form.registration_number,
+        vat_number: form.vat_number,
+        industry: form.industry,
+        website: form.website,
+        description: form.description,
+        address: { street: form.street, city: form.city, province: form.province, postal_code: form.postal_code, country: form.country },
+        contact: { phone: form.phone, email: form.email, support_email: form.support_email },
+      } });
+      setSaved(true); setTimeout(() => setSaved(false), 2000);
+    } catch {}
+    setSaving(false);
   };
 
   return (
-    <div className="space-y-4 max-w-5xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-heading text-foreground">Company Details</h1>
-        <p className="text-caption text-muted-foreground">
-          Manage your company information and branding settings
-        </p>
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Company Details</div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Your business information and branding</div>
       </div>
 
-      {/* Company Logo */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-body-medium">Company Logo</CardTitle>
-        </CardHeader>
-        <CardContent className="p-3">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden border border-border">
-              {formData.logo_url ? (
-                <img
-                  src={formData.logo_url}
-                  alt="Company Logo"
-                  className="w-full h-full object-contain p-2"
-                />
-              ) : (
-                <Building2 className="w-8 h-8 text-muted-foreground" />
-              )}
+      {/* Business Info */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Business Information</span></div>
+        <div style={{ padding: 20 }}>
+          <div style={{ ...grid2, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>Company Name</label>
+              <input style={inputStyle} value={form.company_name} onChange={e => set('company_name', e.target.value)} />
             </div>
-            <div className="space-y-1">
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handleLogoUpload}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-              >
-                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                {isUploading ? "Uploading..." : "Upload New Logo"}
-              </Button>
-              <p className="text-caption text-muted-foreground">
-                SVG, PNG or JPG. Max size 2MB.
-              </p>
+            <div>
+              <label style={labelStyle}>Industry</label>
+              <select style={selectStyle} value={form.industry} onChange={e => set('industry', e.target.value)}>
+                <option value="logistics">Logistics</option>
+                <option value="road_freight">Road Freight</option>
+                <option value="courier">Courier</option>
+                <option value="warehousing">Warehousing</option>
+              </select>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Basic Information */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-body-medium">
-              <Building2 className="w-4 h-4" />
-              Basic Information
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditing(!isEditing)}
-              className="gap-2"
-            >
-              {isEditing ? <X className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
-              {isEditing ? 'Cancel' : 'Edit'}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-3">
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="company_name" className="text-caption text-muted-foreground">Company Name</Label>
-              <Input
-                id="company_name"
-                value={formData.company_name}
-                readOnly={!isEditing}
-                onChange={(e) => handleChange('company_name', e.target.value)}
-                className={`text-body ${!isEditing ? "bg-muted/30" : ""}`}
-              />
+          <div style={{ ...grid2, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>Registration Number</label>
+              <input style={inputStyle} value={form.registration_number} onChange={e => set('registration_number', e.target.value)} placeholder="YYYY/XXXXXX/XX" />
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="registration_number" className="text-caption text-muted-foreground">Registration Number</Label>
-                <Input
-                  id="registration_number"
-                  value={formData.registration_number}
-                  readOnly={!isEditing}
-                  onChange={(e) => handleChange('registration_number', e.target.value)}
-                  className={`text-body ${!isEditing ? "bg-muted/30" : ""}`}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="vat_number" className="text-caption text-muted-foreground">VAT Number</Label>
-                <Input
-                  id="vat_number"
-                  value={formData.vat_number}
-                  readOnly={!isEditing}
-                  onChange={(e) => handleChange('vat_number', e.target.value)}
-                  className={`text-body ${!isEditing ? "bg-muted/30" : ""}`}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="industry" className="text-caption text-muted-foreground">Industry</Label>
-                {isEditing ? (
-                  <Select value={formData.industry} onValueChange={(value) => handleChange('industry', value)}>
-                    <SelectTrigger className="text-body">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="logistics">Logistics & Transportation</SelectItem>
-                      <SelectItem value="freight">Freight Forwarding</SelectItem>
-                      <SelectItem value="supply-chain">Supply Chain</SelectItem>
-                      <SelectItem value="warehousing">Warehousing</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    value="Logistics & Transportation"
-                    readOnly
-                    className="text-body bg-muted/30"
-                  />
-                )}
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="website" className="text-caption text-muted-foreground">Website</Label>
-                <Input
-                  id="website"
-                  value={formData.website}
-                  readOnly={!isEditing}
-                  onChange={(e) => handleChange('website', e.target.value)}
-                  className={`text-body ${!isEditing ? "bg-muted/30" : ""}`}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="description" className="text-caption text-muted-foreground">Company Description</Label>
-              <Textarea
-                id="description"
-                rows={2}
-                value={formData.description}
-                readOnly={!isEditing}
-                onChange={(e) => handleChange('description', e.target.value)}
-                className={`text-body ${!isEditing ? "bg-muted/30" : ""}`}
-              />
+            <div>
+              <label style={labelStyle}>VAT Number</label>
+              <input style={inputStyle} value={form.vat_number} onChange={e => set('vat_number', e.target.value)} placeholder="4XXXXXXXXX" />
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Website</label>
+            <input style={inputStyle} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://" />
+          </div>
+          <div>
+            <label style={labelStyle}>Description</label>
+            <textarea
+              style={{ ...inputStyle, minHeight: 72, resize: 'vertical' as const }}
+              value={form.description}
+              onChange={e => set('description', e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
 
-      {/* Business Address */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-body-medium">Business Address</CardTitle>
-        </CardHeader>
-        <CardContent className="p-3">
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="street" className="text-caption text-muted-foreground">Street Address</Label>
-              <Input
-                id="street"
-                value={formData.address.street}
-                readOnly={!isEditing}
-                onChange={(e) => handleChange('street', e.target.value, 'address')}
-                className={`text-body ${!isEditing ? "bg-muted/30" : ""}`}
-              />
+      {/* Address */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>📍 Business Address</span></div>
+        <div style={{ padding: 20 }}>
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Street Address</label>
+            <input style={inputStyle} value={form.street} onChange={e => set('street', e.target.value)} />
+          </div>
+          <div style={{ ...grid3, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>City</label>
+              <input style={inputStyle} value={form.city} onChange={e => set('city', e.target.value)} />
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="city" className="text-caption text-muted-foreground">City</Label>
-                <Input
-                  id="city"
-                  value={formData.address.city}
-                  readOnly={!isEditing}
-                  onChange={(e) => handleChange('city', e.target.value, 'address')}
-                  className={`text-body ${!isEditing ? "bg-muted/30" : ""}`}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="province" className="text-caption text-muted-foreground">Province</Label>
-                {isEditing ? (
-                  <Select
-                    value={formData.address.province}
-                    onValueChange={(value) => handleChange('province', value, 'address')}
-                  >
-                    <SelectTrigger className="text-body">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Gauteng">Gauteng</SelectItem>
-                      <SelectItem value="Western Cape">Western Cape</SelectItem>
-                      <SelectItem value="KwaZulu-Natal">KwaZulu-Natal</SelectItem>
-                      <SelectItem value="Eastern Cape">Eastern Cape</SelectItem>
-                      <SelectItem value="Free State">Free State</SelectItem>
-                      <SelectItem value="Limpopo">Limpopo</SelectItem>
-                      <SelectItem value="Mpumalanga">Mpumalanga</SelectItem>
-                      <SelectItem value="North West">North West</SelectItem>
-                      <SelectItem value="Northern Cape">Northern Cape</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    value={formData.address.province}
-                    readOnly
-                    className="text-body bg-muted/30"
-                  />
-                )}
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="postal_code" className="text-caption text-muted-foreground">Postal Code</Label>
-                <Input
-                  id="postal_code"
-                  value={formData.address.postal_code}
-                  readOnly={!isEditing}
-                  onChange={(e) => handleChange('postal_code', e.target.value, 'address')}
-                  className={`text-body ${!isEditing ? "bg-muted/30" : ""}`}
-                />
-              </div>
+            <div>
+              <label style={labelStyle}>Province</label>
+              <select style={selectStyle} value={form.province} onChange={e => set('province', e.target.value)}>
+                <option value="">Select province</option>
+                <option value="GP">Gauteng</option>
+                <option value="WC">Western Cape</option>
+                <option value="KZN">KwaZulu-Natal</option>
+                <option value="EC">Eastern Cape</option>
+                <option value="LP">Limpopo</option>
+                <option value="MP">Mpumalanga</option>
+                <option value="NW">North West</option>
+                <option value="FS">Free State</option>
+                <option value="NC">Northern Cape</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Postal Code</label>
+              <input style={inputStyle} value={form.postal_code} onChange={e => set('postal_code', e.target.value)} />
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Contact Information */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-body-medium">Contact Information</CardTitle>
-        </CardHeader>
-        <CardContent className="p-3">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="phone" className="text-caption text-muted-foreground">Phone Number</Label>
-                <Input
-                  id="phone"
-                  value={formData.contact.phone}
-                  readOnly={!isEditing}
-                  onChange={(e) => handleChange('phone', e.target.value, 'contact')}
-                  className={`text-body ${!isEditing ? "bg-muted/30" : ""}`}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="email" className="text-caption text-muted-foreground">General Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.contact.email}
-                  readOnly={!isEditing}
-                  onChange={(e) => handleChange('email', e.target.value, 'contact')}
-                  className={`text-body ${!isEditing ? "bg-muted/30" : ""}`}
-                />
-              </div>
+      {/* Contact */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>📞 Contact Details</span></div>
+        <div style={{ padding: 20 }}>
+          <div style={{ ...grid3 }}>
+            <div>
+              <label style={labelStyle}>Phone</label>
+              <input style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
             </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="support_email" className="text-caption text-muted-foreground">Support Email</Label>
-              <Input
-                id="support_email"
-                type="email"
-                value={formData.contact.support_email}
-                readOnly={!isEditing}
-                onChange={(e) => handleChange('support_email', e.target.value, 'contact')}
-                className={`text-body max-w-md ${!isEditing ? "bg-muted/30" : ""}`}
-              />
+            <div>
+              <label style={labelStyle}>Business Email</label>
+              <input style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>Support Email</label>
+              <input style={inputStyle} type="email" value={form.support_email} onChange={e => set('support_email', e.target.value)} />
             </div>
           </div>
+        </div>
+      </div>
 
-          {isEditing && (
-            <div className="flex gap-2 pt-3 mt-3 border-t border-border">
-              <Button onClick={handleSave} disabled={isUpdating} className="gap-2" size="sm">
-                <Save className="w-4 h-4" />
-                {isUpdating ? "Saving..." : "Save Changes"}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
-                Cancel
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button className="btn-action" onClick={handleSave} disabled={saving} style={{ opacity: saving ? 0.6 : 1 }}>
+          {saved ? '✓ SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
+        </button>
+      </div>
     </div>
   );
 }

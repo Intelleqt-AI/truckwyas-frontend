@@ -1,245 +1,257 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
-import { CreditCard, Download, Receipt, AlertCircle, CheckCircle } from "lucide-react";
-import { toast } from "sonner";
+import { useState, useEffect } from "react";
+import { fetchData, postData } from "@/lib/Api";
+// postData signature: ({ url, data }) => Promise
+import { toast } from "@/lib/toast";
+
+const sectionStyle: React.CSSProperties = {
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--card-radius)',
+  marginBottom: 16,
+};
+
+const sectionHeaderStyle: React.CSSProperties = {
+  padding: '14px 20px',
+  borderBottom: '1px solid var(--border-subtle)',
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--text-secondary)',
+  fontWeight: 600,
+};
+
+interface CompanyProfile {
+  subscription_plan?: string | null;
+  subscription_status?: string | null;
+  company_name?: string;
+}
+
+interface BillingTransaction {
+  id: string;
+  pf_payment_id: string;
+  created_at: string;
+  amount: number;
+  status: string;
+}
+
+const PRO_PLAN = {
+  key: 'pro',
+  name: 'TruckWys Pro',
+  price: 4999,
+  features: [
+    'Unlimited loads & invoices',
+    'AI-powered quote optimisation',
+    'Fast Pay capital access',
+    'Advanced analytics & reporting',
+    'Fleet intelligence dashboard',
+    'Multi-user access',
+    'API & integrations',
+    'Priority support',
+  ],
+};
 
 export function BillingSettings() {
-  const [currentPlan] = useState({
-    name: "Professional",
-    price: 2499,
-    billing: "monthly",
-    users: 15,
-    maxUsers: 25,
-    features: [
-      "AI-powered quote optimization",
-      "Advanced analytics & reporting",
-      "Fleet management",
-      "API integrations",
-      "Priority support"
-    ]
-  });
+  const [profile, setProfile] = useState<CompanyProfile | null>(null);
+  const [billingHistory, setBillingHistory] = useState<BillingTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [subscribing, setSubscribing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
-  const invoices = [
-    {
-      id: "INV-2024-003",
-      date: "2024-09-01",
-      amount: 2499,
-      status: "paid",
-      downloadUrl: "#"
-    },
-    {
-      id: "INV-2024-002", 
-      date: "2024-08-01",
-      amount: 2499,
-      status: "paid",
-      downloadUrl: "#"
-    },
-    {
-      id: "INV-2024-001",
-      date: "2024-07-01", 
-      amount: 2499,
-      status: "paid",
-      downloadUrl: "#"
+  useEffect(() => {
+    fetchData('api/v1/company/profile/')
+      .then((data) => setProfile(data))
+      .catch(() => setProfile(null))
+      .finally(() => setLoading(false));
+
+    fetchData('api/v1/billing/history/')
+      .then((data) => setBillingHistory(data.results || data || []))
+      .catch(() => setBillingHistory([]));
+  }, []);
+
+  const handleSubscribe = async () => {
+    setSubscribing(true);
+    try {
+      const data = await postData({ url: 'api/v1/billing/subscribe/', data: {
+        plan: 'pro',
+        return_url: `${window.location.origin}/settings/billing?success=1`,
+        cancel_url: `${window.location.origin}/settings/billing?cancelled=1`,
+        notify_url: `${window.location.origin}/api/v1/billing/itn/`,
+      }});
+      if ((data.payfast_url || data.payment_url) && data.form_data) {
+        // PayFast requires a form POST — build and auto-submit a hidden form
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = data.payfast_url || data.payment_url;
+        Object.entries(data.form_data).forEach(([key, value]) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = String(value);
+          form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+      } else {
+        toast.error('Could not initiate payment. Please try again.');
+      }
+    } catch {
+      toast.error('Failed to start subscription. Please try again.');
+    } finally {
+      setSubscribing(false);
     }
-  ];
-
-  const handleDownloadInvoice = (invoiceId: string) => {
-    toast.success(`Downloading ${invoiceId}`);
   };
 
-  const handleUpdatePayment = () => {
-    toast.success("Payment method updated");
+  const handleCancel = async () => {
+    if (!window.confirm('Are you sure you want to cancel your subscription?')) return;
+    setCancelling(true);
+    try {
+      await postData({ url: 'api/v1/billing/cancel/', data: {} });
+      toast.success('Subscription cancelled.');
+      setProfile(prev => prev ? { ...prev, subscription_status: 'cancelled' } : prev);
+    } catch {
+      toast.error('Failed to cancel subscription. Please contact support.');
+    } finally {
+      setCancelling(false);
+    }
   };
+
+  const planKey = profile?.subscription_plan?.toLowerCase() || 'free';
+  const isActive = profile?.subscription_status === 'active';
+  const isPro = planKey === 'pro' && isActive;
 
   return (
-    <div className="space-y-4 max-w-5xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-heading text-foreground">Billing & Subscription</h1>
-        <p className="text-caption text-muted-foreground">
-          Manage your subscription, payment methods, and billing history
-        </p>
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Billing</div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Manage your subscription and payment history</div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Current Plan */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-body-medium">
-              <span>Current Plan</span>
-              <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Active
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-body-medium">{currentPlan.name} Plan</h3>
-                <p className="text-caption text-muted-foreground">
-                  R{currentPlan.price.toLocaleString()}/{currentPlan.billing}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-caption text-muted-foreground">Next billing</p>
-                <p className="text-body">Oct 1, 2024</p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-caption">
-                <span>Users ({currentPlan.users}/{currentPlan.maxUsers})</span>
-                <span>{Math.round((currentPlan.users / currentPlan.maxUsers) * 100)}%</span>
-              </div>
-              <Progress value={(currentPlan.users / currentPlan.maxUsers) * 100} className="h-2" />
-            </div>
-
-            <div className="space-y-1">
-              <p className="text-body">Plan Features:</p>
-              <ul className="space-y-0.5">
-                {currentPlan.features.slice(0, 3).map((feature, index) => (
-                  <li key={index} className="text-caption text-muted-foreground flex items-center gap-2">
-                    <CheckCircle className="w-3 h-3 text-success" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">Change Plan</Button>
-              <Button variant="outline" size="sm">Cancel</Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Payment Method & Usage */}
-        <div className="space-y-4">
-          {/* Payment Method */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-body-medium">
-                <CreditCard className="w-4 h-4" />
-                Payment Method
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-6 bg-gradient-to-r from-blue-600 to-blue-400 rounded flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">VISA</span>
-                  </div>
-                  <div>
-                    <p className="text-body">•••• 4242</p>
-                    <p className="text-caption text-muted-foreground">Expires 12/26</p>
-                  </div>
-                </div>
-                <Button variant="outline" size="sm" onClick={handleUpdatePayment}>
-                  Update
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Usage & Limits */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-body-medium">Usage & Limits</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-caption">API Calls</span>
-                  <span className="text-caption text-muted-foreground text-tabular">8,234 / 10,000</span>
-                </div>
-                <Progress value={82.34} className="h-1.5" />
-              </div>
-              
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-caption">Data Storage</span>
-                  <span className="text-caption text-muted-foreground text-tabular">15.2 GB / 25 GB</span>
-                </div>
-                <Progress value={60.8} className="h-1.5" />
-              </div>
-              
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-caption">Integrations</span>
-                  <span className="text-caption text-muted-foreground text-tabular">3 / 5</span>
-                </div>
-                <Progress value={60} className="h-1.5" />
-              </div>
-            </CardContent>
-          </Card>
+      {loading && (
+        <div style={sectionStyle}>
+          <div style={{ padding: 20 }}>
+            <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
+            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, width: '40%' }} />
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Billing History */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-body-medium">
-            <Receipt className="w-4 h-4" />
-            Billing History
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="space-y-3">
-            {invoices.slice(0, 3).map((invoice, index) => (
-              <div key={invoice.id}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-body">{invoice.id}</p>
-                      <Badge 
-                        variant="outline" 
-                        className="bg-success/10 text-success border-success/20"
-                      >
-                        Paid
-                      </Badge>
-                    </div>
-                    <p className="text-caption text-muted-foreground">
-                      {new Date(invoice.date).toLocaleDateString('en-ZA', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-body text-tabular">
-                      R{invoice.amount.toLocaleString()}
-                    </span>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleDownloadInvoice(invoice.id)}
-                      className="gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download
-                    </Button>
-                  </div>
+      {!loading && (
+        <div style={sectionStyle}>
+          <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Plan</span></div>
+          <div style={{ padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                  <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {isPro ? PRO_PLAN.name : 'Free Plan'}
+                  </span>
+                  {isPro && (
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 7px',
+                      background: 'var(--status-success-bg)', color: 'var(--accent-primary)',
+                      borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
+                    }}>Active</span>
+                  )}
                 </div>
-                {index < 2 && <Separator className="mt-2" />}
+                <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                  {isPro ? `R ${PRO_PLAN.price.toLocaleString()} / month` : 'No active subscription'}
+                </div>
               </div>
-            ))}
+              <div style={{ display: 'flex', gap: 8 }}>
+                {isPro ? (
+                  <button onClick={handleCancel} disabled={cancelling} style={{
+                    background: 'none', border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-secondary)', padding: '7px 14px',
+                    fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                    opacity: cancelling ? 0.6 : 1,
+                  }}>
+                    {cancelling ? 'CANCELLING...' : 'CANCEL PLAN'}
+                  </button>
+                ) : (
+                  <button onClick={handleSubscribe} disabled={subscribing} className="btn-action">
+                    {subscribing ? 'REDIRECTING...' : 'SUBSCRIBE — R4,999/MO'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {PRO_PLAN.features.map(f => (
+                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: isPro ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}>
+                  <span style={{ color: isPro ? 'var(--accent-primary)' : 'var(--border-subtle)', fontSize: 14 }}>✓</span>
+                  {f}
+                </div>
+              ))}
+            </div>
+
+            {!isPro && (
+              <div style={{
+                marginTop: 16, padding: 12,
+                background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
+                borderRadius: 2, fontSize: 12, color: 'var(--text-secondary)',
+              }}>
+                <strong style={{ color: 'var(--accent-primary)' }}>Unlock the full platform</strong>
+                <br />
+                Subscribe to TruckWys Pro for AI-powered insights, Fast Pay capital access, and unlimited loads.
+              </div>
+            )}
           </div>
-          
-          <div className="flex items-start gap-2 text-caption text-muted-foreground mt-3 pt-2 border-t border-border">
-            <AlertCircle className="w-3 h-3 mt-0.5" />
-            <span>
-              Need help? Contact <strong>billing@truckwys.com</strong> or <strong>+27 11 123 4567</strong>
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
+
+      {!loading && (
+        <div style={sectionStyle}>
+          <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Billing History</span></div>
+          {billingHistory.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center' }}>
+              <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>📄</div>
+              <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 4 }}>No billing history yet</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Payment records will appear here after your first transaction</div>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+              <thead>
+                <tr>
+                  {['Payment ID', 'Date', 'Amount', 'Status'].map(h => (
+                    <th key={h} style={{
+                      padding: '10px 20px', textAlign: 'left' as const,
+                      fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
+                      letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                      borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {billingHistory.map((tx, i) => (
+                  <tr key={tx.id} style={{ borderBottom: i < billingHistory.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
+                    <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>
+                      {tx.pf_payment_id || tx.id}
+                    </td>
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      {new Date(tx.created_at).toLocaleDateString('en-ZA')}
+                    </td>
+                    <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>
+                      R {Number(tx.amount).toLocaleString()}
+                    </td>
+                    <td style={{ padding: '12px 20px' }}>
+                      <span style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 10,
+                        color: tx.status === 'complete' ? 'var(--accent-primary)' : 'var(--status-warning)',
+                        textTransform: 'uppercase' as const,
+                      }}>{tx.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
     </div>
   );
 }

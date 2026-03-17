@@ -1,441 +1,546 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Truck,
-  ArrowUpDown,
-  User,
-  TrendingUp,
-  TrendingDown,
-  Zap,
-} from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatCurrency } from "@/lib/formatters";
-
-import { AIOpportunitiesPanel } from "@/components/fleet/AIOpportunitiesPanel";
-import { AICopilotButton } from "@/components/fleet/AICopilotButton";
-import { AddVehicleModal } from "@/components/fleet/AddVehicleModal";
-import useFetch from "@/hooks/useFetch";
+import { useNavigate, useLocation } from "react-router-dom";
+import { fetchData, postData, patchData } from '../lib/Api';
 
 interface Vehicle {
   id: number;
-  vin: string;
-  make: string;
-  model: string;
-  year: number;
-  plate: string;
-  type: string;
-  capacity: string;
-  status: string;
-  fuel_type: string;
-  mileage: string;
-  last_maintenance_date: string;
-  next_maintenance_due: string;
-  insurance_expiry: string;
-  registration_expiry: string;
-  ai_health_score: number;
-  fuel_efficiency_score: number;
-  uptime_score: number;
-  maintenance_score: number;
-  uptime_percentage: string;
-  cost_per_km: string;
-  margin_per_trip: string;
-  driver_name?: string;
+  registration: string;
+  make?: string;
+  model?: string;
+  vehicle_type?: string;
   vehicle_type_name?: string;
-  created_at: string;
-  updated_at: string;
+  year?: number;
+  capacity?: number;
+  status: string;
+  revenue_this_month?: number;
+  trips_this_month?: number;
+  fuel_efficiency?: number;
+  ai_health_score?: number;
+  plate?: string;
+  vin?: string;
+  mileage?: number;
+  insurance_expiry?: string;
+  registration_expiry?: string;
+  fuel_type?: string;
+  type?: string;
+  last_maintenance_date?: string;
+  next_maintenance_due?: string;
 }
 
-const getStatusColor = (status: string) => {
-  switch (status?.toUpperCase()) {
-    case "AVAILABLE":
-      return "bg-success/10 text-success border-success/20";
-    case "MAINTENANCE":
-      return "bg-warning/10 text-warning border-warning/20";
-    case "IN_TRANSIT":
-    case "EN ROUTE":
-      return "bg-primary/10 text-primary border-primary/20";
-    case "OUT_OF_SERVICE":
-      return "bg-destructive/10 text-destructive border-destructive/20";
-    default:
-      return "bg-muted text-muted-foreground border-muted";
-  }
+interface FleetOverview {
+  header?: any;
+  banner?: any;
+  kpi_cards?: Array<{
+    label: string;
+    value: string | number;
+    change?: string;
+    trend?: string;
+  }>;
+  // Legacy support
+  total_vehicles?: number;
+  active_vehicles?: number;
+  maintenance_vehicles?: number;
+  revenue_this_month?: number;
+}
+
+interface FleetInsight {
+  id?: number;
+  vehicle_id?: number;
+  vehicle_registration?: string;
+  type: string;
+  title: string;
+  message: string;
+  severity?: string;
+  category?: string;
+  icon?: string;
+}
+
+interface FleetIntelligence {
+  title?: string;
+  active_count?: number;
+  opportunities?: FleetInsight[];
+}
+
+const STATUS_COLOR: Record<string, string> = {
+  ACTIVE: 'var(--status-success)',
+  AVAILABLE: 'var(--status-success)',
+  IN_USE: 'var(--status-success)',
+  MAINTENANCE: 'var(--status-warning)',
+  INACTIVE: 'var(--text-tertiary)',
+  OUT_OF_SERVICE: 'var(--text-tertiary)',
 };
+
+const formatZAR = (v: number) =>
+  'R ' + v.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 export default function Vehicles() {
   const navigate = useNavigate();
-  const [sortField, setSortField] = useState<keyof Vehicle | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [viewMode, setViewMode] = useState<"vehicle" | "driver">("vehicle");
+  const location = useLocation();
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [overview, setOverview] = useState<FleetOverview | null>(null);
+  const [insights, setInsights] = useState<FleetInsight[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('revenue');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [addForm, setAddForm] = useState({
+    vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '',
+    type: 'Rigid Truck', capacity: '', fuel_type: 'Diesel', status: 'AVAILABLE',
+  });
+  const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
 
-  const { data: vehiclesData, isLoading: vehiclesLoading, refetch } = useFetch("api/vehicles/");
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      fetchData('api/v1/vehicles/'),
+      fetchData('api/v1/fleet/overview/'),
+      fetchData('api/v1/fleet/intelligence/')
+    ])
+      .then(([vehData, overviewData, insightsData]) => {
+        // Handle paginated response for vehicles
+        const vehiclesArray = Array.isArray(vehData) ? vehData : (vehData?.results || []);
+        setVehicles(vehiclesArray);
 
-  const vehicles: Vehicle[] = vehiclesData?.results || [];
+        // Overview data comes in {header, banner, kpi_cards} format
+        setOverview(overviewData);
 
-  const handleSort = (field: keyof Vehicle) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("desc");
-    }
-  };
+        // Intelligence data comes in {title, active_count, opportunities} format
+        const insightsArray = Array.isArray(insightsData) ? insightsData : (insightsData?.opportunities || []);
+        setInsights(insightsArray);
 
-  const sortedVehicles = [...vehicles].sort((a, b) => {
-    if (!sortField) return 0;
-    const aVal = a[sortField];
-    const bVal = b[sortField];
-    if (aVal === bVal) return 0;
-    // Handle null/undefined
-    if (aVal === null || aVal === undefined) return 1;
-    if (bVal === null || bVal === undefined) return -1;
+        setError(null);
+      })
+      .catch(() => {
+        setError('Failed to load fleet data');
+        setVehicles([]);
+        setOverview(null);
+        setInsights([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
-    const direction = sortDirection === "asc" ? 1 : -1;
-    return aVal > bVal ? direction : -direction;
+  // Filter vehicles
+  const filtered = vehicles.filter(v => {
+    if (statusFilter === 'All') return true;
+    return v.status === statusFilter;
   });
 
-  // Calculations based on available data
-  const avgMargin =
-    vehicles.length > 0
-      ? vehicles.reduce((sum, v) => sum + parseFloat(v.margin_per_trip || "0"), 0) / vehicles.length
-      : 0;
-  const avgCostPerKm =
-    vehicles.length > 0
-      ? vehicles.reduce((sum, v) => sum + parseFloat(v.cost_per_km || "0"), 0) / vehicles.length
-      : 0;
-  const avgAiScore =
-    vehicles.length > 0
-      ? vehicles.reduce((sum, v) => sum + (v.ai_health_score || 0), 0) / vehicles.length
-      : 0;
+  // Sort vehicles
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === 'revenue') {
+      return (b.revenue_this_month || 0) - (a.revenue_this_month || 0);
+    }
+    return 0;
+  });
 
-  const getAiScoreBadge = (score: number) => {
-    if (score === undefined || score === null) return "bg-muted text-muted-foreground border-muted";
-    if (score >= 85) return "bg-success/10 text-success border-success/20";
-    if (score >= 70) return "bg-warning/10 text-warning border-warning/20";
-    return "bg-destructive/10 text-destructive border-destructive/20";
+  const getStatusBadge = (status: string) => {
+    const color = STATUS_COLOR[status] || 'var(--text-secondary)';
+    return (
+      <span style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 10,
+        color,
+        padding: '2px 6px',
+        background: 'var(--bg-surface-hover)',
+        borderRadius: 2,
+        textTransform: 'uppercase'
+      }}>
+        {status.replace('_', ' ')}
+      </span>
+    );
   };
 
+  if (loading) {
+    return (
+      <div style={{ padding: 40 }}>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 8, width: '20%' }} />
+          <div style={{ height: 24, background: 'var(--bg-surface)', borderRadius: 4, width: '30%' }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="card" style={{ padding: 20 }}>
+              <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
+              <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    background: 'none', border: 'none',
+    borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
+    color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+    fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em',
+    textTransform: 'uppercase', padding: '10px 18px', cursor: 'pointer', marginBottom: -1,
+  });
+
   return (
-    <div className="space-y-5 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>HEATMAP</button>
+            <button className="btn-action" onClick={() => setShowAddForm(true)}>+ ADD VEHICLE</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Fleet sub-tabs */}
+      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 20, display: 'flex' }}>
+        <button style={tabStyle(!location.pathname.includes('/drivers'))} onClick={() => navigate('/fleet/vehicles')}>Vehicles</button>
+        <button style={tabStyle(location.pathname.includes('/drivers'))} onClick={() => navigate('/fleet/drivers')}>Drivers</button>
+      </div>
+
+      {/* Fleet Summary — always computed from real vehicle data */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Total Vehicles</span></div>
+          <div className="metric-value" style={{ fontSize: 28 }}>{vehicles.length}</div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Available</span></div>
+          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-success)' }}>
+            {vehicles.filter(v => v.status === 'AVAILABLE' || v.status === 'ACTIVE' || v.status === 'IN_USE').length}
+          </div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">In Maintenance</span></div>
+          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-warning)' }}>
+            {vehicles.filter(v => v.status === 'MAINTENANCE').length}
+          </div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Fleet Health Score</span></div>
+          <div className="metric-value" style={{ fontSize: 28, color: 'var(--accent-primary)' }}>
+            {(() => {
+              const scores = vehicles.filter(v => v.ai_health_score).map(v => v.ai_health_score || 0);
+              return scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : '—';
+            })()}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
+        {/* Vehicle Table */}
         <div>
-          <h1 className="text-display-1 font-display-semibold text-foreground">
-            Fleet Profitability Overview
-          </h1>
-          <p className="text-body text-muted-foreground mt-0.5">
-            AI-driven vehicle performance, efficiency, and profitability
-            insights
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <AddVehicleModal onSuccess={() => refetch()} />
-          <Badge className="bg-success/10 text-success border-success/20">
-            {vehicles.length} Active Vehicles
-          </Badge>
-        </div>
-      </div>
+          {/* Status Filter Tabs */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            {['All', 'ACTIVE', 'MAINTENANCE', 'INACTIVE'].map(status => {
+              const isActive = statusFilter === status;
+              return (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  style={{
+                    background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                    padding: '7px 14px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    borderRadius: 2,
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    fontWeight: isActive ? 600 : 400,
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+                </button>
+              );
+            })}
+          </div>
 
-      {/* AI Summary Bar */}
-      <Card className="bg-gradient-to-r from-brand-500/5 to-brand-300/5 border-brand-500/20">
-        <CardContent className="p-3">
-          <p className="text-body text-foreground">
-            <span className="font-body-medium">
-              Fleet margin up 2.3% this month
-            </span>{" "}
-            driven by improved route pairing and fewer idling hours. 4 vehicles
-            flagged for maintenance risk.
-          </p>
-        </CardContent>
-      </Card>
+          {/* Table */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {['Registration', 'Make / Model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency', ''].map(h => (
+                    <th key={h} style={{
+                      padding: '10px 20px', textAlign: 'left',
+                      fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
+                      letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                      borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.length === 0 ? (
+                  vehicles.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ padding: 0 }}>
+                        <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🚛</div>
+                          <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>
+                            No vehicles yet
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+                            Get started by adding your first vehicle to your fleet
+                          </div>
+                          <button onClick={() => setShowAddForm(true)} className="btn-action">
+                            ADD VEHICLE
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles match your filters</td></tr>
+                  )
+                ) : sorted.map((v, idx) => {
+                  const utilizationPercent = ((v.trips_this_month || 0) / 20) * 100;
+                  const utilizationColor = utilizationPercent > 70 ? 'var(--status-success)' : utilizationPercent >= 40 ? 'var(--status-warning)' : 'var(--status-danger)';
 
-      {/* Fleet Profitability Snapshot */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <Card className="bg-card border-border hover-lift transition-smooth">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div className="space-y-1">
-                <div className="text-caption text-muted-foreground">
-                  Total Active Vehicles
-                </div>
-                <div className="text-display-2 font-display-semibold text-foreground text-tabular">
-                  {vehicles.length}
-                </div>
-              </div>
-              <TrendingUp className="w-4 h-4 text-success" />
-            </div>
-            <p className="text-caption text-muted-foreground">
-              +5 vs last month
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border hover-lift transition-smooth">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div className="space-y-1">
-                <div className="text-caption text-muted-foreground">
-                  Avg Margin per Vehicle (MTD)
-                </div>
-                <div className="text-display-2 font-display-semibold text-foreground text-tabular">
-                  {formatCurrency(avgMargin)}
-                </div>
-              </div>
-              <TrendingUp className="w-4 h-4 text-success" />
-            </div>
-            <p className="text-caption text-success">+12% improvement</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border hover-lift transition-smooth">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div className="space-y-1">
-                <div className="text-caption text-muted-foreground">
-                  Fleet Cost per KM
-                </div>
-                <div className="text-display-2 font-display-semibold text-foreground text-tabular">
-                  R {avgCostPerKm.toFixed(2)}
-                </div>
-              </div>
-              <TrendingDown className="w-4 h-4 text-destructive" />
-            </div>
-            <p className="text-caption text-muted-foreground">
-              vs Target R 20.0
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border hover-lift transition-smooth">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div className="space-y-1">
-                <div className="text-caption text-muted-foreground">
-                  AI Health Score
-                </div>
-                <div className="text-display-2 font-display-semibold text-brand-500 text-tabular">
-                  {avgAiScore.toFixed(0)}/100
-                </div>
-              </div>
-              <Zap className="w-4 h-4 text-brand-500" />
-            </div>
-            <p className="text-caption text-muted-foreground">
-              Based on fuel, uptime, & maintenance
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Vehicle Insights Table */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-body-large font-body-medium text-foreground">
-            Vehicle Insights
-          </h2>
-          <div className="flex items-center gap-1.5 bg-muted/50 rounded-lg p-1">
-            <Button
-              variant={viewMode === "vehicle" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("vehicle")}
-              className="h-8 px-3 text-xs">
-              <Truck className="w-3.5 h-3.5 mr-1.5" />
-              By Vehicle
-            </Button>
-            <Button
-              variant={viewMode === "driver" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("driver")}
-              className="h-8 px-3 text-xs">
-              <User className="w-3.5 h-3.5 mr-1.5" />
-              By Driver
-            </Button>
+                  return (
+                    <tr
+                      key={v.id}
+                      style={{ cursor: 'pointer', borderBottom: idx < sorted.length - 1 ? '1px solid var(--border-row)' : 'none' }}
+                      onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
+                        {v.plate || v.registration || '—'}
+                      </td>
+                      <td style={{ padding: '13px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                        {[v.make, v.model].filter(Boolean).join(' ') || '—'}
+                      </td>
+                      <td style={{ padding: '13px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                        {v.vehicle_type_name || v.vehicle_type || '—'}
+                      </td>
+                      <td style={{ padding: '13px 20px' }}>{getStatusBadge(v.status)}</td>
+                      <td style={{ padding: '13px 20px' }}>
+                        <span style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 11,
+                          color: utilizationColor,
+                          padding: '3px 8px',
+                          background: 'var(--bg-surface-hover)',
+                          borderRadius: 2,
+                          fontWeight: 600
+                        }}>
+                          {Math.min(utilizationPercent, 100).toFixed(0)}%
+                        </span>
+                      </td>
+                      <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {v.revenue_this_month ? formatZAR(v.revenue_this_month) : '—'}
+                      </td>
+                      <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {v.trips_this_month ?? 0}
+                      </td>
+                      <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {v.fuel_efficiency ? `${parseFloat(v.fuel_efficiency as any).toFixed(1)} L/100km` : '—'}
+                      </td>
+                      <td style={{ padding: '13px 20px', textAlign: 'right' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditVehicle(v);
+                            setEditForm({
+                              vin: v.vin || '',
+                              make: v.make || '',
+                              model: v.model || '',
+                              year: v.year || new Date().getFullYear(),
+                              plate: v.plate || v.registration || '',
+                              type: v.vehicle_type || 'Rigid Truck',
+                              capacity: v.capacity || '',
+                              fuel_type: v.fuel_type || 'Diesel',
+                              status: v.status || 'AVAILABLE',
+                              mileage: v.mileage || '',
+                              insurance_expiry: v.insurance_expiry || '',
+                              registration_expiry: v.registration_expiry || '',
+                              last_maintenance_date: v.last_maintenance_date || '',
+                              next_maintenance_due: v.next_maintenance_due || '',
+                            });
+                          }}
+                          style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
+                        >EDIT</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <Card className="bg-card border-border overflow-hidden w-full">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table className="w-full">
-                {/* <colgroup>
-                  <col style={{ width: 180 }} />
-                  <col style={{ width: 150 }} />
-                  <col style={{ width: 120 }} />
-                  <col style={{ width: 160 }} />
-                  <col style={{ width: 160 }} />
-                  <col style={{ width: 130 }} />
-                  <col style={{ width: 100 }} />
-                </colgroup> */}
-                <TableHeader className="bg-muted/30">
-                  <TableRow>
-                    <TableHead className="text-muted-foreground">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSort("plate")}
-                        className="flex items-center gap-1 hover:text-foreground ">
-                        Vehicle
-                        <ArrowUpDown className="w-3 h-3" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-muted-foreground">
-                      Driver
-                    </TableHead>
-                    <TableHead className="text-muted-foreground">
-                      Status
-                    </TableHead>
-                    <TableHead className="text-muted-foreground text-left">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSort("margin_per_trip")}
-                        className="flex items-center gap-1 hover:text-foreground ml-auto">
-                        Margin per Trip
-                        <ArrowUpDown className="w-3 h-3" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-muted-foreground text-left">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSort("cost_per_km")}
-                        className="flex items-center gap-1 hover:text-foreground ml-auto">
-                        Cost per KM
-                        <ArrowUpDown className="w-3 h-3" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-muted-foreground text-left">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSort("uptime_percentage")}
-                        className="flex items-center gap-1 hover:text-foreground ml-auto">
-                        Uptime
-                        <ArrowUpDown className="w-3 h-3" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-muted-foreground text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSort("ai_health_score")}
-                        className="flex items-center gap-1 hover:text-foreground mx-auto">
-                        AI Score
-                        <ArrowUpDown className="w-3 h-3" />
-                      </Button>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {vehiclesLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-10">
-                        Loading vehicles...
-                      </TableCell>
-                    </TableRow>
-                  ) : sortedVehicles.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-10">
-                        No vehicles found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    sortedVehicles.map((vehicle) => (
-                      <TableRow
-                        key={vehicle.id}
-                        className="cursor-pointer hover:bg-muted/50 transition-smooth"
-                        onClick={() => navigate(`/fleet/vehicles/${vehicle.id}`)}>
-                        <TableCell className="font-mono text-foreground font-medium">
-                          <div>
-                            <p>{vehicle.plate || vehicle.vin || vehicle.id}</p>
-                            <p className="text-caption text-muted-foreground font-sans">{vehicle.vehicle_type_name || vehicle.type}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-foreground">
-                          {vehicle.driver_name || "Unassigned"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={getStatusColor(vehicle.status)}>
-                            {vehicle.status.charAt(0).toUpperCase() + vehicle.status.slice(1).toLowerCase().replace('_', ' ')}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-left text-tabular">
-                          <span
-                            className={
-                              parseFloat(vehicle.margin_per_trip) > avgMargin
-                                ? "text-success font-body-medium pl-3"
-                                : parseFloat(vehicle.margin_per_trip) < avgMargin * 0.8
-                                  ? "text-destructive pl-3"
-                                  : "text-foreground pl-3"
-                            }>
-                            {formatCurrency(parseFloat(vehicle.margin_per_trip))}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-left text-tabular">
-                          <span
-                            className={
-                              parseFloat(vehicle.cost_per_km) < avgCostPerKm
-                                ? "text-success pl-3"
-                                : parseFloat(vehicle.cost_per_km) > avgCostPerKm * 1.1
-                                  ? "text-destructive pl-3"
-                                  : "text-foreground pl-3"
-                            }>
-                            R {parseFloat(vehicle.cost_per_km).toFixed(2)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-left text-tabular">
-                          <span
-                            className={
-                              parseFloat(vehicle.uptime_percentage) >= 90
-                                ? "text-success pl-3"
-                                : parseFloat(vehicle.uptime_percentage) >= 80
-                                  ? "text-warning pl-3"
-                                  : "text-destructive pl-3"
-                            }>
-                            {parseFloat(vehicle.uptime_percentage).toFixed(1)}%
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            variant="outline"
-                            className={getAiScoreBadge(vehicle.ai_health_score)}>
-                            {vehicle.ai_health_score}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-muted/30 border-border">
-          <CardContent className="p-3">
-            <p className="text-body text-muted-foreground">
-              Top 3 vehicles generate 32% of fleet profit. 4 vehicles
-              underperform with negative margins.
-            </p>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* AI Opportunities & Risks */}
-      <AIOpportunitiesPanel />
+      {/* Add Vehicle Slide-out */}
+      {showAddForm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setShowAddForm(false)} />
+          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Add Vehicle</div>
+              <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            {[
+              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. 1HGBH41JXMN109186' },
+              { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz' },
+              { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
+              { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
+              { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
+              { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <input
+                  type={f.type || 'text'}
+                  placeholder={f.placeholder}
+                  value={(addForm as any)[f.key]}
+                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: f.type === 'number' ? e.target.value : e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
+            {[
+              { key: 'type', label: 'Vehicle Type', options: ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck'] },
+              { key: 'fuel_type', label: 'Fuel Type', options: ['Diesel', 'Petrol', 'Electric', 'Hybrid'] },
+              { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE'] },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <select
+                  value={(addForm as any)[f.key]}
+                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                >
+                  {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+              <button
+                disabled={saving}
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    await postData({ url: 'api/v1/vehicles/', data: { ...addForm, year: Number(addForm.year), capacity: Number(addForm.capacity) || 0 } });
+                    setShowAddForm(false);
+                    setAddForm({ vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '', type: 'Rigid Truck', capacity: '', fuel_type: 'Diesel', status: 'AVAILABLE' });
+                    // Refresh
+                    const d = await fetchData('api/v1/vehicles/');
+                    setVehicles(Array.isArray(d) ? d : d?.results || []);
+                  } catch (e: any) { alert(e?.message || 'Failed to create vehicle'); }
+                  setSaving(false);
+                }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+              >
+                {saving ? 'SAVING...' : 'CREATE VEHICLE'}
+              </button>
+              <button
+                onClick={() => setShowAddForm(false)}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* AI Copilot Button */}
-      <AICopilotButton />
+      {/* Edit Vehicle Slide-out */}
+      {editVehicle && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditVehicle(null)} />
+          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Vehicle</div>
+              <button onClick={() => setEditVehicle(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            {error && (
+              <div style={{ padding: 12, background: 'var(--status-danger)', color: 'var(--bg-deep)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+                {error}
+              </div>
+            )}
+            {[
+              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. 1HGBH41JXMN109186' },
+              { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz' },
+              { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
+              { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
+              { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
+              { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
+              { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
+              { key: 'insurance_expiry', label: 'Insurance Expiry', type: 'date' },
+              { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
+              { key: 'last_maintenance_date', label: 'Last Maintenance', type: 'date' },
+              { key: 'next_maintenance_due', label: 'Next Maintenance Due', type: 'date' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <input
+                  type={f.type || 'text'}
+                  placeholder={f.placeholder}
+                  value={(editForm as any)[f.key]}
+                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
+            {[
+              { key: 'type', label: 'Vehicle Type', options: ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck'] },
+              { key: 'fuel_type', label: 'Fuel Type', options: ['Diesel', 'Petrol', 'Electric', 'Hybrid'] },
+              { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE', 'OUT_OF_SERVICE'] },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <select
+                  value={(editForm as any)[f.key]}
+                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                >
+                  {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+              <button
+                disabled={saving}
+                onClick={async () => {
+                  setSaving(true);
+                  setError(null);
+                  try {
+                    const payload = {
+                      ...editForm,
+                      year: editForm.year ? Number(editForm.year) : undefined,
+                      capacity: editForm.capacity ? Number(editForm.capacity) : undefined,
+                      mileage: editForm.mileage ? Number(editForm.mileage) : undefined,
+                    };
+                    await patchData({ url: `api/v1/vehicles/${editVehicle.id}/`, data: payload });
+                    setEditVehicle(null);
+                    setEditForm({});
+                    const d = await fetchData('api/v1/vehicles/');
+                    setVehicles(Array.isArray(d) ? d : d?.results || []);
+                  } catch (e: any) {
+                    setError(e?.message || 'Failed to update vehicle');
+                  }
+                  setSaving(false);
+                }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+              >
+                {saving ? 'SAVING...' : 'UPDATE VEHICLE'}
+              </button>
+              <button
+                onClick={() => setEditVehicle(null)}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

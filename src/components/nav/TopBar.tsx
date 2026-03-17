@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { Bell, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bell, User } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -18,7 +17,6 @@ import { cn } from "@/lib/utils";
 import useFetch from "@/hooks/useFetch";
 import { usePost } from "@/hooks/usePost";
 import { useQueryClient } from "@tanstack/react-query";
-import truckwysLogo from "@/assets/truckwys-logo.png";
 
 // Notification interface
 interface AppNotification {
@@ -38,11 +36,36 @@ interface PaginatedResponse<T> {
   results: T[];
 }
 
+// Page title mapping
+const PAGE_TITLES: Record<string, string> = {
+  '/': 'Home',
+  '/bookings': 'Orders',
+  '/bookings/pipeline': 'Pipeline',
+  '/finance-hq': 'Finance Overview',
+  '/finance/invoices': 'Invoices',
+  '/finance/expenses': 'Expenses',
+  '/finance/reports': 'Reports',
+  '/capital': 'Capital',
+  '/fleet': 'Fleet Dashboard',
+  '/fleet/vehicles': 'Vehicles',
+  '/fleet/drivers': 'Drivers',
+  '/settings': 'Settings',
+};
+
 export function TopBar() {
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const queryClient = useQueryClient();
   const { data: notificationsData } = useFetch<PaginatedResponse<AppNotification>>("api/notifications/");
   const notificationList = notificationsData?.results || [];
+
+  useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      setUser(JSON.parse(userStr));
+    }
+  }, []);
 
   const { mutate: markRead } = usePost({
     onSuccess: () => {
@@ -58,42 +81,28 @@ export function TopBar() {
     markRead({ url: "api/notifications/mark-read/", data: { ids: [id] } });
   };
 
+  const pageTitle = PAGE_TITLES[location.pathname] || 'TruckWys';
+
   return (
     <>
       {isOpen && (
         <div className="fixed inset-0 bg-black/20 z-[40] transition-all duration-300" />
       )}
-      <header className="h-16 bg-nav-bg border-b border-nav-border shadow-nav flex items-center justify-between px-6 fixed top-0 left-0 right-0 z-50">
-        {/* Left Section - Logo & Menu */}
+      <header className="h-16 bg-background border-b border-border flex items-center justify-between px-8 sticky top-0 z-40">
+        {/* Left Section - Page Title/Breadcrumb */}
         <div className="flex items-center gap-4">
-          <img
-            src={truckwysLogo}
-            alt="Truckwys"
-            className="h-20"
-          />
-          <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+          <h1 className="text-2xl font-semibold text-foreground">{pageTitle}</h1>
         </div>
 
-        {/* Center Section - AI Search */}
-        <div className="flex-1 max-w-lg mx-8">
-          <div className="relative">
-            <Sparkles className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary w-4 h-4" />
-            <Input
-              placeholder="Ask AI about loads, quotes, invoices..."
-              className="pl-10 bg-background border-border"
-            />
-          </div>
-        </div>
-
-        {/* Right Section */}
-        <div className="flex items-center gap-4">
+        {/* Right Section - Notifications & User */}
+        <div className="flex items-center gap-3">
           {/* Notifications */}
           <DropdownMenu onOpenChange={setIsOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className="relative hover:bg-slate-100">
+                <Bell className="w-5 h-5 text-muted-foreground" />
                 {notificationList.filter(n => n.unread).length > 0 && (
-                  <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center bg-destructive text-destructive-foreground text-xs border-2 border-nav-bg">
+                  <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center bg-primary text-white text-xs border-2 border-background">
                     {notificationList.filter(n => n.unread).length}
                   </Badge>
                 )}
@@ -101,11 +110,11 @@ export function TopBar() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80 bg-background border-border p-0 shadow-xl">
               <div className="p-4 border-b border-border flex items-center justify-between">
-                <DropdownMenuLabel className="p-0 font-heading text-body-medium">Notifications</DropdownMenuLabel>
+                <DropdownMenuLabel className="p-0 font-semibold text-sm">Notifications</DropdownMenuLabel>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-auto p-0 text-xs text-primary hover:bg-transparent"
+                  className="h-auto p-0 text-xs text-primary hover:bg-transparent hover:text-primary/80"
                   onClick={handleMarkAllAsRead}
                 >
                   Mark all as read
@@ -117,7 +126,7 @@ export function TopBar() {
                     notificationList.map((notification) => (
                       <DropdownMenuItem
                         key={notification.id}
-                        className="flex flex-col items-start gap-1 p-4 cursor-pointer border-b border-border/50 last:border-0 focus:bg-accent/50"
+                        className="flex flex-col items-start gap-1 p-4 cursor-pointer border-b border-border last:border-0 focus:bg-muted/20"
                         onClick={() => notification.unread && handleMarkAsRead(notification.id)}
                       >
                         <div className="flex items-center justify-between w-full gap-2">
@@ -125,7 +134,7 @@ export function TopBar() {
                             {notification.type === 'success' && <CheckCircle2 className="w-4 h-4 text-success" />}
                             {notification.type === 'warning' && <AlertCircle className="w-4 h-4 text-warning" />}
                             {notification.type === 'info' && <Info className="w-4 h-4 text-primary" />}
-                            <span className={cn("text-body-medium", notification.unread ? "font-semibold" : "font-normal")}>
+                            <span className={cn("text-sm", notification.unread ? "font-semibold text-foreground" : "font-normal text-muted-foreground")}>
                               {notification.title}
                             </span>
                           </div>
@@ -133,7 +142,7 @@ export function TopBar() {
                             <div className="w-2 h-2 bg-primary rounded-full" />
                           )}
                         </div>
-                        <p className="text-caption text-muted-foreground line-clamp-2">
+                        <p className="text-xs text-muted-foreground line-clamp-2">
                           {notification.description}
                         </p>
                         <div className="flex items-center gap-1 mt-1">
@@ -149,13 +158,10 @@ export function TopBar() {
                   )}
                 </div>
               </ScrollArea>
-              <div className="p-2 border-t border-border bg-muted/30">
-                <Button variant="ghost" className="w-full text-xs h-8 hover:bg-accent">
-                  View all notifications
-                </Button>
-              </div>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* User avatar removed — user actions are in sidebar footer */}
         </div>
       </header>
     </>

@@ -1,9 +1,9 @@
 // Truckwys Application Constants
 
 export const APP_CONFIG = {
-  name: 'Truckwys',
-  version: '1.0.0',
-  description: 'AI-Powered Logistics Operations Platform'
+  name: 'TruckWys',
+  version: '3.0.0',
+  description: 'World-Class AI Financial & Logistics Platform'
 } as const;
 
 // Navigation types
@@ -31,8 +31,8 @@ export type NavigationItem = NavigationParent | NavigationLink;
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
   {
-    id: 'overview',
-    label: 'Overview',
+    id: 'home',
+    label: 'Home',
     href: '/',
     icon: 'LayoutDashboard'
   },
@@ -40,29 +40,13 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     id: 'bookings',
     label: 'Bookings',
     icon: 'FileText',
-    children: [
-      {
-        id: 'bookings-overview',
-        label: 'Overview',
-        href: '/bookings'
-      },
-      {
-        id: 'bookings-pipeline',
-        label: 'Pipeline',
-        href: '/bookings/pipeline'
-      }
-    ]
+    href: '/bookings'
   },
   {
     id: 'fleet',
     label: 'Fleet',
     icon: 'Truck',
     children: [
-      {
-        id: 'dashboard',
-        label: 'Dashboard',
-        href: '/fleet'
-      },
       {
         id: 'vehicles',
         label: 'Vehicles',
@@ -72,11 +56,6 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
         id: 'drivers',
         label: 'Drivers',
         href: '/fleet/drivers'
-      },
-      {
-        id: 'scenarios',
-        label: 'Scenarios',
-        href: '/fleet/scenarios'
       }
     ]
   },
@@ -85,11 +64,6 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: 'Finance',
     icon: 'Building2',
     children: [
-      {
-        id: 'finance-overview',
-        label: 'Overview',
-        href: '/finance-hq'
-      },
       {
         id: 'invoices',
         label: 'Invoices',
@@ -104,11 +78,6 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
         id: 'reports',
         label: 'Reports',
         href: '/finance/reports'
-      },
-      {
-        id: 'economic-model',
-        label: 'Economic Model',
-        href: '/finance/economic-model'
       }
     ]
   },
@@ -119,6 +88,12 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: 'Banknote'
   },
   {
+    id: 'insights',
+    label: 'Insights',
+    href: '/insights',
+    icon: 'Sparkles'
+  },
+  {
     id: 'settings',
     label: 'Settings',
     href: '/settings',
@@ -126,16 +101,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   }
 ] as const;
 
-export const MOCK_DATA_ENDPOINTS = {
-  quotes: '/mocks/quotes.json',
-  lanes: '/mocks/lanes.json',
-  trips: '/mocks/trips.json',
-  invoices: '/mocks/invoices.json',
-  finance: '/mocks/finance.json',
-  border: '/mocks/border.json',
-  fuel: '/mocks/fuel.json',
-  loads: '/mocks/loads.json'
-} as const;
+// Removed MOCK_DATA_ENDPOINTS - use API calls via useFetch/usePost hooks
 
 export const STATUS_COLOURS = {
   success: 'hsl(var(--success))',
@@ -157,3 +123,57 @@ export const METRIC_FORMATS = {
   weight: 'tonnes',
   volume: 'litres'
 } as const;
+
+// Invoice Status Configuration
+export const INVOICE_STATUS = {
+  DRAFT: 'DRAFT',
+  SENT: 'SENT',
+  PAID: 'PAID',
+  OVERDUE: 'OVERDUE',
+  PARTIALLY_PAID: 'PARTIALLY_PAID',
+  CANCELLED: 'CANCELLED'
+} as const;
+
+export const INVOICE_STATUS_COLORS = {
+  DRAFT: { bg: 'var(--text-tertiary)', text: 'var(--bg-deep)' },
+  SENT: { bg: 'var(--accent-primary)', text: 'var(--bg-deep)' },
+  PAID: { bg: 'var(--status-success)', text: 'var(--bg-deep)' },
+  OVERDUE: { bg: 'var(--status-danger)', text: 'var(--bg-deep)' },
+  PARTIALLY_PAID: { bg: 'var(--status-warning)', text: 'var(--bg-deep)' },
+  CANCELLED: { bg: 'var(--text-secondary)', text: 'var(--bg-deep)' }
+} as const;
+
+// Expense Status Configuration
+export const EXPENSE_STATUS = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED'
+} as const;
+
+// Expense Category Configuration
+export const EXPENSE_CATEGORIES = {
+  FUEL: { label: 'Fuel', icon: '⛽', color: 'var(--status-warning)' },
+  TOLLS: { label: 'Tolls', icon: '🛣️', color: 'var(--accent-primary)' },
+  MAINTENANCE: { label: 'Maintenance', icon: '🔧', color: 'var(--status-danger)' },
+  DRIVER: { label: 'Driver', icon: '👤', color: 'var(--status-success)' },
+  INSURANCE: { label: 'Insurance', icon: '🛡️', color: 'var(--accent-primary)' },
+  OVERHEAD: { label: 'Overhead', icon: '📋', color: 'var(--text-secondary)' }
+} as const;
+
+// Currency Formatter Utility
+export const formatZAR = (amount: number, showPrefix = true): string => {
+  const formatted = amount.toLocaleString('en-ZA', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return showPrefix ? `R ${formatted}` : formatted;
+};
+
+// Date Age Calculator
+export const calculateDaysAge = (date: string): number => {
+  const targetDate = new Date(date);
+  const today = new Date();
+  const diffTime = Math.abs(today.getTime() - targetDate.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+};

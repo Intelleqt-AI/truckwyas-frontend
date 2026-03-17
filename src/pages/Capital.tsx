@@ -1,194 +1,392 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Banknote, Sparkles, TrendingUp, AlertCircle, ArrowRight, FileText } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import invoicesData from "@/mocks/invoices.json";
+import { formatCurrency } from "@/lib/formatters";
+import { fetchData, postData } from "@/lib/Api";
+
+const TIER_COLOR: Record<string, string> = {
+  prime: 'var(--accent-primary)', standard: 'var(--status-success)',
+  elevated: 'var(--status-warning)', high: 'var(--status-danger)', ineligible: 'var(--text-tertiary)',
+};
+const TIER_FEE: Record<string, string> = {
+  prime: '2.0%', standard: '2.5%', elevated: '3.5%', high: '4.5%', ineligible: 'N/A',
+};
+const tierEligible = (t: string) => t === 'prime' || t === 'standard';
 
 export default function Capital() {
   const navigate = useNavigate();
-  
-  // Count eligible invoices
-  const eligibleInvoices = invoicesData.filter(inv => inv.status === "Eligible");
-  const totalEligibleAmount = eligibleInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [facility, setFacility] = useState<any>(null);
+  const [advances, setAdvances] = useState<any[]>([]);
+  const [eligibleInvoices, setEligibleInvoices] = useState<any[]>([]);
+  const [requestingIds, setRequestingIds] = useState<Set<number>>(new Set());
+  const [settlingIds, setSettlingIds] = useState<Set<number>>(new Set());
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Mock advance history data
-  const advanceHistory = [
-    { id: "ADV-024", invoiceId: "INV-751", customer: "Tiger Brands", amount: 22400, status: "Settled", date: "2025-10-12" },
-    { id: "ADV-023", invoiceId: "INV-748", customer: "Woolworths", amount: 16800, status: "Approved", date: "2025-10-10" },
-    { id: "ADV-022", invoiceId: "INV-745", customer: "Shoprite", amount: 19200, status: "Approved", date: "2025-10-08" },
-    { id: "ADV-021", invoiceId: "INV-742", customer: "Pick n Pay", amount: 15600, status: "Settled", date: "2025-10-05" },
-    { id: "ADV-020", invoiceId: "INV-739", customer: "SPAR Group", amount: 18900, status: "Settled", date: "2025-10-03" },
-    { id: "ADV-019", invoiceId: "INV-736", customer: "Makana Foods", amount: 21500, status: "Pending", date: "2025-10-01" },
-  ];
+  const handleRequestAdvance = async (invoice: any) => {
+    setRequestingIds(prev => new Set(prev).add(invoice.id));
+    setSuccessMessage(null);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Approved': return 'bg-success/5 text-success border-success/20';
-      case 'Pending': return 'bg-muted/50 text-muted-foreground border-0';
-      case 'Settled': return 'bg-primary/5 text-primary border-primary/20';
-      default: return 'bg-muted/50 text-muted-foreground border-0';
+    try {
+      await postData({
+        url: 'api/v1/advances/',
+        data: {
+          invoice_id: invoice.id,
+        }
+      });
+
+      setSuccessMessage(`Advance request submitted for ${invoice.invoice_number}`);
+      // Reload data
+      const advancesData = await fetchData('api/v1/advances/');
+      const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
+      const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
+      setAdvances(active);
+
+      const eligibleData = await fetchData('api/v1/capital/eligible/');
+      const eligible = eligibleData?.invoices || [];
+      setEligibleInvoices(eligible);
+
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.response?.data?.invoice_id?.[0] || err?.message || 'Request failed';
+      setSuccessMessage(null);
+      setErrorMessage(msg);
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setRequestingIds(prev => {
+        const next = new Set(prev);
+        next.delete(invoice.id);
+        return next;
+      });
     }
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
+  const handleSettleAdvance = async (advance: any) => {
+    setSettlingIds(prev => new Set(prev).add(advance.id));
+    setSuccessMessage(null);
+
+    try {
+      await postData({
+        url: `/api/v1/advances/${advance.id}/settle/`,
+        data: {}
+      });
+
+      setSuccessMessage(`Advance ${advance.invoice_number} settled successfully`);
+      // Reload data
+      const advancesData = await fetchData('api/v1/advances/');
+      const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
+      const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
+      setAdvances(active);
+
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('Failed to settle advance:', err);
+      alert('Failed to settle advance. Please try again.');
+    } finally {
+      setSettlingIds(prev => {
+        const next = new Set(prev);
+        next.delete(advance.id);
+        return next;
+      });
+    }
+  };
+
+  const eligibleTotal = eligibleInvoices.reduce((sum, inv) => sum + (inv.total_amount || inv.amount || 0), 0);
+  const outstanding = facility?.outstanding_advances || 0;
+  const facilityLimit = facility?.facility_limit || 1000000;
+  const available = facilityLimit - outstanding;
+  const utilization = Math.round((outstanding / facilityLimit) * 100);
+
+  useEffect(() => {
+    document.title = 'Capital - TruckWys';
+  }, []);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // Load facility data — paginated {count, results}
+        const facilityData = await fetchData('api/v1/facilities/');
+        const facilityList = Array.isArray(facilityData) ? facilityData : (facilityData?.results || []);
+        setFacility(facilityList[0] || null);
+
+        // Load active advances — paginated {count, results}
+        const advancesData = await fetchData('api/v1/advances/');
+        const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
+        const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
+        setAdvances(active);
+
+        // Load eligible invoices from dedicated endpoint
+        const eligibleData = await fetchData('api/v1/capital/eligible/');
+        const eligible = eligibleData?.invoices || [];
+        setEligibleInvoices(eligible);
+      } catch (err) {
+        console.error('Failed to load capital data:', err);
+        setError('Failed to load capital data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
       <div>
-        <h1 className="text-body-medium font-body-medium text-foreground flex items-center gap-2">
-          <Banknote className="h-4 w-4 text-muted-foreground" />
-          Capital
-        </h1>
-        <p className="text-caption text-muted-foreground">
-          Working capital management and advance funding
-        </p>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fast Pay Facility</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="card" style={{ padding: 24 }}>
+              <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
+              <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
+            </div>
+          ))}
+        </div>
+        <div className="card" style={{ padding: 24 }}>
+          <div style={{ height: 120, background: 'var(--bg-surface)', borderRadius: 4 }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fast Pay Facility</div>
+        </div>
+        <div className="card" style={{ padding: 40, textAlign: 'center' }}>
+          <div style={{ color: 'var(--status-danger)', marginBottom: 8, fontSize: 14, fontWeight: 500 }}>{error}</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Unable to load capital data. Please try again later.</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fast Pay Facility</div>
+
       </div>
 
-      {/* Smart CTA - Eligible Invoices Alert */}
-      {eligibleInvoices.length > 0 && (
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex gap-3">
-                <div className="rounded-full bg-primary/10 p-2.5">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-body font-body-medium text-foreground">
-                    You have {eligibleInvoices.length} eligible invoices ready for instant payment
-                  </h3>
-                  <p className="text-caption text-muted-foreground">
-                    Total value: {formatCurrency(totalEligibleAmount)} • Get paid instantly with transparent 2.5% fee
-                  </p>
-                </div>
-              </div>
-              <Button 
-                onClick={() => navigate('/finance/invoices')}
-                className="gap-2 shrink-0"
-              >
-                View & Fund Invoices
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      {successMessage && (
+        <div style={{
+          background: 'var(--status-success)',
+          color: 'var(--bg-deep)',
+          padding: '12px 16px',
+          borderRadius: 4,
+          marginBottom: 16,
+          fontSize: 12,
+          fontFamily: 'var(--font-mono)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          ✓ {successMessage}
+        </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="bg-card border-border hover:shadow-glow transition-smooth">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-caption text-muted-foreground">
-              Available Capital
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-display-small font-display-small text-foreground text-tabular">
-              {formatCurrency(500000)}
-            </div>
-            <p className="text-caption text-muted-foreground mt-1">
-              Total credit facility
-            </p>
-          </CardContent>
-        </Card>
+      {errorMessage && (
+        <div style={{
+          background: 'var(--status-danger-bg)',
+          color: 'var(--status-danger)',
+          padding: '12px 16px',
+          borderRadius: 4,
+          marginBottom: 16,
+          fontSize: 12,
+          fontFamily: 'var(--font-mono)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          border: '1px solid var(--status-danger)',
+          borderOpacity: 0.25,
+        }}>
+          ✕ {errorMessage}
+        </div>
+      )}
 
-        <Card className="bg-card border-border hover:shadow-glow transition-smooth">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-caption text-muted-foreground">
-              Outstanding Advances
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-display-small font-display-small text-foreground text-tabular">
-              {formatCurrency(156000)}
-            </div>
-            <div className="mt-3 space-y-2">
-              <div className="flex justify-between text-caption">
-                <span className="text-muted-foreground">Active Advances</span>
-                <span className="font-body-medium text-foreground text-tabular">12</span>
-              </div>
-              <div className="flex justify-between text-caption">
-                <span className="text-muted-foreground">Avg. Term</span>
-                <span className="font-body-medium text-foreground text-tabular">45 days</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border hover:shadow-glow transition-smooth">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-caption text-muted-foreground">
-              Utilisation Rate
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-display-small font-display-small text-foreground text-tabular">
-              31.2%
-            </div>
-            <p className="text-caption text-muted-foreground mt-1">
-              Of available capital
-            </p>
-            <div className="mt-4">
-              <Progress value={31.2} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Facility overview */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+        {[
+          { label: 'Available Capital', value: formatCurrency(available), sub: `of ${formatCurrency(facilityLimit)} limit`, color: 'var(--status-success)' },
+          { label: 'In Use', value: formatCurrency(outstanding), sub: `${utilization}% utilization`, color: 'var(--status-warning)' },
+          { label: 'Eligible Invoices', value: eligibleInvoices.length, sub: 'ready for fast pay', color: 'var(--accent-primary)' },
+          { label: 'Eligible Value', value: formatCurrency(eligibleTotal), sub: 'total available', color: 'var(--text-primary)' },
+        ].map(m => (
+          <div key={m.label} className="card metric-card">
+            <div className="card-header"><span className="card-title">{m.label}</span></div>
+            <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{m.sub}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Advance History Table */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-muted-foreground">Advance History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Advance ID</TableHead>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right">Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {advanceHistory.map((advance) => (
-                  <TableRow key={advance.id} className="hover:bg-muted/30">
-                    <TableCell className="font-mono text-body">{advance.id}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="link"
-                        className="h-auto p-0 font-mono text-primary"
-                        onClick={() => navigate('/finance/invoices')}
-                      >
-                        <FileText className="h-3.5 w-3.5 mr-1.5" />
-                        {advance.invoiceId}
-                      </Button>
-                    </TableCell>
-                    <TableCell className="text-body font-body-medium">{advance.customer}</TableCell>
-                    <TableCell className="text-right text-body font-body-medium text-tabular">
-                      {formatCurrency(advance.amount)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="outline" className={`text-xs ${getStatusColor(advance.status)}`}>
-                        {advance.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-caption text-muted-foreground">
-                      {formatDate(advance.date)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+      {/* Facility utilization bar - meter visual */}
+      <div className="card" style={{ padding: '14px 20px', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+          <span style={{ color: 'var(--text-tertiary)' }}>FACILITY METER</span>
+          <span style={{ color: utilization > 75 ? 'var(--status-warning)' : 'var(--status-success)' }}>{utilization}% USED</span>
+        </div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 2, height: 12, width: '100%', overflow: 'hidden', position: 'relative' }}>
+          <div style={{
+            width: `${utilization}%`,
+            height: '100%',
+            background: utilization > 90 ? 'var(--status-danger)' : utilization > 75 ? 'var(--status-warning)' : 'var(--accent-primary)',
+            borderRadius: 2,
+            transition: 'width 0.3s'
+          }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+          <div>
+            <div style={{ color: 'var(--status-danger)', fontWeight: 600 }}>OUTSTANDING</div>
+            <div>{formatCurrency(outstanding)}</div>
           </div>
-        </CardContent>
-      </Card>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>LIMIT</div>
+            <div>{formatCurrency(facilityLimit)}</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ color: 'var(--status-success)', fontWeight: 600 }}>AVAILABLE</div>
+            <div>{formatCurrency(available)}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Active advances — currently in use */}
+      {advances.length > 0 && (
+        <div className="card table-card" style={{ marginBottom: 20 }}>
+          <div className="card-header" style={{ marginBottom: 16 }}>
+            <span className="card-title">Active Advances</span>
+            <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{advances.length} IN USE · {formatCurrency(outstanding)} OUTSTANDING</span>
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Invoice #</th><th>Customer</th><th>Invoice Amt</th><th>Advanced</th><th>Fee</th><th>Due</th><th className="text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {advances.map(adv => (
+                <tr key={adv.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/capital/advances/${adv.id}`)}>
+                  <td className="mono">{adv.invoice_number || adv.invoiceNumber}</td>
+                  <td>{adv.customer_name || adv.customerName}</td>
+                  <td className="mono">{formatCurrency(adv.gross_amount || adv.invoice_amount || adv.amount)}</td>
+                  <td className="mono" style={{ color: 'var(--accent-primary)' }}>{formatCurrency(adv.net_amount || adv.advanced_amount || adv.advancedAmount)}</td>
+                  <td className="mono" style={{ color: 'var(--text-secondary)' }}>{formatCurrency(adv.fee_amount || adv.fee)}</td>
+                  <td className="mono">{adv.repayment_date || adv.due_date || adv.dueDate}</td>
+                  <td className="text-right" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 10,
+                      color: adv.status === 'DISBURSED' ? 'var(--status-success)' : 'var(--status-warning)',
+                      padding: '2px 6px',
+                      background: 'var(--bg-surface-hover)',
+                      borderRadius: 2,
+                      textTransform: 'uppercase'
+                    }}>{adv.status || 'FUNDED'}</span>
+                    {adv.status === 'DISBURSED' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleSettleAdvance(adv); }}
+                        disabled={settlingIds.has(adv.id)}
+                        style={{
+                          background: 'transparent',
+                          border: '1px solid var(--status-success)',
+                          color: 'var(--status-success)',
+                          padding: '4px 10px',
+                          fontSize: 10,
+                          fontFamily: 'var(--font-mono)',
+                          letterSpacing: '0.05em',
+                          borderRadius: 2,
+                          cursor: settlingIds.has(adv.id) ? 'not-allowed' : 'pointer',
+                          opacity: settlingIds.has(adv.id) ? 0.5 : 1,
+                        }}
+                      >
+                        {settlingIds.has(adv.id) ? 'SETTLING...' : 'SETTLE'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Fast Pay NOW — eligible invoices section */}
+      <div className="card table-card">
+        <div className="card-header" style={{ marginBottom: 16 }}>
+          <span className="card-title">Fast Pay NOW — Eligible Invoices</span>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{eligibleInvoices.length} INVOICES · {formatCurrency(eligibleTotal)} AVAILABLE</span>
+            <button onClick={() => navigate('/capital/risk-scores')} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '3px 10px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>RISK SCORES →</button>
+          </div>
+        </div>
+        {eligibleInvoices.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>
+            No eligible invoices. Complete deliveries with POD to unlock Fast Pay.
+          </div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Invoice #</th><th>Customer</th><th>Amount</th><th>Tier</th><th>Fee</th><th>You Receive</th><th className="text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {eligibleInvoices.map(inv => {
+                const tier = inv.risk_tier || inv.tier || 'standard';
+                const amount = inv.total_amount || inv.amount || 0;
+                const feeNum = tier === 'prime' ? 0.02 : 0.025;
+                const netPayout = amount * (1 - feeNum);
+                return (
+                  <tr key={inv.id}>
+                    <td className="mono">{inv.invoice_number || inv.invoiceNumber}</td>
+                    <td>{inv.customer_name || inv.customerName}</td>
+                    <td className="mono">{formatCurrency(amount)}</td>
+                    <td>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: TIER_COLOR[tier], background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase' }}>
+                        {tier}
+                      </span>
+                    </td>
+                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{TIER_FEE[tier]}</td>
+                    <td style={{ color: 'var(--status-success)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(netPayout)}</td>
+                    <td className="text-right">
+                      <button
+                        className="btn-action"
+                        disabled={requestingIds.has(inv.id)}
+                        style={{
+                          fontSize: 10,
+                          padding: '4px 12px',
+                          background: requestingIds.has(inv.id) ? 'var(--border-subtle)' : 'var(--accent-primary)',
+                          color: 'var(--btn-action-color)',
+                          border: 'none',
+                          borderRadius: 2,
+                          cursor: requestingIds.has(inv.id) ? 'not-allowed' : 'pointer',
+                          fontFamily: 'var(--font-mono)',
+                          fontWeight: 600,
+                          opacity: requestingIds.has(inv.id) ? 0.6 : 1,
+                        }}
+                        onClick={() => handleRequestAdvance(inv)}
+                      >
+                        {requestingIds.has(inv.id) ? 'REQUESTING...' : 'REQUEST'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

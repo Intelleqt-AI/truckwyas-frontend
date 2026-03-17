@@ -1,163 +1,150 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { DashboardLayout } from "./components/layout/DashboardLayout";
-
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { OSLayout } from "./components/os/OSLayout";
+// Eager load — Overview for fast first load
 import Overview from "./pages/Overview";
-import { QuotesList } from "./pages/QuotesList";
-import { QuoteCopilot } from "./pages/QuoteCopilot";
-import NewQuote from "./pages/NewQuote";
-import { BookingsList } from "./pages/BookingsList";
-import RevenueGuard from "./pages/RevenueGuard";
-import Bookings from "./pages/Bookings";
-import FleetDashboard from "./pages/FleetDashboard";
-import Vehicles from "./pages/Vehicles";
-import VehicleDigitalTwin from "./pages/VehicleDigitalTwin";
-import Drivers from "./pages/Drivers";
-import DriverProfile from "./pages/DriverProfile";
-import FleetScenarios from "./pages/FleetScenarios";
-import FinanceHQ from "./pages/FinanceHQ";
-import Invoices from "./pages/Invoices";
-import Expenses from "./pages/Expenses";
-import FinanceReports from "./pages/FinanceReports";
-import EconomicModel from "./pages/EconomicModel";
-import Capital from "./pages/Capital";
-import FleetDirect from "./pages/FleetDirect";
-import Reports from "./pages/Reports";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
 
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import ProtectedRoute from "./components/ProtectedRoute";
+// Auth guard — redirects to /login if no token
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access') : null;
+  if (!token) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
 
-const queryClient = new QueryClient();
+// Public route — redirects to / if already logged in
+function PublicOnly({ children }: { children: React.ReactNode }) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access') : null;
+  if (token) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+// Lazy load all other pages for code splitting
+const QuotesList = lazy(() => import("./pages/QuotesList").then(m => ({ default: m.QuotesList })));
+const NewQuote = lazy(() => import("./pages/NewQuote"));
+const QuoteDetail = lazy(() => import("./pages/QuoteDetail"));
+const BookingsList = lazy(() => import("./pages/BookingsList").then(m => ({ default: m.BookingsList })));
+const Bookings = lazy(() => import("./pages/Bookings"));
+const LoadsList = lazy(() => import("./pages/LoadsList"));
+const Vehicles = lazy(() => import("./pages/Vehicles"));
+const Drivers = lazy(() => import("./pages/Drivers"));
+const DriverProfile = lazy(() => import("./pages/DriverProfile"));
+const FleetDashboard = lazy(() => import("./pages/FleetDashboard"));
+const Invoices = lazy(() => import("./pages/Invoices"));
+const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
+const CreateInvoice = lazy(() => import("./pages/CreateInvoice"));
+const Expenses = lazy(() => import("./pages/Expenses"));
+const FinanceReports = lazy(() => import("./pages/FinanceReports"));
+const Capital = lazy(() => import("./pages/Capital"));
+const AdvanceRequest = lazy(() => import("./pages/AdvanceRequest"));
+const AdvanceDetail = lazy(() => import("./pages/AdvanceDetail"));
+const Insights = lazy(() => import("./pages/Insights"));
+// PartnerDashboard removed — moved to standalone partner portal
+const Settings = lazy(() => import("./pages/Settings"));
+const XeroIntegration = lazy(() => import("./pages/settings/XeroIntegration"));
+const FleetImport = lazy(() => import("./pages/settings/FleetImport"));
+const Login = lazy(() => import("./pages/Login"));
+const Signup = lazy(() => import("./pages/Signup"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const PasswordReset = lazy(() => import("./pages/PasswordReset"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword").then(m => ({ default: m.ForgotPassword })));
+const ResetPassword = lazy(() => import("./pages/ResetPassword").then(m => ({ default: m.ResetPassword })));
+const InviteAccept = lazy(() => import("./pages/InviteAccept").then(m => ({ default: m.InviteAccept })));
+const Onboarding = lazy(() => import("./pages/Onboarding").then(m => ({ default: m.Onboarding })));
+const VehicleFinancialProfile = lazy(() => import("./pages/VehicleFinancialProfile"));
+const RiskScoreView = lazy(() => import("./pages/RiskScoreView"));
+const FleetHeatmap = lazy(() => import("./pages/FleetHeatmap"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: 2, throwOnError: false, refetchOnWindowFocus: false, staleTime: 0 },
+  },
+});
+
+// Loading fallback for code splitting
+const LoadingFallback = () => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    background: 'var(--bg-deep)',
+    color: 'var(--text-tertiary)',
+    fontSize: 14
+  }}>
+    Loading...
+  </div>
+);
 
 const App = () => (
   <BrowserRouter>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+      <ErrorBoundary>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Suspense fallback={<LoadingFallback />}>
+            <Routes>
+            {/* Public routes — no auth required */}
+            <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
+            <Route path="/signup" element={<PublicOnly><Signup /></PublicOnly>} />
+            <Route path="/password-reset" element={<PasswordReset />} />
+            <Route path="/forgot-password" element={<PublicOnly><ForgotPassword /></PublicOnly>} />
+            <Route path="/reset-password" element={<PublicOnly><ResetPassword /></PublicOnly>} />
+            <Route path="/invite/:token" element={<PublicOnly><InviteAccept /></PublicOnly>} />
+            <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
 
-          <Route element={<ProtectedRoute />}>
-            <Route path="/" element={
-              <DashboardLayout>
-                <Overview />
-              </DashboardLayout>
-            } />
-            <Route path="/bookings" element={
-              <DashboardLayout>
-                <Bookings />
-              </DashboardLayout>
-            } />
-            <Route path="/bookings/:id" element={
-              <DashboardLayout>
-                <Bookings />
-              </DashboardLayout>
-            } />
-            <Route path="/bookings/list" element={
-              <DashboardLayout>
-                <BookingsList />
-              </DashboardLayout>
-            } />
-            <Route path="/bookings/pipeline" element={
-              <DashboardLayout>
-                <QuotesList />
-              </DashboardLayout>
-            } />
-            <Route path="/bookings/pipeline/:id" element={
-              <DashboardLayout>
-                <NewQuote />
-              </DashboardLayout>
-            } />
-            <Route path="/quotes/new" element={
-              <DashboardLayout>
-                <NewQuote />
-              </DashboardLayout>
-            } />
-            <Route path="/fleet" element={
-              <DashboardLayout>
-                <FleetDashboard />
-              </DashboardLayout>
-            } />
-            <Route path="/fleet/vehicles" element={
-              <DashboardLayout>
-                <Vehicles />
-              </DashboardLayout>
-            } />
-            <Route path="/fleet/vehicles/:id" element={
-              <DashboardLayout>
-                <VehicleDigitalTwin />
-              </DashboardLayout>
-            } />
-            <Route path="/fleet/drivers" element={
-              <DashboardLayout>
-                <Drivers />
-              </DashboardLayout>
-            } />
-            <Route path="/fleet/drivers/:driverId" element={
-              <DashboardLayout>
-                <DriverProfile />
-              </DashboardLayout>
-            } />
-            <Route path="/fleet/scenarios" element={
-              <DashboardLayout>
-                <FleetScenarios />
-              </DashboardLayout>
-            } />
-            <Route path="/finance-hq" element={
-              <DashboardLayout>
-                <FinanceHQ />
-              </DashboardLayout>
-            } />
-            <Route path="/finance/invoices" element={
-              <DashboardLayout>
-                <Invoices />
-              </DashboardLayout>
-            } />
-            <Route path="/finance/expenses" element={
-              <DashboardLayout>
-                <Expenses />
-              </DashboardLayout>
-            } />
-            <Route path="/finance/reports" element={
-              <DashboardLayout>
-                <FinanceReports />
-              </DashboardLayout>
-            } />
-            <Route path="/finance/economic-model" element={<EconomicModel />} />
-            <Route path="/capital" element={
-              <DashboardLayout>
-                <Capital />
-              </DashboardLayout>
-            } />
-            <Route path="/fleetdirect" element={
-              <DashboardLayout>
-                <FleetDirect />
-              </DashboardLayout>
-            } />
-            <Route path="/reports" element={
-              <DashboardLayout>
-                <Reports />
-              </DashboardLayout>
-            } />
-            <Route path="/settings/:section?" element={
-              <DashboardLayout>
-                <Settings />
-              </DashboardLayout>
-            } />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </TooltipProvider>
+            {/* Protected routes — require auth token */}
+            <Route path="/" element={<RequireAuth><OSLayout><Overview /></OSLayout></RequireAuth>} />
+            <Route path="/quotes" element={<RequireAuth><OSLayout><QuotesList /></OSLayout></RequireAuth>} />
+            <Route path="/quotes/new" element={<RequireAuth><OSLayout><NewQuote /></OSLayout></RequireAuth>} />
+            <Route path="/quotes/:id" element={<RequireAuth><OSLayout><QuoteDetail /></OSLayout></RequireAuth>} />
+            <Route path="/bookings" element={<RequireAuth><OSLayout><LoadsList /></OSLayout></RequireAuth>} />
+            <Route path="/bookings/:id" element={<RequireAuth><OSLayout><Bookings /></OSLayout></RequireAuth>} />
+            <Route path="/bookings/list" element={<RequireAuth><OSLayout><BookingsList /></OSLayout></RequireAuth>} />
+            <Route path="/bookings/pipeline" element={<RequireAuth><OSLayout><QuotesList /></OSLayout></RequireAuth>} />
+            <Route path="/bookings/pipeline/:id" element={<RequireAuth><OSLayout><NewQuote /></OSLayout></RequireAuth>} />
+            <Route path="/fleet" element={<RequireAuth><OSLayout><Vehicles /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/overview" element={<RequireAuth><OSLayout><FleetDashboard /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/vehicles" element={<RequireAuth><OSLayout><Vehicles /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/vehicles/:id" element={<RequireAuth><OSLayout><VehicleFinancialProfile /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/drivers" element={<RequireAuth><OSLayout><Drivers /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/drivers/:driverId" element={<RequireAuth><OSLayout><DriverProfile /></OSLayout></RequireAuth>} />
+            <Route path="/vehicles" element={<RequireAuth><OSLayout><Vehicles /></OSLayout></RequireAuth>} />
+            <Route path="/drivers" element={<RequireAuth><OSLayout><Drivers /></OSLayout></RequireAuth>} />
+            <Route path="/invoices" element={<RequireAuth><OSLayout><Invoices /></OSLayout></RequireAuth>} />
+            <Route path="/finance/invoices" element={<RequireAuth><OSLayout><Invoices /></OSLayout></RequireAuth>} />
+            <Route path="/finance/invoices/new" element={<RequireAuth><OSLayout><CreateInvoice /></OSLayout></RequireAuth>} />
+            <Route path="/finance/invoices/:id" element={<RequireAuth><OSLayout><InvoiceDetail /></OSLayout></RequireAuth>} />
+            <Route path="/finance/expenses" element={<RequireAuth><OSLayout><Expenses /></OSLayout></RequireAuth>} />
+            <Route path="/finance/reports" element={<RequireAuth><OSLayout><FinanceReports /></OSLayout></RequireAuth>} />
+            <Route path="/capital" element={<RequireAuth><OSLayout><Capital /></OSLayout></RequireAuth>} />
+            <Route path="/capital/request" element={<RequireAuth><OSLayout><AdvanceRequest /></OSLayout></RequireAuth>} />
+            <Route path="/capital/advances/:id" element={<RequireAuth><OSLayout><AdvanceDetail /></OSLayout></RequireAuth>} />
+            <Route path="/insights" element={<RequireAuth><OSLayout><Insights /></OSLayout></RequireAuth>} />
+            {/* /partner-dashboard removed — standalone partner portal */}
+            <Route path="/settings/:section?" element={<RequireAuth><OSLayout><Settings /></OSLayout></RequireAuth>} />
+            <Route path="/settings/integrations/xero" element={<RequireAuth><OSLayout><XeroIntegration /></OSLayout></RequireAuth>} />
+            <Route path="/settings/integrations/fleet" element={<RequireAuth><OSLayout><FleetImport /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/vehicles/:id/financial" element={<RequireAuth><OSLayout><VehicleFinancialProfile /></OSLayout></RequireAuth>} />
+            <Route path="/capital/risk-scores" element={<RequireAuth><OSLayout><RiskScoreView /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/heatmap" element={<RequireAuth><OSLayout><FleetHeatmap /></OSLayout></RequireAuth>} />
+
+            {/* Route aliases */}
+            <Route path="/overview" element={<Navigate to="/" replace />} />
+            <Route path="/expenses" element={<Navigate to="/finance/expenses" replace />} />
+            <Route path="/finance-reports" element={<Navigate to="/finance/reports" replace />} />
+            {/* /partner redirect removed */}
+            <Route path="*" element={<OSLayout><NotFound /></OSLayout>} />
+          </Routes>
+          </Suspense>
+        </TooltipProvider>
+      </ErrorBoundary>
     </QueryClientProvider>
-  </BrowserRouter >
+  </BrowserRouter>
 );
 
 export default App;

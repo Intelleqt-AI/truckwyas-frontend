@@ -253,12 +253,12 @@ export default function NewQuote() {
       weight: parseFloat(weight || '0'),
       distance: distanceKm,
       vehicle_type: vehicleType,
-      base_rate: baseCost,
-      fuel_surcharge: fuelCost,
-      toll_charges: tollCost,
-      driver_allowance: driverAllowance,
+      base_rate: Math.round(baseCost * 100) / 100,
+      fuel_surcharge: Math.round(fuelCost * 100) / 100,
+      toll_charges: Math.round(tollCost * 100) / 100,
+      driver_allowance: Math.round(driverAllowance * 100) / 100,
       additional_charges: 0,
-      total_amount: total,
+      total_amount: Math.round(total * 100) / 100,
       margin_percentage: 15.0,
       notes,
       status,
@@ -370,7 +370,7 @@ export default function NewQuote() {
             className="btn-action"
             style={{ width: '100%', marginBottom: 16 }}
           >
-            {calculatingRoute ? 'CALCULATING ROUTE...' : '🗺️ CALCULATE ROUTE (TomTom)'}
+            {calculatingRoute ? 'CALCULATING ROUTE...' : 'CALCULATE ROUTE'}
           </button>
 
           {error && (
@@ -387,7 +387,7 @@ export default function NewQuote() {
                 </div>
                 <span style={{
                   padding: '2px 8px',
-                  background: routeData.source === 'tomtom' ? 'var(--accent-glow)' : 'var(--status-warning-bg)',
+                  background: routeData.source === 'tomtom' ? 'var(--accent-glow)' : 'var(--bg-surface-hover)',
                   border: `1px solid ${routeData.source === 'tomtom' ? 'var(--accent-primary)' : 'var(--status-warning)'}`,
                   borderRadius: 2,
                   fontSize: 9,
@@ -395,7 +395,7 @@ export default function NewQuote() {
                   fontWeight: 600,
                   fontFamily: 'var(--font-mono)',
                 }}>
-                  {routeData.source === 'tomtom' ? 'TOMTOM' : 'ESTIMATED'}
+                  {routeData.source === 'tomtom' ? 'LIVE' : 'ESTIMATED'}
                 </span>
               </div>
 
@@ -625,7 +625,7 @@ export default function NewQuote() {
               className="btn-action"
               style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}
             >
-              {loadingAI ? 'GETTING AI SUGGESTION...' : '🤖 GET AI QUOTE SUGGESTION'}
+              {loadingAI ? 'GETTING AI SUGGESTION...' : 'GET AI SUGGESTION'}
             </button>
 
             {showAISuggestion && aiSuggestion && (
@@ -804,9 +804,9 @@ export default function NewQuote() {
                     fontWeight: 700,
                     fontFamily: 'var(--font-mono)',
                   }}>
-                    {revenueGuard.risk_level === 'SAFE' && '🟢 SAFE'}
-                    {revenueGuard.risk_level === 'CAUTION' && '🟡 CAUTION'}
-                    {revenueGuard.risk_level === 'AT_RISK' && '🔴 AT RISK'}
+                    {revenueGuard.risk_level === 'SAFE' && 'SAFE'}
+                    {revenueGuard.risk_level === 'CAUTION' && 'CAUTION'}
+                    {revenueGuard.risk_level === 'AT_RISK' && 'AT RISK'}
                   </span>
                 </div>
               </div>

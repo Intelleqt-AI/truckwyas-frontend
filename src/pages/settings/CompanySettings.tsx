@@ -152,7 +152,7 @@ export function CompanySettings() {
 
       {/* Address */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>📍 Business Address</span></div>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Business Address</span></div>
         <div style={{ padding: 20 }}>
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>Street Address</label>
@@ -188,7 +188,7 @@ export function CompanySettings() {
 
       {/* Contact */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>📞 Contact Details</span></div>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Contact Details</span></div>
         <div style={{ padding: 20 }}>
           <div style={{ ...grid3 }}>
             <div>
@@ -209,7 +209,7 @@ export function CompanySettings() {
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button className="btn-action" onClick={handleSave} disabled={saving} style={{ opacity: saving ? 0.6 : 1 }}>
-          {saved ? '✓ SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
+          {saved ? 'SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
         </button>
       </div>
     </div>

@@ -22,11 +22,17 @@ export default function Capital() {
   const [requestingIds, setRequestingIds] = useState<Set<number>>(new Set());
   const [settlingIds, setSettlingIds] = useState<Set<number>>(new Set());
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [invoiceErrors, setInvoiceErrors] = useState<Record<number, string>>({});
+  const [activeTab, setActiveTab] = useState<'active' | 'eligible'>('eligible');
 
   const handleRequestAdvance = async (invoice: any) => {
     setRequestingIds(prev => new Set(prev).add(invoice.id));
     setSuccessMessage(null);
+    setInvoiceErrors(prev => {
+      const next = { ...prev };
+      delete next[invoice.id];
+      return next;
+    });
 
     try {
       await postData({
@@ -49,10 +55,8 @@ export default function Capital() {
 
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.invoice_id?.[0] || err?.message || 'Request failed';
-      setSuccessMessage(null);
-      setErrorMessage(msg);
-      setTimeout(() => setErrorMessage(null), 5000);
+      const msg = err?.data?.error || err?.data?.reason || err?.data?.reasons?.[0] || err?.response?.data?.error || err?.response?.data?.reason || err?.message || 'Request failed';
+      setInvoiceErrors(prev => ({ ...prev, [invoice.id]: msg }));
     } finally {
       setRequestingIds(prev => {
         const next = new Set(prev);
@@ -80,9 +84,11 @@ export default function Capital() {
       setAdvances(active);
 
       setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to settle advance:', err);
-      alert('Failed to settle advance. Please try again.');
+      const msg = err?.data?.error || err?.message || 'Failed to settle advance';
+      setError(msg);
+      setTimeout(() => setError(null), 4000);
     } finally {
       setSettlingIds(prev => {
         const next = new Set(prev);
@@ -195,25 +201,6 @@ export default function Capital() {
         </div>
       )}
 
-      {errorMessage && (
-        <div style={{
-          background: 'var(--status-danger-bg)',
-          color: 'var(--status-danger)',
-          padding: '12px 16px',
-          borderRadius: 4,
-          marginBottom: 16,
-          fontSize: 12,
-          fontFamily: 'var(--font-mono)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          border: '1px solid var(--status-danger)',
-          borderOpacity: 0.25,
-        }}>
-          ✕ {errorMessage}
-        </div>
-      )}
-
       {/* Facility overview */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
@@ -261,8 +248,22 @@ export default function Capital() {
         </div>
       </div>
 
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '1px solid var(--border-subtle)' }}>
+        {(['eligible', 'active'] as const).map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)} style={{
+            background: 'none', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--accent-primary)' : '2px solid transparent',
+            color: activeTab === tab ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase',
+            padding: '10px 20px', cursor: 'pointer', marginBottom: -1,
+          }}>
+            {tab === 'eligible' ? `ELIGIBLE (${eligibleInvoices.length})` : `ACTIVE (${advances.length})`}
+          </button>
+        ))}
+      </div>
+
       {/* Active advances — currently in use */}
-      {advances.length > 0 && (
+      {activeTab === 'active' && advances.length > 0 && (
         <div className="card table-card" style={{ marginBottom: 20 }}>
           <div className="card-header" style={{ marginBottom: 16 }}>
             <span className="card-title">Active Advances</span>
@@ -322,7 +323,7 @@ export default function Capital() {
       )}
 
       {/* Fast Pay NOW — eligible invoices section */}
-      <div className="card table-card">
+      {activeTab === 'eligible' && <div className="card table-card">
         <div className="card-header" style={{ marginBottom: 16 }}>
           <span className="card-title">Fast Pay NOW — Eligible Invoices</span>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -360,25 +361,39 @@ export default function Capital() {
                     <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{TIER_FEE[tier]}</td>
                     <td style={{ color: 'var(--status-success)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(netPayout)}</td>
                     <td className="text-right">
-                      <button
-                        className="btn-action"
-                        disabled={requestingIds.has(inv.id)}
-                        style={{
-                          fontSize: 10,
-                          padding: '4px 12px',
-                          background: requestingIds.has(inv.id) ? 'var(--border-subtle)' : 'var(--accent-primary)',
-                          color: 'var(--btn-action-color)',
-                          border: 'none',
-                          borderRadius: 2,
-                          cursor: requestingIds.has(inv.id) ? 'not-allowed' : 'pointer',
-                          fontFamily: 'var(--font-mono)',
-                          fontWeight: 600,
-                          opacity: requestingIds.has(inv.id) ? 0.6 : 1,
-                        }}
-                        onClick={() => handleRequestAdvance(inv)}
-                      >
-                        {requestingIds.has(inv.id) ? 'REQUESTING...' : 'REQUEST'}
-                      </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                        <button
+                          className="btn-action"
+                          disabled={requestingIds.has(inv.id)}
+                          style={{
+                            fontSize: 10,
+                            padding: '4px 12px',
+                            background: requestingIds.has(inv.id) ? 'var(--border-subtle)' : 'var(--accent-primary)',
+                            color: 'var(--btn-action-color)',
+                            border: 'none',
+                            borderRadius: 2,
+                            cursor: requestingIds.has(inv.id) ? 'not-allowed' : 'pointer',
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            opacity: requestingIds.has(inv.id) ? 0.6 : 1,
+                          }}
+                          onClick={() => handleRequestAdvance(inv)}
+                        >
+                          {requestingIds.has(inv.id) ? 'REQUESTING...' : 'REQUEST'}
+                        </button>
+                        {invoiceErrors[inv.id] && (
+                          <div style={{
+                            fontSize: 9,
+                            color: 'var(--status-danger)',
+                            fontFamily: 'var(--font-mono)',
+                            textAlign: 'right',
+                            maxWidth: 200,
+                            lineHeight: 1.3,
+                          }}>
+                            {invoiceErrors[inv.id]}
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -386,7 +401,7 @@ export default function Capital() {
             </tbody>
           </table>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

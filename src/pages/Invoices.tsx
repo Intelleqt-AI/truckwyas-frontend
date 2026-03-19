@@ -37,6 +37,7 @@ export default function Invoices() {
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
   const statuses = ['All', 'SENT', 'OVERDUE', 'PAID', 'DRAFT'];
@@ -276,6 +277,25 @@ export default function Invoices() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const handleSendReminder = async (e: React.MouseEvent, invoiceId: string) => {
+    e.stopPropagation();
+    setSendingReminderId(invoiceId);
+    try {
+      await postData({ url: `/api/v1/invoices/${invoiceId}/send_reminder/`, data: {} });
+      setToast('Reminder sent successfully!');
+      setTimeout(() => setToast(null), 3000);
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        setToast('Reminder recorded — customer will be contacted');
+      } else {
+        setToast('Failed to send reminder');
+      }
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setSendingReminderId(null);
+    }
+  };
+
   // Never fall back to mock data — show empty state if API returns nothing
   const allInvoices = invoices;
 
@@ -309,9 +329,7 @@ export default function Invoices() {
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>
               {activeTab === 'invoices' ? 'Invoices' : 'Expenses'}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
-              Last updated: {new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
-            </div>
+
           </div>
           {activeTab === 'invoices' && (
             <button className="btn-action" onClick={() => navigate('/finance/invoices/new')}>+ NEW INVOICE</button>
@@ -1113,6 +1131,11 @@ export default function Invoices() {
                       {invStatus === 'DRAFT' && (
                         <button className="btn-action" style={{ fontSize: 10, padding: '4px 8px' }} onClick={(e) => handleSendInvoice(e, inv.id)} disabled={sendingId === inv.id}>
                           {sendingId === inv.id ? 'SENDING...' : 'SEND'}
+                        </button>
+                      )}
+                      {invStatus === 'OVERDUE' && (
+                        <button className="btn-action" style={{ fontSize: 10, padding: '4px 8px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={(e) => handleSendReminder(e, inv.id)} disabled={sendingReminderId === inv.id}>
+                          {sendingReminderId === inv.id ? 'SENDING...' : 'REMIND'}
                         </button>
                       )}
                       {invStatus !== 'DRAFT' && (

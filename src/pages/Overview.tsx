@@ -361,7 +361,7 @@ export default function Overview() {
                     <td className="mono">{load.load_number || `LD-${load.id}`}</td>
                     <td>{load.customer_name || load.customer?.company_name || '—'}</td>
                     <td style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-                      {load.origin?.split(' ').slice(0, 2).join(' ') || '—'} → {load.destination?.split(' ').slice(0, 2).join(' ') || '—'}
+                      {(load.pickup_location || load.origin || '').split(' ').slice(0, 2).join(' ') || '—'} → {(load.delivery_location || load.destination || '').split(' ').slice(0, 2).join(' ') || '—'}
                     </td>
                     <td>
                       <span style={{

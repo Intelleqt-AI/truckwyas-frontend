@@ -106,7 +106,7 @@ export function UsersPermissions() {
   };
 
   const loadPendingInvites = () => {
-    fetchData('api/v1/auth/invites/')
+    fetchData('api/v1/auth/invite/')
       .then((d: any) => {
         const arr = Array.isArray(d) ? d : (d?.results || []);
         setPendingInvites(arr);
@@ -135,7 +135,7 @@ export function UsersPermissions() {
     setInviting(true);
     try {
       await postData({
-        url: 'api/v1/auth/invites/',
+        url: 'api/v1/auth/invite/',
         data: { email: inviteEmail, role: inviteRole },
       });
       toast.success(`Invite sent to ${inviteEmail}`);
@@ -188,7 +188,7 @@ export function UsersPermissions() {
   const handleResendInvite = async (token: string) => {
     try {
       await postData({
-        url: `api/v1/auth/invites/${token}/resend/`,
+        url: `api/v1/auth/invite/${token}/resend/`,
         data: {},
       });
       toast.success('Invite resent');
@@ -204,7 +204,7 @@ export function UsersPermissions() {
       return;
     }
     try {
-      await deleteData({ url: `api/v1/auth/invites/${token}/` });
+      await deleteData({ url: `api/v1/auth/invite/${token}/` });
       toast.success('Invite revoked');
       loadPendingInvites();
     } catch (err) {

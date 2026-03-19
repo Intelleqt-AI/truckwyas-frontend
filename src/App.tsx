@@ -58,6 +58,7 @@ const Onboarding = lazy(() => import("./pages/Onboarding").then(m => ({ default:
 const VehicleFinancialProfile = lazy(() => import("./pages/VehicleFinancialProfile"));
 const RiskScoreView = lazy(() => import("./pages/RiskScoreView"));
 const FleetHeatmap = lazy(() => import("./pages/FleetHeatmap"));
+const ClientQuoteView = lazy(() => import("./pages/ClientQuoteView"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -96,6 +97,7 @@ const App = () => (
             <Route path="/forgot-password" element={<PublicOnly><ForgotPassword /></PublicOnly>} />
             <Route path="/reset-password" element={<PublicOnly><ResetPassword /></PublicOnly>} />
             <Route path="/invite/:token" element={<PublicOnly><InviteAccept /></PublicOnly>} />
+            <Route path="/quotes/view/:quoteId/:token" element={<ClientQuoteView />} />
             <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
 
             {/* Protected routes — require auth token */}

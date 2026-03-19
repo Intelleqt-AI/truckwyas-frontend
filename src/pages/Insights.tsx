@@ -88,7 +88,7 @@ interface DriverLeaderboard {
 }
 
 type TabType = 'overview' | 'customers' | 'routes' | 'assets' | 'costs';
-type PeriodType = 'month' | '3months' | 'ytd' | '12months' | 'custom';
+type PeriodType = '7D' | '30D' | '90D' | '6M' | '1YR' | 'ALL';
 type AssetsSubTab = 'vehicles' | 'drivers';
 type SortField = string;
 type SortDirection = 'asc' | 'desc';
@@ -118,44 +118,12 @@ const getMarginColor = (margin: number): string => {
   return 'var(--status-danger)';
 };
 
-const getPeriodDates = (period: PeriodType, customFrom?: string, customTo?: string): { from: string; to: string } => {
-  if (period === 'custom' && customFrom && customTo) {
-    return { from: customFrom, to: customTo };
-  }
-
-  const now = new Date();
-  const to = now.toISOString().split('T')[0];
-  let from: Date;
-
-  switch (period) {
-    case 'month':
-      from = new Date(now.getFullYear(), now.getMonth(), 1);
-      break;
-    case '3months':
-      from = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-      break;
-    case 'ytd':
-      from = new Date(now.getFullYear(), 0, 1);
-      break;
-    case '12months':
-      from = new Date(now.getFullYear(), now.getMonth() - 12, 1);
-      break;
-    case 'custom':
-      from = new Date(now.getFullYear(), now.getMonth(), 1);
-      break;
-  }
-
-  return { from: from.toISOString().split('T')[0], to };
+const getPeriodParam = (period: PeriodType): string => {
+  return `period=${period}`;
 };
 
 const getPeriodLabel = (period: PeriodType): string => {
-  switch (period) {
-    case 'month': return 'This Month';
-    case '3months': return 'Last 3 Months';
-    case 'ytd': return 'YTD';
-    case '12months': return 'Last 12 Months';
-    case 'custom': return 'Custom';
-  }
+  return period;
 };
 
 const TrendIndicator = ({ value, showArrow = true }: { value: number; showArrow?: boolean }) => {
@@ -173,10 +141,8 @@ const TrendIndicator = ({ value, showArrow = true }: { value: number; showArrow?
 
 export default function Insights() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [period, setPeriod] = useState<PeriodType>('month');
+  const [period, setPeriod] = useState<PeriodType>('30D');
   const [assetsSubTab, setAssetsSubTab] = useState<AssetsSubTab>('vehicles');
-  const [customFrom, setCustomFrom] = useState<string>('');
-  const [customTo, setCustomTo] = useState<string>('');
 
   // Data states
   const [loading, setLoading] = useState(true);
@@ -198,22 +164,22 @@ export default function Insights() {
   useEffect(() => {
     document.title = 'Insights - TruckWys';
     loadData();
-  }, [period, customFrom, customTo]);
+  }, [period]);
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
-    const { from, to } = getPeriodDates(period, customFrom, customTo);
-    const dateParams = `from=${from}&to=${to}`;
+    const periodParam = getPeriodParam(period);
 
     try {
-      const [financeRes, routesRes, customerRes, signalsRes, vehiclesRes, driversRes] = await Promise.all([
-        fetchData(`api/v1/dashboard/finance/?compare=previous_period&${dateParams}`).catch(() => null),
-        fetchData(`api/v1/dashboard/routes/?${dateParams}`).catch(() => null),
-        fetchData(`api/v1/dashboard/customer-health/?${dateParams}`).catch(() => null),
-        fetchData('api/v1/dashboard/signals/').catch(() => null),
-        fetchData('api/v1/fleet/insights/').catch(() => null),
-        fetchData('api/v1/drivers/leaderboard/').catch(() => null),
+      const [financeRes, routesRes, customerRes, signalsRes, vehiclesRes, driversRes, expenseRes] = await Promise.all([
+        fetchData(`api/v1/dashboard/finance/?compare=previous_period&${periodParam}`).catch(() => null),
+        fetchData(`api/v1/dashboard/routes/?${periodParam}`).catch(() => null),
+        fetchData(`api/v1/dashboard/customer-health/?${periodParam}`).catch(() => null),
+        fetchData(`api/v1/dashboard/signals/?${periodParam}`).catch(() => null),
+        fetchData(`api/v1/fleet/insights/?${periodParam}`).catch(() => null),
+        fetchData(`api/v1/drivers/leaderboard/?${periodParam}`).catch(() => null),
+        fetchData(`api/v1/expenses/report/?${periodParam}`).catch(() => null),
       ]);
 
       if (financeRes) setFinance(financeRes);
@@ -228,11 +194,6 @@ export default function Insights() {
       ).slice(0, 5));
       setVehicleInsights(vehiclesRes?.vehicles || []);
       setDriverLeaderboard(driversRes?.drivers || []);
-
-      // Fetch expense breakdown - use the most recent month from the period
-      const fromDate = new Date(from);
-      const expenseMonth = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}`;
-      const expenseRes = await fetchData(`api/v1/expenses/report/?month=${expenseMonth}`).catch(() => null);
       if (expenseRes?.by_category) {
         setExpenseCategories(expenseRes.by_category);
       }
@@ -289,10 +250,29 @@ export default function Insights() {
   const cashFlow = finance?.cash_flow_forecast;
   const monthlyTrend = finance?.monthly_trend || [];
 
+  const handleExport = async () => {
+    try {
+      const response = await fetchData(`api/v1/insights/export/?${getPeriodParam(period)}`);
+      // Create download link
+      const blob = new Blob([response], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `insights-export-${period}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      alert('Export unavailable');
+      console.error(err);
+    }
+  };
+
   return (
     <div>
-      {/* Page Header with Date Filter */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      {/* Page Header */}
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{
             fontSize: 11,
@@ -309,77 +289,79 @@ export default function Insights() {
           </div>
         </div>
 
-        {/* Date Range Filter */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginRight: 4 }}>
-            Period:
-          </span>
-          {(['month', '3months', 'ytd', '12months', 'custom'] as PeriodType[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              style={{
-                background: period === p ? 'var(--accent-primary)' : 'transparent',
-                border: `1px solid ${period === p ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-                color: period === p ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                padding: '6px 12px',
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
-                borderRadius: 4,
-                cursor: 'pointer',
-                fontWeight: period === p ? 600 : 400,
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (period !== p) {
-                  e.currentTarget.style.borderColor = 'var(--accent-dim)';
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (period !== p) {
-                  e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-                }
-              }}
-            >
-              {getPeriodLabel(p)}
-            </button>
-          ))}
-          {period === 'custom' && (
-            <>
-              <input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                style={{
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  color: 'var(--text-primary)',
-                  padding: '6px 10px',
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
-                  borderRadius: 4,
-                }}
-              />
-              <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>to</span>
-              <input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                style={{
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  color: 'var(--text-primary)',
-                  padding: '6px 10px',
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
-                  borderRadius: 4,
-                }}
-              />
-            </>
-          )}
-        </div>
+        {/* Export Button */}
+        <button
+          onClick={handleExport}
+          style={{
+            background: 'transparent',
+            border: '1px solid var(--accent-primary)',
+            color: 'var(--accent-primary)',
+            padding: '8px 16px',
+            fontSize: 11,
+            fontFamily: 'var(--font-mono)',
+            borderRadius: 4,
+            cursor: 'pointer',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--accent-primary)';
+            e.currentTarget.style.color = 'var(--bg-deep)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = 'var(--accent-primary)';
+          }}
+        >
+          EXPORT CSV
+        </button>
+      </div>
+
+      {/* Global Date Filter Bar */}
+      <div style={{
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 4,
+        padding: '12px 16px',
+        marginBottom: 24,
+        display: 'flex',
+        gap: 8,
+        alignItems: 'center',
+      }}>
+        {(['7D', '30D', '90D', '6M', '1YR', 'ALL'] as PeriodType[]).map((p) => (
+          <button
+            key={p}
+            onClick={() => setPeriod(p)}
+            style={{
+              background: period === p ? 'var(--accent-primary)' : 'transparent',
+              border: `1px solid ${period === p ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+              color: period === p ? 'var(--bg-deep)' : 'var(--text-secondary)',
+              padding: '6px 14px',
+              fontSize: 11,
+              fontFamily: 'var(--font-mono)',
+              borderRadius: 20,
+              cursor: 'pointer',
+              fontWeight: period === p ? 600 : 400,
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              if (period !== p) {
+                e.currentTarget.style.borderColor = 'var(--accent-dim)';
+                e.currentTarget.style.color = 'var(--text-primary)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (period !== p) {
+                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                e.currentTarget.style.color = 'var(--text-secondary)';
+              }
+            }}
+          >
+            {p}
+          </button>
+        ))}
       </div>
 
       {/* Tab Navigation */}
@@ -597,8 +579,48 @@ export default function Insights() {
               padding: 24,
             }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-                Top Performing Routes
+                Route Performance
               </div>
+
+              {/* Route KPI Cards */}
+              {loading ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+                  {[1,2,3].map(i => (
+                    <div key={i} style={{ height: 60, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+                  ))}
+                </div>
+              ) : topRoutes.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+                  <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+                    <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                      Top Route
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {topRoutes[0]?.route.split(' - ')[0] || 'N/A'}
+                    </div>
+                    <div style={{ fontSize: 10, color: getMarginColor(topRoutes[0]?.margin_pct || 0), fontFamily: 'var(--font-mono)', marginTop: 2 }}>
+                      {topRoutes[0]?.margin_pct.toFixed(1)}% margin
+                    </div>
+                  </div>
+                  <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+                    <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                      Total Trips
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {allRoutes.reduce((sum, r) => sum + r.trips, 0)}
+                    </div>
+                  </div>
+                  <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+                    <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                      Avg Margin
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {(allRoutes.reduce((sum, r) => sum + r.margin_pct, 0) / allRoutes.length || 0).toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {loading ? (
                 <div style={{ height: 240, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
               ) : topRoutes.length === 0 ? (
@@ -655,6 +677,51 @@ export default function Insights() {
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
                 Customer Health
               </div>
+
+              {/* Customer KPI Cards */}
+              {loading ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+                  {[1,2,3,4].map(i => (
+                    <div key={i} style={{ height: 60, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+                  ))}
+                </div>
+              ) : allCustomers.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+                  <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+                    <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                      Total
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {allCustomers.length}
+                    </div>
+                  </div>
+                  <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+                    <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                      At-Risk
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--status-warning)', fontFamily: 'var(--font-mono)' }}>
+                      {allCustomers.filter(c => c.risk_tier.toUpperCase() === 'HIGH' || c.risk_tier.toUpperCase() === 'CRITICAL' || c.risk_tier.toUpperCase() === 'ELEVATED').length}
+                    </div>
+                  </div>
+                  <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+                    <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                      Avg DSO
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {Math.round(allCustomers.reduce((sum, c) => sum + c.dso, 0) / allCustomers.length || 0)}d
+                    </div>
+                  </div>
+                  <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+                    <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                      Best
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--status-success)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {allCustomers.filter(c => c.risk_tier.toUpperCase() === 'PRIME')[0]?.customer_name.split(' ')[0] || 'N/A'}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {loading ? (
                 <div style={{ height: 240, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
               ) : customerHealth.length === 0 ? (
@@ -722,8 +789,53 @@ export default function Insights() {
             marginBottom: 32,
           }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-              Cash Flow Forecast — Expected Receivables
+              Cash Flow
             </div>
+
+            {/* Cash Flow KPI Cards */}
+            {loading || !cashFlow ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+                {[1,2,3,4].map(i => (
+                  <div key={i} style={{ height: 60, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+                <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                    Collected MTD
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--status-success)', fontFamily: 'var(--font-mono)' }}>
+                    {formatCurrency(finance?.revenue_period || 0)}
+                  </div>
+                </div>
+                <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                    Outstanding
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                    {formatCurrency(finance?.outstanding_invoices_total || 0)}
+                  </div>
+                </div>
+                <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                    Overdue
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--status-danger)', fontFamily: 'var(--font-mono)' }}>
+                    {formatCurrency(finance?.overdue_invoices_total || 0)}
+                  </div>
+                </div>
+                <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                    Next 30d
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
+                    {formatCurrency(cashFlow?.next_30_days || 0)}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {loading || !cashFlow ? (
               <div style={{ height: 100, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
             ) : (

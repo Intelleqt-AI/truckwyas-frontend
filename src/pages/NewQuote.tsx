@@ -384,7 +384,7 @@ export default function NewQuote() {
                 type="text"
                 placeholder="e.g. Johannesburg Depot"
                 value={pickupLocation}
-                onChange={e => { setPickupLocation(e.target.value); setRouteData(null); }}
+                onChange={e => { setPickupLocation(e.target.value); setRouteData(null); setAiSuggestion(null); setShowAISuggestion(false); }}
                 style={inputStyle}
               />
               {routeData?.origin_resolved && (
@@ -399,7 +399,7 @@ export default function NewQuote() {
                 type="text"
                 placeholder="e.g. Cape Town Warehouse"
                 value={deliveryLocation}
-                onChange={e => { setDeliveryLocation(e.target.value); setRouteData(null); }}
+                onChange={e => { setDeliveryLocation(e.target.value); setRouteData(null); setAiSuggestion(null); setShowAISuggestion(false); }}
                 style={inputStyle}
               />
               {routeData?.dest_resolved && (
@@ -575,7 +575,7 @@ export default function NewQuote() {
                 type="number"
                 placeholder="15000"
                 value={weight}
-                onChange={e => setWeight(e.target.value)}
+                onChange={e => { setWeight(e.target.value); setAiSuggestion(null); setShowAISuggestion(false); }}
                 style={inputStyle}
               />
             </div>
@@ -583,7 +583,7 @@ export default function NewQuote() {
               {label('Vehicle Type')}
               <select
                 value={vehicleType}
-                onChange={e => setVehicleType(e.target.value as VehicleType)}
+                onChange={e => { setVehicleType(e.target.value as VehicleType); setAiSuggestion(null); setShowAISuggestion(false); }}
                 style={inputStyle}
               >
                 <option value="Flatbed">Flatbed</option>
@@ -679,11 +679,11 @@ export default function NewQuote() {
           <div style={{ marginBottom: 16 }}>
             <button
               onClick={fetchAISuggestion}
-              disabled={loadingAI || !canGoToStep3}
+              disabled={loadingAI || !canGoToStep3 || showAISuggestion}
               className="btn-action"
-              style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}
+              style={{ width: '100%', background: showAISuggestion ? 'var(--bg-surface)' : 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: showAISuggestion ? 'var(--text-tertiary)' : 'var(--accent-primary)', cursor: showAISuggestion ? 'not-allowed' : 'pointer' }}
             >
-              {loadingAI ? 'GETTING AI SUGGESTION...' : 'GET AI SUGGESTION'}
+              {loadingAI ? 'GETTING AI SUGGESTION...' : showAISuggestion ? 'AI SUGGESTION LOADED' : 'GET AI SUGGESTION'}
             </button>
 
             {showAISuggestion && aiSuggestion && (

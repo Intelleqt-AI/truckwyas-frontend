@@ -124,7 +124,7 @@ export default function NewQuote() {
         fuel_cost: fuelCost,
         toll_cost: tollCost,
         driver_cost: driverAllowance,
-        actual_cost: total,
+        actual_cost: (routeData ? (routeData.distance_km * parseFloat(baseRatePerKm || '0')) + (editableFuelCost !== null ? editableFuelCost : (routeData?.fuel_cost_zar || 0)) + (editableTollCost !== null ? editableTollCost : (routeData?.toll_cost_zar || 0)) + parseFloat(driverAllowanceInput || '0') : 0),
       });
 
       if (data.success) {

@@ -18,6 +18,37 @@ interface RouteData {
   total_cost_zar: number;
   success: boolean;
   source: 'tomtom' | 'estimated';
+  cross_border?: boolean;
+  countries?: string[];
+  warnings?: string[];
+  additional_costs?: {
+    border_fees?: number;
+    weighbridge_fees?: number;
+    non_sa_tolls?: number;
+  };
+}
+
+interface FuelPriceData {
+  diesel_inland: number;
+  diesel_coastal: number;
+  source: string;
+}
+
+interface AISuggestion {
+  suggested_price: number;
+  margin_pct: number;
+  confidence: number;
+  margin_range: {
+    lower: number;
+    upper: number;
+  };
+}
+
+interface RevenueGuard {
+  risk_level: 'SAFE' | 'CAUTION' | 'AT_RISK';
+  color: string;
+  margin_pct: number;
+  warnings: string[];
 }
 
 export default function NewQuote() {
@@ -52,11 +83,94 @@ export default function NewQuote() {
     return date.toISOString().split('T')[0];
   });
 
+  // New Phase 2 features
+  const [fuelPriceData, setFuelPriceData] = useState<FuelPriceData | null>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<AISuggestion | null>(null);
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [showAISuggestion, setShowAISuggestion] = useState(false);
+  const [revenueGuard, setRevenueGuard] = useState<RevenueGuard | null>(null);
+
   const { data: customersData } = useQuery({
     queryKey: ['customers'],
     queryFn: () => fetchData('api/v1/customers/')
   });
   const customers = customersData?.results || customersData || [];
+
+  // Fetch current fuel prices on mount
+  useEffect(() => {
+    fetchData('/api/v1/fuel-prices/current/')
+      .then(data => {
+        if (data.success) {
+          setFuelPriceData(data);
+        }
+      })
+      .catch(() => {
+        // Silently fail — not critical
+      });
+  }, []);
+
+  // Fetch AI quote suggestion
+  const fetchAISuggestion = async () => {
+    if (!routeData) return;
+
+    setLoadingAI(true);
+    try {
+      const data = await postData('/api/v1/quotes/suggest/', {
+        distance_km: routeData.distance_km,
+        truck_type: 0, // Map vehicle types to numeric codes
+        load_type: 0,
+        load_weight: parseFloat(weight || '0'),
+        fuel_price: fuelPriceData?.diesel_inland || 22.0,
+        fuel_cost: fuelCost,
+        toll_cost: tollCost,
+        driver_cost: driverAllowance,
+        actual_cost: total,
+      });
+
+      if (data.success) {
+        setAiSuggestion(data);
+        setShowAISuggestion(true);
+      } else {
+        setError(data.error || 'AI suggestion failed');
+      }
+    } catch (err: any) {
+      if (err?.response?.status === 503) {
+        setError('AI model training — try again later');
+      } else {
+        setError('Failed to get AI suggestion');
+      }
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  // Fetch revenue guard assessment
+  const fetchRevenueGuard = async () => {
+    if (total <= 0) return;
+
+    try {
+      const data = await postData('/api/v1/quotes/guard/', {
+        total_cost: total,
+        quote_price: total, // Using total as quote price for now
+        distance_km: routeData?.distance_km || 0,
+        fuel_cost: fuelCost,
+        toll_cost: tollCost,
+      });
+
+      if (data.success) {
+        setRevenueGuard(data);
+      }
+    } catch (err) {
+      // Silently fail — not critical
+    }
+  };
+
+  // Update revenue guard when costs change
+  useEffect(() => {
+    if (currentStep === 3 && total > 0) {
+      fetchRevenueGuard();
+    }
+  }, [currentStep, total, fuelCost, tollCost]);
 
   // Calculate route via TomTom backend
   const calculateRoute = async () => {
@@ -307,7 +421,78 @@ export default function NewQuote() {
                     R {Math.round(routeData.toll_cost_zar).toLocaleString()}
                   </span>
                 </div>
+                {fuelPriceData && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginTop: 4 }}>
+                    <span style={{ color: 'var(--text-tertiary)' }}>Live Fuel Price (FIASA):</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                      R {fuelPriceData.diesel_inland.toFixed(2)}/L
+                    </span>
+                  </div>
+                )}
               </div>
+            </div>
+          )}
+
+          {/* Cross-Border Warning Panel */}
+          {routeData && routeData.cross_border && (
+            <div style={{ padding: '16px', background: 'var(--bg-surface)', borderRadius: 2, border: '1px solid var(--status-warning)', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{
+                  padding: '2px 8px',
+                  background: 'rgba(251, 191, 36, 0.1)',
+                  border: '1px solid var(--status-warning)',
+                  borderRadius: 2,
+                  fontSize: 9,
+                  color: 'var(--status-warning)',
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-mono)',
+                }}>
+                  CROSS-BORDER ROUTE
+                </span>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  International Crossing Detected
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                This route crosses borders: {routeData.countries?.join(' → ') || 'Multiple countries'}
+              </div>
+              {routeData.additional_costs && (
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11 }}>
+                  {routeData.additional_costs.border_fees && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Border Crossing Fees:</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)', fontWeight: 600 }}>
+                        R {Math.round(routeData.additional_costs.border_fees).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {routeData.additional_costs.weighbridge_fees && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Weighbridge Fees:</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)', fontWeight: 600 }}>
+                        R {Math.round(routeData.additional_costs.weighbridge_fees).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {routeData.additional_costs.non_sa_tolls && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>International Tolls:</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)', fontWeight: 600 }}>
+                        R {Math.round(routeData.additional_costs.non_sa_tolls).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {routeData.warnings && routeData.warnings.length > 0 && (
+                <div style={{ marginTop: 8, padding: '8px', background: 'rgba(251, 191, 36, 0.05)', borderRadius: 2 }}>
+                  {routeData.warnings.map((warning, idx) => (
+                    <div key={idx} style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: idx < routeData.warnings!.length - 1 ? 4 : 0 }}>
+                      • {warning}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -424,6 +609,76 @@ export default function NewQuote() {
             </div>
           </div>
 
+          {/* AI Quote Suggestion Panel */}
+          <div style={{ marginBottom: 16 }}>
+            <button
+              onClick={fetchAISuggestion}
+              disabled={loadingAI || !canGoToStep3}
+              className="btn-action"
+              style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}
+            >
+              {loadingAI ? 'GETTING AI SUGGESTION...' : '🤖 GET AI QUOTE SUGGESTION'}
+            </button>
+
+            {showAISuggestion && aiSuggestion && (
+              <div style={{ marginTop: 12, padding: '16px', background: 'var(--bg-surface-hover)', borderRadius: 2, border: '1px solid var(--accent-primary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}>
+                    AI SUGGESTION
+                  </div>
+                  <div style={{
+                    padding: '2px 8px',
+                    background: `rgba(0, 194, 255, ${aiSuggestion.confidence * 0.15})`,
+                    border: '1px solid var(--accent-primary)',
+                    borderRadius: 2,
+                    fontSize: 9,
+                    color: 'var(--accent-primary)',
+                    fontWeight: 600,
+                    fontFamily: 'var(--font-mono)',
+                  }}>
+                    {Math.round(aiSuggestion.confidence * 100)}% CONFIDENCE
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Suggested Price:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--accent-primary)' }}>
+                      R {Math.round(aiSuggestion.suggested_price).toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Predicted Margin:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 600 }}>
+                      {aiSuggestion.margin_pct.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+                    <span style={{ color: 'var(--text-tertiary)' }}>Margin Range:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                      {aiSuggestion.margin_range.lower.toFixed(1)}% - {aiSuggestion.margin_range.upper.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    // Auto-fill the total with suggested price
+                    const suggestedTotal = Math.round(aiSuggestion.suggested_price);
+                    const currentCosts = fuelCost + tollCost + driverAllowance;
+                    const newBaseRate = (suggestedTotal - currentCosts) / distanceKm;
+                    setBaseRatePerKm(newBaseRate.toFixed(2));
+                    setShowAISuggestion(false);
+                  }}
+                  className="btn-action"
+                  style={{ width: '100%', fontSize: 11 }}
+                >
+                  USE THIS SUGGESTION
+                </button>
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <button
               onClick={() => setCurrentStep(1)}
@@ -520,6 +775,44 @@ export default function NewQuote() {
               </div>
             </div>
           </div>
+
+          {/* Revenue Guard Badge */}
+          {revenueGuard && (
+            <div style={{ padding: '12px 16px', background: 'var(--bg-surface-hover)', borderRadius: 2, border: `1px solid var(--status-${revenueGuard.color})`, marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: revenueGuard.warnings.length > 0 ? 8 : 0 }}>
+                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}>
+                  REVENUE GUARD
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                    Margin: {revenueGuard.margin_pct.toFixed(1)}%
+                  </span>
+                  <span style={{
+                    padding: '4px 10px',
+                    background: `var(--status-${revenueGuard.color})`,
+                    borderRadius: 2,
+                    fontSize: 10,
+                    color: '#000',
+                    fontWeight: 700,
+                    fontFamily: 'var(--font-mono)',
+                  }}>
+                    {revenueGuard.risk_level === 'SAFE' && '🟢 SAFE'}
+                    {revenueGuard.risk_level === 'CAUTION' && '🟡 CAUTION'}
+                    {revenueGuard.risk_level === 'AT_RISK' && '🔴 AT RISK'}
+                  </span>
+                </div>
+              </div>
+              {revenueGuard.warnings.length > 0 && (
+                <div style={{ padding: '8px', background: 'rgba(251, 191, 36, 0.05)', borderRadius: 2 }}>
+                  {revenueGuard.warnings.map((warning, idx) => (
+                    <div key={idx} style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: idx < revenueGuard.warnings.length - 1 ? 4 : 0 }}>
+                      • {warning}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Full cost breakdown */}
           <div style={{ padding: '16px', background: 'var(--bg-surface-hover)', borderRadius: 2, marginBottom: 16 }}>

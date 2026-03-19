@@ -54,9 +54,14 @@ export default function DriverProfile() {
     </div>
   );
 
-  const name = driver.first_name && driver.last_name
-    ? `${driver.first_name} ${driver.last_name}`
-    : driver.name || driver.username || `Driver ${driver.id}`;
+  const ud = driver.user_details || {};
+  const firstName = driver.first_name || ud.first_name || '';
+  const lastName = driver.last_name || ud.last_name || '';
+  const email = driver.email || ud.email || '';
+  const phone = driver.phone || ud.phone || '';
+  const name = (firstName && lastName)
+    ? `${firstName} ${lastName}`
+    : firstName || driver.name || ud.name || ud.username || `Driver ${driver.id}`;
 
   const loads = Array.isArray(loadsData) ? loadsData : (loadsData?.results || []);
   const delivered = loads.filter((l: any) => l.status === 'DELIVERED');
@@ -89,7 +94,7 @@ export default function DriverProfile() {
             {driver.license_number && (
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
                 {driver.license_number}
-                {driver.phone ? ` · ${driver.phone}` : ''}
+                {phone ? ` · ${phone}` : ''}
               </div>
             )}
           </div>
@@ -146,8 +151,8 @@ export default function DriverProfile() {
         <div className="card" style={{ padding: 20 }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Details</div>
           <Row label="License Number" value={driver.license_number} />
-          <Row label="Phone" value={driver.phone} mono={false} />
-          <Row label="Email" value={driver.email} mono={false} />
+          <Row label="Phone" value={phone} mono={false} />
+          <Row label="Email" value={email} mono={false} />
           <Row label="ID Number" value={driver.id_number} />
           <Row label="Date of Birth" value={driver.date_of_birth?.slice(0, 10)} />
           <Row label="Address" value={driver.address} mono={false} />

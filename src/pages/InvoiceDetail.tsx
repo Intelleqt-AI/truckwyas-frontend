@@ -49,16 +49,26 @@ export default function InvoiceDetail() {
     }
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!id) return;
     setDownloading(true);
-    const url = `/api/v1/invoices/${id}/generate_pdf/`;
-    window.open(import.meta.env.VITE_API_URL + url, '_blank');
-    setToast('PDF downloading...');
-    setTimeout(() => {
-      setToast(null);
-      setDownloading(false);
-    }, 3000);
+    try {
+      const result: any = await postData({ url: `api/v1/invoices/${id}/generate_pdf/`, data: {} });
+      const pdfUrl = result?.pdf_url;
+      if (pdfUrl) {
+        window.open(pdfUrl, '_blank');
+        setToast('PDF opened in new tab');
+      } else {
+        setToast('PDF generated — check downloads');
+      }
+    } catch {
+      setToast('Failed to generate PDF');
+    } finally {
+      setTimeout(() => {
+        setToast(null);
+        setDownloading(false);
+      }, 3000);
+    }
   };
 
   const handleSendReminder = async () => {
@@ -275,11 +285,9 @@ export default function InvoiceDetail() {
                 {sending ? 'SENDING...' : 'SEND TO CUSTOMER'}
               </button>
             )}
-            {invoice.status !== 'DRAFT' && (
-              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={handleDownloadPDF} disabled={downloading}>
-                {downloading ? 'DOWNLOADING...' : 'DOWNLOAD PDF'}
-              </button>
-            )}
+            <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={handleDownloadPDF} disabled={downloading}>
+              {downloading ? 'DOWNLOADING...' : 'DOWNLOAD PDF'}
+            </button>
             {(invoice.status === 'SENT' || invoice.status === 'OVERDUE') && (
               <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={handleSendReminder} disabled={sendingReminder}>
                 {sendingReminder ? 'SENDING...' : 'SEND REMINDER'}

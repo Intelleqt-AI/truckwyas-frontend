@@ -55,7 +55,7 @@ export default function Capital() {
 
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.reason || err?.response?.data?.invoice_id?.[0] || err?.message || 'Request failed';
+      const msg = err?.data?.error || err?.data?.reason || err?.data?.reasons?.[0] || err?.response?.data?.error || err?.response?.data?.reason || err?.message || 'Request failed';
       setInvoiceErrors(prev => ({ ...prev, [invoice.id]: msg }));
     } finally {
       setRequestingIds(prev => {
@@ -84,9 +84,11 @@ export default function Capital() {
       setAdvances(active);
 
       setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to settle advance:', err);
-      alert('Failed to settle advance. Please try again.');
+      const msg = err?.data?.error || err?.message || 'Failed to settle advance';
+      setError(msg);
+      setTimeout(() => setError(null), 4000);
     } finally {
       setSettlingIds(prev => {
         const next = new Set(prev);

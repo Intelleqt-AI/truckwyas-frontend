@@ -42,7 +42,13 @@ export default function CreateInvoice() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.customer || !form.amount) { setError('Customer and amount are required'); return; }
-    mutation.mutate(form);
+    const subtotal = parseFloat(form.amount) || 0;
+    mutation.mutate({
+      ...form,
+      subtotal: subtotal.toFixed(2),
+      total_amount: subtotal.toFixed(2),
+      balance: subtotal.toFixed(2),
+    });
   };
 
   return (

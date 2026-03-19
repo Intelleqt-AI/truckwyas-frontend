@@ -192,8 +192,8 @@ export default function Insights() {
       setSignals((signalsRes?.signals || []).filter((s: Signal) =>
         s.severity?.toLowerCase() === 'high' || s.severity?.toLowerCase() === 'critical'
       ).slice(0, 5));
-      setVehicleInsights(vehiclesRes?.vehicles || []);
-      setDriverLeaderboard(driversRes?.drivers || []);
+      setVehicleInsights(vehiclesRes?.vehicles || vehiclesRes?.data || []);
+      setDriverLeaderboard(driversRes?.drivers || driversRes?.data || []);
       if (expenseRes?.by_category) {
         setExpenseCategories(expenseRes.by_category);
       }
@@ -264,8 +264,18 @@ export default function Insights() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (err) {
-      alert('Export unavailable');
       console.error(err);
+      // Graceful fallback — endpoint not yet implemented
+      const toast = document.createElement('div');
+      toast.textContent = 'Export not available yet';
+      Object.assign(toast.style, {
+        position: 'fixed', top: '80px', right: '24px', zIndex: '9999',
+        background: 'var(--status-warning)', color: '#000',
+        padding: '10px 18px', borderRadius: '2px',
+        fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: '600',
+      });
+      document.body.appendChild(toast);
+      setTimeout(() => document.body.removeChild(toast), 3000);
     }
   };
 
@@ -1167,22 +1177,22 @@ export default function Insights() {
                     </tr>
                   </thead>
                   <tbody>
-                    {vehicleInsights.map((vehicle, i) => (
+                    {vehicleInsights.map((vehicle: any, i: number) => (
                       <tr key={i} style={{ borderBottom: i < vehicleInsights.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
                         <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                          {vehicle.registration}
+                          {vehicle.registration || vehicle.vehicle_id || '—'}
                         </td>
                         <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>
-                          {formatCurrency(vehicle.revenue)}
+                          {vehicle.revenue != null ? formatCurrency(vehicle.revenue) : (vehicle.margin_per_trip || '—')}
                         </td>
                         <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                          {vehicle.trips}
+                          {vehicle.trips ?? vehicle.trips_count ?? '—'}
                         </td>
                         <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                          {vehicle.utilization.toFixed(1)}%
+                          {vehicle.utilization != null ? `${vehicle.utilization.toFixed(1)}%` : (vehicle.uptime || '—')}
                         </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: getMarginColor(vehicle.avg_margin), textAlign: 'right' }}>
-                          {vehicle.avg_margin.toFixed(1)}%
+                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: getMarginColor(vehicle.avg_margin ?? vehicle.ai_score ?? 0), textAlign: 'right' }}>
+                          {vehicle.avg_margin != null ? `${vehicle.avg_margin.toFixed(1)}%` : (vehicle.ai_score != null ? `Score: ${vehicle.ai_score}` : '—')}
                         </td>
                       </tr>
                     ))}
@@ -1230,25 +1240,27 @@ export default function Insights() {
                     </tr>
                   </thead>
                   <tbody>
-                    {driverLeaderboard.map((driver, i) => (
+                    {driverLeaderboard.map((driver: any, i: number) => {
+                      const onTime = driver.on_time_pct ?? driver.on_time_percentage ?? 0;
+                      return (
                       <tr key={i} style={{ borderBottom: i < driverLeaderboard.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
                         <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
                           {driver.driver_name}
                         </td>
                         <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                          {driver.trips}
+                          {driver.trips ?? '—'}
                         </td>
                         <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>
-                          {formatCurrency(driver.revenue)}
+                          {driver.revenue != null ? formatCurrency(driver.revenue) : (driver.margin_per_trip != null ? formatCurrency(driver.margin_per_trip) : '—')}
                         </td>
                         <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                          {driver.avg_rating.toFixed(1)} ★
+                          {driver.avg_rating != null ? `${driver.avg_rating.toFixed(1)} ★` : (driver.roi_score != null ? `${driver.roi_score}` : '—')}
                         </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: driver.on_time_pct >= 90 ? 'var(--status-success)' : driver.on_time_pct >= 75 ? 'var(--status-warning)' : 'var(--status-danger)', textAlign: 'right', fontWeight: 600 }}>
-                          {driver.on_time_pct.toFixed(1)}%
+                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: onTime >= 90 ? 'var(--status-success)' : onTime >= 75 ? 'var(--status-warning)' : 'var(--status-danger)', textAlign: 'right', fontWeight: 600 }}>
+                          {`${onTime.toFixed(1)}%`}
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               )}

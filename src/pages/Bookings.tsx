@@ -72,13 +72,13 @@ export default function Bookings() {
       });
       const data = await res.json();
       if (res.ok) {
-        setUploadMsg(`✅ POD uploaded: ${data.filename}`);
+        setUploadMsg(`POD uploaded: ${data.filename}`);
         qc.invalidateQueries({ queryKey: ['load', id] });
       } else {
-        setUploadMsg(`❌ ${data.error || 'Upload failed'}`);
+        setUploadMsg(`ERROR: ${data.error || 'Upload failed'}`);
       }
     } catch {
-      setUploadMsg('❌ Upload failed');
+      setUploadMsg("Upload failed");
     }
   };
 
@@ -234,7 +234,7 @@ export default function Bookings() {
                   color: convertResult.error ? 'var(--status-danger)' : 'var(--status-success)',
                   fontFamily: 'var(--font-mono)',
                 }}>
-                  {convertResult.error ? `❌ ${convertResult.error}` : `✓ ${convertResult.invoice_number} — ${formatCurrency(convertResult.total_amount)}`}
+                  {convertResult.error ? `ERROR: ${convertResult.error}` : `${convertResult.invoice_number} — ${formatCurrency(convertResult.total_amount)}`}
                 </div>
               )}
 
@@ -265,7 +265,7 @@ export default function Bookings() {
                 {hasPOD ? `✓ POD: ${load.pod_received_by || 'Uploaded'}` : '↑ UPLOAD POD'}
               </button>
               {uploadMsg && (
-                <div style={{ fontSize: 11, color: uploadMsg.startsWith('✅') ? 'var(--status-success)' : uploadMsg === 'Uploading...' ? 'var(--text-secondary)' : 'var(--status-danger)', fontFamily: 'var(--font-mono)' }}>
+                <div style={{ fontSize: 11, color: uploadMsg.startsWith('POD uploaded') ? 'var(--status-success)' : uploadMsg === 'Uploading...' ? 'var(--text-secondary)' : 'var(--status-danger)', fontFamily: 'var(--font-mono)' }}>
                   {uploadMsg}
                 </div>
               )}

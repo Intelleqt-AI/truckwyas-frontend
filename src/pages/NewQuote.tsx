@@ -90,6 +90,13 @@ export default function NewQuote() {
   const [showAISuggestion, setShowAISuggestion] = useState(false);
   const [revenueGuard, setRevenueGuard] = useState<RevenueGuard | null>(null);
 
+  // Cost calculations — defined early so they can be used in callbacks/effects below
+  const _fuelCost = editableFuelCost !== null ? editableFuelCost : (routeData?.fuel_cost_zar || 0);
+  const _tollCost = editableTollCost !== null ? editableTollCost : (routeData?.toll_cost_zar || 0);
+  const _baseCost = (routeData?.distance_km || 0) * parseFloat(baseRatePerKm || '0');
+  const _driverAllowance = parseFloat(driverAllowanceInput || '0');
+  const _total = _baseCost + _fuelCost + _tollCost + _driverAllowance;
+
   const { data: customersData } = useQuery({
     queryKey: ['customers'],
     queryFn: () => fetchData('api/v1/customers/')
@@ -115,17 +122,17 @@ export default function NewQuote() {
 
     setLoadingAI(true);
     try {
-      const data = await postData('/api/v1/quotes/suggest/', {
+      const data = await postData({ url: '/api/v1/quotes/suggest/', data: {
         distance_km: routeData.distance_km,
-        truck_type: 0, // Map vehicle types to numeric codes
+        truck_type: 0,
         load_type: 0,
         load_weight: parseFloat(weight || '0'),
         fuel_price: fuelPriceData?.diesel_inland || 22.0,
-        fuel_cost: fuelCost,
-        toll_cost: tollCost,
-        driver_cost: driverAllowance,
-        actual_cost: (routeData ? (routeData.distance_km * parseFloat(baseRatePerKm || '0')) + (editableFuelCost !== null ? editableFuelCost : (routeData?.fuel_cost_zar || 0)) + (editableTollCost !== null ? editableTollCost : (routeData?.toll_cost_zar || 0)) + parseFloat(driverAllowanceInput || '0') : 0),
-      });
+        fuel_cost: _fuelCost,
+        toll_cost: _tollCost,
+        driver_cost: _driverAllowance,
+        actual_cost: _total,
+      }});
 
       if (data.success) {
         setAiSuggestion(data);
@@ -146,16 +153,16 @@ export default function NewQuote() {
 
   // Fetch revenue guard assessment
   const fetchRevenueGuard = async () => {
-    if (total <= 0) return;
+    if (_total <= 0) return;
 
     try {
-      const data = await postData('/api/v1/quotes/guard/', {
-        total_cost: total,
-        quote_price: total, // Using total as quote price for now
+      const data = await postData({ url: '/api/v1/quotes/guard/', data: {
+        total_cost: _total,
+        quote_price: _total,
         distance_km: routeData?.distance_km || 0,
-        fuel_cost: fuelCost,
-        toll_cost: tollCost,
-      });
+        fuel_cost: _fuelCost,
+        toll_cost: _tollCost,
+      }});
 
       if (data.success) {
         setRevenueGuard(data);
@@ -167,10 +174,10 @@ export default function NewQuote() {
 
   // Update revenue guard when costs change
   useEffect(() => {
-    if (currentStep === 3 && total > 0) {
+    if (currentStep === 3 && _total > 0) {
       fetchRevenueGuard();
     }
-  }, [currentStep, total, fuelCost, tollCost]);
+  }, [currentStep, _total, _fuelCost, _tollCost]);
 
   // Calculate route via TomTom backend
   const calculateRoute = async () => {
@@ -184,12 +191,13 @@ export default function NewQuote() {
     setRouteData(null);
 
     try {
-      const data = await postData('/api/v1/route/calculate/', {
+      const data = await postData({ url: '/api/v1/route/calculate/', data: {
         origin: pickupLocation.trim(),
         destination: deliveryLocation.trim(),
-        vehicle_type: 'truck',
-        weight_kg: parseFloat(weight || '20000'),
-      });
+        vehicle_type: vehicleType,
+        cross_border_enabled: false,
+        weight: parseFloat(weight || '20000'),
+      }});
 
       if (data.success) {
         setRouteData(data);
@@ -206,11 +214,11 @@ export default function NewQuote() {
 
   // Cost calculations
   const distanceKm = routeData?.distance_km || 0;
-  const baseCost = distanceKm * parseFloat(baseRatePerKm || '0');
-  const fuelCost = editableFuelCost !== null ? editableFuelCost : (routeData?.fuel_cost_zar || 0);
-  const tollCost = editableTollCost !== null ? editableTollCost : (routeData?.toll_cost_zar || 0);
-  const driverAllowance = parseFloat(driverAllowanceInput || '0');
-  const total = baseCost + fuelCost + tollCost + driverAllowance;
+  const baseCost = _baseCost;
+  const fuelCost = _fuelCost;
+  const tollCost = _tollCost;
+  const driverAllowance = _driverAllowance;
+  const total = _total;
 
   // Extract origin and destination codes
   const extractCode = (location: string) => {

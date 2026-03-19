@@ -23,6 +23,7 @@ export default function Capital() {
   const [settlingIds, setSettlingIds] = useState<Set<number>>(new Set());
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [invoiceErrors, setInvoiceErrors] = useState<Record<number, string>>({});
+  const [activeTab, setActiveTab] = useState<'active' | 'eligible'>('eligible');
 
   const handleRequestAdvance = async (invoice: any) => {
     setRequestingIds(prev => new Set(prev).add(invoice.id));
@@ -245,8 +246,22 @@ export default function Capital() {
         </div>
       </div>
 
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '1px solid var(--border-subtle)' }}>
+        {(['eligible', 'active'] as const).map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)} style={{
+            background: 'none', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--accent-primary)' : '2px solid transparent',
+            color: activeTab === tab ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase',
+            padding: '10px 20px', cursor: 'pointer', marginBottom: -1,
+          }}>
+            {tab === 'eligible' ? `ELIGIBLE (${eligibleInvoices.length})` : `ACTIVE (${advances.length})`}
+          </button>
+        ))}
+      </div>
+
       {/* Active advances — currently in use */}
-      {advances.length > 0 && (
+      {activeTab === 'active' && advances.length > 0 && (
         <div className="card table-card" style={{ marginBottom: 20 }}>
           <div className="card-header" style={{ marginBottom: 16 }}>
             <span className="card-title">Active Advances</span>
@@ -306,7 +321,7 @@ export default function Capital() {
       )}
 
       {/* Fast Pay NOW — eligible invoices section */}
-      <div className="card table-card">
+      {activeTab === 'eligible' && <div className="card table-card">
         <div className="card-header" style={{ marginBottom: 16 }}>
           <span className="card-title">Fast Pay NOW — Eligible Invoices</span>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>

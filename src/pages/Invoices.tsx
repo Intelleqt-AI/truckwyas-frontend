@@ -329,9 +329,7 @@ export default function Invoices() {
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>
               {activeTab === 'invoices' ? 'Invoices' : 'Expenses'}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
-              Last updated: {new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
-            </div>
+
           </div>
           {activeTab === 'invoices' && (
             <button className="btn-action" onClick={() => navigate('/finance/invoices/new')}>+ NEW INVOICE</button>

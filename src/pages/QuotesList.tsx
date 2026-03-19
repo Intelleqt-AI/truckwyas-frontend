@@ -230,6 +230,9 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Loads & Quotes</div>
             <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-action" style={{ background: 'var(--accent-primary)', color: 'var(--bg-deep)' }} onClick={() => navigate('/quotes/ai-chat')}>
+                AI QUOTE
+              </button>
               <button className="btn-action" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={() => navigate('/quotes/new')}>
                 + NEW QUOTE
               </button>

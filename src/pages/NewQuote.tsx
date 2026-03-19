@@ -18,6 +18,8 @@ interface RouteData {
   total_cost_zar: number;
   success: boolean;
   source: 'tomtom' | 'estimated';
+  origin_resolved?: string;
+  dest_resolved?: string;
   cross_border?: boolean;
   countries?: string[];
   warnings?: string[];
@@ -350,9 +352,14 @@ export default function NewQuote() {
                 type="text"
                 placeholder="e.g. Johannesburg Depot"
                 value={pickupLocation}
-                onChange={e => setPickupLocation(e.target.value)}
+                onChange={e => { setPickupLocation(e.target.value); setRouteData(null); }}
                 style={inputStyle}
               />
+              {routeData?.origin_resolved && (
+                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+                  RESOLVED: {routeData.origin_resolved}
+                </div>
+              )}
             </div>
             <div>
               {label('Delivery Location')}
@@ -360,9 +367,14 @@ export default function NewQuote() {
                 type="text"
                 placeholder="e.g. Cape Town Warehouse"
                 value={deliveryLocation}
-                onChange={e => setDeliveryLocation(e.target.value)}
+                onChange={e => { setDeliveryLocation(e.target.value); setRouteData(null); }}
                 style={inputStyle}
               />
+              {routeData?.dest_resolved && (
+                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+                  RESOLVED: {routeData.dest_resolved}
+                </div>
+              )}
             </div>
           </div>
 

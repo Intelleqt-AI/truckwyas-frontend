@@ -7,6 +7,16 @@ import { postData, fetchData } from "@/lib/Api";
 const DEFAULT_BASE_RATE_PER_KM = 10;
 const FUEL_PRICE_PER_LITRE = 21.7;
 
+// Fuel consumption by vehicle type (L/100km — match app exactly)
+const FUEL_CONSUMPTION: Record<string, number> = {
+  Flatbed: 32,
+  Tautliner: 35,
+  Refrigerated: 38,
+  'Box Truck': 30,
+  Tanker: 40,
+  'Danger Load': 36,
+};
+
 type VehicleType = 'Flatbed' | 'Tautliner' | 'Refrigerated' | 'Box Truck' | 'Tanker' | 'Danger Load';
 
 interface RouteData {
@@ -93,11 +103,33 @@ export default function NewQuote() {
   const [revenueGuard, setRevenueGuard] = useState<RevenueGuard | null>(null);
 
   // Cost calculations — defined early so they can be used in callbacks/effects below
-  const _fuelCost = editableFuelCost !== null ? editableFuelCost : (routeData?.fuel_cost_zar || 0);
-  const _tollCost = editableTollCost !== null ? editableTollCost : (routeData?.toll_cost_zar || 0);
-  const _baseCost = (routeData?.distance_km || 0) * parseFloat(baseRatePerKm || '0');
+  // Mobile app formula implementation
+  const distance = routeData?.distance_km || 0;
+  const _baseCost = distance * parseFloat(baseRatePerKm || '0');
+
+  // Fuel cost: (distance × fuelConsumptionL100km × fuelPricePerLitre) / 100
+  const fuelConsumption = FUEL_CONSUMPTION[vehicleType] || 36; // Default to Danger Load
+  const fuelPrice = fuelPriceData?.diesel_inland || FUEL_PRICE_PER_LITRE;
+  const calculatedFuelCost = (distance * fuelConsumption * fuelPrice) / 100;
+  const _fuelCost = editableFuelCost !== null ? editableFuelCost : calculatedFuelCost;
+
+  // Toll cost: routeData.toll_cost_zar OR distance × 0.5 (fallback)
+  const calculatedTollCost = routeData?.toll_cost_zar || (distance * 0.5);
+  const _tollCost = editableTollCost !== null ? editableTollCost : calculatedTollCost;
+
+  // Weight surcharge: baseCost × 0.15 IF weight > 5000kg, ELSE 0
+  const weightKg = parseFloat(weight || '0');
+  const _weightSurcharge = weightKg > 5000 ? _baseCost * 0.15 : 0;
+
+  // Additional costs (cross-border only)
+  const _additionalCosts = (routeData?.additional_costs?.border_fees || 0) +
+                           (routeData?.additional_costs?.weighbridge_fees || 0) +
+                           (routeData?.additional_costs?.non_sa_tolls || 0);
+
   const _driverAllowance = parseFloat(driverAllowanceInput || '0');
-  const _total = _baseCost + _fuelCost + _tollCost + _driverAllowance;
+
+  // Total: baseCost + fuelCost + tollCost + weightSurcharge + additionalCosts + driverAllowance
+  const _total = _baseCost + _fuelCost + _tollCost + _weightSurcharge + _additionalCosts + _driverAllowance;
 
   const { data: customersData } = useQuery({
     queryKey: ['customers'],
@@ -259,7 +291,7 @@ export default function NewQuote() {
       fuel_surcharge: Math.round(fuelCost * 100) / 100,
       toll_charges: Math.round(tollCost * 100) / 100,
       driver_allowance: Math.round(driverAllowance * 100) / 100,
-      additional_charges: 0,
+      additional_charges: Math.round((_weightSurcharge + _additionalCosts) * 100) / 100,
       total_amount: Math.round(total * 100) / 100,
       margin_percentage: 15.0,
       notes,
@@ -595,7 +627,7 @@ export default function NewQuote() {
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(baseCost).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Fuel Surcharge:</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Fuel Surcharge ({fuelConsumption}L/100km @ R{fuelPrice.toFixed(2)}/L):</span>
                 <input
                   type="number"
                   value={editableFuelCost !== null ? editableFuelCost : Math.round(fuelCost)}
@@ -612,6 +644,18 @@ export default function NewQuote() {
                   style={{ ...inputStyle, width: 100, padding: '4px 8px', fontSize: 12 }}
                 />
               </div>
+              {_weightSurcharge > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Weight Surcharge (15% over 5T):</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)' }}>R {Math.round(_weightSurcharge).toLocaleString()}</span>
+                </div>
+              )}
+              {_additionalCosts > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Cross-Border Fees:</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)' }}>R {Math.round(_additionalCosts).toLocaleString()}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Driver Allowance:</span>
                 <input
@@ -868,6 +912,18 @@ export default function NewQuote() {
                 <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Toll Charges:</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(tollCost).toLocaleString()}</span>
               </div>
+              {_weightSurcharge > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Weight Surcharge (15% over 5T):</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)' }}>R {Math.round(_weightSurcharge).toLocaleString()}</span>
+                </div>
+              )}
+              {_additionalCosts > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Cross-Border Fees:</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)' }}>R {Math.round(_additionalCosts).toLocaleString()}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Driver Allowance:</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {driverAllowance.toLocaleString()}</span>

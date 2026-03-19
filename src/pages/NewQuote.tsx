@@ -379,7 +379,7 @@ export default function NewQuote() {
                 </div>
                 <span style={{
                   padding: '2px 8px',
-                  background: routeData.source === 'tomtom' ? 'rgba(0, 194, 255, 0.1)' : 'rgba(251, 191, 36, 0.1)',
+                  background: routeData.source === 'tomtom' ? 'var(--accent-glow)' : 'var(--status-warning-bg)',
                   border: `1px solid ${routeData.source === 'tomtom' ? 'var(--accent-primary)' : 'var(--status-warning)'}`,
                   borderRadius: 2,
                   fontSize: 9,
@@ -410,20 +410,20 @@ export default function NewQuote() {
 
               <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Fuel Cost:</span>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Fuel Cost:</span>
                   <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-success)', fontWeight: 600 }}>
                     R {Math.round(routeData.fuel_cost_zar).toLocaleString()}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Toll Cost:</span>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Toll Cost:</span>
                   <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-success)', fontWeight: 600 }}>
                     R {Math.round(routeData.toll_cost_zar).toLocaleString()}
                   </span>
                 </div>
                 {fuelPriceData && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginTop: 4 }}>
-                    <span style={{ color: 'var(--text-tertiary)' }}>Live Fuel Price (FIASA):</span>
+                    <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>Live Fuel Price (FIASA):</span>
                     <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       R {fuelPriceData.diesel_inland.toFixed(2)}/L
                     </span>
@@ -439,7 +439,7 @@ export default function NewQuote() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <span style={{
                   padding: '2px 8px',
-                  background: 'rgba(251, 191, 36, 0.1)',
+                  background: 'var(--status-warning-bg)',
                   border: '1px solid var(--status-warning)',
                   borderRadius: 2,
                   fontSize: 9,
@@ -449,18 +449,18 @@ export default function NewQuote() {
                 }}>
                   CROSS-BORDER ROUTE
                 </span>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)' }}>
                   International Crossing Detected
                 </div>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8, fontFamily: 'var(--font-sans)' }}>
                 This route crosses borders: {routeData.countries?.join(' → ') || 'Multiple countries'}
               </div>
               {routeData.additional_costs && (
                 <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11 }}>
                   {routeData.additional_costs.border_fees && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Border Crossing Fees:</span>
+                      <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Border Crossing Fees:</span>
                       <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)', fontWeight: 600 }}>
                         R {Math.round(routeData.additional_costs.border_fees).toLocaleString()}
                       </span>
@@ -468,7 +468,7 @@ export default function NewQuote() {
                   )}
                   {routeData.additional_costs.weighbridge_fees && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Weighbridge Fees:</span>
+                      <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Weighbridge Fees:</span>
                       <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)', fontWeight: 600 }}>
                         R {Math.round(routeData.additional_costs.weighbridge_fees).toLocaleString()}
                       </span>
@@ -476,7 +476,7 @@ export default function NewQuote() {
                   )}
                   {routeData.additional_costs.non_sa_tolls && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>International Tolls:</span>
+                      <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>International Tolls:</span>
                       <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)', fontWeight: 600 }}>
                         R {Math.round(routeData.additional_costs.non_sa_tolls).toLocaleString()}
                       </span>
@@ -485,9 +485,9 @@ export default function NewQuote() {
                 </div>
               )}
               {routeData.warnings && routeData.warnings.length > 0 && (
-                <div style={{ marginTop: 8, padding: '8px', background: 'rgba(251, 191, 36, 0.05)', borderRadius: 2 }}>
+                <div style={{ marginTop: 8, padding: '8px', background: 'var(--bg-surface)', borderRadius: 2 }}>
                   {routeData.warnings.map((warning, idx) => (
-                    <div key={idx} style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: idx < routeData.warnings!.length - 1 ? 4 : 0 }}>
+                    <div key={idx} style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: idx < routeData.warnings!.length - 1 ? 4 : 0, fontFamily: 'var(--font-sans)' }}>
                       • {warning}
                     </div>
                   ))}
@@ -569,11 +569,11 @@ export default function NewQuote() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Base Cost ({Math.round(distanceKm)} km × R{baseRatePerKm}/km):</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Base Cost ({Math.round(distanceKm)} km × R{baseRatePerKm}/km):</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(baseCost).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Fuel Surcharge:</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Fuel Surcharge:</span>
                 <input
                   type="number"
                   value={editableFuelCost !== null ? editableFuelCost : Math.round(fuelCost)}
@@ -582,7 +582,7 @@ export default function NewQuote() {
                 />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Toll Charges:</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Toll Charges:</span>
                 <input
                   type="number"
                   value={editableTollCost !== null ? editableTollCost : Math.round(tollCost)}
@@ -591,7 +591,7 @@ export default function NewQuote() {
                 />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Driver Allowance:</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Driver Allowance:</span>
                 <input
                   type="number"
                   value={driverAllowanceInput}
@@ -601,7 +601,7 @@ export default function NewQuote() {
                 />
               </div>
               <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Total:</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)' }}>Total:</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--accent-primary)' }}>
                   R {Math.round(total).toLocaleString()}
                 </span>
@@ -628,7 +628,7 @@ export default function NewQuote() {
                   </div>
                   <div style={{
                     padding: '2px 8px',
-                    background: `rgba(0, 194, 255, ${aiSuggestion.confidence * 0.15})`,
+                    background: 'var(--accent-dim)',
                     border: '1px solid var(--accent-primary)',
                     borderRadius: 2,
                     fontSize: 9,
@@ -642,19 +642,19 @@ export default function NewQuote() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, marginBottom: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Suggested Price:</span>
+                    <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Suggested Price:</span>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--accent-primary)' }}>
                       R {Math.round(aiSuggestion.suggested_price).toLocaleString()}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Predicted Margin:</span>
+                    <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Predicted Margin:</span>
                     <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 600 }}>
                       {aiSuggestion.margin_pct.toFixed(1)}%
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-                    <span style={{ color: 'var(--text-tertiary)' }}>Margin Range:</span>
+                    <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>Margin Range:</span>
                     <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       {aiSuggestion.margin_range.lower.toFixed(1)}% - {aiSuggestion.margin_range.upper.toFixed(1)}%
                     </span>
@@ -792,7 +792,7 @@ export default function NewQuote() {
                     background: `var(--status-${revenueGuard.color})`,
                     borderRadius: 2,
                     fontSize: 10,
-                    color: '#000',
+                    color: 'var(--text-primary)',
                     fontWeight: 700,
                     fontFamily: 'var(--font-mono)',
                   }}>
@@ -803,9 +803,9 @@ export default function NewQuote() {
                 </div>
               </div>
               {revenueGuard.warnings.length > 0 && (
-                <div style={{ padding: '8px', background: 'rgba(251, 191, 36, 0.05)', borderRadius: 2 }}>
+                <div style={{ padding: '8px', background: 'var(--bg-surface)', borderRadius: 2 }}>
                   {revenueGuard.warnings.map((warning, idx) => (
-                    <div key={idx} style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: idx < revenueGuard.warnings.length - 1 ? 4 : 0 }}>
+                    <div key={idx} style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: idx < revenueGuard.warnings.length - 1 ? 4 : 0, fontFamily: 'var(--font-sans)' }}>
                       • {warning}
                     </div>
                   ))}
@@ -821,37 +821,37 @@ export default function NewQuote() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Route:</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Route:</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{pickupLocation} → {deliveryLocation}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Distance:</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Distance:</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{Math.round(distanceKm)} km</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Cargo:</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Cargo:</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{weight}kg {vehicleType}</span>
               </div>
             </div>
             <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Base Cost:</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Base Cost:</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(baseCost).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Fuel Surcharge:</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Fuel Surcharge:</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(fuelCost).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Toll Charges:</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Toll Charges:</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {Math.round(tollCost).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Driver Allowance:</span>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Driver Allowance:</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>R {driverAllowance.toLocaleString()}</span>
               </div>
               <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}>Quote Total:</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14, fontFamily: 'var(--font-sans)' }}>Quote Total:</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: 'var(--accent-primary)' }}>
                   R {Math.round(total).toLocaleString()}
                 </span>

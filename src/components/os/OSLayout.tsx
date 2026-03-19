@@ -1,12 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 export function OSLayout({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('tw-theme') as 'dark' | 'light') || 'dark';
   });
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Get user initials from stored user data
+  const storedUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
+  const userName = storedUser.name || storedUser.username || 'User';
+  const initials = userName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'TW';
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('access');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('onboarding_done');
+    navigate('/login');
+  };
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -60,7 +86,33 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
               : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             }
           </button>
-          <div style={{ width: 30, height: 30, background: 'var(--accent-dim)', border: '1px solid var(--border-subtle)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'var(--accent-primary)', fontWeight: 700 }}>TW</div>
+          <div ref={profileRef} style={{ position: 'relative' }}>
+            <div
+              onClick={() => setShowProfileMenu(p => !p)}
+              style={{ width: 30, height: 30, background: 'var(--accent-dim)', border: '1px solid var(--border-subtle)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'var(--accent-primary)', fontWeight: 700, cursor: 'pointer' }}
+              title={userName}
+            >{initials}</div>
+            {showProfileMenu && (
+              <div style={{ position: 'absolute', top: 38, right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, minWidth: 180, zIndex: 1000, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: 12, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', fontWeight: 600 }}>{userName}</div>
+                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginTop: 2 }}>{storedUser.email || storedUser.username || ''}</div>
+                </div>
+                <div
+                  onClick={() => { setShowProfileMenu(false); navigate('/settings'); }}
+                  style={{ padding: '10px 16px', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', cursor: 'pointer', letterSpacing: '0.05em' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                >PROFILE & SETTINGS</div>
+                <div
+                  onClick={handleLogout}
+                  style={{ padding: '10px 16px', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--status-danger)', cursor: 'pointer', letterSpacing: '0.05em', borderTop: '1px solid var(--border-subtle)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >SIGN OUT</div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

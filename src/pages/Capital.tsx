@@ -22,11 +22,16 @@ export default function Capital() {
   const [requestingIds, setRequestingIds] = useState<Set<number>>(new Set());
   const [settlingIds, setSettlingIds] = useState<Set<number>>(new Set());
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [invoiceErrors, setInvoiceErrors] = useState<Record<number, string>>({});
 
   const handleRequestAdvance = async (invoice: any) => {
     setRequestingIds(prev => new Set(prev).add(invoice.id));
     setSuccessMessage(null);
+    setInvoiceErrors(prev => {
+      const next = { ...prev };
+      delete next[invoice.id];
+      return next;
+    });
 
     try {
       await postData({
@@ -49,10 +54,8 @@ export default function Capital() {
 
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.invoice_id?.[0] || err?.message || 'Request failed';
-      setSuccessMessage(null);
-      setErrorMessage(msg);
-      setTimeout(() => setErrorMessage(null), 5000);
+      const msg = err?.response?.data?.error || err?.response?.data?.reason || err?.response?.data?.invoice_id?.[0] || err?.message || 'Request failed';
+      setInvoiceErrors(prev => ({ ...prev, [invoice.id]: msg }));
     } finally {
       setRequestingIds(prev => {
         const next = new Set(prev);
@@ -192,25 +195,6 @@ export default function Capital() {
           gap: 8,
         }}>
           ✓ {successMessage}
-        </div>
-      )}
-
-      {errorMessage && (
-        <div style={{
-          background: 'var(--status-danger-bg)',
-          color: 'var(--status-danger)',
-          padding: '12px 16px',
-          borderRadius: 4,
-          marginBottom: 16,
-          fontSize: 12,
-          fontFamily: 'var(--font-mono)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          border: '1px solid var(--status-danger)',
-          borderOpacity: 0.25,
-        }}>
-          ✕ {errorMessage}
         </div>
       )}
 
@@ -360,25 +344,39 @@ export default function Capital() {
                     <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{TIER_FEE[tier]}</td>
                     <td style={{ color: 'var(--status-success)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(netPayout)}</td>
                     <td className="text-right">
-                      <button
-                        className="btn-action"
-                        disabled={requestingIds.has(inv.id)}
-                        style={{
-                          fontSize: 10,
-                          padding: '4px 12px',
-                          background: requestingIds.has(inv.id) ? 'var(--border-subtle)' : 'var(--accent-primary)',
-                          color: 'var(--btn-action-color)',
-                          border: 'none',
-                          borderRadius: 2,
-                          cursor: requestingIds.has(inv.id) ? 'not-allowed' : 'pointer',
-                          fontFamily: 'var(--font-mono)',
-                          fontWeight: 600,
-                          opacity: requestingIds.has(inv.id) ? 0.6 : 1,
-                        }}
-                        onClick={() => handleRequestAdvance(inv)}
-                      >
-                        {requestingIds.has(inv.id) ? 'REQUESTING...' : 'REQUEST'}
-                      </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                        <button
+                          className="btn-action"
+                          disabled={requestingIds.has(inv.id)}
+                          style={{
+                            fontSize: 10,
+                            padding: '4px 12px',
+                            background: requestingIds.has(inv.id) ? 'var(--border-subtle)' : 'var(--accent-primary)',
+                            color: 'var(--btn-action-color)',
+                            border: 'none',
+                            borderRadius: 2,
+                            cursor: requestingIds.has(inv.id) ? 'not-allowed' : 'pointer',
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            opacity: requestingIds.has(inv.id) ? 0.6 : 1,
+                          }}
+                          onClick={() => handleRequestAdvance(inv)}
+                        >
+                          {requestingIds.has(inv.id) ? 'REQUESTING...' : 'REQUEST'}
+                        </button>
+                        {invoiceErrors[inv.id] && (
+                          <div style={{
+                            fontSize: 9,
+                            color: 'var(--status-danger)',
+                            fontFamily: 'var(--font-mono)',
+                            textAlign: 'right',
+                            maxWidth: 200,
+                            lineHeight: 1.3,
+                          }}>
+                            {invoiceErrors[inv.id]}
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

@@ -16,6 +16,7 @@ export default function InvoiceDetail() {
   const navigate = useNavigate();
   const [sending, setSending] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -58,6 +59,25 @@ export default function InvoiceDetail() {
       setToast(null);
       setDownloading(false);
     }, 3000);
+  };
+
+  const handleSendReminder = async () => {
+    if (!id) return;
+    setSendingReminder(true);
+    try {
+      await postData({ url: `api/v1/invoices/${id}/send_reminder/`, data: {} });
+      setToast('Reminder sent successfully!');
+      setTimeout(() => setToast(null), 3000);
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        setToast('Reminder recorded — customer will be contacted');
+      } else {
+        setToast('Failed to send reminder');
+      }
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setSendingReminder(false);
+    }
   };
 
   const handleRecordPayment = async () => {
@@ -258,6 +278,11 @@ export default function InvoiceDetail() {
             {invoice.status !== 'DRAFT' && (
               <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={handleDownloadPDF} disabled={downloading}>
                 {downloading ? 'DOWNLOADING...' : 'DOWNLOAD PDF'}
+              </button>
+            )}
+            {(invoice.status === 'SENT' || invoice.status === 'OVERDUE') && (
+              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={handleSendReminder} disabled={sendingReminder}>
+                {sendingReminder ? 'SENDING...' : 'SEND REMINDER'}
               </button>
             )}
             {(invoice.status === 'SENT' || invoice.status === 'OVERDUE' || invoice.status === 'PARTIALLY_PAID') && !showPaymentForm && (

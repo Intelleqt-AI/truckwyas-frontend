@@ -399,7 +399,7 @@ export default function Capital() {
             </tbody>
           </table>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

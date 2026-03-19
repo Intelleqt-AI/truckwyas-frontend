@@ -233,6 +233,9 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
               <button className="btn-action" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={() => navigate('/quotes/new')}>
                 + NEW QUOTE
               </button>
+              <button className="btn-action" style={{ background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }} onClick={() => navigate('/quotes/ai-chat')}>
+                AI QUOTE
+              </button>
               <button className="btn-action" onClick={() => navigate('/quotes/new')}>+ NEW LOAD</button>
             </div>
           </div>

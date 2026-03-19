@@ -25,6 +25,7 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
 // Lazy load all other pages for code splitting
 const QuotesList = lazy(() => import("./pages/QuotesList").then(m => ({ default: m.QuotesList })));
 const NewQuote = lazy(() => import("./pages/NewQuote"));
+const AIQuoteChat = lazy(() => import("./pages/AIQuoteChat"));
 const QuoteDetail = lazy(() => import("./pages/QuoteDetail"));
 const BookingsList = lazy(() => import("./pages/BookingsList").then(m => ({ default: m.BookingsList })));
 const Bookings = lazy(() => import("./pages/Bookings"));
@@ -101,6 +102,7 @@ const App = () => (
             <Route path="/" element={<RequireAuth><OSLayout><Overview /></OSLayout></RequireAuth>} />
             <Route path="/quotes" element={<RequireAuth><OSLayout><QuotesList /></OSLayout></RequireAuth>} />
             <Route path="/quotes/new" element={<RequireAuth><OSLayout><NewQuote /></OSLayout></RequireAuth>} />
+            <Route path="/quotes/ai-chat" element={<RequireAuth><OSLayout><AIQuoteChat /></OSLayout></RequireAuth>} />
             <Route path="/quotes/:id" element={<RequireAuth><OSLayout><QuoteDetail /></OSLayout></RequireAuth>} />
             <Route path="/bookings" element={<RequireAuth><OSLayout><LoadsList /></OSLayout></RequireAuth>} />
             <Route path="/bookings/:id" element={<RequireAuth><OSLayout><Bookings /></OSLayout></RequireAuth>} />

@@ -303,7 +303,25 @@ export default function NewQuote() {
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
           Operations
         </div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>New Quote</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>New Quote</div>
+          <button
+            onClick={() => navigate('/quotes/ai-chat')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--accent-primary)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              textDecoration: 'underline'
+            }}
+          >
+            USE AI ASSISTANT
+          </button>
+        </div>
       </div>
 
       {/* Step Indicator */}

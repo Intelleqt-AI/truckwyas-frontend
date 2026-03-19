@@ -386,7 +386,7 @@ export default function Vehicles() {
               <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {[
-              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. 1HGBH41JXMN109186' },
+              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. WDB9634031L123456' },
               { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz' },
               { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
               { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
@@ -465,7 +465,7 @@ export default function Vehicles() {
               </div>
             )}
             {[
-              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. 1HGBH41JXMN109186' },
+              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. WDB9634031L123456' },
               { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz' },
               { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
               { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },

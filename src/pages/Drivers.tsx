@@ -19,6 +19,12 @@ interface Driver {
   hire_date?: string;
   emergency_contact?: string;
   emergency_phone?: string;
+  user_details?: {
+    id: number;
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+  };
 }
 
 interface DriverOverview {
@@ -91,13 +97,21 @@ export default function Drivers() {
         rank: d.rank || i + 1,
       }));
 
-      // Merge leaderboard data into driver list
-      const driversWithPerformance = driverList.map((driver: Driver) => {
+      // Flatten user_details into driver and merge leaderboard data
+      const driversWithPerformance = driverList.map((driver: any) => {
+        const ud = driver.user_details || {};
+        const flattened: Driver = {
+          ...driver,
+          first_name: driver.first_name || ud.first_name || '',
+          last_name: driver.last_name || ud.last_name || '',
+          name: driver.name || ud.name || (ud.first_name ? `${ud.first_name} ${ud.last_name || ''}`.trim() : ''),
+          phone: driver.phone || ud.phone || '',
+        };
         const leaderboardEntry = leaderboardEntries.find((lb: LeaderboardEntry) => lb.driver_id === driver.id);
-        if (leaderboardEntry && !driver.efficiency_score) {
-          return { ...driver, efficiency_score: leaderboardEntry.efficiency_score };
+        if (leaderboardEntry && !flattened.efficiency_score) {
+          return { ...flattened, efficiency_score: leaderboardEntry.efficiency_score };
         }
-        return driver;
+        return flattened;
       });
 
       setDrivers(driversWithPerformance);
@@ -313,6 +327,8 @@ export default function Drivers() {
                         e.stopPropagation();
                         setEditDriver(d);
                         setEditForm({
+                          first_name: d.first_name || '',
+                          last_name: d.last_name || '',
                           license_number: d.license_number || '',
                           license_expiry: d.license_expiry || '',
                           license_state: d.license_state || 'GP',
@@ -407,9 +423,20 @@ export default function Drivers() {
                     }});
                     setShowAddForm(false);
                     setAddForm({ first_name: '', last_name: '', email: '', phone: '', license_number: '', license_expiry: '', license_state: 'GP', hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE' });
-                    // Refresh
+                    // Refresh with user_details flattening
                     const d = await fetchData('api/v1/drivers/');
-                    setDrivers(Array.isArray(d) ? d : d?.results || []);
+                    const driverList = Array.isArray(d) ? d : (d?.results || []);
+                    const driversWithNames = driverList.map((driver: any) => {
+                      const ud = driver.user_details || {};
+                      return {
+                        ...driver,
+                        first_name: driver.first_name || ud.first_name || '',
+                        last_name: driver.last_name || ud.last_name || '',
+                        name: driver.name || ud.name || (ud.first_name ? `${ud.first_name} ${ud.last_name || ''}`.trim() : ''),
+                        phone: driver.phone || ud.phone || '',
+                      };
+                    });
+                    setDrivers(driversWithNames);
                   } catch (e: any) { alert(e?.message || 'Failed to create driver'); }
                   setSaving(false);
                 }}
@@ -437,15 +464,26 @@ export default function Drivers() {
               <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Driver</div>
               <button onClick={() => setEditDriver(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
-            <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 2, marginBottom: 16, fontSize: 12, color: 'var(--text-secondary)' }}>
-              <div style={{ marginBottom: 4 }}><strong>Name:</strong> {getDriverName(editDriver)}</div>
-              {editDriver.first_name && <div><strong>Email:</strong> {editDriver.first_name.toLowerCase()}.{editDriver.last_name?.toLowerCase()}@truckwys.co.za</div>}
-            </div>
             {error && (
               <div style={{ padding: 12, background: 'var(--status-danger)', color: 'var(--bg-deep)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
                 {error}
               </div>
             )}
+            {[
+              { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan' },
+              { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <input
+                  type="text"
+                  placeholder={f.placeholder}
+                  value={(editForm as any)[f.key]}
+                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
             {[
               { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001' },
               { key: 'license_expiry', label: 'License Expiry', type: 'date' },
@@ -486,11 +524,35 @@ export default function Drivers() {
                   setSaving(true);
                   setError(null);
                   try {
-                    await patchData({ url: `api/v1/drivers/${editDriver.id}/`, data: editForm });
+                    // Update driver license and status fields
+                    const { first_name, last_name, ...driverFields } = editForm;
+                    await patchData({ url: `api/v1/drivers/${editDriver.id}/`, data: driverFields });
+
+                    // Update user name if user_details exists
+                    if (editDriver.user_details?.id && (first_name || last_name)) {
+                      await patchData({
+                        url: `api/v1/users/${editDriver.user_details.id}/`,
+                        data: { first_name, last_name }
+                      });
+                    }
+
                     setEditDriver(null);
                     setEditForm({});
+
+                    // Re-fetch with user_details flattening
                     const d = await fetchData('api/v1/drivers/');
-                    setDrivers(Array.isArray(d) ? d : d?.results || []);
+                    const driverList = Array.isArray(d) ? d : (d?.results || []);
+                    const driversWithNames = driverList.map((driver: any) => {
+                      const ud = driver.user_details || {};
+                      return {
+                        ...driver,
+                        first_name: driver.first_name || ud.first_name || '',
+                        last_name: driver.last_name || ud.last_name || '',
+                        name: driver.name || ud.name || (ud.first_name ? `${ud.first_name} ${ud.last_name || ''}`.trim() : ''),
+                        phone: driver.phone || ud.phone || '',
+                      };
+                    });
+                    setDrivers(driversWithNames);
                   } catch (e: any) {
                     setError(e?.message || 'Failed to update driver');
                   }

@@ -32,6 +32,10 @@ export default function VehicleFinancialProfile() {
   const queryClient = useQueryClient();
   const isFinancial = location.pathname.endsWith('/financial');
   const [updating, setUpdating] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editForm, setEditForm] = useState<any>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const { data: vehicle, isLoading } = useQuery({
     queryKey: ['vehicle', id],
@@ -93,7 +97,26 @@ export default function VehicleFinancialProfile() {
               {vehicle.vehicle_type_name} · {vehicle.year} · {vehicle.fuel_type}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button
+              onClick={() => {
+                setShowEditForm(true);
+                setEditForm({
+                  plate: vehicle.plate || '',
+                  make: vehicle.make || '',
+                  model: vehicle.model || '',
+                  year: vehicle.year || '',
+                  status: vehicle.status || 'AVAILABLE',
+                  fuel_type: vehicle.fuel_type || 'DIESEL',
+                  capacity: vehicle.capacity || '',
+                });
+              }}
+              className="btn-action"
+              style={{ fontSize: 10, padding: '6px 12px' }}
+            >
+              EDIT
+            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
             {VEHICLE_STATUSES.map(s => {
               const isCurrentStatus = vehicle.status === s;
               const btnColor = STATUS_COLOR[s] || 'var(--text-tertiary)';
@@ -125,6 +148,7 @@ export default function VehicleFinancialProfile() {
                 </button>
               );
             })}
+            </div>
           </div>
         </div>
       </div>
@@ -315,6 +339,84 @@ export default function VehicleFinancialProfile() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Edit Vehicle Slide-out */}
+      {showEditForm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setShowEditForm(false)} />
+          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Vehicle</div>
+              <button onClick={() => setShowEditForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            {error && (
+              <div style={{ padding: 12, background: 'var(--status-danger)', color: 'var(--bg-deep)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+                {error}
+              </div>
+            )}
+            {[
+              { key: 'plate', label: 'Registration / Plate', placeholder: 'e.g. ABC123GP' },
+              { key: 'make', label: 'Make', placeholder: 'e.g. Volvo' },
+              { key: 'model', label: 'Model', placeholder: 'e.g. FH16' },
+              { key: 'year', label: 'Year', placeholder: 'e.g. 2022', type: 'number' },
+              { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <input
+                  type={f.type || 'text'}
+                  placeholder={f.placeholder}
+                  value={editForm[f.key]}
+                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
+            {[
+              { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'OUT_OF_SERVICE'] },
+              { key: 'fuel_type', label: 'Fuel Type', options: ['DIESEL', 'PETROL', 'ELECTRIC', 'HYBRID'] },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <select
+                  value={editForm[f.key]}
+                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                >
+                  {f.options.map(o => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}
+                </select>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+              <button
+                disabled={saving}
+                onClick={async () => {
+                  setSaving(true);
+                  setError(null);
+                  try {
+                    await patchData({ url: `api/v1/vehicles/${id}/`, data: editForm });
+                    queryClient.invalidateQueries({ queryKey: ['vehicle', id] });
+                    setShowEditForm(false);
+                    setEditForm({});
+                  } catch (e: any) {
+                    setError(e?.message || 'Failed to update vehicle');
+                  }
+                  setSaving(false);
+                }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+              >
+                {saving ? 'SAVING...' : 'UPDATE VEHICLE'}
+              </button>
+              <button
+                onClick={() => setShowEditForm(false)}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

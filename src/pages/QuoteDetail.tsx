@@ -23,11 +23,33 @@ export default function QuoteDetail() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
 
+  // Sprint 1 features
+  const [showOutcomeModal, setShowOutcomeModal] = useState(false);
+  const [outcomeType, setOutcomeType] = useState<'accepted' | 'rejected' | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [finalPrice, setFinalPrice] = useState('');
+  const [fuelAlert, setFuelAlert] = useState<any>(null);
+
   const { data: quote, isLoading, error } = useQuery({
     queryKey: ['quote', id],
     queryFn: () => fetchData(`api/v1/quotes/${id}/`),
     retry: 1,
   });
+
+  // Fetch fuel alert for sent/pending quotes
+  useEffect(() => {
+    if (quote && (quote.status === 'SENT' || quote.status === 'DRAFT')) {
+      fetchData(`/api/v1/quotes/${id}/fuel-alert/`)
+        .then(data => {
+          if (data.has_alert) {
+            setFuelAlert(data);
+          }
+        })
+        .catch(() => {
+          // Silently fail
+        });
+    }
+  }, [quote, id]);
 
   const statusMutation = useMutation({
     mutationFn: (newStatus: string) => patchData({ url: `api/v1/quotes/${id}/`, data: { status: newStatus } }),
@@ -74,6 +96,19 @@ export default function QuoteDetail() {
     onError: (error: any) => {
       setConvertError(error?.message || 'Failed to convert quote to booking');
       setConvertSuccess(null);
+    },
+  });
+
+  const outcomeMutation = useMutation({
+    mutationFn: (data: { outcome: string; rejection_reason?: string; final_price?: number }) =>
+      patchData({ url: `api/v1/quotes/${id}/outcome/`, data }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quote', id] });
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      setShowOutcomeModal(false);
+      setOutcomeType(null);
+      setRejectionReason('');
+      setFinalPrice('');
     },
   });
 
@@ -171,6 +206,28 @@ export default function QuoteDetail() {
           </div>
         </div>
       </div>
+
+      {/* UPGRADE 2: Fuel Delta Alert */}
+      {fuelAlert && fuelAlert.has_alert && (
+        <div style={{ padding: '14px 18px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid var(--status-warning)', borderRadius: 2, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
+            <div style={{ fontSize: 18 }}>⚠️</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--status-warning)', marginBottom: 4 }}>
+                Fuel Price Alert
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 8 }}>
+                {fuelAlert.message || `Diesel up R${fuelAlert.fuel_delta_zar?.toFixed(2)}/L since this quote was created. This job now costs ~R${Math.round(fuelAlert.estimated_cost_impact).toLocaleString()} more.`}
+              </div>
+              {fuelAlert.action && (
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                  {fuelAlert.action}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
         {/* LEFT — Quote Details */}
@@ -322,6 +379,58 @@ export default function QuoteDetail() {
               )}
             </div>
           </div>
+
+          {/* UPGRADE 3: Win Probability Display */}
+          {quote.win_probability && (quote.status === 'DRAFT' || quote.status === 'SENT') && (
+            <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+              <div className="card-title" style={{ marginBottom: 12 }}>Win Probability</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                <div style={{ flex: 1, height: 8, background: 'var(--bg-deep)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${quote.win_probability * 100}%`,
+                    height: '100%',
+                    background: quote.win_probability >= 0.7 ? 'var(--status-success)' : quote.win_probability >= 0.4 ? 'var(--status-warning)' : 'var(--status-danger)',
+                  }} />
+                </div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {Math.round(quote.win_probability * 100)}%
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                Estimated chance of winning at current price
+              </div>
+            </div>
+          )}
+
+          {/* UPGRADE 1: Outcome Buttons */}
+          {(quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome && (
+            <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+              <div className="card-title" style={{ marginBottom: 12 }}>Mark Outcome</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => {
+                    setOutcomeType('accepted');
+                    setFinalPrice(String(quote.total_amount || ''));
+                    setShowOutcomeModal(true);
+                  }}
+                  className="btn-action"
+                  style={{ flex: 1, fontSize: 11, padding: '10px 16px', background: 'var(--status-success)', border: 'none', color: '#000' }}
+                >
+                  ✓ MARK AS ACCEPTED
+                </button>
+                <button
+                  onClick={() => {
+                    setOutcomeType('rejected');
+                    setShowOutcomeModal(true);
+                  }}
+                  className="btn-action"
+                  style={{ flex: 1, fontSize: 11, padding: '10px 16px', background: 'var(--status-danger)', border: 'none', color: '#fff' }}
+                >
+                  ✗ MARK AS REJECTED
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="card" style={{ padding: 20 }}>
@@ -499,6 +608,113 @@ export default function QuoteDetail() {
           </div>
         </div>
       </div>
+
+      {/* UPGRADE 1: Outcome Modal */}
+      {showOutcomeModal && outcomeType && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}
+        onClick={() => setShowOutcomeModal(false)}
+        >
+          <div
+            className="card"
+            style={{ padding: 24, maxWidth: 440, margin: 20, width: '100%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+              {outcomeType === 'accepted' ? 'Mark Quote as Accepted' : 'Mark Quote as Rejected'}
+            </div>
+
+            {outcomeType === 'accepted' && (
+              <div style={{ marginBottom: 16 }}>
+                {label('Final Price Agreed (Optional)')}
+                <input
+                  type="number"
+                  value={finalPrice}
+                  onChange={e => setFinalPrice(e.target.value)}
+                  placeholder={String(quote?.total_amount || '')}
+                  style={inputStyle}
+                />
+                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 4 }}>
+                  Leave blank to use quote total: {formatCurrency(parseFloat(quote?.total_amount || '0'))}
+                </div>
+              </div>
+            )}
+
+            {outcomeType === 'rejected' && (
+              <div style={{ marginBottom: 16 }}>
+                {label('Rejection Reason')}
+                <select
+                  value={rejectionReason}
+                  onChange={e => setRejectionReason(e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="">Select reason...</option>
+                  <option value="Price too high">Price too high</option>
+                  <option value="Went with competitor">Went with competitor</option>
+                  <option value="Job cancelled">Job cancelled</option>
+                  <option value="Other">Other (please specify)</option>
+                </select>
+                {rejectionReason === 'Other' && (
+                  <input
+                    type="text"
+                    placeholder="Please specify reason"
+                    value={rejectionReason}
+                    onChange={e => setRejectionReason(e.target.value)}
+                    style={{ ...inputStyle, marginTop: 10 }}
+                  />
+                )}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => {
+                  setShowOutcomeModal(false);
+                  setOutcomeType(null);
+                  setRejectionReason('');
+                  setFinalPrice('');
+                }}
+                className="btn-action"
+                style={{ flex: 1, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+              >
+                CANCEL
+              </button>
+              <button
+                onClick={() => {
+                  const data: any = { outcome: outcomeType };
+                  if (outcomeType === 'rejected' && rejectionReason) {
+                    data.rejection_reason = rejectionReason;
+                  }
+                  if (outcomeType === 'accepted' && finalPrice) {
+                    data.final_price = parseFloat(finalPrice);
+                  }
+                  outcomeMutation.mutate(data);
+                }}
+                disabled={outcomeType === 'rejected' && !rejectionReason}
+                className="btn-action"
+                style={{
+                  flex: 1,
+                  background: outcomeType === 'accepted' ? 'var(--status-success)' : 'var(--status-danger)',
+                  border: 'none',
+                  color: outcomeType === 'accepted' ? '#000' : '#fff'
+                }}
+              >
+                {outcomeMutation.isPending ? 'SAVING...' : outcomeType === 'accepted' ? 'MARK ACCEPTED' : 'MARK REJECTED'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

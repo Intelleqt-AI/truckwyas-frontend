@@ -273,8 +273,10 @@ export default function NewQuote() {
 
       fetchData(`/api/v1/quotes/benchmark/?origin=${origin}&destination=${destination}&vehicle_type=${vehicleType.toLowerCase()}`)
         .then(data => {
-          // Add your_rate to the data
-          setMarketBenchmark({ ...data, your_rate: _total });
+          // Only set if response has valid numeric fields
+          if (data && typeof data.market_avg_rate === 'number' && typeof data.your_vs_market_pct === 'number') {
+            setMarketBenchmark({ ...data, your_rate: _total });
+          }
         })
         .catch(() => {
           // Silently fail — not critical
@@ -1047,7 +1049,7 @@ export default function NewQuote() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
-                    Margin: {revenueGuard.margin_pct.toFixed(1)}%
+                    Margin: {(revenueGuard.margin_pct ?? 0).toFixed(1)}%
                   </span>
                   <span style={{
                     padding: '4px 10px',
@@ -1262,8 +1264,8 @@ export default function NewQuote() {
                     color: marketBenchmark.your_vs_market_pct < 0 ? 'var(--status-success)' : marketBenchmark.your_vs_market_pct > 10 ? 'var(--status-danger)' : 'var(--status-warning)',
                     fontWeight: 600
                   }}>
-                    {marketBenchmark.your_vs_market_pct > 0 ? '+' : ''}{marketBenchmark.your_vs_market_pct.toFixed(1)}% {marketBenchmark.your_vs_market_pct < 0 ? 'below' : 'above'} market
-                    {marketBenchmark.your_vs_market_pct < 0 && ' ✓'}
+                    {(marketBenchmark.your_vs_market_pct ?? 0) > 0 ? '+' : ''}{(marketBenchmark.your_vs_market_pct ?? 0).toFixed(1)}% {(marketBenchmark.your_vs_market_pct ?? 0) < 0 ? 'below' : 'above'} market
+                    {(marketBenchmark.your_vs_market_pct ?? 0) < 0 && ' ✓'}
                   </span>
                 </div>
               </div>
@@ -1364,7 +1366,7 @@ export default function NewQuote() {
                   </div>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 16 }}>
-                  Your quote (R {Math.round(total).toLocaleString()}) is {Math.abs(marketBenchmark.your_vs_market_pct).toFixed(1)}% {marketBenchmark.your_vs_market_pct < 0 ? 'below' : 'above'} average, which is {marketBenchmark.your_vs_market_pct < 0 ? 'competitive' : marketBenchmark.your_vs_market_pct > 15 ? 'significantly above market' : 'within range'}.
+                  Your quote (R {Math.round(total).toLocaleString()}) is {Math.abs(marketBenchmark.your_vs_market_pct ?? 0).toFixed(1)}% {(marketBenchmark.your_vs_market_pct ?? 0) < 0 ? 'below' : 'above'} average, which is {(marketBenchmark.your_vs_market_pct ?? 0) < 0 ? 'competitive' : (marketBenchmark.your_vs_market_pct ?? 0) > 15 ? 'significantly above market' : 'within range'}.
                 </div>
                 <button
                   onClick={() => setShowBenchmarkModal(false)}

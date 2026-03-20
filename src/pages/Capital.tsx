@@ -252,10 +252,12 @@ export default function Capital() {
       <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '1px solid var(--border-subtle)' }}>
         {(['eligible', 'active'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)} style={{
-            background: 'none', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            color: activeTab === tab ? 'var(--accent-primary)' : 'var(--text-secondary)',
-            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase',
-            padding: '10px 20px', cursor: 'pointer', marginBottom: -1,
+            background: 'transparent', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--accent-primary)' : '2px solid transparent',
+            color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
+            fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em', textTransform: 'uppercase',
+            fontWeight: activeTab === tab ? 600 : 400,
+            padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
+            transition: 'all 0.2s ease',
           }}>
             {tab === 'eligible' ? `ELIGIBLE (${eligibleInvoices.length})` : `ACTIVE (${advances.length})`}
           </button>

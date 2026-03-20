@@ -65,7 +65,29 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
       onClick={onClick}
     >
       <div style={{ padding: 14, borderLeft: `2px solid ${STATUS_COLOR[quote.status] || 'var(--border-subtle)'}` }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6 }}>{quote.quote_number}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>{quote.quote_number}</div>
+          {/* UPGRADE 1: Outcome badges */}
+          {quote.outcome && quote.outcome !== 'pending' && (
+            <span style={{
+              fontSize: 9,
+              padding: '2px 6px',
+              borderRadius: 2,
+              background: quote.outcome === 'accepted' ? 'var(--status-success)' : quote.outcome === 'rejected' ? 'var(--status-danger)' : 'var(--bg-surface)',
+              color: quote.outcome === 'accepted' ? '#000' : quote.outcome === 'rejected' ? '#fff' : 'var(--text-tertiary)',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 600
+            }}>
+              {quote.outcome === 'accepted' && '✓'}
+              {quote.outcome === 'rejected' && '✗'}
+              {quote.outcome === 'pending' && '⏳'}
+            </span>
+          )}
+          {/* UPGRADE 2: Fuel alert icon */}
+          {quote.fuel_alert && (
+            <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 11 }}>⛽</span>
+          )}
+        </div>
         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{quote.customer_name}</div>
         <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
           {quote.origin} → {quote.destination}
@@ -357,12 +379,18 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
           <div className="card table-card">
             <table className="data-table">
               <thead>
-                <tr><th>Quote #</th><th>Customer</th><th>Route</th><th>Total</th><th>Status</th><th className="text-right">Created</th><th>Actions</th></tr>
+                <tr><th>Quote #</th><th>Customer</th><th>Route</th><th>Total</th><th>Status</th><th>Outcome</th><th className="text-right">Created</th><th>Actions</th></tr>
               </thead>
               <tbody>
                 {filteredQuotes.map((quote: any) => (
                   <tr key={quote.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/quotes/${quote.id}`)}>
-                    <td className="mono">{quote.quote_number}</td>
+                    <td className="mono">
+                      {quote.quote_number}
+                      {/* UPGRADE 2: Fuel alert icon */}
+                      {quote.fuel_alert && (
+                        <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 11, marginLeft: 6 }}>⛽</span>
+                      )}
+                    </td>
                     <td>{quote.customer_name}</td>
                     <td style={{ color: 'var(--text-secondary)' }}>{quote.origin} → {quote.destination}</td>
                     <td style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{formatCurrency(parseFloat(quote.total_amount || '0'))}</td>
@@ -377,6 +405,27 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                       }}>
                         {COLUMN_LABELS[quote.status] || quote.status}
                       </span>
+                    </td>
+                    {/* UPGRADE 1: Outcome column */}
+                    <td>
+                      {quote.outcome && quote.outcome !== 'pending' && (
+                        <span style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 10,
+                          padding: '2px 6px',
+                          background: quote.outcome === 'accepted' ? 'var(--status-success)' : quote.outcome === 'rejected' ? 'var(--status-danger)' : 'var(--bg-surface-hover)',
+                          color: quote.outcome === 'accepted' ? '#000' : quote.outcome === 'rejected' ? '#fff' : 'var(--text-tertiary)',
+                          borderRadius: 2,
+                          fontWeight: 600
+                        }}>
+                          {quote.outcome === 'accepted' && '✓ Accepted'}
+                          {quote.outcome === 'rejected' && '✗ Rejected'}
+                          {quote.outcome === 'pending' && '⏳ Pending'}
+                        </span>
+                      )}
+                      {(!quote.outcome || quote.outcome === 'pending') && (
+                        <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>—</span>
+                      )}
                     </td>
                     <td className="text-right" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                       {quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '—'}

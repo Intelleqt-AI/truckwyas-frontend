@@ -8,6 +8,7 @@ const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',
   SENT: 'var(--status-warning)',
   ACCEPTED: 'var(--status-success)',
+  DECLINED: 'var(--status-danger)',
   IT: 'var(--accent-primary)',
   COMPLETED: 'var(--status-success)',
 };
@@ -18,6 +19,9 @@ export default function QuoteDetail() {
   const queryClient = useQueryClient();
   const [convertSuccess, setConvertSuccess] = useState<any>(null);
   const [convertError, setConvertError] = useState<string | null>(null);
+
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const { data: quote, isLoading, error } = useQuery({
     queryKey: ['quote', id],
@@ -30,6 +34,19 @@ export default function QuoteDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+    },
+  });
+
+  const sendToCustomerMutation = useMutation({
+    mutationFn: () => postData({ url: `api/v1/quotes/${id}/send_to_customer/`, data: {} }),
+    onSuccess: (data) => {
+      setShareUrl(data.share_url);
+      setShareError(null);
+      queryClient.invalidateQueries({ queryKey: ['quote', id] });
+    },
+    onError: (error: any) => {
+      setShareError(error?.message || 'Failed to generate share link');
+      setShareUrl(null);
     },
   });
 
@@ -267,6 +284,7 @@ export default function QuoteDetail() {
                   <option value="DRAFT">Draft</option>
                   <option value="SENT">Sent</option>
                   <option value="ACCEPTED">Accepted</option>
+                  <option value="DECLINED">Declined</option>
                   <option value="IT">In-Transit</option>
                   <option value="COMPLETED">Completed</option>
                 </select>
@@ -316,6 +334,77 @@ export default function QuoteDetail() {
               >
                 EDIT QUOTE
               </button>
+
+              {/* Send to Customer */}
+              <button
+                className="btn-action"
+                onClick={() => sendToCustomerMutation.mutate()}
+                style={{
+                  width: '100%',
+                  fontSize: 11,
+                  padding: '10px 16px',
+                  background: 'var(--accent-primary)',
+                  border: 'none',
+                }}
+                disabled={sendToCustomerMutation.isPending}
+              >
+                {sendToCustomerMutation.isPending ? 'GENERATING...' : 'SEND TO CUSTOMER'}
+              </button>
+
+              {shareUrl && (
+                <div style={{
+                  padding: '12px 14px',
+                  borderRadius: 2,
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--accent-primary)',
+                  fontSize: 11,
+                  color: 'var(--text-primary)',
+                  fontFamily: 'var(--font-mono)',
+                }}>
+                  <div style={{ color: 'var(--text-tertiary)', marginBottom: 6 }}>SHARE LINK:</div>
+                  <div style={{
+                    wordBreak: 'break-all',
+                    color: 'var(--accent-primary)',
+                    marginBottom: 8,
+                    fontSize: 10,
+                  }}>
+                    {shareUrl}
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(shareUrl);
+                      alert('Link copied to clipboard!');
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'var(--accent-primary)',
+                      border: 'none',
+                      color: 'white',
+                      borderRadius: 2,
+                      fontSize: 10,
+                      fontFamily: 'var(--font-mono)',
+                      cursor: 'pointer',
+                      width: '100%',
+                    }}
+                  >
+                    COPY LINK
+                  </button>
+                </div>
+              )}
+
+              {shareError && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: 2,
+                  background: 'var(--status-danger-bg)',
+                  border: '1px solid var(--status-danger)',
+                  fontSize: 12,
+                  color: 'var(--status-danger)',
+                  fontFamily: 'var(--font-mono)',
+                }}>
+                  {shareError}
+                </div>
+              )}
 
               {quote.status === 'ACCEPTED' && (
                 <>

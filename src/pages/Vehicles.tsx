@@ -173,11 +173,13 @@ export default function Vehicles() {
   }
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
-    background: 'none', border: 'none',
+    background: 'transparent', border: 'none',
     borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
-    color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
-    fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em',
-    textTransform: 'uppercase', padding: '10px 18px', cursor: 'pointer', marginBottom: -1,
+    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+    fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
+    fontWeight: active ? 600 : 400,
+    textTransform: 'uppercase', padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
+    transition: 'all 0.2s ease',
   });
 
   return (
@@ -386,7 +388,7 @@ export default function Vehicles() {
               <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {[
-              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. 1HGBH41JXMN109186' },
+              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. WDB9634031L123456' },
               { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz' },
               { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
               { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
@@ -465,7 +467,7 @@ export default function Vehicles() {
               </div>
             )}
             {[
-              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. 1HGBH41JXMN109186' },
+              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. WDB9634031L123456' },
               { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz' },
               { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
               { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },

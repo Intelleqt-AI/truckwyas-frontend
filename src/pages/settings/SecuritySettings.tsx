@@ -172,7 +172,7 @@ export function SecuritySettings() {
       {/* Security Options */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>🛡 Security Options</span>
+          <span style={sectionTitleStyle}>Security Options</span>
         </div>
         <div style={{ paddingBottom: 4 }}>
           <ToggleRow label="Two-factor authentication" description="Require OTP on login in addition to password" checked={twoFactor} onChange={setTwoFactor} badge="Recommended" />

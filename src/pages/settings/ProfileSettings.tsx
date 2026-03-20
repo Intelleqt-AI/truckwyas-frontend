@@ -215,7 +215,7 @@ export function ProfileSettings() {
               disabled={saving}
               style={{ opacity: saving ? 0.6 : 1 }}
             >
-              {saved ? '✓ SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
+              {saved ? 'SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
             </button>
           </div>
         </div>

@@ -350,7 +350,7 @@ export function VehicleDetailDrawer({ vehicleId, isOpen, onClose }: VehicleDetai
                         Route (−R 850/trip).
                       </p>
                       <p className="text-body text-brand-500">
-                        💡 Suggest reassignment to maximize profitability
+                        Suggest reassignment to maximize profitability
                       </p>
                     </div>
                   </div>

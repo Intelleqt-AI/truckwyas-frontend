@@ -104,7 +104,7 @@ export function NotificationSettings() {
       {/* Email */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>✉ Email Notifications</span>
+          <span style={sectionTitleStyle}>Email Notifications</span>
         </div>
         <div style={sectionBodyStyle}>
           <ToggleRow label="Quote activity" description="New quotes, updates, and expirations" checked={settings.email.quotes} onChange={v => setChannel('email', 'quotes', v)} />
@@ -141,7 +141,7 @@ export function NotificationSettings() {
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button className="btn-action" onClick={handleSave} disabled={saving} style={{ opacity: saving ? 0.6 : 1 }}>
-          {saved ? '✓ SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
+          {saved ? 'SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
         </button>
       </div>
     </div>

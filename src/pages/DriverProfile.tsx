@@ -9,22 +9,10 @@ const formatZAR = (v: number) =>
   'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: 'var(--accent-primary)',
+  ACTIVE: 'var(--status-success)',
   INACTIVE: 'var(--text-tertiary)',
   ON_LEAVE: 'var(--status-warning)',
 };
-
-const Row = ({ label, value, mono = true, alert = false }: { label: string; value: any; mono?: boolean; alert?: boolean }) => (
-  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border-row)' }}>
-    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{label}</span>
-    <span style={{
-      fontSize: 12,
-      color: alert ? 'var(--status-danger)' : 'var(--text-primary)',
-      fontFamily: mono ? 'var(--font-mono)' : 'var(--font-sans)',
-      maxWidth: 260, textAlign: 'right',
-    }}>{value ?? '—'}</span>
-  </div>
-);
 
 export default function DriverProfile() {
   const { driverId } = useParams();
@@ -54,9 +42,14 @@ export default function DriverProfile() {
     </div>
   );
 
-  const name = driver.first_name && driver.last_name
-    ? `${driver.first_name} ${driver.last_name}`
-    : driver.name || driver.username || `Driver ${driver.id}`;
+  const ud = driver.user_details || {};
+  const firstName = driver.first_name || ud.first_name || '';
+  const lastName = driver.last_name || ud.last_name || '';
+  const email = driver.email || ud.email || '';
+  const phone = driver.phone || ud.phone || '';
+  const name = (firstName && lastName)
+    ? `${firstName} ${lastName}`
+    : firstName || driver.name || ud.name || ud.username || `Driver ${driver.id}`;
 
   const loads = Array.isArray(loadsData) ? loadsData : (loadsData?.results || []);
   const delivered = loads.filter((l: any) => l.status === 'DELIVERED');
@@ -64,19 +57,10 @@ export default function DriverProfile() {
   const totalDistance = delivered.reduce((s: number, l: any) => s + parseFloat(l.distance || '0'), 0);
   const avgRevPerTrip = delivered.length > 0 ? totalRevenue / delivered.length : 0;
 
-  const statusColor = STATUS_COLOR[driver.status] || 'var(--text-tertiary)';
-
-  const kpis = [
-    { label: 'Total Trips', value: driver.total_trips ?? delivered.length, color: 'var(--text-primary)', suffix: '' },
-    { label: 'Revenue Generated', value: formatZAR(driver.revenue_generated ?? totalRevenue), color: 'var(--accent-primary)', suffix: '' },
-    { label: 'Avg per Trip', value: formatZAR(driver.avg_revenue_per_trip ?? avgRevPerTrip), color: 'var(--text-primary)', suffix: '' },
-    { label: 'Total Distance', value: driver.total_distance ?? Math.round(totalDistance), color: 'var(--text-primary)', suffix: ' km' },
-  ];
-
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 24 }}>
         <button
           onClick={() => navigate('/fleet/drivers')}
           style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}
@@ -84,12 +68,11 @@ export default function DriverProfile() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Driver</div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{name}</div>
-            {driver.license_number && (
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>DRIVER</div>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)' }}>{name}</div>
+            {phone && (
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-                {driver.license_number}
-                {driver.phone ? ` · ${driver.phone}` : ''}
+                {driver.license_number ? `${driver.license_number} · ${phone}` : phone}
               </div>
             )}
           </div>
@@ -110,14 +93,15 @@ export default function DriverProfile() {
                     setUpdating(false);
                   }}
                   style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 10,
+                    fontFamily: 'var(--font-mono)', fontSize: 11,
                     color: isCurrentStatus ? 'var(--bg-deep)' : btnColor,
                     background: isCurrentStatus ? btnColor : 'transparent',
-                    padding: '5px 10px',
+                    padding: '6px 12px',
                     border: `1px solid ${btnColor}`, borderRadius: 2,
                     cursor: isCurrentStatus || updating ? 'default' : 'pointer',
                     opacity: updating && !isCurrentStatus ? 0.5 : 1,
-                    letterSpacing: '0.04em',
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
                     transition: 'all 0.15s ease',
                   }}
                 >
@@ -131,53 +115,72 @@ export default function DriverProfile() {
 
       {/* KPI strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        {kpis.map(k => (
-          <div key={k.label} className="card metric-card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 8 }}>{k.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: k.color }}>
-              {k.value}{k.suffix && <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{k.suffix}</span>}
+        {[
+          { label: 'Total Trips', value: driver.total_trips ?? delivered.length },
+          { label: 'Revenue Generated', value: formatZAR(driver.revenue_generated ?? totalRevenue), color: 'var(--accent-primary)' },
+          { label: 'Avg per Trip', value: formatZAR(driver.avg_revenue_per_trip ?? avgRevPerTrip) },
+          { label: 'Total Distance', value: `${(driver.total_distance ?? Math.round(totalDistance)).toLocaleString('en-ZA')} km` },
+        ].map(k => (
+          <div key={k.label} className="card metric-card">
+            <div className="card-header"><span className="card-title">{k.label}</span></div>
+            <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: k.color || 'var(--text-primary)' }}>
+              {k.value}
             </div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         {/* Details */}
         <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>Details</div>
-          <Row label="License Number" value={driver.license_number} />
-          <Row label="Phone" value={driver.phone} mono={false} />
-          <Row label="Email" value={driver.email} mono={false} />
-          <Row label="ID Number" value={driver.id_number} />
-          <Row label="Date of Birth" value={driver.date_of_birth?.slice(0, 10)} />
-          <Row label="Address" value={driver.address} mono={false} />
-          <Row label="Vehicle" value={driver.vehicle_plate || driver.assigned_vehicle || '—'} />
+          <div className="card-title" style={{ marginBottom: 16 }}>DETAILS</div>
+          {[
+            { label: 'LICENSE NUMBER', value: driver.license_number },
+            { label: 'PHONE', value: phone },
+            { label: 'EMAIL', value: email },
+            { label: 'ID NUMBER', value: driver.id_number },
+            { label: 'DATE OF BIRTH', value: driver.date_of_birth?.slice(0, 10) },
+            { label: 'ADDRESS', value: driver.address },
+            { label: 'VEHICLE', value: driver.vehicle_plate || driver.assigned_vehicle || '—' },
+          ].map(r => (
+            <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
+              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: r.label === 'LICENSE NUMBER' || r.label === 'ID NUMBER' || r.label === 'VEHICLE' ? 'var(--font-mono)' : 'var(--font-sans)', maxWidth: 260, textAlign: 'right' }}>
+                {r.value ?? '—'}
+              </span>
+            </div>
+          ))}
         </div>
 
         {/* Performance */}
         <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>Performance</div>
-          <Row label="Efficiency Score" value={driver.efficiency_score ?? '—'} />
-          <Row label="On-Time Rate" value={driver.on_time_rate ? `${driver.on_time_rate}%` : '—'} />
-          <Row label="Avg Rating" value={driver.avg_rating ? `★ ${driver.avg_rating}` : '—'} />
-          <Row label="Trips This Month" value={driver.trips_this_month ?? 0} />
-          <Row label="Total Trips" value={driver.total_trips ?? delivered.length} />
-          <Row label="Total Distance" value={driver.total_distance ? `${parseFloat(driver.total_distance).toLocaleString('en-ZA')} km` : totalDistance > 0 ? `${Math.round(totalDistance).toLocaleString('en-ZA')} km` : '—'} />
-          <Row
-            label="License Expiry"
-            value={driver.license_expiry?.slice(0, 10) || '—'}
-            alert={driver.license_expiry && new Date(driver.license_expiry) < new Date()}
-          />
+          <div className="card-title" style={{ marginBottom: 16 }}>PERFORMANCE</div>
+          {[
+            { label: 'EFFICIENCY SCORE', value: driver.efficiency_score ?? '—' },
+            { label: 'ON-TIME RATE', value: driver.on_time_rate ? `${driver.on_time_rate}%` : '—' },
+            { label: 'AVG RATING', value: driver.avg_rating ? `★ ${driver.avg_rating}` : '—' },
+            { label: 'TRIPS THIS MONTH', value: driver.trips_this_month ?? 0 },
+            { label: 'TOTAL TRIPS', value: driver.total_trips ?? delivered.length },
+            { label: 'TOTAL DISTANCE', value: driver.total_distance ? `${parseFloat(driver.total_distance).toLocaleString('en-ZA')} km` : totalDistance > 0 ? `${Math.round(totalDistance).toLocaleString('en-ZA')} km` : '—' },
+            { label: 'LICENSE EXPIRY', value: driver.license_expiry?.slice(0, 10) || '—', alert: driver.license_expiry && new Date(driver.license_expiry) < new Date() },
+          ].map(r => (
+            <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
+              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
+              <span style={{ fontSize: 13, color: r.alert ? 'var(--status-danger)' : 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                {r.value}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Recent Loads */}
-      <div className="card" style={{ padding: 20 }}>
-        <div className="card-title" style={{ marginBottom: 16 }}>Recent Loads ({loads.length})</div>
+      <div className="card" style={{ padding: 20, marginTop: 20 }}>
+        <div className="card-title" style={{ marginBottom: 16 }}>RECENT LOADS ({loads.length})</div>
         {loads.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No loads recorded</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="data-table">
             <thead>
               <tr>
                 {['Load #', 'Route', 'Distance', 'Revenue', 'Status', 'Date'].map(h => (
@@ -214,7 +217,7 @@ export default function DriverProfile() {
                   <td style={{ padding: '10px 16px' }}>
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
-                      color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--accent-primary)' : load.status === 'IN_TRANSIT' ? 'var(--status-warning)' : 'var(--text-tertiary)',
+                      color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : load.status === 'IN_TRANSIT' ? 'var(--status-warning)' : 'var(--text-tertiary)',
                     }}>{load.status?.replace('_', ' ')}</span>
                   </td>
                   <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>

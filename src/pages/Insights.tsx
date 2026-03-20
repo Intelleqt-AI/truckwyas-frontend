@@ -72,6 +72,7 @@ interface ExpenseCategory {
 interface VehicleInsight {
   vehicle_id: number;
   registration: string;
+  make_model?: string;
   revenue: number;
   trips: number;
   utilization: number;
@@ -87,7 +88,15 @@ interface DriverLeaderboard {
   on_time_pct: number;
 }
 
-type TabType = 'overview' | 'customers' | 'routes' | 'assets' | 'costs';
+interface QuotesInsight {
+  total_quotes: number;
+  accepted_rate: number;
+  avg_quote_value: number;
+  avg_margin_pct: number;
+  revenue_from_quotes: number;
+}
+
+type TabType = 'overview' | 'customers' | 'routes' | 'assets' | 'costs' | 'quotes';
 type PeriodType = '7D' | '30D' | '90D' | '6M' | '1YR' | 'ALL';
 type AssetsSubTab = 'vehicles' | 'drivers';
 type SortField = string;
@@ -114,6 +123,18 @@ const getRiskTierColor = (tier: string): string => {
 
 const getMarginColor = (margin: number): string => {
   if (margin >= 15) return 'var(--status-success)';
+  if (margin >= 10) return 'var(--status-warning)';
+  return 'var(--status-danger)';
+};
+
+const getUtilizationColor = (utilization: number): string => {
+  if (utilization >= 70) return 'var(--status-success)';
+  if (utilization >= 40) return 'var(--status-warning)';
+  return 'var(--status-danger)';
+};
+
+const getLaneMarginColor = (margin: number): string => {
+  if (margin >= 20) return 'var(--status-success)';
   if (margin >= 10) return 'var(--status-warning)';
   return 'var(--status-danger)';
 };
@@ -156,6 +177,7 @@ export default function Insights() {
   const [allRoutes, setAllRoutes] = useState<RouteData[]>([]);
   const [allCustomers, setAllCustomers] = useState<CustomerHealthData[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [quotesInsight, setQuotesInsight] = useState<QuotesInsight | null>(null);
 
   // Sorting states
   const [customerSort, setCustomerSort] = useState<{ field: SortField; direction: SortDirection }>({ field: 'revenue', direction: 'desc' });
@@ -172,7 +194,7 @@ export default function Insights() {
     const periodParam = getPeriodParam(period);
 
     try {
-      const [financeRes, routesRes, customerRes, signalsRes, vehiclesRes, driversRes, expenseRes] = await Promise.all([
+      const [financeRes, routesRes, customerRes, signalsRes, vehiclesRes, driversRes, expenseRes, quotesRes] = await Promise.all([
         fetchData(`api/v1/dashboard/finance/?compare=previous_period&${periodParam}`).catch(() => null),
         fetchData(`api/v1/dashboard/routes/?${periodParam}`).catch(() => null),
         fetchData(`api/v1/dashboard/customer-health/?${periodParam}`).catch(() => null),
@@ -180,6 +202,7 @@ export default function Insights() {
         fetchData(`api/v1/fleet/insights/?${periodParam}`).catch(() => null),
         fetchData(`api/v1/drivers/leaderboard/?${periodParam}`).catch(() => null),
         fetchData(`api/v1/expenses/report/?${periodParam}`).catch(() => null),
+        fetchData(`api/v1/insights/quotes/?${periodParam}`).catch(() => null),
       ]);
 
       if (financeRes) setFinance(financeRes);
@@ -196,6 +219,18 @@ export default function Insights() {
       setDriverLeaderboard(driversRes?.drivers || driversRes?.data || []);
       if (expenseRes?.by_category) {
         setExpenseCategories(expenseRes.by_category);
+      }
+      if (quotesRes) {
+        setQuotesInsight(quotesRes);
+      } else {
+        // Fallback with zeros
+        setQuotesInsight({
+          total_quotes: 0,
+          accepted_rate: 0,
+          avg_quote_value: 0,
+          avg_margin_pct: 0,
+          revenue_from_quotes: 0,
+        });
       }
     } catch (err) {
       setError('Failed to load insights data');
@@ -351,7 +386,7 @@ export default function Insights() {
               padding: '6px 14px',
               fontSize: 11,
               fontFamily: 'var(--font-mono)',
-              borderRadius: 20,
+              borderRadius: 4,
               cursor: 'pointer',
               fontWeight: period === p ? 600 : 400,
               transition: 'all 0.2s ease',
@@ -387,6 +422,7 @@ export default function Insights() {
           { id: 'routes', label: 'Routes' },
           { id: 'assets', label: 'Assets' },
           { id: 'costs', label: 'Costs' },
+          { id: 'quotes', label: 'Quotes' },
         ] as { id: TabType; label: string }[]).map((tab) => (
           <button
             key={tab.id}
@@ -509,6 +545,67 @@ export default function Insights() {
               )}
             </div>
           </div>
+
+          {/* Section 1.5: Period-over-Period Deltas & Fuel Cost Ratio */}
+          {finance?.previous_period && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 32 }}>
+              {/* Revenue Delta */}
+              <div style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--card-radius)',
+                padding: 20,
+              }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Revenue vs Previous Period
+                </div>
+                <TrendIndicator value={revenueDelta} />
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>
+                  Previous: {formatCurrency(finance.previous_period.revenue)}
+                </div>
+              </div>
+
+              {/* Margin Delta */}
+              <div style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--card-radius)',
+                padding: 20,
+              }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Margin % vs Previous Period
+                </div>
+                <TrendIndicator value={marginDelta} />
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>
+                  Previous: {formatPercent(finance.previous_period.margin_percent, 1)}
+                </div>
+              </div>
+
+              {/* Fuel Cost Ratio */}
+              <div style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--card-radius)',
+                padding: 20,
+              }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Fuel Cost Ratio
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>
+                  {formatPercent(finance?.fuel_cost_ratio || 0, 1)}
+                </div>
+                <div style={{ height: 8, background: 'var(--bg-deep)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${(finance?.fuel_cost_ratio || 0) * 100}%`,
+                    background: 'var(--accent-primary)',
+                    borderRadius: 2,
+                    transition: 'width 0.3s ease',
+                  }} />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Section 2: Revenue & Margin Trend */}
           <div style={{
@@ -804,13 +901,13 @@ export default function Insights() {
 
             {/* Cash Flow KPI Cards */}
             {loading || !cashFlow ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
-                {[1,2,3,4].map(i => (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
+                {[1,2,3,4,5].map(i => (
                   <div key={i} style={{ height: 60, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
                 ))}
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
                 <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
                   <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
                     Collected MTD
@@ -841,6 +938,14 @@ export default function Insights() {
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
                     {formatCurrency(cashFlow?.next_30_days || 0)}
+                  </div>
+                </div>
+                <div style={{ padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>
+                    Projected 90D
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--accent-dim)', fontFamily: 'var(--font-mono)' }}>
+                    {formatCurrency(cashFlow?.next_90_days || 0)}
                   </div>
                 </div>
               </div>
@@ -879,6 +984,80 @@ export default function Insights() {
                     </div>
                   ));
                 })()}
+              </div>
+            )}
+
+            {/* Customer Health Detail Table */}
+            {!loading && allCustomers.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 }}>
+                  Customer Payment Health
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                        Customer
+                      </th>
+                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                        Revenue
+                      </th>
+                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                        Invoices
+                      </th>
+                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                        Avg Pay Days
+                      </th>
+                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                        DSO
+                      </th>
+                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                        Overdue
+                      </th>
+                      <th style={{ textAlign: 'center', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                        Risk
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allCustomers.slice(0, 10).map((customer, i) => (
+                      <tr key={i} style={{ borderBottom: i < Math.min(allCustomers.length, 10) - 1 ? '1px solid var(--border-row)' : 'none' }}>
+                        <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
+                          {customer.customer_name}
+                        </td>
+                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>
+                          {formatCurrency(customer.revenue)}
+                        </td>
+                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
+                          {customer.invoice_count}
+                        </td>
+                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
+                          {Math.round(customer.avg_payment_days)}
+                        </td>
+                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
+                          {Math.round(customer.dso)}
+                        </td>
+                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: customer.overdue_count > 0 ? 'var(--status-danger)' : 'var(--text-secondary)', textAlign: 'right', fontWeight: customer.overdue_count > 0 ? 600 : 400 }}>
+                          {customer.overdue_count}
+                        </td>
+                        <td style={{ padding: '12px 0', textAlign: 'center' }}>
+                          <span style={{
+                            fontSize: 10,
+                            fontFamily: 'var(--font-mono)',
+                            color: getRiskTierColor(customer.risk_tier),
+                            padding: '3px 8px',
+                            background: 'var(--bg-surface-hover)',
+                            borderRadius: 2,
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                          }}>
+                            {customer.risk_tier}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -1034,6 +1213,57 @@ export default function Insights() {
 
       {activeTab === 'routes' && (
         <div>
+          {/* Route Summary Cards */}
+          {!loading && allRoutes.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+              <div style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--card-radius)',
+                padding: 20,
+              }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Total Lanes
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {allRoutes.length}
+                </div>
+              </div>
+              <div style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--card-radius)',
+                padding: 20,
+              }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Best Margin Lane
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--status-success)', fontFamily: 'var(--font-mono)' }}>
+                  {[...allRoutes].sort((a, b) => b.margin_pct - a.margin_pct)[0]?.route.split(' - ')[0] || 'N/A'}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                  {[...allRoutes].sort((a, b) => b.margin_pct - a.margin_pct)[0]?.margin_pct.toFixed(1)}% margin
+                </div>
+              </div>
+              <div style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--card-radius)',
+                padding: 20,
+              }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Worst Margin Lane
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--status-danger)', fontFamily: 'var(--font-mono)' }}>
+                  {[...allRoutes].sort((a, b) => a.margin_pct - b.margin_pct)[0]?.route.split(' - ')[0] || 'N/A'}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                  {[...allRoutes].sort((a, b) => a.margin_pct - b.margin_pct)[0]?.margin_pct.toFixed(1)}% margin
+                </div>
+              </div>
+            </div>
+          )}
+
           <div style={{
             background: 'var(--bg-surface)',
             border: '1px solid var(--border-subtle)',
@@ -1062,6 +1292,9 @@ export default function Insights() {
                     <th onClick={() => handleRouteSort('avg_revenue')} style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
                       Avg Revenue {routeSort.field === 'avg_revenue' && (routeSort.direction === 'asc' ? '↑' : '↓')}
                     </th>
+                    <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                      Rev/Load
+                    </th>
                     <th onClick={() => handleRouteSort('avg_cost')} style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', userSelect: 'none' }}>
                       Avg Cost {routeSort.field === 'avg_cost' && (routeSort.direction === 'asc' ? '↑' : '↓')}
                     </th>
@@ -1071,9 +1304,15 @@ export default function Insights() {
                   </tr>
                 </thead>
                 <tbody>
-                  {getSortedRoutes().map((route, i) => (
-                    <tr key={i} style={{ borderBottom: i < allRoutes.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                      <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
+                  {getSortedRoutes().map((route, i) => {
+                    const revPerLoad = route.trips > 0 ? route.avg_revenue / route.trips : 0;
+                    const marginColor = getLaneMarginColor(route.margin_pct);
+                    return (
+                    <tr key={i} style={{
+                      borderBottom: i < allRoutes.length - 1 ? '1px solid var(--border-row)' : 'none',
+                      borderLeft: `3px solid ${marginColor}`,
+                    }}>
+                      <td style={{ padding: '12px 0 12px 8px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
                         {route.route}
                       </td>
                       <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
@@ -1083,13 +1322,16 @@ export default function Insights() {
                         {formatCurrency(route.avg_revenue)}
                       </td>
                       <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {formatCurrency(revPerLoad)}
+                      </td>
+                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
                         {formatCurrency(route.avg_cost)}
                       </td>
-                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: getMarginColor(route.margin_pct), textAlign: 'right' }}>
+                      <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: marginColor, textAlign: 'right' }}>
                         {route.margin_pct.toFixed(1)}%
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             )}
@@ -1140,65 +1382,127 @@ export default function Insights() {
           </div>
 
           {assetsSubTab === 'vehicles' && (
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--card-radius)',
-              padding: 24,
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-                Vehicle Performance
-              </div>
-              {loading ? (
-                <div style={{ height: 400, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
-              ) : vehicleInsights.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-tertiary)', fontSize: 13 }}>
-                  No vehicle data available
+            <div>
+              {/* Vehicle Summary Cards */}
+              {!loading && vehicleInsights.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+                  <div style={{
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--card-radius)',
+                    padding: 20,
+                  }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
+                      Highest Revenue Vehicle
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--status-success)', fontFamily: 'var(--font-mono)' }}>
+                      {[...vehicleInsights].sort((a: any, b: any) => (b.revenue || 0) - (a.revenue || 0))[0]?.registration || 'N/A'}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                      {formatCurrency([...vehicleInsights].sort((a: any, b: any) => (b.revenue || 0) - (a.revenue || 0))[0]?.revenue || 0)}
+                    </div>
+                  </div>
+                  <div style={{
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--card-radius)',
+                    padding: 20,
+                  }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
+                      Highest Utilisation
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--status-success)', fontFamily: 'var(--font-mono)' }}>
+                      {[...vehicleInsights].sort((a: any, b: any) => (b.utilization || 0) - (a.utilization || 0))[0]?.registration || 'N/A'}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                      {([...vehicleInsights].sort((a: any, b: any) => (b.utilization || 0) - (a.utilization || 0))[0]?.utilization || 0).toFixed(1)}%
+                    </div>
+                  </div>
+                  <div style={{
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--card-radius)',
+                    padding: 20,
+                  }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
+                      Most Trips
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {[...vehicleInsights].sort((a: any, b: any) => (b.trips || 0) - (a.trips || 0))[0]?.registration || 'N/A'}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                      {[...vehicleInsights].sort((a: any, b: any) => (b.trips || 0) - (a.trips || 0))[0]?.trips || 0} trips
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Registration
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Revenue
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Trips
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Utilization
-                      </th>
-                      <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
-                        Avg Margin
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {vehicleInsights.map((vehicle: any, i: number) => (
-                      <tr key={i} style={{ borderBottom: i < vehicleInsights.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                        <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                          {vehicle.registration || vehicle.vehicle_id || '—'}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>
-                          {vehicle.revenue != null ? formatCurrency(vehicle.revenue) : (vehicle.margin_per_trip || '—')}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                          {vehicle.trips ?? vehicle.trips_count ?? '—'}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                          {vehicle.utilization != null ? `${vehicle.utilization.toFixed(1)}%` : (vehicle.uptime || '—')}
-                        </td>
-                        <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: getMarginColor(vehicle.avg_margin ?? vehicle.ai_score ?? 0), textAlign: 'right' }}>
-                          {vehicle.avg_margin != null ? `${vehicle.avg_margin.toFixed(1)}%` : (vehicle.ai_score != null ? `Score: ${vehicle.ai_score}` : '—')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               )}
+
+              <div style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--card-radius)',
+                padding: 24,
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+                  Vehicle Performance
+                </div>
+                {loading ? (
+                  <div style={{ height: 400, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+                ) : vehicleInsights.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-tertiary)', fontSize: 13 }}>
+                    No vehicle data available
+                  </div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                          Vehicle
+                        </th>
+                        <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                          Revenue
+                        </th>
+                        <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                          Trips
+                        </th>
+                        <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                          Utilization
+                        </th>
+                        <th style={{ textAlign: 'right', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', paddingBottom: 12, borderBottom: '1px solid var(--border-subtle)' }}>
+                          Avg Margin
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vehicleInsights.map((vehicle: any, i: number) => {
+                        const util = vehicle.utilization || 0;
+                        const utilColor = getUtilizationColor(util);
+                        return (
+                        <tr key={i} style={{ borderBottom: i < vehicleInsights.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
+                          <td style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
+                            <div>{vehicle.make_model || vehicle.registration || vehicle.vehicle_id || '—'}</div>
+                            {vehicle.make_model && vehicle.registration && (
+                              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{vehicle.registration}</div>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', textAlign: 'right' }}>
+                            {vehicle.revenue != null ? formatCurrency(vehicle.revenue) : (vehicle.margin_per_trip || '—')}
+                          </td>
+                          <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
+                            {vehicle.trips ?? vehicle.trips_count ?? '—'}
+                          </td>
+                          <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', color: utilColor, textAlign: 'right', fontWeight: 600 }}>
+                            {vehicle.utilization != null ? `${vehicle.utilization.toFixed(1)}%` : (vehicle.uptime || '—')}
+                          </td>
+                          <td style={{ padding: '12px 0', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: getMarginColor(vehicle.avg_margin ?? vehicle.ai_score ?? 0), textAlign: 'right' }}>
+                            {vehicle.avg_margin != null ? `${vehicle.avg_margin.toFixed(1)}%` : (vehicle.ai_score != null ? `Score: ${vehicle.ai_score}` : '—')}
+                          </td>
+                        </tr>
+                      )})}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           )}
 
@@ -1266,6 +1570,103 @@ export default function Insights() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'quotes' && (
+        <div>
+          {/* Quotes KPI Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 32 }}>
+            <div style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--card-radius)',
+              padding: 24,
+            }}>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
+                Total Quotes
+              </div>
+              {loading ? (
+                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+              ) : (
+                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                  {quotesInsight?.total_quotes || 0}
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--card-radius)',
+              padding: 24,
+            }}>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
+                Accepted Rate
+              </div>
+              {loading ? (
+                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+              ) : (
+                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--status-success)', letterSpacing: '-0.02em' }}>
+                  {formatPercent(quotesInsight?.accepted_rate || 0, 1)}
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--card-radius)',
+              padding: 24,
+            }}>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
+                Avg Quote Value
+              </div>
+              {loading ? (
+                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+              ) : (
+                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                  {formatCurrency(quotesInsight?.avg_quote_value || 0)}
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--card-radius)',
+              padding: 24,
+            }}>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
+                Avg Margin
+              </div>
+              {loading ? (
+                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+              ) : (
+                <div style={{ fontSize: 28, fontWeight: 700, color: getMarginColor(quotesInsight?.avg_margin_pct || 0), letterSpacing: '-0.02em' }}>
+                  {formatPercent(quotesInsight?.avg_margin_pct || 0, 1)}
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--card-radius)',
+              padding: 24,
+            }}>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 12 }}>
+                Revenue from Quotes
+              </div>
+              {loading ? (
+                <div style={{ height: 32, background: 'var(--bg-surface-hover)', borderRadius: 4 }} />
+              ) : (
+                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent-primary)', letterSpacing: '-0.02em' }}>
+                  {formatCurrency(quotesInsight?.revenue_from_quotes || 0)}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

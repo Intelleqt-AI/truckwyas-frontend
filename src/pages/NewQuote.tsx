@@ -44,6 +44,8 @@ interface FuelPriceData {
   diesel_inland: number;
   diesel_coastal: number;
   source: string;
+  is_stale?: boolean;
+  last_updated?: string;
 }
 
 interface AISuggestion {
@@ -54,6 +56,9 @@ interface AISuggestion {
     lower: number;
     upper: number;
   };
+  win_probability?: number;
+  win_probability_at_lower_price?: number;
+  win_probability_at_higher_price?: number;
 }
 
 interface RevenueGuard {
@@ -61,6 +66,33 @@ interface RevenueGuard {
   color: string;
   margin_pct: number;
   warnings: string[];
+  explanations?: string[];
+  suggestions?: string[];
+  margin_floor?: number;
+  margin_floor_display?: string;
+  recommended_surcharge_zar?: number;
+}
+
+interface ModelStats {
+  training_data_count: number;
+  real_quotes_count: number;
+  synthetic_count: number;
+  last_trained: string;
+  model_version: string;
+}
+
+interface MarketBenchmark {
+  origin: string;
+  destination: string;
+  vehicle_type: string;
+  market_avg_rate: number;
+  market_range_low: number;
+  market_range_high: number;
+  data_points: number;
+  confidence: 'high' | 'medium' | 'low';
+  your_rate: number;
+  your_vs_market_pct: number;
+  recommendation: string;
 }
 
 export default function NewQuote() {
@@ -102,6 +134,15 @@ export default function NewQuote() {
   const [showAISuggestion, setShowAISuggestion] = useState(false);
   const [revenueGuard, setRevenueGuard] = useState<RevenueGuard | null>(null);
 
+  // Sprint 1 features
+  const [modelStats, setModelStats] = useState<ModelStats | null>(null);
+  const [marketBenchmark, setMarketBenchmark] = useState<MarketBenchmark | null>(null);
+  const [adjustedPrice, setAdjustedPrice] = useState<number | null>(null);
+  const [loadingWinProb, setLoadingWinProb] = useState(false);
+  const [winProbAtAdjusted, setWinProbAtAdjusted] = useState<number | null>(null);
+  const [showBenchmarkModal, setShowBenchmarkModal] = useState(false);
+  const [guardExpanded, setGuardExpanded] = useState(false);
+
   // Cost calculations — defined early so they can be used in callbacks/effects below
   // Mobile app formula implementation
   const distance = routeData?.distance_km || 0;
@@ -141,9 +182,20 @@ export default function NewQuote() {
   useEffect(() => {
     fetchData('/api/v1/fuel-prices/current/')
       .then(data => {
-        if (data.success) {
+        if (data.success || data.inland_price) {
           setFuelPriceData(data);
         }
+      })
+      .catch(() => {
+        // Silently fail — not critical
+      });
+  }, []);
+
+  // Fetch model stats on mount
+  useEffect(() => {
+    fetchData('/api/v1/quotes/model-stats/')
+      .then(data => {
+        setModelStats(data);
       })
       .catch(() => {
         // Silently fail — not critical
@@ -212,6 +264,23 @@ export default function NewQuote() {
       fetchRevenueGuard();
     }
   }, [currentStep, _total, _fuelCost, _tollCost]);
+
+  // Fetch market benchmark when Step 3 is reached
+  useEffect(() => {
+    if (currentStep === 3 && pickupLocation && deliveryLocation && vehicleType) {
+      const origin = extractCode(pickupLocation);
+      const destination = extractCode(deliveryLocation);
+
+      fetchData(`/api/v1/quotes/benchmark/?origin=${origin}&destination=${destination}&vehicle_type=${vehicleType.toLowerCase()}`)
+        .then(data => {
+          // Add your_rate to the data
+          setMarketBenchmark({ ...data, your_rate: _total });
+        })
+        .catch(() => {
+          // Silently fail — not critical
+        });
+    }
+  }, [currentStep, pickupLocation, deliveryLocation, vehicleType, _total]);
 
   // Calculate route via TomTom backend
   const calculateRoute = async () => {
@@ -594,6 +663,29 @@ export default function NewQuote() {
                 <option value="Danger Load">Danger Load</option>
               </select>
             </div>
+
+            {/* UPGRADE 2: Live Fuel Price Badge */}
+            {fuelPriceData && (
+              <div style={{ padding: '10px 12px', background: 'var(--bg-surface-hover)', borderRadius: 2, border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 6 }}>
+                  LIVE DIESEL PRICES
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)', marginBottom: 4 }}>
+                  Inland: <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 600 }}>R{fuelPriceData.diesel_inland.toFixed(2)}/L</span> ·
+                  Coastal: <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 600 }}>R{fuelPriceData.diesel_coastal.toFixed(2)}/L</span>
+                </div>
+                {fuelPriceData.last_updated && (
+                  <div style={{ fontSize: 9, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                    Updated {new Date(fuelPriceData.last_updated).toLocaleDateString()} · Source: {fuelPriceData.source || 'FIASA'}
+                  </div>
+                )}
+                {fuelPriceData.is_stale && (
+                  <div style={{ marginTop: 6, padding: '6px 8px', background: 'var(--bg-surface)', border: '1px solid var(--status-warning)', borderRadius: 2, fontSize: 10, color: 'var(--status-warning)', fontFamily: 'var(--font-sans)' }}>
+                    ⚠️ Fuel price may be outdated (last update 7+ days ago)
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               {label('Cargo Description')}
               <input
@@ -727,10 +819,108 @@ export default function NewQuote() {
                   </div>
                 </div>
 
+                {/* UPGRADE 1: Model stats */}
+                {modelStats && (
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: 12, padding: '8px', background: 'var(--bg-surface)', borderRadius: 2 }}>
+                    Model trained on {modelStats.synthetic_count.toLocaleString()} synthetic + <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{modelStats.real_quotes_count}</span> real quotes
+                  </div>
+                )}
+
+                {/* UPGRADE 3: Win Probability Gauge */}
+                {aiSuggestion.win_probability !== undefined && (
+                  <div style={{ marginBottom: 12, padding: '12px', background: 'var(--bg-surface)', borderRadius: 2 }}>
+                    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 8 }}>
+                      WIN PROBABILITY
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                      <div style={{ flex: 1, height: 8, background: 'var(--bg-deep)', borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${(winProbAtAdjusted !== null ? winProbAtAdjusted : aiSuggestion.win_probability) * 100}%`,
+                          height: '100%',
+                          background: (winProbAtAdjusted !== null ? winProbAtAdjusted : aiSuggestion.win_probability) >= 0.7 ? 'var(--status-success)' : (winProbAtAdjusted !== null ? winProbAtAdjusted : aiSuggestion.win_probability) >= 0.4 ? 'var(--status-warning)' : 'var(--status-danger)',
+                          transition: 'all 0.3s ease',
+                        }} />
+                      </div>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', minWidth: 45 }}>
+                        {Math.round((winProbAtAdjusted !== null ? winProbAtAdjusted : aiSuggestion.win_probability) * 100)}%
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10 }}>
+                      At R {adjustedPrice !== null ? Math.round(adjustedPrice).toLocaleString() : Math.round(aiSuggestion.suggested_price).toLocaleString()} → {Math.round((winProbAtAdjusted !== null ? winProbAtAdjusted : aiSuggestion.win_probability) * 100)}% chance of winning
+                    </div>
+
+                    {/* UPGRADE 3: Price Sensitivity */}
+                    {aiSuggestion.win_probability_at_lower_price !== undefined && aiSuggestion.win_probability_at_higher_price !== undefined && (
+                      <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', marginBottom: 10, lineHeight: 1.5 }}>
+                        <div style={{ marginBottom: 2 }}>
+                          Drop R{Math.round(aiSuggestion.suggested_price * 0.05).toLocaleString()} (5%) → {Math.round(aiSuggestion.win_probability_at_lower_price * 100)}% chance
+                        </div>
+                        <div>
+                          Raise R{Math.round(aiSuggestion.suggested_price * 0.05).toLocaleString()} (5%) → {Math.round(aiSuggestion.win_probability_at_higher_price * 100)}% chance
+                        </div>
+                      </div>
+                    )}
+
+                    {/* UPGRADE 3: Price Adjustment Slider */}
+                    <div>
+                      <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 6 }}>
+                        ADJUST PROPOSED PRICE (±15%)
+                      </div>
+                      <input
+                        type="range"
+                        min={Math.round(aiSuggestion.suggested_price * 0.85)}
+                        max={Math.round(aiSuggestion.suggested_price * 1.15)}
+                        step={100}
+                        value={adjustedPrice !== null ? adjustedPrice : aiSuggestion.suggested_price}
+                        onChange={(e) => {
+                          const newPrice = parseFloat(e.target.value);
+                          setAdjustedPrice(newPrice);
+
+                          // Debounced win probability update
+                          setLoadingWinProb(true);
+                          setTimeout(() => {
+                            if (!customerId || !routeData) return;
+                            postData({
+                              url: '/api/v1/quotes/win-probability/',
+                              data: {
+                                price: newPrice,
+                                distance: routeData.distance_km,
+                                vehicle_type: vehicleType,
+                                client_id: parseInt(customerId),
+                                origin: extractCode(pickupLocation),
+                                destination: extractCode(deliveryLocation),
+                                days_until_departure: Math.ceil(parseInt(slaHours) / 24),
+                              }
+                            })
+                            .then(data => {
+                              setWinProbAtAdjusted(data.win_probability);
+                              setLoadingWinProb(false);
+                            })
+                            .catch(() => setLoadingWinProb(false));
+                          }, 500);
+                        }}
+                        style={{
+                          width: '100%',
+                          height: 6,
+                          background: 'var(--bg-deep)',
+                          borderRadius: 3,
+                          outline: 'none',
+                          cursor: 'pointer',
+                        }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+                        <span>R {Math.round(aiSuggestion.suggested_price * 0.85).toLocaleString()}</span>
+                        <span>R {Math.round(aiSuggestion.suggested_price * 1.15).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={() => {
-                    // Auto-fill the total with suggested price
-                    const suggestedTotal = Math.round(aiSuggestion.suggested_price);
+                    // Auto-fill the total with suggested price (or adjusted price if slider was used)
+                    const priceToUse = adjustedPrice !== null ? adjustedPrice : aiSuggestion.suggested_price;
+                    const suggestedTotal = Math.round(priceToUse);
                     const currentCosts = fuelCost + tollCost + driverAllowance;
                     const newBaseRate = (suggestedTotal - currentCosts) / distanceKm;
                     setBaseRatePerKm(newBaseRate.toFixed(2));
@@ -842,10 +1032,16 @@ export default function NewQuote() {
             </div>
           </div>
 
-          {/* Revenue Guard Badge */}
+          {/* UPGRADE 4: Enhanced Revenue Guard Badge */}
           {revenueGuard && (
-            <div style={{ padding: '12px 16px', background: 'var(--bg-surface-hover)', borderRadius: 2, border: `1px solid var(--status-${revenueGuard.color})`, marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: revenueGuard.warnings.length > 0 ? 8 : 0 }}>
+            <div style={{
+              padding: '16px',
+              background: revenueGuard.risk_level === 'AT_RISK' ? 'rgba(239, 68, 68, 0.05)' : revenueGuard.risk_level === 'CAUTION' ? 'rgba(251, 191, 36, 0.05)' : 'rgba(34, 197, 94, 0.05)',
+              borderRadius: 2,
+              border: `1px solid var(--status-${revenueGuard.color})`,
+              marginBottom: 16
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}>
                   REVENUE GUARD
                 </div>
@@ -858,17 +1054,105 @@ export default function NewQuote() {
                     background: `var(--status-${revenueGuard.color})`,
                     borderRadius: 2,
                     fontSize: 10,
-                    color: 'var(--text-primary)',
+                    color: '#000',
                     fontWeight: 700,
                     fontFamily: 'var(--font-mono)',
                   }}>
-                    {revenueGuard.risk_level === 'SAFE' && 'SAFE'}
-                    {revenueGuard.risk_level === 'CAUTION' && 'CAUTION'}
-                    {revenueGuard.risk_level === 'AT_RISK' && 'AT RISK'}
+                    {revenueGuard.risk_level === 'SAFE' && '✓ SAFE'}
+                    {revenueGuard.risk_level === 'CAUTION' && '⚠ CAUTION'}
+                    {revenueGuard.risk_level === 'AT_RISK' && '⚠ AT RISK'}
                   </span>
                 </div>
               </div>
-              {revenueGuard.warnings.length > 0 && (
+
+              {/* Margin Floor Display */}
+              {revenueGuard.margin_floor && (
+                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: 12 }}>
+                  Minimum viable price (0% margin): <span style={{ color: 'var(--status-danger)', fontWeight: 600 }}>{revenueGuard.margin_floor_display || `R${Math.round(revenueGuard.margin_floor).toLocaleString()}`}</span>
+                </div>
+              )}
+
+              {/* Explanations Section (expandable for CAUTION/SAFE, pre-expanded for AT_RISK) */}
+              {revenueGuard.explanations && revenueGuard.explanations.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <button
+                    onClick={() => setGuardExpanded(!guardExpanded)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      fontSize: 11,
+                      fontFamily: 'var(--font-mono)',
+                      cursor: 'pointer',
+                      padding: '4px 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <span>{guardExpanded || revenueGuard.risk_level === 'AT_RISK' ? '▼' : '▶'}</span>
+                    <span>Why is this {revenueGuard.risk_level.replace('_', ' ')}?</span>
+                  </button>
+                  {(guardExpanded || revenueGuard.risk_level === 'AT_RISK') && (
+                    <div style={{ padding: '10px', background: 'var(--bg-surface)', borderRadius: 2, marginBottom: 8 }}>
+                      {revenueGuard.explanations.map((explanation, idx) => (
+                        <div key={idx} style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: idx < revenueGuard.explanations!.length - 1 ? 6 : 0, fontFamily: 'var(--font-sans)', lineHeight: 1.5 }}>
+                          ✓ {explanation}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Suggestions Section (expandable for CAUTION/SAFE, pre-expanded for AT_RISK) */}
+              {revenueGuard.suggestions && revenueGuard.suggestions.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginBottom: 8, fontWeight: 600 }}>
+                    How to fix it:
+                  </div>
+                  <div style={{ padding: '10px', background: 'var(--bg-surface)', borderRadius: 2 }}>
+                    {revenueGuard.suggestions.map((suggestion, idx) => (
+                      <div key={idx} style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: idx < revenueGuard.suggestions!.length - 1 ? 6 : 0, fontFamily: 'var(--font-sans)', lineHeight: 1.5 }}>
+                        → {suggestion}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              {revenueGuard.risk_level === 'AT_RISK' && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  {revenueGuard.recommended_surcharge_zar && (
+                    <button
+                      onClick={() => {
+                        const surcharge = revenueGuard.recommended_surcharge_zar!;
+                        const newAdditionalCharges = (_weightSurcharge + _additionalCosts + surcharge);
+                        setDriverAllowanceInput(String(parseFloat(driverAllowanceInput) + surcharge));
+                        setNotes(prev => prev + (prev ? '\n' : '') + `Fuel surcharge added: +R${Math.round(surcharge).toLocaleString()} due to diesel price increase`);
+                      }}
+                      className="btn-action"
+                      style={{ fontSize: 10, padding: '8px 12px', background: 'var(--status-warning)', border: 'none', color: '#000', flex: 1 }}
+                    >
+                      ADD SURCHARGE
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setNotes(prev => prev + (prev ? '\n\n' : '') + '**PAYMENT TERM:** 50% deposit required before dispatch. 50% balance due on delivery.');
+                    }}
+                    className="btn-action"
+                    style={{ fontSize: 10, padding: '8px 12px', background: 'var(--accent-primary)', border: 'none', color: '#000', flex: 1 }}
+                  >
+                    REQUIRE DEPOSIT
+                  </button>
+                </div>
+              )}
+
+              {/* Old warnings (fallback) */}
+              {(!revenueGuard.explanations || revenueGuard.explanations.length === 0) && revenueGuard.warnings.length > 0 && (
                 <div style={{ padding: '8px', background: 'var(--bg-surface)', borderRadius: 2 }}>
                   {revenueGuard.warnings.map((warning, idx) => (
                     <div key={idx} style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: idx < revenueGuard.warnings.length - 1 ? 4 : 0, fontFamily: 'var(--font-sans)' }}>
@@ -936,6 +1220,162 @@ export default function NewQuote() {
               </div>
             </div>
           </div>
+
+          {/* UPGRADE 5: Market Benchmark Card */}
+          {marketBenchmark && (
+            <div style={{ padding: '16px', background: 'var(--bg-surface-hover)', borderRadius: 2, border: '1px solid var(--border-subtle)', marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 10 }}>
+                📊 SA MARKET RATE FOR {marketBenchmark.origin}→{marketBenchmark.destination} {vehicleType.toUpperCase()}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Market Average:</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 600 }}>
+                    R {Math.round(marketBenchmark.market_avg_rate).toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Market Range:</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                    R {Math.round(marketBenchmark.market_range_low).toLocaleString()} — R {Math.round(marketBenchmark.market_range_high).toLocaleString()}
+                  </span>
+                </div>
+                {marketBenchmark.data_points > 0 && (
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                    From {marketBenchmark.data_points} recent quotes · Confidence: {marketBenchmark.confidence}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10, marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Your Quote:</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 700 }}>
+                    R {Math.round(total).toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>Position:</span>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)',
+                    color: marketBenchmark.your_vs_market_pct < 0 ? 'var(--status-success)' : marketBenchmark.your_vs_market_pct > 10 ? 'var(--status-danger)' : 'var(--status-warning)',
+                    fontWeight: 600
+                  }}>
+                    {marketBenchmark.your_vs_market_pct > 0 ? '+' : ''}{marketBenchmark.your_vs_market_pct.toFixed(1)}% {marketBenchmark.your_vs_market_pct < 0 ? 'below' : 'above'} market
+                    {marketBenchmark.your_vs_market_pct < 0 && ' ✓'}
+                  </span>
+                </div>
+              </div>
+
+              {marketBenchmark.recommendation && (
+                <div style={{ padding: '10px', background: 'var(--bg-surface)', borderRadius: 2, marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>💡 RECOMMENDATION</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)', lineHeight: 1.5 }}>
+                    {marketBenchmark.recommendation}
+                  </div>
+                </div>
+              )}
+
+              {marketBenchmark.data_points < 10 && (
+                <div style={{ fontSize: 10, color: 'var(--status-warning)', fontFamily: 'var(--font-sans)', marginBottom: 10, padding: '8px', background: 'rgba(251, 191, 36, 0.1)', borderRadius: 2 }}>
+                  ℹ️ {marketBenchmark.data_points < 5
+                    ? 'Market data building — not enough quotes on this lane yet. Using industry averages.'
+                    : 'Limited market data for this lane. Take recommendation as guidance.'}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => setShowBenchmarkModal(true)}
+                  className="btn-action"
+                  style={{ fontSize: 10, padding: '8px 12px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', flex: 1 }}
+                >
+                  LEARN MORE
+                </button>
+                <button
+                  onClick={() => {
+                    // Adjust price to market average
+                    const marketPrice = marketBenchmark.market_avg_rate;
+                    const currentCosts = fuelCost + tollCost + driverAllowance + _weightSurcharge + _additionalCosts;
+                    const newBaseRate = (marketPrice - currentCosts) / distanceKm;
+                    setBaseRatePerKm(newBaseRate.toFixed(2));
+                  }}
+                  className="btn-action"
+                  style={{ fontSize: 10, padding: '8px 12px', background: 'var(--accent-primary)', border: 'none', color: '#000', flex: 1 }}
+                >
+                  ADJUST TO MARKET AVG
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Learn More Modal */}
+          {showBenchmarkModal && marketBenchmark && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.8)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+            }}
+            onClick={() => setShowBenchmarkModal(false)}
+            >
+              <div
+                className="card"
+                style={{ padding: 24, maxWidth: 500, margin: 20 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+                  How is this calculated?
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
+                  We track accepted quotes on this lane and route over the past 90 days. The "market average" is the median price of recent, accepted jobs.
+                </div>
+                <div style={{ padding: '12px', background: 'var(--bg-surface-hover)', borderRadius: 2, marginBottom: 16 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>Lane:</span>
+                      <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{marketBenchmark.origin} → {marketBenchmark.destination}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>Vehicle Type:</span>
+                      <span style={{ color: 'var(--text-primary)' }}>{marketBenchmark.vehicle_type}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>Data Points:</span>
+                      <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{marketBenchmark.data_points} quotes (past 90 days)</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>Market Average:</span>
+                      <span style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>R {Math.round(marketBenchmark.market_avg_rate).toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>Range:</span>
+                      <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                        R {Math.round(marketBenchmark.market_range_low).toLocaleString()} — R {Math.round(marketBenchmark.market_range_high).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 16 }}>
+                  Your quote (R {Math.round(total).toLocaleString()}) is {Math.abs(marketBenchmark.your_vs_market_pct).toFixed(1)}% {marketBenchmark.your_vs_market_pct < 0 ? 'below' : 'above'} average, which is {marketBenchmark.your_vs_market_pct < 0 ? 'competitive' : marketBenchmark.your_vs_market_pct > 15 ? 'significantly above market' : 'within range'}.
+                </div>
+                <button
+                  onClick={() => setShowBenchmarkModal(false)}
+                  className="btn-action"
+                  style={{ width: '100%' }}
+                >
+                  CLOSE
+                </button>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div style={{ padding: '10px 12px', background: 'var(--bg-surface)', border: '1px solid var(--status-danger)', borderRadius: 2, color: 'var(--status-danger)', fontSize: 12, marginBottom: 16 }}>

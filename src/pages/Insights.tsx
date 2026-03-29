@@ -1,139 +1,86 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fetchData } from '@/lib/Api';
-import { formatCurrency, formatPercent } from '@/lib/formatters';
+import { formatCurrency } from '@/lib/formatters';
 
 // ========== TYPES ==========
 
-interface Signal {
-  type: string;
-  category: string;
-  title: string;
-  body: string;
-  action?: string;
-  action_url?: string;
-  severity: 'critical' | 'warning' | 'info';
-  created_at: string;
-}
-
-interface RouteData {
-  route: string;
-  trips: number;
-  avg_revenue: number;
-  avg_cost: number;
-  margin_pct: number;
-  revenue_per_load?: number;
-  fuel_per_km?: number | null;
-  avg_days?: number;
-}
-
-interface CustomerHealthData {
-  customer_name: string;
-  customer_id: number;
-  revenue: number;
-  invoice_count: number;
-  avg_payment_days: number;
+interface KPIData {
+  revenue_mtd: number;
+  net_margin_pct: number;
+  outstanding_invoices: number;
+  fleet_utilization_pct: number;
   dso: number;
-  overdue_count: number;
-  risk_tier: 'PRIME' | 'STANDARD' | 'AT_RISK';
+  advances: number;
+}
+
+interface Recommendation {
+  type: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH';
+  message: string;
+  action?: string;
+}
+
+interface InsightsData {
+  recommendations: Recommendation[];
 }
 
 interface FinanceData {
-  revenue_period: number;
-  expenses_period: number;
-  net_margin_period: number;
-  net_margin_percent_period: number;
-  operating_ratio?: number;
-  revenue_per_load?: number;
-  outstanding_invoices_total?: number;
-  overdue_invoices_total?: number;
+  revenue: number;
+  revenue_mtd: number;
+  revenue_ytd: number;
+  margin: number;
+  net_margin_pct: number;
+  weekly_trend?: { week: string; revenue: number; expenses: number }[];
   monthly_trend?: { month: string; revenue: number; expenses: number }[];
-  expense_breakdown?: Record<string, number>;
-  top_customers?: { customer_id: number; customer_name: string; revenue: number; costs?: number; margin_pct?: number; invoice_count: number; avg_payment_days?: number }[];
-  previous_period?: {
-    revenue: number;
-    margin_percent: number;
-  };
-}
-
-interface FleetData {
-  utilisation?: number;
-  vehicles?: {
-    vehicle_id: number;
-    registration: string;
-    make_model?: string;
-    revenue: number;
-    costs?: number;
-    margin_pct?: number;
-    utilisation?: number;
-    trips: number;
-    downtime?: number;
-  }[];
-}
-
-interface DriversData {
-  drivers?: {
-    driver_id: number;
-    driver_name: string;
-    revenue: number;
-    trips: number;
-    otd_pct?: number;
-    avg_fuel_per_trip?: number;
-    rating?: number;
-  }[];
-}
-
-interface QuotesData {
-  total_quotes?: number;
-  conversion_rate?: number;
-  avg_quote_value?: number;
-  revenue_guard_flag_rate?: number;
-  funnel?: {
-    quotes_sent: number;
-    customer_accepted: number;
-    loads_booked: number;
-    loads_completed: number;
-    invoiced: number;
-  };
-  revenue_guard?: {
-    loads_flagged: number;
-    override_rate: number;
-    money_saved: number;
-    override_losses: number;
-  };
-  quote_accuracy?: {
-    corridor: string;
-    quoted_margin: number;
-    actual_margin: number;
-    variance: number;
-    accuracy_score: number;
-  }[];
+  top_customers?: { customer_name: string; revenue: number; pct_of_total: number }[];
+  fuel_cost_ratio?: number;
 }
 
 interface CashFlowData {
-  total_outstanding?: number;
-  total_overdue?: number;
-  avg_dso?: number;
-  next_30d_projected?: number;
-  fast_pay_fees_mtd?: number;
-  aging_buckets?: {
-    current: { amount: number; count: number };
-    days_1_30: { amount: number; count: number };
-    days_31_60: { amount: number; count: number };
-    days_61_90: { amount: number; count: number };
-    days_90_plus: { amount: number; count: number };
-  };
-  customer_payment_health?: CustomerHealthData[];
-  cash_flow_forecast?: {
-    next_30d: number;
-    next_31_60d: number;
-    next_61_90d: number;
-  };
-  fast_pay_summary?: {
-    total_fees: number;
-    fee_pct_of_revenue: number;
-    invoice_count: number;
-    avg_discount: number;
-  };
+  forecast: { week: string; expected_in: number; expected_out: number; net: number; running_balance: number }[];
+}
+
+interface Load {
+  id: number;
+  pickup_city?: string;
+  delivery_city?: string;
+  status: string;
+  amount: number;
+  weight?: number;
+  distance_km?: number;
+  vehicle?: { registration: string };
+  driver?: { full_name: string };
+}
+
+interface Driver {
+  id: number;
+  full_name: string;
+  status: string;
+  revenue_generated: number;
+  trip_count?: number;
+  experience_years?: number;
+}
+
+interface Vehicle {
+  id: number;
+  registration: string;
+  make?: string;
+  model?: string;
+  status: string;
+  revenue_generated: number;
+  health_score?: number;
+  trip_count?: number;
+  utilization_pct?: number;
+}
+
+interface Invoice {
+  id: number;
+  status: string;
+  total_amount: number;
+  due_date?: string;
+  dso?: number;
+  created_at: string;
 }
 
 type TabType = 'command' | 'revenue' | 'lanes' | 'fleet' | 'quotes' | 'cashflow';
@@ -158,6 +105,7 @@ const PERIOD_OPTIONS: { id: PeriodType; label: string }[] = [
 ];
 
 export default function Insights() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<TabType>('command');
   const [period, setPeriod] = useState<PeriodType>('THIS_MONTH');
   const [customFrom, setCustomFrom] = useState('');
@@ -166,14 +114,15 @@ export default function Insights() {
   const [error, setError] = useState<string | null>(null);
   const [fleetSubTab, setFleetSubTab] = useState<'vehicles' | 'drivers'>('vehicles');
 
-  // Data states per tab
-  const [commandData, setCommandData] = useState<any>(null);
-  const [revenueData, setRevenueData] = useState<FinanceData | null>(null);
-  const [lanesData, setLanesData] = useState<RouteData[] | null>(null);
-  const [fleetData, setFleetData] = useState<FleetData | null>(null);
-  const [driversData, setDriversData] = useState<DriversData | null>(null);
-  const [quotesData, setQuotesData] = useState<QuotesData | null>(null);
+  // Data states
+  const [kpiData, setKpiData] = useState<KPIData | null>(null);
+  const [insightsData, setInsightsData] = useState<InsightsData | null>(null);
+  const [financeData, setFinanceData] = useState<FinanceData | null>(null);
   const [cashflowData, setCashflowData] = useState<CashFlowData | null>(null);
+  const [loads, setLoads] = useState<Load[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   // Build period params
   const getPeriodParams = (): string => {
@@ -216,42 +165,46 @@ export default function Insights() {
       try {
         switch (tab) {
           case 'command':
-            const [finance, signals, routes, loads] = await Promise.all([
-              fetchData(`api/v1/dashboard/finance/?compare=previous_period&${params}`).catch(() => null),
-              fetchData(`api/v1/insights/signals/?${params}`).catch(() => ({ signals: [] })),
-              fetchData(`api/v1/insights/routes/?${params}`).catch(() => []),
-              fetchData('api/v1/loads/?status=in_transit,assigned&limit=1').catch(() => ({ count: 0 })),
+            const [kpi, insights, loadsResp] = await Promise.all([
+              fetchData('api/v1/dashboard/kpi/').catch(() => null),
+              fetchData('api/v1/dashboard/insights/').catch(() => ({ recommendations: [] })),
+              fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
             ]);
-            setCommandData({ finance, signals: signals?.signals || [], routes, activeLoads: loads?.count || 0 });
+            setKpiData(kpi);
+            setInsightsData(insights);
+            setLoads(loadsResp?.results || []);
             break;
 
           case 'revenue':
-            const revData = await fetchData(`api/v1/dashboard/finance/?compare=previous_period&${params}`).catch(() => null);
-            setRevenueData(revData);
+            const finance = await fetchData(`api/v1/dashboard/finance/?${params}`).catch(() => null);
+            setFinanceData(finance);
             break;
 
           case 'lanes':
-            const routeData = await fetchData(`api/v1/insights/routes/?${params}`).catch(() => []);
-            setLanesData(Array.isArray(routeData) ? routeData : routeData?.results || []);
+            const lanesLoads = await fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] }));
+            setLoads(lanesLoads?.results || []);
             break;
 
           case 'fleet':
-            const [fleet, drivers] = await Promise.all([
-              fetchData(`api/v1/insights/fleet/?${params}`).catch(() => null),
-              fetchData(`api/v1/insights/drivers/?${params}`).catch(() => null),
+            const [veh, drv] = await Promise.all([
+              fetchData('api/v1/vehicles/?page_size=50').catch(() => ({ results: [] })),
+              fetchData('api/v1/drivers/?page_size=50').catch(() => ({ results: [] })),
             ]);
-            setFleetData(fleet);
-            setDriversData(drivers);
+            setVehicles(veh?.results || []);
+            setDrivers(drv?.results || []);
             break;
 
           case 'quotes':
-            const qData = await fetchData(`api/v1/insights/quotes/?${params}`).catch(() => null);
-            setQuotesData(qData);
+            // Quotes endpoint - if not available, will show message
             break;
 
           case 'cashflow':
-            const cfData = await fetchData(`api/v1/insights/cashflow/?${params}`).catch(() => null);
-            setCashflowData(cfData);
+            const [cf, inv] = await Promise.all([
+              fetchData('api/v1/dashboard/cashflow/').catch(() => ({ forecast: [] })),
+              fetchData('api/v1/invoices/?page_size=100').catch(() => ({ results: [] })),
+            ]);
+            setCashflowData(cf);
+            setInvoices(inv?.results || []);
             break;
         }
       } catch (err) {
@@ -265,76 +218,13 @@ export default function Insights() {
     loadTabData();
   }, [tab, period, customFrom, customTo]);
 
-  const exportToCSV = () => {
-    let csvContent = '';
-    let filename = '';
-
-    switch (tab) {
-      case 'command':
-        filename = 'Command_Centre.csv';
-        csvContent = 'Metric,Value\n';
-        csvContent += `Revenue,${commandData?.finance?.revenue_period || 0}\n`;
-        csvContent += `Active Loads,${commandData?.activeLoads || 0}\n`;
-        break;
-
-      case 'revenue':
-        filename = 'Revenue_Margins.csv';
-        csvContent = 'Metric,Value\n';
-        csvContent += `Gross Revenue,${revenueData?.revenue_period || 0}\n`;
-        csvContent += `Net Margin %,${revenueData?.net_margin_percent_period || 0}\n`;
-        csvContent += `Operating Ratio,${revenueData?.operating_ratio || 0}\n`;
-        break;
-
-      case 'lanes':
-        filename = 'Lanes_Routes.csv';
-        csvContent = 'Route,Loads,Revenue,Total Cost,Margin%,Rev/Load\n';
-        (lanesData || []).forEach((r: RouteData) => {
-          csvContent += `${r.route},${r.trips},${r.avg_revenue},${r.avg_cost},${r.margin_pct},${r.revenue_per_load || r.avg_revenue}\n`;
-        });
-        break;
-
-      case 'fleet':
-        if (fleetSubTab === 'vehicles') {
-          filename = 'Fleet_Vehicles.csv';
-          csvContent = 'Vehicle,Revenue,Costs,Margin%,Utilisation%,Loads\n';
-          (fleetData?.vehicles || []).forEach(v => {
-            csvContent += `${v.registration},${v.revenue},${v.costs || 0},${v.margin_pct || 0},${v.utilisation || 0},${v.trips}\n`;
-          });
-        } else {
-          filename = 'Fleet_Drivers.csv';
-          csvContent = 'Driver,Revenue,Loads,OTD%\n';
-          (driversData?.drivers || []).forEach(d => {
-            csvContent += `${d.driver_name},${d.revenue},${d.trips},${d.otd_pct || 0}\n`;
-          });
-        }
-        break;
-
-      case 'quotes':
-        filename = 'Quotes_Pipeline.csv';
-        csvContent = 'Metric,Value\n';
-        csvContent += `Total Quotes,${quotesData?.total_quotes || 0}\n`;
-        csvContent += `Conversion Rate,${quotesData?.conversion_rate || 0}\n`;
-        csvContent += `Avg Quote Value,${quotesData?.avg_quote_value || 0}\n`;
-        break;
-
-      case 'cashflow':
-        filename = 'Cash_Flow.csv';
-        csvContent = 'Metric,Value\n';
-        csvContent += `Total Outstanding,${cashflowData?.total_outstanding || 0}\n`;
-        csvContent += `Overdue,${cashflowData?.total_overdue || 0}\n`;
-        csvContent += `Avg DSO,${cashflowData?.avg_dso || 0}\n`;
-        break;
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'HIGH': return 'var(--status-danger)';
+      case 'MEDIUM': return 'var(--status-warning)';
+      case 'LOW': return 'var(--status-success)';
+      default: return 'var(--text-secondary)';
     }
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const LoadingSkeleton = () => (
@@ -361,22 +251,63 @@ export default function Insights() {
     </div>
   );
 
-  const getRiskTierColor = (tier: string) => {
-    switch (tier) {
-      case 'PRIME': return 'var(--status-success)';
-      case 'STANDARD': return 'var(--status-warning)';
-      case 'AT_RISK': return 'var(--status-danger)';
-      default: return 'var(--text-secondary)';
-    }
+  // Calculate route aggregations from loads
+  const getRouteAnalytics = () => {
+    const routeMap = new Map<string, { trips: number; totalRevenue: number; totalWeight: number; totalDistance: number }>();
+
+    loads.forEach(load => {
+      const route = `${load.pickup_city || 'Unknown'} → ${load.delivery_city || 'Unknown'}`;
+      const existing = routeMap.get(route) || { trips: 0, totalRevenue: 0, totalWeight: 0, totalDistance: 0 };
+      routeMap.set(route, {
+        trips: existing.trips + 1,
+        totalRevenue: existing.totalRevenue + (load.amount || 0),
+        totalWeight: existing.totalWeight + (load.weight || 0),
+        totalDistance: existing.totalDistance + (load.distance_km || 0),
+      });
+    });
+
+    return Array.from(routeMap.entries())
+      .map(([route, data]) => ({
+        route,
+        trips: data.trips,
+        totalRevenue: data.totalRevenue,
+        avgRevenue: data.trips > 0 ? data.totalRevenue / data.trips : 0,
+        avgWeight: data.trips > 0 ? data.totalWeight / data.trips : 0,
+        revenuePerKm: data.totalDistance > 0 ? data.totalRevenue / data.totalDistance : 0,
+      }))
+      .sort((a, b) => b.totalRevenue - a.totalRevenue)
+      .slice(0, 10);
   };
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'var(--status-danger)';
-      case 'warning': return 'var(--status-warning)';
-      case 'info': return 'var(--status-success)';
-      default: return 'var(--text-secondary)';
-    }
+  // Calculate invoice aging buckets
+  const getInvoiceAging = () => {
+    const buckets = {
+      current: { count: 0, amount: 0 },
+      days31_60: { count: 0, amount: 0 },
+      days61_90: { count: 0, amount: 0 },
+      days90plus: { count: 0, amount: 0 },
+    };
+
+    invoices.forEach(inv => {
+      const dso = inv.dso || 0;
+      const amount = inv.total_amount || 0;
+
+      if (dso <= 30) {
+        buckets.current.count++;
+        buckets.current.amount += amount;
+      } else if (dso <= 60) {
+        buckets.days31_60.count++;
+        buckets.days31_60.amount += amount;
+      } else if (dso <= 90) {
+        buckets.days61_90.count++;
+        buckets.days61_90.amount += amount;
+      } else {
+        buckets.days90plus.count++;
+        buckets.days90plus.amount += amount;
+      }
+    });
+
+    return buckets;
   };
 
   return (
@@ -388,7 +319,6 @@ export default function Insights() {
           <div>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Insights</div>
           </div>
-          <button className="btn-action" onClick={exportToCSV}>↓ EXPORT CSV</button>
         </div>
       </div>
 
@@ -484,117 +414,15 @@ export default function Insights() {
           {/* TAB 1: COMMAND CENTRE */}
           {tab === 'command' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* KPI Row */}
+              {/* Top KPI Strip */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 16 }}>
-                {(() => {
-                  const finance = commandData?.finance;
-                  const opRatio = finance?.operating_ratio || (finance?.expenses_period && finance?.revenue_period ? (finance.expenses_period / finance.revenue_period) * 100 : 0) || 0;
-                  const fleetUtil = finance?.fleet_utilisation || 0;
-                  const opRatioColor = opRatio < 85 ? 'var(--status-success)' : opRatio < 95 ? 'var(--status-warning)' : 'var(--status-danger)';
-                  const utilColor = fleetUtil > 70 ? 'var(--status-success)' : fleetUtil > 40 ? 'var(--status-warning)' : 'var(--status-danger)';
-
-                  return [
-                    { label: 'Revenue This Month', value: formatCurrency(finance?.revenue_period || 0), color: 'var(--accent-primary)' },
-                    { label: 'Operating Ratio', value: `${(opRatio || 0).toFixed(1)}%`, color: opRatioColor },
-                    { label: 'Active Loads', value: commandData?.activeLoads || 0, color: 'var(--text-primary)' },
-                    { label: 'Outstanding Invoices', value: formatCurrency(finance?.outstanding_invoices_total || 0), color: 'var(--status-warning)' },
-                    { label: 'Fleet Utilisation', value: `${(fleetUtil || 0).toFixed(1)}%`, color: utilColor },
-                    { label: 'Overdue Invoices', value: formatCurrency(finance?.overdue_invoices_total || 0), color: 'var(--status-danger)' },
-                  ].map(m => (
-                    <div key={m.label} className="card metric-card">
-                      <div className="card-header"><span className="card-title">{m.label}</span></div>
-                      <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
-                    </div>
-                  ));
-                })()}
-              </div>
-
-              {/* Alert Panel */}
-              <div className="card" style={{ padding: 20 }}>
-                <div className="card-header"><span className="card-title">Alerts & Signals</span></div>
-                {commandData?.signals && commandData.signals.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
-                    {commandData.signals.map((sig: Signal, idx: number) => (
-                      <div key={idx} style={{ display: 'flex', gap: 12, padding: 12, background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-                        <div style={{
-                          padding: '4px 8px',
-                          borderRadius: 2,
-                          background: getSeverityColor(sig.severity),
-                          color: 'white',
-                          fontSize: 10,
-                          fontFamily: 'var(--font-mono)',
-                          fontWeight: 600,
-                          textTransform: 'uppercase',
-                          height: 'fit-content',
-                        }}>
-                          {sig.severity}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{sig.title}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{sig.body}</div>
-                        </div>
-                        {sig.action && (
-                          <button className="btn-action" style={{ fontSize: 10, padding: '4px 10px' }}>
-                            {sig.action}
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ marginTop: 16, color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: 20 }}>
-                    No alerts — your operation looks healthy
-                  </div>
-                )}
-              </div>
-
-              {/* Route Summary */}
-              {commandData?.routes && commandData.routes.length > 0 && (
-                <div className="card table-card">
-                  <div className="card-header" style={{ marginBottom: 16 }}>
-                    <span className="card-title">Top Routes by Revenue</span>
-                  </div>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Route</th>
-                        <th className="text-right">Trips</th>
-                        <th className="text-right">Revenue</th>
-                        <th className="text-right">Margin%</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {commandData.routes.slice(0, 5).map((r: RouteData, idx: number) => (
-                        <tr key={idx}>
-                          <td>{r.route}</td>
-                          <td className="mono text-right">{r.trips}</td>
-                          <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                            {formatCurrency(r.avg_revenue * r.trips)}
-                          </td>
-                          <td className="mono text-right" style={{
-                            color: r.margin_pct > 15 ? 'var(--status-success)' : r.margin_pct > 5 ? 'var(--status-warning)' : 'var(--status-danger)'
-                          }}>
-                            {(r.margin_pct || 0).toFixed(1)}%
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 2: REVENUE & MARGINS */}
-          {tab === 'revenue' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* KPI Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
                 {[
-                  { label: 'Gross Revenue', value: formatCurrency(revenueData?.revenue_period || 0), color: 'var(--accent-primary)' },
-                  { label: 'Net Margin %', value: formatPercent(revenueData?.net_margin_percent_period || 0), color: 'var(--status-success)' },
-                  { label: 'Operating Ratio', value: `${((revenueData?.operating_ratio || (revenueData?.expenses_period && revenueData?.revenue_period ? (revenueData.expenses_period / revenueData.revenue_period) * 100 : 0)) || 0).toFixed(1)}%`, color: 'var(--text-primary)' },
-                  { label: 'Revenue per Load', value: formatCurrency(revenueData?.revenue_per_load || 0), color: 'var(--text-primary)' },
+                  { label: 'Revenue MTD', value: formatCurrency(kpiData?.revenue_mtd || 0), color: 'var(--accent-primary)' },
+                  { label: 'Net Margin %', value: `${(kpiData?.net_margin_pct || 0).toFixed(1)}%`, color: 'var(--status-success)' },
+                  { label: 'DSO', value: `${Math.round(kpiData?.dso || 0)}d`, color: 'var(--text-primary)' },
+                  { label: 'Fleet Utilisation', value: `${(kpiData?.fleet_utilization_pct || 0).toFixed(1)}%`, color: 'var(--status-success)' },
+                  { label: 'Outstanding Invoices', value: formatCurrency(kpiData?.outstanding_invoices || 0), color: 'var(--status-warning)' },
+                  { label: 'Advances This Month', value: formatCurrency(kpiData?.advances || 0), color: 'var(--text-primary)' },
                 ].map(m => (
                   <div key={m.label} className="card metric-card">
                     <div className="card-header"><span className="card-title">{m.label}</span></div>
@@ -603,33 +431,92 @@ export default function Insights() {
                 ))}
               </div>
 
-              {/* Period Deltas */}
-              {revenueData?.previous_period && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-                  {(() => {
-                    const revChange = revenueData.previous_period.revenue > 0
-                      ? ((revenueData.revenue_period - revenueData.previous_period.revenue) / revenueData.previous_period.revenue) * 100
-                      : 0;
-                    const marginChange = (revenueData.net_margin_percent_period || 0) - (revenueData.previous_period.margin_percent || 0);
-
-                    return [
-                      { label: 'Revenue Change', value: `${revChange > 0 ? '+' : ''}${revChange.toFixed(1)}%`, color: revChange > 0 ? 'var(--status-success)' : 'var(--status-danger)' },
-                      { label: 'Margin Change', value: `${marginChange > 0 ? '+' : ''}${marginChange.toFixed(1)}pp`, color: marginChange > 0 ? 'var(--status-success)' : 'var(--status-danger)' },
-                    ].map(m => (
-                      <div key={m.label} className="card" style={{ padding: 16 }}>
-                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{m.label}</div>
-                        <div style={{ fontSize: 18, fontWeight: 600, color: m.color, fontFamily: 'var(--font-mono)' }}>{m.value}</div>
+              {/* AI Signals Section */}
+              <div className="card" style={{ padding: 20 }}>
+                <div className="card-header"><span className="card-title">AI Signals</span></div>
+                {insightsData?.recommendations && insightsData.recommendations.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
+                    {insightsData.recommendations.map((signal, idx) => (
+                      <div key={idx} style={{
+                        display: 'flex',
+                        gap: 12,
+                        padding: 12,
+                        background: 'var(--bg-surface-hover)',
+                        borderRadius: 2,
+                        borderLeft: `3px solid ${getSeverityColor(signal.severity)}`
+                      }}>
+                        <div style={{
+                          padding: '4px 8px',
+                          borderRadius: 2,
+                          background: getSeverityColor(signal.severity),
+                          color: 'white',
+                          fontSize: 10,
+                          fontFamily: 'var(--font-mono)',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          height: 'fit-content',
+                        }}>
+                          {signal.severity}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>
+                            {signal.type.replace('_', ' ')}
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{signal.message}</div>
+                        </div>
                       </div>
-                    ));
-                  })()}
-                </div>
-              )}
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 16, color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: 20 }}>
+                    All clear — no alerts
+                  </div>
+                )}
+              </div>
 
-              {/* Monthly Trend */}
-              {revenueData?.monthly_trend && revenueData.monthly_trend.length > 0 && (
+              {/* Active Intelligence Feed */}
+              <div className="card" style={{ padding: 20 }}>
+                <div className="card-header"><span className="card-title">Active Intelligence Feed</span></div>
+                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {loads.filter(l => l.status === 'in_transit' || l.status === 'assigned').slice(0, 5).map(load => (
+                    <div key={load.id} style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                      → Truck <span style={{ color: 'var(--accent-primary)' }}>{load.vehicle?.registration || 'N/A'}</span> on{' '}
+                      <span style={{ color: 'var(--text-primary)' }}>{load.pickup_city || 'Unknown'}</span> →{' '}
+                      <span style={{ color: 'var(--text-primary)' }}>{load.delivery_city || 'Unknown'}</span> —{' '}
+                      <span style={{ color: 'var(--status-success)' }}>{formatCurrency(load.amount)}</span> in transit
+                    </div>
+                  ))}
+                  {(!loads || loads.filter(l => l.status === 'in_transit' || l.status === 'assigned').length === 0) && (
+                    <div style={{ fontSize: 12, color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No active loads</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: REVENUE & MARGINS */}
+          {tab === 'revenue' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Top KPIs */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                {[
+                  { label: 'Total Revenue', value: formatCurrency(financeData?.revenue || 0), color: 'var(--accent-primary)' },
+                  { label: 'Revenue MTD', value: formatCurrency(financeData?.revenue_mtd || 0), color: 'var(--accent-primary)' },
+                  { label: 'Net Margin %', value: `${(financeData?.net_margin_pct || 0).toFixed(1)}%`, color: 'var(--status-success)' },
+                  { label: 'Revenue YTD', value: formatCurrency(financeData?.revenue_ytd || 0), color: 'var(--text-primary)' },
+                ].map(m => (
+                  <div key={m.label} className="card metric-card">
+                    <div className="card-header"><span className="card-title">{m.label}</span></div>
+                    <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Revenue vs Expenses Chart */}
+              {financeData?.monthly_trend && financeData.monthly_trend.length > 0 && (
                 <div className="card" style={{ padding: 20 }}>
                   <div className="card-header">
-                    <span className="card-title">Monthly Trend (Last 6 Months)</span>
+                    <span className="card-title">Revenue vs Expenses (Last 6 Months)</span>
                     <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-secondary)' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <span style={{ width: 20, height: 2, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1 }}/>Revenue
@@ -640,98 +527,84 @@ export default function Insights() {
                     </div>
                   </div>
                   {(() => {
-                    const trend = revenueData.monthly_trend.slice(-6);
+                    const trend = financeData.monthly_trend.slice(-6);
                     const maxHeight = 120;
                     const maxValue = Math.max(...trend.map(m => Math.max(m.revenue, m.expenses)));
 
                     return (
-                      <>
-                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginTop: 16, height: maxHeight }}>
-                          {trend.map((m, idx) => {
-                            const revHeight = (m.revenue / maxValue) * maxHeight;
-                            const expHeight = (m.expenses / maxValue) * maxHeight;
-                            return (
-                              <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                                <div style={{ width: '100%', display: 'flex', gap: 4, alignItems: 'flex-end', height: maxHeight }}>
-                                  <div style={{ flex: 1, height: revHeight, background: 'var(--accent-primary)', borderRadius: '2px 2px 0 0' }} />
-                                  <div style={{ flex: 1, height: expHeight, background: 'var(--status-danger)', borderRadius: '2px 2px 0 0', opacity: 0.7 }} />
-                                </div>
-                                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                                  {m.month?.slice(5) || ''}
-                                </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginTop: 16, height: maxHeight }}>
+                        {trend.map((m, idx) => {
+                          const revHeight = (m.revenue / maxValue) * maxHeight;
+                          const expHeight = (m.expenses / maxValue) * maxHeight;
+                          return (
+                            <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                              <div style={{ width: '100%', display: 'flex', gap: 4, alignItems: 'flex-end', height: maxHeight }}>
+                                <div style={{ flex: 1, height: revHeight, background: 'var(--accent-primary)', borderRadius: '2px 2px 0 0' }} />
+                                <div style={{ flex: 1, height: expHeight, background: 'var(--status-danger)', borderRadius: '2px 2px 0 0', opacity: 0.7 }} />
                               </div>
-                            );
-                          })}
-                        </div>
-                      </>
+                              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                                {m.month?.slice(5) || ''}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     );
                   })()}
                 </div>
               )}
 
-              {/* Cost Breakdown */}
-              {revenueData?.expense_breakdown && Object.keys(revenueData.expense_breakdown).length > 0 && (
-                <div className="card" style={{ padding: 20 }}>
-                  <div className="card-header"><span className="card-title">Cost Breakdown (% of Revenue)</span></div>
-                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {Object.entries(revenueData.expense_breakdown).map(([category, amount]: [string, any]) => {
-                      const pct = revenueData.revenue_period > 0 ? (amount / revenueData.revenue_period) * 100 : 0;
-                      return (
-                        <div key={category}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <span style={{ fontSize: 13, color: 'var(--text-primary)', textTransform: 'capitalize' }}>{category.replace('_', ' ')}</span>
-                            <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{pct.toFixed(1)}%</span>
-                          </div>
-                          <div style={{ height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent-primary)', borderRadius: 2 }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Margin by Customer */}
-              {revenueData?.top_customers && revenueData.top_customers.length > 0 && (
+              {/* Top Customers Table */}
+              {financeData?.top_customers && financeData.top_customers.length > 0 && (
                 <div className="card table-card">
                   <div className="card-header" style={{ marginBottom: 16 }}>
-                    <span className="card-title">Margin by Customer</span>
+                    <span className="card-title">Top Customers</span>
                   </div>
                   <table className="data-table">
                     <thead>
                       <tr>
                         <th>Customer</th>
                         <th className="text-right">Revenue</th>
-                        <th className="text-right">Costs</th>
-                        <th className="text-right">Margin%</th>
-                        <th className="text-right">Load Count</th>
-                        <th className="text-right">Avg Payment Days</th>
+                        <th className="text-right">% of Total</th>
+                        <th className="text-right">Trend</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {revenueData.top_customers.map((c, idx) => {
-                        const margin = c.margin_pct || 0;
-                        return (
-                          <tr key={idx}>
-                            <td>{c.customer_name}</td>
-                            <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                              {formatCurrency(c.revenue)}
-                            </td>
-                            <td className="mono text-right">{formatCurrency(c.costs || 0)}</td>
-                            <td className="mono text-right" style={{
-                              color: margin < 10 ? 'var(--status-danger)' : 'var(--status-success)',
-                              fontWeight: margin < 10 ? 600 : 400
-                            }}>
-                              {margin.toFixed(1)}%
-                            </td>
-                            <td className="mono text-right">{c.invoice_count}</td>
-                            <td className="mono text-right">{c.avg_payment_days || 0}d</td>
-                          </tr>
-                        );
-                      })}
+                      {financeData.top_customers.map((c, idx) => (
+                        <tr key={idx}>
+                          <td>{c.customer_name}</td>
+                          <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+                            {formatCurrency(c.revenue)}
+                          </td>
+                          <td className="mono text-right">{(c.pct_of_total || 0).toFixed(1)}%</td>
+                          <td className="text-right">—</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* Margin Analysis */}
+              {financeData?.fuel_cost_ratio !== undefined && (
+                <div className="card" style={{ padding: 20 }}>
+                  <div className="card-header"><span className="card-title">Margin Analysis</span></div>
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Fuel Cost Ratio</span>
+                      <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                        {(financeData.fuel_cost_ratio * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div style={{ height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${financeData.fuel_cost_ratio * 100}%`,
+                        background: 'var(--status-warning)',
+                        borderRadius: 2
+                      }} />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -740,71 +613,48 @@ export default function Insights() {
           {/* TAB 3: LANES & ROUTES */}
           {tab === 'lanes' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Summary Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                {(() => {
-                  const lanes = lanesData || [];
-                  const bestLane = lanes.length > 0 ? lanes.reduce((a, b) => a.margin_pct > b.margin_pct ? a : b) : null;
-                  const worstLane = lanes.length > 0 ? lanes.reduce((a, b) => a.margin_pct < b.margin_pct ? a : b) : null;
-
-                  return [
-                    { label: 'Total Lanes', value: lanes.length, color: 'var(--text-primary)' },
-                    { label: 'Best Margin Lane', value: bestLane ? `${bestLane.route} (${(bestLane.margin_pct || 0).toFixed(1)}%)` : 'N/A', color: 'var(--status-success)' },
-                    { label: 'Worst Margin Lane', value: worstLane ? `${worstLane.route} (${(worstLane.margin_pct || 0).toFixed(1)}%)` : 'N/A', color: 'var(--status-danger)' },
-                  ].map(m => (
-                    <div key={m.label} className="card metric-card">
-                      <div className="card-header"><span className="card-title">{m.label}</span></div>
-                      <div style={{ fontSize: 16, fontWeight: 500, color: m.color, marginTop: 8 }}>{m.value}</div>
-                    </div>
-                  ));
-                })()}
-              </div>
-
-              {/* Main Table */}
-              {lanesData && lanesData.length > 0 ? (
-                <div className="card table-card">
-                  <div className="card-header" style={{ marginBottom: 16 }}>
-                    <span className="card-title">Route Performance</span>
-                  </div>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Route</th>
-                        <th className="text-right">Loads</th>
-                        <th className="text-right">Revenue</th>
-                        <th className="text-right">Total Cost</th>
-                        <th className="text-right">Margin%</th>
-                        <th className="text-right">Rev/Load</th>
-                        <th className="text-right">Fuel/km</th>
-                        <th className="text-right">Avg Days</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lanesData.map((r, idx) => (
-                        <tr key={idx}>
-                          <td>{r.route}</td>
-                          <td className="mono text-right">{r.trips}</td>
-                          <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                            {formatCurrency(r.avg_revenue * r.trips)}
-                          </td>
-                          <td className="mono text-right">{formatCurrency(r.avg_cost * r.trips)}</td>
-                          <td className="mono text-right" style={{
-                            color: r.margin_pct > 15 ? 'var(--status-success)' : r.margin_pct > 5 ? 'var(--status-warning)' : 'var(--status-danger)',
-                            fontWeight: 600
-                          }}>
-                            {(r.margin_pct || 0).toFixed(1)}%
-                          </td>
-                          <td className="mono text-right">{formatCurrency(r.revenue_per_load || r.avg_revenue)}</td>
-                          <td className="mono text-right">{r.fuel_per_km != null ? `R${(r.fuel_per_km || 0).toFixed(2)}` : '—'}</td>
-                          <td className="mono text-right">{r.avg_days || 0}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <EmptyState message="No route data for this period. Routes will appear once loads are completed." />
-              )}
+              {(() => {
+                const routes = getRouteAnalytics();
+                return (
+                  <>
+                    {routes.length > 0 ? (
+                      <div className="card table-card">
+                        <div className="card-header" style={{ marginBottom: 16 }}>
+                          <span className="card-title">Top 10 Routes by Revenue</span>
+                        </div>
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>Route</th>
+                              <th className="text-right">Trips</th>
+                              <th className="text-right">Revenue</th>
+                              <th className="text-right">Avg/Trip</th>
+                              <th className="text-right">Rev/km</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {routes.map((r, idx) => (
+                              <tr key={idx}>
+                                <td>{r.route}</td>
+                                <td className="mono text-right">{r.trips}</td>
+                                <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+                                  {formatCurrency(r.totalRevenue)}
+                                </td>
+                                <td className="mono text-right">{formatCurrency(r.avgRevenue)}</td>
+                                <td className="mono text-right">
+                                  {r.revenuePerKm > 0 ? formatCurrency(r.revenuePerKm) : '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <EmptyState message="No route data available. Routes will appear once loads are completed." />
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
 
@@ -840,132 +690,123 @@ export default function Insights() {
 
               {fleetSubTab === 'vehicles' ? (
                 <>
-                  {/* Vehicle Summary */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                    {(() => {
-                      const vehicles = fleetData?.vehicles || [];
-                      const avgUtil = vehicles.length > 0 ? vehicles.reduce((sum, v) => sum + (v.utilisation || 0), 0) / vehicles.length : 0;
-                      const topVehicle = vehicles.length > 0 ? vehicles.reduce((a, b) => a.revenue > b.revenue ? a : b) : null;
-
-                      return [
-                        { label: 'Total Vehicles', value: vehicles.length, color: 'var(--text-primary)' },
-                        { label: 'Avg Utilisation', value: `${(avgUtil || 0).toFixed(1)}%`, color: avgUtil > 70 ? 'var(--status-success)' : avgUtil > 40 ? 'var(--status-warning)' : 'var(--status-danger)' },
-                        { label: 'Highest Revenue Vehicle', value: topVehicle ? topVehicle.registration : 'N/A', color: 'var(--accent-primary)' },
-                      ].map(m => (
-                        <div key={m.label} className="card metric-card">
-                          <div className="card-header"><span className="card-title">{m.label}</span></div>
-                          <div style={{ fontSize: 16, fontWeight: 500, color: m.color, marginTop: 8 }}>{m.value}</div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-
-                  {/* Vehicle Table */}
-                  {fleetData?.vehicles && fleetData.vehicles.length > 0 ? (
+                  {vehicles.length > 0 ? (
                     <div className="card table-card">
                       <div className="card-header" style={{ marginBottom: 16 }}>
-                        <span className="card-title">Vehicle Performance</span>
+                        <span className="card-title">Vehicles by Revenue</span>
                       </div>
                       <table className="data-table">
                         <thead>
                           <tr>
                             <th>Vehicle</th>
-                            <th>Make/Model</th>
+                            <th>Status</th>
                             <th className="text-right">Revenue</th>
-                            <th className="text-right">Costs</th>
-                            <th className="text-right">Margin%</th>
-                            <th className="text-right">Utilisation%</th>
-                            <th className="text-right">Loads</th>
-                            <th className="text-right">Downtime</th>
+                            <th className="text-right">Health Score</th>
+                            <th className="text-right">Trips</th>
+                            <th className="text-right">Utilisation %</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {fleetData.vehicles.map((v, idx) => (
-                            <tr key={idx}>
+                          {[...vehicles].sort((a, b) => (b.revenue_generated || 0) - (a.revenue_generated || 0)).map((v) => (
+                            <tr
+                              key={v.id}
+                              onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
+                              style={{ cursor: 'pointer' }}
+                            >
                               <td>{v.registration}</td>
-                              <td>{v.make_model || '—'}</td>
+                              <td>
+                                <span style={{
+                                  fontSize: 10,
+                                  fontFamily: 'var(--font-mono)',
+                                  padding: '2px 6px',
+                                  borderRadius: 2,
+                                  background: v.status === 'ACTIVE' ? 'var(--status-success)' : 'var(--bg-surface-hover)',
+                                  color: v.status === 'ACTIVE' ? 'white' : 'var(--text-tertiary)',
+                                }}>
+                                  {v.status}
+                                </span>
+                              </td>
                               <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                                {formatCurrency(v.revenue)}
+                                {formatCurrency(v.revenue_generated || 0)}
                               </td>
-                              <td className="mono text-right">{formatCurrency(v.costs || 0)}</td>
-                              <td className="mono text-right">{(v.margin_pct || 0).toFixed(1)}%</td>
-                              <td className="mono text-right" style={{
-                                color: (v.utilisation || 0) > 70 ? 'var(--status-success)' : (v.utilisation || 0) > 40 ? 'var(--status-warning)' : 'var(--status-danger)'
-                              }}>
-                                {(v.utilisation || 0).toFixed(1)}%
+                              <td className="text-right">
+                                {v.health_score !== undefined && (
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                                    <div style={{ width: 60, height: 6, background: 'var(--bg-surface-hover)', borderRadius: 3, overflow: 'hidden' }}>
+                                      <div style={{
+                                        width: `${v.health_score}%`,
+                                        height: '100%',
+                                        background: v.health_score > 70 ? 'var(--status-success)' : v.health_score > 40 ? 'var(--status-warning)' : 'var(--status-danger)'
+                                      }} />
+                                    </div>
+                                    <span className="mono" style={{ fontSize: 11 }}>{v.health_score}%</span>
+                                  </div>
+                                )}
                               </td>
-                              <td className="mono text-right">{v.trips}</td>
-                              <td className="mono text-right">{v.downtime || 0}d</td>
+                              <td className="mono text-right">{v.trip_count || 0}</td>
+                              <td className="mono text-right">{v.utilization_pct !== undefined ? `${v.utilization_pct.toFixed(1)}%` : '—'}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
                   ) : (
-                    <EmptyState message="No vehicle data available" />
+                    <EmptyState message="No vehicles available" />
                   )}
                 </>
               ) : (
                 <>
-                  {/* Driver Summary */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                    {(() => {
-                      const drivers = driversData?.drivers || [];
-                      const avgLoads = drivers.length > 0 ? drivers.reduce((sum, d) => sum + d.trips, 0) / drivers.length : 0;
-                      const bestOTD = drivers.length > 0 ? drivers.reduce((a, b) => (a.otd_pct || 0) > (b.otd_pct || 0) ? a : b) : null;
-
-                      return [
-                        { label: 'Total Drivers', value: drivers.length, color: 'var(--text-primary)' },
-                        { label: 'Avg Loads/Driver', value: (avgLoads || 0).toFixed(1), color: 'var(--text-primary)' },
-                        { label: 'Best OTD Rate', value: bestOTD ? `${bestOTD.driver_name} (${(bestOTD.otd_pct || 0).toFixed(1)}%)` : 'N/A', color: 'var(--status-success)' },
-                      ].map(m => (
-                        <div key={m.label} className="card metric-card">
-                          <div className="card-header"><span className="card-title">{m.label}</span></div>
-                          <div style={{ fontSize: 16, fontWeight: 500, color: m.color, marginTop: 8 }}>{m.value}</div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-
-                  {/* Driver Table */}
-                  {driversData?.drivers && driversData.drivers.length > 0 ? (
+                  {drivers.length > 0 ? (
                     <div className="card table-card">
                       <div className="card-header" style={{ marginBottom: 16 }}>
-                        <span className="card-title">Driver Performance</span>
+                        <span className="card-title">Drivers by Revenue</span>
                       </div>
                       <table className="data-table">
                         <thead>
                           <tr>
                             <th>Driver</th>
+                            <th>Status</th>
                             <th className="text-right">Revenue</th>
-                            <th className="text-right">Loads</th>
-                            <th className="text-right">OTD%</th>
-                            <th className="text-right">Avg Fuel/Trip</th>
-                            <th className="text-right">Rating</th>
+                            <th className="text-right">Avg/Trip</th>
+                            <th className="text-right">Trips</th>
+                            <th className="text-right">Experience</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {driversData.drivers.map((d, idx) => (
-                            <tr key={idx}>
-                              <td>{d.driver_name}</td>
+                          {[...drivers].sort((a, b) => (b.revenue_generated || 0) - (a.revenue_generated || 0)).map((d) => (
+                            <tr
+                              key={d.id}
+                              onClick={() => navigate(`/fleet/drivers/${d.id}/financial`)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <td>{d.full_name}</td>
+                              <td>
+                                <span style={{
+                                  fontSize: 10,
+                                  fontFamily: 'var(--font-mono)',
+                                  padding: '2px 6px',
+                                  borderRadius: 2,
+                                  background: d.status === 'ACTIVE' ? 'var(--status-success)' : 'var(--bg-surface-hover)',
+                                  color: d.status === 'ACTIVE' ? 'white' : 'var(--text-tertiary)',
+                                }}>
+                                  {d.status}
+                                </span>
+                              </td>
                               <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                                {formatCurrency(d.revenue)}
+                                {formatCurrency(d.revenue_generated || 0)}
                               </td>
-                              <td className="mono text-right">{d.trips}</td>
-                              <td className="mono text-right" style={{
-                                color: (d.otd_pct || 0) > 90 ? 'var(--status-success)' : (d.otd_pct || 0) > 70 ? 'var(--status-warning)' : 'var(--status-danger)'
-                              }}>
-                                {(d.otd_pct || 0).toFixed(1)}%
+                              <td className="mono text-right">
+                                {d.trip_count ? formatCurrency((d.revenue_generated || 0) / d.trip_count) : '—'}
                               </td>
-                              <td className="mono text-right">{formatCurrency(d.avg_fuel_per_trip || 0)}</td>
-                              <td className="mono text-right">{(d.rating || 0).toFixed(1)}</td>
+                              <td className="mono text-right">{d.trip_count || 0}</td>
+                              <td className="mono text-right">{d.experience_years ? `${d.experience_years}y` : '—'}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
                   ) : (
-                    <EmptyState message="No driver data available" />
+                    <EmptyState message="No drivers available" />
                   )}
                 </>
               )}
@@ -975,211 +816,55 @@ export default function Insights() {
           {/* TAB 5: QUOTES & PIPELINE */}
           {tab === 'quotes' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {quotesData ? (
-                <>
-                  {/* KPI Cards */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-                    {[
-                      { label: 'Total Quotes', value: quotesData.total_quotes || 0, color: 'var(--text-primary)' },
-                      { label: 'Conversion Rate%', value: `${(quotesData.conversion_rate || 0).toFixed(1)}%`, color: 'var(--status-success)' },
-                      { label: 'Avg Quote Value', value: formatCurrency(quotesData.avg_quote_value || 0), color: 'var(--accent-primary)' },
-                      { label: 'Revenue Guard Flag Rate%', value: `${(quotesData.revenue_guard_flag_rate || 0).toFixed(1)}%`, color: 'var(--status-warning)' },
-                    ].map(m => (
-                      <div key={m.label} className="card metric-card">
-                        <div className="card-header"><span className="card-title">{m.label}</span></div>
-                        <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Conversion Funnel */}
-                  {quotesData.funnel && (
-                    <div className="card" style={{ padding: 20 }}>
-                      <div className="card-header"><span className="card-title">Conversion Funnel</span></div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
-                        {[
-                          { label: 'Quotes Sent', value: quotesData.funnel.quotes_sent },
-                          { label: 'Customer Accepted', value: quotesData.funnel.customer_accepted },
-                          { label: 'Loads Booked', value: quotesData.funnel.loads_booked },
-                          { label: 'Loads Completed', value: quotesData.funnel.loads_completed },
-                          { label: 'Invoiced', value: quotesData.funnel.invoiced },
-                        ].map((stage, idx, arr) => (
-                          <div key={stage.label} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div style={{ flex: 1, textAlign: 'center' }}>
-                              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 6, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{stage.label}</div>
-                              <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{stage.value}</div>
-                            </div>
-                            {idx < arr.length - 1 && <div style={{ fontSize: 20, color: 'var(--text-tertiary)' }}>→</div>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Revenue Guard Performance */}
-                  {quotesData.revenue_guard && (
-                    <div className="card" style={{ padding: 20 }}>
-                      <div className="card-header"><span className="card-title">Revenue Guard Performance</span></div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 16 }}>
-                        {[
-                          { label: 'Loads Flagged', value: quotesData.revenue_guard.loads_flagged },
-                          { label: 'Override Rate%', value: `${quotesData.revenue_guard.override_rate.toFixed(1)}%` },
-                          { label: 'Money Saved', value: formatCurrency(quotesData.revenue_guard.money_saved) },
-                          { label: 'Override Losses', value: formatCurrency(quotesData.revenue_guard.override_losses) },
-                        ].map(m => (
-                          <div key={m.label}>
-                            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{m.label}</div>
-                            <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Quote Accuracy */}
-                  {quotesData.quote_accuracy && quotesData.quote_accuracy.length > 0 && (
-                    <div className="card table-card">
-                      <div className="card-header" style={{ marginBottom: 16 }}>
-                        <span className="card-title">Quote Accuracy</span>
-                      </div>
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Corridor</th>
-                            <th className="text-right">Quoted Margin</th>
-                            <th className="text-right">Actual Margin</th>
-                            <th className="text-right">Variance</th>
-                            <th className="text-right">Accuracy Score</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {quotesData.quote_accuracy.map((q, idx) => (
-                            <tr key={idx}>
-                              <td>{q.corridor}</td>
-                              <td className="mono text-right">{q.quoted_margin.toFixed(1)}%</td>
-                              <td className="mono text-right">{q.actual_margin.toFixed(1)}%</td>
-                              <td className="mono text-right" style={{
-                                color: q.variance < 0 ? 'var(--status-danger)' : 'var(--status-success)'
-                              }}>
-                                {q.variance > 0 ? '+' : ''}{q.variance.toFixed(1)}%
-                              </td>
-                              <td className="mono text-right">{q.accuracy_score.toFixed(1)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <EmptyState message="Quote analytics will appear once the AI Quoting Engine processes your first quote." />
-              )}
+              <EmptyState message="Connect your quoting pipeline — quote analytics will appear once integrated." />
             </div>
           )}
 
           {/* TAB 6: CASH FLOW */}
           {tab === 'cashflow' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* KPI Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
-                {[
-                  { label: 'Total Outstanding', value: formatCurrency(cashflowData?.total_outstanding || 0), color: 'var(--accent-primary)' },
-                  { label: 'Overdue', value: formatCurrency(cashflowData?.total_overdue || 0), color: 'var(--status-danger)' },
-                  { label: 'Avg DSO', value: `${Math.round(cashflowData?.avg_dso || 0)}d`, color: 'var(--text-primary)' },
-                  { label: 'Next 30d Projected', value: formatCurrency(cashflowData?.next_30d_projected || 0), color: 'var(--status-success)' },
-                  { label: 'Fast Pay Fees MTD', value: formatCurrency(cashflowData?.fast_pay_fees_mtd || 0), color: 'var(--status-warning)' },
-                ].map(m => (
-                  <div key={m.label} className="card metric-card">
-                    <div className="card-header"><span className="card-title">{m.label}</span></div>
-                    <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Invoice Aging Buckets */}
-              {cashflowData?.aging_buckets && (
-                <div className="card" style={{ padding: 20 }}>
-                  <div className="card-header"><span className="card-title">Invoice Aging</span></div>
-                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {[
-                      { label: 'Current', data: cashflowData.aging_buckets.current, color: 'var(--status-success)' },
-                      { label: '1-30d', data: cashflowData.aging_buckets.days_1_30, color: 'var(--status-warning)' },
-                      { label: '31-60d', data: cashflowData.aging_buckets.days_31_60, color: 'var(--status-warning)' },
-                      { label: '61-90d', data: cashflowData.aging_buckets.days_61_90, color: 'var(--status-danger)' },
-                      { label: '90d+', data: cashflowData.aging_buckets.days_90_plus, color: 'var(--status-danger)' },
-                    ].map(bucket => {
-                      const totalAmount = Object.values(cashflowData.aging_buckets!).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
-                      const pct = totalAmount > 0 ? (bucket.data.amount / totalAmount) * 100 : 0;
-                      return (
-                        <div key={bucket.label}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <div>
-                              <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{bucket.label}</span>
-                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 8, fontFamily: 'var(--font-mono)' }}>
-                                ({bucket.data.count} {bucket.data.count === 1 ? 'invoice' : 'invoices'})
-                              </span>
-                            </div>
-                            <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
-                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{pct.toFixed(1)}%</span>
-                              <span style={{ fontSize: 15, fontWeight: 600, color: bucket.color, fontFamily: 'var(--font-mono)' }}>
-                                {formatCurrency(bucket.data.amount)}
-                              </span>
-                            </div>
-                          </div>
-                          <div style={{ height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${pct}%`, background: bucket.color, borderRadius: 2 }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Customer Payment Health */}
-              {cashflowData?.customer_payment_health && cashflowData.customer_payment_health.length > 0 && (
+              {/* Weekly Cash Flow Forecast */}
+              {cashflowData?.forecast && cashflowData.forecast.length > 0 && (
                 <div className="card table-card">
                   <div className="card-header" style={{ marginBottom: 16 }}>
-                    <span className="card-title">Customer Payment Health</span>
+                    <span className="card-title">Weekly Cash Flow Forecast (Next 4 Weeks)</span>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                      Net: <span style={{
+                        color: cashflowData.forecast.reduce((sum, w) => sum + w.net, 0) > 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                        fontWeight: 600
+                      }}>
+                        {formatCurrency(cashflowData.forecast.reduce((sum, w) => sum + w.net, 0))}
+                      </span>
+                    </div>
                   </div>
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Customer</th>
-                        <th className="text-right">Revenue</th>
-                        <th className="text-right">Invoices</th>
-                        <th className="text-right">Avg Pay Days</th>
-                        <th className="text-right">DSO</th>
-                        <th className="text-right">Overdue Count</th>
-                        <th className="text-right">Risk Tier</th>
+                        <th>Week</th>
+                        <th className="text-right">Expected In</th>
+                        <th className="text-right">Expected Out</th>
+                        <th className="text-right">Net</th>
+                        <th className="text-right">Running Balance</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {cashflowData.customer_payment_health.map((c, idx) => (
+                      {cashflowData.forecast.slice(0, 4).map((w, idx) => (
                         <tr key={idx}>
-                          <td>{c.customer_name}</td>
-                          <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                            {formatCurrency(c.revenue)}
+                          <td className="mono">{w.week}</td>
+                          <td className="mono text-right" style={{ color: 'var(--status-success)' }}>
+                            {formatCurrency(w.expected_in)}
                           </td>
-                          <td className="mono text-right">{c.invoice_count}</td>
-                          <td className="mono text-right">{c.avg_payment_days}d</td>
-                          <td className="mono text-right">{c.dso}d</td>
+                          <td className="mono text-right" style={{ color: 'var(--status-danger)' }}>
+                            {formatCurrency(w.expected_out)}
+                          </td>
                           <td className="mono text-right" style={{
-                            color: c.overdue_count > 0 ? 'var(--status-danger)' : 'var(--text-tertiary)'
+                            color: w.net > 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                            fontWeight: 600
                           }}>
-                            {c.overdue_count}
+                            {formatCurrency(w.net)}
                           </td>
-                          <td className="text-right">
-                            <span style={{
-                              fontFamily: 'var(--font-mono)',
-                              fontSize: 10,
-                              color: getRiskTierColor(c.risk_tier),
-                              padding: '2px 6px',
-                              background: 'var(--bg-surface-hover)',
-                              borderRadius: 2
-                            }}>
-                              {c.risk_tier}
-                            </span>
+                          <td className="mono text-right" style={{ fontWeight: 600 }}>
+                            {formatCurrency(w.running_balance)}
                           </td>
                         </tr>
                       ))}
@@ -1188,41 +873,48 @@ export default function Insights() {
                 </div>
               )}
 
-              {/* Cash Flow Forecast */}
-              {cashflowData?.cash_flow_forecast && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                  {[
-                    { label: 'Next 30d', value: formatCurrency(cashflowData.cash_flow_forecast.next_30d) },
-                    { label: 'Next 31-60d', value: formatCurrency(cashflowData.cash_flow_forecast.next_31_60d) },
-                    { label: 'Next 61-90d', value: formatCurrency(cashflowData.cash_flow_forecast.next_61_90d) },
-                  ].map(m => (
-                    <div key={m.label} className="card" style={{ padding: 16 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{m.label}</div>
-                      <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Invoice Aging */}
+              {(() => {
+                const aging = getInvoiceAging();
+                const totalAmount = aging.current.amount + aging.days31_60.amount + aging.days61_90.amount + aging.days90plus.amount;
 
-              {/* Fast Pay Cost Summary */}
-              {cashflowData?.fast_pay_summary && (
-                <div className="card" style={{ padding: 20 }}>
-                  <div className="card-header"><span className="card-title">Fast Pay Cost Summary</span></div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 16 }}>
-                    {[
-                      { label: 'Total Fast Pay Fees', value: formatCurrency(cashflowData.fast_pay_summary.total_fees) },
-                      { label: 'As % of Revenue', value: `${cashflowData.fast_pay_summary.fee_pct_of_revenue.toFixed(2)}%` },
-                      { label: 'Count of Invoices', value: cashflowData.fast_pay_summary.invoice_count },
-                      { label: 'Avg Discount', value: `${cashflowData.fast_pay_summary.avg_discount.toFixed(2)}%` },
-                    ].map(m => (
-                      <div key={m.label}>
-                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{m.label}</div>
-                        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
-                      </div>
-                    ))}
+                return totalAmount > 0 ? (
+                  <div className="card" style={{ padding: 20 }}>
+                    <div className="card-header"><span className="card-title">Invoice Aging</span></div>
+                    <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {[
+                        { label: 'Current (0-30 days)', data: aging.current, color: 'var(--status-success)' },
+                        { label: 'Overdue 31-60', data: aging.days31_60, color: 'var(--status-warning)' },
+                        { label: 'Overdue 61-90', data: aging.days61_90, color: 'var(--status-danger)' },
+                        { label: '90+ days', data: aging.days90plus, color: 'var(--status-danger)' },
+                      ].map(bucket => {
+                        const pct = totalAmount > 0 ? (bucket.data.amount / totalAmount) * 100 : 0;
+                        return (
+                          <div key={bucket.label}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                              <div>
+                                <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{bucket.label}</span>
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 8, fontFamily: 'var(--font-mono)' }}>
+                                  ({bucket.data.count} {bucket.data.count === 1 ? 'invoice' : 'invoices'})
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{pct.toFixed(1)}%</span>
+                                <span style={{ fontSize: 15, fontWeight: 600, color: bucket.color, fontFamily: 'var(--font-mono)' }}>
+                                  {formatCurrency(bucket.data.amount)}
+                                </span>
+                              </div>
+                            </div>
+                            <div style={{ height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${pct}%`, background: bucket.color, borderRadius: 2 }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                ) : null;
+              })()}
             </div>
           )}
         </>

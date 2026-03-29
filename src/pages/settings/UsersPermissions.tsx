@@ -27,11 +27,13 @@ const sectionTitleStyle: React.CSSProperties = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  admin: 'var(--status-danger)', // red
-  manager: 'var(--status-warning)', // orange
-  operator: '#3B82F6', // blue
-  viewer: '#9CA3AF', // grey
-  driver: 'var(--status-success)', // green
+  admin: 'var(--status-danger)',
+  manager: 'var(--status-warning)',
+  operator: '#3B82F6',
+  dispatcher: '#8B5CF6',
+  viewer: '#9CA3AF',
+  driver: 'var(--status-success)',
+  customer: 'var(--text-tertiary)',
 };
 
 interface User {
@@ -276,6 +278,7 @@ export function UsersPermissions() {
                 <option value="admin">Admin</option>
                 <option value="manager">Manager</option>
                 <option value="operator">Operator</option>
+                <option value="dispatcher">Dispatcher</option>
                 <option value="viewer">Viewer</option>
                 <option value="driver">Driver</option>
               </select>
@@ -344,6 +347,7 @@ export function UsersPermissions() {
                       <option value="admin">ADMIN</option>
                       <option value="manager">MANAGER</option>
                       <option value="operator">OPERATOR</option>
+                      <option value="dispatcher">DISPATCHER</option>
                       <option value="viewer">VIEWER</option>
                       <option value="driver">DRIVER</option>
                     </select>

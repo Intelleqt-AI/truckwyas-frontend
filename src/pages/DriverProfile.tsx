@@ -353,23 +353,39 @@ export default function DriverProfile() {
               ))}
             </div>
 
-            {/* Compliance & Docs */}
+            {/* Monthly Earnings */}
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>COMPLIANCE & DOCS</div>
-              {[
-                { label: 'LICENSE NUMBER', value: driver.license_number || '—', alert: false },
-                { label: 'LICENSE STATE', value: driver.license_state || '—', alert: false },
-                { label: 'LICENSE EXPIRY', value: driver.license_expiry?.slice(0, 10) || '—', alert: driver.license_expiry && new Date(driver.license_expiry) < new Date() },
-                { label: 'MEDICAL CARD EXPIRY', value: driver.medical_card_expiry?.slice(0, 10) || '—', alert: driver.medical_card_expiry && new Date(driver.medical_card_expiry) < new Date() },
-                { label: 'HIRE DATE', value: driver.hire_date?.slice(0, 10) || '—', alert: false },
-                { label: 'EMERGENCY CONTACT', value: driver.emergency_contact || '—', alert: false },
-                { label: 'EMERGENCY PHONE', value: driver.emergency_phone || '—', alert: false },
-              ].map(r => (
-                <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
-                  <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: r.alert ? 'var(--status-danger)' : 'var(--text-primary)' }}>{r.value}</span>
-                </div>
-              ))}
+              <div className="card-title" style={{ marginBottom: 16 }}>MONTHLY EARNINGS</div>
+              {(() => {
+                const monthMap: Record<string, number> = {};
+                loads.forEach((l: any) => {
+                  if (!l.created_at) return;
+                  const d = new Date(l.created_at);
+                  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                  monthMap[key] = (monthMap[key] || 0) + parseFloat(l.total_amount || '0');
+                });
+                const months = Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0])).slice(-6);
+                const maxVal = Math.max(...months.map(([, v]) => v), 1);
+                if (months.length === 0) return (
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '20px 0', textAlign: 'center' }}>No data available</div>
+                );
+                return months.map(([key, val]) => {
+                  const [yr, mo] = key.split('-');
+                  const label = new Date(parseInt(yr), parseInt(mo) - 1).toLocaleString('en-ZA', { month: 'short', year: '2-digit' });
+                  const pct = (val / maxVal) * 100;
+                  return (
+                    <div key={key} style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{label}</span>
+                        <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>R {val.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                      </div>
+                      <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
+                        <div style={{ height: 4, width: `${pct}%`, background: 'var(--accent-primary)', borderRadius: 2, transition: 'width 0.5s ease' }} />
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
 
             {/* Recent Loads */}

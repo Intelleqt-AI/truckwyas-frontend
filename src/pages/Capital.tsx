@@ -197,7 +197,7 @@ export default function Capital() {
           alignItems: 'center',
           gap: 8,
         }}>
-          ✓ {successMessage}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 4 }}><polyline points="20 6 9 17 4 12"/></svg> {successMessage}
         </div>
       )}
 

@@ -160,9 +160,9 @@ type PeriodType = 'THIS_MONTH' | 'LAST_MONTH' | 'LAST_3M' | 'LAST_6M' | 'LAST_12
 const TABS = [
   { id: 'briefing' as TabType, label: 'Briefing' },
   { id: 'profitability' as TabType, label: 'Profitability' },
-  { id: 'cash' as TabType, label: 'Cash Intelligence' },
-  { id: 'fleet' as TabType, label: 'Fleet Intelligence' },
-  { id: 'lanes' as TabType, label: 'Lanes & Load Intelligence' },
+  { id: 'cash' as TabType, label: 'Cash Flow' },
+  { id: 'fleet' as TabType, label: 'Fleet' },
+  { id: 'lanes' as TabType, label: 'Lanes' },
 ];
 
 const PERIOD_OPTIONS: { id: PeriodType; label: string }[] = [
@@ -256,7 +256,14 @@ export default function Insights() {
             setFinanceData(finance);
             setLoads(loadsData?.results || []);
             setExpenses(expensesData?.results || []);
-            setVehicles(vehiclesData?.results || []);
+            setVehicles((vehiclesData?.results || []).map((v: any) => ({
+              ...v,
+              uptime_percentage: parseFloat(v.uptime_percentage || '0'),
+              cost_per_km: parseFloat(v.cost_per_km || '0'),
+              margin_per_trip: parseFloat(v.margin_per_trip || '0'),
+              capacity: parseFloat(v.capacity || '0'),
+              mileage: parseFloat(v.mileage || '0'),
+            })));
             setDrivers(driversData?.results || []);
             break;
 
@@ -277,7 +284,14 @@ export default function Insights() {
               fetchData('api/v1/drivers/?page_size=50').catch(() => ({ results: [] })),
               fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
             ]);
-            setVehicles(veh?.results || []);
+            setVehicles((veh?.results || []).map((v: any) => ({
+              ...v,
+              uptime_percentage: parseFloat(v.uptime_percentage || '0'),
+              cost_per_km: parseFloat(v.cost_per_km || '0'),
+              margin_per_trip: parseFloat(v.margin_per_trip || '0'),
+              capacity: parseFloat(v.capacity || '0'),
+              mileage: parseFloat(v.mileage || '0'),
+            })));
             setDrivers(drv?.results || []);
             setExpenses(exp?.results || []);
             break;

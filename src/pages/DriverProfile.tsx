@@ -52,10 +52,12 @@ export default function DriverProfile() {
     : firstName || driver.name || ud.name || ud.username || `Driver ${driver.id}`;
 
   const loads = Array.isArray(loadsData) ? loadsData : (loadsData?.results || []);
-  const delivered = loads.filter((l: any) => l.status === 'DELIVERED');
-  const totalRevenue = delivered.reduce((s: number, l: any) => s + parseFloat(l.total_amount || '0'), 0);
-  const totalDistance = delivered.reduce((s: number, l: any) => s + parseFloat(l.distance || '0'), 0);
-  const avgRevPerTrip = delivered.length > 0 ? totalRevenue / delivered.length : 0;
+  const completedLoads = loads.filter((l: any) => l.status === 'DELIVERED' || l.status === 'INVOICED');
+  const totalRevenue = completedLoads.reduce((s: number, l: any) => s + parseFloat(l.total_amount || '0'), 0);
+  const totalTrips = loads.length;
+  const completedTrips = completedLoads.length;
+  const avgRevPerTrip = completedTrips > 0 ? totalRevenue / completedTrips : 0;
+  const totalDistance = completedLoads.reduce((s: number, l: any) => s + parseFloat(l.distance || '0'), 0);
 
   return (
     <div>
@@ -115,19 +117,30 @@ export default function DriverProfile() {
 
       {/* KPI strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        {[
-          { label: 'Total Trips', value: driver.total_trips ?? delivered.length },
-          { label: 'Revenue Generated', value: formatZAR(driver.revenue_generated ?? totalRevenue), color: 'var(--accent-primary)' },
-          { label: 'Avg per Trip', value: formatZAR(driver.avg_revenue_per_trip ?? avgRevPerTrip) },
-          { label: 'Total Distance', value: `${(driver.total_distance ?? Math.round(totalDistance)).toLocaleString('en-ZA')} km` },
-        ].map(k => (
-          <div key={k.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{k.label}</span></div>
-            <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: k.color || 'var(--text-primary)' }}>
-              {k.value}
-            </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Total Revenue</span></div>
+          <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>
+            {formatZAR(totalRevenue)}
           </div>
-        ))}
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Total Trips</span></div>
+          <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+            {totalTrips}
+          </div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Avg Revenue per Trip</span></div>
+          <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+            {formatZAR(avgRevPerTrip)}
+          </div>
+        </div>
+        <div className="card metric-card">
+          <div className="card-header"><span className="card-title">Completed Trips</span></div>
+          <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+            {completedTrips}
+          </div>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
@@ -160,7 +173,7 @@ export default function DriverProfile() {
             { label: 'ON-TIME RATE', value: driver.on_time_rate ? `${driver.on_time_rate}%` : '—' },
             { label: 'AVG RATING', value: driver.avg_rating ? `★ ${driver.avg_rating}` : '—' },
             { label: 'TRIPS THIS MONTH', value: driver.trips_this_month ?? 0 },
-            { label: 'TOTAL TRIPS', value: driver.total_trips ?? delivered.length },
+            { label: 'TOTAL TRIPS', value: driver.total_trips ?? totalTrips },
             { label: 'TOTAL DISTANCE', value: driver.total_distance ? `${parseFloat(driver.total_distance).toLocaleString('en-ZA')} km` : totalDistance > 0 ? `${Math.round(totalDistance).toLocaleString('en-ZA')} km` : '—' },
             { label: 'LICENSE EXPIRY', value: driver.license_expiry?.slice(0, 10) || '—', alert: driver.license_expiry && new Date(driver.license_expiry) < new Date() },
           ].map(r => (

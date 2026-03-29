@@ -19,7 +19,7 @@ interface Vehicle {
 }
 
 const formatZAR = (v: number) =>
-  'R ' + v.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr);

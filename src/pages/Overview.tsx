@@ -268,8 +268,8 @@ export default function Overview() {
             );
           })()}
           <div style={{ display: 'flex', gap: 20, marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-            <span>Net Margin <span style={{ color: 'var(--accent-primary)' }}>{financeData?.net_margin_percent != null ? `${financeData.net_margin_percent.toFixed(1)}%` : '—'}</span></span>
-            <span>Fuel/Rev ratio <span style={{ color: 'var(--status-warning)' }}>{financeData?.monthly_trend?.length > 0 ? `${Math.round((financeData.monthly_trend.at(-1).expenses / Math.max(financeData.monthly_trend.at(-1).revenue, 1)) * 100)}%` : '—'}</span></span>
+            <span>Net Margin <span style={{ color: 'var(--accent-primary)' }}>{financeData?.net_margin_percent != null ? `${(financeData.net_margin_percent || 0).toFixed(1)}%` : '—'}</span></span>
+            <span>Fuel/Rev ratio <span style={{ color: 'var(--status-warning)' }}>{financeData?.monthly_trend?.length > 0 ? `${Math.round(((financeData.monthly_trend.at(-1)?.expenses || 0) / Math.max(financeData.monthly_trend.at(-1)?.revenue || 1, 1)) * 100)}%` : '—'}</span></span>
             <span>Trend <span style={{ color: 'var(--status-success)' }}>↑ improving</span></span>
           </div>
         </div>

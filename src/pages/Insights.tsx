@@ -491,17 +491,17 @@ export default function Insights() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 16 }}>
                 {(() => {
                   const finance = commandData?.finance;
-                  const opRatio = finance?.operating_ratio || (finance?.expenses_period && finance?.revenue_period ? (finance.expenses_period / finance.revenue_period) * 100 : 0);
+                  const opRatio = finance?.operating_ratio || (finance?.expenses_period && finance?.revenue_period ? (finance.expenses_period / finance.revenue_period) * 100 : 0) || 0;
                   const fleetUtil = finance?.fleet_utilisation || 0;
                   const opRatioColor = opRatio < 85 ? 'var(--status-success)' : opRatio < 95 ? 'var(--status-warning)' : 'var(--status-danger)';
                   const utilColor = fleetUtil > 70 ? 'var(--status-success)' : fleetUtil > 40 ? 'var(--status-warning)' : 'var(--status-danger)';
 
                   return [
                     { label: 'Revenue This Month', value: formatCurrency(finance?.revenue_period || 0), color: 'var(--accent-primary)' },
-                    { label: 'Operating Ratio', value: `${opRatio.toFixed(1)}%`, color: opRatioColor },
+                    { label: 'Operating Ratio', value: `${(opRatio || 0).toFixed(1)}%`, color: opRatioColor },
                     { label: 'Active Loads', value: commandData?.activeLoads || 0, color: 'var(--text-primary)' },
                     { label: 'Outstanding Invoices', value: formatCurrency(finance?.outstanding_invoices_total || 0), color: 'var(--status-warning)' },
-                    { label: 'Fleet Utilisation', value: `${fleetUtil.toFixed(1)}%`, color: utilColor },
+                    { label: 'Fleet Utilisation', value: `${(fleetUtil || 0).toFixed(1)}%`, color: utilColor },
                     { label: 'Overdue Invoices', value: formatCurrency(finance?.overdue_invoices_total || 0), color: 'var(--status-danger)' },
                   ].map(m => (
                     <div key={m.label} className="card metric-card">
@@ -577,7 +577,7 @@ export default function Insights() {
                           <td className="mono text-right" style={{
                             color: r.margin_pct > 15 ? 'var(--status-success)' : r.margin_pct > 5 ? 'var(--status-warning)' : 'var(--status-danger)'
                           }}>
-                            {r.margin_pct.toFixed(1)}%
+                            {(r.margin_pct || 0).toFixed(1)}%
                           </td>
                         </tr>
                       ))}
@@ -596,7 +596,7 @@ export default function Insights() {
                 {[
                   { label: 'Gross Revenue', value: formatCurrency(revenueData?.revenue_period || 0), color: 'var(--accent-primary)' },
                   { label: 'Net Margin %', value: formatPercent(revenueData?.net_margin_percent_period || 0), color: 'var(--status-success)' },
-                  { label: 'Operating Ratio', value: `${(revenueData?.operating_ratio || (revenueData?.expenses_period && revenueData?.revenue_period ? (revenueData.expenses_period / revenueData.revenue_period) * 100 : 0)).toFixed(1)}%`, color: 'var(--text-primary)' },
+                  { label: 'Operating Ratio', value: `${((revenueData?.operating_ratio || (revenueData?.expenses_period && revenueData?.revenue_period ? (revenueData.expenses_period / revenueData.revenue_period) * 100 : 0)) || 0).toFixed(1)}%`, color: 'var(--text-primary)' },
                   { label: 'Revenue per Load', value: formatCurrency(revenueData?.revenue_per_load || 0), color: 'var(--text-primary)' },
                 ].map(m => (
                   <div key={m.label} className="card metric-card">
@@ -752,8 +752,8 @@ export default function Insights() {
 
                   return [
                     { label: 'Total Lanes', value: lanes.length, color: 'var(--text-primary)' },
-                    { label: 'Best Margin Lane', value: bestLane ? `${bestLane.route} (${bestLane.margin_pct.toFixed(1)}%)` : 'N/A', color: 'var(--status-success)' },
-                    { label: 'Worst Margin Lane', value: worstLane ? `${worstLane.route} (${worstLane.margin_pct.toFixed(1)}%)` : 'N/A', color: 'var(--status-danger)' },
+                    { label: 'Best Margin Lane', value: bestLane ? `${bestLane.route} (${(bestLane.margin_pct || 0).toFixed(1)}%)` : 'N/A', color: 'var(--status-success)' },
+                    { label: 'Worst Margin Lane', value: worstLane ? `${worstLane.route} (${(worstLane.margin_pct || 0).toFixed(1)}%)` : 'N/A', color: 'var(--status-danger)' },
                   ].map(m => (
                     <div key={m.label} className="card metric-card">
                       <div className="card-header"><span className="card-title">{m.label}</span></div>
@@ -795,10 +795,10 @@ export default function Insights() {
                             color: r.margin_pct > 15 ? 'var(--status-success)' : r.margin_pct > 5 ? 'var(--status-warning)' : 'var(--status-danger)',
                             fontWeight: 600
                           }}>
-                            {r.margin_pct.toFixed(1)}%
+                            {(r.margin_pct || 0).toFixed(1)}%
                           </td>
                           <td className="mono text-right">{formatCurrency(r.revenue_per_load || r.avg_revenue)}</td>
-                          <td className="mono text-right">{r.fuel_per_km != null ? `R${r.fuel_per_km.toFixed(2)}` : '—'}</td>
+                          <td className="mono text-right">{r.fuel_per_km != null ? `R${(r.fuel_per_km || 0).toFixed(2)}` : '—'}</td>
                           <td className="mono text-right">{r.avg_days || 0}</td>
                         </tr>
                       ))}
@@ -852,7 +852,7 @@ export default function Insights() {
 
                       return [
                         { label: 'Total Vehicles', value: vehicles.length, color: 'var(--text-primary)' },
-                        { label: 'Avg Utilisation', value: `${avgUtil.toFixed(1)}%`, color: avgUtil > 70 ? 'var(--status-success)' : avgUtil > 40 ? 'var(--status-warning)' : 'var(--status-danger)' },
+                        { label: 'Avg Utilisation', value: `${(avgUtil || 0).toFixed(1)}%`, color: avgUtil > 70 ? 'var(--status-success)' : avgUtil > 40 ? 'var(--status-warning)' : 'var(--status-danger)' },
                         { label: 'Highest Revenue Vehicle', value: topVehicle ? topVehicle.registration : 'N/A', color: 'var(--accent-primary)' },
                       ].map(m => (
                         <div key={m.label} className="card metric-card">
@@ -919,7 +919,7 @@ export default function Insights() {
 
                       return [
                         { label: 'Total Drivers', value: drivers.length, color: 'var(--text-primary)' },
-                        { label: 'Avg Loads/Driver', value: avgLoads.toFixed(1), color: 'var(--text-primary)' },
+                        { label: 'Avg Loads/Driver', value: (avgLoads || 0).toFixed(1), color: 'var(--text-primary)' },
                         { label: 'Best OTD Rate', value: bestOTD ? `${bestOTD.driver_name} (${(bestOTD.otd_pct || 0).toFixed(1)}%)` : 'N/A', color: 'var(--status-success)' },
                       ].map(m => (
                         <div key={m.label} className="card metric-card">

@@ -267,9 +267,9 @@ export default function VehicleFinancialProfile() {
             <div className="card metric-card">
               <div className="card-header"><span className="card-title">Revenue / km</span></div>
               <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)' }}>
-                R {revPerKm.toFixed(2)}
+                R {(revPerKm || 0).toFixed(2)}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{totalDistance.toFixed(0)} km total</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{(totalDistance || 0).toFixed(0)} km total</div>
             </div>
             <div className="card metric-card">
               <div className="card-header"><span className="card-title">AI Health Score</span></div>

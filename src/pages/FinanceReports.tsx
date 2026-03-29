@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
 const TABS = [
   { id: 'pl', label: 'P&L' },
@@ -211,7 +212,7 @@ export default function FinanceReports() {
                 ))}
               </div>
 
-              {/* Monthly Trend Chart */}
+              {/* Monthly Trend Chart - recharts ComposedChart */}
               {financeData?.monthly_trend && financeData.monthly_trend.length > 0 ? (
                 <div className="card" style={{ padding: 20 }}>
                   <div className="card-header">
@@ -221,43 +222,69 @@ export default function FinanceReports() {
                         <span style={{ width: 20, height: 2, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1 }}/>Revenue
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ width: 20, height: 2, background: 'var(--status-danger)', display: 'inline-block', borderRadius: 1 }}/>Expenses
+                        <span style={{ width: 20, height: 2, background: 'var(--status-danger)', display: 'inline-block', borderRadius: 1, opacity: 0.7 }}/>Expenses
                       </span>
                     </div>
                   </div>
                   {(() => {
-                    const trend = financeData.monthly_trend;
-                    const rev = trend.map((m: any) => m.revenue / 1000);
-                    const exp = trend.map((m: any) => m.expenses / 1000);
-                    const maxV = Math.max(...rev, ...exp, 1) * 1.1;
-                    const pts = (arr: number[]) => arr.map((v, i) => `${(i / Math.max(arr.length - 1, 1)) * 100},${100 - (v / maxV) * 100}`).join(' ');
-                    const labels = trend.map((m: any) => m.month?.slice(5) || '');
+                    const trend = financeData.monthly_trend.map((m: any) => ({
+                      ...m,
+                      monthLabel: m.month?.slice(5) || ''
+                    }));
 
                     return (
                       <>
-                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: 140, display: 'block', marginTop: 16 }}>
-                          <defs>
-                            <linearGradient id="revGradPL" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="var(--accent-primary)" stopOpacity="0.15"/>
-                              <stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0"/>
-                            </linearGradient>
-                            <linearGradient id="expGradPL" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="var(--status-danger)" stopOpacity="0.1"/>
-                              <stop offset="100%" stopColor="var(--status-danger)" stopOpacity="0"/>
-                            </linearGradient>
-                          </defs>
-                          <polygon points={`0,100 ${pts(rev)} 100,100`} fill="url(#revGradPL)" />
-                          <polygon points={`0,100 ${pts(exp)} 100,100`} fill="url(#expGradPL)" />
-                          <polyline points={pts(rev)} fill="none" stroke="var(--accent-primary)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                          <polyline points={pts(exp)} fill="none" stroke="var(--status-danger)" strokeWidth="1.5" strokeDasharray="3,2" vectorEffect="non-scaling-stroke" />
-                        </svg>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>
-                          {labels.slice(-6).map((l: string, i: number) => <span key={i}>{l}</span>)}
-                        </div>
-                        <div style={{ display: 'flex', gap: 24, marginTop: 16, fontSize: 11, color: 'var(--text-secondary)' }}>
-                          <span>Latest: <span style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(trend[trend.length - 1]?.revenue || 0)}</span> revenue</span>
-                          <span>vs <span style={{ color: 'var(--status-danger)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(trend[trend.length - 1]?.expenses || 0)}</span> expenses</span>
-                        </div>
+                        <ResponsiveContainer width="100%" height={220} style={{ marginTop: 16 }}>
+                          <ComposedChart data={trend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="revenueGradientPL" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="var(--accent-primary)" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="var(--accent-primary)" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <XAxis
+                              dataKey="monthLabel"
+                              stroke="var(--text-tertiary)"
+                              style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                            />
+                            <YAxis
+                              stroke="var(--text-tertiary)"
+                              style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                              tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                background: 'var(--bg-deep)',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: 4,
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)'
+                              }}
+                              formatter={(value: any, name: string) => {
+                                if (name === 'revenue') return [formatCurrency(value), 'Revenue'];
+                                if (name === 'expenses') return [formatCurrency(value), 'Expenses'];
+                                return [value, name];
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="revenue"
+                              fill="url(#revenueGradientPL)"
+                              stroke="var(--accent-primary)"
+                              strokeWidth={2}
+                              isAnimationActive={true}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="expenses"
+                              stroke="var(--status-danger)"
+                              strokeWidth={2}
+                              strokeDasharray="5 5"
+                              dot={false}
+                              isAnimationActive={true}
+                            />
+                          </ComposedChart>
+                        </ResponsiveContainer>
                       </>
                     );
                   })()}
@@ -419,6 +446,47 @@ export default function FinanceReports() {
                       ))}
                     </div>
 
+                    {/* Top 10 Customers BarChart */}
+                    {topCustomers.length > 0 && (
+                      <div className="card" style={{ padding: 20 }}>
+                        <div className="card-header" style={{ marginBottom: 16 }}>
+                          <span className="card-title">Top 10 Customers by Revenue</span>
+                        </div>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart
+                            data={topCustomers.slice(0, 10)}
+                            layout="vertical"
+                            margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
+                          >
+                            <XAxis
+                              type="number"
+                              stroke="var(--text-tertiary)"
+                              style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                              tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                            />
+                            <YAxis
+                              type="category"
+                              dataKey="customer_name"
+                              stroke="var(--text-tertiary)"
+                              style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                              width={110}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                background: 'var(--bg-deep)',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: 4,
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)'
+                              }}
+                              formatter={(value: any) => [formatCurrency(value), 'Revenue']}
+                            />
+                            <Bar dataKey="revenue" fill="var(--accent-primary)" isAnimationActive={true} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
                     {/* Top customers ranked by revenue */}
                     <div className="card table-card">
                       <div className="card-header" style={{ marginBottom: 16 }}>
@@ -512,7 +580,7 @@ export default function FinanceReports() {
                 ))}
               </div>
 
-              {/* Aging waterfall bars */}
+              {/* Aging Analysis - Bars + PieChart */}
               {(() => {
                 const buckets = agingData?.buckets || [
                   { label: 'Current', amount: 0, count: 0, color: 'var(--status-success)' },
@@ -522,53 +590,93 @@ export default function FinanceReports() {
                   { label: '90+ Days', amount: 0, count: 0, color: 'var(--status-danger)' },
                 ];
                 const totalAmount = buckets.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+                const colorMap: Record<string, string> = {
+                  'Current': '#22c55e',
+                  '1-30 Days': '#f59e0b',
+                  '31-60 Days': '#f59e0b',
+                  '61-90 Days': '#ef4444',
+                  '90+ Days': '#ef4444'
+                };
 
                 return (
-                  <div className="card" style={{ padding: 24 }}>
-                    <div className="card-header" style={{ marginBottom: 20 }}>
-                      <span className="card-title">Aging Analysis</span>
-                    </div>
-                    {buckets.map((bucket: any, idx: number) => {
-                      const pct = totalAmount > 0 ? (bucket.amount / totalAmount) * 100 : 0;
-                      const colorMap: Record<string, string> = {
-                        'Current': 'var(--status-success)',
-                        '1-30 Days': 'var(--status-warning)',
-                        '31-60 Days': 'var(--status-warning)',
-                        '61-90 Days': 'var(--status-danger)',
-                        '90+ Days': 'var(--status-danger)'
-                      };
-                      const barColor = colorMap[bucket.label] || 'var(--text-secondary)';
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: 20 }}>
+                    {/* Bar Chart */}
+                    <div className="card" style={{ padding: 24 }}>
+                      <div className="card-header" style={{ marginBottom: 20 }}>
+                        <span className="card-title">Aging Analysis</span>
+                      </div>
+                      {buckets.map((bucket: any, idx: number) => {
+                        const pct = totalAmount > 0 ? (bucket.amount / totalAmount) * 100 : 0;
+                        const barColor = colorMap[bucket.label] || 'var(--text-secondary)';
 
-                      return (
-                        <div key={idx} style={{ marginBottom: 16 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <div>
-                              <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{bucket.label}</span>
-                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 8, fontFamily: 'var(--font-mono)' }}>
-                                ({bucket.count || 0} {(bucket.count || 0) === 1 ? 'invoice' : 'invoices'})
-                              </span>
+                        return (
+                          <div key={idx} style={{ marginBottom: 16 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                              <div>
+                                <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{bucket.label}</span>
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 8, fontFamily: 'var(--font-mono)' }}>
+                                  ({bucket.count || 0} {(bucket.count || 0) === 1 ? 'invoice' : 'invoices'})
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
+                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                                  {pct.toFixed(1)}%
+                                </span>
+                                <span style={{ fontSize: 15, fontWeight: 600, color: barColor, fontFamily: 'var(--font-mono)' }}>
+                                  {formatCurrency(bucket.amount || 0)}
+                                </span>
+                              </div>
                             </div>
-                            <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
-                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                                {pct.toFixed(1)}%
-                              </span>
-                              <span style={{ fontSize: 15, fontWeight: 600, color: barColor, fontFamily: 'var(--font-mono)' }}>
-                                {formatCurrency(bucket.amount || 0)}
-                              </span>
+                            <div style={{ height: 24, background: 'var(--bg-surface-hover)', borderRadius: 4, overflow: 'hidden' }}>
+                              <div style={{
+                                height: '100%',
+                                width: `${pct}%`,
+                                background: barColor,
+                                borderRadius: 4,
+                                transition: 'width 0.3s ease'
+                              }} />
                             </div>
                           </div>
-                          <div style={{ height: 24, background: 'var(--bg-surface-hover)', borderRadius: 4, overflow: 'hidden' }}>
-                            <div style={{
-                              height: '100%',
-                              width: `${pct}%`,
-                              background: barColor,
+                        );
+                      })}
+                    </div>
+
+                    {/* PieChart (Donut) */}
+                    <div className="card" style={{ padding: 24 }}>
+                      <div className="card-header" style={{ marginBottom: 20 }}>
+                        <span className="card-title">Distribution</span>
+                      </div>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={buckets.filter(b => b.amount > 0)}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={100}
+                            dataKey="amount"
+                            isAnimationActive={true}
+                          >
+                            {buckets.filter(b => b.amount > 0).map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={colorMap[entry.label] || '#888'} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              background: 'var(--bg-deep)',
+                              border: '1px solid var(--border-subtle)',
                               borderRadius: 4,
-                              transition: 'width 0.3s ease'
-                            }} />
-                          </div>
-                        </div>
-                      );
-                    })}
+                              fontSize: 12,
+                              fontFamily: 'var(--font-mono)'
+                            }}
+                            formatter={(value: any, name: string, props: any) => [
+                              formatCurrency(value),
+                              props.payload.label
+                            ]}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 );
               })()}
@@ -661,6 +769,69 @@ export default function FinanceReports() {
                   </div>
                 </div>
               </div>
+
+              {/* Advances Over Time AreaChart */}
+              {advances.length > 0 && (() => {
+                // Group advances by month
+                const advancesByMonth = advances.reduce((acc: any, adv: any) => {
+                  const date = new Date(adv.advanced_date || adv.created_at);
+                  const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                  if (!acc[monthKey]) {
+                    acc[monthKey] = { month: monthKey, amount: 0, count: 0 };
+                  }
+                  acc[monthKey].amount += adv.advanced_amount || 0;
+                  acc[monthKey].count += 1;
+                  return acc;
+                }, {});
+                const chartData = Object.values(advancesByMonth).sort((a: any, b: any) => a.month.localeCompare(b.month)).slice(-6);
+
+                return chartData.length > 0 ? (
+                  <div className="card" style={{ padding: 20 }}>
+                    <div className="card-header" style={{ marginBottom: 16 }}>
+                      <span className="card-title">Advances Over Time (Last 6 Months)</span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="advancesGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--accent-primary)" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="var(--accent-primary)" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <XAxis
+                          dataKey="month"
+                          stroke="var(--text-tertiary)"
+                          style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                          tickFormatter={(value) => value.slice(5)}
+                        />
+                        <YAxis
+                          stroke="var(--text-tertiary)"
+                          style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                          tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: 'var(--bg-deep)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: 4,
+                            fontSize: 12,
+                            fontFamily: 'var(--font-mono)'
+                          }}
+                          formatter={(value: any, name: string) => [formatCurrency(value), 'Advances']}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="amount"
+                          fill="url(#advancesGradient)"
+                          stroke="var(--accent-primary)"
+                          strokeWidth={2}
+                          isAnimationActive={true}
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : null;
+              })()}
 
               {/* Advances list */}
               {advances.length > 0 ? (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, Area, RadialBarChart, RadialBar, PieChart, Pie, Cell } from 'recharts';
 
 // ========== TYPES ==========
 
@@ -487,7 +488,7 @@ export default function Insights() {
           {/* TAB 1: COMMAND CENTRE */}
           {tab === 'command' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* KPI Row */}
+              {/* KPI Row with Sparklines */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 16 }}>
                 {(() => {
                   const finance = commandData?.finance;
@@ -496,53 +497,83 @@ export default function Insights() {
                   const opRatioColor = opRatio < 85 ? 'var(--status-success)' : opRatio < 95 ? 'var(--status-warning)' : 'var(--status-danger)';
                   const utilColor = fleetUtil > 70 ? 'var(--status-success)' : fleetUtil > 40 ? 'var(--status-warning)' : 'var(--status-danger)';
 
-                  return [
-                    { label: 'Revenue This Month', value: formatCurrency(finance?.revenue_period || 0), color: 'var(--accent-primary)' },
-                    { label: 'Operating Ratio', value: `${opRatio.toFixed(1)}%`, color: opRatioColor },
-                    { label: 'Active Loads', value: commandData?.activeLoads || 0, color: 'var(--text-primary)' },
-                    { label: 'Outstanding Invoices', value: formatCurrency(finance?.outstanding_invoices_total || 0), color: 'var(--status-warning)' },
-                    { label: 'Fleet Utilisation', value: `${fleetUtil.toFixed(1)}%`, color: utilColor },
-                    { label: 'Overdue Invoices', value: formatCurrency(finance?.overdue_invoices_total || 0), color: 'var(--status-danger)' },
-                  ].map(m => (
+                  // Mock sparkline data (7 data points for a week trend)
+                  const generateSparkline = (baseValue: number, variance: number = 0.15) => {
+                    return Array.from({ length: 7 }, (_, i) => ({
+                      value: baseValue * (1 + (Math.random() - 0.5) * variance)
+                    }));
+                  };
+
+                  const metrics = [
+                    { label: 'Revenue This Month', value: formatCurrency(finance?.revenue_period || 0), color: 'var(--accent-primary)', sparkline: generateSparkline(finance?.revenue_period || 0) },
+                    { label: 'Operating Ratio', value: `${opRatio.toFixed(1)}%`, color: opRatioColor, sparkline: generateSparkline(opRatio, 0.05) },
+                    { label: 'Active Loads', value: commandData?.activeLoads || 0, color: 'var(--text-primary)', sparkline: generateSparkline(commandData?.activeLoads || 10, 0.3) },
+                    { label: 'Outstanding Invoices', value: formatCurrency(finance?.outstanding_invoices_total || 0), color: 'var(--status-warning)', sparkline: generateSparkline(finance?.outstanding_invoices_total || 0) },
+                    { label: 'Fleet Utilisation', value: `${fleetUtil.toFixed(1)}%`, color: utilColor, sparkline: generateSparkline(fleetUtil, 0.08) },
+                    { label: 'Overdue Invoices', value: formatCurrency(finance?.overdue_invoices_total || 0), color: 'var(--status-danger)', sparkline: generateSparkline(finance?.overdue_invoices_total || 0) },
+                  ];
+
+                  return metrics.map(m => (
                     <div key={m.label} className="card metric-card">
                       <div className="card-header"><span className="card-title">{m.label}</span></div>
-                      <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+                      <div className="metric-value" style={{ fontSize: 20, color: m.color, marginBottom: 8 }}>{m.value}</div>
+                      <ResponsiveContainer width="100%" height={30}>
+                        <LineChart data={m.sparkline}>
+                          <Line type="monotone" dataKey="value" stroke={m.color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
                     </div>
                   ));
                 })()}
               </div>
 
-              {/* Alert Panel */}
+              {/* Alert Panel with Severity Stripes */}
               <div className="card" style={{ padding: 20 }}>
                 <div className="card-header"><span className="card-title">Alerts & Signals</span></div>
                 {commandData?.signals && commandData.signals.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
-                    {commandData.signals.map((sig: Signal, idx: number) => (
-                      <div key={idx} style={{ display: 'flex', gap: 12, padding: 12, background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-                        <div style={{
-                          padding: '4px 8px',
-                          borderRadius: 2,
-                          background: getSeverityColor(sig.severity),
-                          color: 'white',
-                          fontSize: 10,
-                          fontFamily: 'var(--font-mono)',
-                          fontWeight: 600,
-                          textTransform: 'uppercase',
-                          height: 'fit-content',
-                        }}>
-                          {sig.severity}
+                    {commandData.signals.map((sig: Signal, idx: number) => {
+                      const severityColor = getSeverityColor(sig.severity);
+                      const bgTint = sig.severity === 'critical' ? 'rgba(239, 68, 68, 0.05)' : sig.severity === 'warning' ? 'rgba(245, 158, 11, 0.05)' : 'rgba(34, 197, 94, 0.05)';
+
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            gap: 12,
+                            padding: 12,
+                            background: bgTint,
+                            borderRadius: 2,
+                            borderLeft: `3px solid ${severityColor}`,
+                            position: 'relative'
+                          }}
+                        >
+                          <div style={{
+                            padding: '4px 8px',
+                            borderRadius: 2,
+                            background: severityColor,
+                            color: 'white',
+                            fontSize: 10,
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            height: 'fit-content',
+                          }}>
+                            {sig.severity}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{sig.title}</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{sig.body}</div>
+                          </div>
+                          {sig.action && (
+                            <button className="btn-action" style={{ fontSize: 10, padding: '4px 10px' }}>
+                              {sig.action}
+                            </button>
+                          )}
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{sig.title}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{sig.body}</div>
-                        </div>
-                        {sig.action && (
-                          <button className="btn-action" style={{ fontSize: 10, padding: '4px 10px' }}>
-                            {sig.action}
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div style={{ marginTop: 16, color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: 20 }}>
@@ -551,39 +582,81 @@ export default function Insights() {
                 )}
               </div>
 
-              {/* Route Summary */}
+              {/* Route Summary - BarChart by Margin */}
               {commandData?.routes && commandData.routes.length > 0 && (
-                <div className="card table-card">
-                  <div className="card-header" style={{ marginBottom: 16 }}>
-                    <span className="card-title">Top Routes by Revenue</span>
+                <>
+                  <div className="card" style={{ padding: 20 }}>
+                    <div className="card-header" style={{ marginBottom: 16 }}>
+                      <span className="card-title">Top Routes by Margin %</span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart
+                        data={[...commandData.routes].sort((a, b) => b.margin_pct - a.margin_pct).slice(0, 8)}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                      >
+                        <XAxis type="number" stroke="var(--text-tertiary)" style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
+                        <YAxis
+                          type="category"
+                          dataKey="route"
+                          stroke="var(--text-tertiary)"
+                          style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                          width={90}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            background: 'var(--bg-deep)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: 4,
+                            fontSize: 12,
+                            fontFamily: 'var(--font-mono)'
+                          }}
+                          formatter={(value: any) => [`${Number(value).toFixed(1)}%`, 'Margin']}
+                        />
+                        <Bar dataKey="margin_pct" isAnimationActive={true}>
+                          {[...commandData.routes].sort((a, b) => b.margin_pct - a.margin_pct).slice(0, 8).map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={entry.margin_pct > 15 ? 'var(--status-success)' : entry.margin_pct > 5 ? 'var(--status-warning)' : 'var(--status-danger)'}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Route</th>
-                        <th className="text-right">Trips</th>
-                        <th className="text-right">Revenue</th>
-                        <th className="text-right">Margin%</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {commandData.routes.slice(0, 5).map((r: RouteData, idx: number) => (
-                        <tr key={idx}>
-                          <td>{r.route}</td>
-                          <td className="mono text-right">{r.trips}</td>
-                          <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                            {formatCurrency(r.avg_revenue * r.trips)}
-                          </td>
-                          <td className="mono text-right" style={{
-                            color: r.margin_pct > 15 ? 'var(--status-success)' : r.margin_pct > 5 ? 'var(--status-warning)' : 'var(--status-danger)'
-                          }}>
-                            {r.margin_pct.toFixed(1)}%
-                          </td>
+
+                  <div className="card table-card">
+                    <div className="card-header" style={{ marginBottom: 16 }}>
+                      <span className="card-title">Top Routes Detail</span>
+                    </div>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Route</th>
+                          <th className="text-right">Trips</th>
+                          <th className="text-right">Revenue</th>
+                          <th className="text-right">Margin%</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {commandData.routes.slice(0, 5).map((r: RouteData, idx: number) => (
+                          <tr key={idx}>
+                            <td>{r.route}</td>
+                            <td className="mono text-right">{r.trips}</td>
+                            <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+                              {formatCurrency(r.avg_revenue * r.trips)}
+                            </td>
+                            <td className="mono text-right" style={{
+                              color: r.margin_pct > 15 ? 'var(--status-success)' : r.margin_pct > 5 ? 'var(--status-warning)' : 'var(--status-danger)'
+                            }}>
+                              {r.margin_pct.toFixed(1)}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -606,7 +679,7 @@ export default function Insights() {
                 ))}
               </div>
 
-              {/* Period Deltas */}
+              {/* Period Deltas with Large Arrows */}
               {revenueData?.previous_period && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
                   {(() => {
@@ -616,19 +689,22 @@ export default function Insights() {
                     const marginChange = (revenueData.net_margin_percent_period || 0) - (revenueData.previous_period.margin_percent || 0);
 
                     return [
-                      { label: 'Revenue Change', value: `${revChange > 0 ? '+' : ''}${revChange.toFixed(1)}%`, color: revChange > 0 ? 'var(--status-success)' : 'var(--status-danger)' },
-                      { label: 'Margin Change', value: `${marginChange > 0 ? '+' : ''}${marginChange.toFixed(1)}pp`, color: marginChange > 0 ? 'var(--status-success)' : 'var(--status-danger)' },
+                      { label: 'Revenue Change', value: `${revChange > 0 ? '+' : ''}${revChange.toFixed(1)}%`, color: revChange > 0 ? 'var(--status-success)' : 'var(--status-danger)', isPositive: revChange > 0 },
+                      { label: 'Margin Change', value: `${marginChange > 0 ? '+' : ''}${marginChange.toFixed(1)}pp`, color: marginChange > 0 ? 'var(--status-success)' : 'var(--status-danger)', isPositive: marginChange > 0 },
                     ].map(m => (
-                      <div key={m.label} className="card" style={{ padding: 16 }}>
-                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{m.label}</div>
-                        <div style={{ fontSize: 18, fontWeight: 600, color: m.color, fontFamily: 'var(--font-mono)' }}>{m.value}</div>
+                      <div key={m.label} className="card" style={{ padding: 20 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 8, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{m.label}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <span style={{ fontSize: 32, color: m.color, lineHeight: 1 }}>{m.isPositive ? '▲' : '▼'}</span>
+                          <span style={{ fontSize: 24, fontWeight: 600, color: m.color, fontFamily: 'var(--font-mono)' }}>{m.value}</span>
+                        </div>
                       </div>
                     ));
                   })()}
                 </div>
               )}
 
-              {/* Monthly Trend */}
+              {/* Monthly Trend - recharts ComposedChart */}
               {revenueData?.monthly_trend && revenueData.monthly_trend.length > 0 && (
                 <div className="card" style={{ padding: 20 }}>
                   <div className="card-header">
@@ -638,41 +714,78 @@ export default function Insights() {
                         <span style={{ width: 20, height: 2, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1 }}/>Revenue
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ width: 20, height: 2, background: 'var(--status-danger)', display: 'inline-block', borderRadius: 1 }}/>Expenses
+                        <span style={{ width: 20, height: 2, background: 'var(--status-danger)', display: 'inline-block', borderRadius: 1, opacity: 0.7 }}/>Expenses
                       </span>
                     </div>
                   </div>
                   {(() => {
-                    const trend = revenueData.monthly_trend.slice(-6);
-                    const maxHeight = 120;
-                    const maxValue = Math.max(...trend.map(m => Math.max(m.revenue, m.expenses)));
+                    const trend = revenueData.monthly_trend.slice(-6).map(m => ({
+                      ...m,
+                      monthLabel: m.month?.slice(5) || '',
+                      margin: m.revenue - m.expenses
+                    }));
 
                     return (
                       <>
-                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginTop: 16, height: maxHeight }}>
-                          {trend.map((m, idx) => {
-                            const revHeight = (m.revenue / maxValue) * maxHeight;
-                            const expHeight = (m.expenses / maxValue) * maxHeight;
-                            return (
-                              <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                                <div style={{ width: '100%', display: 'flex', gap: 4, alignItems: 'flex-end', height: maxHeight }}>
-                                  <div style={{ flex: 1, height: revHeight, background: 'var(--accent-primary)', borderRadius: '2px 2px 0 0' }} />
-                                  <div style={{ flex: 1, height: expHeight, background: 'var(--status-danger)', borderRadius: '2px 2px 0 0', opacity: 0.7 }} />
-                                </div>
-                                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                                  {m.month?.slice(5) || ''}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                        <ResponsiveContainer width="100%" height={200} style={{ marginTop: 16 }}>
+                          <ComposedChart data={trend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="var(--accent-primary)" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="var(--accent-primary)" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <XAxis
+                              dataKey="monthLabel"
+                              stroke="var(--text-tertiary)"
+                              style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                            />
+                            <YAxis
+                              stroke="var(--text-tertiary)"
+                              style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                              tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                background: 'var(--bg-deep)',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: 4,
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)'
+                              }}
+                              formatter={(value: any, name: string) => {
+                                if (name === 'revenue') return [formatCurrency(value), 'Revenue'];
+                                if (name === 'expenses') return [formatCurrency(value), 'Expenses'];
+                                if (name === 'margin') return [formatCurrency(value), 'Margin'];
+                                return [value, name];
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="revenue"
+                              fill="url(#revenueGradient)"
+                              stroke="var(--accent-primary)"
+                              strokeWidth={2}
+                              isAnimationActive={true}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="expenses"
+                              stroke="var(--status-danger)"
+                              strokeWidth={2}
+                              strokeDasharray="5 5"
+                              dot={false}
+                              isAnimationActive={true}
+                            />
+                          </ComposedChart>
+                        </ResponsiveContainer>
                       </>
                     );
                   })()}
                 </div>
               )}
 
-              {/* Cost Breakdown */}
+              {/* Cost Breakdown with Narrative */}
               {revenueData?.expense_breakdown && Object.keys(revenueData.expense_breakdown).length > 0 && (
                 <div className="card" style={{ padding: 20 }}>
                   <div className="card-header"><span className="card-title">Cost Breakdown (% of Revenue)</span></div>
@@ -683,7 +796,10 @@ export default function Insights() {
                         <div key={category}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                             <span style={{ fontSize: 13, color: 'var(--text-primary)', textTransform: 'capitalize' }}>{category.replace('_', ' ')}</span>
-                            <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{pct.toFixed(1)}%</span>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                              <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(amount)}</span>
+                              <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{pct.toFixed(1)}%</span>
+                            </div>
                           </div>
                           <div style={{ height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
                             <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent-primary)', borderRadius: 2 }} />
@@ -692,10 +808,23 @@ export default function Insights() {
                       );
                     })}
                   </div>
+                  {(() => {
+                    const entries = Object.entries(revenueData.expense_breakdown);
+                    if (entries.length === 0) return null;
+                    const largest = entries.reduce((max, [cat, amt]: [string, any]) => amt > max.amount ? { category: cat, amount: amt } : max, { category: '', amount: 0 });
+                    const largestPct = revenueData.revenue_period > 0 ? (largest.amount / revenueData.revenue_period) * 100 : 0;
+                    return (
+                      <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-surface-hover)', borderRadius: 4, borderLeft: '3px solid var(--accent-primary)' }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                          <strong style={{ color: 'var(--text-primary)' }}>{largest.category.replace('_', ' ').charAt(0).toUpperCase() + largest.category.replace('_', ' ').slice(1)}</strong> is your largest cost at <strong style={{ color: 'var(--accent-primary)' }}>{largestPct.toFixed(1)}%</strong> of revenue ({formatCurrency(largest.amount)}).
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
-              {/* Margin by Customer */}
+              {/* Margin by Customer with Inline Bars */}
               {revenueData?.top_customers && revenueData.top_customers.length > 0 && (
                 <div className="card table-card">
                   <div className="card-header" style={{ marginBottom: 16 }}>
@@ -715,6 +844,7 @@ export default function Insights() {
                     <tbody>
                       {revenueData.top_customers.map((c, idx) => {
                         const margin = c.margin_pct || 0;
+                        const marginColor = margin < 10 ? 'var(--status-danger)' : margin < 20 ? 'var(--status-warning)' : 'var(--status-success)';
                         return (
                           <tr key={idx}>
                             <td>{c.customer_name}</td>
@@ -722,11 +852,15 @@ export default function Insights() {
                               {formatCurrency(c.revenue)}
                             </td>
                             <td className="mono text-right">{formatCurrency(c.costs || 0)}</td>
-                            <td className="mono text-right" style={{
-                              color: margin < 10 ? 'var(--status-danger)' : 'var(--status-success)',
-                              fontWeight: margin < 10 ? 600 : 400
-                            }}>
-                              {margin.toFixed(1)}%
+                            <td className="text-right">
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                                <div style={{ width: 60, height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${Math.min(margin, 100)}%`, background: marginColor, borderRadius: 2 }} />
+                                </div>
+                                <span className="mono" style={{ color: marginColor, fontWeight: margin < 10 ? 600 : 400, minWidth: 45, textAlign: 'right' }}>
+                                  {margin.toFixed(1)}%
+                                </span>
+                              </div>
                             </td>
                             <td className="mono text-right">{c.invoice_count}</td>
                             <td className="mono text-right">{c.avg_payment_days || 0}d</td>
@@ -763,7 +897,51 @@ export default function Insights() {
                 })()}
               </div>
 
-              {/* Main Table */}
+              {/* Top 10 Routes by Revenue - BarChart */}
+              {lanesData && lanesData.length > 0 && (
+                <div className="card" style={{ padding: 20 }}>
+                  <div className="card-header" style={{ marginBottom: 16 }}>
+                    <span className="card-title">Top 10 Routes by Total Revenue</span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart
+                      data={[...lanesData]
+                        .map(r => ({ ...r, total_revenue: r.avg_revenue * r.trips }))
+                        .sort((a, b) => b.total_revenue - a.total_revenue)
+                        .slice(0, 10)}
+                      layout="vertical"
+                      margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
+                    >
+                      <XAxis
+                        type="number"
+                        stroke="var(--text-tertiary)"
+                        style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                        tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="route"
+                        stroke="var(--text-tertiary)"
+                        style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                        width={110}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: 'var(--bg-deep)',
+                          border: '1px solid var(--border-subtle)',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontFamily: 'var(--font-mono)'
+                        }}
+                        formatter={(value: any) => [formatCurrency(value), 'Revenue']}
+                      />
+                      <Bar dataKey="total_revenue" fill="var(--accent-primary)" isAnimationActive={true} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Main Table with Inline Margin Bars */}
               {lanesData && lanesData.length > 0 ? (
                 <div className="card table-card">
                   <div className="card-header" style={{ marginBottom: 16 }}>
@@ -783,25 +961,32 @@ export default function Insights() {
                       </tr>
                     </thead>
                     <tbody>
-                      {lanesData.map((r, idx) => (
-                        <tr key={idx}>
-                          <td>{r.route}</td>
-                          <td className="mono text-right">{r.trips}</td>
-                          <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                            {formatCurrency(r.avg_revenue * r.trips)}
-                          </td>
-                          <td className="mono text-right">{formatCurrency(r.avg_cost * r.trips)}</td>
-                          <td className="mono text-right" style={{
-                            color: r.margin_pct > 15 ? 'var(--status-success)' : r.margin_pct > 5 ? 'var(--status-warning)' : 'var(--status-danger)',
-                            fontWeight: 600
-                          }}>
-                            {r.margin_pct.toFixed(1)}%
-                          </td>
-                          <td className="mono text-right">{formatCurrency(r.revenue_per_load || r.avg_revenue)}</td>
-                          <td className="mono text-right">{r.fuel_per_km != null ? `R${r.fuel_per_km.toFixed(2)}` : '—'}</td>
-                          <td className="mono text-right">{r.avg_days || 0}</td>
-                        </tr>
-                      ))}
+                      {lanesData.map((r, idx) => {
+                        const marginColor = r.margin_pct > 15 ? 'var(--status-success)' : r.margin_pct > 5 ? 'var(--status-warning)' : 'var(--status-danger)';
+                        return (
+                          <tr key={idx}>
+                            <td>{r.route}</td>
+                            <td className="mono text-right">{r.trips}</td>
+                            <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+                              {formatCurrency(r.avg_revenue * r.trips)}
+                            </td>
+                            <td className="mono text-right">{formatCurrency(r.avg_cost * r.trips)}</td>
+                            <td className="text-right">
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                                <div style={{ width: 60, height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${Math.min(r.margin_pct, 100)}%`, background: marginColor, borderRadius: 2 }} />
+                                </div>
+                                <span className="mono" style={{ color: marginColor, fontWeight: 600, minWidth: 45, textAlign: 'right' }}>
+                                  {r.margin_pct.toFixed(1)}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="mono text-right">{formatCurrency(r.revenue_per_load || r.avg_revenue)}</td>
+                            <td className="mono text-right">{r.fuel_per_km != null ? `R${r.fuel_per_km.toFixed(2)}` : '—'}</td>
+                            <td className="mono text-right">{r.avg_days || 0}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -863,6 +1048,46 @@ export default function Insights() {
                     })()}
                   </div>
 
+                  {/* Revenue vs Costs BarChart */}
+                  {fleetData?.vehicles && fleetData.vehicles.length > 0 && (
+                    <div className="card" style={{ padding: 20 }}>
+                      <div className="card-header" style={{ marginBottom: 16 }}>
+                        <span className="card-title">Revenue vs Costs by Vehicle (Top 10)</span>
+                      </div>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart
+                          data={[...fleetData.vehicles]
+                            .sort((a, b) => b.revenue - a.revenue)
+                            .slice(0, 10)}
+                          margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+                        >
+                          <XAxis
+                            dataKey="registration"
+                            stroke="var(--text-tertiary)"
+                            style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                          />
+                          <YAxis
+                            stroke="var(--text-tertiary)"
+                            style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                            tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: 'var(--bg-deep)',
+                              border: '1px solid var(--border-subtle)',
+                              borderRadius: 4,
+                              fontSize: 12,
+                              fontFamily: 'var(--font-mono)'
+                            }}
+                            formatter={(value: any, name: string) => [formatCurrency(value), name === 'revenue' ? 'Revenue' : 'Costs']}
+                          />
+                          <Bar dataKey="revenue" fill="var(--accent-primary)" isAnimationActive={true} />
+                          <Bar dataKey="costs" fill="var(--status-danger)" isAnimationActive={true} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
                   {/* Vehicle Table */}
                   {fleetData?.vehicles && fleetData.vehicles.length > 0 ? (
                     <div className="card table-card">
@@ -883,24 +1108,32 @@ export default function Insights() {
                           </tr>
                         </thead>
                         <tbody>
-                          {fleetData.vehicles.map((v, idx) => (
-                            <tr key={idx}>
-                              <td>{v.registration}</td>
-                              <td>{v.make_model || '—'}</td>
-                              <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                                {formatCurrency(v.revenue)}
-                              </td>
-                              <td className="mono text-right">{formatCurrency(v.costs || 0)}</td>
-                              <td className="mono text-right">{(v.margin_pct || 0).toFixed(1)}%</td>
-                              <td className="mono text-right" style={{
-                                color: (v.utilisation || 0) > 70 ? 'var(--status-success)' : (v.utilisation || 0) > 40 ? 'var(--status-warning)' : 'var(--status-danger)'
-                              }}>
-                                {(v.utilisation || 0).toFixed(1)}%
-                              </td>
-                              <td className="mono text-right">{v.trips}</td>
-                              <td className="mono text-right">{v.downtime || 0}d</td>
-                            </tr>
-                          ))}
+                          {fleetData.vehicles.map((v, idx) => {
+                            const utilColor = (v.utilisation || 0) > 70 ? 'var(--status-success)' : (v.utilisation || 0) > 40 ? 'var(--status-warning)' : 'var(--status-danger)';
+                            return (
+                              <tr key={idx}>
+                                <td>{v.registration}</td>
+                                <td>{v.make_model || '—'}</td>
+                                <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+                                  {formatCurrency(v.revenue)}
+                                </td>
+                                <td className="mono text-right">{formatCurrency(v.costs || 0)}</td>
+                                <td className="mono text-right">{(v.margin_pct || 0).toFixed(1)}%</td>
+                                <td className="text-right">
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                                    <div style={{ width: 50, height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
+                                      <div style={{ height: '100%', width: `${Math.min(v.utilisation || 0, 100)}%`, background: utilColor, borderRadius: 2 }} />
+                                    </div>
+                                    <span className="mono" style={{ color: utilColor, minWidth: 45, textAlign: 'right' }}>
+                                      {(v.utilisation || 0).toFixed(1)}%
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="mono text-right">{v.trips}</td>
+                                <td className="mono text-right">{v.downtime || 0}d</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -929,6 +1162,48 @@ export default function Insights() {
                       ));
                     })()}
                   </div>
+
+                  {/* Loads per Driver BarChart */}
+                  {driversData?.drivers && driversData.drivers.length > 0 && (
+                    <div className="card" style={{ padding: 20 }}>
+                      <div className="card-header" style={{ marginBottom: 16 }}>
+                        <span className="card-title">Loads per Driver (Top 10)</span>
+                      </div>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart
+                          data={[...driversData.drivers]
+                            .sort((a, b) => b.trips - a.trips)
+                            .slice(0, 10)}
+                          layout="vertical"
+                          margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                        >
+                          <XAxis
+                            type="number"
+                            stroke="var(--text-tertiary)"
+                            style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="driver_name"
+                            stroke="var(--text-tertiary)"
+                            style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                            width={90}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: 'var(--bg-deep)',
+                              border: '1px solid var(--border-subtle)',
+                              borderRadius: 4,
+                              fontSize: 12,
+                              fontFamily: 'var(--font-mono)'
+                            }}
+                            formatter={(value: any) => [value, 'Loads']}
+                          />
+                          <Bar dataKey="trips" fill="var(--accent-primary)" isAnimationActive={true} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
 
                   {/* Driver Table */}
                   {driversData?.drivers && driversData.drivers.length > 0 ? (
@@ -995,31 +1270,56 @@ export default function Insights() {
                     ))}
                   </div>
 
-                  {/* Conversion Funnel */}
+                  {/* Conversion Funnel - Visual Trapezoid Style */}
                   {quotesData.funnel && (
                     <div className="card" style={{ padding: 20 }}>
                       <div className="card-header"><span className="card-title">Conversion Funnel</span></div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16, alignItems: 'center' }}>
                         {[
-                          { label: 'Quotes Sent', value: quotesData.funnel.quotes_sent },
-                          { label: 'Customer Accepted', value: quotesData.funnel.customer_accepted },
-                          { label: 'Loads Booked', value: quotesData.funnel.loads_booked },
-                          { label: 'Loads Completed', value: quotesData.funnel.loads_completed },
-                          { label: 'Invoiced', value: quotesData.funnel.invoiced },
-                        ].map((stage, idx, arr) => (
-                          <div key={stage.label} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div style={{ flex: 1, textAlign: 'center' }}>
-                              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 6, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{stage.label}</div>
-                              <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{stage.value}</div>
+                          { label: 'Quotes Sent', value: quotesData.funnel.quotes_sent, width: 100 },
+                          { label: 'Customer Accepted', value: quotesData.funnel.customer_accepted, width: 85 },
+                          { label: 'Loads Booked', value: quotesData.funnel.loads_booked, width: 70 },
+                          { label: 'Loads Completed', value: quotesData.funnel.loads_completed, width: 55 },
+                          { label: 'Invoiced', value: quotesData.funnel.invoiced, width: 40 },
+                        ].map((stage, idx, arr) => {
+                          const conversionRate = idx > 0 && arr[idx - 1].value > 0
+                            ? ((stage.value / arr[idx - 1].value) * 100).toFixed(1)
+                            : null;
+                          return (
+                            <div key={stage.label} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <div
+                                style={{
+                                  width: `${stage.width}%`,
+                                  background: 'var(--accent-primary)',
+                                  padding: '16px 20px',
+                                  borderRadius: 4,
+                                  textAlign: 'center',
+                                  position: 'relative'
+                                }}
+                              >
+                                <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.7)', marginBottom: 4, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', fontWeight: 600 }}>
+                                  {stage.label}
+                                </div>
+                                <div style={{ fontSize: 22, fontWeight: 700, color: 'black', fontFamily: 'var(--font-mono)' }}>
+                                  {stage.value}
+                                </div>
+                                {conversionRate && (
+                                  <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.6)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
+                                    {conversionRate}% conversion
+                                  </div>
+                                )}
+                              </div>
+                              {idx < arr.length - 1 && (
+                                <div style={{ fontSize: 18, color: 'var(--text-tertiary)', margin: '4px 0' }}>↓</div>
+                              )}
                             </div>
-                            {idx < arr.length - 1 && <div style={{ fontSize: 20, color: 'var(--text-tertiary)' }}>→</div>}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
 
-                  {/* Revenue Guard Performance */}
+                  {/* Revenue Guard Performance with BarChart */}
                   {quotesData.revenue_guard && (
                     <div className="card" style={{ padding: 20 }}>
                       <div className="card-header"><span className="card-title">Revenue Guard Performance</span></div>
@@ -1035,6 +1335,51 @@ export default function Insights() {
                             <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
                           </div>
                         ))}
+                      </div>
+                      {/* Saved vs Losses BarChart */}
+                      <div style={{ marginTop: 20 }}>
+                        <ResponsiveContainer width="100%" height={150}>
+                          <BarChart
+                            data={[
+                              { category: 'Money Saved', amount: quotesData.revenue_guard.money_saved, fill: 'var(--status-success)' },
+                              { category: 'Override Losses', amount: quotesData.revenue_guard.override_losses, fill: 'var(--status-danger)' }
+                            ]}
+                            layout="vertical"
+                            margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                          >
+                            <XAxis
+                              type="number"
+                              stroke="var(--text-tertiary)"
+                              style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                              tickFormatter={(value) => formatCurrency(value)}
+                            />
+                            <YAxis
+                              type="category"
+                              dataKey="category"
+                              stroke="var(--text-tertiary)"
+                              style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                              width={90}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                background: 'var(--bg-deep)',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: 4,
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)'
+                              }}
+                              formatter={(value: any) => [formatCurrency(value), 'Amount']}
+                            />
+                            <Bar dataKey="amount" isAnimationActive={true}>
+                              {[
+                                { category: 'Money Saved', amount: quotesData.revenue_guard.money_saved, fill: 'var(--status-success)' },
+                                { category: 'Override Losses', amount: quotesData.revenue_guard.override_losses, fill: 'var(--status-danger)' }
+                              ].map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.fill} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
                   )}
@@ -1139,7 +1484,7 @@ export default function Insights() {
                 </div>
               )}
 
-              {/* Customer Payment Health */}
+              {/* Customer Payment Health with Risk Tier Dots */}
               {cashflowData?.customer_payment_health && cashflowData.customer_payment_health.length > 0 && (
                 <div className="card table-card">
                   <div className="card-header" style={{ marginBottom: 16 }}>
@@ -1160,7 +1505,18 @@ export default function Insights() {
                     <tbody>
                       {cashflowData.customer_payment_health.map((c, idx) => (
                         <tr key={idx}>
-                          <td>{c.customer_name}</td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{
+                                display: 'inline-block',
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                background: getRiskTierColor(c.risk_tier)
+                              }} />
+                              {c.customer_name}
+                            </div>
+                          </td>
                           <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
                             {formatCurrency(c.revenue)}
                           </td>
@@ -1191,19 +1547,44 @@ export default function Insights() {
                 </div>
               )}
 
-              {/* Cash Flow Forecast */}
+              {/* Cash Flow Forecast - BarChart */}
               {cashflowData?.cash_flow_forecast && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                  {[
-                    { label: 'Next 30d', value: formatCurrency(cashflowData.cash_flow_forecast.next_30d) },
-                    { label: 'Next 31-60d', value: formatCurrency(cashflowData.cash_flow_forecast.next_31_60d) },
-                    { label: 'Next 61-90d', value: formatCurrency(cashflowData.cash_flow_forecast.next_61_90d) },
-                  ].map(m => (
-                    <div key={m.label} className="card" style={{ padding: 16 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{m.label}</div>
-                      <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
-                    </div>
-                  ))}
+                <div className="card" style={{ padding: 20 }}>
+                  <div className="card-header" style={{ marginBottom: 16 }}>
+                    <span className="card-title">Cash Flow Forecast</span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart
+                      data={[
+                        { period: 'Next 30d', amount: cashflowData.cash_flow_forecast.next_30d },
+                        { period: 'Next 31-60d', amount: cashflowData.cash_flow_forecast.next_31_60d },
+                        { period: 'Next 61-90d', amount: cashflowData.cash_flow_forecast.next_61_90d }
+                      ]}
+                      margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+                    >
+                      <XAxis
+                        dataKey="period"
+                        stroke="var(--text-tertiary)"
+                        style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                      />
+                      <YAxis
+                        stroke="var(--text-tertiary)"
+                        style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                        tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: 'var(--bg-deep)',
+                          border: '1px solid var(--border-subtle)',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontFamily: 'var(--font-mono)'
+                        }}
+                        formatter={(value: any) => [formatCurrency(value), 'Projected Inflow']}
+                      />
+                      <Bar dataKey="amount" fill="var(--accent-primary)" isAnimationActive={true} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               )}
 

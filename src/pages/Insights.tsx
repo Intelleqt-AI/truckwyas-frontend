@@ -1362,6 +1362,506 @@ export default function Insights() {
               </div>
             </div>
           )}
+
+          {tab === 'fleet' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* SECTION 1: FLEET HEALTH SUMMARY */}
+              <div>
+                <SectionHeader>FLEET HEALTH SUMMARY</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 12,
+                    }}>
+                      {vehicles.filter(v => ['IN_USE', 'AVAILABLE'].includes(v.status.toUpperCase())).length}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Active Vehicles
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 12,
+                    }}>
+                      {vehicles.length > 0 ? (vehicles.reduce((sum, v) => sum + (v.ai_health_score || 0), 0) / vehicles.length).toFixed(0) : 0}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Avg Health Score
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--status-danger)',
+                      marginBottom: 12,
+                    }}>
+                      {vehicles.filter(v => (v.ai_health_score || 100) < 60).length}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Vehicles at Risk
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 12,
+                    }}>
+                      {vehicles.length > 0 ? formatCurrency(vehicles.reduce((sum, v) => sum + (v.cost_per_km || 0), 0) / vehicles.length) : formatCurrency(0)}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Avg Cost/km
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: VEHICLE EFFICIENCY RANKING */}
+              <div>
+                <SectionHeader>VEHICLE PERFORMANCE — Revenue earned vs operational cost</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {vehicles.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {[...vehicles]
+                        .sort((a, b) => b.revenue_generated - a.revenue_generated)
+                        .map((v, idx) => {
+                          const healthColor = v.ai_health_score > 80 ? 'var(--status-success)' : v.ai_health_score > 60 ? 'var(--status-warning)' : 'var(--status-danger)';
+
+                          return (
+                            <div
+                              key={v.id}
+                              onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 12,
+                                padding: 12,
+                                background: 'var(--bg-surface)',
+                                borderRadius: 2,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <div style={{
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-tertiary)',
+                                minWidth: 30,
+                              }}>
+                                #{idx + 1}
+                              </div>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                minWidth: 100,
+                              }}>
+                                {v.plate}
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                color: 'var(--text-secondary)',
+                                minWidth: 150,
+                              }}>
+                                {v.make} {v.model}
+                              </div>
+                              <StatusBadge>{v.status}</StatusBadge>
+                              <div style={{ flex: 1 }} />
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--accent-primary)',
+                                minWidth: 100,
+                              }}>
+                                {v.revenue_generated > 0 ? formatCurrency(v.revenue_generated) : 'No revenue data'}
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 80,
+                              }}>
+                                {formatCurrency(v.cost_per_km)}/km
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                minWidth: 100,
+                              }}>
+                                <div style={{
+                                  flex: 1,
+                                  height: 8,
+                                  background: 'var(--bg-surface-hover)',
+                                  borderRadius: 4,
+                                  overflow: 'hidden',
+                                }}>
+                                  <div style={{
+                                    width: `${v.ai_health_score}%`,
+                                    height: '100%',
+                                    background: healthColor,
+                                  }} />
+                                </div>
+                                <div style={{
+                                  fontSize: 11,
+                                  fontFamily: 'var(--font-mono)',
+                                  color: healthColor,
+                                }}>
+                                  {v.ai_health_score}
+                                </div>
+                              </div>
+                              <div style={{
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 60,
+                              }}>
+                                {v.uptime_percentage.toFixed(1)}%
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      No data for this period
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* SECTION 3: DRIVER EFFICIENCY MATRIX */}
+              <div>
+                <SectionHeader>DRIVER PERFORMANCE — Revenue generated and risk profile</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {drivers.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {[...drivers]
+                        .sort((a, b) => b.revenue_generated - a.revenue_generated)
+                        .map((d, idx) => (
+                          <div
+                            key={d.id}
+                            onClick={() => navigate(`/fleet/drivers/${d.id}/financial`)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              padding: 12,
+                              background: 'var(--bg-surface)',
+                              borderRadius: 2,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{
+                              fontSize: 11,
+                              fontFamily: 'var(--font-mono)',
+                              fontWeight: 600,
+                              color: 'var(--text-tertiary)',
+                              minWidth: 30,
+                            }}>
+                              #{idx + 1}
+                            </div>
+                            <div style={{
+                              fontSize: 13,
+                              color: 'var(--text-primary)',
+                              fontWeight: 500,
+                              minWidth: 180,
+                            }}>
+                              {d.user_details.name}
+                            </div>
+                            <StatusBadge>{d.status}</StatusBadge>
+                            <div style={{ flex: 1 }} />
+                            <div style={{
+                              fontSize: 13,
+                              fontFamily: 'var(--font-mono)',
+                              fontWeight: 600,
+                              color: 'var(--accent-primary)',
+                              minWidth: 100,
+                            }}>
+                              {formatCurrency(d.revenue_generated)}
+                            </div>
+                            <div style={{
+                              fontSize: 12,
+                              fontFamily: 'var(--font-mono)',
+                              color: 'var(--text-secondary)',
+                              minWidth: 60,
+                            }}>
+                              {d.total_trips} trips
+                            </div>
+                            <div style={{
+                              fontSize: 12,
+                              fontFamily: 'var(--font-mono)',
+                              color: 'var(--text-secondary)',
+                              minWidth: 100,
+                            }}>
+                              {formatCurrency(d.avg_revenue_per_trip)}/trip
+                            </div>
+                            {(d.violation_count > 0 || d.accident_history > 0) && (
+                              <div style={{
+                                fontSize: 11,
+                                color: 'var(--status-danger)',
+                              }}>
+                                {d.violation_count > 0 && `⚠ ${d.violation_count} violations`}
+                                {d.violation_count > 0 && d.accident_history > 0 && ', '}
+                                {d.accident_history > 0 && `⚠ ${d.accident_history} accidents`}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      No data for this period
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* SECTION 4: MAINTENANCE RISK ALERT */}
+              <div>
+                <SectionHeader>MAINTENANCE RISK ALERT</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {(() => {
+                    const atRisk = vehicles.filter(v => (v.ai_health_score || 100) < 70).sort((a, b) => a.ai_health_score - b.ai_health_score);
+
+                    return atRisk.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {atRisk.map((v, idx) => {
+                          const recommendation = v.ai_health_score < 50 ? '⚠ High maintenance risk — schedule immediately' : 'Monitor closely';
+
+                          return (
+                            <div key={idx} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              padding: 12,
+                              background: 'var(--bg-surface)',
+                              borderRadius: 2,
+                            }}>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                minWidth: 100,
+                              }}>
+                                {v.plate}
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                color: 'var(--text-secondary)',
+                                minWidth: 120,
+                              }}>
+                                {v.make}
+                              </div>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: v.ai_health_score < 50 ? 'var(--status-danger)' : 'var(--status-warning)',
+                                minWidth: 60,
+                              }}>
+                                {v.ai_health_score}
+                              </div>
+                              <StatusBadge>{v.status}</StatusBadge>
+                              <div style={{ flex: 1, fontSize: 12, color: 'var(--status-danger)' }}>
+                                {recommendation}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{
+                        padding: 20,
+                        textAlign: 'center',
+                        color: 'var(--status-success)',
+                        fontSize: 13,
+                      }}>
+                        All vehicles within healthy operating range
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: LANES */}
+          {tab === 'lanes' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+              {/* SECTION 1: CORRIDOR EFFICIENCY */}
+              <div>
+                <SectionHeader>CORRIDOR EFFICIENCY — Revenue per km driven</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {(() => {
+                    const routeMap = new Map<string, { trips: number; total_revenue: number; total_distance: number; total_fuel: number }>();
+                    loads.forEach(load => {
+                      if (!load.pickup_city || !load.delivery_city) return;
+                      const route = `${load.pickup_city} → ${load.delivery_city}`;
+                      const e = routeMap.get(route) || { trips: 0, total_revenue: 0, total_distance: 0, total_fuel: 0 };
+                      routeMap.set(route, {
+                        trips: e.trips + 1,
+                        total_revenue: e.total_revenue + (parseFloat(String(load.total_amount)) || 0),
+                        total_distance: e.total_distance + (parseFloat(String(load.distance)) || 0),
+                        total_fuel: e.total_fuel + (parseFloat(String(load.fuel_surcharge)) || 0),
+                      });
+                    });
+                    const routes = Array.from(routeMap.entries())
+                      .map(([route, d]) => ({
+                        route, trips: d.trips,
+                        total_revenue: d.total_revenue,
+                        rev_per_km: d.total_distance > 0 ? d.total_revenue / d.total_distance : 0,
+                        margin_pct: d.total_revenue > 0 ? ((d.total_revenue - d.total_fuel) / d.total_revenue) * 100 : 0,
+                      }))
+                      .filter(r => r.rev_per_km > 0)
+                      .sort((a, b) => b.rev_per_km - a.rev_per_km)
+                      .slice(0, 8);
+                    if (routes.length === 0) return <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No route data for this period</div>;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        {/* Header row */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 80px 80px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>
+                          {['Route', 'Trips', 'Revenue', 'Rev/km', 'Margin'].map(h => (
+                            <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+                          ))}
+                        </div>
+                        {routes.map((r, idx) => (
+                          <div key={idx} style={{
+                            display: 'grid', gridTemplateColumns: '1fr 80px 100px 80px 80px', gap: 12,
+                            padding: '10px 12px',
+                            borderBottom: '1px solid var(--border-row)',
+                            borderLeft: idx < 2 ? '3px solid var(--status-success)' : idx >= routes.length - 2 ? '3px solid var(--status-danger)' : '3px solid transparent',
+                          }}>
+                            <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)' }}>{r.route}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{r.trips}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{formatCurrency(r.total_revenue)}</div>
+                            <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent-primary)' }}>{formatCurrency(r.rev_per_km)}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: r.margin_pct > 50 ? 'var(--status-success)' : r.margin_pct > 30 ? 'var(--status-warning)' : 'var(--status-danger)' }}>{r.margin_pct.toFixed(1)}%</div>
+                          </div>
+                        ))}
+                        <div style={{ padding: '12px 12px 0', fontSize: 12, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                          Green = most efficient corridors · Red = least efficient
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 2: CARGO PERFORMANCE */}
+              <div>
+                <SectionHeader>CARGO PERFORMANCE — Avg revenue per trip by cargo type</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {(() => {
+                    const cargoMap = new Map<string, { count: number; total: number }>();
+                    loads.forEach(load => {
+                      const words = (load.cargo_description || 'Unknown').trim().split(/\s+/).slice(0, 2);
+                      const key = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                      const e = cargoMap.get(key) || { count: 0, total: 0 };
+                      cargoMap.set(key, { count: e.count + 1, total: e.total + (parseFloat(String(load.total_amount)) || 0) });
+                    });
+                    const types = Array.from(cargoMap.entries())
+                      .map(([cargo, d]) => ({ cargo, trips: d.count, avg: d.total / d.count, total: d.total }))
+                      .sort((a, b) => b.avg - a.avg);
+                    if (types.length === 0) return <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No cargo data</div>;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 60px 100px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>
+                          {['Cargo Type', 'Avg/Trip', 'Trips', 'Total'].map(h => (
+                            <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+                          ))}
+                        </div>
+                        {types.map((c, idx) => (
+                          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 60px 100px', gap: 12, padding: '10px 12px', borderBottom: '1px solid var(--border-row)' }}>
+                            <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{c.cargo}</div>
+                            <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: idx === 0 ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{formatCurrency(c.avg)}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{c.trips}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{formatCurrency(c.total)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 3: LOAD STATUS */}
+              <div>
+                <SectionHeader>LOAD PIPELINE STATUS</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                  {(() => {
+                    const pending = loads.filter(l => ['PENDING', 'ASSIGNED'].includes((l.status || '').toUpperCase()));
+                    const inMotion = loads.filter(l => ['IN_TRANSIT'].includes((l.status || '').toUpperCase().replace(' ', '_')));
+                    const completed = loads.filter(l => ['DELIVERED', 'INVOICED'].includes((l.status || '').toUpperCase()));
+                    const pRev = pending.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
+                    const mRev = inMotion.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
+                    const cRev = completed.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
+                    return [
+                      { label: 'Pipeline', count: pending.length, rev: pRev, sub: 'pending dispatch', color: 'var(--text-secondary)' },
+                      { label: 'In Motion', count: inMotion.length, rev: mRev, sub: 'revenue in transit', color: 'var(--accent-primary)' },
+                      { label: 'Completed', count: completed.length, rev: cRev, sub: 'revenue realised', color: 'var(--status-success)' },
+                    ].map((item, idx) => (
+                      <div key={idx} className="card" style={{ padding: 20 }}>
+                        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 12 }}>{item.label}</div>
+                        <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 600, color: item.color, marginBottom: 6 }}>{item.count}</div>
+                        <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginBottom: 4 }}>{formatCurrency(item.rev)}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.sub}</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 4: WEIGHT CLASS */}
+              <div>
+                <SectionHeader>WEIGHT CLASS ANALYSIS — Avg revenue per trip by load size</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                  {(() => {
+                    const bins = [
+                      { label: 'Under 5t', filter: (w: number) => w < 5000 },
+                      { label: '5 – 10t', filter: (w: number) => w >= 5000 && w < 10000 },
+                      { label: '10 – 20t', filter: (w: number) => w >= 10000 && w < 20000 },
+                      { label: '20t+', filter: (w: number) => w >= 20000 },
+                    ].map(b => {
+                      const bl = loads.filter(l => b.filter(parseFloat(String(l.weight)) || 0));
+                      const avg = bl.length > 0 ? bl.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0) / bl.length : 0;
+                      return { ...b, count: bl.length, avg };
+                    });
+                    const maxAvg = Math.max(...bins.map(b => b.avg), 1);
+                    return bins.map((b, idx) => (
+                      <div key={idx} className="card" style={{ padding: 20, borderLeft: b.avg === maxAvg && b.avg > 0 ? '3px solid var(--accent-primary)' : '3px solid transparent' }}>
+                        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 12 }}>{b.label}</div>
+                        <div style={{ fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 600, color: b.avg === maxAvg && b.avg > 0 ? 'var(--accent-primary)' : 'var(--text-primary)', marginBottom: 6 }}>{b.avg > 0 ? formatCurrency(b.avg) : '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>avg/trip · {b.count} loads</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
+            </div>
+          )}
+        </>
+      )}
         </>
       )}
     </div>

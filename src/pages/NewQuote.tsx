@@ -682,8 +682,8 @@ export default function NewQuote() {
                   </div>
                 )}
                 {fuelPriceData.is_stale && (
-                  <div style={{ marginTop: 6, padding: '6px 8px', background: 'var(--bg-surface)', border: '1px solid var(--status-warning)', borderRadius: 2, fontSize: 10, color: 'var(--status-warning)', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Fuel price may be outdated (last update 7+ days ago)
+                  <div style={{ marginTop: 6, padding: '6px 8px', background: 'var(--bg-surface)', border: '1px solid var(--status-warning)', borderRadius: 2, fontSize: 10, color: 'var(--status-warning)', fontFamily: 'var(--font-sans)' }}>
+                    ⚠️ Fuel price may be outdated (last update 7+ days ago)
                   </div>
                 )}
               </div>
@@ -1060,9 +1060,9 @@ export default function NewQuote() {
                     fontWeight: 700,
                     fontFamily: 'var(--font-mono)',
                   }}>
-                    {revenueGuard.risk_level === 'SAFE' && <><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg> SAFE</>}
-                    {revenueGuard.risk_level === 'CAUTION' && <><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> CAUTION</>}
-                    {revenueGuard.risk_level === 'AT_RISK' && <><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> AT RISK</>}
+                    {revenueGuard.risk_level === 'SAFE' && '✓ SAFE'}
+                    {revenueGuard.risk_level === 'CAUTION' && '⚠ CAUTION'}
+                    {revenueGuard.risk_level === 'AT_RISK' && '⚠ AT RISK'}
                   </span>
                 </div>
               </div>
@@ -1099,8 +1099,8 @@ export default function NewQuote() {
                   {(guardExpanded || revenueGuard.risk_level === 'AT_RISK') && (
                     <div style={{ padding: '10px', background: 'var(--bg-surface)', borderRadius: 2, marginBottom: 8 }}>
                       {revenueGuard.explanations.map((explanation, idx) => (
-                        <div key={idx} style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: idx < revenueGuard.explanations!.length - 1 ? 6 : 0, fontFamily: 'var(--font-sans)', lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg> {explanation}
+                        <div key={idx} style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: idx < revenueGuard.explanations!.length - 1 ? 6 : 0, fontFamily: 'var(--font-sans)', lineHeight: 1.5 }}>
+                          ✓ {explanation}
                         </div>
                       ))}
                     </div>
@@ -1226,8 +1226,8 @@ export default function NewQuote() {
           {/* UPGRADE 5: Market Benchmark Card */}
           {marketBenchmark && (
             <div style={{ padding: '16px', background: 'var(--bg-surface-hover)', borderRadius: 2, border: '1px solid var(--border-subtle)', marginBottom: 16 }}>
-              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> SA MARKET RATE FOR {marketBenchmark.origin}→{marketBenchmark.destination} {vehicleType.toUpperCase()}
+              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 10 }}>
+                📊 SA MARKET RATE FOR {marketBenchmark.origin}→{marketBenchmark.destination} {vehicleType.toUpperCase()}
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
@@ -1265,7 +1265,7 @@ export default function NewQuote() {
                     fontWeight: 600
                   }}>
                     {(marketBenchmark.your_vs_market_pct ?? 0) > 0 ? '+' : ''}{(marketBenchmark.your_vs_market_pct ?? 0).toFixed(1)}% {(marketBenchmark.your_vs_market_pct ?? 0) < 0 ? 'below' : 'above'} market
-                    {(marketBenchmark.your_vs_market_pct ?? 0) < 0 && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginLeft: 4, display: 'inline-block', verticalAlign: 'middle' }}><polyline points="20 6 9 17 4 12"/></svg>}
+                    {(marketBenchmark.your_vs_market_pct ?? 0) < 0 && ' ✓'}
                   </span>
                 </div>
               </div>

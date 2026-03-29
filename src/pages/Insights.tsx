@@ -1807,342 +1807,157 @@ export default function Insights() {
           {/* TAB 5: LANES */}
           {tab === 'lanes' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {/* SECTION 1: CORRIDOR INTELLIGENCE */}
+
+              {/* SECTION 1: CORRIDOR EFFICIENCY */}
               <div>
                 <SectionHeader>CORRIDOR EFFICIENCY — Revenue per km driven</SectionHeader>
-                {(() => {
-                  const routeMap = new Map<string, {
-                    trips: number;
-                    total_revenue: number;
-                    total_distance: number;
-                    total_fuel: number;
-                  }>();
-
-                  loads.forEach(load => {
-                    const route = `${load.pickup_city} → ${load.delivery_city}`;
-                    const existing = routeMap.get(route) || {
-                      trips: 0,
-                      total_revenue: 0,
-                      total_distance: 0,
-                      total_fuel: 0,
-                    };
-                    routeMap.set(route, {
-                      trips: existing.trips + 1,
-                      total_revenue: existing.total_revenue + load.total_amount,
-                      total_distance: existing.total_distance + load.distance,
-                      total_fuel: existing.total_fuel + (load.fuel_surcharge || 0),
+                <div className="card" style={{ padding: 20 }}>
+                  {(() => {
+                    const routeMap = new Map<string, { trips: number; total_revenue: number; total_distance: number; total_fuel: number }>();
+                    loads.forEach(load => {
+                      if (!load.pickup_city || !load.delivery_city) return;
+                      const route = `${load.pickup_city} → ${load.delivery_city}`;
+                      const e = routeMap.get(route) || { trips: 0, total_revenue: 0, total_distance: 0, total_fuel: 0 };
+                      routeMap.set(route, {
+                        trips: e.trips + 1,
+                        total_revenue: e.total_revenue + (parseFloat(String(load.total_amount)) || 0),
+                        total_distance: e.total_distance + (parseFloat(String(load.distance)) || 0),
+                        total_fuel: e.total_fuel + (parseFloat(String(load.fuel_surcharge)) || 0),
+                      });
                     });
-                  });
-
-                  const routes = Array.from(routeMap.entries())
-                    .map(([route, data]) => ({
-                      route,
-                      trips: data.trips,
-                      total_revenue: data.total_revenue,
-                      avg_revenue: data.total_revenue / data.trips,
-                      total_distance: data.total_distance,
-                      rev_per_km: data.total_distance > 0 ? data.total_revenue / data.total_distance : 0,
-                      net_margin_r: data.total_revenue - data.total_fuel,
-                      margin_pct: data.total_revenue > 0 ? ((data.total_revenue - data.total_fuel) / data.total_revenue) * 100 : 0,
-                    }))
-                    .sort((a, b) => b.rev_per_km - a.rev_per_km)
-                    .slice(0, 8);
-
-                  return routes.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, alignItems: 'start' }}>
-                      {routes.map((r, idx) => {
-                        const isTop2 = idx < 2;
-                        const isBottom2 = idx >= routes.length - 2 && routes.length >= 4;
-
-                        return (
-                          <div
-                            key={idx}
-                            className="card"
-                            style={{
-                              padding: 16,
-                              borderLeft: `3px solid ${isTop2 ? 'var(--status-success)' : isBottom2 ? 'var(--status-danger)' : 'transparent'}`,
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                                {r.route}
-                              </div>
-                              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                                {r.trips} trips
-                              </div>
-                            </div>
-                            <div style={{
-                              fontSize: 24,
-                              fontFamily: 'var(--font-mono)',
-                              fontWeight: 600,
-                              color: 'var(--accent-primary)',
-                              marginBottom: 12,
-                            }}>
-                              {formatCurrency(r.rev_per_km)}/km
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                                {formatCurrency(r.total_revenue)}
-                              </div>
-                              <div style={{
-                                fontSize: 12,
-                                fontFamily: 'var(--font-mono)',
-                                fontWeight: 600,
-                                color: r.margin_pct > 50 ? 'var(--status-success)' : r.margin_pct > 30 ? 'var(--status-warning)' : 'var(--status-danger)',
-                              }}>
-                                {r.margin_pct.toFixed(1)}%
-                              </div>
-                            </div>
-                            <div style={{
-                              height: 6,
-                              background: 'var(--bg-surface-hover)',
-                              borderRadius: 3,
-                              overflow: 'hidden',
-                            }}>
-                              <div style={{
-                                width: `${r.margin_pct}%`,
-                                height: '100%',
-                                background: r.margin_pct > 50 ? 'var(--status-success)' : r.margin_pct > 30 ? 'var(--status-warning)' : 'var(--status-danger)',
-                              }} />
-                            </div>
+                    const routes = Array.from(routeMap.entries())
+                      .map(([route, d]) => ({
+                        route, trips: d.trips,
+                        total_revenue: d.total_revenue,
+                        rev_per_km: d.total_distance > 0 ? d.total_revenue / d.total_distance : 0,
+                        margin_pct: d.total_revenue > 0 ? ((d.total_revenue - d.total_fuel) / d.total_revenue) * 100 : 0,
+                      }))
+                      .filter(r => r.rev_per_km > 0)
+                      .sort((a, b) => b.rev_per_km - a.rev_per_km)
+                      .slice(0, 8);
+                    if (routes.length === 0) return <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No route data for this period</div>;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        {/* Header row */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 80px 80px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>
+                          {['Route', 'Trips', 'Revenue', 'Rev/km', 'Margin'].map(h => (
+                            <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+                          ))}
+                        </div>
+                        {routes.map((r, idx) => (
+                          <div key={idx} style={{
+                            display: 'grid', gridTemplateColumns: '1fr 80px 100px 80px 80px', gap: 12,
+                            padding: '10px 12px',
+                            borderBottom: '1px solid var(--border-row)',
+                            borderLeft: idx < 2 ? '3px solid var(--status-success)' : idx >= routes.length - 2 ? '3px solid var(--status-danger)' : '3px solid transparent',
+                          }}>
+                            <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)' }}>{r.route}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{r.trips}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{formatCurrency(r.total_revenue)}</div>
+                            <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent-primary)' }}>{formatCurrency(r.rev_per_km)}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: r.margin_pct > 50 ? 'var(--status-success)' : r.margin_pct > 30 ? 'var(--status-warning)' : 'var(--status-danger)' }}>{r.margin_pct.toFixed(1)}%</div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-                      <div style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                        No data for this period
+                        ))}
+                        <div style={{ padding: '12px 12px 0', fontSize: 12, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                          Green = most efficient corridors · Red = least efficient
+                        </div>
                       </div>
-                    </div>
-                  );
-                })()}
+                    );
+                  })()}
+                </div>
               </div>
 
-              {/* SECTION 2: CARGO INTELLIGENCE */}
+              {/* SECTION 2: CARGO PERFORMANCE */}
               <div>
                 <SectionHeader>CARGO PERFORMANCE — Avg revenue per trip by cargo type</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
                   {(() => {
-                    const cargoMap = new Map<string, { count: number; totalRevenue: number }>();
-
+                    const cargoMap = new Map<string, { count: number; total: number }>();
                     loads.forEach(load => {
-                      const cargoWords = (load.cargo_description || 'Unknown').split(' ').slice(0, 2);
-                      const cargo = cargoWords.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-                      const existing = cargoMap.get(cargo) || { count: 0, totalRevenue: 0 };
-                      cargoMap.set(cargo, {
-                        count: existing.count + 1,
-                        totalRevenue: existing.totalRevenue + load.total_amount,
-                      });
+                      const words = (load.cargo_description || 'Unknown').trim().split(/\s+/).slice(0, 2);
+                      const key = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                      const e = cargoMap.get(key) || { count: 0, total: 0 };
+                      cargoMap.set(key, { count: e.count + 1, total: e.total + (parseFloat(String(load.total_amount)) || 0) });
                     });
-
-                    const cargoTypes = Array.from(cargoMap.entries())
-                      .map(([cargo, data]) => ({
-                        cargo,
-                        trips: data.count,
-                        total_revenue: data.totalRevenue,
-                        avg_revenue: data.totalRevenue / data.count,
-                      }))
-                      .sort((a, b) => b.avg_revenue - a.avg_revenue);
-
-                    return cargoTypes.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {cargoTypes.map((c, idx) => (
-                          <div key={idx} style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 12,
-                            padding: 12,
-                            background: 'var(--bg-surface)',
-                            borderRadius: 2,
-                          }}>
-                            <div style={{ minWidth: 180, fontSize: 13, color: 'var(--text-primary)' }}>
-                              {c.cargo}
-                            </div>
-                            <div style={{ flex: 1 }} />
-                            <div style={{
-                              fontSize: 16,
-                              fontFamily: 'var(--font-mono)',
-                              fontWeight: 600,
-                              color: 'var(--accent-primary)',
-                              minWidth: 120,
-                            }}>
-                              {formatCurrency(c.avg_revenue)}/trip
-                            </div>
-                            <div style={{
-                              fontSize: 11,
-                              fontFamily: 'var(--font-mono)',
-                              color: 'var(--text-secondary)',
-                              minWidth: 80,
-                            }}>
-                              {c.trips} trips
-                            </div>
-                            <div style={{
-                              fontSize: 12,
-                              fontFamily: 'var(--font-mono)',
-                              color: 'var(--text-secondary)',
-                              minWidth: 100,
-                            }}>
-                              {formatCurrency(c.total_revenue)}
-                            </div>
+                    const types = Array.from(cargoMap.entries())
+                      .map(([cargo, d]) => ({ cargo, trips: d.count, avg: d.total / d.count, total: d.total }))
+                      .sort((a, b) => b.avg - a.avg);
+                    if (types.length === 0) return <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No cargo data</div>;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 60px 100px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>
+                          {['Cargo Type', 'Avg/Trip', 'Trips', 'Total'].map(h => (
+                            <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+                          ))}
+                        </div>
+                        {types.map((c, idx) => (
+                          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 60px 100px', gap: 12, padding: '10px 12px', borderBottom: '1px solid var(--border-row)' }}>
+                            <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{c.cargo}</div>
+                            <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: idx === 0 ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{formatCurrency(c.avg)}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{c.trips}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{formatCurrency(c.total)}</div>
                           </div>
                         ))}
-                        <div style={{
-                          marginTop: 8,
-                          padding: 12,
-                          background: 'var(--bg-surface)',
-                          borderRadius: 2,
-                          fontSize: 13,
-                          color: 'var(--text-secondary)',
-                        }}>
-                          Your highest-value cargo is <span style={{
-                            fontFamily: 'var(--font-mono)',
-                            fontWeight: 600,
-                            color: 'var(--accent-primary)',
-                          }}>{cargoTypes[0].cargo}</span> at {formatCurrency(cargoTypes[0].avg_revenue)}/trip avg
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                        No data for this period
                       </div>
                     );
                   })()}
                 </div>
               </div>
 
-              {/* SECTION 3: LOAD STATUS INTELLIGENCE */}
+              {/* SECTION 3: LOAD STATUS */}
               <div>
-                <SectionHeader>LOAD STATUS INTELLIGENCE</SectionHeader>
+                <SectionHeader>LOAD PIPELINE STATUS</SectionHeader>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                   {(() => {
-                    const pending = loads.filter(l => ['PENDING', 'DRAFT'].includes(l.status.toUpperCase()));
-                    const pendingRev = pending.reduce((sum, l) => sum + l.total_amount, 0);
-
-                    const inMotion = loads.filter(l => ['IN_TRANSIT', 'ASSIGNED'].includes(l.status.toUpperCase().replace(' ', '_')));
-                    const inMotionRev = inMotion.reduce((sum, l) => sum + l.total_amount, 0);
-
-                    const completed = loads.filter(l => ['DELIVERED', 'INVOICED', 'COMPLETED'].includes(l.status.toUpperCase()));
-                    const completedRev = completed.reduce((sum, l) => sum + l.total_amount, 0);
-
-                    return (
-                      <>
-                        <div className="card" style={{ padding: 20, background: 'var(--text-secondary)', color: 'white' }}>
-                          <div style={{
-                            fontSize: 28,
-                            fontFamily: 'var(--font-mono)',
-                            fontWeight: 600,
-                            marginBottom: 8,
-                          }}>
-                            {pending.length}
-                          </div>
-                          <div style={{ fontSize: 13, marginBottom: 4, opacity: 0.9 }}>
-                            loads
-                          </div>
-                          <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', opacity: 0.85 }}>
-                            {formatCurrency(pendingRev)} pending dispatch
-                          </div>
-                        </div>
-
-                        <div className="card" style={{ padding: 20, background: 'var(--accent-primary)', color: 'white' }}>
-                          <div style={{
-                            fontSize: 28,
-                            fontFamily: 'var(--font-mono)',
-                            fontWeight: 600,
-                            marginBottom: 8,
-                          }}>
-                            {inMotion.length}
-                          </div>
-                          <div style={{ fontSize: 13, marginBottom: 4, opacity: 0.9 }}>
-                            loads
-                          </div>
-                          <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', opacity: 0.85 }}>
-                            {formatCurrency(inMotionRev)} revenue in transit
-                          </div>
-                        </div>
-
-                        <div className="card" style={{ padding: 20, background: 'var(--status-success)', color: 'white' }}>
-                          <div style={{
-                            fontSize: 28,
-                            fontFamily: 'var(--font-mono)',
-                            fontWeight: 600,
-                            marginBottom: 8,
-                          }}>
-                            {completed.length}
-                          </div>
-                          <div style={{ fontSize: 13, marginBottom: 4, opacity: 0.9 }}>
-                            loads
-                          </div>
-                          <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', opacity: 0.85 }}>
-                            {formatCurrency(completedRev)} revenue completed
-                          </div>
-                        </div>
-                      </>
-                    );
+                    const pending = loads.filter(l => ['PENDING', 'ASSIGNED'].includes((l.status || '').toUpperCase()));
+                    const inMotion = loads.filter(l => ['IN_TRANSIT'].includes((l.status || '').toUpperCase().replace(' ', '_')));
+                    const completed = loads.filter(l => ['DELIVERED', 'INVOICED'].includes((l.status || '').toUpperCase()));
+                    const pRev = pending.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
+                    const mRev = inMotion.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
+                    const cRev = completed.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
+                    return [
+                      { label: 'Pipeline', count: pending.length, rev: pRev, sub: 'pending dispatch', color: 'var(--text-secondary)' },
+                      { label: 'In Motion', count: inMotion.length, rev: mRev, sub: 'revenue in transit', color: 'var(--accent-primary)' },
+                      { label: 'Completed', count: completed.length, rev: cRev, sub: 'revenue realised', color: 'var(--status-success)' },
+                    ].map((item, idx) => (
+                      <div key={idx} className="card" style={{ padding: 20 }}>
+                        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 12 }}>{item.label}</div>
+                        <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 600, color: item.color, marginBottom: 6 }}>{item.count}</div>
+                        <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginBottom: 4 }}>{formatCurrency(item.rev)}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.sub}</div>
+                      </div>
+                    ));
                   })()}
                 </div>
               </div>
 
-              {/* SECTION 4: WEIGHT CLASS ANALYSIS */}
+              {/* SECTION 4: WEIGHT CLASS */}
               <div>
-                <SectionHeader>WEIGHT CLASS ANALYSIS</SectionHeader>
+                <SectionHeader>WEIGHT CLASS ANALYSIS — Avg revenue per trip by load size</SectionHeader>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
                   {(() => {
                     const bins = [
-                      { label: 'Under 5t', loads: loads.filter(l => l.weight < 5000) },
-                      { label: '5-10t', loads: loads.filter(l => l.weight >= 5000 && l.weight < 10000) },
-                      { label: '10-20t', loads: loads.filter(l => l.weight >= 10000 && l.weight < 20000) },
-                      { label: '20t+', loads: loads.filter(l => l.weight >= 20000) },
-                    ].map(bin => ({
-                      ...bin,
-                      count: bin.loads.length,
-                      avg: bin.loads.length > 0 ? bin.loads.reduce((sum, l) => sum + l.total_amount, 0) / bin.loads.length : 0,
-                    }));
-
-                    const maxAvg = Math.max(...bins.map(b => b.avg), 1);
-
-                    return bins.map((bin, idx) => {
-                      const isHighest = bin.avg === maxAvg && bin.avg > 0;
-
-                      return (
-                        <div
-                          key={idx}
-                          className="card"
-                          style={{
-                            padding: 20,
-                            borderLeft: isHighest ? '3px solid var(--accent-primary)' : 'none',
-                          }}
-                        >
-                          <div style={{
-                            fontSize: 11,
-                            fontFamily: 'var(--font-mono)',
-                            textTransform: 'uppercase',
-                            color: 'var(--text-tertiary)',
-                            marginBottom: 8,
-                          }}>
-                            {bin.label}
-                          </div>
-                          <div style={{
-                            fontSize: 20,
-                            fontFamily: 'var(--font-mono)',
-                            fontWeight: 600,
-                            color: isHighest ? 'var(--accent-primary)' : 'var(--text-primary)',
-                            marginBottom: 8,
-                          }}>
-                            {formatCurrency(bin.avg)}
-                          </div>
-                          <div style={{
-                            fontSize: 11,
-                            color: 'var(--text-secondary)',
-                          }}>
-                            avg per trip · {bin.count} loads
-                          </div>
-                        </div>
-                      );
+                      { label: 'Under 5t', filter: (w: number) => w < 5000 },
+                      { label: '5 – 10t', filter: (w: number) => w >= 5000 && w < 10000 },
+                      { label: '10 – 20t', filter: (w: number) => w >= 10000 && w < 20000 },
+                      { label: '20t+', filter: (w: number) => w >= 20000 },
+                    ].map(b => {
+                      const bl = loads.filter(l => b.filter(parseFloat(String(l.weight)) || 0));
+                      const avg = bl.length > 0 ? bl.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0) / bl.length : 0;
+                      return { ...b, count: bl.length, avg };
                     });
+                    const maxAvg = Math.max(...bins.map(b => b.avg), 1);
+                    return bins.map((b, idx) => (
+                      <div key={idx} className="card" style={{ padding: 20, borderLeft: b.avg === maxAvg && b.avg > 0 ? '3px solid var(--accent-primary)' : '3px solid transparent' }}>
+                        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 12 }}>{b.label}</div>
+                        <div style={{ fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 600, color: b.avg === maxAvg && b.avg > 0 ? 'var(--accent-primary)' : 'var(--text-primary)', marginBottom: 6 }}>{b.avg > 0 ? formatCurrency(b.avg) : '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>avg/trip · {b.count} loads</div>
+                      </div>
+                    ));
                   })()}
                 </div>
               </div>
+
             </div>
           )}
         </>

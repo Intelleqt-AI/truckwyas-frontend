@@ -387,9 +387,6 @@ export default function Insights() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Insights</div>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-              Operational intelligence • Last updated: {new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
-            </div>
           </div>
           <button className="btn-action" onClick={exportToCSV}>↓ EXPORT CSV</button>
         </div>

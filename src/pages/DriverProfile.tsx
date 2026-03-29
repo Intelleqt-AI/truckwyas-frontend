@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
+import { formatCurrency } from "@/lib/formatters";
 
 const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] as const;
 
@@ -17,7 +18,9 @@ const STATUS_COLOR: Record<string, string> = {
 export default function DriverProfile() {
   const { driverId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
+  const isFinancial = location.pathname.endsWith('/financial');
   const [updating, setUpdating] = useState(false);
 
   const { data: driver, isLoading } = useQuery({
@@ -58,6 +61,31 @@ export default function DriverProfile() {
   const completedTrips = completedLoads.length;
   const avgRevPerTrip = completedTrips > 0 ? totalRevenue / completedTrips : 0;
   const totalDistance = completedLoads.reduce((s: number, l: any) => s + parseFloat(l.distance || '0'), 0);
+
+  // Financial metrics (for Financial Profile tab)
+  const totalFuelCost = loads.reduce((s: number, l: any) => s + parseFloat(l.fuel_cost || '0'), 0);
+  const totalDistanceKm = loads.reduce((s: number, l: any) => s + parseFloat(l.distance_km || l.distance || '0'), 0);
+  const netMargin = totalRevenue - totalFuelCost;
+  const bestTrip = loads.length > 0 ? loads.reduce((max: any, l: any) => {
+    const amt = parseFloat(l.total_amount || '0');
+    const maxAmt = parseFloat(max.total_amount || '0');
+    return amt > maxAmt ? l : max;
+  }, loads[0]) : null;
+  const worstTrip = loads.length > 0 ? loads.reduce((min: any, l: any) => {
+    const amt = parseFloat(l.total_amount || '0');
+    const minAmt = parseFloat(min.total_amount || '0');
+    return amt > 0 && amt < minAmt ? l : min;
+  }, loads[0]) : null;
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    background: 'transparent', border: 'none',
+    borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
+    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+    fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
+    fontWeight: active ? 600 : 400,
+    textTransform: 'uppercase', padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
+    transition: 'all 0.2s ease',
+  });
 
   return (
     <div>
@@ -115,6 +143,15 @@ export default function DriverProfile() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 24, display: 'flex' }}>
+        <button style={tabStyle(!isFinancial)} onClick={() => navigate(`/fleet/drivers/${driverId}`)}>Overview</button>
+        <button style={tabStyle(isFinancial)} onClick={() => navigate(`/fleet/drivers/${driverId}/financial`)}>Financial Profile</button>
+      </div>
+
+      {/* ── OVERVIEW TAB ── */}
+      {!isFinancial && (
+        <>
       {/* KPI strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         <div className="card metric-card">
@@ -242,6 +279,95 @@ export default function DriverProfile() {
           </table>
         )}
       </div>
+        </>
+      )}
+
+      {/* ── FINANCIAL PROFILE TAB ── */}
+      {isFinancial && (
+        <>
+          {/* KPI strip */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+            <div className="card metric-card">
+              <div className="card-header"><span className="card-title">Revenue Generated</span></div>
+              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>
+                {formatCurrency(totalRevenue)}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{completedTrips} completed trips</div>
+            </div>
+            <div className="card metric-card">
+              <div className="card-header"><span className="card-title">Total Trips</span></div>
+              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                {totalTrips}
+              </div>
+            </div>
+            <div className="card metric-card">
+              <div className="card-header"><span className="card-title">Avg Revenue per Trip</span></div>
+              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                {formatCurrency(avgRevPerTrip)}
+              </div>
+            </div>
+            <div className="card metric-card">
+              <div className="card-header"><span className="card-title">Completed Trips</span></div>
+              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                {completedTrips}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            {/* Earnings Breakdown */}
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 16 }}>EARNINGS BREAKDOWN</div>
+              {[
+                { label: 'TOTAL REVENUE', value: formatCurrency(totalRevenue) },
+                { label: 'AVG PER TRIP', value: formatCurrency(avgRevPerTrip) },
+                { label: 'BEST TRIP', value: bestTrip ? formatCurrency(parseFloat(bestTrip.total_amount || '0')) : '—' },
+                { label: 'WORST TRIP', value: worstTrip ? formatCurrency(parseFloat(worstTrip.total_amount || '0')) : '—' },
+              ].map(r => (
+                <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Route History */}
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 16 }}>ROUTE HISTORY</div>
+              {loads.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '20px 0', textAlign: 'center' }}>No loads recorded</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {loads.slice(0, 10).map((load: any) => (
+                    <div
+                      key={load.id}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-row)', cursor: 'pointer' }}
+                      onClick={() => navigate(`/bookings/${load.id}`)}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{load.load_number}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                          {load.pickup_city || '—'} → {load.delivery_city || '—'}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>
+                          {formatCurrency(parseFloat(load.total_amount || '0'))}
+                        </div>
+                        <div style={{ fontSize: 10, color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>
+                          {load.status?.replace('_', ' ')}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

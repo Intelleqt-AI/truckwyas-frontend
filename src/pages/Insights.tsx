@@ -1862,8 +1862,6 @@ export default function Insights() {
           )}
         </>
       )}
-        </>
-      )}
     </div>
   );
 }

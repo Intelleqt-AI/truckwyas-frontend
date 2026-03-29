@@ -100,6 +100,7 @@ interface Load {
   fuel_surcharge: number;
   rate: number;
   created_at: string;
+  pickup_date: string;
 }
 
 interface Invoice {
@@ -134,6 +135,8 @@ interface Driver {
   status: string;
   user_details: {
     name: string;
+    first_name?: string;
+    last_name?: string;
   };
 }
 
@@ -154,12 +157,12 @@ interface Vehicle {
   revenue_generated: number;
 }
 
-type TabType = 'briefing' | 'profitability' | 'cash' | 'fleet' | 'lanes';
+type TabType = 'briefing' | 'margin' | 'cash' | 'fleet' | 'lanes';
 type PeriodType = 'THIS_MONTH' | 'LAST_MONTH' | 'LAST_3M' | 'LAST_6M' | 'LAST_12M' | 'CUSTOM';
 
 const TABS = [
   { id: 'briefing' as TabType, label: 'Briefing' },
-  { id: 'profitability' as TabType, label: 'Profitability' },
+  { id: 'margin' as TabType, label: 'Margin Engine' },
   { id: 'cash' as TabType, label: 'Cash Flow' },
   { id: 'fleet' as TabType, label: 'Fleet' },
   { id: 'lanes' as TabType, label: 'Lanes' },
@@ -233,38 +236,25 @@ export default function Insights() {
       try {
         switch (tab) {
           case 'briefing':
-            const [kpi, insights, loadsResp, invoicesResp] = await Promise.all([
+            const [kpi, insights, loadsResp] = await Promise.all([
               fetchData('api/v1/dashboard/kpi/').catch(() => null),
               fetchData('api/v1/dashboard/insights/').catch(() => ({ recommendations: [] })),
               fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
-              fetchData('api/v1/invoices/?page_size=100').catch(() => ({ results: [] })),
             ]);
             setKpiData(kpi);
             setInsightsData(insights);
             setLoads(loadsResp?.results || []);
-            setInvoices(invoicesResp?.results || []);
             break;
 
-          case 'profitability':
-            const [finance, loadsData, expensesData, vehiclesData, driversData] = await Promise.all([
+          case 'margin':
+            const [finance, loadsData, expensesData] = await Promise.all([
               fetchData(`api/v1/dashboard/finance/?${params}`).catch(() => null),
               fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
               fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
-              fetchData('api/v1/vehicles/?page_size=50').catch(() => ({ results: [] })),
-              fetchData('api/v1/drivers/?page_size=50').catch(() => ({ results: [] })),
             ]);
             setFinanceData(finance);
             setLoads(loadsData?.results || []);
             setExpenses(expensesData?.results || []);
-            setVehicles((vehiclesData?.results || []).map((v: any) => ({
-              ...v,
-              uptime_percentage: parseFloat(v.uptime_percentage || '0'),
-              cost_per_km: parseFloat(v.cost_per_km || '0'),
-              margin_per_trip: parseFloat(v.margin_per_trip || '0'),
-              capacity: parseFloat(v.capacity || '0'),
-              mileage: parseFloat(v.mileage || '0'),
-            })));
-            setDrivers(driversData?.results || []);
             break;
 
           case 'cash':
@@ -289,7 +279,6 @@ export default function Insights() {
               uptime_percentage: parseFloat(v.uptime_percentage || '0'),
               cost_per_km: parseFloat(v.cost_per_km || '0'),
               margin_per_trip: parseFloat(v.margin_per_trip || '0'),
-              capacity: parseFloat(v.capacity || '0'),
               mileage: parseFloat(v.mileage || '0'),
             })));
             setDrivers(drv?.results || []);
@@ -316,16 +305,6 @@ export default function Insights() {
   }, [tab, period, customFrom, customTo]);
 
   // Helper functions
-  const getSeverityDot = (severity: string) => {
-    const colors: Record<string, string> = {
-      CRITICAL: '#ff0000',
-      HIGH: '#ff0000',
-      MEDIUM: '#ff9500',
-      LOW: '#00ff00',
-    };
-    return colors[severity] || '#999999';
-  };
-
   const getMarginColor = (pct: number) => {
     if (pct > 50) return 'var(--status-success)';
     if (pct >= 30) return 'var(--status-warning)';
@@ -338,151 +317,10 @@ export default function Insights() {
     return 'var(--status-danger)';
   };
 
-  // Calculate route profitability
-  const getRouteProfitability = () => {
-    const routeMap = new Map<string, { trips: number; totalRevenue: number; totalDistance: number }>();
-
-    loads.forEach(load => {
-      const route = `${load.pickup_city} → ${load.delivery_city}`;
-      const existing = routeMap.get(route) || { trips: 0, totalRevenue: 0, totalDistance: 0 };
-      routeMap.set(route, {
-        trips: existing.trips + 1,
-        totalRevenue: existing.totalRevenue + load.total_amount,
-        totalDistance: existing.totalDistance + load.distance,
-      });
-    });
-
-    return Array.from(routeMap.entries())
-      .map(([route, data]) => ({
-        route,
-        trips: data.trips,
-        totalRevenue: data.totalRevenue,
-        avgRevenue: data.totalRevenue / data.trips,
-        revenuePerKm: data.totalDistance > 0 ? data.totalRevenue / data.totalDistance : 0,
-      }))
-      .sort((a, b) => b.revenuePerKm - a.revenuePerKm)
-      .slice(0, 10);
-  };
-
-  // Calculate cargo intelligence
-  const getCargoIntelligence = () => {
-    const cargoMap = new Map<string, { count: number; totalRevenue: number }>();
-
-    loads.forEach(load => {
-      const cargo = load.cargo_description?.split(' ').slice(0, 2).join(' ') || 'Unknown';
-      const existing = cargoMap.get(cargo) || { count: 0, totalRevenue: 0 };
-      cargoMap.set(cargo, {
-        count: existing.count + 1,
-        totalRevenue: existing.totalRevenue + load.total_amount,
-      });
-    });
-
-    return Array.from(cargoMap.entries())
-      .map(([cargo, data]) => ({
-        cargo,
-        tripCount: data.count,
-        totalRevenue: data.totalRevenue,
-        avgRevenue: data.totalRevenue / data.count,
-      }))
-      .sort((a, b) => b.avgRevenue - a.avgRevenue)
-      .slice(0, 10);
-  };
-
-  // Calculate weight bins
-  const getWeightBins = () => {
-    const bins = {
-      under5: { count: 0, totalRevenue: 0 },
-      '5to10': { count: 0, totalRevenue: 0 },
-      '10to20': { count: 0, totalRevenue: 0 },
-      over20: { count: 0, totalRevenue: 0 },
-    };
-
-    loads.forEach(load => {
-      const weight = load.weight;
-      const amount = load.total_amount;
-
-      if (weight < 5) {
-        bins.under5.count++;
-        bins.under5.totalRevenue += amount;
-      } else if (weight < 10) {
-        bins['5to10'].count++;
-        bins['5to10'].totalRevenue += amount;
-      } else if (weight < 20) {
-        bins['10to20'].count++;
-        bins['10to20'].totalRevenue += amount;
-      } else {
-        bins.over20.count++;
-        bins.over20.totalRevenue += amount;
-      }
-    });
-
-    return [
-      { label: 'Under 5t', ...bins.under5, avg: bins.under5.count > 0 ? bins.under5.totalRevenue / bins.under5.count : 0 },
-      { label: '5-10t', ...bins['5to10'], avg: bins['5to10'].count > 0 ? bins['5to10'].totalRevenue / bins['5to10'].count : 0 },
-      { label: '10-20t', ...bins['10to20'], avg: bins['10to20'].count > 0 ? bins['10to20'].totalRevenue / bins['10to20'].count : 0 },
-      { label: '20t+', ...bins.over20, avg: bins.over20.count > 0 ? bins.over20.totalRevenue / bins.over20.count : 0 },
-    ];
-  };
-
-  // Calculate invoice aging
-  const getInvoiceAging = () => {
-    const now = new Date();
-    const buckets = {
-      current: { count: 0, amount: 0 },
-      '1to30': { count: 0, amount: 0 },
-      '31to60': { count: 0, amount: 0 },
-      '60plus': { count: 0, amount: 0 },
-    };
-
-    invoices.forEach(inv => {
-      const dueDate = new Date(inv.due_date);
-      const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-      const amount = inv.balance;
-
-      if (daysOverdue <= 0) {
-        buckets.current.count++;
-        buckets.current.amount += amount;
-      } else if (daysOverdue <= 30) {
-        buckets['1to30'].count++;
-        buckets['1to30'].amount += amount;
-      } else if (daysOverdue <= 60) {
-        buckets['31to60'].count++;
-        buckets['31to60'].amount += amount;
-      } else {
-        buckets['60plus'].count++;
-        buckets['60plus'].amount += amount;
-      }
-    });
-
-    const total = buckets.current.amount + buckets['1to30'].amount + buckets['31to60'].amount + buckets['60plus'].amount;
-
-    return [
-      { label: 'Current', ...buckets.current, pct: total > 0 ? (buckets.current.amount / total) * 100 : 0, color: 'var(--status-success)' },
-      { label: '1-30 days', ...buckets['1to30'], pct: total > 0 ? (buckets['1to30'].amount / total) * 100 : 0, color: 'var(--status-warning)' },
-      { label: '31-60 days', ...buckets['31to60'], pct: total > 0 ? (buckets['31to60'].amount / total) * 100 : 0, color: 'var(--status-danger)' },
-      { label: '60+ days', ...buckets['60plus'], pct: total > 0 ? (buckets['60plus'].amount / total) * 100 : 0, color: 'var(--status-danger)' },
-    ];
-  };
-
-  // Calculate expense categories
-  const getExpenseCategories = () => {
-    const categoryMap = new Map<string, number>();
-    let total = 0;
-
-    expenses.forEach(exp => {
-      const existing = categoryMap.get(exp.category) || 0;
-      categoryMap.set(exp.category, existing + exp.amount);
-      total += exp.amount;
-    });
-
-    return Array.from(categoryMap.entries())
-      .map(([category, amount]) => ({
-        category,
-        amount,
-        pct: total > 0 ? (amount / total) * 100 : 0,
-      }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 6);
+  const getSeverityDot = (severity: string) => {
+    if (severity === 'HIGH' || severity === 'CRITICAL') return 'var(--status-danger)';
+    if (severity === 'MEDIUM') return 'var(--status-warning)';
+    return 'var(--status-success)';
   };
 
   const SectionHeader = ({ children }: { children: string }) => (
@@ -492,7 +330,22 @@ export default function Insights() {
       color: 'var(--text-tertiary)',
       letterSpacing: '0.08em',
       textTransform: 'uppercase',
-      marginBottom: 12,
+      marginBottom: 16,
+    }}>
+      {children}
+    </div>
+  );
+
+  const StatusBadge = ({ children }: { children: string }) => (
+    <div style={{
+      fontSize: 10,
+      fontFamily: 'var(--font-mono)',
+      textTransform: 'uppercase',
+      padding: '2px 8px',
+      borderRadius: 2,
+      background: 'var(--bg-surface-hover)',
+      color: 'var(--text-secondary)',
+      display: 'inline-block',
     }}>
       {children}
     </div>
@@ -603,250 +456,288 @@ export default function Insights() {
 
       {/* Content */}
       {loading ? (
-        <div style={{ color: 'var(--text-tertiary)', textAlign: 'center', padding: 40 }}>Loading...</div>
+        <div style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', textAlign: 'center', padding: 40 }}>—</div>
       ) : (
         <>
           {/* TAB 1: BRIEFING */}
           {tab === 'briefing' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Section A: BUSINESS HEALTH */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>BUSINESS HEALTH</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                  {/* Revenue Momentum */}
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Revenue Momentum</div>
-                    <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-                      {kpiData?.revenue_change_pct !== undefined ? (
-                        <span style={{ color: kpiData.revenue_change_pct >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>
-                          {kpiData.revenue_change_pct >= 0 ? '+' : ''}{kpiData.revenue_change_pct.toFixed(1)}%
-                        </span>
-                      ) : '—'}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* SECTION 1: BUSINESS PULSE */}
+              <div>
+                <SectionHeader>BUSINESS PULSE</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
+                  {/* Revenue MTD */}
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{ fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                      {formatCurrency(kpiData?.revenue_mtd || 0)}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                      {kpiData?.revenue_change_pct !== undefined && kpiData.revenue_change_pct >= 0 ? 'Up vs last month' : 'Down — investigate'}
-                    </div>
-                  </div>
-
-                  {/* Margin Health */}
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Margin Health</div>
-                    <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>
-                      <span style={{ color: getMarginColor(kpiData?.net_margin_pct || 0) }}>
-                        {(kpiData?.net_margin_pct || 0).toFixed(1)}%
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                      {(kpiData?.net_margin_pct || 0) > 50 ? 'Healthy' : (kpiData?.net_margin_pct || 0) >= 30 ? 'Watch fuel costs' : 'Margin under pressure'}
+                    {kpiData?.revenue_change_pct !== undefined && (
+                      <div style={{
+                        fontSize: 12,
+                        fontFamily: 'var(--font-mono)',
+                        color: kpiData.revenue_change_pct >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                        marginBottom: 8,
+                      }}>
+                        {kpiData.revenue_change_pct >= 0 ? '+' : ''}{kpiData.revenue_change_pct.toFixed(1)}%
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Revenue MTD
                     </div>
                   </div>
 
-                  {/* Cash Risk */}
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Cash Risk</div>
-                    <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>
-                      <span style={{ color: getDSOColor(kpiData?.dso || 0) }}>
-                        {Math.round(kpiData?.dso || 0)}d
-                      </span>
+                  {/* Net Margin */}
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: getMarginColor(kpiData?.net_margin_pct || 0),
+                      marginBottom: 12,
+                    }}>
+                      {(kpiData?.net_margin_pct || 0).toFixed(1)}%
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                      {(kpiData?.dso || 0) < 30 ? `Collecting in ${Math.round(kpiData?.dso || 0)} days avg` : `Slow payments — ${Math.round(kpiData?.dso || 0)} days avg`}
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Net Margin
                     </div>
                   </div>
 
-                  {/* Fleet Pulse */}
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Fleet Pulse</div>
-                    <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                  {/* DSO */}
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: getDSOColor(kpiData?.dso || 0),
+                      marginBottom: 4,
+                    }}>
+                      {Math.round(kpiData?.dso || 0)}d
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 8 }}>
+                      avg days to collect
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      DSO
+                    </div>
+                  </div>
+
+                  {/* Fleet Utilisation */}
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 4,
+                    }}>
                       {(kpiData?.fleet_utilization_pct || 0).toFixed(1)}%
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                      {(kpiData?.fleet_utilization_pct || 0).toFixed(0)}% of fleet earning today
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 8 }}>
+                      of fleet active
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Fleet Utilisation
                     </div>
                   </div>
 
-                  {/* Fast Pay Signal */}
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Fast Pay Signal</div>
-                    <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--accent-primary)', marginBottom: 4 }}>
+                  {/* Cash in 30 Days */}
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--status-success)',
+                      marginBottom: 12,
+                    }}>
                       {formatCurrency(kpiData?.total_advance_amount || 0)}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                      {formatCurrency(kpiData?.total_advance_amount || 0)} available via Fast Pay
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Cash Available
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Section B: ALERTS REQUIRING ACTION */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>ALERTS REQUIRING ACTION</SectionHeader>
-                {insightsData?.recommendations && insightsData.recommendations.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {insightsData.recommendations.map((rec, idx) => (
-                      <div key={idx} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: 10,
-                        background: 'var(--bg-surface)',
-                        borderRadius: 2,
-                      }}>
-                        <div style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: '50%',
-                          background: getSeverityDot(rec.severity),
-                          animation: rec.severity === 'CRITICAL' ? 'pulse 1.5s infinite' : 'none',
-                        }} />
-                        <div style={{
-                          padding: '2px 6px',
-                          background: 'var(--bg-surface-hover)',
-                          borderRadius: 2,
-                          fontSize: 10,
-                          fontFamily: 'var(--font-mono)',
-                          color: 'var(--text-secondary)',
-                          textTransform: 'uppercase',
-                        }}>
-                          {rec.type.replace(/_/g, ' ')}
-                        </div>
-                        <div style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
-                          {rec.message}
-                        </div>
-                        {rec.days_overdue && (
-                          <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                            {rec.days_overdue}d
-                          </div>
-                        )}
-                        {rec.amount && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                            {formatCurrency(rec.amount)}
-                          </div>
-                        )}
-                        {rec.link && (
-                          <button
-                            onClick={() => navigate(rec.link || '#')}
-                            style={{
-                              padding: '4px 10px',
-                              background: 'var(--accent-primary)',
-                              border: 'none',
-                              borderRadius: 2,
+              {/* SECTION 2: ACTION REQUIRED */}
+              <div>
+                <SectionHeader>ACTION REQUIRED</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {insightsData?.recommendations && insightsData.recommendations.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {[...insightsData.recommendations]
+                        .sort((a, b) => {
+                          const impactA = a.amount || 0;
+                          const impactB = b.amount || 0;
+                          return impactB - impactA;
+                        })
+                        .map((rec, idx) => (
+                          <div key={idx} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            padding: 12,
+                            background: 'var(--bg-surface)',
+                            borderRadius: 2,
+                          }}>
+                            <div style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              background: getSeverityDot(rec.severity),
+                              flexShrink: 0,
+                            }} />
+                            <div style={{
                               fontSize: 10,
                               fontFamily: 'var(--font-mono)',
-                              color: 'var(--bg-deep)',
-                              cursor: 'pointer',
                               textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                            }}
-                          >
-                            ACTION
-                          </button>
-                        )}
+                              padding: '2px 8px',
+                              borderRadius: 2,
+                              background: 'var(--bg-surface-hover)',
+                              color: 'var(--text-secondary)',
+                            }}>
+                              {rec.type.replace(/_/g, ' ')}
+                            </div>
+                            <div style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
+                              {rec.message}
+                            </div>
+                            {rec.amount && (
+                              <div style={{
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                              }}>
+                                {formatCurrency(rec.amount)}
+                              </div>
+                            )}
+                            {rec.days_overdue && (
+                              <div style={{
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                              }}>
+                                {rec.days_overdue}d
+                              </div>
+                            )}
+                            {rec.link && (
+                              <div
+                                onClick={() => navigate(rec.link || '')}
+                                style={{
+                                  fontSize: 18,
+                                  color: 'var(--accent-primary)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                →
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: 12,
+                    }}>
+                      <div style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        background: 'var(--status-success)',
+                      }} />
+                      <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                        All systems normal — no alerts
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{
-                    padding: 20,
-                    textAlign: 'center',
-                    background: 'var(--status-success)',
-                    color: 'white',
-                    borderRadius: 2,
-                    fontSize: 13,
-                  }}>
-                    No alerts — all systems normal
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Section C: WHAT'S HAPPENING RIGHT NOW */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>WHAT&apos;S HAPPENING RIGHT NOW</SectionHeader>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* SECTION 3: LIVE OPERATIONS */}
+              <div>
+                <SectionHeader>LIVE OPERATIONS</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                   {(() => {
-                    const inTransit = loads.filter(l => l.status.toLowerCase() === 'in_transit' || l.status.toLowerCase() === 'in transit');
+                    const inTransit = loads.filter(l => ['IN_TRANSIT', 'ASSIGNED'].includes(l.status.toUpperCase().replace(' ', '_')));
                     const inTransitRevenue = inTransit.reduce((sum, l) => sum + l.total_amount, 0);
 
-                    const routeRevenue = new Map<string, number>();
+                    const delivered = loads.filter(l => ['DELIVERED', 'INVOICED'].includes(l.status.toUpperCase()));
+                    const deliveredRevenue = delivered.reduce((sum, l) => sum + l.total_amount, 0);
+
+                    const routeMap = new Map<string, number>();
                     loads.forEach(l => {
                       const route = `${l.pickup_city} → ${l.delivery_city}`;
-                      routeRevenue.set(route, (routeRevenue.get(route) || 0) + l.total_amount);
+                      routeMap.set(route, (routeMap.get(route) || 0) + 1);
                     });
-                    const topRoute = Array.from(routeRevenue.entries()).sort((a, b) => b[1] - a[1])[0];
-
-                    const overdue = invoices.filter(inv => {
-                      const dueDate = new Date(inv.due_date);
-                      return dueDate < new Date() && inv.balance > 0;
-                    });
-                    const overdueTotal = overdue.reduce((sum, inv) => sum + inv.balance, 0);
-                    const maxOverdue = overdue.reduce((max, inv) => {
-                      const days = Math.floor((new Date().getTime() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24));
-                      return Math.max(max, days);
-                    }, 0);
+                    const topRoute = Array.from(routeMap.entries()).sort((a, b) => b[1] - a[1])[0];
 
                     return (
                       <>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontSize: 15, color: 'var(--text-primary)', fontWeight: 500 }}>
-                            {inTransit.length} loads in transit representing {formatCurrency(inTransitRevenue)} in revenue
+                        <div className="card" style={{ padding: 20, borderLeft: '3px solid var(--accent-primary)' }}>
+                          <div style={{
+                            fontSize: 24,
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            color: 'var(--text-primary)',
+                            marginBottom: 4,
+                          }}>
+                            {inTransit.length}
                           </div>
-                          <button
-                            onClick={() => navigate('/loads')}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: 'var(--accent-primary)',
-                              fontSize: 11,
-                              fontFamily: 'var(--font-mono)',
-                              cursor: 'pointer',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                            }}
-                          >
-                            VIEW LOADS →
-                          </button>
+                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            loads in motion
+                          </div>
+                          <div style={{
+                            fontSize: 12,
+                            fontFamily: 'var(--font-mono)',
+                            color: 'var(--accent-primary)',
+                          }}>
+                            {formatCurrency(inTransitRevenue)} revenue in transit
+                          </div>
                         </div>
-                        {topRoute && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ fontSize: 15, color: 'var(--text-primary)', fontWeight: 500 }}>
-                              Your top route this period: {topRoute[0]} — {formatCurrency(topRoute[1])}
-                            </div>
-                            <button
-                              onClick={() => setTab('lanes')}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'var(--accent-primary)',
-                                fontSize: 11,
-                                fontFamily: 'var(--font-mono)',
-                                cursor: 'pointer',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em',
-                              }}
-                            >
-                              VIEW LANES →
-                            </button>
+
+                        <div className="card" style={{ padding: 20, borderLeft: '3px solid var(--status-success)' }}>
+                          <div style={{
+                            fontSize: 24,
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            color: 'var(--text-primary)',
+                            marginBottom: 4,
+                          }}>
+                            {delivered.length}
                           </div>
-                        )}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontSize: 15, color: 'var(--text-primary)', fontWeight: 500 }}>
-                            {overdue.length} invoices overdue totalling {formatCurrency(overdueTotal)} — {maxOverdue} days oldest
+                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            loads completed
                           </div>
-                          <button
-                            onClick={() => navigate('/invoices')}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: 'var(--accent-primary)',
-                              fontSize: 11,
-                              fontFamily: 'var(--font-mono)',
-                              cursor: 'pointer',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                            }}
-                          >
-                            VIEW INVOICES →
-                          </button>
+                          <div style={{
+                            fontSize: 12,
+                            fontFamily: 'var(--font-mono)',
+                            color: 'var(--status-success)',
+                          }}>
+                            {formatCurrency(deliveredRevenue)} revenue realised
+                          </div>
+                        </div>
+
+                        <div className="card" style={{ padding: 20, borderLeft: '3px solid var(--text-secondary)' }}>
+                          <div style={{
+                            fontSize: 16,
+                            fontWeight: 500,
+                            color: 'var(--text-primary)',
+                            marginBottom: 4,
+                          }}>
+                            {topRoute ? topRoute[0] : 'No routes'}
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            most active route
+                          </div>
+                          <div style={{
+                            fontSize: 12,
+                            fontFamily: 'var(--font-mono)',
+                            color: 'var(--text-tertiary)',
+                          }}>
+                            {topRoute ? `${topRoute[1]} trips this period` : ''}
+                          </div>
                         </div>
                       </>
                     );
@@ -856,178 +747,371 @@ export default function Insights() {
             </div>
           )}
 
-          {/* TAB 2: PROFITABILITY */}
-          {tab === 'profitability' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Section A: P&L AT A GLANCE */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>P&L AT A GLANCE</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Revenue Period</div>
-                    <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--accent-primary)' }}>
+          {/* TAB 2: MARGIN ENGINE */}
+          {tab === 'margin' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* SECTION 1: P&L SUMMARY */}
+              <div>
+                <SectionHeader>P&L SUMMARY</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 12,
+                    }}>
                       {formatCurrency(financeData?.revenue_period || 0)}
                     </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Revenue Period
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Total Costs</div>
-                    <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--status-danger)' }}>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--status-danger)',
+                      marginBottom: 12,
+                    }}>
                       {formatCurrency(financeData?.expenses_period || 0)}
                     </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Net Margin R</div>
-                    <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {formatCurrency(financeData?.net_margin_period || 0)}
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Total Costs
                     </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Net Margin %</div>
-                    <div style={{ fontSize: 22, fontWeight: 600 }}>
-                      <span style={{ color: getMarginColor(financeData?.net_margin_percent_period || 0) }}>
-                        {(financeData?.net_margin_percent_period || 0).toFixed(1)}%
-                      </span>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: (financeData?.net_margin_period || 0) >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                      marginBottom: 12,
+                    }}>
+                      {formatCurrency(financeData?.net_margin_period || 0)}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Net Margin R
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: getMarginColor(financeData?.net_margin_percent_period || 0),
+                      marginBottom: 12,
+                    }}>
+                      {(financeData?.net_margin_percent_period || 0).toFixed(1)}%
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Net Margin %
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Section B: MONTHLY TREND */}
-              {financeData?.monthly_trend && financeData.monthly_trend.length > 0 && (
+              {/* SECTION 2: ROUTE PROFITABILITY RANKING */}
+              <div>
+                <SectionHeader>ROUTE EFFICIENCY RANKING — Revenue per km driven</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
-                  <SectionHeader>MONTHLY TREND</SectionHeader>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {(() => {
+                    const routeMap = new Map<string, {
+                      trips: number;
+                      total_revenue: number;
+                      total_distance: number;
+                      total_fuel: number;
+                    }>();
+
+                    loads.forEach(load => {
+                      const route = `${load.pickup_city} → ${load.delivery_city}`;
+                      const existing = routeMap.get(route) || {
+                        trips: 0,
+                        total_revenue: 0,
+                        total_distance: 0,
+                        total_fuel: 0,
+                      };
+                      routeMap.set(route, {
+                        trips: existing.trips + 1,
+                        total_revenue: existing.total_revenue + load.total_amount,
+                        total_distance: existing.total_distance + load.distance,
+                        total_fuel: existing.total_fuel + (load.fuel_surcharge || 0),
+                      });
+                    });
+
+                    const routes = Array.from(routeMap.entries())
+                      .map(([route, data]) => ({
+                        route,
+                        trips: data.trips,
+                        total_revenue: data.total_revenue,
+                        total_distance: data.total_distance,
+                        total_fuel: data.total_fuel,
+                        true_margin: data.total_revenue - data.total_fuel,
+                        margin_pct: data.total_revenue > 0 ? ((data.total_revenue - data.total_fuel) / data.total_revenue) * 100 : 0,
+                        rev_per_km: data.total_distance > 0 ? data.total_revenue / data.total_distance : 0,
+                      }))
+                      .sort((a, b) => b.rev_per_km - a.rev_per_km)
+                      .slice(0, 10);
+
+                    const maxRevPerKm = Math.max(...routes.map(r => r.rev_per_km), 1);
+
+                    return routes.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {routes.map((r, idx) => {
+                          const isTop3 = idx < 3;
+                          const isBottom2 = idx >= routes.length - 2 && routes.length >= 5;
+
+                          return (
+                            <div
+                              key={idx}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 12,
+                                padding: 12,
+                                background: 'var(--bg-surface)',
+                                borderRadius: 2,
+                                borderLeft: `3px solid ${isTop3 ? 'var(--status-success)' : isBottom2 ? 'var(--status-danger)' : 'transparent'}`,
+                              }}
+                            >
+                              <div style={{
+                                fontSize: 10,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-tertiary)',
+                                minWidth: 20,
+                              }}>
+                                #{idx + 1}
+                              </div>
+                              <div style={{ minWidth: 200, fontSize: 13, color: 'var(--text-primary)' }}>
+                                {r.route}
+                              </div>
+                              <div style={{
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 60,
+                              }}>
+                                {r.trips} trips
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-primary)',
+                                minWidth: 100,
+                              }}>
+                                {formatCurrency(r.total_revenue)}
+                              </div>
+                              <div style={{
+                                fontSize: 14,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--accent-primary)',
+                                minWidth: 100,
+                              }}>
+                                {formatCurrency(r.rev_per_km)}/km
+                              </div>
+                              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{
+                                  flex: 1,
+                                  height: 16,
+                                  background: 'var(--bg-surface-hover)',
+                                  borderRadius: 2,
+                                  overflow: 'hidden',
+                                }}>
+                                  <div style={{
+                                    width: `${r.margin_pct}%`,
+                                    height: '100%',
+                                    background: r.margin_pct > 50 ? 'var(--status-success)' : r.margin_pct > 30 ? 'var(--status-warning)' : 'var(--status-danger)',
+                                    borderRadius: 2,
+                                  }} />
+                                </div>
+                                <div style={{
+                                  fontSize: 12,
+                                  fontFamily: 'var(--font-mono)',
+                                  color: 'var(--text-secondary)',
+                                  minWidth: 50,
+                                }}>
+                                  {r.margin_pct.toFixed(1)}%
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                        No data for this period
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 3: MONTHLY P&L TREND */}
+              {financeData?.monthly_trend && financeData.monthly_trend.length > 0 && (
+                <div>
+                  <SectionHeader>MONTHLY P&L TREND</SectionHeader>
+                  <div className="card" style={{ padding: 20 }}>
                     {(() => {
-                      const maxValue = Math.max(...financeData.monthly_trend.map(m => Math.max(m.revenue, m.expenses)));
                       const trend = financeData.monthly_trend.slice(-6);
+                      const maxValue = Math.max(...trend.map(m => Math.max(m.revenue, m.expenses)));
                       const isImproving = trend.length >= 2 && trend[trend.length - 1].margin > trend[trend.length - 2].margin;
 
                       return (
-                        <>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Trend:</span>
-                            <span style={{ fontSize: 13, color: isImproving ? 'var(--status-success)' : 'var(--status-danger)' }}>
-                              {isImproving ? '↑ Improving' : '↓ Declining'}
-                            </span>
-                          </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                           {trend.map((m, idx) => {
-                            const revWidth = (m.revenue / maxValue) * 100;
-                            const expWidth = (m.expenses / maxValue) * 100;
+                            const revWidth = maxValue > 0 ? (m.revenue / maxValue) * 100 : 0;
+                            const expWidth = maxValue > 0 ? (m.expenses / maxValue) * 100 : 0;
+
                             return (
                               <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                <div style={{ width: 60, fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                                  {m.month.slice(5)}
+                                <div style={{
+                                  width: 40,
+                                  fontSize: 11,
+                                  fontFamily: 'var(--font-mono)',
+                                  color: 'var(--text-tertiary)',
+                                  textTransform: 'uppercase',
+                                }}>
+                                  {m.month.slice(-3)}
                                 </div>
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                  <div style={{ height: 12, background: 'var(--accent-primary)', width: `${revWidth}%`, borderRadius: 2 }} />
-                                  <div style={{ height: 12, background: 'var(--status-danger)', width: `${expWidth}%`, borderRadius: 2, opacity: 0.7 }} />
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                  <div style={{
+                                    height: 16,
+                                    background: 'var(--accent-primary)',
+                                    width: `${revWidth}%`,
+                                    borderRadius: 2,
+                                  }} />
+                                  <div style={{
+                                    height: 16,
+                                    background: 'var(--status-danger)',
+                                    width: `${expWidth}%`,
+                                    borderRadius: 2,
+                                    opacity: 0.7,
+                                  }} />
                                 </div>
                                 <div style={{
-                                  width: 100,
-                                  textAlign: 'right',
                                   fontSize: 13,
                                   fontFamily: 'var(--font-mono)',
                                   fontWeight: 600,
-                                  color: m.margin > 0 ? 'var(--status-success)' : 'var(--status-danger)'
+                                  color: m.margin > 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                                  minWidth: 100,
+                                  textAlign: 'right',
                                 }}>
                                   {formatCurrency(m.margin)}
                                 </div>
                               </div>
                             );
                           })}
-                        </>
+                          <div style={{
+                            marginTop: 8,
+                            fontSize: 13,
+                            color: isImproving ? 'var(--status-success)' : 'var(--status-danger)',
+                          }}>
+                            {isImproving ? '↑ Margin improving' : '↓ Margin declining'}
+                          </div>
+                        </div>
                       );
                     })()}
                   </div>
                 </div>
               )}
 
-              {/* Section C: CUSTOMER PROFITABILITY */}
-              {financeData?.top_customers && financeData.top_customers.length > 0 && (
+              {/* SECTION 4: COST BREAKDOWN */}
+              <div>
+                <SectionHeader>COST BREAKDOWN</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
-                  <SectionHeader>REVENUE CONCENTRATION RISK</SectionHeader>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {(() => {
-                      const totalRevenue = financeData.top_customers.reduce((sum, c) => sum + c.revenue, 0);
-                      const top3Revenue = financeData.top_customers.slice(0, 3).reduce((sum, c) => sum + c.revenue, 0);
-                      const top3Pct = (top3Revenue / totalRevenue) * 100;
-                      const topCustomerPct = (financeData.top_customers[0].revenue / totalRevenue) * 100;
-
-                      return (
-                        <>
-                          {topCustomerPct > 40 && (
-                            <div style={{
-                              padding: 12,
-                              background: 'var(--status-warning)',
-                              color: 'white',
-                              borderRadius: 2,
-                              fontSize: 13,
-                              marginBottom: 8,
-                            }}>
-                              ⚠ High concentration risk: top customer represents {topCustomerPct.toFixed(1)}% of revenue
-                            </div>
-                          )}
-                          {financeData.top_customers.slice(0, 5).map((c, idx) => {
-                            const pct = (c.revenue / totalRevenue) * 100;
-                            return (
-                              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                <div style={{ width: 200, fontSize: 13, color: 'var(--text-primary)' }}>
-                                  {c.customer_name}
-                                </div>
-                                <div style={{ flex: 1, height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                                  <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent-primary)', borderRadius: 2 }} />
-                                </div>
-                                <div style={{ width: 60, textAlign: 'right', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                                  {pct.toFixed(1)}%
-                                </div>
-                                <div style={{ width: 100, textAlign: 'right', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                  {formatCurrency(c.revenue)}
-                                </div>
-                              </div>
-                            );
-                          })}
-                          <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-surface)', borderRadius: 2, fontSize: 13, color: 'var(--text-secondary)' }}>
-                            Your top 3 customers represent {top3Pct.toFixed(1)}% of revenue — {top3Pct > 60 ? 'High risk' : top3Pct > 40 ? 'Moderate risk' : 'Healthy diversification'}
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-              )}
-
-              {/* Section D: COST STRUCTURE */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>COST STRUCTURE</SectionHeader>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {(() => {
-                    const categories = getExpenseCategories();
-                    const total = categories.reduce((sum, c) => sum + c.amount, 0);
+                    const categoryMap = new Map<string, number>();
+                    expenses.forEach(exp => {
+                      const existing = categoryMap.get(exp.category) || 0;
+                      categoryMap.set(exp.category, existing + exp.amount);
+                    });
 
-                    return (
-                      <>
-                        {categories.map((cat, idx) => (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div style={{ width: 120, fontSize: 13, color: 'var(--text-primary)' }}>
-                              {cat.category}
+                    const categories = Array.from(categoryMap.entries())
+                      .map(([category, amount]) => ({ category, amount }))
+                      .sort((a, b) => b.amount - a.amount)
+                      .slice(0, 6);
+
+                    const totalExpenses = categories.reduce((sum, c) => sum + c.amount, 0);
+                    const maxAmount = Math.max(...categories.map(c => c.amount), 1);
+
+                    return categories.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {categories.map((cat, idx) => {
+                          const widthPct = (cat.amount / maxAmount) * 100;
+                          const pct = totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0;
+
+                          return (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <div style={{
+                                minWidth: 120,
+                                fontSize: 12,
+                                textTransform: 'uppercase',
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                              }}>
+                                {cat.category}
+                              </div>
+                              <div style={{
+                                flex: 1,
+                                height: 20,
+                                background: 'var(--bg-surface-hover)',
+                                borderRadius: 2,
+                                overflow: 'hidden',
+                              }}>
+                                <div style={{
+                                  width: `${widthPct}%`,
+                                  height: '100%',
+                                  background: 'var(--accent-dim)',
+                                  borderRadius: 2,
+                                }} />
+                              </div>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                minWidth: 100,
+                                textAlign: 'right',
+                              }}>
+                                {formatCurrency(cat.amount)}
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 50,
+                                textAlign: 'right',
+                              }}>
+                                {pct.toFixed(1)}%
+                              </div>
                             </div>
-                            <div style={{ flex: 1, height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${cat.pct}%`, background: 'var(--status-danger)', borderRadius: 2, opacity: 0.8 }} />
-                            </div>
-                            <div style={{ width: 100, textAlign: 'right', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                              {formatCurrency(cat.amount)}
-                            </div>
-                            <div style={{ width: 60, textAlign: 'right', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                              {cat.pct.toFixed(1)}%
-                            </div>
-                          </div>
-                        ))}
-                        {financeData?.fuel_cost_ratio !== undefined && (
-                          <div style={{ marginTop: 12, padding: 12, background: 'var(--bg-surface)', borderRadius: 2, fontSize: 13, color: 'var(--text-secondary)' }}>
-                            Fuel cost ratio: {(financeData.fuel_cost_ratio * 100).toFixed(1)}% of revenue
-                          </div>
-                        )}
-                      </>
+                          );
+                        })}
+                        <div style={{
+                          marginTop: 8,
+                          paddingTop: 12,
+                          borderTop: '1px solid var(--border-subtle)',
+                          fontSize: 13,
+                          color: 'var(--text-secondary)',
+                        }}>
+                          Total expenses this period: <span style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            color: 'var(--text-primary)',
+                          }}>{formatCurrency(totalExpenses)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                        No data for this period
+                      </div>
                     );
                   })()}
                 </div>
@@ -1035,393 +1119,1023 @@ export default function Insights() {
             </div>
           )}
 
-          {/* TAB 3: CASH INTELLIGENCE */}
+          {/* TAB 3: CASH FLOW */}
           {tab === 'cash' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Section A: CASH POSITION FORECAST */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>CASH POSITION FORECAST</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Next 30 days</div>
-                    <div style={{ fontSize: 24, fontWeight: 600 }}>
-                      <span style={{ color: (financeData?.cash_flow_forecast?.next_30_days || 0) >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>
-                        {formatCurrency(financeData?.cash_flow_forecast?.next_30_days || 0)}
-                      </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* SECTION 1: CASH POSITION */}
+              <div>
+                <SectionHeader>CASH POSITION</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: (financeData?.cash_flow_forecast?.next_30_days || 0) >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                      marginBottom: 8,
+                    }}>
+                      {formatCurrency(financeData?.cash_flow_forecast?.next_30_days || 0)}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>Expected Net Cash In</div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                      Next 30 Days
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                      Expected Net Cash
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Next 60 days</div>
-                    <div style={{ fontSize: 24, fontWeight: 600 }}>
-                      <span style={{ color: (financeData?.cash_flow_forecast?.next_60_days || 0) >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>
-                        {formatCurrency(financeData?.cash_flow_forecast?.next_60_days || 0)}
-                      </span>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 8,
+                    }}>
+                      {formatCurrency(financeData?.cash_flow_forecast?.next_60_days || 0)}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>Expected Net Cash In</div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                      Next 60 Days
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                      Expected Net Cash
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Next 90 days</div>
-                    <div style={{ fontSize: 24, fontWeight: 600 }}>
-                      <span style={{ color: (financeData?.cash_flow_forecast?.next_90_days || 0) >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>
-                        {formatCurrency(financeData?.cash_flow_forecast?.next_90_days || 0)}
-                      </span>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 8,
+                    }}>
+                      {formatCurrency(financeData?.cash_flow_forecast?.next_90_days || 0)}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>Expected Net Cash In</div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                      Next 90 Days
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                      Expected Net Cash
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Section B: WEEKLY CASH FLOW */}
-              {cashflowData?.forecast && cashflowData.forecast.length > 0 && (
+              {/* SECTION 2: CUSTOMER PAYMENT INTELLIGENCE */}
+              <div>
+                <SectionHeader>WHO OWES YOU AND HOW LONG</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
-                  <SectionHeader>WEEKLY CASH FLOW</SectionHeader>
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, height: 200, position: 'relative' }}>
-                    {/* Baseline */}
-                    <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, background: 'var(--border-subtle)' }} />
-                    {(() => {
-                      const maxAbs = Math.max(...cashflowData.forecast.map(f => Math.abs(f.net)));
-                      let runningTotal = 0;
+                  {(() => {
+                    const customerMap = new Map<string, {
+                      total_outstanding: number;
+                      oldest_days: number;
+                      invoice_count: number;
+                    }>();
 
-                      return cashflowData.forecast.map((f, idx) => {
-                        runningTotal += f.net;
-                        const heightPct = maxAbs > 0 ? (Math.abs(f.net) / maxAbs) * 50 : 0;
-                        const isPositive = f.net >= 0;
+                    const now = new Date();
+                    invoices.forEach(inv => {
+                      if (inv.status !== 'PAID' && inv.balance > 0) {
+                        const issueDate = new Date(inv.issue_date);
+                        const daysOld = Math.floor((now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24));
 
-                        return (
-                          <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-                            <div style={{
-                              position: 'absolute',
-                              bottom: '50%',
-                              width: '70%',
-                              height: isPositive ? `${heightPct}%` : 0,
-                              background: 'var(--accent-primary)',
-                              borderRadius: '2px 2px 0 0',
-                            }} />
-                            <div style={{
-                              position: 'absolute',
-                              top: '50%',
-                              width: '70%',
-                              height: !isPositive ? `${heightPct}%` : 0,
-                              background: 'var(--status-danger)',
-                              borderRadius: '0 0 2px 2px',
-                            }} />
-                            <div style={{
-                              position: 'absolute',
-                              bottom: -30,
-                              fontSize: 10,
-                              fontFamily: 'var(--font-mono)',
-                              color: 'var(--text-tertiary)',
-                              whiteSpace: 'nowrap',
+                        const existing = customerMap.get(inv.customer_name) || {
+                          total_outstanding: 0,
+                          oldest_days: 0,
+                          invoice_count: 0,
+                        };
+
+                        customerMap.set(inv.customer_name, {
+                          total_outstanding: existing.total_outstanding + inv.balance,
+                          oldest_days: Math.max(existing.oldest_days, daysOld),
+                          invoice_count: existing.invoice_count + 1,
+                        });
+                      }
+                    });
+
+                    const customers = Array.from(customerMap.entries())
+                      .map(([name, data]) => ({
+                        customer_name: name,
+                        total_outstanding: data.total_outstanding,
+                        oldest_invoice_days: data.oldest_days,
+                        invoice_count: data.invoice_count,
+                      }))
+                      .sort((a, b) => b.total_outstanding - a.total_outstanding)
+                      .slice(0, 8);
+
+                    const top3sum = customers.slice(0, 3).reduce((sum, c) => sum + c.total_outstanding, 0);
+
+                    return customers.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {customers.map((c, idx) => {
+                          const risk = c.oldest_invoice_days > 60 ? 'HIGH RISK' : c.oldest_invoice_days > 30 ? 'MEDIUM' : 'CURRENT';
+                          const riskColor = c.oldest_invoice_days > 60 ? 'var(--status-danger)' : c.oldest_invoice_days > 30 ? 'var(--status-warning)' : 'var(--status-success)';
+
+                          return (
+                            <div key={idx} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              padding: 12,
+                              background: 'var(--bg-surface)',
+                              borderRadius: 2,
                             }}>
-                              {f.period}
+                              <div style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
+                                {c.customer_name}
+                              </div>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                minWidth: 100,
+                              }}>
+                                {formatCurrency(c.total_outstanding)}
+                              </div>
+                              <div style={{
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 100,
+                              }}>
+                                Oldest: {c.oldest_invoice_days}d
+                              </div>
+                              <div style={{
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 80,
+                              }}>
+                                {c.invoice_count} invoices
+                              </div>
+                              <div style={{
+                                fontSize: 10,
+                                fontFamily: 'var(--font-mono)',
+                                textTransform: 'uppercase',
+                                padding: '2px 8px',
+                                borderRadius: 2,
+                                background: riskColor,
+                                color: 'white',
+                              }}>
+                                {risk}
+                              </div>
                             </div>
-                            <div style={{
-                              position: 'absolute',
-                              bottom: -50,
-                              fontSize: 11,
-                              fontFamily: 'var(--font-mono)',
-                              fontWeight: 600,
-                              color: isPositive ? 'var(--status-success)' : 'var(--status-danger)',
-                            }}>
-                              {formatCurrency(f.net)}
+                          );
+                        })}
+                        <div style={{
+                          marginTop: 8,
+                          padding: 12,
+                          background: 'var(--bg-surface)',
+                          borderRadius: 2,
+                          fontSize: 13,
+                          color: 'var(--text-secondary)',
+                        }}>
+                          Collecting these 3 accounts would unlock <span style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            color: 'var(--accent-primary)',
+                          }}>{formatCurrency(top3sum)}</span> in cash
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                        No outstanding invoices
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 3: WEEKLY CASH FORECAST */}
+              {cashflowData?.forecast && cashflowData.forecast.length > 0 && (
+                <div>
+                  <SectionHeader>WEEKLY CASH FORECAST</SectionHeader>
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, height: 200, position: 'relative' }}>
+                      <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: '50%',
+                        height: 1,
+                        background: 'var(--border-subtle)',
+                      }} />
+                      {(() => {
+                        const maxAbs = Math.max(...cashflowData.forecast.slice(0, 8).map(f => Math.abs(f.net)), 1);
+
+                        return cashflowData.forecast.slice(0, 8).map((f, idx) => {
+                          const heightPct = (Math.abs(f.net) / maxAbs) * 45;
+                          const isPositive = f.net >= 0;
+
+                          return (
+                            <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                              <div style={{
+                                position: 'absolute',
+                                bottom: '50%',
+                                width: '70%',
+                                height: isPositive ? `${heightPct}%` : 0,
+                                background: 'var(--accent-primary)',
+                                borderRadius: '2px 2px 0 0',
+                              }} />
+                              <div style={{
+                                position: 'absolute',
+                                top: '50%',
+                                width: '70%',
+                                height: !isPositive ? `${heightPct}%` : 0,
+                                background: 'var(--status-danger)',
+                                borderRadius: '0 0 2px 2px',
+                              }} />
+                              <div style={{
+                                position: 'absolute',
+                                bottom: -30,
+                                fontSize: 10,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-tertiary)',
+                                whiteSpace: 'nowrap',
+                              }}>
+                                {f.period}
+                              </div>
+                              <div style={{
+                                position: 'absolute',
+                                bottom: -50,
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: isPositive ? 'var(--status-success)' : 'var(--status-danger)',
+                              }}>
+                                {formatCurrency(f.net)}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                  <div style={{ marginTop: 60, fontSize: 13, color: 'var(--text-secondary)' }}>
-                    Running total: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {formatCurrency(cashflowData.forecast.reduce((sum, f) => sum + f.net, 0))}
-                    </span>
+                          );
+                        });
+                      })()}
+                    </div>
+                    <div style={{
+                      marginTop: 60,
+                      fontSize: 13,
+                      color: 'var(--text-secondary)',
+                    }}>
+                      Running balance: <span style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                      }}>
+                        {formatCurrency(cashflowData.forecast.slice(0, 8).reduce((sum, f) => sum + f.net, 0))}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Section C: INVOICE AGING INTELLIGENCE */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>INVOICE AGING INTELLIGENCE</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 16 }}>
-                  {getInvoiceAging().map((bucket, idx) => (
-                    <div key={idx} style={{
-                      padding: 16,
-                      background: 'var(--bg-surface)',
-                      borderRadius: 2,
-                      borderLeft: `4px solid ${bucket.color}`,
-                    }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>{bucket.label}</div>
-                      <div style={{ fontSize: 20, fontWeight: 600, color: bucket.color, marginBottom: 4 }}>
-                        {formatCurrency(bucket.amount)}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                        {bucket.count} invoices · {bucket.pct.toFixed(1)}%
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ padding: 12, background: 'var(--bg-surface)', borderRadius: 2, fontSize: 13, color: 'var(--text-secondary)' }}>
-                  DSO of {Math.round(financeData?.dso || 0)} days means you wait {Math.round((financeData?.dso || 0) / 7)} weeks on average to collect
-                </div>
-              </div>
-
-              {/* Section D: FAST PAY OPPORTUNITY */}
-              <div className="card" style={{ padding: 20 }}>
+              {/* SECTION 4: FAST PAY OPPORTUNITY */}
+              <div>
                 <SectionHeader>FAST PAY OPPORTUNITY</SectionHeader>
-                {(() => {
-                  const eligibleInvoices = invoices.filter(inv => inv.early_pay_eligible);
-                  const totalEligible = eligibleInvoices.reduce((sum, inv) => sum + inv.balance, 0);
+                <div className="card" style={{ padding: 20 }}>
+                  {(() => {
+                    const eligibleInvoices = invoices.filter(inv => inv.early_pay_eligible);
+                    const totalEligible = eligibleInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
 
-                  return eligibleInvoices.length > 0 ? (
-                    <div style={{
-                      padding: 24,
-                      background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
-                      borderRadius: 4,
-                      textAlign: 'center',
-                    }}>
-                      <div style={{ fontSize: 32, fontWeight: 700, color: 'white', marginBottom: 8 }}>
-                        {formatCurrency(totalEligible)}
-                      </div>
-                      <div style={{ fontSize: 15, color: 'white', marginBottom: 20, opacity: 0.9 }}>
-                        Unlock {formatCurrency(totalEligible)} today via Fast Pay — stop waiting 30-90 days
-                      </div>
-                      <div style={{ fontSize: 12, color: 'white', marginBottom: 20, opacity: 0.8 }}>
-                        {eligibleInvoices.length} invoices eligible
-                      </div>
-                      <button
-                        onClick={() => navigate('/capital')}
-                        style={{
-                          padding: '12px 24px',
-                          background: 'white',
-                          border: 'none',
-                          borderRadius: 2,
-                          fontSize: 12,
+                    return eligibleInvoices.length > 0 ? (
+                      <div style={{
+                        padding: 32,
+                        background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
+                        borderRadius: 4,
+                        textAlign: 'center',
+                      }}>
+                        <div style={{
+                          fontSize: 36,
                           fontFamily: 'var(--font-mono)',
-                          fontWeight: 600,
-                          color: 'var(--accent-primary)',
-                          cursor: 'pointer',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.08em',
-                        }}
-                      >
-                        UNLOCK NOW →
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
-                      No invoices currently eligible for Fast Pay
-                    </div>
-                  );
-                })()}
+                          fontWeight: 700,
+                          color: 'white',
+                          marginBottom: 12,
+                        }}>
+                          {formatCurrency(totalEligible)}
+                        </div>
+                        <div style={{
+                          fontSize: 15,
+                          color: 'white',
+                          marginBottom: 8,
+                          opacity: 0.95,
+                        }}>
+                          eligible for Fast Pay across {eligibleInvoices.length} invoices
+                        </div>
+                        <div style={{
+                          fontSize: 13,
+                          color: 'white',
+                          marginBottom: 24,
+                          opacity: 0.85,
+                        }}>
+                          Stop waiting 30-90 days. Unlock working capital today.
+                        </div>
+                        <button
+                          onClick={() => navigate('/capital')}
+                          style={{
+                            padding: '12px 32px',
+                            background: 'white',
+                            border: 'none',
+                            borderRadius: 2,
+                            fontSize: 12,
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.08em',
+                            color: 'var(--accent-primary)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          REQUEST FAST PAY
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{
+                        padding: 40,
+                        textAlign: 'center',
+                        color: 'var(--text-tertiary)',
+                        fontSize: 13,
+                      }}>
+                        No invoices currently eligible
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
           )}
 
-          {/* TAB 4: FLEET INTELLIGENCE */}
+          {/* TAB 4: FLEET */}
           {tab === 'fleet' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Section A: FLEET SCORECARD */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>FLEET SCORECARD</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Active Vehicles</div>
-                    <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {vehicles.filter(v => v.status === 'ACTIVE' || v.status === 'Active').length}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* SECTION 1: FLEET HEALTH SUMMARY */}
+              <div>
+                <SectionHeader>FLEET HEALTH SUMMARY</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 12,
+                    }}>
+                      {vehicles.filter(v => ['IN_USE', 'AVAILABLE'].includes(v.status.toUpperCase())).length}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Active Vehicles
                     </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Avg Health Score</div>
-                    <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)' }}>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 12,
+                    }}>
                       {vehicles.length > 0 ? (vehicles.reduce((sum, v) => sum + (v.ai_health_score || 0), 0) / vehicles.length).toFixed(0) : 0}
                     </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Avg Utilisation %</div>
-                    <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {vehicles.length > 0 ? (vehicles.reduce((sum, v) => sum + (v.uptime_percentage || 0), 0) / vehicles.length).toFixed(1) : 0}%
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Avg Health Score
                     </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Vehicles Needing Attention</div>
-                    <div style={{ fontSize: 24, fontWeight: 600 }}>
-                      <span style={{ color: 'var(--status-danger)' }}>
-                        {vehicles.filter(v => (v.ai_health_score || 100) < 60).length}
-                      </span>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--status-danger)',
+                      marginBottom: 12,
+                    }}>
+                      {vehicles.filter(v => (v.ai_health_score || 100) < 60).length}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Vehicles at Risk
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 12,
+                    }}>
+                      {vehicles.length > 0 ? formatCurrency(vehicles.reduce((sum, v) => sum + (v.cost_per_km || 0), 0) / vehicles.length) : formatCurrency(0)}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Avg Cost/km
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Section B: VEHICLE PERFORMANCE RANKING */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>VEHICLE PERFORMANCE RANKING</SectionHeader>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {[...vehicles].sort((a, b) => b.revenue_generated - a.revenue_generated).map((v, idx) => {
-                    const isTopEarner = idx === 0;
-                    const needsAttention = (v.ai_health_score || 100) < 60;
-                    const isBottomTwo = idx >= vehicles.length - 2;
+              {/* SECTION 2: VEHICLE EFFICIENCY RANKING */}
+              <div>
+                <SectionHeader>VEHICLE PERFORMANCE — Revenue earned vs operational cost</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {vehicles.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {[...vehicles]
+                        .sort((a, b) => b.revenue_generated - a.revenue_generated)
+                        .map((v, idx) => {
+                          const healthColor = v.ai_health_score > 80 ? 'var(--status-success)' : v.ai_health_score > 60 ? 'var(--status-warning)' : 'var(--status-danger)';
 
-                    return (
-                      <div key={v.id}>
-                        <div
-                          onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
-                          style={{
+                          return (
+                            <div
+                              key={v.id}
+                              onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 12,
+                                padding: 12,
+                                background: 'var(--bg-surface)',
+                                borderRadius: 2,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <div style={{
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-tertiary)',
+                                minWidth: 30,
+                              }}>
+                                #{idx + 1}
+                              </div>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                minWidth: 100,
+                              }}>
+                                {v.plate}
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                color: 'var(--text-secondary)',
+                                minWidth: 150,
+                              }}>
+                                {v.make} {v.model}
+                              </div>
+                              <StatusBadge>{v.status}</StatusBadge>
+                              <div style={{ flex: 1 }} />
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--accent-primary)',
+                                minWidth: 100,
+                              }}>
+                                {v.revenue_generated > 0 ? formatCurrency(v.revenue_generated) : 'No revenue data'}
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 80,
+                              }}>
+                                {formatCurrency(v.cost_per_km)}/km
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                minWidth: 100,
+                              }}>
+                                <div style={{
+                                  flex: 1,
+                                  height: 8,
+                                  background: 'var(--bg-surface-hover)',
+                                  borderRadius: 4,
+                                  overflow: 'hidden',
+                                }}>
+                                  <div style={{
+                                    width: `${v.ai_health_score}%`,
+                                    height: '100%',
+                                    background: healthColor,
+                                  }} />
+                                </div>
+                                <div style={{
+                                  fontSize: 11,
+                                  fontFamily: 'var(--font-mono)',
+                                  color: healthColor,
+                                }}>
+                                  {v.ai_health_score}
+                                </div>
+                              </div>
+                              <div style={{
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 60,
+                              }}>
+                                {v.uptime_percentage.toFixed(1)}%
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      No data for this period
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* SECTION 3: DRIVER EFFICIENCY MATRIX */}
+              <div>
+                <SectionHeader>DRIVER PERFORMANCE — Revenue generated and risk profile</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {drivers.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {[...drivers]
+                        .sort((a, b) => b.revenue_generated - a.revenue_generated)
+                        .map((d, idx) => (
+                          <div
+                            key={d.id}
+                            onClick={() => navigate(`/fleet/drivers/${d.id}/financial`)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              padding: 12,
+                              background: 'var(--bg-surface)',
+                              borderRadius: 2,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{
+                              fontSize: 11,
+                              fontFamily: 'var(--font-mono)',
+                              fontWeight: 600,
+                              color: 'var(--text-tertiary)',
+                              minWidth: 30,
+                            }}>
+                              #{idx + 1}
+                            </div>
+                            <div style={{
+                              fontSize: 13,
+                              color: 'var(--text-primary)',
+                              fontWeight: 500,
+                              minWidth: 180,
+                            }}>
+                              {d.user_details.name}
+                            </div>
+                            <StatusBadge>{d.status}</StatusBadge>
+                            <div style={{ flex: 1 }} />
+                            <div style={{
+                              fontSize: 13,
+                              fontFamily: 'var(--font-mono)',
+                              fontWeight: 600,
+                              color: 'var(--accent-primary)',
+                              minWidth: 100,
+                            }}>
+                              {formatCurrency(d.revenue_generated)}
+                            </div>
+                            <div style={{
+                              fontSize: 12,
+                              fontFamily: 'var(--font-mono)',
+                              color: 'var(--text-secondary)',
+                              minWidth: 60,
+                            }}>
+                              {d.total_trips} trips
+                            </div>
+                            <div style={{
+                              fontSize: 12,
+                              fontFamily: 'var(--font-mono)',
+                              color: 'var(--text-secondary)',
+                              minWidth: 100,
+                            }}>
+                              {formatCurrency(d.avg_revenue_per_trip)}/trip
+                            </div>
+                            {(d.violation_count > 0 || d.accident_history > 0) && (
+                              <div style={{
+                                fontSize: 11,
+                                color: 'var(--status-danger)',
+                              }}>
+                                {d.violation_count > 0 && `⚠ ${d.violation_count} violations`}
+                                {d.violation_count > 0 && d.accident_history > 0 && ', '}
+                                {d.accident_history > 0 && `⚠ ${d.accident_history} accidents`}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      No data for this period
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* SECTION 4: MAINTENANCE RISK ALERT */}
+              <div>
+                <SectionHeader>MAINTENANCE RISK ALERT</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {(() => {
+                    const atRisk = vehicles.filter(v => (v.ai_health_score || 100) < 70).sort((a, b) => a.ai_health_score - b.ai_health_score);
+
+                    return atRisk.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {atRisk.map((v, idx) => {
+                          const recommendation = v.ai_health_score < 50 ? '⚠ High maintenance risk — schedule immediately' : 'Monitor closely';
+
+                          return (
+                            <div key={idx} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              padding: 12,
+                              background: 'var(--bg-surface)',
+                              borderRadius: 2,
+                            }}>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                minWidth: 100,
+                              }}>
+                                {v.plate}
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                color: 'var(--text-secondary)',
+                                minWidth: 120,
+                              }}>
+                                {v.make}
+                              </div>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: v.ai_health_score < 50 ? 'var(--status-danger)' : 'var(--status-warning)',
+                                minWidth: 60,
+                              }}>
+                                {v.ai_health_score}
+                              </div>
+                              <StatusBadge>{v.status}</StatusBadge>
+                              <div style={{ flex: 1, fontSize: 12, color: 'var(--status-danger)' }}>
+                                {recommendation}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{
+                        padding: 20,
+                        textAlign: 'center',
+                        color: 'var(--status-success)',
+                        fontSize: 13,
+                      }}>
+                        All vehicles within healthy operating range
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: LANES */}
+          {tab === 'lanes' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* SECTION 1: CORRIDOR INTELLIGENCE */}
+              <div>
+                <SectionHeader>YOUR MOST EFFICIENT CORRIDORS — Revenue per km tells you where to focus</SectionHeader>
+                {(() => {
+                  const routeMap = new Map<string, {
+                    trips: number;
+                    total_revenue: number;
+                    total_distance: number;
+                    total_fuel: number;
+                  }>();
+
+                  loads.forEach(load => {
+                    const route = `${load.pickup_city} → ${load.delivery_city}`;
+                    const existing = routeMap.get(route) || {
+                      trips: 0,
+                      total_revenue: 0,
+                      total_distance: 0,
+                      total_fuel: 0,
+                    };
+                    routeMap.set(route, {
+                      trips: existing.trips + 1,
+                      total_revenue: existing.total_revenue + load.total_amount,
+                      total_distance: existing.total_distance + load.distance,
+                      total_fuel: existing.total_fuel + (load.fuel_surcharge || 0),
+                    });
+                  });
+
+                  const routes = Array.from(routeMap.entries())
+                    .map(([route, data]) => ({
+                      route,
+                      trips: data.trips,
+                      total_revenue: data.total_revenue,
+                      avg_revenue: data.total_revenue / data.trips,
+                      total_distance: data.total_distance,
+                      rev_per_km: data.total_distance > 0 ? data.total_revenue / data.total_distance : 0,
+                      net_margin_r: data.total_revenue - data.total_fuel,
+                      margin_pct: data.total_revenue > 0 ? ((data.total_revenue - data.total_fuel) / data.total_revenue) * 100 : 0,
+                    }))
+                    .sort((a, b) => b.rev_per_km - a.rev_per_km)
+                    .slice(0, 8);
+
+                  return routes.length > 0 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+                      {routes.map((r, idx) => {
+                        const isTop2 = idx < 2;
+                        const isBottom2 = idx >= routes.length - 2 && routes.length >= 4;
+
+                        return (
+                          <div
+                            key={idx}
+                            className="card"
+                            style={{
+                              padding: 16,
+                              borderLeft: `3px solid ${isTop2 ? 'var(--status-success)' : isBottom2 ? 'var(--status-danger)' : 'transparent'}`,
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {r.route}
+                              </div>
+                              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                                {r.trips} trips
+                              </div>
+                            </div>
+                            <div style={{
+                              fontSize: 24,
+                              fontFamily: 'var(--font-mono)',
+                              fontWeight: 600,
+                              color: 'var(--accent-primary)',
+                              marginBottom: 12,
+                            }}>
+                              {formatCurrency(r.rev_per_km)}/km
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                                {formatCurrency(r.total_revenue)}
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: r.margin_pct > 50 ? 'var(--status-success)' : r.margin_pct > 30 ? 'var(--status-warning)' : 'var(--status-danger)',
+                              }}>
+                                {r.margin_pct.toFixed(1)}%
+                              </div>
+                            </div>
+                            <div style={{
+                              height: 6,
+                              background: 'var(--bg-surface-hover)',
+                              borderRadius: 3,
+                              overflow: 'hidden',
+                            }}>
+                              <div style={{
+                                width: `${r.margin_pct}%`,
+                                height: '100%',
+                                background: r.margin_pct > 50 ? 'var(--status-success)' : r.margin_pct > 30 ? 'var(--status-warning)' : 'var(--status-danger)',
+                              }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="card" style={{ padding: 40, textAlign: 'center' }}>
+                      <div style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                        No data for this period
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* SECTION 2: CARGO INTELLIGENCE */}
+              <div>
+                <SectionHeader>CARGO TYPE PERFORMANCE — Which cargo earns the most per trip</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {(() => {
+                    const cargoMap = new Map<string, { count: number; totalRevenue: number }>();
+
+                    loads.forEach(load => {
+                      const cargoWords = (load.cargo_description || 'Unknown').split(' ').slice(0, 2);
+                      const cargo = cargoWords.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                      const existing = cargoMap.get(cargo) || { count: 0, totalRevenue: 0 };
+                      cargoMap.set(cargo, {
+                        count: existing.count + 1,
+                        totalRevenue: existing.totalRevenue + load.total_amount,
+                      });
+                    });
+
+                    const cargoTypes = Array.from(cargoMap.entries())
+                      .map(([cargo, data]) => ({
+                        cargo,
+                        trips: data.count,
+                        total_revenue: data.totalRevenue,
+                        avg_revenue: data.totalRevenue / data.count,
+                      }))
+                      .sort((a, b) => b.avg_revenue - a.avg_revenue);
+
+                    return cargoTypes.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {cargoTypes.map((c, idx) => (
+                          <div key={idx} style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: 12,
                             padding: 12,
-                            background: isTopEarner ? 'var(--status-success)' : needsAttention ? 'var(--status-danger)' : 'var(--bg-surface)',
-                            color: isTopEarner || needsAttention ? 'white' : 'var(--text-primary)',
+                            background: 'var(--bg-surface)',
                             borderRadius: 2,
-                            cursor: 'pointer',
-                            opacity: isTopEarner || needsAttention ? 0.9 : 1,
-                          }}
-                        >
-                          <div style={{ width: 30, fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600 }}>#{idx + 1}</div>
-                          <div style={{ width: 120, fontSize: 13, fontWeight: 500 }}>{v.plate}</div>
-                          <div style={{ width: 150, fontSize: 12, opacity: 0.8 }}>{v.make} {v.model}</div>
-                          <div style={{
-                            padding: '2px 6px',
-                            background: isTopEarner || needsAttention ? 'rgba(255,255,255,0.2)' : 'var(--bg-surface-hover)',
-                            borderRadius: 2,
-                            fontSize: 10,
-                            fontFamily: 'var(--font-mono)',
                           }}>
-                            {v.status}
-                          </div>
-                          <div style={{ flex: 1 }} />
-                          <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                            {formatCurrency(v.revenue_generated)}
-                          </div>
-                          <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>
-                            {formatCurrency(v.cost_per_km)}/km
-                          </div>
-                          <div style={{ width: 100, display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{
-                              flex: 1,
-                              height: 6,
-                              background: isTopEarner || needsAttention ? 'rgba(255,255,255,0.3)' : 'var(--bg-surface-hover)',
-                              borderRadius: 3,
-                              overflow: 'hidden'
-                            }}>
-                              <div style={{
-                                width: `${v.ai_health_score}%`,
-                                height: '100%',
-                                background: isTopEarner || needsAttention ? 'white' : v.ai_health_score > 70 ? 'var(--status-success)' : v.ai_health_score > 40 ? 'var(--status-warning)' : 'var(--status-danger)',
-                              }} />
+                            <div style={{ minWidth: 180, fontSize: 13, color: 'var(--text-primary)' }}>
+                              {c.cargo}
                             </div>
-                            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}>{v.ai_health_score}%</span>
-                          </div>
-                          <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>
-                            {v.uptime_percentage?.toFixed(1)}%
-                          </div>
-                        </div>
-                        {isBottomTwo && v.cost_per_km > v.margin_per_trip && (
-                          <div style={{ fontSize: 11, color: 'var(--status-danger)', marginLeft: 54, marginTop: 4 }}>
-                            ⚠ This vehicle costs more to run than its revenue suggests — review
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Section C: DRIVER PERFORMANCE RANKING */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>DRIVER PERFORMANCE RANKING</SectionHeader>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {[...drivers].sort((a, b) => b.revenue_generated - a.revenue_generated).map((d, idx) => (
-                    <div
-                      key={d.id}
-                      onClick={() => navigate(`/fleet/drivers/${d.id}/financial`)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: 12,
-                        background: 'var(--bg-surface)',
-                        borderRadius: 2,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <div style={{ width: 30, fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>#{idx + 1}</div>
-                      <div style={{ width: 180, fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{d.user_details.name}</div>
-                      <div style={{
-                        padding: '2px 6px',
-                        background: 'var(--bg-surface-hover)',
-                        borderRadius: 2,
-                        fontSize: 10,
-                        fontFamily: 'var(--font-mono)',
-                        color: 'var(--text-secondary)',
-                      }}>
-                        {d.status}
-                      </div>
-                      <div style={{ flex: 1 }} />
-                      <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent-primary)' }}>
-                        {formatCurrency(d.revenue_generated)}
-                      </div>
-                      <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                        {formatCurrency(d.avg_revenue_per_trip)}/trip
-                      </div>
-                      <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                        {d.total_trips} trips
-                      </div>
-                      <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                        {d.experience_years}y exp
-                      </div>
-                      {(d.violation_count > 0 || d.accident_history > 0) && (
-                        <div style={{ fontSize: 11, color: 'var(--status-danger)' }}>
-                          {d.violation_count > 0 && `⚠ ${d.violation_count} violations`}
-                          {d.violation_count > 0 && d.accident_history > 0 && ', '}
-                          {d.accident_history > 0 && `⚠ ${d.accident_history} accidents`}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Section D: COST PER KM ANALYSIS */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>COST PER KM ANALYSIS</SectionHeader>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, position: 'relative' }}>
-                  {/* Industry benchmark line */}
-                  <div style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, pointerEvents: 'none' }}>
-                    <div style={{ position: 'absolute', left: '60%', top: 0, bottom: 0, width: 1, background: 'var(--accent-primary)', opacity: 0.3 }} />
-                    <div style={{ position: 'absolute', left: '60%', top: 0, fontSize: 10, color: 'var(--accent-primary)', transform: 'translateX(4px)' }}>
-                      R18/km benchmark
-                    </div>
-                  </div>
-                  {(() => {
-                    const maxCost = Math.max(...vehicles.map(v => v.cost_per_km), 18);
-                    return [...vehicles].sort((a, b) => b.cost_per_km - a.cost_per_km).map((v, idx) => {
-                      const widthPct = (v.cost_per_km / maxCost) * 100;
-                      const aboveBenchmark = v.cost_per_km > 18;
-
-                      return (
-                        <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <div style={{ width: 100, fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                            {v.plate}
-                          </div>
-                          <div style={{ flex: 1, height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
+                            <div style={{ flex: 1 }} />
                             <div style={{
-                              height: '100%',
-                              width: `${widthPct}%`,
-                              background: aboveBenchmark ? 'var(--status-danger)' : 'var(--status-success)',
-                              borderRadius: 2,
-                            }} />
+                              fontSize: 16,
+                              fontFamily: 'var(--font-mono)',
+                              fontWeight: 600,
+                              color: 'var(--accent-primary)',
+                              minWidth: 120,
+                            }}>
+                              {formatCurrency(c.avg_revenue)}/trip
+                            </div>
+                            <div style={{
+                              fontSize: 11,
+                              fontFamily: 'var(--font-mono)',
+                              color: 'var(--text-secondary)',
+                              minWidth: 80,
+                            }}>
+                              {c.trips} trips
+                            </div>
+                            <div style={{
+                              fontSize: 12,
+                              fontFamily: 'var(--font-mono)',
+                              color: 'var(--text-secondary)',
+                              minWidth: 100,
+                            }}>
+                              {formatCurrency(c.total_revenue)}
+                            </div>
                           </div>
-                          <div style={{
-                            width: 80,
-                            textAlign: 'right',
-                            fontSize: 13,
+                        ))}
+                        <div style={{
+                          marginTop: 8,
+                          padding: 12,
+                          background: 'var(--bg-surface)',
+                          borderRadius: 2,
+                          fontSize: 13,
+                          color: 'var(--text-secondary)',
+                        }}>
+                          Your highest-value cargo is <span style={{
                             fontFamily: 'var(--font-mono)',
                             fontWeight: 600,
-                            color: aboveBenchmark ? 'var(--status-danger)' : 'var(--text-primary)'
+                            color: 'var(--accent-primary)',
+                          }}>{cargoTypes[0].cargo}</span> at {formatCurrency(cargoTypes[0].avg_revenue)}/trip avg
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                        No data for this period
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 3: LOAD STATUS INTELLIGENCE */}
+              <div>
+                <SectionHeader>LOAD STATUS INTELLIGENCE</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                  {(() => {
+                    const pending = loads.filter(l => ['PENDING', 'DRAFT'].includes(l.status.toUpperCase()));
+                    const pendingRev = pending.reduce((sum, l) => sum + l.total_amount, 0);
+
+                    const inMotion = loads.filter(l => ['IN_TRANSIT', 'ASSIGNED'].includes(l.status.toUpperCase().replace(' ', '_')));
+                    const inMotionRev = inMotion.reduce((sum, l) => sum + l.total_amount, 0);
+
+                    const completed = loads.filter(l => ['DELIVERED', 'INVOICED', 'COMPLETED'].includes(l.status.toUpperCase()));
+                    const completedRev = completed.reduce((sum, l) => sum + l.total_amount, 0);
+
+                    return (
+                      <>
+                        <div className="card" style={{ padding: 20, background: 'var(--text-secondary)', color: 'white' }}>
+                          <div style={{
+                            fontSize: 28,
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            marginBottom: 8,
                           }}>
-                            {formatCurrency(v.cost_per_km)}/km
+                            {pending.length}
+                          </div>
+                          <div style={{ fontSize: 13, marginBottom: 4, opacity: 0.9 }}>
+                            loads
+                          </div>
+                          <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', opacity: 0.85 }}>
+                            {formatCurrency(pendingRev)} pending dispatch
+                          </div>
+                        </div>
+
+                        <div className="card" style={{ padding: 20, background: 'var(--accent-primary)', color: 'white' }}>
+                          <div style={{
+                            fontSize: 28,
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            marginBottom: 8,
+                          }}>
+                            {inMotion.length}
+                          </div>
+                          <div style={{ fontSize: 13, marginBottom: 4, opacity: 0.9 }}>
+                            loads
+                          </div>
+                          <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', opacity: 0.85 }}>
+                            {formatCurrency(inMotionRev)} revenue in transit
+                          </div>
+                        </div>
+
+                        <div className="card" style={{ padding: 20, background: 'var(--status-success)', color: 'white' }}>
+                          <div style={{
+                            fontSize: 28,
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            marginBottom: 8,
+                          }}>
+                            {completed.length}
+                          </div>
+                          <div style={{ fontSize: 13, marginBottom: 4, opacity: 0.9 }}>
+                            loads
+                          </div>
+                          <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', opacity: 0.85 }}>
+                            {formatCurrency(completedRev)} revenue completed
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 4: WEIGHT CLASS ANALYSIS */}
+              <div>
+                <SectionHeader>WEIGHT CLASS ANALYSIS</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                  {(() => {
+                    const bins = [
+                      { label: 'Under 5t', loads: loads.filter(l => l.weight < 5000) },
+                      { label: '5-10t', loads: loads.filter(l => l.weight >= 5000 && l.weight < 10000) },
+                      { label: '10-20t', loads: loads.filter(l => l.weight >= 10000 && l.weight < 20000) },
+                      { label: '20t+', loads: loads.filter(l => l.weight >= 20000) },
+                    ].map(bin => ({
+                      ...bin,
+                      count: bin.loads.length,
+                      avg: bin.loads.length > 0 ? bin.loads.reduce((sum, l) => sum + l.total_amount, 0) / bin.loads.length : 0,
+                    }));
+
+                    const maxAvg = Math.max(...bins.map(b => b.avg), 1);
+
+                    return bins.map((bin, idx) => {
+                      const isHighest = bin.avg === maxAvg && bin.avg > 0;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="card"
+                          style={{
+                            padding: 20,
+                            borderLeft: isHighest ? '3px solid var(--accent-primary)' : 'none',
+                          }}
+                        >
+                          <div style={{
+                            fontSize: 11,
+                            fontFamily: 'var(--font-mono)',
+                            textTransform: 'uppercase',
+                            color: 'var(--text-tertiary)',
+                            marginBottom: 8,
+                          }}>
+                            {bin.label}
+                          </div>
+                          <div style={{
+                            fontSize: 20,
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            color: isHighest ? 'var(--accent-primary)' : 'var(--text-primary)',
+                            marginBottom: 8,
+                          }}>
+                            {formatCurrency(bin.avg)}
+                          </div>
+                          <div style={{
+                            fontSize: 11,
+                            color: 'var(--text-secondary)',
+                          }}>
+                            avg per trip · {bin.count} loads
                           </div>
                         </div>
                       );
@@ -1431,189 +2145,8 @@ export default function Insights() {
               </div>
             </div>
           )}
-
-          {/* TAB 5: LANES & LOAD INTELLIGENCE */}
-          {tab === 'lanes' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Section A: ROUTE PROFITABILITY */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>ROUTE PROFITABILITY</SectionHeader>
-                {(() => {
-                  const routes = getRouteProfitability();
-                  const maxRevPerKm = Math.max(...routes.map(r => r.revenuePerKm), 1);
-
-                  return routes.length > 0 ? (
-                    <>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {routes.map((r, idx) => {
-                          const widthPct = (r.revenuePerKm / maxRevPerKm) * 100;
-                          const isTop3 = idx < 3;
-                          const isBottom3 = idx >= routes.length - 3;
-
-                          return (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              <div style={{ width: 250, fontSize: 13, color: 'var(--text-primary)' }}>
-                                {r.route}
-                              </div>
-                              <div style={{ flex: 1, height: 24, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                                <div style={{
-                                  height: '100%',
-                                  width: `${widthPct}%`,
-                                  background: isTop3 ? 'var(--status-success)' : isBottom3 ? 'var(--status-danger)' : 'var(--accent-primary)',
-                                  borderRadius: 2,
-                                }} />
-                              </div>
-                              <div style={{ width: 100, textAlign: 'right', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                {formatCurrency(r.revenuePerKm)}/km
-                              </div>
-                              <div style={{ width: 80, textAlign: 'right', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                                {r.trips} trips
-                              </div>
-                              <div style={{ width: 120, textAlign: 'right', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent-primary)' }}>
-                                {formatCurrency(r.totalRevenue)}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-surface)', borderRadius: 2, fontSize: 13, color: 'var(--text-secondary)' }}>
-                        Your most efficient route is {routes[0].route} at {formatCurrency(routes[0].revenuePerKm)}/km
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
-                      No route data for this period
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Section B: LOAD STATUS INTELLIGENCE */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>LOAD STATUS INTELLIGENCE</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
-                  {(() => {
-                    const delivered = loads.filter(l => l.status.toLowerCase() === 'delivered' || l.status.toLowerCase() === 'completed');
-                    const inTransit = loads.filter(l => l.status.toLowerCase() === 'in_transit' || l.status.toLowerCase() === 'in transit');
-                    const pending = loads.filter(l => l.status.toLowerCase() === 'pending' || l.status.toLowerCase() === 'draft');
-
-                    const deliveredRevenue = delivered.reduce((sum, l) => sum + l.total_amount, 0);
-                    const inTransitRevenue = inTransit.reduce((sum, l) => sum + l.total_amount, 0);
-                    const pendingRevenue = pending.reduce((sum, l) => sum + l.total_amount, 0);
-
-                    const total = loads.length;
-                    const deliveredPct = total > 0 ? (delivered.length / total) * 100 : 0;
-
-                    return (
-                      <>
-                        <div style={{ padding: 16, background: 'var(--status-success)', color: 'white', borderRadius: 2 }}>
-                          <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 4 }}>DELIVERED & INVOICED</div>
-                          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>{deliveredPct.toFixed(0)}%</div>
-                          <div style={{ fontSize: 13, opacity: 0.9 }}>
-                            {delivered.length} loads — {formatCurrency(deliveredRevenue)} revenue realised
-                          </div>
-                        </div>
-                        <div style={{ padding: 16, background: 'var(--accent-primary)', color: 'white', borderRadius: 2 }}>
-                          <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 4 }}>IN TRANSIT</div>
-                          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>{inTransit.length}</div>
-                          <div style={{ fontSize: 13, opacity: 0.9 }}>
-                            {formatCurrency(inTransitRevenue)} revenue in motion
-                          </div>
-                        </div>
-                        <div style={{ padding: 16, background: 'var(--text-secondary)', color: 'white', borderRadius: 2 }}>
-                          <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 4 }}>PENDING DISPATCH</div>
-                          <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>{pending.length}</div>
-                          <div style={{ fontSize: 13, opacity: 0.9 }}>
-                            {formatCurrency(pendingRevenue)} pipeline
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Section C: CARGO INTELLIGENCE */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>CARGO INTELLIGENCE</SectionHeader>
-                {(() => {
-                  const cargo = getCargoIntelligence();
-                  const maxAvg = Math.max(...cargo.map(c => c.avgRevenue), 1);
-
-                  return cargo.length > 0 ? (
-                    <>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {cargo.map((c, idx) => {
-                          const widthPct = (c.avgRevenue / maxAvg) * 100;
-
-                          return (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              <div style={{ width: 180, fontSize: 13, color: 'var(--text-primary)' }}>
-                                {c.cargo}
-                              </div>
-                              <div style={{ flex: 1, height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                                <div style={{ height: '100%', width: `${widthPct}%`, background: 'var(--accent-primary)', borderRadius: 2 }} />
-                              </div>
-                              <div style={{ width: 120, textAlign: 'right', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent-primary)' }}>
-                                {formatCurrency(c.avgRevenue)}/trip
-                              </div>
-                              <div style={{ width: 80, textAlign: 'right', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                                {c.tripCount} trips
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-surface)', borderRadius: 2, fontSize: 13, color: 'var(--text-secondary)' }}>
-                        Your highest-value cargo type is {cargo[0].cargo} at {formatCurrency(cargo[0].avgRevenue)} avg per trip
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
-                      No cargo data for this period
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Section D: WEIGHT & REVENUE CORRELATION */}
-              <div className="card" style={{ padding: 20 }}>
-                <SectionHeader>WEIGHT & REVENUE CORRELATION</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                  {getWeightBins().map((bin, idx) => (
-                    <div key={idx} style={{ padding: 16, background: 'var(--bg-surface)', borderRadius: 2 }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>{bin.label}</div>
-                      <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--accent-primary)', marginBottom: 4 }}>
-                        {formatCurrency(bin.avg)}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                        avg per trip · {bin.count} loads
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {(() => {
-                  const bins = getWeightBins();
-                  const maxBin = bins.reduce((max, bin) => bin.avg > max.avg ? bin : max, bins[0]);
-                  return (
-                    <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-surface)', borderRadius: 2, fontSize: 13, color: 'var(--text-secondary)' }}>
-                      {maxBin.label} loads earn most per trip at {formatCurrency(maxBin.avg)} avg
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
         </>
       )}
-
-      {/* CSS Animation for pulse */}
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-      `}</style>
     </div>
   );
 }

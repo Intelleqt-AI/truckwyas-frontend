@@ -959,7 +959,7 @@ export default function Insights() {
                   <SectionHeader>MONTHLY P&L TREND</SectionHeader>
                   <div className="card" style={{ padding: 20 }}>
                     {(() => {
-                      const trend = financeData.monthly_trend.slice(-6);
+                      const trend = [...financeData.monthly_trend].sort((a, b) => a.month.localeCompare(b.month)).slice(-6);
                       const maxValue = Math.max(...trend.map(m => Math.max(m.revenue, m.expenses)));
                       const isImproving = trend.length >= 2 && trend[trend.length - 1].margin > trend[trend.length - 2].margin;
 
@@ -978,7 +978,7 @@ export default function Insights() {
                                   color: 'var(--text-tertiary)',
                                   textTransform: 'uppercase',
                                 }}>
-                                  {m.month.slice(-3)}
+                                  {new Date(m.month + '-01').toLocaleString('en-ZA', { month: 'short' }).toUpperCase()}
                                 </div>
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
                                   <div style={{
@@ -1809,7 +1809,7 @@ export default function Insights() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* SECTION 1: CORRIDOR INTELLIGENCE */}
               <div>
-                <SectionHeader>YOUR MOST EFFICIENT CORRIDORS — Revenue per km tells you where to focus</SectionHeader>
+                <SectionHeader>CORRIDOR EFFICIENCY — Revenue per km driven</SectionHeader>
                 {(() => {
                   const routeMap = new Map<string, {
                     trips: number;
@@ -1849,7 +1849,7 @@ export default function Insights() {
                     .slice(0, 8);
 
                   return routes.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, alignItems: 'start' }}>
                       {routes.map((r, idx) => {
                         const isTop2 = idx < 2;
                         const isBottom2 = idx >= routes.length - 2 && routes.length >= 4;
@@ -1921,7 +1921,7 @@ export default function Insights() {
 
               {/* SECTION 2: CARGO INTELLIGENCE */}
               <div>
-                <SectionHeader>CARGO TYPE PERFORMANCE — Which cargo earns the most per trip</SectionHeader>
+                <SectionHeader>CARGO PERFORMANCE — Avg revenue per trip by cargo type</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
                   {(() => {
                     const cargoMap = new Map<string, { count: number; totalRevenue: number }>();

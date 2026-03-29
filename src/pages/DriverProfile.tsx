@@ -6,6 +6,18 @@ import { formatCurrency } from "@/lib/formatters";
 
 const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] as const;
 
+const ScoreBar = ({ label, value, max = 100, color = 'var(--accent-primary)' }: any) => (
+  <div style={{ marginBottom: 14 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{label}</span>
+      <span style={{ fontSize: 13, color, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{value ?? '—'}</span>
+    </div>
+    <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
+      <div style={{ height: 4, width: `${Math.min(100, ((value ?? 0) / max) * 100)}%`, background: color, borderRadius: 2, transition: 'width 0.5s ease' }} />
+    </div>
+  </div>
+);
+
 const formatZAR = (v: number) =>
   'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -62,20 +74,16 @@ export default function DriverProfile() {
   const avgRevPerTrip = completedTrips > 0 ? totalRevenue / completedTrips : 0;
   const totalDistance = completedLoads.reduce((s: number, l: any) => s + parseFloat(l.distance || '0'), 0);
 
-  // Financial metrics (for Financial Profile tab)
-  const totalFuelCost = loads.reduce((s: number, l: any) => s + parseFloat(l.fuel_cost || '0'), 0);
-  const totalDistanceKm = loads.reduce((s: number, l: any) => s + parseFloat(l.distance_km || l.distance || '0'), 0);
-  const netMargin = totalRevenue - totalFuelCost;
-  const bestTrip = loads.length > 0 ? loads.reduce((max: any, l: any) => {
-    const amt = parseFloat(l.total_amount || '0');
-    const maxAmt = parseFloat(max.total_amount || '0');
-    return amt > maxAmt ? l : max;
-  }, loads[0]) : null;
-  const worstTrip = loads.length > 0 ? loads.reduce((min: any, l: any) => {
-    const amt = parseFloat(l.total_amount || '0');
-    const minAmt = parseFloat(min.total_amount || '0');
-    return amt > 0 && amt < minAmt ? l : min;
-  }, loads[0]) : null;
+  // Financial metrics
+  const totalDistanceKm = loads.reduce((s: number, l: any) => s + parseFloat(l.distance || '0'), 0);
+  const revPerKm = totalDistanceKm > 0 ? totalRevenue / totalDistanceKm : 0;
+  const bestTripAmount = loads.length > 0 ? Math.max(...loads.map((l: any) => parseFloat(l.total_amount || '0'))) : 0;
+
+  // Performance scores
+  const onTimeRate = driver.on_time_rate ?? 85;
+  const safetyScore = Math.max(0, Math.min(100, 100 - (driver.violation_count ?? 0) * 10 - (driver.accident_history ?? 0) * 20));
+  const experienceScore = Math.min(100, ((driver.experience_years ?? 0) / 15) * 100);
+  const complianceScore = driver.license_expiry && new Date(driver.license_expiry) > new Date() ? 100 : 0;
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
     background: 'transparent', border: 'none',
@@ -290,39 +298,53 @@ export default function DriverProfile() {
             <div className="card metric-card">
               <div className="card-header"><span className="card-title">Revenue Generated</span></div>
               <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>
-                {formatCurrency(totalRevenue)}
+                {formatCurrency(driver.revenue_generated ?? totalRevenue)}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{completedTrips} completed trips</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{driver.total_trips ?? totalTrips} completed trips</div>
             </div>
             <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Total Trips</span></div>
-              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                {totalTrips}
-              </div>
-            </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Avg Revenue per Trip</span></div>
-              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                {formatCurrency(avgRevPerTrip)}
+              <div className="card-header"><span className="card-title">Avg Revenue / Trip</span></div>
+              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)' }}>
+                {formatCurrency(driver.avg_revenue_per_trip ?? avgRevPerTrip)}
               </div>
             </div>
             <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Completed Trips</span></div>
-              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                {completedTrips}
+              <div className="card-header"><span className="card-title">Revenue / km</span></div>
+              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)' }}>
+                R {(revPerKm || 0).toFixed(2)}
               </div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{(totalDistanceKm || 0).toFixed(0)} km total</div>
+            </div>
+            <div className="card metric-card">
+              <div className="card-header"><span className="card-title">Experience</span></div>
+              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)' }}>
+                {driver.experience_years ?? 0} years
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>Hire: {driver.hire_date?.slice(0, 10) || '—'}</div>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            {/* Performance Scores */}
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 20 }}>PERFORMANCE SCORES</div>
+              <ScoreBar label="ON-TIME RATE" value={onTimeRate} color="var(--accent-primary)" />
+              <ScoreBar label="SAFETY SCORE" value={safetyScore} color={safetyScore >= 80 ? 'var(--status-success)' : safetyScore >= 60 ? 'var(--status-warning)' : 'var(--status-danger)'} />
+              <ScoreBar label="EXPERIENCE SCORE" value={experienceScore} />
+              <ScoreBar label="COMPLIANCE" value={complianceScore} color={complianceScore === 100 ? 'var(--status-success)' : 'var(--status-danger)'} />
+            </div>
+
             {/* Earnings Breakdown */}
             <div className="card" style={{ padding: 20 }}>
               <div className="card-title" style={{ marginBottom: 16 }}>EARNINGS BREAKDOWN</div>
               {[
-                { label: 'TOTAL REVENUE', value: formatCurrency(totalRevenue) },
-                { label: 'AVG PER TRIP', value: formatCurrency(avgRevPerTrip) },
-                { label: 'BEST TRIP', value: bestTrip ? formatCurrency(parseFloat(bestTrip.total_amount || '0')) : '—' },
-                { label: 'WORST TRIP', value: worstTrip ? formatCurrency(parseFloat(worstTrip.total_amount || '0')) : '—' },
+                { label: 'TOTAL REVENUE', value: formatCurrency(driver.revenue_generated ?? totalRevenue) },
+                { label: 'TOTAL TRIPS', value: (driver.total_trips ?? totalTrips).toString() },
+                { label: 'AVG PER TRIP', value: formatCurrency(driver.avg_revenue_per_trip ?? avgRevPerTrip) },
+                { label: 'BEST TRIP', value: formatCurrency(bestTripAmount) },
+                { label: 'TOTAL DISTANCE', value: `${(totalDistanceKm || 0).toFixed(0)} km` },
+                { label: 'VIOLATIONS', value: (driver.violation_count ?? 0).toString() },
+                { label: 'ACCIDENTS', value: (driver.accident_history ?? 0).toString() },
               ].map(r => (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
                   <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
@@ -331,39 +353,48 @@ export default function DriverProfile() {
               ))}
             </div>
 
-            {/* Route History */}
+            {/* Compliance & Docs */}
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>ROUTE HISTORY</div>
+              <div className="card-title" style={{ marginBottom: 16 }}>COMPLIANCE & DOCS</div>
+              {[
+                { label: 'LICENSE NUMBER', value: driver.license_number || '—', alert: false },
+                { label: 'LICENSE STATE', value: driver.license_state || '—', alert: false },
+                { label: 'LICENSE EXPIRY', value: driver.license_expiry?.slice(0, 10) || '—', alert: driver.license_expiry && new Date(driver.license_expiry) < new Date() },
+                { label: 'MEDICAL CARD EXPIRY', value: driver.medical_card_expiry?.slice(0, 10) || '—', alert: driver.medical_card_expiry && new Date(driver.medical_card_expiry) < new Date() },
+                { label: 'HIRE DATE', value: driver.hire_date?.slice(0, 10) || '—', alert: false },
+                { label: 'EMERGENCY CONTACT', value: driver.emergency_contact || '—', alert: false },
+                { label: 'EMERGENCY PHONE', value: driver.emergency_phone || '—', alert: false },
+              ].map(r => (
+                <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
+                  <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: r.alert ? 'var(--status-danger)' : 'var(--text-primary)' }}>{r.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Recent Loads */}
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 16 }}>RECENT LOADS ({loads.length})</div>
               {loads.length === 0 ? (
                 <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '20px 0', textAlign: 'center' }}>No loads recorded</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {loads.slice(0, 10).map((load: any) => (
-                    <div
-                      key={load.id}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-row)', cursor: 'pointer' }}
-                      onClick={() => navigate(`/bookings/${load.id}`)}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 11, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{load.load_number}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                          {load.pickup_city || '—'} → {load.delivery_city || '—'}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>
-                          {formatCurrency(parseFloat(load.total_amount || '0'))}
-                        </div>
-                        <div style={{ fontSize: 10, color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>
-                          {load.status?.replace('_', ' ')}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+              ) : loads.slice(0, 8).map((load: any) => (
+                <div
+                  key={load.id}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-row)', cursor: 'pointer' }}
+                  onClick={() => navigate(`/bookings/${load.id}`)}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{load.load_number}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{load.pickup_city || '—'} → {load.delivery_city || '—'}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>{formatCurrency(parseFloat(load.total_amount || '0'))}</div>
+                    <div style={{ fontSize: 10, color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{load.status}</div>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           </div>
         </>

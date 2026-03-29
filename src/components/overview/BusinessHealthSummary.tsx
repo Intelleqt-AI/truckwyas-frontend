@@ -49,10 +49,10 @@ export function BusinessHealthSummary() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'good': return '#22c55e';
-      case 'warning': return '#f59e0b';
-      case 'critical': return '#ef4444';
-      default: return '#888';
+      case 'good': return 'var(--status-success)';
+      case 'warning': return 'var(--status-warning)';
+      case 'critical': return 'var(--status-danger)';
+      default: return 'var(--text-tertiary)';
     }
   };
 
@@ -107,7 +107,7 @@ export function BusinessHealthSummary() {
                         <span
                           style={{
                             fontSize: '14px',
-                            color: metric.trend === 'up' ? '#22c55e' : metric.trend === 'down' ? '#ef4444' : '#888'
+                            color: metric.trend === 'up' ? 'var(--status-success)' : metric.trend === 'down' ? 'var(--status-danger)' : 'var(--text-tertiary)'
                           }}
                         >
                           {trendIcon}

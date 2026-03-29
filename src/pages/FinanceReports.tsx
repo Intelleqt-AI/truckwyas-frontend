@@ -591,11 +591,11 @@ export default function FinanceReports() {
                 ];
                 const totalAmount = buckets.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
                 const colorMap: Record<string, string> = {
-                  'Current': '#22c55e',
-                  '1-30 Days': '#f59e0b',
-                  '31-60 Days': '#f59e0b',
-                  '61-90 Days': '#ef4444',
-                  '90+ Days': '#ef4444'
+                  'Current': 'var(--status-success)',
+                  '1-30 Days': 'var(--status-warning)',
+                  '31-60 Days': 'var(--status-warning)',
+                  '61-90 Days': 'var(--status-danger)',
+                  '90+ Days': 'var(--status-danger)'
                 };
 
                 return (

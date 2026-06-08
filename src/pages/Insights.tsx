@@ -1,41 +1,59 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fetchData } from '@/lib/Api';
-import { formatCurrency, formatPercent } from '@/lib/formatters';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, Area, RadialBarChart, RadialBar, PieChart, Pie, Cell } from 'recharts';
+import { formatCurrency } from '@/lib/formatters';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 
 // ========== TYPES ==========
 
-interface Signal {
+interface KPIData {
+  revenue_mtd: number;
+  revenue_prev_month: number;
+  revenue_change_pct: number;
+  net_margin_pct: number;
+  outstanding_invoices: number;
+  overdue_invoices: number;
+  dso: number;
+  active_vehicles: number;
+  fleet_utilization_pct: number;
+  advances_this_month: number;
+  total_advance_amount: number;
+}
+
+interface Recommendation {
   type: string;
-  category: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   title: string;
-  body: string;
-  action?: string;
-  action_url?: string;
-  severity: 'critical' | 'warning' | 'info';
-  created_at: string;
+  message: string;
+  customer_name?: string;
+  amount?: number;
+  days_overdue?: number;
+  dso?: number;
+  link?: string;
 }
 
-interface RouteData {
-  route: string;
-  trips: number;
-  avg_revenue: number;
-  avg_cost: number;
-  margin_pct: number;
-  revenue_per_load?: number;
-  fuel_per_km?: number | null;
-  avg_days?: number;
+interface InsightsData {
+  recommendations: Recommendation[];
 }
 
-interface CustomerHealthData {
-  customer_name: string;
+interface TopCustomer {
   customer_id: number;
+  customer_name: string;
   revenue: number;
   invoice_count: number;
-  avg_payment_days: number;
-  dso: number;
-  overdue_count: number;
-  risk_tier: 'PRIME' | 'STANDARD' | 'AT_RISK';
+}
+
+interface MonthlyTrend {
+  month: string;
+  revenue: number;
+  expenses: number;
+  margin: number;
+}
+
+interface CashFlowForecast {
+  next_30_days: number;
+  next_60_days: number;
+  next_90_days: number;
 }
 
 interface FinanceData {
@@ -43,110 +61,112 @@ interface FinanceData {
   expenses_period: number;
   net_margin_period: number;
   net_margin_percent_period: number;
-  operating_ratio?: number;
-  revenue_per_load?: number;
-  outstanding_invoices_total?: number;
-  overdue_invoices_total?: number;
-  monthly_trend?: { month: string; revenue: number; expenses: number }[];
-  expense_breakdown?: Record<string, number>;
-  top_customers?: { customer_id: number; customer_name: string; revenue: number; costs?: number; margin_pct?: number; invoice_count: number; avg_payment_days?: number }[];
-  previous_period?: {
-    revenue: number;
-    margin_percent: number;
-  };
+  revenue_ytd: number;
+  total_revenue: number;
+  total_expenses: number;
+  dso: number;
+  fuel_cost_ratio: number;
+  outstanding_invoices_total: number;
+  overdue_invoices_total: number;
+  top_customers: TopCustomer[];
+  monthly_trend: MonthlyTrend[];
+  cash_flow_forecast: CashFlowForecast;
 }
 
-interface FleetData {
-  utilisation?: number;
-  vehicles?: {
-    vehicle_id: number;
-    registration: string;
-    make_model?: string;
-    revenue: number;
-    costs?: number;
-    margin_pct?: number;
-    utilisation?: number;
-    trips: number;
-    downtime?: number;
-  }[];
-}
-
-interface DriversData {
-  drivers?: {
-    driver_id: number;
-    driver_name: string;
-    revenue: number;
-    trips: number;
-    otd_pct?: number;
-    avg_fuel_per_trip?: number;
-    rating?: number;
-  }[];
-}
-
-interface QuotesData {
-  total_quotes?: number;
-  conversion_rate?: number;
-  avg_quote_value?: number;
-  revenue_guard_flag_rate?: number;
-  funnel?: {
-    quotes_sent: number;
-    customer_accepted: number;
-    loads_booked: number;
-    loads_completed: number;
-    invoiced: number;
-  };
-  revenue_guard?: {
-    loads_flagged: number;
-    override_rate: number;
-    money_saved: number;
-    override_losses: number;
-  };
-  quote_accuracy?: {
-    corridor: string;
-    quoted_margin: number;
-    actual_margin: number;
-    variance: number;
-    accuracy_score: number;
-  }[];
+interface CashFlowPeriod {
+  period: string;
+  start_date: string;
+  end_date: string;
+  expected_in: number;
+  expected_out: number;
+  net: number;
 }
 
 interface CashFlowData {
-  total_outstanding?: number;
-  total_overdue?: number;
-  avg_dso?: number;
-  next_30d_projected?: number;
-  fast_pay_fees_mtd?: number;
-  aging_buckets?: {
-    current: { amount: number; count: number };
-    days_1_30: { amount: number; count: number };
-    days_31_60: { amount: number; count: number };
-    days_61_90: { amount: number; count: number };
-    days_90_plus: { amount: number; count: number };
-  };
-  customer_payment_health?: CustomerHealthData[];
-  cash_flow_forecast?: {
-    next_30d: number;
-    next_31_60d: number;
-    next_61_90d: number;
-  };
-  fast_pay_summary?: {
-    total_fees: number;
-    fee_pct_of_revenue: number;
-    invoice_count: number;
-    avg_discount: number;
+  forecast: CashFlowPeriod[];
+}
+
+interface Load {
+  id: number;
+  load_number: string;
+  pickup_city: string;
+  delivery_city: string;
+  total_amount: number;
+  status: string;
+  distance: number;
+  weight: number;
+  driver_name: string;
+  vehicle_info: string;
+  cargo_description: string;
+  fuel_surcharge: number;
+  rate: number;
+  created_at: string;
+  pickup_date: string;
+}
+
+interface Invoice {
+  id: number;
+  customer_name: string;
+  total_amount: number;
+  paid_amount: number;
+  balance: number;
+  status: string;
+  due_date: string;
+  issue_date: string;
+  early_pay_eligible: boolean;
+}
+
+interface Expense {
+  id: number;
+  category: string;
+  amount: number;
+  expense_date: string;
+  vehicle_info: string;
+  driver_name: string;
+}
+
+interface Driver {
+  id: number;
+  revenue_generated: number;
+  total_trips: number;
+  avg_revenue_per_trip: number;
+  experience_years: number;
+  violation_count: number;
+  accident_history: number;
+  status: string;
+  user_details: {
+    name: string;
+    first_name?: string;
+    last_name?: string;
   };
 }
 
-type TabType = 'command' | 'revenue' | 'lanes' | 'fleet' | 'quotes' | 'cashflow';
+interface Vehicle {
+  id: number;
+  plate: string;
+  make: string;
+  model: string;
+  status: string;
+  ai_health_score: number;
+  fuel_efficiency_score: number;
+  uptime_score: number;
+  maintenance_score: number;
+  uptime_percentage: number;
+  cost_per_km: number;
+  margin_per_trip: number;
+  mileage: number;
+  revenue_generated: number;
+}
+
+type TabType = 'briefing' | 'margin' | 'cash' | 'fleet' | 'lanes';
 type PeriodType = 'THIS_MONTH' | 'LAST_MONTH' | 'LAST_3M' | 'LAST_6M' | 'LAST_12M' | 'CUSTOM';
 
 const TABS = [
-  { id: 'command' as TabType, label: 'Command Centre' },
-  { id: 'revenue' as TabType, label: 'Revenue & Margins' },
-  { id: 'lanes' as TabType, label: 'Lanes & Routes' },
-  { id: 'fleet' as TabType, label: 'Fleet & Drivers' },
-  { id: 'quotes' as TabType, label: 'Quotes & Pipeline' },
-  { id: 'cashflow' as TabType, label: 'Cash Flow' },
+  { id: 'briefing' as TabType, label: 'Briefing' },
+  { id: 'margin' as TabType, label: 'Margin Engine' },
+  { id: 'cash' as TabType, label: 'Cash Flow' },
+  { id: 'fleet' as TabType, label: 'Fleet' },
+  { id: 'lanes' as TabType, label: 'Lanes' },
 ];
 
 const PERIOD_OPTIONS: { id: PeriodType; label: string }[] = [
@@ -159,22 +179,23 @@ const PERIOD_OPTIONS: { id: PeriodType; label: string }[] = [
 ];
 
 export default function Insights() {
-  const [tab, setTab] = useState<TabType>('command');
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<TabType>('briefing');
   const [period, setPeriod] = useState<PeriodType>('THIS_MONTH');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fleetSubTab, setFleetSubTab] = useState<'vehicles' | 'drivers'>('vehicles');
 
-  // Data states per tab
-  const [commandData, setCommandData] = useState<any>(null);
-  const [revenueData, setRevenueData] = useState<FinanceData | null>(null);
-  const [lanesData, setLanesData] = useState<RouteData[] | null>(null);
-  const [fleetData, setFleetData] = useState<FleetData | null>(null);
-  const [driversData, setDriversData] = useState<DriversData | null>(null);
-  const [quotesData, setQuotesData] = useState<QuotesData | null>(null);
+  // Data states
+  const [kpiData, setKpiData] = useState<KPIData | null>(null);
+  const [insightsData, setInsightsData] = useState<InsightsData | null>(null);
+  const [financeData, setFinanceData] = useState<FinanceData | null>(null);
   const [cashflowData, setCashflowData] = useState<CashFlowData | null>(null);
+  const [loads, setLoads] = useState<Load[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
   // Build period params
   const getPeriodParams = (): string => {
@@ -211,53 +232,71 @@ export default function Insights() {
   useEffect(() => {
     const loadTabData = async () => {
       setLoading(true);
-      setError(null);
       const params = getPeriodParams();
 
       try {
         switch (tab) {
-          case 'command':
-            const [finance, signals, routes, loads] = await Promise.all([
-              fetchData(`api/v1/dashboard/finance/?compare=previous_period&${params}`).catch(() => null),
-              fetchData(`api/v1/insights/signals/?${params}`).catch(() => ({ signals: [] })),
-              fetchData(`api/v1/insights/routes/?${params}`).catch(() => []),
-              fetchData('api/v1/loads/?status=in_transit,assigned&limit=1').catch(() => ({ count: 0 })),
+          case 'briefing':
+            const [kpi, insights, loadsResp] = await Promise.all([
+              fetchData('api/v1/dashboard/kpi/').catch(() => null),
+              fetchData('api/v1/dashboard/insights/').catch(() => ({ recommendations: [] })),
+              fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
             ]);
-            setCommandData({ finance, signals: signals?.signals || [], routes, activeLoads: loads?.count || 0 });
+            setKpiData(kpi);
+            setInsightsData(insights);
+            setLoads(loadsResp?.results || []);
             break;
 
-          case 'revenue':
-            const revData = await fetchData(`api/v1/dashboard/finance/?compare=previous_period&${params}`).catch(() => null);
-            setRevenueData(revData);
+          case 'margin':
+            const [finance, loadsData, expensesData] = await Promise.all([
+              fetchData(`api/v1/dashboard/finance/?${params}`).catch(() => null),
+              fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
+              fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
+            ]);
+            setFinanceData(finance);
+            setLoads(loadsData?.results || []);
+            setExpenses(expensesData?.results || []);
             break;
 
-          case 'lanes':
-            const routeData = await fetchData(`api/v1/insights/routes/?${params}`).catch(() => []);
-            setLanesData(Array.isArray(routeData) ? routeData : routeData?.results || []);
+          case 'cash':
+            const [cf, finData, invData] = await Promise.all([
+              fetchData('api/v1/dashboard/cashflow/').catch(() => ({ forecast: [] })),
+              fetchData(`api/v1/dashboard/finance/?${params}`).catch(() => null),
+              fetchData('api/v1/invoices/?page_size=100').catch(() => ({ results: [] })),
+            ]);
+            setCashflowData(cf);
+            setFinanceData(finData);
+            setInvoices(invData?.results || []);
             break;
 
           case 'fleet':
-            const [fleet, drivers] = await Promise.all([
-              fetchData(`api/v1/insights/fleet/?${params}`).catch(() => null),
-              fetchData(`api/v1/insights/drivers/?${params}`).catch(() => null),
+            const [veh, drv, exp] = await Promise.all([
+              fetchData('api/v1/vehicles/?page_size=50').catch(() => ({ results: [] })),
+              fetchData('api/v1/drivers/?page_size=50').catch(() => ({ results: [] })),
+              fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
             ]);
-            setFleetData(fleet);
-            setDriversData(drivers);
+            setVehicles((veh?.results || []).map((v: any) => ({
+              ...v,
+              uptime_percentage: parseFloat(v.uptime_percentage || '0'),
+              cost_per_km: parseFloat(v.cost_per_km || '0'),
+              margin_per_trip: parseFloat(v.margin_per_trip || '0'),
+              mileage: parseFloat(v.mileage || '0'),
+            })));
+            setDrivers(drv?.results || []);
+            setExpenses(exp?.results || []);
             break;
 
-          case 'quotes':
-            const qData = await fetchData(`api/v1/insights/quotes/?${params}`).catch(() => null);
-            setQuotesData(qData);
-            break;
-
-          case 'cashflow':
-            const cfData = await fetchData(`api/v1/insights/cashflow/?${params}`).catch(() => null);
-            setCashflowData(cfData);
+          case 'lanes':
+            const [lds, exps] = await Promise.all([
+              fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
+              fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
+            ]);
+            setLoads(lds?.results || []);
+            setExpenses(exps?.results || []);
             break;
         }
       } catch (err) {
         console.error('Failed to load insights data:', err);
-        setError('Failed to load data');
       } finally {
         setLoading(false);
       }
@@ -266,138 +305,72 @@ export default function Insights() {
     loadTabData();
   }, [tab, period, customFrom, customTo]);
 
-  const exportToCSV = () => {
-    let csvContent = '';
-    let filename = '';
-
-    switch (tab) {
-      case 'command':
-        filename = 'Command_Centre.csv';
-        csvContent = 'Metric,Value\n';
-        csvContent += `Revenue,${commandData?.finance?.revenue_period || 0}\n`;
-        csvContent += `Active Loads,${commandData?.activeLoads || 0}\n`;
-        break;
-
-      case 'revenue':
-        filename = 'Revenue_Margins.csv';
-        csvContent = 'Metric,Value\n';
-        csvContent += `Gross Revenue,${revenueData?.revenue_period || 0}\n`;
-        csvContent += `Net Margin %,${revenueData?.net_margin_percent_period || 0}\n`;
-        csvContent += `Operating Ratio,${revenueData?.operating_ratio || 0}\n`;
-        break;
-
-      case 'lanes':
-        filename = 'Lanes_Routes.csv';
-        csvContent = 'Route,Loads,Revenue,Total Cost,Margin%,Rev/Load\n';
-        (lanesData || []).forEach((r: RouteData) => {
-          csvContent += `${r.route},${r.trips},${r.avg_revenue},${r.avg_cost},${r.margin_pct},${r.revenue_per_load || r.avg_revenue}\n`;
-        });
-        break;
-
-      case 'fleet':
-        if (fleetSubTab === 'vehicles') {
-          filename = 'Fleet_Vehicles.csv';
-          csvContent = 'Vehicle,Revenue,Costs,Margin%,Utilisation%,Loads\n';
-          (fleetData?.vehicles || []).forEach(v => {
-            csvContent += `${v.registration},${v.revenue},${v.costs || 0},${v.margin_pct || 0},${v.utilisation || 0},${v.trips}\n`;
-          });
-        } else {
-          filename = 'Fleet_Drivers.csv';
-          csvContent = 'Driver,Revenue,Loads,OTD%\n';
-          (driversData?.drivers || []).forEach(d => {
-            csvContent += `${d.driver_name},${d.revenue},${d.trips},${d.otd_pct || 0}\n`;
-          });
-        }
-        break;
-
-      case 'quotes':
-        filename = 'Quotes_Pipeline.csv';
-        csvContent = 'Metric,Value\n';
-        csvContent += `Total Quotes,${quotesData?.total_quotes || 0}\n`;
-        csvContent += `Conversion Rate,${quotesData?.conversion_rate || 0}\n`;
-        csvContent += `Avg Quote Value,${quotesData?.avg_quote_value || 0}\n`;
-        break;
-
-      case 'cashflow':
-        filename = 'Cash_Flow.csv';
-        csvContent = 'Metric,Value\n';
-        csvContent += `Total Outstanding,${cashflowData?.total_outstanding || 0}\n`;
-        csvContent += `Overdue,${cashflowData?.total_overdue || 0}\n`;
-        csvContent += `Avg DSO,${cashflowData?.avg_dso || 0}\n`;
-        break;
-    }
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Helper functions
+  const getMarginColor = (pct: number) => {
+    if (pct > 50) return 'var(--status-success)';
+    if (pct >= 30) return 'var(--status-warning)';
+    return 'var(--status-danger)';
   };
 
-  const LoadingSkeleton = () => (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-      {[1, 2, 3, 4].map(i => (
-        <div key={i} className="card" style={{ padding: 20 }}>
-          <div style={{ height: 16, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 12, width: '50%' }} />
-          <div style={{ height: 24, background: 'var(--bg-surface-hover)', borderRadius: 4, width: '70%' }} />
-        </div>
-      ))}
+  const getDSOColor = (dso: number) => {
+    if (dso < 30) return 'var(--status-success)';
+    if (dso <= 60) return 'var(--status-warning)';
+    return 'var(--status-danger)';
+  };
+
+  const getSeverityDot = (severity: string) => {
+    if (severity === 'HIGH' || severity === 'CRITICAL') return 'var(--status-danger)';
+    if (severity === 'MEDIUM') return 'var(--status-warning)';
+    return 'var(--status-success)';
+  };
+
+  const SectionHeader = ({ children }: { children: string }) => (
+    <div style={{
+      fontSize: 11,
+      fontFamily: 'var(--font-mono)',
+      color: 'var(--text-tertiary)',
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      marginBottom: 16,
+    }}>
+      {children}
     </div>
   );
 
-  const ErrorState = () => (
-    <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-      <div style={{ color: 'var(--status-danger)', marginBottom: 16, fontSize: 14 }}>Failed to load data</div>
-      <button className="btn-action" onClick={() => window.location.reload()}>RETRY</button>
+  const StatusBadge = ({ children }: { children: string }) => (
+    <div style={{
+      fontSize: 10,
+      fontFamily: 'var(--font-mono)',
+      textTransform: 'uppercase',
+      padding: '2px 8px',
+      borderRadius: 2,
+      background: 'var(--bg-surface-hover)',
+      color: 'var(--text-secondary)',
+      display: 'inline-block',
+    }}>
+      {children}
     </div>
   );
-
-  const EmptyState = ({ message }: { message: string }) => (
-    <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
-      {message}
-    </div>
-  );
-
-  const getRiskTierColor = (tier: string) => {
-    switch (tier) {
-      case 'PRIME': return 'var(--status-success)';
-      case 'STANDARD': return 'var(--status-warning)';
-      case 'AT_RISK': return 'var(--status-danger)';
-      default: return 'var(--text-secondary)';
-    }
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'var(--status-danger)';
-      case 'warning': return 'var(--status-warning)';
-      case 'info': return 'var(--status-success)';
-      default: return 'var(--text-secondary)';
-    }
-  };
 
   return (
     <div>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Intelligence</div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Insights</div>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-              Operational intelligence • Last updated: {new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
-            </div>
-          </div>
-          <button className="btn-action" onClick={exportToCSV}>↓ EXPORT CSV</button>
+        <div style={{
+          fontSize: 11,
+          fontFamily: 'var(--font-mono)',
+          color: 'var(--text-tertiary)',
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          marginBottom: 4
+        }}>
+          Intelligence
         </div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Insights</div>
       </div>
 
       {/* Period filters */}
-      <div style={{ marginBottom: 20, display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ marginBottom: 20, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         {PERIOD_OPTIONS.map(p => (
           <button
             key={p.id}
@@ -455,7 +428,7 @@ export default function Insights() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 24, borderBottom: '1px solid var(--border-subtle)' }}>
+      <div style={{ display: 'flex', gap: 2, marginBottom: 24, borderBottom: '1px solid var(--border-subtle)', overflowX: 'auto' }}>
         {TABS.map(t => (
           <button
             key={t.id}
@@ -483,330 +456,569 @@ export default function Insights() {
       </div>
 
       {/* Content */}
-      {loading ? <LoadingSkeleton /> : error ? <ErrorState /> : (
+      {loading ? (
+        <div style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', textAlign: 'center', padding: 40 }}>—</div>
+      ) : (
         <>
-          {/* TAB 1: COMMAND CENTRE */}
-          {tab === 'command' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* KPI Row with Sparklines */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 16 }}>
-                {(() => {
-                  const finance = commandData?.finance;
-                  const opRatio = finance?.operating_ratio || (finance?.expenses_period && finance?.revenue_period ? (finance.expenses_period / finance.revenue_period) * 100 : 0);
-                  const fleetUtil = finance?.fleet_utilisation || 0;
-                  const opRatioColor = opRatio < 85 ? 'var(--status-success)' : opRatio < 95 ? 'var(--status-warning)' : 'var(--status-danger)';
-                  const utilColor = fleetUtil > 70 ? 'var(--status-success)' : fleetUtil > 40 ? 'var(--status-warning)' : 'var(--status-danger)';
-
-                  // Mock sparkline data (7 data points for a week trend)
-                  const generateSparkline = (baseValue: number, variance: number = 0.15) => {
-                    return Array.from({ length: 7 }, (_, i) => ({
-                      value: baseValue * (1 + (Math.random() - 0.5) * variance)
-                    }));
-                  };
-
-                  const metrics = [
-                    { label: 'Revenue This Month', value: formatCurrency(finance?.revenue_period || 0), color: 'var(--accent-primary)', sparkline: generateSparkline(finance?.revenue_period || 0) },
-                    { label: 'Operating Ratio', value: `${opRatio.toFixed(1)}%`, color: opRatioColor, sparkline: generateSparkline(opRatio, 0.05) },
-                    { label: 'Active Loads', value: commandData?.activeLoads || 0, color: 'var(--text-primary)', sparkline: generateSparkline(commandData?.activeLoads || 10, 0.3) },
-                    { label: 'Outstanding Invoices', value: formatCurrency(finance?.outstanding_invoices_total || 0), color: 'var(--status-warning)', sparkline: generateSparkline(finance?.outstanding_invoices_total || 0) },
-                    { label: 'Fleet Utilisation', value: `${fleetUtil.toFixed(1)}%`, color: utilColor, sparkline: generateSparkline(fleetUtil, 0.08) },
-                    { label: 'Overdue Invoices', value: formatCurrency(finance?.overdue_invoices_total || 0), color: 'var(--status-danger)', sparkline: generateSparkline(finance?.overdue_invoices_total || 0) },
-                  ];
-
-                  return metrics.map(m => (
-                    <div key={m.label} className="card metric-card">
-                      <div className="card-header"><span className="card-title">{m.label}</span></div>
-                      <div className="metric-value" style={{ fontSize: 20, color: m.color, marginBottom: 8 }}>{m.value}</div>
-                      <ResponsiveContainer width="100%" height={30}>
-                        <LineChart data={m.sparkline}>
-                          <Line type="monotone" dataKey="value" stroke={m.color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
+          {/* TAB 1: BRIEFING */}
+          {tab === 'briefing' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* SECTION 1: BUSINESS PULSE */}
+              <div>
+                <SectionHeader>BUSINESS PULSE</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
+                  {/* Revenue MTD */}
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{ fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                      {formatCurrency(kpiData?.revenue_mtd || 0)}
                     </div>
-                  ));
-                })()}
+                    {kpiData?.revenue_change_pct !== undefined && (
+                      <div style={{
+                        fontSize: 12,
+                        fontFamily: 'var(--font-mono)',
+                        color: kpiData.revenue_change_pct >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                        marginBottom: 8,
+                      }}>
+                        {kpiData.revenue_change_pct >= 0 ? '+' : ''}{kpiData.revenue_change_pct.toFixed(1)}%
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Revenue MTD
+                    </div>
+                  </div>
+
+                  {/* Net Margin */}
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: getMarginColor(kpiData?.net_margin_pct || 0),
+                      marginBottom: 12,
+                    }}>
+                      {(kpiData?.net_margin_pct || 0).toFixed(1)}%
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Net Margin
+                    </div>
+                  </div>
+
+                  {/* DSO */}
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: getDSOColor(kpiData?.dso || 0),
+                      marginBottom: 4,
+                    }}>
+                      {Math.round(kpiData?.dso || 0)}d
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 8 }}>
+                      avg days to collect
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      DSO
+                    </div>
+                  </div>
+
+                  {/* Fleet Utilisation */}
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 4,
+                    }}>
+                      {(kpiData?.fleet_utilization_pct || 0).toFixed(1)}%
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 8 }}>
+                      of fleet active
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Fleet Utilisation
+                    </div>
+                  </div>
+
+                  {/* Cash in 30 Days */}
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--status-success)',
+                      marginBottom: 12,
+                    }}>
+                      {formatCurrency(kpiData?.total_advance_amount || 0)}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Cash Available
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Alert Panel with Severity Stripes */}
-              <div className="card" style={{ padding: 20 }}>
-                <div className="card-header"><span className="card-title">Alerts & Signals</span></div>
-                {commandData?.signals && commandData.signals.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
-                    {commandData.signals.map((sig: Signal, idx: number) => {
-                      const severityColor = getSeverityColor(sig.severity);
-                      const bgTint = sig.severity === 'critical' ? 'rgba(239, 68, 68, 0.05)' : sig.severity === 'warning' ? 'rgba(245, 158, 11, 0.05)' : 'rgba(34, 197, 94, 0.05)';
-
-                      return (
-                        <div
-                          key={idx}
-                          style={{
+              {/* SECTION 2: ACTION REQUIRED */}
+              <div>
+                <SectionHeader>ACTION REQUIRED</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {insightsData?.recommendations && insightsData.recommendations.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {[...insightsData.recommendations]
+                        .sort((a, b) => {
+                          const impactA = a.amount || 0;
+                          const impactB = b.amount || 0;
+                          return impactB - impactA;
+                        })
+                        .map((rec, idx) => (
+                          <div key={idx} style={{
                             display: 'flex',
+                            alignItems: 'center',
                             gap: 12,
                             padding: 12,
-                            background: bgTint,
+                            background: 'var(--bg-surface)',
                             borderRadius: 2,
-                            borderLeft: `3px solid ${severityColor}`,
-                            position: 'relative'
-                          }}
-                        >
-                          <div style={{
-                            padding: '4px 8px',
-                            borderRadius: 2,
-                            background: severityColor,
-                            color: 'white',
-                            fontSize: 10,
-                            fontFamily: 'var(--font-mono)',
-                            fontWeight: 600,
-                            textTransform: 'uppercase',
-                            height: 'fit-content',
                           }}>
-                            {sig.severity}
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{sig.title}</div>
-                            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{sig.body}</div>
-                          </div>
-                          {sig.action && (
-                            <button className="btn-action" style={{ fontSize: 10, padding: '4px 10px' }}>
-                              {sig.action}
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div style={{ marginTop: 16, color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: 20 }}>
-                    No alerts — your operation looks healthy
-                  </div>
-                )}
-              </div>
-
-              {/* Route Summary - BarChart by Margin */}
-              {commandData?.routes && commandData.routes.length > 0 && (
-                <>
-                  <div className="card" style={{ padding: 20 }}>
-                    <div className="card-header" style={{ marginBottom: 16 }}>
-                      <span className="card-title">Top Routes by Margin %</span>
-                    </div>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart
-                        data={[...commandData.routes].sort((a, b) => b.margin_pct - a.margin_pct).slice(0, 8)}
-                        layout="vertical"
-                        margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-                      >
-                        <XAxis type="number" stroke="var(--text-tertiary)" style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }} />
-                        <YAxis
-                          type="category"
-                          dataKey="route"
-                          stroke="var(--text-tertiary)"
-                          style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                          width={90}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            background: 'var(--bg-deep)',
-                            border: '1px solid var(--border-subtle)',
-                            borderRadius: 4,
-                            fontSize: 12,
-                            fontFamily: 'var(--font-mono)'
-                          }}
-                          formatter={(value: any) => [`${Number(value).toFixed(1)}%`, 'Margin']}
-                        />
-                        <Bar dataKey="margin_pct" isAnimationActive={true}>
-                          {[...commandData.routes].sort((a, b) => b.margin_pct - a.margin_pct).slice(0, 8).map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={entry.margin_pct > 15 ? 'var(--status-success)' : entry.margin_pct > 5 ? 'var(--status-warning)' : 'var(--status-danger)'}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  <div className="card table-card">
-                    <div className="card-header" style={{ marginBottom: 16 }}>
-                      <span className="card-title">Top Routes Detail</span>
-                    </div>
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Route</th>
-                          <th className="text-right">Trips</th>
-                          <th className="text-right">Revenue</th>
-                          <th className="text-right">Margin%</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {commandData.routes.slice(0, 5).map((r: RouteData, idx: number) => (
-                          <tr key={idx}>
-                            <td>{r.route}</td>
-                            <td className="mono text-right">{r.trips}</td>
-                            <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                              {formatCurrency(r.avg_revenue * r.trips)}
-                            </td>
-                            <td className="mono text-right" style={{
-                              color: r.margin_pct > 15 ? 'var(--status-success)' : r.margin_pct > 5 ? 'var(--status-warning)' : 'var(--status-danger)'
+                            <div style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              background: getSeverityDot(rec.severity),
+                              flexShrink: 0,
+                            }} />
+                            <div style={{
+                              fontSize: 10,
+                              fontFamily: 'var(--font-mono)',
+                              textTransform: 'uppercase',
+                              padding: '2px 8px',
+                              borderRadius: 2,
+                              background: 'var(--bg-surface-hover)',
+                              color: 'var(--text-secondary)',
                             }}>
-                              {r.margin_pct.toFixed(1)}%
-                            </td>
-                          </tr>
+                              {rec.type.replace(/_/g, ' ')}
+                            </div>
+                            <div style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
+                              {rec.message}
+                            </div>
+                            {rec.amount && (
+                              <div style={{
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                              }}>
+                                {formatCurrency(rec.amount)}
+                              </div>
+                            )}
+                            {rec.days_overdue && (
+                              <div style={{
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                              }}>
+                                {rec.days_overdue}d
+                              </div>
+                            )}
+                            {rec.link && (
+                              <div
+                                onClick={() => navigate(rec.link || '')}
+                                style={{
+                                  fontSize: 18,
+                                  color: 'var(--accent-primary)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                →
+                              </div>
+                            )}
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* TAB 2: REVENUE & MARGINS */}
-          {tab === 'revenue' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* KPI Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-                {[
-                  { label: 'Gross Revenue', value: formatCurrency(revenueData?.revenue_period || 0), color: 'var(--accent-primary)' },
-                  { label: 'Net Margin %', value: formatPercent(revenueData?.net_margin_percent_period || 0), color: 'var(--status-success)' },
-                  { label: 'Operating Ratio', value: `${(revenueData?.operating_ratio || (revenueData?.expenses_period && revenueData?.revenue_period ? (revenueData.expenses_period / revenueData.revenue_period) * 100 : 0)).toFixed(1)}%`, color: 'var(--text-primary)' },
-                  { label: 'Revenue per Load', value: formatCurrency(revenueData?.revenue_per_load || 0), color: 'var(--text-primary)' },
-                ].map(m => (
-                  <div key={m.label} className="card metric-card">
-                    <div className="card-header"><span className="card-title">{m.label}</span></div>
-                    <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
-                  </div>
-                ))}
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: 12,
+                    }}>
+                      <div style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        background: 'var(--status-success)',
+                      }} />
+                      <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                        All systems normal — no alerts
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Period Deltas with Large Arrows */}
-              {revenueData?.previous_period && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+              {/* SECTION 3: LIVE OPERATIONS */}
+              <div>
+                <SectionHeader>LIVE OPERATIONS</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                   {(() => {
-                    const revChange = revenueData.previous_period.revenue > 0
-                      ? ((revenueData.revenue_period - revenueData.previous_period.revenue) / revenueData.previous_period.revenue) * 100
-                      : 0;
-                    const marginChange = (revenueData.net_margin_percent_period || 0) - (revenueData.previous_period.margin_percent || 0);
+                    const inTransit = loads.filter(l => ['IN_TRANSIT', 'ASSIGNED'].includes(l.status.toUpperCase().replace(' ', '_')));
+                    const inTransitRevenue = inTransit.reduce((sum, l) => sum + l.total_amount, 0);
 
-                    return [
-                      { label: 'Revenue Change', value: `${revChange > 0 ? '+' : ''}${revChange.toFixed(1)}%`, color: revChange > 0 ? 'var(--status-success)' : 'var(--status-danger)', isPositive: revChange > 0 },
-                      { label: 'Margin Change', value: `${marginChange > 0 ? '+' : ''}${marginChange.toFixed(1)}pp`, color: marginChange > 0 ? 'var(--status-success)' : 'var(--status-danger)', isPositive: marginChange > 0 },
-                    ].map(m => (
-                      <div key={m.label} className="card" style={{ padding: 20 }}>
-                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 8, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{m.label}</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <span style={{ fontSize: 32, color: m.color, lineHeight: 1 }}>{m.isPositive ? '▲' : '▼'}</span>
-                          <span style={{ fontSize: 24, fontWeight: 600, color: m.color, fontFamily: 'var(--font-mono)' }}>{m.value}</span>
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              )}
+                    const delivered = loads.filter(l => ['DELIVERED', 'INVOICED'].includes(l.status.toUpperCase()));
+                    const deliveredRevenue = delivered.reduce((sum, l) => sum + l.total_amount, 0);
 
-              {/* Monthly Trend - recharts ComposedChart */}
-              {revenueData?.monthly_trend && revenueData.monthly_trend.length > 0 && (
-                <div className="card" style={{ padding: 20 }}>
-                  <div className="card-header">
-                    <span className="card-title">Monthly Trend (Last 6 Months)</span>
-                    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-secondary)' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ width: 20, height: 2, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1 }}/>Revenue
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ width: 20, height: 2, background: 'var(--status-danger)', display: 'inline-block', borderRadius: 1, opacity: 0.7 }}/>Expenses
-                      </span>
-                    </div>
-                  </div>
-                  {(() => {
-                    const trend = revenueData.monthly_trend.slice(-6).map(m => ({
-                      ...m,
-                      monthLabel: m.month?.slice(5) || '',
-                      margin: m.revenue - m.expenses
-                    }));
+                    const routeMap = new Map<string, number>();
+                    loads.forEach(l => {
+                      const route = `${l.pickup_city} → ${l.delivery_city}`;
+                      routeMap.set(route, (routeMap.get(route) || 0) + 1);
+                    });
+                    const topRoute = Array.from(routeMap.entries()).sort((a, b) => b[1] - a[1])[0];
 
                     return (
                       <>
-                        <ResponsiveContainer width="100%" height={200} style={{ marginTop: 16 }}>
-                          <ComposedChart data={trend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                            <defs>
-                              <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="var(--accent-primary)" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="var(--accent-primary)" stopOpacity={0}/>
-                              </linearGradient>
-                            </defs>
-                            <XAxis
-                              dataKey="monthLabel"
-                              stroke="var(--text-tertiary)"
-                              style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                            />
-                            <YAxis
-                              stroke="var(--text-tertiary)"
-                              style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                              tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                            />
-                            <Tooltip
-                              contentStyle={{
-                                background: 'var(--bg-deep)',
-                                border: '1px solid var(--border-subtle)',
-                                borderRadius: 4,
-                                fontSize: 12,
-                                fontFamily: 'var(--font-mono)'
-                              }}
-                              formatter={(value: any, name: string) => {
-                                if (name === 'revenue') return [formatCurrency(value), 'Revenue'];
-                                if (name === 'expenses') return [formatCurrency(value), 'Expenses'];
-                                if (name === 'margin') return [formatCurrency(value), 'Margin'];
-                                return [value, name];
-                              }}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="revenue"
-                              fill="url(#revenueGradient)"
-                              stroke="var(--accent-primary)"
-                              strokeWidth={2}
-                              isAnimationActive={true}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="expenses"
-                              stroke="var(--status-danger)"
-                              strokeWidth={2}
-                              strokeDasharray="5 5"
-                              dot={false}
-                              isAnimationActive={true}
-                            />
-                          </ComposedChart>
-                        </ResponsiveContainer>
+                        <div className="card" style={{ padding: 20, borderLeft: '3px solid var(--accent-primary)' }}>
+                          <div style={{
+                            fontSize: 24,
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            color: 'var(--text-primary)',
+                            marginBottom: 4,
+                          }}>
+                            {inTransit.length}
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            loads in motion
+                          </div>
+                          <div style={{
+                            fontSize: 12,
+                            fontFamily: 'var(--font-mono)',
+                            color: 'var(--accent-primary)',
+                          }}>
+                            {formatCurrency(inTransitRevenue)} revenue in transit
+                          </div>
+                        </div>
+
+                        <div className="card" style={{ padding: 20, borderLeft: '3px solid var(--status-success)' }}>
+                          <div style={{
+                            fontSize: 24,
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            color: 'var(--text-primary)',
+                            marginBottom: 4,
+                          }}>
+                            {delivered.length}
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            loads completed
+                          </div>
+                          <div style={{
+                            fontSize: 12,
+                            fontFamily: 'var(--font-mono)',
+                            color: 'var(--status-success)',
+                          }}>
+                            {formatCurrency(deliveredRevenue)} revenue realised
+                          </div>
+                        </div>
+
+                        <div className="card" style={{ padding: 20, borderLeft: '3px solid var(--text-secondary)' }}>
+                          <div style={{
+                            fontSize: 16,
+                            fontWeight: 500,
+                            color: 'var(--text-primary)',
+                            marginBottom: 4,
+                          }}>
+                            {topRoute ? topRoute[0] : 'No routes'}
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            most active route
+                          </div>
+                          <div style={{
+                            fontSize: 12,
+                            fontFamily: 'var(--font-mono)',
+                            color: 'var(--text-tertiary)',
+                          }}>
+                            {topRoute ? `${topRoute[1]} trips this period` : ''}
+                          </div>
+                        </div>
                       </>
                     );
                   })()}
                 </div>
-              )}
+              </div>
+            </div>
+          )}
 
-              {/* Cost Breakdown with Narrative */}
-              {revenueData?.expense_breakdown && Object.keys(revenueData.expense_breakdown).length > 0 && (
+          {/* TAB 2: MARGIN ENGINE */}
+          {tab === 'margin' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* SECTION 1: P&L SUMMARY */}
+              <div>
+                <SectionHeader>P&L SUMMARY</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 12,
+                    }}>
+                      {formatCurrency(financeData?.revenue_period || 0)}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Revenue Period
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--status-danger)',
+                      marginBottom: 12,
+                    }}>
+                      {formatCurrency(financeData?.expenses_period || 0)}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Total Costs
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: (financeData?.net_margin_period || 0) >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                      marginBottom: 12,
+                    }}>
+                      {formatCurrency(financeData?.net_margin_period || 0)}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Net Margin R
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 24,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: getMarginColor(financeData?.net_margin_percent_period || 0),
+                      marginBottom: 12,
+                    }}>
+                      {(financeData?.net_margin_percent_period || 0).toFixed(1)}%
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Net Margin %
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: ROUTE PROFITABILITY RANKING */}
+              <div>
+                <SectionHeader>ROUTE EFFICIENCY RANKING — Revenue per km driven</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
-                  <div className="card-header"><span className="card-title">Cost Breakdown (% of Revenue)</span></div>
-                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {Object.entries(revenueData.expense_breakdown).map(([category, amount]: [string, any]) => {
-                      const pct = revenueData.revenue_period > 0 ? (amount / revenueData.revenue_period) * 100 : 0;
-                      return (
-                        <div key={category}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <span style={{ fontSize: 13, color: 'var(--text-primary)', textTransform: 'capitalize' }}>{category.replace('_', ' ')}</span>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-                              <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(amount)}</span>
-                              <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{pct.toFixed(1)}%</span>
+                  {(() => {
+                    const routeMap = new Map<string, {
+                      trips: number;
+                      total_revenue: number;
+                      total_distance: number;
+                      total_fuel: number;
+                    }>();
+
+                    loads.forEach(load => {
+                      const route = `${load.pickup_city} → ${load.delivery_city}`;
+                      const existing = routeMap.get(route) || {
+                        trips: 0,
+                        total_revenue: 0,
+                        total_distance: 0,
+                        total_fuel: 0,
+                      };
+                      routeMap.set(route, {
+                        trips: existing.trips + 1,
+                        total_revenue: existing.total_revenue + load.total_amount,
+                        total_distance: existing.total_distance + load.distance,
+                        total_fuel: existing.total_fuel + (load.fuel_surcharge || 0),
+                      });
+                    });
+
+                    const routes = Array.from(routeMap.entries())
+                      .map(([route, data]) => ({
+                        route,
+                        trips: data.trips,
+                        total_revenue: data.total_revenue,
+                        total_distance: data.total_distance,
+                        total_fuel: data.total_fuel,
+                        true_margin: data.total_revenue - data.total_fuel,
+                        margin_pct: data.total_revenue > 0 ? ((data.total_revenue - data.total_fuel) / data.total_revenue) * 100 : 0,
+                        rev_per_km: data.total_distance > 0 ? data.total_revenue / data.total_distance : 0,
+                      }))
+                      .sort((a, b) => b.rev_per_km - a.rev_per_km)
+                      .slice(0, 10);
+
+                    const maxRevPerKm = Math.max(...routes.map(r => r.rev_per_km), 1);
+
+                    return routes.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {routes.map((r, idx) => {
+                          const isTop3 = idx < 3;
+                          const isBottom2 = idx >= routes.length - 2 && routes.length >= 5;
+
+                          return (
+                            <div
+                              key={idx}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 12,
+                                padding: 12,
+                                background: 'var(--bg-surface)',
+                                borderRadius: 2,
+                                borderLeft: `3px solid ${isTop3 ? 'var(--status-success)' : isBottom2 ? 'var(--status-danger)' : 'transparent'}`,
+                              }}
+                            >
+                              <div style={{
+                                fontSize: 10,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-tertiary)',
+                                minWidth: 20,
+                              }}>
+                                #{idx + 1}
+                              </div>
+                              <div style={{ minWidth: 200, fontSize: 13, color: 'var(--text-primary)' }}>
+                                {r.route}
+                              </div>
+                              <div style={{
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 60,
+                              }}>
+                                {r.trips} trips
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-primary)',
+                                minWidth: 100,
+                              }}>
+                                {formatCurrency(r.total_revenue)}
+                              </div>
+                              <div style={{
+                                fontSize: 14,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--accent-primary)',
+                                minWidth: 100,
+                              }}>
+                                {formatCurrency(r.rev_per_km)}/km
+                              </div>
+                              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{
+                                  flex: 1,
+                                  height: 16,
+                                  background: 'var(--bg-surface-hover)',
+                                  borderRadius: 2,
+                                  overflow: 'hidden',
+                                }}>
+                                  <div style={{
+                                    width: `${r.margin_pct}%`,
+                                    height: '100%',
+                                    background: r.margin_pct > 50 ? 'var(--status-success)' : r.margin_pct > 30 ? 'var(--status-warning)' : 'var(--status-danger)',
+                                    borderRadius: 2,
+                                  }} />
+                                </div>
+                                <div style={{
+                                  fontSize: 12,
+                                  fontFamily: 'var(--font-mono)',
+                                  color: 'var(--text-secondary)',
+                                  minWidth: 50,
+                                }}>
+                                  {r.margin_pct.toFixed(1)}%
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                          <div style={{ height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent-primary)', borderRadius: 2 }} />
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                        No data for this period
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 3: MONTHLY P&L TREND */}
+              {financeData?.monthly_trend && financeData.monthly_trend.length > 0 && (
+                <div>
+                  <SectionHeader>MONTHLY P&L TREND</SectionHeader>
+                  <div className="card" style={{ padding: 20 }}>
+                    {(() => {
+                      const trend = [...financeData.monthly_trend].sort((a, b) => a.month.localeCompare(b.month)).slice(-6);
+                      const maxValue = Math.max(...trend.map(m => Math.max(m.revenue, m.expenses)));
+                      const isImproving = trend.length >= 2 && trend[trend.length - 1].margin > trend[trend.length - 2].margin;
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {trend.map((m, idx) => {
+                            const revWidth = maxValue > 0 ? (m.revenue / maxValue) * 100 : 0;
+                            const expWidth = maxValue > 0 ? (m.expenses / maxValue) * 100 : 0;
+
+                            return (
+                              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <div style={{
+                                  width: 40,
+                                  fontSize: 11,
+                                  fontFamily: 'var(--font-mono)',
+                                  color: 'var(--text-tertiary)',
+                                  textTransform: 'uppercase',
+                                }}>
+                                  {new Date(m.month + '-01').toLocaleString('en-ZA', { month: 'short' }).toUpperCase()}
+                                </div>
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                  <div style={{
+                                    height: 16,
+                                    background: 'var(--accent-primary)',
+                                    width: `${revWidth}%`,
+                                    borderRadius: 2,
+                                  }} />
+                                  <div style={{
+                                    height: 16,
+                                    background: 'var(--status-danger)',
+                                    width: `${expWidth}%`,
+                                    borderRadius: 2,
+                                    opacity: 0.7,
+                                  }} />
+                                </div>
+                                <div style={{
+                                  fontSize: 13,
+                                  fontFamily: 'var(--font-mono)',
+                                  fontWeight: 600,
+                                  color: m.margin > 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                                  minWidth: 100,
+                                  textAlign: 'right',
+                                }}>
+                                  {formatCurrency(m.margin)}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div style={{
+                            marginTop: 8,
+                            fontSize: 13,
+                            color: isImproving ? 'var(--status-success)' : 'var(--status-danger)',
+                          }}>
+                            {isImproving ? '↑ Margin improving' : '↓ Margin declining'}
                           </div>
                         </div>
                       );
-                    })}
+                    })()}
                   </div>
                   {(() => {
                     const entries = Object.entries(revenueData.expense_breakdown);
@@ -824,789 +1036,841 @@ export default function Insights() {
                 </div>
               )}
 
-              {/* Margin by Customer with Inline Bars */}
-              {revenueData?.top_customers && revenueData.top_customers.length > 0 && (
-                <div className="card table-card">
-                  <div className="card-header" style={{ marginBottom: 16 }}>
-                    <span className="card-title">Margin by Customer</span>
-                  </div>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Customer</th>
-                        <th className="text-right">Revenue</th>
-                        <th className="text-right">Costs</th>
-                        <th className="text-right">Margin%</th>
-                        <th className="text-right">Load Count</th>
-                        <th className="text-right">Avg Payment Days</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {revenueData.top_customers.map((c, idx) => {
-                        const margin = c.margin_pct || 0;
-                        const marginColor = margin < 10 ? 'var(--status-danger)' : margin < 20 ? 'var(--status-warning)' : 'var(--status-success)';
-                        return (
-                          <tr key={idx}>
-                            <td>{c.customer_name}</td>
-                            <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                              {formatCurrency(c.revenue)}
-                            </td>
-                            <td className="mono text-right">{formatCurrency(c.costs || 0)}</td>
-                            <td className="text-right">
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                                <div style={{ width: 60, height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                                  <div style={{ height: '100%', width: `${Math.min(margin, 100)}%`, background: marginColor, borderRadius: 2 }} />
-                                </div>
-                                <span className="mono" style={{ color: marginColor, fontWeight: margin < 10 ? 600 : 400, minWidth: 45, textAlign: 'right' }}>
-                                  {margin.toFixed(1)}%
-                                </span>
-                              </div>
-                            </td>
-                            <td className="mono text-right">{c.invoice_count}</td>
-                            <td className="mono text-right">{c.avg_payment_days || 0}d</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 3: LANES & ROUTES */}
-          {tab === 'lanes' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Summary Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                {(() => {
-                  const lanes = lanesData || [];
-                  const bestLane = lanes.length > 0 ? lanes.reduce((a, b) => a.margin_pct > b.margin_pct ? a : b) : null;
-                  const worstLane = lanes.length > 0 ? lanes.reduce((a, b) => a.margin_pct < b.margin_pct ? a : b) : null;
-
-                  return [
-                    { label: 'Total Lanes', value: lanes.length, color: 'var(--text-primary)' },
-                    { label: 'Best Margin Lane', value: bestLane ? `${bestLane.route} (${bestLane.margin_pct.toFixed(1)}%)` : 'N/A', color: 'var(--status-success)' },
-                    { label: 'Worst Margin Lane', value: worstLane ? `${worstLane.route} (${worstLane.margin_pct.toFixed(1)}%)` : 'N/A', color: 'var(--status-danger)' },
-                  ].map(m => (
-                    <div key={m.label} className="card metric-card">
-                      <div className="card-header"><span className="card-title">{m.label}</span></div>
-                      <div style={{ fontSize: 16, fontWeight: 500, color: m.color, marginTop: 8 }}>{m.value}</div>
-                    </div>
-                  ));
-                })()}
-              </div>
-
-              {/* Top 10 Routes by Revenue - BarChart */}
-              {lanesData && lanesData.length > 0 && (
+              {/* SECTION 4: COST BREAKDOWN */}
+              <div>
+                <SectionHeader>COST BREAKDOWN</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
-                  <div className="card-header" style={{ marginBottom: 16 }}>
-                    <span className="card-title">Top 10 Routes by Total Revenue</span>
-                  </div>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart
-                      data={[...lanesData]
-                        .map(r => ({ ...r, total_revenue: r.avg_revenue * r.trips }))
-                        .sort((a, b) => b.total_revenue - a.total_revenue)
-                        .slice(0, 10)}
-                      layout="vertical"
-                      margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
-                    >
-                      <XAxis
-                        type="number"
-                        stroke="var(--text-tertiary)"
-                        style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                        tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                      />
-                      <YAxis
-                        type="category"
-                        dataKey="route"
-                        stroke="var(--text-tertiary)"
-                        style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                        width={110}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          background: 'var(--bg-deep)',
-                          border: '1px solid var(--border-subtle)',
-                          borderRadius: 4,
-                          fontSize: 12,
-                          fontFamily: 'var(--font-mono)'
-                        }}
-                        formatter={(value: any) => [formatCurrency(value), 'Revenue']}
-                      />
-                      <Bar dataKey="total_revenue" fill="var(--accent-primary)" isAnimationActive={true} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
+                  {(() => {
+                    const categoryMap = new Map<string, number>();
+                    expenses.forEach(exp => {
+                      const existing = categoryMap.get(exp.category) || 0;
+                      categoryMap.set(exp.category, existing + exp.amount);
+                    });
 
-              {/* Main Table with Inline Margin Bars */}
-              {lanesData && lanesData.length > 0 ? (
-                <div className="card table-card">
-                  <div className="card-header" style={{ marginBottom: 16 }}>
-                    <span className="card-title">Route Performance</span>
-                  </div>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Route</th>
-                        <th className="text-right">Loads</th>
-                        <th className="text-right">Revenue</th>
-                        <th className="text-right">Total Cost</th>
-                        <th className="text-right">Margin%</th>
-                        <th className="text-right">Rev/Load</th>
-                        <th className="text-right">Fuel/km</th>
-                        <th className="text-right">Avg Days</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lanesData.map((r, idx) => {
-                        const marginColor = r.margin_pct > 15 ? 'var(--status-success)' : r.margin_pct > 5 ? 'var(--status-warning)' : 'var(--status-danger)';
-                        return (
-                          <tr key={idx}>
-                            <td>{r.route}</td>
-                            <td className="mono text-right">{r.trips}</td>
-                            <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                              {formatCurrency(r.avg_revenue * r.trips)}
-                            </td>
-                            <td className="mono text-right">{formatCurrency(r.avg_cost * r.trips)}</td>
-                            <td className="text-right">
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                                <div style={{ width: 60, height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                                  <div style={{ height: '100%', width: `${Math.min(r.margin_pct, 100)}%`, background: marginColor, borderRadius: 2 }} />
-                                </div>
-                                <span className="mono" style={{ color: marginColor, fontWeight: 600, minWidth: 45, textAlign: 'right' }}>
-                                  {r.margin_pct.toFixed(1)}%
-                                </span>
-                              </div>
-                            </td>
-                            <td className="mono text-right">{formatCurrency(r.revenue_per_load || r.avg_revenue)}</td>
-                            <td className="mono text-right">{r.fuel_per_km != null ? `R${r.fuel_per_km.toFixed(2)}` : '—'}</td>
-                            <td className="mono text-right">{r.avg_days || 0}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <EmptyState message="No route data for this period. Routes will appear once loads are completed." />
-              )}
-            </div>
-          )}
+                    const categories = Array.from(categoryMap.entries())
+                      .map(([category, amount]) => ({ category, amount }))
+                      .sort((a, b) => b.amount - a.amount)
+                      .slice(0, 6);
 
-          {/* TAB 4: FLEET & DRIVERS */}
-          {tab === 'fleet' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Sub-tabs */}
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[
-                  { id: 'vehicles' as const, label: 'Vehicles' },
-                  { id: 'drivers' as const, label: 'Drivers' },
-                ].map(st => (
-                  <button
-                    key={st.id}
-                    onClick={() => setFleetSubTab(st.id)}
-                    style={{
-                      background: fleetSubTab === st.id ? 'var(--accent-primary)' : 'transparent',
-                      border: `1px solid ${fleetSubTab === st.id ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-                      color: fleetSubTab === st.id ? 'black' : 'var(--text-secondary)',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 10,
-                      letterSpacing: '0.05em',
-                      textTransform: 'uppercase',
-                      padding: '6px 14px',
-                      cursor: 'pointer',
-                      borderRadius: 2,
-                    }}
-                  >
-                    {st.label}
-                  </button>
-                ))}
-              </div>
+                    const totalExpenses = categories.reduce((sum, c) => sum + c.amount, 0);
+                    const maxAmount = Math.max(...categories.map(c => c.amount), 1);
 
-              {fleetSubTab === 'vehicles' ? (
-                <>
-                  {/* Vehicle Summary */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                    {(() => {
-                      const vehicles = fleetData?.vehicles || [];
-                      const avgUtil = vehicles.length > 0 ? vehicles.reduce((sum, v) => sum + (v.utilisation || 0), 0) / vehicles.length : 0;
-                      const topVehicle = vehicles.length > 0 ? vehicles.reduce((a, b) => a.revenue > b.revenue ? a : b) : null;
+                    return categories.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {categories.map((cat, idx) => {
+                          const widthPct = (cat.amount / maxAmount) * 100;
+                          const pct = totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0;
 
-                      return [
-                        { label: 'Total Vehicles', value: vehicles.length, color: 'var(--text-primary)' },
-                        { label: 'Avg Utilisation', value: `${avgUtil.toFixed(1)}%`, color: avgUtil > 70 ? 'var(--status-success)' : avgUtil > 40 ? 'var(--status-warning)' : 'var(--status-danger)' },
-                        { label: 'Highest Revenue Vehicle', value: topVehicle ? topVehicle.registration : 'N/A', color: 'var(--accent-primary)' },
-                      ].map(m => (
-                        <div key={m.label} className="card metric-card">
-                          <div className="card-header"><span className="card-title">{m.label}</span></div>
-                          <div style={{ fontSize: 16, fontWeight: 500, color: m.color, marginTop: 8 }}>{m.value}</div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-
-                  {/* Revenue vs Costs BarChart */}
-                  {fleetData?.vehicles && fleetData.vehicles.length > 0 && (
-                    <div className="card" style={{ padding: 20 }}>
-                      <div className="card-header" style={{ marginBottom: 16 }}>
-                        <span className="card-title">Revenue vs Costs by Vehicle (Top 10)</span>
-                      </div>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart
-                          data={[...fleetData.vehicles]
-                            .sort((a, b) => b.revenue - a.revenue)
-                            .slice(0, 10)}
-                          margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-                        >
-                          <XAxis
-                            dataKey="registration"
-                            stroke="var(--text-tertiary)"
-                            style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                          />
-                          <YAxis
-                            stroke="var(--text-tertiary)"
-                            style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                            tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              background: 'var(--bg-deep)',
-                              border: '1px solid var(--border-subtle)',
-                              borderRadius: 4,
-                              fontSize: 12,
-                              fontFamily: 'var(--font-mono)'
-                            }}
-                            formatter={(value: any, name: string) => [formatCurrency(value), name === 'revenue' ? 'Revenue' : 'Costs']}
-                          />
-                          <Bar dataKey="revenue" fill="var(--accent-primary)" isAnimationActive={true} />
-                          <Bar dataKey="costs" fill="var(--status-danger)" isAnimationActive={true} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-
-                  {/* Vehicle Table */}
-                  {fleetData?.vehicles && fleetData.vehicles.length > 0 ? (
-                    <div className="card table-card">
-                      <div className="card-header" style={{ marginBottom: 16 }}>
-                        <span className="card-title">Vehicle Performance</span>
-                      </div>
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Vehicle</th>
-                            <th>Make/Model</th>
-                            <th className="text-right">Revenue</th>
-                            <th className="text-right">Costs</th>
-                            <th className="text-right">Margin%</th>
-                            <th className="text-right">Utilisation%</th>
-                            <th className="text-right">Loads</th>
-                            <th className="text-right">Downtime</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {fleetData.vehicles.map((v, idx) => {
-                            const utilColor = (v.utilisation || 0) > 70 ? 'var(--status-success)' : (v.utilisation || 0) > 40 ? 'var(--status-warning)' : 'var(--status-danger)';
-                            return (
-                              <tr key={idx}>
-                                <td>{v.registration}</td>
-                                <td>{v.make_model || '—'}</td>
-                                <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                                  {formatCurrency(v.revenue)}
-                                </td>
-                                <td className="mono text-right">{formatCurrency(v.costs || 0)}</td>
-                                <td className="mono text-right">{(v.margin_pct || 0).toFixed(1)}%</td>
-                                <td className="text-right">
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                                    <div style={{ width: 50, height: 8, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                                      <div style={{ height: '100%', width: `${Math.min(v.utilisation || 0, 100)}%`, background: utilColor, borderRadius: 2 }} />
-                                    </div>
-                                    <span className="mono" style={{ color: utilColor, minWidth: 45, textAlign: 'right' }}>
-                                      {(v.utilisation || 0).toFixed(1)}%
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="mono text-right">{v.trips}</td>
-                                <td className="mono text-right">{v.downtime || 0}d</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <EmptyState message="No vehicle data available" />
-                  )}
-                </>
-              ) : (
-                <>
-                  {/* Driver Summary */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                    {(() => {
-                      const drivers = driversData?.drivers || [];
-                      const avgLoads = drivers.length > 0 ? drivers.reduce((sum, d) => sum + d.trips, 0) / drivers.length : 0;
-                      const bestOTD = drivers.length > 0 ? drivers.reduce((a, b) => (a.otd_pct || 0) > (b.otd_pct || 0) ? a : b) : null;
-
-                      return [
-                        { label: 'Total Drivers', value: drivers.length, color: 'var(--text-primary)' },
-                        { label: 'Avg Loads/Driver', value: avgLoads.toFixed(1), color: 'var(--text-primary)' },
-                        { label: 'Best OTD Rate', value: bestOTD ? `${bestOTD.driver_name} (${(bestOTD.otd_pct || 0).toFixed(1)}%)` : 'N/A', color: 'var(--status-success)' },
-                      ].map(m => (
-                        <div key={m.label} className="card metric-card">
-                          <div className="card-header"><span className="card-title">{m.label}</span></div>
-                          <div style={{ fontSize: 16, fontWeight: 500, color: m.color, marginTop: 8 }}>{m.value}</div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-
-                  {/* Loads per Driver BarChart */}
-                  {driversData?.drivers && driversData.drivers.length > 0 && (
-                    <div className="card" style={{ padding: 20 }}>
-                      <div className="card-header" style={{ marginBottom: 16 }}>
-                        <span className="card-title">Loads per Driver (Top 10)</span>
-                      </div>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart
-                          data={[...driversData.drivers]
-                            .sort((a, b) => b.trips - a.trips)
-                            .slice(0, 10)}
-                          layout="vertical"
-                          margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-                        >
-                          <XAxis
-                            type="number"
-                            stroke="var(--text-tertiary)"
-                            style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                          />
-                          <YAxis
-                            type="category"
-                            dataKey="driver_name"
-                            stroke="var(--text-tertiary)"
-                            style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                            width={90}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              background: 'var(--bg-deep)',
-                              border: '1px solid var(--border-subtle)',
-                              borderRadius: 4,
-                              fontSize: 12,
-                              fontFamily: 'var(--font-mono)'
-                            }}
-                            formatter={(value: any) => [value, 'Loads']}
-                          />
-                          <Bar dataKey="trips" fill="var(--accent-primary)" isAnimationActive={true} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-
-                  {/* Driver Table */}
-                  {driversData?.drivers && driversData.drivers.length > 0 ? (
-                    <div className="card table-card">
-                      <div className="card-header" style={{ marginBottom: 16 }}>
-                        <span className="card-title">Driver Performance</span>
-                      </div>
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Driver</th>
-                            <th className="text-right">Revenue</th>
-                            <th className="text-right">Loads</th>
-                            <th className="text-right">OTD%</th>
-                            <th className="text-right">Avg Fuel/Trip</th>
-                            <th className="text-right">Rating</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {driversData.drivers.map((d, idx) => (
-                            <tr key={idx}>
-                              <td>{d.driver_name}</td>
-                              <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                                {formatCurrency(d.revenue)}
-                              </td>
-                              <td className="mono text-right">{d.trips}</td>
-                              <td className="mono text-right" style={{
-                                color: (d.otd_pct || 0) > 90 ? 'var(--status-success)' : (d.otd_pct || 0) > 70 ? 'var(--status-warning)' : 'var(--status-danger)'
-                              }}>
-                                {(d.otd_pct || 0).toFixed(1)}%
-                              </td>
-                              <td className="mono text-right">{formatCurrency(d.avg_fuel_per_trip || 0)}</td>
-                              <td className="mono text-right">{(d.rating || 0).toFixed(1)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <EmptyState message="No driver data available" />
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* TAB 5: QUOTES & PIPELINE */}
-          {tab === 'quotes' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {quotesData ? (
-                <>
-                  {/* KPI Cards */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-                    {[
-                      { label: 'Total Quotes', value: quotesData.total_quotes || 0, color: 'var(--text-primary)' },
-                      { label: 'Conversion Rate%', value: `${(quotesData.conversion_rate || 0).toFixed(1)}%`, color: 'var(--status-success)' },
-                      { label: 'Avg Quote Value', value: formatCurrency(quotesData.avg_quote_value || 0), color: 'var(--accent-primary)' },
-                      { label: 'Revenue Guard Flag Rate%', value: `${(quotesData.revenue_guard_flag_rate || 0).toFixed(1)}%`, color: 'var(--status-warning)' },
-                    ].map(m => (
-                      <div key={m.label} className="card metric-card">
-                        <div className="card-header"><span className="card-title">{m.label}</span></div>
-                        <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Conversion Funnel - Visual Trapezoid Style */}
-                  {quotesData.funnel && (
-                    <div className="card" style={{ padding: 20 }}>
-                      <div className="card-header"><span className="card-title">Conversion Funnel</span></div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16, alignItems: 'center' }}>
-                        {[
-                          { label: 'Quotes Sent', value: quotesData.funnel.quotes_sent, width: 100 },
-                          { label: 'Customer Accepted', value: quotesData.funnel.customer_accepted, width: 85 },
-                          { label: 'Loads Booked', value: quotesData.funnel.loads_booked, width: 70 },
-                          { label: 'Loads Completed', value: quotesData.funnel.loads_completed, width: 55 },
-                          { label: 'Invoiced', value: quotesData.funnel.invoiced, width: 40 },
-                        ].map((stage, idx, arr) => {
-                          const conversionRate = idx > 0 && arr[idx - 1].value > 0
-                            ? ((stage.value / arr[idx - 1].value) * 100).toFixed(1)
-                            : null;
                           return (
-                            <div key={stage.label} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <div
-                                style={{
-                                  width: `${stage.width}%`,
-                                  background: 'var(--accent-primary)',
-                                  padding: '16px 20px',
-                                  borderRadius: 4,
-                                  textAlign: 'center',
-                                  position: 'relative'
-                                }}
-                              >
-                                <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.7)', marginBottom: 4, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', fontWeight: 600 }}>
-                                  {stage.label}
-                                </div>
-                                <div style={{ fontSize: 22, fontWeight: 700, color: 'black', fontFamily: 'var(--font-mono)' }}>
-                                  {stage.value}
-                                </div>
-                                {conversionRate && (
-                                  <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.6)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
-                                    {conversionRate}% conversion
-                                  </div>
-                                )}
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <div style={{
+                                minWidth: 120,
+                                fontSize: 12,
+                                textTransform: 'uppercase',
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                              }}>
+                                {cat.category}
                               </div>
-                              {idx < arr.length - 1 && (
-                                <div style={{ fontSize: 18, color: 'var(--text-tertiary)', margin: '4px 0' }}>↓</div>
-                              )}
+                              <div style={{
+                                flex: 1,
+                                height: 20,
+                                background: 'var(--bg-surface-hover)',
+                                borderRadius: 2,
+                                overflow: 'hidden',
+                              }}>
+                                <div style={{
+                                  width: `${widthPct}%`,
+                                  height: '100%',
+                                  background: 'var(--accent-dim)',
+                                  borderRadius: 2,
+                                }} />
+                              </div>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                minWidth: 100,
+                                textAlign: 'right',
+                              }}>
+                                {formatCurrency(cat.amount)}
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 50,
+                                textAlign: 'right',
+                              }}>
+                                {pct.toFixed(1)}%
+                              </div>
                             </div>
                           );
                         })}
+                        <div style={{
+                          marginTop: 8,
+                          paddingTop: 12,
+                          borderTop: '1px solid var(--border-subtle)',
+                          fontSize: 13,
+                          color: 'var(--text-secondary)',
+                        }}>
+                          Total expenses this period: <span style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            color: 'var(--text-primary)',
+                          }}>{formatCurrency(totalExpenses)}</span>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                        No data for this period
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
 
-                  {/* Revenue Guard Performance with BarChart */}
-                  {quotesData.revenue_guard && (
-                    <div className="card" style={{ padding: 20 }}>
-                      <div className="card-header"><span className="card-title">Revenue Guard Performance</span></div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 16 }}>
-                        {[
-                          { label: 'Loads Flagged', value: quotesData.revenue_guard.loads_flagged },
-                          { label: 'Override Rate%', value: `${quotesData.revenue_guard.override_rate.toFixed(1)}%` },
-                          { label: 'Money Saved', value: formatCurrency(quotesData.revenue_guard.money_saved) },
-                          { label: 'Override Losses', value: formatCurrency(quotesData.revenue_guard.override_losses) },
-                        ].map(m => (
-                          <div key={m.label}>
-                            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{m.label}</div>
-                            <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
-                          </div>
-                        ))}
+          {/* TAB 3: CASH FLOW */}
+          {tab === 'cash' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* SECTION 1: CASH POSITION */}
+              <div>
+                <SectionHeader>CASH POSITION</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: (financeData?.cash_flow_forecast?.next_30_days || 0) >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                      marginBottom: 8,
+                    }}>
+                      {formatCurrency(financeData?.cash_flow_forecast?.next_30_days || 0)}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                      Next 30 Days
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                      Expected Net Cash
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 8,
+                    }}>
+                      {formatCurrency(financeData?.cash_flow_forecast?.next_60_days || 0)}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                      Next 60 Days
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                      Expected Net Cash
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 8,
+                    }}>
+                      {formatCurrency(financeData?.cash_flow_forecast?.next_90_days || 0)}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                      Next 90 Days
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                      Expected Net Cash
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: CUSTOMER PAYMENT INTELLIGENCE */}
+              <div>
+                <SectionHeader>WHO OWES YOU AND HOW LONG</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {(() => {
+                    const customerMap = new Map<string, {
+                      total_outstanding: number;
+                      oldest_days: number;
+                      invoice_count: number;
+                    }>();
+
+                    const now = new Date();
+                    invoices.forEach(inv => {
+                      if (inv.status !== 'PAID' && inv.balance > 0) {
+                        const issueDate = new Date(inv.issue_date);
+                        const daysOld = Math.floor((now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24));
+
+                        const existing = customerMap.get(inv.customer_name) || {
+                          total_outstanding: 0,
+                          oldest_days: 0,
+                          invoice_count: 0,
+                        };
+
+                        customerMap.set(inv.customer_name, {
+                          total_outstanding: existing.total_outstanding + inv.balance,
+                          oldest_days: Math.max(existing.oldest_days, daysOld),
+                          invoice_count: existing.invoice_count + 1,
+                        });
+                      }
+                    });
+
+                    const customers = Array.from(customerMap.entries())
+                      .map(([name, data]) => ({
+                        customer_name: name,
+                        total_outstanding: data.total_outstanding,
+                        oldest_invoice_days: data.oldest_days,
+                        invoice_count: data.invoice_count,
+                      }))
+                      .sort((a, b) => b.total_outstanding - a.total_outstanding)
+                      .slice(0, 8);
+
+                    const top3sum = customers.slice(0, 3).reduce((sum, c) => sum + c.total_outstanding, 0);
+
+                    return customers.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {customers.map((c, idx) => {
+                          const risk = c.oldest_invoice_days > 60 ? 'HIGH RISK' : c.oldest_invoice_days > 30 ? 'MEDIUM' : 'CURRENT';
+                          const riskColor = c.oldest_invoice_days > 60 ? 'var(--status-danger)' : c.oldest_invoice_days > 30 ? 'var(--status-warning)' : 'var(--status-success)';
+
+                          return (
+                            <div key={idx} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              padding: 12,
+                              background: 'var(--bg-surface)',
+                              borderRadius: 2,
+                            }}>
+                              <div style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
+                                {c.customer_name}
+                              </div>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                minWidth: 100,
+                              }}>
+                                {formatCurrency(c.total_outstanding)}
+                              </div>
+                              <div style={{
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 100,
+                              }}>
+                                Oldest: {c.oldest_invoice_days}d
+                              </div>
+                              <div style={{
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 80,
+                              }}>
+                                {c.invoice_count} invoices
+                              </div>
+                              <div style={{
+                                fontSize: 10,
+                                fontFamily: 'var(--font-mono)',
+                                textTransform: 'uppercase',
+                                padding: '2px 8px',
+                                borderRadius: 2,
+                                background: riskColor,
+                                color: 'white',
+                              }}>
+                                {risk}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <div style={{
+                          marginTop: 8,
+                          padding: 12,
+                          background: 'var(--bg-surface)',
+                          borderRadius: 2,
+                          fontSize: 13,
+                          color: 'var(--text-secondary)',
+                        }}>
+                          Collecting these 3 accounts would unlock <span style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                            color: 'var(--accent-primary)',
+                          }}>{formatCurrency(top3sum)}</span> in cash
+                        </div>
                       </div>
-                      {/* Saved vs Losses BarChart */}
-                      <div style={{ marginTop: 20 }}>
-                        <ResponsiveContainer width="100%" height={150}>
-                          <BarChart
-                            data={[
-                              { category: 'Money Saved', amount: quotesData.revenue_guard.money_saved, fill: 'var(--status-success)' },
-                              { category: 'Override Losses', amount: quotesData.revenue_guard.override_losses, fill: 'var(--status-danger)' }
-                            ]}
-                            layout="vertical"
-                            margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-                          >
-                            <XAxis
-                              type="number"
-                              stroke="var(--text-tertiary)"
-                              style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                              tickFormatter={(value) => formatCurrency(value)}
-                            />
-                            <YAxis
-                              type="category"
-                              dataKey="category"
-                              stroke="var(--text-tertiary)"
-                              style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                              width={90}
-                            />
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                        No outstanding invoices
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 3: WEEKLY CASH FORECAST */}
+              <div>
+                <SectionHeader>WEEKLY CASH FORECAST — Next 8 weeks net position</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {cashflowData?.forecast && cashflowData.forecast.length > 0 ? (() => {
+                    const data = cashflowData.forecast.slice(0, 8).map(f => ({
+                      week: f.period.replace('2026-', ''),
+                      net: Math.round(f.net),
+                      in: Math.round(f.expected_in),
+                      out: Math.round(f.expected_out),
+                    }));
+                    const runningBalance = data.reduce((sum, d) => sum + d.net, 0);
+                    return (
+                      <div>
+                        <ResponsiveContainer width="100%" height={240}>
+                          <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
+                            <XAxis dataKey="week" tick={{ fontFamily: 'var(--font-mono)', fontSize: 10, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontFamily: 'var(--font-mono)', fontSize: 10, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R${Math.abs(v/1000).toFixed(0)}k`} />
                             <Tooltip
-                              contentStyle={{
-                                background: 'var(--bg-deep)',
-                                border: '1px solid var(--border-subtle)',
-                                borderRadius: 4,
-                                fontSize: 12,
-                                fontFamily: 'var(--font-mono)'
-                              }}
-                              formatter={(value: any) => [formatCurrency(value), 'Amount']}
+                              contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, fontFamily: 'var(--font-mono)', fontSize: 11 }}
+                              formatter={(value: number) => [formatCurrency(value), '']}
+                              labelStyle={{ color: 'var(--text-secondary)', marginBottom: 4 }}
                             />
-                            <Bar dataKey="amount" isAnimationActive={true}>
-                              {[
-                                { category: 'Money Saved', amount: quotesData.revenue_guard.money_saved, fill: 'var(--status-success)' },
-                                { category: 'Override Losses', amount: quotesData.revenue_guard.override_losses, fill: 'var(--status-danger)' }
-                              ].map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.fill} />
+                            <ReferenceLine y={0} stroke="var(--border-subtle)" strokeWidth={1} />
+                            <Bar dataKey="net" radius={[2, 2, 0, 0]}>
+                              {data.map((entry, index) => (
+                                <Cell key={index} fill={entry.net >= 0 ? 'var(--accent-primary)' : 'var(--status-danger)'} />
                               ))}
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
+                          <div>
+                            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>8-Week Net</div>
+                            <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600, color: runningBalance >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>{formatCurrency(runningBalance)}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Positive Weeks</div>
+                            <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--status-success)' }}>{data.filter(d => d.net >= 0).length} of {data.length}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Peak Week</div>
+                            <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent-primary)' }}>{formatCurrency(Math.max(...data.map(d => d.net)))}</div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    );
+                  })() : (
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No forecast data available</div>
                   )}
-
-                  {/* Quote Accuracy */}
-                  {quotesData.quote_accuracy && quotesData.quote_accuracy.length > 0 && (
-                    <div className="card table-card">
-                      <div className="card-header" style={{ marginBottom: 16 }}>
-                        <span className="card-title">Quote Accuracy</span>
-                      </div>
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Corridor</th>
-                            <th className="text-right">Quoted Margin</th>
-                            <th className="text-right">Actual Margin</th>
-                            <th className="text-right">Variance</th>
-                            <th className="text-right">Accuracy Score</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {quotesData.quote_accuracy.map((q, idx) => (
-                            <tr key={idx}>
-                              <td>{q.corridor}</td>
-                              <td className="mono text-right">{q.quoted_margin.toFixed(1)}%</td>
-                              <td className="mono text-right">{q.actual_margin.toFixed(1)}%</td>
-                              <td className="mono text-right" style={{
-                                color: q.variance < 0 ? 'var(--status-danger)' : 'var(--status-success)'
-                              }}>
-                                {q.variance > 0 ? '+' : ''}{q.variance.toFixed(1)}%
-                              </td>
-                              <td className="mono text-right">{q.accuracy_score.toFixed(1)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <EmptyState message="Quote analytics will appear once the AI Quoting Engine processes your first quote." />
-              )}
+                </div>
+              </div>
             </div>
           )}
 
-          {/* TAB 6: CASH FLOW */}
-          {tab === 'cashflow' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* KPI Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
-                {[
-                  { label: 'Total Outstanding', value: formatCurrency(cashflowData?.total_outstanding || 0), color: 'var(--accent-primary)' },
-                  { label: 'Overdue', value: formatCurrency(cashflowData?.total_overdue || 0), color: 'var(--status-danger)' },
-                  { label: 'Avg DSO', value: `${Math.round(cashflowData?.avg_dso || 0)}d`, color: 'var(--text-primary)' },
-                  { label: 'Next 30d Projected', value: formatCurrency(cashflowData?.next_30d_projected || 0), color: 'var(--status-success)' },
-                  { label: 'Fast Pay Fees MTD', value: formatCurrency(cashflowData?.fast_pay_fees_mtd || 0), color: 'var(--status-warning)' },
-                ].map(m => (
-                  <div key={m.label} className="card metric-card">
-                    <div className="card-header"><span className="card-title">{m.label}</span></div>
-                    <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+          {tab === 'fleet' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* SECTION 1: FLEET HEALTH SUMMARY */}
+              <div>
+                <SectionHeader>FLEET HEALTH SUMMARY</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 12,
+                    }}>
+                      {vehicles.filter(v => ['IN_USE', 'AVAILABLE'].includes(v.status.toUpperCase())).length}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Active Vehicles
+                    </div>
                   </div>
-                ))}
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 12,
+                    }}>
+                      {vehicles.length > 0 ? (vehicles.reduce((sum, v) => sum + (v.ai_health_score || 0), 0) / vehicles.length).toFixed(0) : 0}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Avg Health Score
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--status-danger)',
+                      marginBottom: 12,
+                    }}>
+                      {vehicles.filter(v => (v.ai_health_score || 100) < 60).length}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Vehicles at Risk
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 20 }}>
+                    <div style={{
+                      fontSize: 28,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      marginBottom: 12,
+                    }}>
+                      {vehicles.length > 0 ? formatCurrency(vehicles.reduce((sum, v) => sum + (v.cost_per_km || 0), 0) / vehicles.length) : formatCurrency(0)}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                      Avg Cost/km
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Invoice Aging Buckets */}
-              {cashflowData?.aging_buckets && (
+              {/* SECTION 2: VEHICLE EFFICIENCY RANKING */}
+              <div>
+                <SectionHeader>VEHICLE PERFORMANCE — Revenue earned vs operational cost</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
-                  <div className="card-header"><span className="card-title">Invoice Aging</span></div>
-                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {[
-                      { label: 'Current', data: cashflowData.aging_buckets.current, color: 'var(--status-success)' },
-                      { label: '1-30d', data: cashflowData.aging_buckets.days_1_30, color: 'var(--status-warning)' },
-                      { label: '31-60d', data: cashflowData.aging_buckets.days_31_60, color: 'var(--status-warning)' },
-                      { label: '61-90d', data: cashflowData.aging_buckets.days_61_90, color: 'var(--status-danger)' },
-                      { label: '90d+', data: cashflowData.aging_buckets.days_90_plus, color: 'var(--status-danger)' },
-                    ].map(bucket => {
-                      const totalAmount = Object.values(cashflowData.aging_buckets!).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
-                      const pct = totalAmount > 0 ? (bucket.data.amount / totalAmount) * 100 : 0;
-                      return (
-                        <div key={bucket.label}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <div>
-                              <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{bucket.label}</span>
-                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 8, fontFamily: 'var(--font-mono)' }}>
-                                ({bucket.data.count} {bucket.data.count === 1 ? 'invoice' : 'invoices'})
-                              </span>
-                            </div>
-                            <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
-                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{pct.toFixed(1)}%</span>
-                              <span style={{ fontSize: 15, fontWeight: 600, color: bucket.color, fontFamily: 'var(--font-mono)' }}>
-                                {formatCurrency(bucket.data.amount)}
-                              </span>
-                            </div>
-                          </div>
-                          <div style={{ height: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${pct}%`, background: bucket.color, borderRadius: 2 }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+                  {vehicles.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {[...vehicles]
+                        .sort((a, b) => b.revenue_generated - a.revenue_generated)
+                        .map((v, idx) => {
+                          const healthColor = v.ai_health_score > 80 ? 'var(--status-success)' : v.ai_health_score > 60 ? 'var(--status-warning)' : 'var(--status-danger)';
 
-              {/* Customer Payment Health with Risk Tier Dots */}
-              {cashflowData?.customer_payment_health && cashflowData.customer_payment_health.length > 0 && (
-                <div className="card table-card">
-                  <div className="card-header" style={{ marginBottom: 16 }}>
-                    <span className="card-title">Customer Payment Health</span>
-                  </div>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Customer</th>
-                        <th className="text-right">Revenue</th>
-                        <th className="text-right">Invoices</th>
-                        <th className="text-right">Avg Pay Days</th>
-                        <th className="text-right">DSO</th>
-                        <th className="text-right">Overdue Count</th>
-                        <th className="text-right">Risk Tier</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cashflowData.customer_payment_health.map((c, idx) => (
-                        <tr key={idx}>
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{
-                                display: 'inline-block',
-                                width: 8,
-                                height: 8,
-                                borderRadius: '50%',
-                                background: getRiskTierColor(c.risk_tier)
-                              }} />
-                              {c.customer_name}
+                          return (
+                            <div
+                              key={v.id}
+                              onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 12,
+                                padding: 12,
+                                background: 'var(--bg-surface)',
+                                borderRadius: 2,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <div style={{
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-tertiary)',
+                                minWidth: 30,
+                              }}>
+                                #{idx + 1}
+                              </div>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                minWidth: 100,
+                              }}>
+                                {v.plate}
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                color: 'var(--text-secondary)',
+                                minWidth: 150,
+                              }}>
+                                {v.make} {v.model}
+                              </div>
+                              <StatusBadge>{v.status}</StatusBadge>
+                              <div style={{ flex: 1 }} />
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--accent-primary)',
+                                minWidth: 100,
+                              }}>
+                                {v.revenue_generated > 0 ? formatCurrency(v.revenue_generated) : 'No revenue data'}
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 80,
+                              }}>
+                                {formatCurrency(v.cost_per_km)}/km
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                minWidth: 100,
+                              }}>
+                                <div style={{
+                                  flex: 1,
+                                  height: 8,
+                                  background: 'var(--bg-surface-hover)',
+                                  borderRadius: 4,
+                                  overflow: 'hidden',
+                                }}>
+                                  <div style={{
+                                    width: `${v.ai_health_score}%`,
+                                    height: '100%',
+                                    background: healthColor,
+                                  }} />
+                                </div>
+                                <div style={{
+                                  fontSize: 11,
+                                  fontFamily: 'var(--font-mono)',
+                                  color: healthColor,
+                                }}>
+                                  {v.ai_health_score}
+                                </div>
+                              </div>
+                              <div style={{
+                                fontSize: 11,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--text-secondary)',
+                                minWidth: 60,
+                              }}>
+                                {v.uptime_percentage.toFixed(1)}%
+                              </div>
                             </div>
-                          </td>
-                          <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
-                            {formatCurrency(c.revenue)}
-                          </td>
-                          <td className="mono text-right">{c.invoice_count}</td>
-                          <td className="mono text-right">{c.avg_payment_days}d</td>
-                          <td className="mono text-right">{c.dso}d</td>
-                          <td className="mono text-right" style={{
-                            color: c.overdue_count > 0 ? 'var(--status-danger)' : 'var(--text-tertiary)'
-                          }}>
-                            {c.overdue_count}
-                          </td>
-                          <td className="text-right">
-                            <span style={{
+                          );
+                        })}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      No data for this period
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* SECTION 3: DRIVER EFFICIENCY MATRIX */}
+              <div>
+                <SectionHeader>DRIVER PERFORMANCE — Revenue generated and risk profile</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {drivers.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {[...drivers]
+                        .sort((a, b) => b.revenue_generated - a.revenue_generated)
+                        .map((d, idx) => (
+                          <div
+                            key={d.id}
+                            onClick={() => navigate(`/fleet/drivers/${d.id}/financial`)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              padding: 12,
+                              background: 'var(--bg-surface)',
+                              borderRadius: 2,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{
+                              fontSize: 11,
                               fontFamily: 'var(--font-mono)',
-                              fontSize: 10,
-                              color: getRiskTierColor(c.risk_tier),
-                              padding: '2px 6px',
-                              background: 'var(--bg-surface-hover)',
-                              borderRadius: 2
+                              fontWeight: 600,
+                              color: 'var(--text-tertiary)',
+                              minWidth: 30,
                             }}>
-                              {c.risk_tier}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                              #{idx + 1}
+                            </div>
+                            <div style={{
+                              fontSize: 13,
+                              color: 'var(--text-primary)',
+                              fontWeight: 500,
+                              minWidth: 180,
+                            }}>
+                              {d.user_details.name}
+                            </div>
+                            <StatusBadge>{d.status}</StatusBadge>
+                            <div style={{ flex: 1 }} />
+                            <div style={{
+                              fontSize: 13,
+                              fontFamily: 'var(--font-mono)',
+                              fontWeight: 600,
+                              color: 'var(--accent-primary)',
+                              minWidth: 100,
+                            }}>
+                              {formatCurrency(d.revenue_generated)}
+                            </div>
+                            <div style={{
+                              fontSize: 12,
+                              fontFamily: 'var(--font-mono)',
+                              color: 'var(--text-secondary)',
+                              minWidth: 60,
+                            }}>
+                              {d.total_trips} trips
+                            </div>
+                            <div style={{
+                              fontSize: 12,
+                              fontFamily: 'var(--font-mono)',
+                              color: 'var(--text-secondary)',
+                              minWidth: 100,
+                            }}>
+                              {formatCurrency(d.avg_revenue_per_trip)}/trip
+                            </div>
+                            {(d.violation_count > 0 || d.accident_history > 0) && (
+                              <div style={{
+                                fontSize: 11,
+                                color: 'var(--status-danger)',
+                              }}>
+                                {d.violation_count > 0 && `⚠ ${d.violation_count} violations`}
+                                {d.violation_count > 0 && d.accident_history > 0 && ', '}
+                                {d.accident_history > 0 && `⚠ ${d.accident_history} accidents`}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      No data for this period
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
 
-              {/* Cash Flow Forecast - BarChart */}
-              {cashflowData?.cash_flow_forecast && (
+              {/* SECTION 4: MAINTENANCE RISK ALERT */}
+              <div>
+                <SectionHeader>MAINTENANCE RISK ALERT</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
-                  <div className="card-header" style={{ marginBottom: 16 }}>
-                    <span className="card-title">Cash Flow Forecast</span>
-                  </div>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart
-                      data={[
-                        { period: 'Next 30d', amount: cashflowData.cash_flow_forecast.next_30d },
-                        { period: 'Next 31-60d', amount: cashflowData.cash_flow_forecast.next_31_60d },
-                        { period: 'Next 61-90d', amount: cashflowData.cash_flow_forecast.next_61_90d }
-                      ]}
-                      margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-                    >
-                      <XAxis
-                        dataKey="period"
-                        stroke="var(--text-tertiary)"
-                        style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                      />
-                      <YAxis
-                        stroke="var(--text-tertiary)"
-                        style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}
-                        tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          background: 'var(--bg-deep)',
-                          border: '1px solid var(--border-subtle)',
-                          borderRadius: 4,
-                          fontSize: 12,
-                          fontFamily: 'var(--font-mono)'
-                        }}
-                        formatter={(value: any) => [formatCurrency(value), 'Projected Inflow']}
-                      />
-                      <Bar dataKey="amount" fill="var(--accent-primary)" isAnimationActive={true} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
+                  {(() => {
+                    const atRisk = vehicles.filter(v => (v.ai_health_score || 100) < 70).sort((a, b) => a.ai_health_score - b.ai_health_score);
 
-              {/* Fast Pay Cost Summary */}
-              {cashflowData?.fast_pay_summary && (
-                <div className="card" style={{ padding: 20 }}>
-                  <div className="card-header"><span className="card-title">Fast Pay Cost Summary</span></div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 16 }}>
-                    {[
-                      { label: 'Total Fast Pay Fees', value: formatCurrency(cashflowData.fast_pay_summary.total_fees) },
-                      { label: 'As % of Revenue', value: `${cashflowData.fast_pay_summary.fee_pct_of_revenue.toFixed(2)}%` },
-                      { label: 'Count of Invoices', value: cashflowData.fast_pay_summary.invoice_count },
-                      { label: 'Avg Discount', value: `${cashflowData.fast_pay_summary.avg_discount.toFixed(2)}%` },
-                    ].map(m => (
-                      <div key={m.label}>
-                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4, fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>{m.label}</div>
-                        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
+                    return atRisk.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {atRisk.map((v, idx) => {
+                          const recommendation = v.ai_health_score < 50 ? '⚠ High maintenance risk — schedule immediately' : 'Monitor closely';
+
+                          return (
+                            <div key={idx} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              padding: 12,
+                              background: 'var(--bg-surface)',
+                              borderRadius: 2,
+                            }}>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                minWidth: 100,
+                              }}>
+                                {v.plate}
+                              </div>
+                              <div style={{
+                                fontSize: 12,
+                                color: 'var(--text-secondary)',
+                                minWidth: 120,
+                              }}>
+                                {v.make}
+                              </div>
+                              <div style={{
+                                fontSize: 13,
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 600,
+                                color: v.ai_health_score < 50 ? 'var(--status-danger)' : 'var(--status-warning)',
+                                minWidth: 60,
+                              }}>
+                                {v.ai_health_score}
+                              </div>
+                              <StatusBadge>{v.status}</StatusBadge>
+                              <div style={{ flex: 1, fontSize: 12, color: 'var(--status-danger)' }}>
+                                {recommendation}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
+                    ) : (
+                      <div style={{
+                        padding: 20,
+                        textAlign: 'center',
+                        color: 'var(--status-success)',
+                        fontSize: 13,
+                      }}>
+                        All vehicles within healthy operating range
+                      </div>
+                    );
+                  })()}
                 </div>
-              )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: LANES */}
+          {tab === 'lanes' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+              {/* SECTION 1: CORRIDOR EFFICIENCY */}
+              <div>
+                <SectionHeader>CORRIDOR EFFICIENCY — Revenue per km driven</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {(() => {
+                    const routeMap = new Map<string, { trips: number; total_revenue: number; total_distance: number; total_fuel: number }>();
+                    loads.forEach(load => {
+                      if (!load.pickup_city || !load.delivery_city) return;
+                      const route = `${load.pickup_city} → ${load.delivery_city}`;
+                      const e = routeMap.get(route) || { trips: 0, total_revenue: 0, total_distance: 0, total_fuel: 0 };
+                      routeMap.set(route, {
+                        trips: e.trips + 1,
+                        total_revenue: e.total_revenue + (parseFloat(String(load.total_amount)) || 0),
+                        total_distance: e.total_distance + (parseFloat(String(load.distance)) || 0),
+                        total_fuel: e.total_fuel + (parseFloat(String(load.fuel_surcharge)) || 0),
+                      });
+                    });
+                    const routes = Array.from(routeMap.entries())
+                      .map(([route, d]) => ({
+                        route, trips: d.trips,
+                        total_revenue: d.total_revenue,
+                        rev_per_km: d.total_distance > 0 ? d.total_revenue / d.total_distance : 0,
+                        margin_pct: d.total_revenue > 0 ? ((d.total_revenue - d.total_fuel) / d.total_revenue) * 100 : 0,
+                      }))
+                      .filter(r => r.rev_per_km > 0)
+                      .sort((a, b) => b.rev_per_km - a.rev_per_km)
+                      .slice(0, 8);
+                    if (routes.length === 0) return <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No route data for this period</div>;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        {/* Header row */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 80px 80px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>
+                          {['Route', 'Trips', 'Revenue', 'Rev/km', 'Margin'].map(h => (
+                            <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+                          ))}
+                        </div>
+                        {routes.map((r, idx) => (
+                          <div key={idx} style={{
+                            display: 'grid', gridTemplateColumns: '1fr 80px 100px 80px 80px', gap: 12,
+                            padding: '10px 12px',
+                            borderBottom: '1px solid var(--border-row)',
+                            borderLeft: idx < 2 ? '3px solid var(--status-success)' : idx >= routes.length - 2 ? '3px solid var(--status-danger)' : '3px solid transparent',
+                          }}>
+                            <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)' }}>{r.route}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{r.trips}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{formatCurrency(r.total_revenue)}</div>
+                            <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent-primary)' }}>{formatCurrency(r.rev_per_km)}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: r.margin_pct > 50 ? 'var(--status-success)' : r.margin_pct > 30 ? 'var(--status-warning)' : 'var(--status-danger)' }}>{r.margin_pct.toFixed(1)}%</div>
+                          </div>
+                        ))}
+                        <div style={{ padding: '12px 12px 0', fontSize: 12, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                          Green = most efficient corridors · Red = least efficient
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 2: CARGO PERFORMANCE */}
+              <div>
+                <SectionHeader>CARGO PERFORMANCE — Avg revenue per trip by cargo type</SectionHeader>
+                <div className="card" style={{ padding: 20 }}>
+                  {(() => {
+                    const cargoMap = new Map<string, { count: number; total: number }>();
+                    loads.forEach(load => {
+                      const words = (load.cargo_description || 'Unknown').trim().split(/\s+/).slice(0, 2);
+                      const key = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                      const e = cargoMap.get(key) || { count: 0, total: 0 };
+                      cargoMap.set(key, { count: e.count + 1, total: e.total + (parseFloat(String(load.total_amount)) || 0) });
+                    });
+                    const types = Array.from(cargoMap.entries())
+                      .map(([cargo, d]) => ({ cargo, trips: d.count, avg: d.total / d.count, total: d.total }))
+                      .sort((a, b) => b.avg - a.avg);
+                    if (types.length === 0) return <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No cargo data</div>;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 60px 100px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>
+                          {['Cargo Type', 'Avg/Trip', 'Trips', 'Total'].map(h => (
+                            <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+                          ))}
+                        </div>
+                        {types.map((c, idx) => (
+                          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 60px 100px', gap: 12, padding: '10px 12px', borderBottom: '1px solid var(--border-row)' }}>
+                            <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{c.cargo}</div>
+                            <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: idx === 0 ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{formatCurrency(c.avg)}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{c.trips}</div>
+                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{formatCurrency(c.total)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 3: LOAD STATUS */}
+              <div>
+                <SectionHeader>LOAD PIPELINE STATUS</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                  {(() => {
+                    const pending = loads.filter(l => ['PENDING', 'ASSIGNED'].includes((l.status || '').toUpperCase()));
+                    const inMotion = loads.filter(l => ['IN_TRANSIT'].includes((l.status || '').toUpperCase().replace(' ', '_')));
+                    const completed = loads.filter(l => ['DELIVERED', 'INVOICED'].includes((l.status || '').toUpperCase()));
+                    const pRev = pending.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
+                    const mRev = inMotion.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
+                    const cRev = completed.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
+                    return [
+                      { label: 'Pipeline', count: pending.length, rev: pRev, sub: 'pending dispatch', color: 'var(--text-secondary)' },
+                      { label: 'In Motion', count: inMotion.length, rev: mRev, sub: 'revenue in transit', color: 'var(--accent-primary)' },
+                      { label: 'Completed', count: completed.length, rev: cRev, sub: 'revenue realised', color: 'var(--status-success)' },
+                    ].map((item, idx) => (
+                      <div key={idx} className="card" style={{ padding: 20 }}>
+                        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 12 }}>{item.label}</div>
+                        <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 600, color: item.color, marginBottom: 6 }}>{item.count}</div>
+                        <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginBottom: 4 }}>{formatCurrency(item.rev)}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.sub}</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 4: WEIGHT CLASS */}
+              <div>
+                <SectionHeader>WEIGHT CLASS ANALYSIS — Avg revenue per trip by load size</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                  {(() => {
+                    const bins = [
+                      { label: 'Under 5t', filter: (w: number) => w < 5000 },
+                      { label: '5 – 10t', filter: (w: number) => w >= 5000 && w < 10000 },
+                      { label: '10 – 20t', filter: (w: number) => w >= 10000 && w < 20000 },
+                      { label: '20t+', filter: (w: number) => w >= 20000 },
+                    ].map(b => {
+                      const bl = loads.filter(l => b.filter(parseFloat(String(l.weight)) || 0));
+                      const avg = bl.length > 0 ? bl.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0) / bl.length : 0;
+                      return { ...b, count: bl.length, avg };
+                    });
+                    const maxAvg = Math.max(...bins.map(b => b.avg), 1);
+                    return bins.map((b, idx) => (
+                      <div key={idx} className="card" style={{ padding: 20, borderLeft: b.avg === maxAvg && b.avg > 0 ? '3px solid var(--accent-primary)' : '3px solid transparent' }}>
+                        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 12 }}>{b.label}</div>
+                        <div style={{ fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 600, color: b.avg === maxAvg && b.avg > 0 ? 'var(--accent-primary)' : 'var(--text-primary)', marginBottom: 6 }}>{b.avg > 0 ? formatCurrency(b.avg) : '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>avg/trip · {b.count} loads</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
             </div>
           )}
         </>

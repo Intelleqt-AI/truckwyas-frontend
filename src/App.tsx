@@ -117,6 +117,7 @@ const App = () => (
             <Route path="/fleet/vehicles/:id" element={<RequireAuth><OSLayout><VehicleFinancialProfile /></OSLayout></RequireAuth>} />
             <Route path="/fleet/drivers" element={<RequireAuth><OSLayout><Drivers /></OSLayout></RequireAuth>} />
             <Route path="/fleet/drivers/:driverId" element={<RequireAuth><OSLayout><DriverProfile /></OSLayout></RequireAuth>} />
+            <Route path="/fleet/drivers/:driverId/financial" element={<RequireAuth><OSLayout><DriverProfile /></OSLayout></RequireAuth>} />
             <Route path="/vehicles" element={<RequireAuth><OSLayout><Vehicles /></OSLayout></RequireAuth>} />
             <Route path="/drivers" element={<RequireAuth><OSLayout><Drivers /></OSLayout></RequireAuth>} />
             <Route path="/invoices" element={<RequireAuth><OSLayout><Invoices /></OSLayout></RequireAuth>} />

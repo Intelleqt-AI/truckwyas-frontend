@@ -268,8 +268,8 @@ export default function Overview() {
             );
           })()}
           <div style={{ display: 'flex', gap: 20, marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-            <span>Net Margin <span style={{ color: 'var(--accent-primary)' }}>{financeData?.net_margin_percent != null ? `${financeData.net_margin_percent.toFixed(1)}%` : '—'}</span></span>
-            <span>Fuel/Rev ratio <span style={{ color: 'var(--status-warning)' }}>{financeData?.monthly_trend?.length > 0 ? `${Math.round((financeData.monthly_trend.at(-1).expenses / Math.max(financeData.monthly_trend.at(-1).revenue, 1)) * 100)}%` : '—'}</span></span>
+            <span>Net Margin <span style={{ color: 'var(--accent-primary)' }}>{financeData?.net_margin_percent != null ? `${(financeData.net_margin_percent || 0).toFixed(1)}%` : '—'}</span></span>
+            <span>Fuel/Rev ratio <span style={{ color: 'var(--status-warning)' }}>{financeData?.monthly_trend?.length > 0 ? `${Math.round(((financeData.monthly_trend.at(-1)?.expenses || 0) / Math.max(financeData.monthly_trend.at(-1)?.revenue || 1, 1)) * 100)}%` : '—'}</span></span>
             <span>Trend <span style={{ color: 'var(--status-success)' }}>↑ improving</span></span>
           </div>
         </div>
@@ -403,7 +403,7 @@ export default function Overview() {
               Request Advance
             </button>
             <button
-              onClick={() => navigate('/expenses')}
+              onClick={() => navigate('/finance/expenses')}
               className="btn-action"
               style={{ width: '100%', justifyContent: 'center', padding: '10px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
             >
@@ -417,33 +417,25 @@ export default function Overview() {
               View Reports
             </button>
           </div>
-          <div style={{ marginTop: 16, padding: '12px', background: 'var(--bg-surface-hover)', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Active Loads:</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--accent-primary)' }}>
-              {activeLoadsCount}
-            </span>
-          </div>
+        </div>
 
-          {/* RECENT ACTIVITY */}
-          <div style={{ marginTop: 24 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 12 }}>
-              Recent Activity
+        {/* Recent Activity */}
+        <div className="card" style={{ padding: 20 }}>
+          <div className="card-title" style={{ marginBottom: 16 }}>Recent Activity</div>
+          {activityLoading ? (
+            <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>Loading...</div>
+          ) : activity.length === 0 ? (
+            <div style={{ color: 'var(--text-secondary)', fontSize: 13, padding: '16px 0' }}>No recent activity</div>
+          ) : (
+            <div>
+              {activity.slice(0, 8).map((e: any) => (
+                <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border-row)' }}>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{e.title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap', marginLeft: 16 }}>{timeAgo(e.created_at)}</div>
+                </div>
+              ))}
             </div>
-            {activityLoading ? (
-              <div style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>Loading...</div>
-            ) : activity.length === 0 ? (
-              <div style={{ color: 'var(--text-secondary)', fontSize: 13, padding: '16px 0' }}>No recent activity</div>
-            ) : (
-              <div>
-                {activity.slice(0, 8).map((e: any) => (
-                  <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border-row)' }}>
-                    <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{e.title}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap', marginLeft: 16 }}>{timeAgo(e.created_at)}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
 

@@ -1020,6 +1020,19 @@ export default function Insights() {
                       );
                     })()}
                   </div>
+                  {(() => {
+                    const entries = Object.entries(revenueData.expense_breakdown);
+                    if (entries.length === 0) return null;
+                    const largest = entries.reduce((max, [cat, amt]: [string, any]) => amt > max.amount ? { category: cat, amount: amt } : max, { category: '', amount: 0 });
+                    const largestPct = revenueData.revenue_period > 0 ? (largest.amount / revenueData.revenue_period) * 100 : 0;
+                    return (
+                      <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-surface-hover)', borderRadius: 4, borderLeft: '3px solid var(--accent-primary)' }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                          <strong style={{ color: 'var(--text-primary)' }}>{largest.category.replace('_', ' ').charAt(0).toUpperCase() + largest.category.replace('_', ' ').slice(1)}</strong> is your largest cost at <strong style={{ color: 'var(--accent-primary)' }}>{largestPct.toFixed(1)}%</strong> of revenue ({formatCurrency(largest.amount)}).
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

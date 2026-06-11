@@ -53,6 +53,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const PasswordReset = lazy(() => import("./pages/PasswordReset"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword").then(m => ({ default: m.ForgotPassword })));
 const InviteAccept = lazy(() => import("./pages/InviteAccept").then(m => ({ default: m.InviteAccept })));
+const EmailVerification = lazy(() => import("./pages/EmailVerification").then(m => ({ default: m.EmailVerification })));
 const Onboarding = lazy(() => import("./pages/Onboarding").then(m => ({ default: m.Onboarding })));
 const VehicleFinancialProfile = lazy(() => import("./pages/VehicleFinancialProfile"));
 const RiskScoreView = lazy(() => import("./pages/RiskScoreView"));
@@ -96,6 +97,7 @@ const App = () => (
             <Route path="/forgot-password" element={<PublicOnly><ForgotPassword /></PublicOnly>} />
             <Route path="/reset-password" element={<Navigate to="/password-reset" replace />} />
             <Route path="/invite/:token" element={<PublicOnly><InviteAccept /></PublicOnly>} />
+            <Route path="/verify-email" element={<PublicOnly><EmailVerification /></PublicOnly>} />
             <Route path="/quotes/view/:quoteId/:token" element={<ClientQuoteView />} />
             <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
 

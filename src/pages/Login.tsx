@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { useLogin } from "@/hooks/useLogin";
 import { fetchData } from "@/lib/Api";
 
@@ -12,6 +13,7 @@ const Login = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -166,18 +168,29 @@ const Login = () => {
                 Forgot password?
               </Link>
             </div>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              value={formData.password}
-              onChange={handleChange}
-              style={{
-                ...inputStyle,
-                borderColor: validationErrors.password ? 'var(--status-danger)' : 'var(--border-subtle)',
-              }}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                required
+                value={formData.password}
+                onChange={handleChange}
+                style={{
+                  ...inputStyle,
+                  borderColor: validationErrors.password ? 'var(--status-danger)' : 'var(--border-subtle)',
+                  paddingRight: 40,
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
             {validationErrors.password && (
               <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
                 {validationErrors.password}

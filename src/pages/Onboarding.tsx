@@ -25,12 +25,16 @@ export function Onboarding() {
   const [loadingCompany, setLoadingCompany] = useState(true);
 
   // Step 2: First vehicle
-  const [registration, setRegistration] = useState('');
+  const [plate, setPlate] = useState('');
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
+  const [year, setYear] = useState(new Date().getFullYear().toString());
   const [vehicleTypeId, setVehicleTypeId] = useState('');
   const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(true);
+  const [capacity, setCapacity] = useState('');
+  const [fuelType, setFuelType] = useState('DIESEL');
+  const [vin, setVin] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -62,7 +66,7 @@ export function Onboarding() {
 
   const handleSkip = () => {
     localStorage.setItem('onboarding_done', 'true');
-    navigate('/dashboard');
+    navigate('/');
   };
 
   const handleStep1Submit = async () => {
@@ -87,20 +91,32 @@ export function Onboarding() {
   };
 
   const handleStep2Submit = async () => {
-    if (!registration.trim()) {
-      toast.error('Please enter vehicle registration');
+    if (!plate.trim()) { toast.error('Registration plate is required'); return; }
+    if (!make.trim())  { toast.error('Make is required'); return; }
+    if (!model.trim()) { toast.error('Model is required'); return; }
+    const yearNum = parseInt(year);
+    const curYear = new Date().getFullYear();
+    if (!year || yearNum < 1990 || yearNum > curYear + 1) {
+      toast.error('Enter a valid year (1990–present)');
       return;
     }
+    if (!capacity || parseFloat(capacity) <= 0) { toast.error('Capacity is required'); return; }
+    if (!vehicleTypeId) { toast.error('Vehicle type is required'); return; }
 
     setSubmitting(true);
     try {
       await postData({
         url: 'api/v1/vehicles/',
         data: {
-          registration,
+          plate: plate.trim().toUpperCase(),
           make,
           model,
+          year: yearNum,
           vehicle_type: vehicleTypeId,
+          capacity: parseFloat(capacity),
+          fuel_type: fuelType,
+          type: 'TRUCK',
+          ...(vin.trim() ? { vin: vin.trim().toUpperCase() } : {}),
         },
       });
       toast.success('Vehicle added');
@@ -114,7 +130,34 @@ export function Onboarding() {
 
   const handleComplete = () => {
     localStorage.setItem('onboarding_done', 'true');
-    navigate('/dashboard');
+    navigate('/');
+  };
+
+  const lblSt: React.CSSProperties = {
+    display: 'block',
+    fontSize: 11,
+    fontFamily: 'var(--font-mono)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    color: 'var(--text-tertiary)',
+    marginBottom: 6,
+  };
+
+  const inSt: React.CSSProperties = {
+    width: '100%',
+    padding: '10px 14px',
+    background: 'var(--input-bg)',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: 2,
+    color: 'var(--text-primary)',
+    fontSize: 13,
+    outline: 'none',
+    boxSizing: 'border-box',
+  };
+
+  const selSt: React.CSSProperties = {
+    ...inSt,
+    cursor: 'pointer',
   };
 
   return (
@@ -305,132 +348,123 @@ export function Onboarding() {
               </div>
             ) : (
               <>
+                {/* Registration Plate */}
                 <div style={{ marginBottom: 16 }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 11,
-                    fontFamily: 'var(--font-mono)',
-                    textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em',
-                    color: 'var(--text-tertiary)',
-                    marginBottom: 6,
-                  }}>
-                    Registration *
-                  </label>
+                  <label style={lblSt}>Registration Plate *</label>
                   <input
                     type="text"
-                    value={registration}
-                    onChange={(e) => setRegistration(e.target.value.toUpperCase())}
+                    value={plate}
+                    onChange={(e) => setPlate(e.target.value.toUpperCase())}
                     placeholder="ABC 123 GP"
                     autoFocus
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      background: 'var(--input-bg)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: 2,
-                      color: 'var(--text-primary)',
-                      fontSize: 13,
-                      fontFamily: 'var(--font-mono)',
-                      outline: 'none',
-                    }}
+                    style={{ ...inSt, fontFamily: 'var(--font-mono)' }}
                   />
                 </div>
 
+                {/* Make + Model */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                   <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: 11,
-                      fontFamily: 'var(--font-mono)',
-                      textTransform: 'uppercase' as const,
-                      letterSpacing: '0.08em',
-                      color: 'var(--text-tertiary)',
-                      marginBottom: 6,
-                    }}>
-                      Make
-                    </label>
+                    <label style={lblSt}>Make *</label>
                     <input
+                      list="truck-makes"
                       type="text"
                       value={make}
                       onChange={(e) => setMake(e.target.value)}
                       placeholder="Mercedes-Benz"
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        background: 'var(--input-bg)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: 2,
-                        color: 'var(--text-primary)',
-                        fontSize: 13,
-                        outline: 'none',
-                      }}
+                      style={inSt}
                     />
+                    <datalist id="truck-makes">
+                      {['Mercedes-Benz','Volvo','MAN','Scania','DAF','Iveco',
+                        'UD Trucks','Hino','Isuzu','Ford','Toyota']
+                        .map(m => <option key={m} value={m} />)}
+                    </datalist>
                   </div>
                   <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: 11,
-                      fontFamily: 'var(--font-mono)',
-                      textTransform: 'uppercase' as const,
-                      letterSpacing: '0.08em',
-                      color: 'var(--text-tertiary)',
-                      marginBottom: 6,
-                    }}>
-                      Model
-                    </label>
+                    <label style={lblSt}>Model *</label>
                     <input
                       type="text"
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
                       placeholder="Actros"
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        background: 'var(--input-bg)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: 2,
-                        color: 'var(--text-primary)',
-                        fontSize: 13,
-                        outline: 'none',
-                      }}
+                      style={inSt}
                     />
                   </div>
                 </div>
 
+                {/* Year + Vehicle Type */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                  <div>
+                    <label style={lblSt}>Year *</label>
+                    <input
+                      type="number"
+                      min={1990}
+                      max={new Date().getFullYear() + 1}
+                      value={year}
+                      onChange={(e) => setYear(e.target.value)}
+                      placeholder={new Date().getFullYear().toString()}
+                      style={inSt}
+                    />
+                  </div>
+                  <div>
+                    <label style={lblSt}>Vehicle Type *</label>
+                    <select
+                      value={vehicleTypeId}
+                      onChange={(e) => setVehicleTypeId(e.target.value)}
+                      style={selSt}
+                    >
+                      <option value="">Select type</option>
+                      {vehicleTypes.map((vt) => (
+                        <option key={vt.id} value={vt.id}>{vt.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Capacity + Fuel Type */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                  <div>
+                    <label style={lblSt}>Capacity (tonnes) *</label>
+                    <input
+                      type="number"
+                      min={0.5}
+                      max={200}
+                      step={0.5}
+                      value={capacity}
+                      onChange={(e) => setCapacity(e.target.value)}
+                      placeholder="30"
+                      style={inSt}
+                    />
+                  </div>
+                  <div>
+                    <label style={lblSt}>Fuel Type *</label>
+                    <select
+                      value={fuelType}
+                      onChange={(e) => setFuelType(e.target.value)}
+                      style={selSt}
+                    >
+                      <option value="DIESEL">Diesel</option>
+                      <option value="PETROL">Petrol</option>
+                      <option value="ELECTRIC">Electric</option>
+                      <option value="HYBRID">Hybrid</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* VIN optional */}
                 <div style={{ marginBottom: 24 }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: 11,
-                    fontFamily: 'var(--font-mono)',
-                    textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em',
-                    color: 'var(--text-tertiary)',
-                    marginBottom: 6,
-                  }}>
-                    Vehicle Type
+                  <label style={lblSt}>
+                    VIN{' '}
+                    <span style={{ color: 'var(--text-tertiary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                      — optional
+                    </span>
                   </label>
-                  <select
-                    value={vehicleTypeId}
-                    onChange={(e) => setVehicleTypeId(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      background: 'var(--input-bg)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: 2,
-                      color: 'var(--text-primary)',
-                      fontSize: 13,
-                      outline: 'none',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {vehicleTypes.map((vt) => (
-                      <option key={vt.id} value={vt.id}>
-                        {vt.name}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    value={vin}
+                    onChange={(e) => setVin(e.target.value.toUpperCase())}
+                    placeholder="WDB9340321L123456"
+                    style={{ ...inSt, fontFamily: 'var(--font-mono)' }}
+                  />
                 </div>
 
                 <div style={{ display: 'flex', gap: 12 }}>

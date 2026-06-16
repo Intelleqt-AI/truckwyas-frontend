@@ -505,6 +505,9 @@ body {
 
 /* Metric Values */
 .metric-value {
+  /* Numbers render in the mono face everywhere — this class previously inherited
+     sans, so cards using it looked different from cards with inline mono. */
+  font-family: var(--font-mono);
   font-size: 28px;
   font-weight: 600;
   color: var(--text-primary);

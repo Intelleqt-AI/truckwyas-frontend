@@ -69,15 +69,15 @@ export default function PasswordReset() {
             </div>
 
             {error && (
-              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 4, fontSize: 12, color: 'var(--status-danger)' }}>
+              <div style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 4, fontSize: 12, color: 'var(--status-danger)' }}>
                 {error}
               </div>
             )}
 
             {step === 'request' ? (
-              <form onSubmit={requestReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <form onSubmit={requestReset} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
-                  <label style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, letterSpacing: '0.08em' }}>EMAIL ADDRESS</label>
+                  <label style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'block', marginBottom: 8, letterSpacing: '0.08em' }}>EMAIL ADDRESS</label>
                   <input
                     type="email" required value={email} onChange={e => setEmail(e.target.value)}
                     style={{ width: '100%', padding: '10px 12px', background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
@@ -89,14 +89,14 @@ export default function PasswordReset() {
                 </button>
               </form>
             ) : (
-              <form onSubmit={confirmReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <form onSubmit={confirmReset} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {[
                   { label: 'RESET CODE', val: code, set: setCode, type: 'text', ph: '6-digit code from email' },
                   { label: 'NEW PASSWORD', val: newPassword, set: setNewPassword, type: 'password', ph: 'Min 8 characters' },
                   { label: 'CONFIRM PASSWORD', val: confirm, set: setConfirm, type: 'password', ph: 'Repeat new password' },
                 ].map(f => (
                   <div key={f.label}>
-                    <label style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, letterSpacing: '0.08em' }}>{f.label}</label>
+                    <label style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'block', marginBottom: 8, letterSpacing: '0.08em' }}>{f.label}</label>
                     <input
                       type={f.type} required value={f.val} onChange={e => f.set(e.target.value)}
                       placeholder={f.ph}

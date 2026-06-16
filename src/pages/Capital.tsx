@@ -148,13 +148,13 @@ export default function Capital() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="card" style={{ padding: 24 }}>
+            <div key={i} className="card" style={{ padding: 20 }}>
               <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
               <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
             </div>
           ))}
         </div>
-        <div className="card" style={{ padding: 24 }}>
+        <div className="card" style={{ padding: 20 }}>
           <div style={{ height: 120, background: 'var(--bg-surface)', borderRadius: 4 }} />
         </div>
       </div>

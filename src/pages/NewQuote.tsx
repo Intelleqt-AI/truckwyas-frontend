@@ -445,7 +445,7 @@ export default function NewQuote() {
 
       {/* STEP 1: Route Entry */}
       {currentStep === 1 && (
-        <div className="card" style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+        <div className="card" style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Step 1: Route Details</div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
@@ -636,7 +636,7 @@ export default function NewQuote() {
 
       {/* STEP 2: Freight Details */}
       {currentStep === 2 && (
-        <div className="card" style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+        <div className="card" style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Step 2: Freight Details</div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
@@ -959,7 +959,7 @@ export default function NewQuote() {
 
       {/* STEP 3: Customer & Summary */}
       {currentStep === 3 && (
-        <div className="card" style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+        <div className="card" style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Step 3: Quote Summary</div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>

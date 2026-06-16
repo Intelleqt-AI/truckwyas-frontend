@@ -436,7 +436,7 @@ export default function Insights() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 24, borderBottom: '1px solid var(--border-subtle)', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 0, marginBottom: 24, borderBottom: '1px solid var(--border-subtle)', overflowX: 'auto' }}>
         {TABS.map(t => (
           <button
             key={t.id}
@@ -1780,7 +1780,7 @@ export default function Insights() {
                       .filter(r => r.rev_per_km > 0)
                       .sort((a, b) => b.rev_per_km - a.rev_per_km)
                       .slice(0, 8);
-                    if (routes.length === 0) return <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No route data for this period</div>;
+                    if (routes.length === 0) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No route data for this period</div>;
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         {/* Header row */}
@@ -1827,7 +1827,7 @@ export default function Insights() {
                     const types = Array.from(cargoMap.entries())
                       .map(([cargo, d]) => ({ cargo, trips: d.count, avg: d.total / d.count, total: d.total }))
                       .sort((a, b) => b.avg - a.avg);
-                    if (types.length === 0) return <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No cargo data</div>;
+                    if (types.length === 0) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No cargo data</div>;
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 60px 100px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>

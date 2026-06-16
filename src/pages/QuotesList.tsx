@@ -64,7 +64,7 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
       className="card"
       onClick={onClick}
     >
-      <div style={{ padding: 14, borderLeft: `2px solid ${STATUS_COLOR[quote.status] || 'var(--border-subtle)'}` }}>
+      <div style={{ padding: 12, borderLeft: `2px solid ${STATUS_COLOR[quote.status] || 'var(--border-subtle)'}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>{quote.quote_number}</div>
           {/* UPGRADE 1: Outcome badges */}
@@ -271,7 +271,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
           placeholder="Search loads, customers, routes..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '8px 12px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 12, outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
+          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 12, outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
         />
         <div style={{ display: 'flex', gap: 4 }}>
           {(['board', 'list'] as const).map(v => (
@@ -279,7 +279,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
               background: view === v ? 'var(--accent-primary)' : 'var(--bg-surface)',
               border: '1px solid var(--border-subtle)',
               color: view === v ? 'var(--bg-deep)' : 'var(--text-secondary)',
-              padding: '7px 14px',
+              padding: '6px 12px',
               borderRadius: 2,
               fontSize: 11,
               fontFamily: 'var(--font-mono)',
@@ -305,8 +305,8 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
           onDragEnd={handleDragEnd}
         >
           {/* Quotes Kanban */}
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 12 }}>QUOTES PIPELINE — DRAG TO UPDATE STATUS</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 28 }}>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 16 }}>QUOTES PIPELINE — DRAG TO UPDATE STATUS</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
             {COLUMNS.map(col => (
               <div key={col}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '0 2px' }}>
@@ -333,7 +333,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
           {/* Drag Overlay */}
           <DragOverlay>
             {activeQuote ? (
-              <div className="card" style={{ padding: 14, borderLeft: `2px solid ${STATUS_COLOR[activeQuote.status] || 'var(--border-subtle)'}`, opacity: 0.9, boxShadow: '0 8px 16px rgba(0,0,0,0.2)' }}>
+              <div className="card" style={{ padding: 12, borderLeft: `2px solid ${STATUS_COLOR[activeQuote.status] || 'var(--border-subtle)'}`, opacity: 0.9, boxShadow: '0 8px 16px rgba(0,0,0,0.2)' }}>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6 }}>{activeQuote.quote_number}</div>
                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{activeQuote.customer_name}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
@@ -360,7 +360,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                   background: statusFilter === status ? 'var(--accent-primary)' : 'var(--bg-surface)',
                   border: '1px solid var(--border-subtle)',
                   color: statusFilter === status ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                  padding: '7px 14px',
+                  padding: '6px 12px',
                   borderRadius: 2,
                   fontSize: 11,
                   fontFamily: 'var(--font-mono)',
@@ -445,7 +445,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                 ))}
               </tbody>
             </table>
-            {filteredQuotes.length === 0 && <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No quotes found</div>}
+            {filteredQuotes.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No quotes found</div>}
           </div>
         </>
       )}

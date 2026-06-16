@@ -97,7 +97,7 @@ export function BookingsList() {
       </motion.div>
 
       {/* Status Filter Buttons */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
         {['All', 'En-route', 'Delivered', 'Loading', 'Planned'].map(status => {
           const isActive = statusFilter === status;
           return (
@@ -108,7 +108,7 @@ export function BookingsList() {
                 background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
                 border: '1px solid var(--border-subtle)',
                 color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                padding: '7px 14px',
+                padding: '6px 12px',
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11,
                 borderRadius: 2,
@@ -133,25 +133,25 @@ export function BookingsList() {
         className="grid grid-cols-1 md:grid-cols-4 gap-4"
       >
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-5">
             <div className="text-display-h3 font-display-bold text-foreground text-tabular">{loadingData ? '...' : bookings.length}</div>
             <p className="text-caption text-muted-foreground">Total Bookings</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-5">
             <div className="text-display-h3 font-display-bold text-primary text-tabular">{loadingData ? '...' : bookings.filter(b => b.status === 'En-route').length}</div>
             <p className="text-caption text-muted-foreground">En-route</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-5">
             <div className="text-display-h3 font-display-bold text-success text-tabular">{loadingData ? '...' : bookings.filter(b => b.status === 'Delivered').length}</div>
             <p className="text-caption text-muted-foreground">Delivered</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-5">
             <div className="text-display-h3 font-display-bold text-warning text-tabular">{loadingData ? '...' : bookings.filter(b => b.invoiceStatus === 'Not Raised').length}</div>
             <p className="text-caption text-muted-foreground">Invoice Pending</p>
           </CardContent>
@@ -215,7 +215,7 @@ export function BookingsList() {
             </Table>
             
             {filteredBookings.length === 0 && (
-              <div className="text-center py-12">
+              <div className="text-center p-10">
                 <p className="text-muted-foreground">No bookings found</p>
               </div>
             )}

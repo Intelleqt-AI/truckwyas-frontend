@@ -167,7 +167,7 @@ export default function Drivers() {
   return (
     <div>
       {/* Page header */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
@@ -207,7 +207,7 @@ export default function Drivers() {
                 background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
                 border: '1px solid var(--border-subtle)',
                 color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                padding: '7px 14px',
+                padding: '6px 12px',
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11,
                 borderRadius: 2,
@@ -231,7 +231,7 @@ export default function Drivers() {
             <tr>
               {['Name', 'License', 'Status', 'Trips MTD', 'Revenue Generated', 'Performance', ''].map(h => (
                 <th key={h} style={{
-                  padding: '10px 20px', textAlign: 'left',
+                  padding: '12px 20px', textAlign: 'left',
                   fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
                   letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                   borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
@@ -273,7 +273,7 @@ export default function Drivers() {
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <td style={{ padding: '13px 20px', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
+                  <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{
                         width: 6,
@@ -285,10 +285,10 @@ export default function Drivers() {
                       {getDriverName(d)}
                     </div>
                   </td>
-                  <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
                     {d.license_number || '—'}
                   </td>
-                  <td style={{ padding: '13px 20px' }}>
+                  <td style={{ padding: '12px 20px' }}>
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 10,
                       color: STATUS_COLOR[d.status] || 'var(--text-secondary)',
@@ -297,13 +297,13 @@ export default function Drivers() {
                       {d.status?.replace('_', ' ')}
                     </span>
                   </td>
-                  <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
                     {d.trips_this_month ?? 0}
                   </td>
-                  <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
                     {d.revenue_generated ? formatZAR(d.revenue_generated) : '—'}
                   </td>
-                  <td style={{ padding: '13px 20px' }}>
+                  <td style={{ padding: '12px 20px' }}>
                     {efficiencyScore > 0 ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ flex: 1, maxWidth: 120, height: 6, background: 'var(--bg-surface-hover)', borderRadius: 3, overflow: 'hidden' }}>
@@ -323,7 +323,7 @@ export default function Drivers() {
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                     )}
                   </td>
-                  <td style={{ padding: '13px 20px', textAlign: 'right' }}>
+                  <td style={{ padding: '12px 20px', textAlign: 'right' }}>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

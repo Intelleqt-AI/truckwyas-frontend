@@ -109,7 +109,7 @@ const Signup = () => {
   const inputStyle: React.CSSProperties = {
     background: 'var(--bg-surface)',
     border: '1px solid var(--border-subtle)',
-    padding: '12px 14px',
+    padding: '10px 12px',
     color: 'var(--text-primary)',
     borderRadius: 2,
     fontSize: 13,
@@ -148,7 +148,7 @@ const Signup = () => {
         background: 'var(--bg-surface)',
         border: '1px solid var(--border-subtle)',
         borderRadius: 2,
-        padding: 32,
+        padding: 40,
       }}>
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
@@ -176,7 +176,7 @@ const Signup = () => {
               }}
             />
             {validationErrors.name && (
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
                 {validationErrors.name}
               </div>
             )}
@@ -211,7 +211,7 @@ const Signup = () => {
               }}
             />
             {validationErrors.email && (
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
                 {validationErrors.email}
               </div>
             )}
@@ -232,7 +232,7 @@ const Signup = () => {
               }}
             />
             {validationErrors.password && (
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
                 {validationErrors.password}
               </div>
             )}
@@ -253,7 +253,7 @@ const Signup = () => {
               }}
             />
             {validationErrors.confirmPassword && (
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
                 {validationErrors.confirmPassword}
               </div>
             )}
@@ -261,7 +261,7 @@ const Signup = () => {
 
           {error && (
             <div style={{
-              padding: '10px 14px',
+              padding: '12px 16px',
               background: 'var(--status-danger-bg)',
               border: '1px solid var(--status-danger)',
               borderRadius: 2,

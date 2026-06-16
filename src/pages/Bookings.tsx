@@ -106,7 +106,7 @@ export default function Bookings() {
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{load.load_number}</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{load.customer_name}</div>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           {/* Status dropdown */}
           <select
             value={load.status}
@@ -201,7 +201,7 @@ export default function Bookings() {
 
           {/* Actions */}
           <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 14 }}>Actions</div>
+            <div className="card-title" style={{ marginBottom: 16 }}>Actions</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
               {/* Convert to Invoice */}
@@ -226,7 +226,7 @@ export default function Bookings() {
 
               {convertResult && (
                 <div style={{
-                  padding: '10px 14px',
+                  padding: '12px 16px',
                   borderRadius: 4,
                   background: convertResult.error ? 'var(--status-danger-dim)' : 'var(--status-success-dim)',
                   border: `1px solid ${convertResult.error ? 'var(--status-danger)' : 'var(--status-success)'}`,

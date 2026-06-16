@@ -82,9 +82,9 @@ export default function RiskScoreView() {
       </div>
 
       {/* Portfolio KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
         {tiers.map(t => (
-          <div key={t} className="card" style={{ padding: 16, background: TIER_BG[t], border: `1px solid ${TIER_COLOR[t]}22` }}>
+          <div key={t} className="card" style={{ padding: 20, background: TIER_BG[t], border: `1px solid ${TIER_COLOR[t]}22` }}>
             <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: TIER_COLOR[t], marginBottom: 8, letterSpacing: '0.08em' }}>{t}</div>
             <div style={{ fontSize: 24, fontWeight: 600, color: TIER_COLOR[t] }}>{tierCounts[t] || 0}</div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{FEE_MAP[t] > 0 ? `${FEE_MAP[t]}% fee` : 'Not eligible'}</div>
@@ -92,11 +92,11 @@ export default function RiskScoreView() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24, marginBottom: 24 }}>
         {/* Portfolio score card */}
-        <div className="card" style={{ padding: 24 }}>
+        <div className="card" style={{ padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>PORTFOLIO OVERVIEW</div>
-          <div style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
             <ScoreRing score={avgScore} tier={avgScore >= 85 ? 'EXCELLENT' : avgScore >= 70 ? 'GOOD' : avgScore >= 55 ? 'FAIR' : 'ELEVATED'} />
             <div>
               <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Portfolio Score: {avgScore}/100</div>
@@ -107,7 +107,7 @@ export default function RiskScoreView() {
         </div>
 
         {/* Score factors legend */}
-        <div className="card" style={{ padding: 24 }}>
+        <div className="card" style={{ padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>SCORE FACTORS</div>
           {[
             { label: 'Payment History', weight: 35 },
@@ -117,7 +117,7 @@ export default function RiskScoreView() {
             { label: 'Relationship', weight: 10 },
             { label: 'Facility Use', weight: 5 },
           ].map(f => (
-            <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--border-row)' }}>
+            <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border-row)' }}>
               <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{f.label}</span>
               <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{f.weight} pts</span>
             </div>
@@ -143,7 +143,7 @@ export default function RiskScoreView() {
             <thead>
               <tr style={{ background: 'var(--bg-surface-hover)' }}>
                 {['CUSTOMER', 'SCORE', 'TIER', 'PAYMENT HIST', 'OVERDUE', 'POD', 'FAST PAY FEE', 'ELIGIBLE'].map(h => (
-                  <th key={h} style={{ padding: '10px 16px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textAlign: 'left', letterSpacing: '0.08em', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
+                  <th key={h} style={{ padding: '12px 16px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textAlign: 'left', letterSpacing: '0.08em', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
                 ))}
               </tr>
             </thead>

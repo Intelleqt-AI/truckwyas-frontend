@@ -184,7 +184,7 @@ export function Onboarding() {
                     textTransform: 'uppercase' as const,
                     letterSpacing: '0.08em',
                     color: 'var(--text-tertiary)',
-                    marginBottom: 6,
+                    marginBottom: 8,
                   }}>
                     Company Name *
                   </label>
@@ -196,7 +196,7 @@ export function Onboarding() {
                     autoFocus
                     style={{
                       width: '100%',
-                      padding: '10px 14px',
+                      padding: '10px 12px',
                       background: 'var(--input-bg)',
                       border: '1px solid var(--border-subtle)',
                       borderRadius: 2,
@@ -215,7 +215,7 @@ export function Onboarding() {
                     textTransform: 'uppercase' as const,
                     letterSpacing: '0.08em',
                     color: 'var(--text-tertiary)',
-                    marginBottom: 6,
+                    marginBottom: 8,
                   }}>
                     Industry
                   </label>
@@ -224,7 +224,7 @@ export function Onboarding() {
                     onChange={(e) => setIndustry(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '10px 14px',
+                      padding: '10px 12px',
                       background: 'var(--input-bg)',
                       border: '1px solid var(--border-subtle)',
                       borderRadius: 2,
@@ -252,7 +252,7 @@ export function Onboarding() {
                     textTransform: 'uppercase' as const,
                     letterSpacing: '0.08em',
                     color: 'var(--text-tertiary)',
-                    marginBottom: 6,
+                    marginBottom: 8,
                   }}>
                     Phone
                   </label>
@@ -263,7 +263,7 @@ export function Onboarding() {
                     placeholder="+27 11 123 4567"
                     style={{
                       width: '100%',
-                      padding: '10px 14px',
+                      padding: '10px 12px',
                       background: 'var(--input-bg)',
                       border: '1px solid var(--border-subtle)',
                       borderRadius: 2,

@@ -249,8 +249,8 @@ export default function Expenses() {
   };
 
   if (loading) return (
-    <div style={{ padding: 40 }}>
-      <div className="card" style={{ padding: 24, marginBottom: 16 }}>
+    <div>
+      <div className="card" style={{ padding: 20, marginBottom: 16 }}>
         <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
         <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
       </div>
@@ -523,13 +523,13 @@ export default function Expenses() {
 
       {/* Filters & Actions */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           <select
             value={categoryFilter}
             onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
             style={{
               background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-primary)', padding: '7px 12px',
+              color: 'var(--text-primary)', padding: '6px 10px',
               fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
             }}
           >
@@ -540,7 +540,7 @@ export default function Expenses() {
             onChange={e => { setVehicleFilter(e.target.value); setPage(1); }}
             style={{
               background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-primary)', padding: '7px 12px',
+              color: 'var(--text-primary)', padding: '6px 10px',
               fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
             }}
           >
@@ -552,7 +552,7 @@ export default function Expenses() {
             onChange={e => { setDateFilter(e.target.value); setPage(1); }}
             style={{
               background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-primary)', padding: '7px 12px',
+              color: 'var(--text-primary)', padding: '6px 10px',
               fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
             }}
           >
@@ -564,7 +564,7 @@ export default function Expenses() {
             onChange={e => { setSearch(e.target.value); setPage(1); }}
             style={{
               background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-primary)', padding: '7px 12px',
+              color: 'var(--text-primary)', padding: '6px 10px',
               fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, width: 240,
             }}
           />
@@ -575,7 +575,7 @@ export default function Expenses() {
             disabled={bulkDeleting}
             style={{
               fontSize: 11,
-              padding: '7px 12px',
+              padding: '6px 12px',
               background: 'var(--status-danger)',
               border: 'none',
               color: 'white',
@@ -636,7 +636,7 @@ export default function Expenses() {
                     <button
                       onClick={() => setEditingExpense(exp)}
                       className="btn-action"
-                      style={{ fontSize: 10, padding: '4px 8px' }}
+                      style={{ fontSize: 10, padding: '4px 12px' }}
                     >
                       EDIT
                     </button>
@@ -645,7 +645,7 @@ export default function Expenses() {
                       disabled={deletingId === exp.id}
                       style={{
                         fontSize: 10,
-                        padding: '4px 8px',
+                        padding: '4px 10px',
                         background: 'none',
                         border: '1px solid var(--status-danger)',
                         color: 'var(--status-danger)',
@@ -729,7 +729,7 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-backdrop)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="card" style={{ padding: 28, width: 480, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="card" style={{ padding: 20, width: 480, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>
             {expense ? 'Edit Expense' : 'Add Expense'}

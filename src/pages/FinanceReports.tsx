@@ -167,7 +167,7 @@ export default function FinanceReports() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 24, borderBottom: '1px solid var(--border-subtle)' }}>
+      <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--border-subtle)' }}>
         {TABS.map(t => (
           <button
             key={t.id}
@@ -181,7 +181,8 @@ export default function FinanceReports() {
               fontSize: 11,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              padding: '10px 16px',
+              padding: '12px 0',
+              marginRight: 24,
               cursor: 'pointer',
               marginBottom: -1,
               whiteSpace: 'nowrap',
@@ -197,7 +198,7 @@ export default function FinanceReports() {
         <>
           {/* TAB 1: P&L */}
           {tab === 'pl' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
                 {[
                   { label: 'Total Revenue', value: formatCurrency(financeData?.total_revenue || 0), color: 'var(--accent-primary)' },
@@ -324,7 +325,7 @@ export default function FinanceReports() {
 
           {/* TAB 2: Cash Flow */}
           {tab === 'cashflow' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {(() => {
                 const forecast = cashflowData?.forecast || [];
                 // Calculate next 30 days summary
@@ -415,7 +416,7 @@ export default function FinanceReports() {
 
           {/* TAB 3: Customer */}
           {tab === 'customer' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* Top customer metrics */}
               {(() => {
                 const topCustomers = financeData?.top_customers || customers
@@ -565,7 +566,7 @@ export default function FinanceReports() {
 
           {/* TAB 4: Aging */}
           {tab === 'aging' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* Header metrics */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                 {[
@@ -601,8 +602,8 @@ export default function FinanceReports() {
                 return (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: 20 }}>
                     {/* Bar Chart */}
-                    <div className="card" style={{ padding: 24 }}>
-                      <div className="card-header" style={{ marginBottom: 20 }}>
+                    <div className="card" style={{ padding: 20 }}>
+                      <div className="card-header" style={{ marginBottom: 16 }}>
                         <span className="card-title">Aging Analysis</span>
                       </div>
                       {buckets.map((bucket: any, idx: number) => {
@@ -642,8 +643,8 @@ export default function FinanceReports() {
                     </div>
 
                     {/* PieChart (Donut) */}
-                    <div className="card" style={{ padding: 24 }}>
-                      <div className="card-header" style={{ marginBottom: 20 }}>
+                    <div className="card" style={{ padding: 20 }}>
+                      <div className="card-header" style={{ marginBottom: 16 }}>
                         <span className="card-title">Distribution</span>
                       </div>
                       <ResponsiveContainer width="100%" height={300}>
@@ -723,7 +724,7 @@ export default function FinanceReports() {
 
           {/* TAB 5: Capital */}
           {tab === 'capital' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
                 {[
                   { label: 'Facility Limit', value: formatCurrency(facilities?.facility_limit || 0), color: 'var(--accent-primary)' },
@@ -745,7 +746,7 @@ export default function FinanceReports() {
               {/* Fee summary */}
               <div className="card" style={{ padding: 20 }}>
                 <div className="card-header"><span className="card-title">Fee Summary</span></div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20, marginTop: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 16 }}>
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>Total Fees Paid</div>
                     <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>

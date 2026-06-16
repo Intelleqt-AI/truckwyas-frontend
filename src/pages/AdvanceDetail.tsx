@@ -133,7 +133,7 @@ export default function AdvanceDetail() {
         {/* Left column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Amount summary card */}
-          <div className="card" style={{ padding: 24 }}>
+          <div className="card" style={{ padding: 20 }}>
             <div className="card-header" style={{ marginBottom: 16 }}>
               <span className="card-title">Amount Summary</span>
             </div>
@@ -155,7 +155,7 @@ export default function AdvanceDetail() {
           </div>
 
           {/* Invoice details */}
-          <div className="card" style={{ padding: 24 }}>
+          <div className="card" style={{ padding: 20 }}>
             <div className="card-header" style={{ marginBottom: 16 }}>
               <span className="card-title">Invoice Details</span>
             </div>
@@ -189,8 +189,8 @@ export default function AdvanceDetail() {
           </div>
 
           {/* Timeline */}
-          <div className="card" style={{ padding: 24 }}>
-            <div className="card-header" style={{ marginBottom: 20 }}>
+          <div className="card" style={{ padding: 20 }}>
+            <div className="card-header" style={{ marginBottom: 16 }}>
               <span className="card-title">Status Timeline</span>
             </div>
             <div style={{ display: 'grid', gap: 20 }}>

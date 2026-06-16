@@ -20,7 +20,8 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   fontSize: 11,
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
-  padding: '10px 18px',
+  padding: '12px 0',
+  marginRight: 24,
   cursor: 'pointer',
   marginBottom: -1,
 });
@@ -66,7 +67,7 @@ export default function FleetDashboard() {
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
         </div>
-        <div className="card" style={{ padding: 24 }}>
+        <div className="card" style={{ padding: 20 }}>
           <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
           <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
         </div>
@@ -81,7 +82,7 @@ export default function FleetDashboard() {
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
         </div>
-        <div className="card" style={{ padding: 24, color: 'var(--status-danger)' }}>
+        <div className="card" style={{ padding: 20, color: 'var(--status-danger)' }}>
           {error}
         </div>
       </div>
@@ -102,7 +103,7 @@ export default function FleetDashboard() {
       </div>
 
       {/* Stats — always visible */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
           { label: 'Total Vehicles', value: vehicles.length, color: 'var(--text-primary)' },
           { label: 'Active', value: activeVehicles, color: 'var(--accent-primary)' },

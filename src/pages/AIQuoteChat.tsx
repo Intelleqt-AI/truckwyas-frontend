@@ -230,11 +230,13 @@ export default function AIQuoteChat() {
             }
           });
 
-          if (response.transcription) {
-            setInput(response.transcription);
+          // Backend returns the transcript under `text` (legacy: `transcription`).
+          const transcript = response.text || response.transcription;
+          if (transcript) {
+            setInput(transcript);
             // Auto-send the transcription
             setTimeout(() => {
-              setInput(response.transcription);
+              setInput(transcript);
               handleSend();
             }, 100);
           }
@@ -263,39 +265,26 @@ export default function AIQuoteChat() {
     }
   };
 
-  const handleCreateQuote = async () => {
-    if (!quotePreview.pickup_location || !quotePreview.delivery_location || !quotePreview.cargo_description) {
-      alert('Please provide at least pickup location, delivery location, and cargo description');
+  const handleCreateQuote = () => {
+    if (!quotePreview.pickup_location || !quotePreview.delivery_location) {
+      alert('Please provide at least a pickup and delivery location first.');
       return;
     }
-
-    try {
-      setIsLoading(true);
-      const result = await postData({
-        url: 'api/v1/quotes/',
-        data: {
+    // Hand off to the full New Quote flow with the AI-parsed fields prefilled —
+    // the operator picks a customer and the live route/cost engine runs there.
+    // (Posting straight to the API fails: a quote needs a customer, base_rate,
+    // total_amount and valid_until, none of which the chat collects.)
+    navigate('/quotes/new', {
+      state: {
+        prefill: {
           pickup_location: quotePreview.pickup_location,
           delivery_location: quotePreview.delivery_location,
           cargo_description: quotePreview.cargo_description,
           weight: quotePreview.weight,
           vehicle_type: quotePreview.vehicle_type,
-          urgency: quotePreview.urgency,
-          distance: quotePreview.distance,
-          estimated_cost: quotePreview.estimated_cost
-        }
-      });
-
-      if (result.id) {
-        navigate(`/quotes/${result.id}`);
-      } else {
-        navigate('/quotes');
-      }
-    } catch (error: any) {
-      console.error('Failed to create quote:', error);
-      alert('Failed to create quote. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+        },
+      },
+    });
   };
 
   const canCreateQuote = Boolean(

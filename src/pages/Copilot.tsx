@@ -3,11 +3,40 @@ import { useNavigate } from 'react-router-dom';
 import { postData } from '@/lib/Api';
 
 interface Action { label: string; route: string; }
+interface ProposedAction {
+  type: string;
+  method: string;
+  endpoint: string;
+  body: Record<string, any>;
+  label: string;
+  detail?: string;
+  confirm_text?: string;
+  success_text?: string;
+}
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   actions?: Action[];
   source?: 'llm' | 'rules';
+  proposedAction?: ProposedAction | null;
+  actionState?: 'pending' | 'done' | 'dismissed' | 'error';
+  animate?: boolean;
+}
+
+// Lightweight typewriter for the streaming feel (used on freshly-arrived replies).
+function Typewriter({ text }: { text: string }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    setN(0);
+    let i = 0;
+    const id = setInterval(() => {
+      i += 2;
+      setN(Math.min(text.length, i));
+      if (i >= text.length) clearInterval(id);
+    }, 12);
+    return () => clearInterval(id);
+  }, [text]);
+  return <>{text.slice(0, n)}</>;
 }
 
 const STARTERS: { title: string; prompt: string; hint: string }[] = [
@@ -69,15 +98,52 @@ export default function Copilot() {
         content: res?.reply || 'Sorry, I could not produce a response.',
         actions: res?.actions || [],
         source: res?.source,
+        proposedAction: res?.proposed_action || null,
+        actionState: res?.proposed_action ? 'pending' : undefined,
+        animate: true,
       }]);
     } catch (e: any) {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: e?.message || 'Something went wrong reaching the copilot.',
+        animate: true,
       }]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const runAction = async (msgIndex: number, a: ProposedAction) => {
+    // mark this message's action as in-flight by flipping to done optimistically guarded below
+    setMessages(prev => prev.map((m, i) => i === msgIndex ? { ...m, actionState: 'pending' } : m));
+    setLoading(true);
+    try {
+      const res: any = await postData({ url: a.endpoint, data: a.body });
+      setMessages(prev => {
+        const next = prev.map((m, i) => i === msgIndex ? { ...m, actionState: 'done' as const } : m);
+        return [...next, {
+          role: 'assistant' as const,
+          content: a.success_text || 'Done.',
+          animate: true,
+          actions: [{ label: 'View in Fast Pay', route: res?.id ? `/capital/advances/${res.id}` : '/capital' }],
+        }];
+      });
+    } catch (e: any) {
+      setMessages(prev => {
+        const next = prev.map((m, i) => i === msgIndex ? { ...m, actionState: 'error' as const } : m);
+        return [...next, {
+          role: 'assistant' as const,
+          content: e?.message || 'That action could not be completed.',
+          animate: true,
+        }];
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const dismissAction = (msgIndex: number) => {
+    setMessages(prev => prev.map((m, i) => i === msgIndex ? { ...m, actionState: 'dismissed' } : m));
   };
 
   const reset = () => { setMessages([INTRO]); setInput(''); setAiAvailable(null); };
@@ -167,8 +233,10 @@ export default function Copilot() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-              {messages.slice(1).map((m, i) => (
-                <div key={i} className="cp-msg" style={{ display: 'flex', gap: 12, flexDirection: m.role === 'user' ? 'row-reverse' : 'row' }}>
+              {messages.slice(1).map((m, i) => {
+                const realIndex = i + 1;
+                return (
+                <div key={realIndex} className="cp-msg" style={{ display: 'flex', gap: 12, flexDirection: m.role === 'user' ? 'row-reverse' : 'row' }}>
                   {/* avatar */}
                   <div style={{
                     flexShrink: 0, width: 30, height: 30, borderRadius: 8, display: 'grid', placeItems: 'center',
@@ -190,8 +258,52 @@ export default function Copilot() {
                       color: m.role === 'user' ? 'var(--bg-deep)' : 'var(--text-primary)',
                       border: m.role === 'user' ? 'none' : '1px solid var(--border-subtle)',
                     }}>
-                      {m.content}
+                      {m.role === 'assistant' && m.animate ? <Typewriter text={m.content} /> : m.content}
                     </div>
+                    {/* Confirmable action card */}
+                    {m.proposedAction && (m.actionState === 'pending') && (
+                      <div style={{
+                        marginTop: 10, padding: 14, width: '100%',
+                        background: 'var(--bg-surface)', border: '1px solid var(--border-active)', borderRadius: 12,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <span style={{ color: 'var(--accent-primary)' }}><SparkIcon size={14} /></span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{m.proposedAction.label}</span>
+                        </div>
+                        {m.proposedAction.detail && (
+                          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>{m.proposedAction.detail}</div>
+                        )}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={() => runAction(realIndex, m.proposedAction!)}
+                            disabled={loading}
+                            style={{
+                              background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none',
+                              padding: '8px 14px', borderRadius: 8, cursor: loading ? 'default' : 'pointer',
+                              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase',
+                            }}
+                          >
+                            {m.proposedAction.confirm_text || 'Confirm'}
+                          </button>
+                          <button
+                            onClick={() => dismissAction(realIndex)}
+                            style={{
+                              background: 'none', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)',
+                              padding: '8px 14px', borderRadius: 8, cursor: 'pointer',
+                              fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase',
+                            }}
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {m.proposedAction && m.actionState === 'done' && (
+                      <div style={{ marginTop: 8, fontSize: 11, color: 'var(--status-success)', fontFamily: 'var(--font-mono)' }}>✓ Confirmed</div>
+                    )}
+                    {m.proposedAction && m.actionState === 'dismissed' && (
+                      <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>Dismissed</div>
+                    )}
                     {m.actions && m.actions.length > 0 && (
                       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                         {m.actions.map((a, j) => (
@@ -214,7 +326,8 @@ export default function Copilot() {
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {loading && (
                 <div className="cp-msg" style={{ display: 'flex', gap: 12 }}>
                   <div style={{

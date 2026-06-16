@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { postData, patchData, fetchData } from "@/lib/Api";
 
@@ -97,6 +97,7 @@ interface MarketBenchmark {
 
 export default function NewQuote() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id: editId } = useParams();
   const isEditing = !!editId;
   const [currentStep, setCurrentStep] = useState(1);
@@ -362,6 +363,20 @@ export default function NewQuote() {
       });
     return () => { cancelled = true; };
   }, [editId]);
+
+  // Prefill from the AI Quote Chat hand-off (navigate('/quotes/new', { state: { prefill }})).
+  useEffect(() => {
+    if (isEditing) return;
+    const p = (location.state as any)?.prefill;
+    if (!p) return;
+    if (p.pickup_location) setPickupLocation(p.pickup_location);
+    if (p.delivery_location) setDeliveryLocation(p.delivery_location);
+    if (p.weight != null && p.weight !== '') setWeight(String(p.weight));
+    if (p.cargo_description) setCargoDescription(p.cargo_description);
+    const VALID: VehicleType[] = ['Flatbed', 'Tautliner', 'Refrigerated', 'Box Truck', 'Tanker', 'Danger Load'];
+    if (p.vehicle_type && VALID.includes(p.vehicle_type)) setVehicleType(p.vehicle_type);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Cost calculations
   const distanceKm = routeData?.distance_km || 0;

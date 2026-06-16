@@ -25,7 +25,7 @@ export default function AdvanceRequest() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(preSelectedId);
   const [bankAccount, setBankAccount] = useState(''); // Placeholder for now
 
-  const selectedInvoice = invoices.find(inv => inv.id === selectedInvoiceId);
+  const selectedInvoice = invoices.find(inv => String(inv.id) === String(selectedInvoiceId));
   const tier = selectedInvoice?.risk_tier || selectedInvoice?.tier || 'standard';
   const amount = selectedInvoice?.total_amount || selectedInvoice?.amount || 0;
   const feeRate = TIER_FEE[tier] || 0.025;
@@ -181,14 +181,14 @@ export default function AdvanceRequest() {
                   {invoices.map(inv => (
                     <tr
                       key={inv.id}
-                      style={{ cursor: 'pointer', background: selectedInvoiceId === inv.id ? 'var(--bg-surface-hover)' : 'transparent' }}
-                      onClick={() => setSelectedInvoiceId(inv.id)}
+                      style={{ cursor: 'pointer', background: selectedInvoiceId === String(inv.id) ? 'var(--bg-surface-hover)' : 'transparent' }}
+                      onClick={() => setSelectedInvoiceId(String(inv.id))}
                     >
                       <td>
                         <input
                           type="radio"
-                          checked={selectedInvoiceId === inv.id}
-                          onChange={() => setSelectedInvoiceId(inv.id)}
+                          checked={selectedInvoiceId === String(inv.id)}
+                          onChange={() => setSelectedInvoiceId(String(inv.id))}
                           style={{ cursor: 'pointer' }}
                         />
                       </td>

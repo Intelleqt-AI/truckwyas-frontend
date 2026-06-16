@@ -55,8 +55,8 @@ export default function FleetDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const activeVehicles = vehicles.filter(v => v.status === 'IN_TRANSIT' || v.status === 'LOADING').length;
-  const idleVehicles = vehicles.filter(v => v.status === 'IDLE').length;
+  const activeVehicles = vehicles.filter(v => v.status === 'IN_USE').length;
+  const idleVehicles = vehicles.filter(v => v.status === 'AVAILABLE').length;
   const inMaintenance = vehicles.filter(v => v.status === 'MAINTENANCE').length;
   const activeDrivers = drivers.filter(d => d.status === 'ACTIVE').length;
 
@@ -136,7 +136,7 @@ export default function FleetDashboard() {
             <tbody>
               {vehicles.map(v => (
                 <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/vehicles/${v.id}`)}>
-                  <td className="mono">{v.registration || '—'}</td>
+                  <td className="mono">{v.plate || v.registration || '—'}</td>
                   <td>{v.make || ''} {v.model || ''}</td>
                   <td>{v.driver || '—'}</td>
                   <td>
@@ -169,9 +169,9 @@ export default function FleetDashboard() {
             <tbody>
               {drivers.map(d => (
                 <tr key={d.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/drivers/${d.id}`)}>
-                  <td>{d.name || '—'}</td>
-                  <td className="mono">{d.code || '—'}</td>
-                  <td className="mono">{d.trips !== undefined ? d.trips : '—'}</td>
+                  <td>{(d.user_details ? `${d.user_details.first_name || ''} ${d.user_details.last_name || ''}`.trim() : '') || d.name || `Driver ${d.id}`}</td>
+                  <td className="mono">{d.license_number || '—'}</td>
+                  <td className="mono">{d.total_trips ?? '—'}</td>
                   <td style={{ color: d.onTime >= 90 ? 'var(--accent-primary)' : d.onTime >= 80 ? 'var(--status-warning)' : 'var(--status-danger)', fontFamily: 'var(--font-mono)' }}>
                     {d.onTime !== undefined ? `${d.onTime}%` : '—'}
                   </td>

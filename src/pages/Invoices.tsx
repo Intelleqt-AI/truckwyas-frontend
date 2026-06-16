@@ -269,11 +269,16 @@ export default function Invoices() {
     }
   };
 
-  const handleDownloadPDF = (e: React.MouseEvent, invoiceId: string) => {
+  const handleDownloadPDF = async (e: React.MouseEvent, invoiceId: string) => {
     e.stopPropagation();
-    const url = `/api/v1/invoices/${invoiceId}/generate_pdf/`;
-    window.open(import.meta.env.VITE_API_URL + url, '_blank');
-    setToast('PDF downloading...');
+    // generate_pdf is POST-only and returns a pdf_url; window.open(GET) 405s.
+    try {
+      const result = await postData({ url: `api/v1/invoices/${invoiceId}/generate_pdf/`, data: {} });
+      if (result?.pdf_url) window.open(result.pdf_url, '_blank');
+      setToast('PDF ready');
+    } catch {
+      setToast('Could not generate PDF');
+    }
     setTimeout(() => setToast(null), 3000);
   };
 
@@ -343,9 +348,9 @@ export default function Invoices() {
       {/* Tab Navigation */}
       <div style={{
         borderBottom: '1px solid var(--border-subtle)',
-        marginBottom: 32,
+        marginBottom: 20,
         display: 'flex',
-        gap: 32,
+        gap: 24,
       }}>
         {([
           { id: 'invoices', label: 'Invoices' },
@@ -360,6 +365,7 @@ export default function Invoices() {
               borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
               color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
               padding: '12px 0',
+              marginBottom: -1,
               fontSize: 13,
               fontWeight: activeTab === tab.id ? 600 : 400,
               cursor: 'pointer',
@@ -407,7 +413,7 @@ export default function Invoices() {
                 maxWidth: 600,
                 maxHeight: '90vh',
                 overflow: 'auto',
-                padding: 24,
+                padding: 20,
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                   <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -529,7 +535,7 @@ export default function Invoices() {
                       value={expenseForm.amount}
                       onChange={(e) => handleExpenseFormChange('amount', e.target.value)}
                       placeholder="0.00"
-                      readOnly={expenseForm.category === 'FUEL' && expenseForm.litres && expenseForm.price_per_litre}
+                      readOnly={Boolean(expenseForm.category === 'FUEL' && expenseForm.litres && expenseForm.price_per_litre)}
                       style={{
                         width: '100%',
                         background: 'var(--bg-surface)',
@@ -743,7 +749,7 @@ export default function Invoices() {
           )}
 
           {/* Filters */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               type="text"
               placeholder="Search expenses..."
@@ -752,7 +758,7 @@ export default function Invoices() {
               style={{
                 background: 'var(--bg-surface)',
                 border: '1px solid var(--border-subtle)',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 color: 'var(--text-primary)',
                 borderRadius: 2,
                 fontSize: 12,
@@ -767,7 +773,7 @@ export default function Invoices() {
               style={{
                 background: 'var(--bg-surface)',
                 border: '1px solid var(--border-subtle)',
-                padding: '7px 12px',
+                padding: '6px 10px',
                 color: 'var(--text-primary)',
                 borderRadius: 2,
                 fontSize: 11,
@@ -780,7 +786,7 @@ export default function Invoices() {
                 <option key={c} value={c}>{c === 'All' ? 'All Categories' : c.replace('_', ' ')}</option>
               ))}
             </select>
-            <div style={{ display: 'flex', gap: 4 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
               {expenseStatuses.map(s => (
                 <button
                   key={s}
@@ -789,7 +795,7 @@ export default function Invoices() {
                     background: expenseStatusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
                     border: '1px solid var(--border-subtle)',
                     color: expenseStatusFilter === s ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                    padding: '7px 14px',
+                    padding: '6px 12px',
                     fontFamily: 'var(--font-mono)',
                     fontSize: 11,
                     borderRadius: 2,
@@ -903,14 +909,14 @@ export default function Invoices() {
                               </span>
                             </td>
                             <td className="text-right">
-                              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                                 {exp.status === 'PENDING' && (
                                   <>
                                     <button
                                       className="btn-action"
                                       style={{
                                         fontSize: 10,
-                                        padding: '4px 8px',
+                                        padding: '4px 12px',
                                         background: 'var(--status-success)',
                                         border: 'none',
                                       }}
@@ -922,7 +928,7 @@ export default function Invoices() {
                                       className="btn-action"
                                       style={{
                                         fontSize: 10,
-                                        padding: '4px 8px',
+                                        padding: '4px 12px',
                                         background: 'var(--status-danger)',
                                         border: 'none',
                                       }}
@@ -936,7 +942,7 @@ export default function Invoices() {
                                   className="btn-action"
                                   style={{
                                     fontSize: 10,
-                                    padding: '4px 8px',
+                                    padding: '4px 10px',
                                     background: 'transparent',
                                     border: '1px solid var(--border-subtle)',
                                     color: 'var(--text-secondary)',
@@ -949,7 +955,7 @@ export default function Invoices() {
                                   className="btn-action"
                                   style={{
                                     fontSize: 10,
-                                    padding: '4px 8px',
+                                    padding: '4px 10px',
                                     background: 'transparent',
                                     border: '1px solid var(--status-danger)',
                                     color: 'var(--status-danger)',
@@ -1032,19 +1038,19 @@ export default function Invoices() {
       )}
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, alignItems: 'center' }}>
         <input
           type="text" placeholder="Search invoices..."
           value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
-          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '8px 12px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 12, outline: 'none', width: 220, fontFamily: 'var(--font-sans)' }}
+          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 12, outline: 'none', width: 220, fontFamily: 'var(--font-sans)' }}
         />
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           {statuses.map(s => (
             <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }} style={{
               background: statusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
               border: '1px solid var(--border-subtle)',
               color: statusFilter === s ? 'var(--bg-deep)' : 'var(--text-secondary)',
-              padding: '7px 14px',
+              padding: '6px 12px',
               fontFamily: 'var(--font-mono)',
               fontSize: 11,
               borderRadius: 2,
@@ -1127,19 +1133,19 @@ export default function Invoices() {
                     </div>
                   </td>
                   <td className="text-right" onClick={e => e.stopPropagation()}>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                       {invStatus === 'DRAFT' && (
-                        <button className="btn-action" style={{ fontSize: 10, padding: '4px 8px' }} onClick={(e) => handleSendInvoice(e, inv.id)} disabled={sendingId === inv.id}>
+                        <button className="btn-action" style={{ fontSize: 10, padding: '4px 12px' }} onClick={(e) => handleSendInvoice(e, inv.id)} disabled={sendingId === inv.id}>
                           {sendingId === inv.id ? 'SENDING...' : 'SEND'}
                         </button>
                       )}
                       {invStatus === 'OVERDUE' && (
-                        <button className="btn-action" style={{ fontSize: 10, padding: '4px 8px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={(e) => handleSendReminder(e, inv.id)} disabled={sendingReminderId === inv.id}>
+                        <button className="btn-action" style={{ fontSize: 10, padding: '4px 10px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={(e) => handleSendReminder(e, inv.id)} disabled={sendingReminderId === inv.id}>
                           {sendingReminderId === inv.id ? 'SENDING...' : 'REMIND'}
                         </button>
                       )}
                       {invStatus !== 'DRAFT' && (
-                        <button className="btn-action" style={{ fontSize: 10, padding: '4px 8px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={(e) => handleDownloadPDF(e, inv.id)}>
+                        <button className="btn-action" style={{ fontSize: 10, padding: '4px 10px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={(e) => handleDownloadPDF(e, inv.id)}>
                           PDF
                         </button>
                       )}

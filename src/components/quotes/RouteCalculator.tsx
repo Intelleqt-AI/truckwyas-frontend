@@ -59,12 +59,12 @@ export const RouteCalculator: React.FC<RouteCalculatorProps> = ({
     setRouteData(null);
 
     try {
-      const data = await postData('/api/v1/route/calculate/', {
+      const data = await postData({ url: 'api/v1/route/calculate/', data: {
         origin: origin.trim(),
         destination: destination.trim(),
         vehicle_type: 'truck',
         weight_kg: 20000,
-      });
+      } });
 
       if (data.success) {
         setRouteData(data);

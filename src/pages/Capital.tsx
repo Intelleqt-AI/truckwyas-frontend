@@ -148,13 +148,13 @@ export default function Capital() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="card" style={{ padding: 24 }}>
+            <div key={i} className="card" style={{ padding: 20 }}>
               <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
               <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
             </div>
           ))}
         </div>
-        <div className="card" style={{ padding: 24 }}>
+        <div className="card" style={{ padding: 20 }}>
           <div style={{ height: 120, background: 'var(--bg-surface)', borderRadius: 4 }} />
         </div>
       </div>
@@ -346,21 +346,24 @@ export default function Capital() {
             </thead>
             <tbody>
               {eligibleInvoices.map(inv => {
-                const tier = inv.risk_tier || inv.tier || 'standard';
-                const amount = inv.total_amount || inv.amount || 0;
-                const feeNum = tier === 'prime' ? 0.02 : 0.025;
-                const netPayout = amount * (1 - feeNum);
+                const tier = String(inv.risk_tier || inv.tier || 'standard');
+                const tierKey = tier.toLowerCase();
+                const amount = Number(inv.total_amount || inv.amount || inv.invoice_amount || 0);
+                // Use the backend's computed fee/net; only estimate if absent.
+                const feePct = inv.fee_rate_pct ?? inv.fee_percent;
+                const netPayout = inv.net_payout_zar ?? (amount * (1 - (feePct != null ? Number(feePct) / 100 : 0.025)));
+                const feeLabel = feePct != null ? `${Number(feePct).toFixed(1)}%` : (TIER_FEE[tierKey] || '—');
                 return (
                   <tr key={inv.id}>
                     <td className="mono">{inv.invoice_number || inv.invoiceNumber}</td>
                     <td>{inv.customer_name || inv.customerName}</td>
                     <td className="mono">{formatCurrency(amount)}</td>
                     <td>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: TIER_COLOR[tier], background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: TIER_COLOR[tierKey], background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase' }}>
                         {tier}
                       </span>
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{TIER_FEE[tier]}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{feeLabel}</td>
                     <td style={{ color: 'var(--status-success)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(netPayout)}</td>
                     <td className="text-right">
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>

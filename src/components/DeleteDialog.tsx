@@ -57,7 +57,7 @@ export const DeleteDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg z-[999]" overlayClassName="z-[999]">
+      <DialogContent className="sm:max-w-lg z-[999]">
         <DialogHeader className="flex flex-row items-center gap-3">
           <div
             className={`flex-shrink-0 w-10 h-10 ${isArchive ? "bg-gray-100" : "bg-red-100"

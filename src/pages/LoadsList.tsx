@@ -60,8 +60,8 @@ export default function LoadsList() {
         data: {}
       });
 
-      if (response?.id) {
-        navigate(`/finance/invoices/${response.id}`);
+      if (response?.invoice_id) {
+        navigate(`/finance/invoices/${response.invoice_id}`);
       }
     } catch (err) {
       console.error('Failed to convert load to invoice:', err);
@@ -130,14 +130,14 @@ export default function LoadsList() {
               onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
-              <td style={{ padding: '14px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 600 }}>{load.load_number}</td>
-              <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-primary)' }}>{load.customer_name || '—'}</td>
-              <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>
+              <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 600 }}>{load.load_number}</td>
+              <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-primary)' }}>{load.customer_name || '—'}</td>
+              <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>
                 {load.pickup_location} → {load.delivery_location}
               </td>
-              <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>{load.driver_name || '—'}</td>
-              <td style={{ padding: '14px 16px', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{load.vehicle_info || '—'}</td>
-              <td style={{ padding: '14px 16px' }}>
+              <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>{load.driver_name || '—'}</td>
+              <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{load.vehicle_info || '—'}</td>
+              <td style={{ padding: '12px 16px' }}>
                 <span style={{
                   fontFamily: 'var(--font-mono)', fontSize: 10,
                   color: STATUS_COLOR[load.status] || 'var(--text-secondary)',
@@ -148,10 +148,10 @@ export default function LoadsList() {
                   {load.status?.replace('_', ' ')}
                 </span>
               </td>
-              <td style={{ padding: '14px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600 }}>
+              <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600 }}>
                 {formatCurrency(parseFloat(load.total_amount || '0'))}
               </td>
-              <td style={{ padding: '14px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+              <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                 {showInvoiceAction && load.status === 'DELIVERED' && (
                   <button
                     onClick={(e) => handleConvertToInvoice(load, e)}
@@ -177,7 +177,7 @@ export default function LoadsList() {
       </table>
       {data.length === 0 && (
         loads.length === 0 ? (
-          <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div style={{ padding: '40px 20px', textAlign: 'center' }}>
             <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>📦</div>
             <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>
               No loads yet
@@ -202,7 +202,7 @@ export default function LoadsList() {
     return (
       <div style={{ padding: 40 }}>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 20 }}>Bookings</div>
-        <div className="card" style={{ padding: 24 }}>
+        <div className="card" style={{ padding: 20 }}>
           <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
           <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
         </div>
@@ -248,7 +248,7 @@ export default function LoadsList() {
       </div>
 
       {/* Tab Navigation */}
-      <div style={{ display: 'flex', gap: 24, borderBottom: '1px solid var(--border-subtle)', marginBottom: 24 }}>
+      <div style={{ display: 'flex', gap: 24, borderBottom: '1px solid var(--border-subtle)', marginBottom: 20 }}>
         {([
           { id: 'quotes' as BookingTab, label: 'Quotes' },
           { id: 'orders' as BookingTab, label: 'Orders' },
@@ -307,7 +307,7 @@ export default function LoadsList() {
           </div>
 
           {/* Order Status Filter */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
             {['All', 'PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].map(status => {
               const isActive = orderFilter === status;
               return (
@@ -318,7 +318,7 @@ export default function LoadsList() {
                     background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
                     border: '1px solid var(--border-subtle)',
                     color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                    padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 11,
+                    padding: '6px 12px', fontFamily: 'var(--font-mono)', fontSize: 11,
                     borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase',
                     letterSpacing: '0.06em', fontWeight: isActive ? 600 : 400,
                     transition: 'all 0.2s ease'
@@ -353,17 +353,17 @@ export default function LoadsList() {
           </div>
 
           {/* History Filters */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center' }}>
             <input
               type="text" placeholder="Search history..."
               value={historySearch} onChange={e => setHistorySearch(e.target.value)}
               style={{
                 background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                padding: '8px 12px', color: 'var(--text-primary)', borderRadius: 2,
+                padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2,
                 fontSize: 12, outline: 'none', width: 220, fontFamily: 'var(--font-sans)',
               }}
             />
-            <div style={{ display: 'flex', gap: 4 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
               {['All', 'DELIVERED', 'INVOICED', 'CANCELLED'].map(status => {
                 const isActive = historyFilter === status;
                 return (
@@ -374,7 +374,7 @@ export default function LoadsList() {
                       background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
                       border: '1px solid var(--border-subtle)',
                       color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                      padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 11,
+                      padding: '6px 12px', fontFamily: 'var(--font-mono)', fontSize: 11,
                       borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase',
                       letterSpacing: '0.06em', fontWeight: isActive ? 600 : 400,
                       transition: 'all 0.2s ease'

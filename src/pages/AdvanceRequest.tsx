@@ -25,7 +25,7 @@ export default function AdvanceRequest() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(preSelectedId);
   const [bankAccount, setBankAccount] = useState(''); // Placeholder for now
 
-  const selectedInvoice = invoices.find(inv => inv.id === selectedInvoiceId);
+  const selectedInvoice = invoices.find(inv => String(inv.id) === String(selectedInvoiceId));
   const tier = selectedInvoice?.risk_tier || selectedInvoice?.tier || 'standard';
   const amount = selectedInvoice?.total_amount || selectedInvoice?.amount || 0;
   const feeRate = TIER_FEE[tier] || 0.025;
@@ -130,7 +130,7 @@ export default function AdvanceRequest() {
       </div>
 
       {/* Step counter */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 24 }}>
         {[1, 2, 3].map(s => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
@@ -152,7 +152,7 @@ export default function AdvanceRequest() {
       </div>
 
       {error && (
-        <div className="card" style={{ padding: 16, marginBottom: 20, background: 'var(--status-danger)', color: 'white', fontSize: 13 }}>
+        <div className="card" style={{ padding: '12px 16px', marginBottom: 16, background: 'var(--status-danger)', color: 'white', fontSize: 13 }}>
           {error}
         </div>
       )}
@@ -181,14 +181,14 @@ export default function AdvanceRequest() {
                   {invoices.map(inv => (
                     <tr
                       key={inv.id}
-                      style={{ cursor: 'pointer', background: selectedInvoiceId === inv.id ? 'var(--bg-surface-hover)' : 'transparent' }}
-                      onClick={() => setSelectedInvoiceId(inv.id)}
+                      style={{ cursor: 'pointer', background: selectedInvoiceId === String(inv.id) ? 'var(--bg-surface-hover)' : 'transparent' }}
+                      onClick={() => setSelectedInvoiceId(String(inv.id))}
                     >
                       <td>
                         <input
                           type="radio"
-                          checked={selectedInvoiceId === inv.id}
-                          onChange={() => setSelectedInvoiceId(inv.id)}
+                          checked={selectedInvoiceId === String(inv.id)}
+                          onChange={() => setSelectedInvoiceId(String(inv.id))}
                           style={{ cursor: 'pointer' }}
                         />
                       </td>
@@ -239,8 +239,8 @@ export default function AdvanceRequest() {
 
       {/* STEP 2: Fee breakdown */}
       {step === 2 && selectedInvoice && (
-        <div className="card" style={{ padding: 24 }}>
-          <div className="card-header" style={{ marginBottom: 20 }}>
+        <div className="card" style={{ padding: 20 }}>
+          <div className="card-header" style={{ marginBottom: 16 }}>
             <span className="card-title">Step 2: Fee Breakdown</span>
           </div>
           <div style={{ marginBottom: 24, padding: 16, background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
@@ -285,7 +285,7 @@ export default function AdvanceRequest() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 32 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 24 }}>
             <button
               className="btn-action"
               style={{ padding: '10px 20px', background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11 }}
@@ -306,8 +306,8 @@ export default function AdvanceRequest() {
 
       {/* STEP 3: Confirmation */}
       {step === 3 && selectedInvoice && (
-        <div className="card" style={{ padding: 24 }}>
-          <div className="card-header" style={{ marginBottom: 20 }}>
+        <div className="card" style={{ padding: 20 }}>
+          <div className="card-header" style={{ marginBottom: 16 }}>
             <span className="card-title">Step 3: Confirm Request</span>
           </div>
 

@@ -181,7 +181,7 @@ export function Onboarding() {
         <div style={{ marginBottom: 32 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-              STEP {step} OF 3
+              STEP {step} OF 2
             </span>
             <button onClick={handleSkip} style={{
               background: 'none', border: 'none', color: 'var(--text-tertiary)',
@@ -193,7 +193,7 @@ export function Onboarding() {
           <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
             <div style={{
               height: '100%',
-              width: `${(step / 3) * 100}%`,
+              width: `${(step / 2) * 100}%`,
               background: 'var(--accent-primary)',
               borderRadius: 2,
               transition: 'width 0.3s ease',
@@ -227,7 +227,7 @@ export function Onboarding() {
                     textTransform: 'uppercase' as const,
                     letterSpacing: '0.08em',
                     color: 'var(--text-tertiary)',
-                    marginBottom: 6,
+                    marginBottom: 8,
                   }}>
                     Company Name *
                   </label>
@@ -239,7 +239,7 @@ export function Onboarding() {
                     autoFocus
                     style={{
                       width: '100%',
-                      padding: '10px 14px',
+                      padding: '10px 12px',
                       background: 'var(--input-bg)',
                       border: '1px solid var(--border-subtle)',
                       borderRadius: 2,
@@ -258,7 +258,7 @@ export function Onboarding() {
                     textTransform: 'uppercase' as const,
                     letterSpacing: '0.08em',
                     color: 'var(--text-tertiary)',
-                    marginBottom: 6,
+                    marginBottom: 8,
                   }}>
                     Industry
                   </label>
@@ -267,7 +267,7 @@ export function Onboarding() {
                     onChange={(e) => setIndustry(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '10px 14px',
+                      padding: '10px 12px',
                       background: 'var(--input-bg)',
                       border: '1px solid var(--border-subtle)',
                       borderRadius: 2,
@@ -295,7 +295,7 @@ export function Onboarding() {
                     textTransform: 'uppercase' as const,
                     letterSpacing: '0.08em',
                     color: 'var(--text-tertiary)',
-                    marginBottom: 6,
+                    marginBottom: 8,
                   }}>
                     Phone
                   </label>
@@ -306,7 +306,7 @@ export function Onboarding() {
                     placeholder="+27 11 123 4567"
                     style={{
                       width: '100%',
-                      padding: '10px 14px',
+                      padding: '10px 12px',
                       background: 'var(--input-bg)',
                       border: '1px solid var(--border-subtle)',
                       borderRadius: 2,
@@ -330,8 +330,9 @@ export function Onboarding() {
           </div>
         )}
 
-        {/* Step 2: Add First Vehicle */}
-        {step === 2 && (
+        {/* Vehicle step removed from onboarding — vehicles are optional and
+            added later from Fleet (the full vehicle form lives there). */}
+        {false && (
           <div>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
@@ -497,15 +498,16 @@ export function Onboarding() {
           </div>
         )}
 
-        {/* Step 3: Done */}
-        {step === 3 && (
+        {/* Step 2: You're all set */}
+        {step === 2 && (
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>🚛</div>
             <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
               You're All Set!
             </div>
             <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 32, lineHeight: 1.6 }}>
-              Your account is ready. Start managing your fleet, creating quotes, and tracking loads.
+              Your business is ready. Jump in and create your first quote — you can add
+              vehicles, drivers and staff any time from the app.
             </div>
 
             <button
@@ -517,7 +519,7 @@ export function Onboarding() {
             </button>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12 }}>
-              <a href="/bookings/new" style={{
+              <a href="/quotes/new" style={{
                 padding: '10px',
                 background: 'var(--bg-deep)',
                 border: '1px solid var(--border-subtle)',
@@ -526,7 +528,7 @@ export function Onboarding() {
                 textDecoration: 'none',
                 display: 'block',
               }}>
-                + Add Load
+                + Create a quote
               </a>
               <a href="/fleet" style={{
                 padding: '10px',
@@ -537,7 +539,7 @@ export function Onboarding() {
                 textDecoration: 'none',
                 display: 'block',
               }}>
-                + Add Driver
+                + Add a vehicle
               </a>
             </div>
           </div>

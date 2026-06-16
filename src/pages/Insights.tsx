@@ -196,6 +196,14 @@ export default function Insights() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [briefing, setBriefing] = useState<{ narrative?: string; ai_available?: boolean } | null>(null);
+
+  // AI executive briefing (Claude when configured, deterministic summary otherwise)
+  useEffect(() => {
+    fetchData('api/v1/dashboard/briefing/')
+      .then(setBriefing)
+      .catch(() => setBriefing(null));
+  }, []);
 
   // Build period params
   const getPeriodParams = (): string => {
@@ -428,7 +436,7 @@ export default function Insights() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 24, borderBottom: '1px solid var(--border-subtle)', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 0, marginBottom: 24, borderBottom: '1px solid var(--border-subtle)', overflowX: 'auto' }}>
         {TABS.map(t => (
           <button
             key={t.id}
@@ -463,6 +471,30 @@ export default function Insights() {
           {/* TAB 1: BRIEFING */}
           {tab === 'briefing' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* AI EXECUTIVE BRIEFING */}
+              {briefing?.narrative && (
+                <div style={{
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 4,
+                  padding: 20,
+                  background: 'var(--bg-surface)',
+                }}>
+                  <div style={{
+                    fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
+                    textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 10,
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}>
+                    <span>AI Executive Briefing</span>
+                    <span style={{ color: briefing.ai_available ? 'var(--accent-primary)' : 'var(--text-tertiary)' }}>
+                      {briefing.ai_available ? 'CLAUDE' : 'SUMMARY'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+                    {briefing.narrative}
+                  </div>
+                </div>
+              )}
+
               {/* SECTION 1: BUSINESS PULSE */}
               <div>
                 <SectionHeader>BUSINESS PULSE</SectionHeader>
@@ -1021,10 +1053,15 @@ export default function Insights() {
                     })()}
                   </div>
                   {(() => {
-                    const entries = Object.entries(revenueData.expense_breakdown);
+                    // Largest cost, computed from the loaded expenses (the API
+                    // doesn't return an expense_breakdown).
+                    const catMap = new Map<string, number>();
+                    expenses.forEach(exp => catMap.set(exp.category, (catMap.get(exp.category) || 0) + Number(exp.amount || 0)));
+                    const entries = Array.from(catMap.entries());
                     if (entries.length === 0) return null;
-                    const largest = entries.reduce((max, [cat, amt]: [string, any]) => amt > max.amount ? { category: cat, amount: amt } : max, { category: '', amount: 0 });
-                    const largestPct = revenueData.revenue_period > 0 ? (largest.amount / revenueData.revenue_period) * 100 : 0;
+                    const largest = entries.reduce((max, [cat, amt]) => amt > max.amount ? { category: cat, amount: amt } : max, { category: '', amount: 0 });
+                    const revenue = financeData?.revenue_period || 0;
+                    const largestPct = revenue > 0 ? (largest.amount / revenue) * 100 : 0;
                     return (
                       <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-surface-hover)', borderRadius: 4, borderLeft: '3px solid var(--accent-primary)' }}>
                         <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -1748,7 +1785,7 @@ export default function Insights() {
                       .filter(r => r.rev_per_km > 0)
                       .sort((a, b) => b.rev_per_km - a.rev_per_km)
                       .slice(0, 8);
-                    if (routes.length === 0) return <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No route data for this period</div>;
+                    if (routes.length === 0) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No route data for this period</div>;
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         {/* Header row */}
@@ -1795,7 +1832,7 @@ export default function Insights() {
                     const types = Array.from(cargoMap.entries())
                       .map(([cargo, d]) => ({ cargo, trips: d.count, avg: d.total / d.count, total: d.total }))
                       .sort((a, b) => b.avg - a.avg);
-                    if (types.length === 0) return <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No cargo data</div>;
+                    if (types.length === 0) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No cargo data</div>;
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 60px 100px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>

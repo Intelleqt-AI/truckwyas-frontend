@@ -108,14 +108,17 @@ export default function AIQuoteChat() {
     try {
       const result = await postData({
         url: 'api/v1/route/calculate/',
-        data: { pickup_location: pickup, delivery_location: delivery }
+        data: { origin: pickup, destination: delivery }
       });
 
-      if (result.distance && result.estimated_cost) {
+      // Backend returns distance_km / total_cost_zar (not distance / estimated_cost).
+      const km = result.distance_km ?? result.distance;
+      const cost = result.total_cost_zar ?? result.estimated_cost;
+      if (km && cost) {
         setQuotePreview(prev => ({
           ...prev,
-          distance: result.distance,
-          estimated_cost: result.estimated_cost
+          distance: km,
+          estimated_cost: cost
         }));
       }
     } catch (error) {

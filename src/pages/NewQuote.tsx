@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { postData, fetchData } from "@/lib/Api";
+import { postData, patchData, fetchData } from "@/lib/Api";
 
 // SA constants
 const DEFAULT_BASE_RATE_PER_KM = 10;
@@ -97,8 +97,11 @@ interface MarketBenchmark {
 
 export default function NewQuote() {
   const navigate = useNavigate();
+  const { id: editId } = useParams();
+  const isEditing = !!editId;
   const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState('');
+  const [loadingQuote, setLoadingQuote] = useState(!!editId);
 
   // Step 1: Route data
   const [pickupLocation, setPickupLocation] = useState('');
@@ -317,6 +320,49 @@ export default function NewQuote() {
     }
   };
 
+  // Edit mode: load the existing quote and prefill the form
+  useEffect(() => {
+    if (!editId) return;
+    let cancelled = false;
+    setLoadingQuote(true);
+    fetchData(`api/v1/quotes/${editId}/`)
+      .then((q: any) => {
+        if (cancelled || !q) return;
+        setPickupLocation(q.pickup_location || '');
+        setDeliveryLocation(q.delivery_location || '');
+        setWeight(q.weight != null ? String(q.weight) : '');
+        if (q.vehicle_type) setVehicleType(q.vehicle_type as VehicleType);
+        setCargoDescription(q.cargo_description || '');
+        setDriverAllowanceInput(q.driver_allowance != null ? String(q.driver_allowance) : '0');
+        setCustomerId(q.customer != null ? String(q.customer) : '');
+        setNotes(q.notes || '');
+        if (q.status === 'DRAFT' || q.status === 'SENT') setStatus(q.status);
+        if (q.confidence) setConfidence(q.confidence);
+        if (q.sla_hours != null) setSlaHours(String(q.sla_hours));
+        if (q.valid_until) setValidUntil(String(q.valid_until).split('T')[0]);
+        // Reconstruct cost state from the saved quote so totals render without re-running route calc
+        const dist = parseFloat(q.distance || '0');
+        if (dist > 0) {
+          setRouteData({
+            success: true,
+            distance_km: dist,
+            toll_cost_zar: parseFloat(q.toll_charges || '0'),
+          } as RouteData);
+          if (q.base_rate != null) setBaseRatePerKm(String((parseFloat(q.base_rate) || 0) / dist));
+        }
+        if (q.fuel_surcharge != null) setEditableFuelCost(parseFloat(q.fuel_surcharge));
+        if (q.toll_charges != null) setEditableTollCost(parseFloat(q.toll_charges));
+        setCurrentStep(3);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load quote for editing');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingQuote(false);
+      });
+    return () => { cancelled = true; };
+  }, [editId]);
+
   // Cost calculations
   const distanceKm = routeData?.distance_km || 0;
   const baseCost = _baseCost;
@@ -338,9 +384,11 @@ export default function NewQuote() {
   };
 
   const mutation = useMutation({
-    mutationFn: (data: any) => postData({ url: 'api/v1/quotes/', data }),
-    onSuccess: () => navigate('/quotes'),
-    onError: (e: any) => setError(e?.message || 'Failed to create quote'),
+    mutationFn: (data: any) => isEditing
+      ? patchData({ url: `api/v1/quotes/${editId}/`, data })
+      : postData({ url: 'api/v1/quotes/', data }),
+    onSuccess: () => navigate(isEditing ? `/quotes/${editId}` : '/quotes'),
+    onError: (e: any) => setError(e?.message || (isEditing ? 'Failed to update quote' : 'Failed to create quote')),
   });
 
   const handleSave = () => {
@@ -395,6 +443,14 @@ export default function NewQuote() {
     </div>
   );
 
+  if (loadingQuote) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+        Loading quote…
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Header */}
@@ -409,7 +465,7 @@ export default function NewQuote() {
           Operations
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>New Quote</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{isEditing ? `Edit Quote #${editId}` : 'New Quote'}</div>
         </div>
       </div>
 
@@ -445,7 +501,7 @@ export default function NewQuote() {
 
       {/* STEP 1: Route Entry */}
       {currentStep === 1 && (
-        <div className="card" style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+        <div className="card" style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Step 1: Route Details</div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
@@ -636,7 +692,7 @@ export default function NewQuote() {
 
       {/* STEP 2: Freight Details */}
       {currentStep === 2 && (
-        <div className="card" style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+        <div className="card" style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Step 2: Freight Details</div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
@@ -959,7 +1015,7 @@ export default function NewQuote() {
 
       {/* STEP 3: Customer & Summary */}
       {currentStep === 3 && (
-        <div className="card" style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+        <div className="card" style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Step 3: Quote Summary</div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
@@ -1399,7 +1455,7 @@ export default function NewQuote() {
               className="btn-action"
               style={{ minWidth: 140 }}
             >
-              {mutation.isPending ? 'SAVING...' : 'SAVE QUOTE'}
+              {mutation.isPending ? 'SAVING...' : (isEditing ? 'UPDATE QUOTE' : 'SAVE QUOTE')}
             </button>
           </div>
         </div>

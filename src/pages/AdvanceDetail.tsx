@@ -79,7 +79,7 @@ export default function AdvanceDetail() {
   const status = advance.status || 'REQUESTED';
   const invoiceNumber = advance.invoice_number || advance.invoiceNumber || 'N/A';
   const customerName = advance.customer_name || advance.customerName || 'N/A';
-  const grossAmount = advance.gross_amount || advance.invoice_amount || advance.amount || 0;
+  const grossAmount = advance.invoice_total || advance.gross_amount || advance.invoice_amount || advance.amount || 0;
   const feePercent = advance.fee_percent || 2.0;
   const feeAmount = advance.fee_amount || advance.fee || (grossAmount * feePercent / 100);
   const netAmount = advance.net_amount || advance.advanced_amount || advance.advancedAmount || (grossAmount - feeAmount);
@@ -133,7 +133,7 @@ export default function AdvanceDetail() {
         {/* Left column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Amount summary card */}
-          <div className="card" style={{ padding: 24 }}>
+          <div className="card" style={{ padding: 20 }}>
             <div className="card-header" style={{ marginBottom: 16 }}>
               <span className="card-title">Amount Summary</span>
             </div>
@@ -155,7 +155,7 @@ export default function AdvanceDetail() {
           </div>
 
           {/* Invoice details */}
-          <div className="card" style={{ padding: 24 }}>
+          <div className="card" style={{ padding: 20 }}>
             <div className="card-header" style={{ marginBottom: 16 }}>
               <span className="card-title">Invoice Details</span>
             </div>
@@ -180,7 +180,7 @@ export default function AdvanceDetail() {
                 <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Invoice Link</div>
                 <button
                   style={{ fontSize: 12, color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'var(--font-mono)' }}
-                  onClick={() => navigate(`/finance/invoices/${advance.invoice_id || advance.id}`)}
+                  onClick={() => navigate(`/finance/invoices/${advance.invoice || advance.invoice_id}`)}
                 >
                   View Invoice →
                 </button>
@@ -189,8 +189,8 @@ export default function AdvanceDetail() {
           </div>
 
           {/* Timeline */}
-          <div className="card" style={{ padding: 24 }}>
-            <div className="card-header" style={{ marginBottom: 20 }}>
+          <div className="card" style={{ padding: 20 }}>
+            <div className="card-header" style={{ marginBottom: 16 }}>
               <span className="card-title">Status Timeline</span>
             </div>
             <div style={{ display: 'grid', gap: 20 }}>

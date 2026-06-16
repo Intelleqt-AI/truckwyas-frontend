@@ -14,25 +14,38 @@ api.interceptors.request.use(config => {
   return config;
 });
 
-// 401 → redirect to login
+// 401 → redirect to login (except on the auth endpoints themselves, where a 401
+// just means "wrong credentials" — not an expired session)
 api.interceptors.response.use(
   res => res,
   error => {
-    if (error.response?.status === 401) {
-      // Show toast notification
-      toast.error('Session expired');
+    const reqUrl: string = error.config?.url || '';
+    const isAuthEndpoint = reqUrl.includes('auth/login') || reqUrl.includes('auth/register');
 
-      // Clear all auth-related localStorage keys
+    if (error.response?.status === 401 && !isAuthEndpoint) {
+      toast.error('Session expired');
       localStorage.removeItem('access');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         window.location.href = '/login';
       }
     }
+
+    // Surface a human-readable message from the backend when one is present
+    // (DRF returns {error}, {detail}, or per-field {field: [msg]} shapes).
+    const data = error.response?.data;
+    let serverMsg: string | undefined;
+    if (typeof data === 'string') {
+      serverMsg = data;
+    } else if (data && typeof data === 'object') {
+      const obj = data as Record<string, any>;
+      const firstField = obj.error ?? obj.detail ?? obj[Object.keys(obj)[0]];
+      serverMsg = Array.isArray(firstField) ? firstField[0] : firstField;
+    }
+
     const err = error.response
-      ? new Error(`HTTP error! status: ${error.response.status}`)
+      ? new Error(serverMsg || `HTTP error! status: ${error.response.status}`)
       : new Error(error.message);
     (err as any).status = error.response?.status;
     (err as any).data = error.response?.data;

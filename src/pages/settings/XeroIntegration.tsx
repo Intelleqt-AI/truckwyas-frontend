@@ -166,7 +166,7 @@ export default function XeroIntegration() {
 
       {/* Connection Status Card */}
       <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-4">
+        <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Connection Status</CardTitle>
             {connection?.is_connected ? (

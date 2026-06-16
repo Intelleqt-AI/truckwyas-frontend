@@ -57,9 +57,9 @@ const Login = () => {
         const onboardingDone = localStorage.getItem('onboarding_done');
         if (!onboardingDone) {
           try {
-            // Check if company has any vehicles or loads
-            const overview = await fetchData('api/v1/fleet/overview/');
-            const vehicleCount = overview?.total_vehicles || 0;
+            // fleet/overview has no total_vehicles field — use the vehicles count.
+            const v = await fetchData('api/v1/vehicles/');
+            const vehicleCount = v?.count ?? (Array.isArray(v) ? v.length : (v?.results?.length ?? 0));
 
             if (vehicleCount === 0) {
               navigate("/onboarding");
@@ -73,7 +73,11 @@ const Login = () => {
       },
       onError: (error: any) => {
         console.error("Login error:", error);
-        setError(error.message || "Invalid credentials");
+        setError(
+          error.status === 401
+            ? "Incorrect email or password. Please try again."
+            : (error.message || "Sign in failed. Please try again.")
+        );
       }
     });
   };
@@ -81,7 +85,7 @@ const Login = () => {
   const inputStyle: React.CSSProperties = {
     background: 'var(--bg-surface)',
     border: '1px solid var(--border-subtle)',
-    padding: '12px 14px',
+    padding: '10px 12px',
     color: 'var(--text-primary)',
     borderRadius: 2,
     fontSize: 13,
@@ -120,7 +124,7 @@ const Login = () => {
         background: 'var(--bg-surface)',
         border: '1px solid var(--border-subtle)',
         borderRadius: 2,
-        padding: 32,
+        padding: 40,
       }}>
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
@@ -148,7 +152,7 @@ const Login = () => {
               }}
             />
             {validationErrors.username && (
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
                 {validationErrors.username}
               </div>
             )}
@@ -192,7 +196,7 @@ const Login = () => {
               </button>
             </div>
             {validationErrors.password && (
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
                 {validationErrors.password}
               </div>
             )}
@@ -200,7 +204,7 @@ const Login = () => {
 
           {error && (
             <div style={{
-              padding: '10px 14px',
+              padding: '12px 16px',
               background: 'var(--status-danger-bg)',
               border: '1px solid var(--status-danger)',
               borderRadius: 2,

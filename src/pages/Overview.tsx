@@ -168,7 +168,7 @@ export default function Overview() {
         minWidth: 0,
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 20,
+        gap: 16,
         alignContent: 'start',
       }}>
         {/* Real-time Clock */}
@@ -304,7 +304,7 @@ export default function Overview() {
             <button onClick={() => navigate('/quotes')} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 8px', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>VIEW ALL</button>
           </div>
           {loading ? (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)' }}>Loading quotes...</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>Loading quotes...</div>
           ) : recentQuotes.length > 0 ? (
             <table className="data-table">
               <thead>
@@ -338,7 +338,7 @@ export default function Overview() {
               </tbody>
             </table>
           ) : (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)' }}>No recent quotes</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>No recent quotes</div>
           )}
         </div>
 
@@ -346,10 +346,10 @@ export default function Overview() {
         <div className="card table-card">
           <div className="card-header">
             <span className="card-title">Recent Bookings</span>
-            <button onClick={() => navigate('/orders')} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 8px', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>VIEW ALL</button>
+            <button onClick={() => navigate('/bookings')} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 8px', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>VIEW ALL</button>
           </div>
           {loading ? (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)' }}>Loading bookings...</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>Loading bookings...</div>
           ) : recentLoads.length > 0 ? (
             <table className="data-table">
               <thead>
@@ -357,7 +357,7 @@ export default function Overview() {
               </thead>
               <tbody>
                 {recentLoads.map((load: any) => (
-                  <tr key={load.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/orders/${load.id}`)}>
+                  <tr key={load.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/bookings/${load.id}`)}>
                     <td className="mono">{load.load_number || `LD-${load.id}`}</td>
                     <td>{load.customer_name || load.customer?.company_name || '—'}</td>
                     <td style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
@@ -380,7 +380,7 @@ export default function Overview() {
               </tbody>
             </table>
           ) : (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)' }}>No recent bookings</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>No recent bookings</div>
           )}
         </div>
 

@@ -117,7 +117,7 @@ export function SecuritySettings() {
     setSaving(true);
     try {
       await postData({
-        url: 'api/v1/auth/password-reset/',
+        url: 'api/v1/auth/change-password/',
         data: { current_password: pwForm.current, new_password: pwForm.new1 },
       });
       setPwForm({ current: '', new1: '', new2: '' });

@@ -167,7 +167,7 @@ export default function FleetImport() {
     // Note: usePost with FormData requires special handling
     // For now, using the pattern - backend will handle multipart/form-data
     uploadFile({
-      url: "/api/integrations/fleet/import/",
+      url: "/api/v1/integrations/fleet/import-trips/",
       data: formData,
       config: {
         headers: {

@@ -486,7 +486,7 @@ export default function Overview() {
                       Recommendation
                     </div>
                     <div>Reroute via N1 Alternate or renegotiate return load.</div>
-                    <button className="btn-action">APPLY REROUTE</button>
+                    <button className="btn-action" onClick={() => navigate('/copilot')}>ASK COPILOT</button>
                   </div>
                 </div>
               </div>

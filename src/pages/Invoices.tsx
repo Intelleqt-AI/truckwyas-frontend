@@ -1088,8 +1088,8 @@ export default function Invoices() {
                       <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
                         Invoices will be generated from completed bookings
                       </div>
-                      <button onClick={() => navigate('/bookings/new')} className="btn-action">
-                        CREATE BOOKING
+                      <button onClick={() => navigate('/bookings')} className="btn-action">
+                        GO TO BOOKINGS
                       </button>
                     </div>
                   </td>

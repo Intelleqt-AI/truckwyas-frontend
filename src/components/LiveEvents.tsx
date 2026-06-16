@@ -29,6 +29,7 @@ const EVENT_TITLES: Record<string, string> = {
   'booking.created': 'New booking',
   'booking.status': 'Booking updated',
   'advance.created': 'Advance requested',
+  'advance.status': 'Capital',
   'invoice.status': 'Invoice updated',
 };
 

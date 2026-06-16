@@ -1,6 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { postData } from '@/lib/Api';
+import { postData, fetchData, deleteData } from '@/lib/Api';
+
+const THREAD_KEY = 'copilot_thread';
+function loadCached(): Message[] | null {
+  try {
+    const c = JSON.parse(localStorage.getItem(THREAD_KEY) || 'null');
+    if (Array.isArray(c) && c.length) return c as Message[];
+  } catch { /* ignore */ }
+  return null;
+}
 
 interface Action { label: string; route: string; }
 interface ProposedAction {
@@ -48,7 +57,10 @@ const labelStyle: React.CSSProperties = {
 export default function Copilot() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [messages, setMessages] = useState<Message[]>([INTRO]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const cached = loadCached();
+    return cached ? [INTRO, ...cached] : [INTRO];
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
@@ -59,6 +71,27 @@ export default function Copilot() {
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
   useEffect(() => { document.title = 'Copilot - TruckWys'; }, []);
+
+  // Load the durable server-side thread on mount (authoritative — survives
+  // refresh and works across devices). The localStorage cache already gave an
+  // instant first paint above.
+  useEffect(() => {
+    fetchData('api/v1/agent/history/')
+      .then((d: any) => {
+        const hist = (d?.messages || []).map((m: any) => ({ role: m.role, content: m.content }));
+        if (hist.length) setMessages([INTRO, ...hist]);
+      })
+      .catch(() => { /* offline: keep the cached thread */ });
+  }, []);
+
+  // Cache the live thread (sans transient fields) for instant restore next time.
+  useEffect(() => {
+    try {
+      const thread = messages.slice(1).map(m => ({ role: m.role, content: m.content }));
+      if (thread.length) localStorage.setItem(THREAD_KEY, JSON.stringify(thread));
+      else localStorage.removeItem(THREAD_KEY);
+    } catch { /* ignore quota errors */ }
+  }, [messages]);
 
   const autoGrow = () => {
     const ta = taRef.current;
@@ -122,7 +155,11 @@ export default function Copilot() {
     }
   };
   const dismissAction = (i: number) => setMessages(prev => prev.map((m, j) => j === i ? { ...m, actionState: 'dismissed' } : m));
-  const reset = () => { setMessages([INTRO]); setInput(''); setAiAvailable(null); };
+  const reset = () => {
+    setMessages([INTRO]); setInput(''); setAiAvailable(null);
+    try { localStorage.removeItem(THREAD_KEY); } catch { /* ignore */ }
+    deleteData({ url: 'api/v1/agent/history/' }).catch(() => {});
+  };
 
   const avatar = (role: 'user' | 'assistant') => (
     <div style={{

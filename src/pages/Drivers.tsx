@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetchData, postData, patchData } from '../lib/Api';
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { LiveBadge } from "@/components/LiveBadge";
 
 interface Driver {
   id: number;
@@ -77,9 +79,8 @@ export default function Drivers() {
   const [editForm, setEditForm] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
+  const load = useCallback(() => {
+    return Promise.all([
       fetchData('api/v1/drivers/'),
       fetchData('api/v1/drivers/overview/').catch(() => null),
       fetchData('api/v1/drivers/leaderboard/').catch(() => null),
@@ -142,6 +143,9 @@ export default function Drivers() {
     }).finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { load(); }, [load]);
+  useAutoRefresh(load);
+
   const filtered = drivers.filter(d => statusFilter === 'All' || d.status === statusFilter);
 
   const rankColor = (rank: number) => {
@@ -170,7 +174,10 @@ export default function Drivers() {
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
+            <LiveBadge />
+          </div>
         </div>
         <button className="btn-action" onClick={() => setShowAddForm(true)}>+ ADD DRIVER</button>
       </div>

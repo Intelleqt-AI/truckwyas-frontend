@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
+import { LiveBadge } from "@/components/LiveBadge";
 import {
   DndContext,
   DragEndEvent,
@@ -250,7 +251,10 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Loads & Quotes</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Loads & Quotes</div>
+              <LiveBadge />
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-action" style={{ background: 'var(--accent-primary)', color: 'var(--bg-deep)' }} onClick={() => navigate('/quotes/ai-chat')}>
                 AI QUOTE

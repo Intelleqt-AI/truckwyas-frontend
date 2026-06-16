@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
+import { LiveBadge } from '@/components/LiveBadge';
 
 export default function Overview() {
   const navigate = useNavigate();
@@ -30,95 +32,76 @@ export default function Overview() {
     return () => clearInterval(clockInterval);
   }, []);
 
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | null = null;
+  const load = useCallback(async () => {
+    try {
+      const [finance, insightsData, advancesData, quotesData, loadsData, activityData, vehiclesData, fleetData] = await Promise.all([
+        fetchData('api/v1/dashboard/finance/').catch(() => null),
+        fetchData('api/v1/dashboard/signals/').catch(() => fetchData('api/v1/dashboard/insights/').catch(() => [])),
+        fetchData('api/v1/advances/').catch(() => []),
+        fetchData('api/v1/quotes/?limit=5').catch(() => []),
+        fetchData('api/v1/loads/').catch(() => []),
+        fetchData('api/v1/activity/').catch(() => []),
+        fetchData('api/v1/vehicles/').catch(() => []),
+        fetchData('api/v1/fleet/overview/').catch(() => null),
+      ]);
+      setFinanceData(finance);
+      const insightsArr = Array.isArray(insightsData) ? insightsData : (insightsData?.signals || []);
+      setInsights(insightsArr.map((s: any) => ({
+        category: s.category || s.type || 'Update',
+        title: s.title || '',
+        body: s.body || s.message || '',
+        action: s.action || 'VIEW',
+        severity: s.severity || 'low',
+        type: s.type || 'INFO',
+      })));
 
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const [finance, insightsData, advancesData, quotesData, loadsData, activityData, vehiclesData, fleetData] = await Promise.all([
-          fetchData('api/v1/dashboard/finance/').catch(() => null),
-          fetchData('api/v1/dashboard/signals/').catch(() => fetchData('api/v1/dashboard/insights/').catch(() => [])),
-          fetchData('api/v1/advances/').catch(() => []),
-          fetchData('api/v1/quotes/?limit=5').catch(() => []),
-          fetchData('api/v1/loads/').catch(() => []),
-          fetchData('api/v1/activity/').catch(() => []),
-          fetchData('api/v1/vehicles/').catch(() => []),
-          fetchData('api/v1/fleet/overview/').catch(() => null),
-        ]);
-        setFinanceData(finance);
-        const insightsArr = Array.isArray(insightsData) ? insightsData : (insightsData?.signals || []);
-        setInsights(insightsArr.map((s: any) => ({
-          category: s.category || s.type || 'Update',
-          title: s.title || '',
-          body: s.body || s.message || '',
-          action: s.action || 'VIEW',
-          severity: s.severity || 'low',
-          type: s.type || 'INFO',
-        })));
+      setAdvances(Array.isArray(advancesData) ? advancesData : (advancesData?.results || []));
 
-        setAdvances(Array.isArray(advancesData) ? advancesData : (advancesData?.results || []));
+      const quotes = quotesData?.results || quotesData || [];
+      setRecentQuotes(quotes.slice(0, 5));
 
-        const quotes = quotesData?.results || quotesData || [];
-        setRecentQuotes(quotes.slice(0, 5));
+      const loads = loadsData?.results || loadsData || [];
+      const activeLoads = loads.filter((l: any) => l.status === 'IN_TRANSIT' || l.status === 'LOADING');
+      setActiveLoadsCount(activeLoads.length);
+      setRecentLoads(loads.slice(0, 5));
+      const vehicles = vehiclesData?.results || vehiclesData || [];
+      setTotalVehicles(vehicles.length);
 
-        const loads = loadsData?.results || loadsData || [];
-        const activeLoads = loads.filter((l: any) => l.status === 'IN_TRANSIT' || l.status === 'LOADING');
-        setActiveLoadsCount(activeLoads.length);
-        setRecentLoads(loads.slice(0, 5));
-        const vehicles = vehiclesData?.results || vehiclesData || [];
-        setTotalVehicles(vehicles.length);
+      const activeVehicleCount = fleetData?.active_vehicles || vehicles.filter((v: any) => v.status === 'AVAILABLE' || v.status === 'IN_USE').length || 0;
+      setActiveVehicles(activeVehicleCount);
 
-        const activeVehicleCount = fleetData?.active_vehicles || vehicles.filter((v: any) => v.status === 'AVAILABLE' || v.status === 'IN_USE').length || 0;
-        setActiveVehicles(activeVehicleCount);
+      // Generate heatmap data from last 28 days of load activity
+      const heatmap = new Array(28).fill(0);
+      const now = Date.now();
+      const dayMs = 24 * 60 * 60 * 1000;
 
-        // Generate heatmap data from last 28 days of load activity
-        const heatmap = new Array(28).fill(0);
-        const now = Date.now();
-        const dayMs = 24 * 60 * 60 * 1000;
-
-        loads.forEach((load: any) => {
-          const createdAt = load.created_at || load.pickup_date;
-          if (createdAt) {
-            const loadTime = new Date(createdAt).getTime();
-            const daysAgo = Math.floor((now - loadTime) / dayMs);
-            if (daysAgo >= 0 && daysAgo < 28) {
-              heatmap[27 - daysAgo]++;
-            }
+      loads.forEach((load: any) => {
+        const createdAt = load.created_at || load.pickup_date;
+        if (createdAt) {
+          const loadTime = new Date(createdAt).getTime();
+          const daysAgo = Math.floor((now - loadTime) / dayMs);
+          if (daysAgo >= 0 && daysAgo < 28) {
+            heatmap[27 - daysAgo]++;
           }
-        });
+        }
+      });
 
-        setHeatmapData(heatmap);
+      setHeatmapData(heatmap);
 
-        setActivity(Array.isArray(activityData) ? activityData : (activityData?.results || []));
-        setActivityLoading(false);
-
-        // Auto-refresh signals every 60s
-        timer = setInterval(() => {
-          fetchData('api/v1/dashboard/signals/').then((fresh: any) => {
-            const arr = Array.isArray(fresh) ? fresh : (fresh?.signals || []);
-            setInsights(arr.map((s: any) => ({
-              category: s.category || s.type || 'Update',
-              title: s.title || '',
-              body: s.body || s.message || '',
-              action: s.action || 'VIEW',
-              severity: s.severity || 'low',
-              type: s.type || 'INFO',
-            })));
-          }).catch(() => {});
-        }, 60000);
-      } catch (error) {
-        console.error('Failed to load overview data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-
-    return () => {
-      if (timer) clearInterval(timer);
-    };
+      setActivity(Array.isArray(activityData) ? activityData : (activityData?.results || []));
+      setActivityLoading(false);
+    } catch (error) {
+      console.error('Failed to load overview data:', error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useAutoRefresh(load);
 
   const timeAgo = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -175,8 +158,11 @@ export default function Overview() {
         <div className="card" style={{ gridColumn: 'span 3', padding: '14px 20px', background: 'var(--bg-surface)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                {formatDate(currentTime)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                  {formatDate(currentTime)}
+                </div>
+                <LiveBadge />
               </div>
               <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
                 {formatTime(currentTime)} <span style={{ fontSize: 14, color: 'var(--text-secondary)', marginLeft: 8 }}>SAST</span>

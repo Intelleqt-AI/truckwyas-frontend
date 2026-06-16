@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { fetchData, postData, putData, deleteData } from "@/lib/Api";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { LiveBadge } from "@/components/LiveBadge";
 
 const STATUS_COLOR: Record<string, string> = {
   PAID: 'var(--status-success)', SENT: 'var(--status-warning)',
@@ -72,9 +74,14 @@ export default function Invoices() {
     document.title = 'Invoices - TruckWys';
   }, []);
 
-  useEffect(() => {
-    const loadInvoices = async () => {
-      setLoading(true);
+  // Single stable loader: fetches invoices + stats, and (when the expenses
+  // tab is active) expenses + vehicles. Refreshes silently — never flips the
+  // main loading flag back on, only off in finally — so auto-refresh doesn't
+  // flash skeletons every interval.
+  const load = async () => {
+    const tasks: Promise<void>[] = [];
+
+    tasks.push((async () => {
       try {
         const [data, statsData] = await Promise.all([
           fetchData('/api/v1/invoices/'),
@@ -89,16 +96,10 @@ export default function Invoices() {
       } finally {
         setLoading(false);
       }
-    };
+    })());
 
-    loadInvoices();
-  }, []);
-
-  // Load expenses when switching to expenses tab
-  useEffect(() => {
     if (activeTab === 'expenses') {
-      const loadExpenses = async () => {
-        setExpensesLoading(true);
+      tasks.push((async () => {
         try {
           const [expensesData, vehiclesData] = await Promise.all([
             fetchData('/api/v1/expenses/'),
@@ -112,9 +113,19 @@ export default function Invoices() {
         } finally {
           setExpensesLoading(false);
         }
-      };
+      })());
+    }
 
-      loadExpenses();
+    await Promise.all(tasks);
+  };
+
+  useEffect(() => { load(); }, []);
+  useAutoRefresh(load);
+
+  // Load expenses when switching to expenses tab
+  useEffect(() => {
+    if (activeTab === 'expenses') {
+      load();
     }
   }, [activeTab]);
 
@@ -330,11 +341,11 @@ export default function Invoices() {
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Finance</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>
               {activeTab === 'invoices' ? 'Invoices' : 'Expenses'}
             </div>
-
+            <LiveBadge />
           </div>
           {activeTab === 'invoices' && (
             <button className="btn-action" onClick={() => navigate('/finance/invoices/new')}>+ NEW INVOICE</button>

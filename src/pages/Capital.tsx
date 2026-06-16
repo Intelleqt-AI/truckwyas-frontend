@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "@/lib/formatters";
 import { fetchData, postData } from "@/lib/Api";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { LiveBadge } from "@/components/LiveBadge";
 
 const TIER_COLOR: Record<string, string> = {
   prime: 'var(--accent-primary)', standard: 'var(--status-success)',
@@ -108,36 +110,37 @@ export default function Capital() {
     document.title = 'Capital - TruckWys';
   }, []);
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Load facility data — paginated {count, results}
-        const facilityData = await fetchData('api/v1/facilities/');
-        const facilityList = Array.isArray(facilityData) ? facilityData : (facilityData?.results || []);
-        setFacility(facilityList[0] || null);
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      // Load facility data — paginated {count, results}
+      const facilityData = await fetchData('api/v1/facilities/');
+      const facilityList = Array.isArray(facilityData) ? facilityData : (facilityData?.results || []);
+      setFacility(facilityList[0] || null);
 
-        // Load active advances — paginated {count, results}
-        const advancesData = await fetchData('api/v1/advances/');
-        const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
-        const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
-        setAdvances(active);
+      // Load active advances — paginated {count, results}
+      const advancesData = await fetchData('api/v1/advances/');
+      const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
+      const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
+      setAdvances(active);
 
-        // Load eligible invoices from dedicated endpoint
-        const eligibleData = await fetchData('api/v1/capital/eligible/');
-        const eligible = eligibleData?.invoices || [];
-        setEligibleInvoices(eligible);
-      } catch (err) {
-        console.error('Failed to load capital data:', err);
-        setError('Failed to load capital data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
+      // Load eligible invoices from dedicated endpoint
+      const eligibleData = await fetchData('api/v1/capital/eligible/');
+      const eligible = eligibleData?.invoices || [];
+      setEligibleInvoices(eligible);
+    } catch (err) {
+      console.error('Failed to load capital data:', err);
+      setError('Failed to load capital data');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useAutoRefresh(load);
 
   if (loading) {
     return (
@@ -180,7 +183,10 @@ export default function Capital() {
     <div>
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fast Pay Facility</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fast Pay Facility</div>
+          <LiveBadge />
+        </div>
 
       </div>
 

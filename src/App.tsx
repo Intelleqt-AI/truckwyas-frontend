@@ -83,7 +83,15 @@ const ClientQuoteView = lazy(() => import("./pages/ClientQuoteView"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 2, throwOnError: false, refetchOnWindowFocus: false, staleTime: 0 },
+    queries: {
+      retry: 2,
+      throwOnError: false,
+      staleTime: 15000,
+      refetchOnWindowFocus: true,      // refresh when the operator returns to the tab
+      refetchOnReconnect: true,
+      refetchInterval: 30000,          // live polling for React-Query screens
+      refetchIntervalInBackground: false, // …but not while the tab is hidden
+    },
   },
 });
 

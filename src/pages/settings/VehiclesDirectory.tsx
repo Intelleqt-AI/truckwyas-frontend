@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { fetchData, deleteData } from "@/lib/Api";
 
 interface Vehicle {
@@ -28,6 +29,7 @@ const sectionStyle: React.CSSProperties = {
 };
 
 export function VehiclesDirectory() {
+  const navigate = useNavigate();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -80,7 +82,7 @@ export function VehiclesDirectory() {
                 fontSize: 12, outline: 'none', width: 180,
               }}
             />
-            <button className="btn-action">+ ADD VEHICLE</button>
+            <button className="btn-action" onClick={() => navigate('/fleet/vehicles')}>+ ADD VEHICLE</button>
           </div>
         </div>
 

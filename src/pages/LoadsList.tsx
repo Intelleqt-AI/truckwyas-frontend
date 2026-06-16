@@ -60,8 +60,8 @@ export default function LoadsList() {
         data: {}
       });
 
-      if (response?.id) {
-        navigate(`/finance/invoices/${response.id}`);
+      if (response?.invoice_id) {
+        navigate(`/finance/invoices/${response.invoice_id}`);
       }
     } catch (err) {
       console.error('Failed to convert load to invoice:', err);

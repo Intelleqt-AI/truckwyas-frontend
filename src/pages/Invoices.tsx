@@ -269,11 +269,16 @@ export default function Invoices() {
     }
   };
 
-  const handleDownloadPDF = (e: React.MouseEvent, invoiceId: string) => {
+  const handleDownloadPDF = async (e: React.MouseEvent, invoiceId: string) => {
     e.stopPropagation();
-    const url = `/api/v1/invoices/${invoiceId}/generate_pdf/`;
-    window.open(import.meta.env.VITE_API_URL + url, '_blank');
-    setToast('PDF downloading...');
+    // generate_pdf is POST-only and returns a pdf_url; window.open(GET) 405s.
+    try {
+      const result = await postData({ url: `api/v1/invoices/${invoiceId}/generate_pdf/`, data: {} });
+      if (result?.pdf_url) window.open(result.pdf_url, '_blank');
+      setToast('PDF ready');
+    } catch {
+      setToast('Could not generate PDF');
+    }
     setTimeout(() => setToast(null), 3000);
   };
 
@@ -530,7 +535,7 @@ export default function Invoices() {
                       value={expenseForm.amount}
                       onChange={(e) => handleExpenseFormChange('amount', e.target.value)}
                       placeholder="0.00"
-                      readOnly={expenseForm.category === 'FUEL' && expenseForm.litres && expenseForm.price_per_litre}
+                      readOnly={Boolean(expenseForm.category === 'FUEL' && expenseForm.litres && expenseForm.price_per_litre)}
                       style={{
                         width: '100%',
                         background: 'var(--bg-surface)',

@@ -55,9 +55,9 @@ const Login = () => {
         const onboardingDone = localStorage.getItem('onboarding_done');
         if (!onboardingDone) {
           try {
-            // Check if company has any vehicles or loads
-            const overview = await fetchData('api/v1/fleet/overview/');
-            const vehicleCount = overview?.total_vehicles || 0;
+            // fleet/overview has no total_vehicles field — use the vehicles count.
+            const v = await fetchData('api/v1/vehicles/');
+            const vehicleCount = v?.count ?? (Array.isArray(v) ? v.length : (v?.results?.length ?? 0));
 
             if (vehicleCount === 0) {
               navigate("/onboarding");

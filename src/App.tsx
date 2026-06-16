@@ -125,6 +125,7 @@ const App = () => (
             <Route path="/quotes" element={<RequireAuth><OSLayout><QuotesList /></OSLayout></RequireAuth>} />
             <Route path="/quotes/new" element={<RequireAuth><OSLayout><NewQuote /></OSLayout></RequireAuth>} />
             <Route path="/quotes/ai-chat" element={<RequireAuth><OSLayout><AIQuoteChat /></OSLayout></RequireAuth>} />
+            <Route path="/quotes/:id/edit" element={<RequireAuth><OSLayout><NewQuote /></OSLayout></RequireAuth>} />
             <Route path="/quotes/:id" element={<RequireAuth><OSLayout><QuoteDetail /></OSLayout></RequireAuth>} />
             <Route path="/bookings" element={<RequireAuth><OSLayout><LoadsList /></OSLayout></RequireAuth>} />
             <Route path="/bookings/:id" element={<RequireAuth><OSLayout><Bookings /></OSLayout></RequireAuth>} />

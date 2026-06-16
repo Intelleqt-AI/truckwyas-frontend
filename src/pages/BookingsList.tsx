@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { fetchData } from "@/lib/Api";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { formatDate } from "@/lib/formatters";
 
 
 export function BookingsList() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [bookings, setBookings] = useState<any[]>([]);
@@ -24,6 +26,8 @@ export function BookingsList() {
       const raw = d?.results || d || [];
       setBookings(raw.map((l: any) => ({
         id: l.load_number || `L-${l.id}`,
+        rawId: l.id,
+        invoiceId: l.invoices?.[0]?.id,
         quoteId: l.quote || '—',
         customer: l.customer_name || l.customer || '—',
         origin: l.pickup_location || '—',
@@ -298,15 +302,29 @@ export function BookingsList() {
               <div className="space-y-3">
                 <h4 className="text-body font-body-medium text-foreground">Actions</h4>
                 <div className="space-y-2">
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => navigate(selectedBooking.invoiceId ? `/finance/invoices/${selectedBooking.invoiceId}` : '/finance/invoices')}
+                  >
                     View in Finance HQ
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    Track Shipment
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => navigate(`/bookings/${selectedBooking.rawId}`)}
+                  >
+                    Open Booking
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    Generate Invoice
-                  </Button>
+                  {selectedBooking.invoiceStatus === 'Not Raised' && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => navigate(`/bookings/${selectedBooking.rawId}`)}
+                    >
+                      Generate Invoice
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

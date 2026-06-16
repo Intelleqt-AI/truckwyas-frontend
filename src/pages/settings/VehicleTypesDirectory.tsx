@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchData, deleteData } from "@/lib/Api";
+import { fetchData, deleteData, postData } from "@/lib/Api";
 
 interface VehicleType {
   id: number;
@@ -21,6 +21,10 @@ export function VehicleTypesDirectory() {
   const [types, setTypes] = useState<VehicleType[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [addErr, setAddErr] = useState('');
+  const [form, setForm] = useState({ name: '', description: '', capacity: '', base_rate: '' });
 
   const load = () => {
     setLoading(true);
@@ -44,6 +48,28 @@ export function VehicleTypesDirectory() {
     if (!confirm('Delete this vehicle type?')) return;
     await deleteData({ url: `api/v1/vehicle-types/${id}/` }).catch(() => {});
     load();
+  };
+
+  const handleAdd = async () => {
+    if (!form.name.trim()) { setAddErr('Name is required'); return; }
+    setSaving(true);
+    setAddErr('');
+    try {
+      await postData({ url: 'api/v1/vehicle-types/', data: {
+        name: form.name.trim(),
+        description: form.description.trim(),
+        capacity: form.capacity ? Number(form.capacity) : 0,
+        base_rate: form.base_rate ? Number(form.base_rate) : 0,
+        active: true,
+      }});
+      setForm({ name: '', description: '', capacity: '', base_rate: '' });
+      setShowAdd(false);
+      load();
+    } catch (e: any) {
+      setAddErr(e?.message || 'Failed to add vehicle type');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const formatRate = (v: any) => v ? `R ${parseFloat(v).toLocaleString('en-ZA', { minimumFractionDigits: 0 })}` : '—';
@@ -74,9 +100,44 @@ export function VehicleTypesDirectory() {
                 fontSize: 12, outline: 'none', width: 160,
               }}
             />
-            <button className="btn-action">+ ADD TYPE</button>
+            <button className="btn-action" onClick={() => { setShowAdd(s => !s); setAddErr(''); }}>
+              {showAdd ? 'CLOSE' : '+ ADD TYPE'}
+            </button>
           </div>
         </div>
+
+        {/* Add form */}
+        {showAdd && (
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-deep)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.6fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
+              {([
+                { k: 'name', ph: 'Name *', type: 'text' },
+                { k: 'description', ph: 'Description', type: 'text' },
+                { k: 'capacity', ph: 'Capacity (ton)', type: 'number' },
+                { k: 'base_rate', ph: 'Base rate /km', type: 'number' },
+              ] as const).map(f => (
+                <input
+                  key={f.k}
+                  type={f.type}
+                  value={(form as any)[f.k]}
+                  onChange={e => setForm(prev => ({ ...prev, [f.k]: e.target.value }))}
+                  placeholder={f.ph}
+                  style={{
+                    background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
+                    borderRadius: 2, padding: '8px 10px', color: 'var(--text-primary)',
+                    fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box',
+                  }}
+                />
+              ))}
+            </div>
+            {addErr && <div style={{ color: 'var(--status-danger)', fontSize: 12, marginBottom: 10 }}>{addErr}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn-action" onClick={handleAdd} disabled={saving}>
+                {saving ? 'SAVING...' : 'SAVE TYPE'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center' as const, color: 'var(--text-tertiary)', fontSize: 13 }}>Loading...</div>

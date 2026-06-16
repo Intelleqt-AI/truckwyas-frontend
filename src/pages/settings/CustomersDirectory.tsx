@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchData, deleteData } from "@/lib/Api";
+import { fetchData, deleteData, postData } from "@/lib/Api";
 
 interface Customer {
   id: number;
@@ -30,6 +30,10 @@ export function CustomersDirectory() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [addErr, setAddErr] = useState('');
+  const [form, setForm] = useState({ name: '', email: '', phone: '', city: '' });
 
   const load = () => {
     setLoading(true);
@@ -50,6 +54,28 @@ export function CustomersDirectory() {
     if (!confirm('Delete this customer?')) return;
     await deleteData({ url: `api/v1/customers/${id}/` }).catch(() => {});
     load();
+  };
+
+  const handleAdd = async () => {
+    if (!form.name.trim()) { setAddErr('Name is required'); return; }
+    setSaving(true);
+    setAddErr('');
+    try {
+      await postData({ url: 'api/v1/customers/', data: {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        city: form.city.trim(),
+        status: 'ACTIVE',
+      }});
+      setForm({ name: '', email: '', phone: '', city: '' });
+      setShowAdd(false);
+      load();
+    } catch (e: any) {
+      setAddErr(e?.message || 'Failed to add customer');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -79,9 +105,43 @@ export function CustomersDirectory() {
                 fontSize: 12, outline: 'none', width: 180,
               }}
             />
-            <button className="btn-action">+ ADD CUSTOMER</button>
+            <button className="btn-action" onClick={() => { setShowAdd(s => !s); setAddErr(''); }}>
+              {showAdd ? 'CLOSE' : '+ ADD CUSTOMER'}
+            </button>
           </div>
         </div>
+
+        {/* Add form */}
+        {showAdd && (
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-deep)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12 }}>
+              {([
+                { k: 'name', ph: 'Name *' },
+                { k: 'email', ph: 'Email' },
+                { k: 'phone', ph: 'Phone' },
+                { k: 'city', ph: 'City' },
+              ] as const).map(f => (
+                <input
+                  key={f.k}
+                  value={(form as any)[f.k]}
+                  onChange={e => setForm(prev => ({ ...prev, [f.k]: e.target.value }))}
+                  placeholder={f.ph}
+                  style={{
+                    background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
+                    borderRadius: 2, padding: '8px 10px', color: 'var(--text-primary)',
+                    fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box',
+                  }}
+                />
+              ))}
+            </div>
+            {addErr && <div style={{ color: 'var(--status-danger)', fontSize: 12, marginBottom: 10 }}>{addErr}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn-action" onClick={handleAdd} disabled={saving}>
+                {saving ? 'SAVING...' : 'SAVE CUSTOMER'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Table */}
         {loading ? (

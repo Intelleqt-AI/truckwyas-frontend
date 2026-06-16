@@ -128,7 +128,7 @@ export function InvoicePreview({
             </div>
             <div className="flex justify-between text-base font-semibold pt-2 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
               <span style={{ color: 'var(--text-primary)' }}>Total</span>
-              <CurrencyDisplay amount={total} style={{ color: 'var(--text-primary)' }} />
+              <CurrencyDisplay amount={total} />
             </div>
           </div>
         </div>

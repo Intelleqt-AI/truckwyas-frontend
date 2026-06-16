@@ -705,7 +705,7 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
     const data = {
       category,
       amount: parseFloat(amount),
-      date,
+      expense_date: date,
       description,
       vehicle: vehicleId ? parseInt(vehicleId) : null,
     };
@@ -714,11 +714,11 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
       if (expense) {
         // Update existing via Api wrapper (includes auth token)
         const { putData } = await import('@/lib/Api');
-        await putData({ url: `/api/v1/expenses/${expense.id}/`, data });
+        await putData({ url: `api/v1/expenses/${expense.id}/`, data });
         onClose();
       } else {
-        // Create new
-        await postData('/api/v1/expenses/', data);
+        // Create new (expense_number is auto-generated server-side)
+        await postData({ url: 'api/v1/expenses/', data });
         onClose();
       }
     } catch (err) {

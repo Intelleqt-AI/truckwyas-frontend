@@ -63,6 +63,7 @@ const Capital = lazy(() => import("./pages/Capital"));
 const AdvanceRequest = lazy(() => import("./pages/AdvanceRequest"));
 const AdvanceDetail = lazy(() => import("./pages/AdvanceDetail"));
 const Insights = lazy(() => import("./pages/Insights"));
+const Copilot = lazy(() => import("./pages/Copilot"));
 // PartnerDashboard removed — moved to standalone partner portal
 const Settings = lazy(() => import("./pages/Settings"));
 const XeroIntegration = lazy(() => import("./pages/settings/XeroIntegration"));
@@ -152,6 +153,7 @@ const App = () => (
             <Route path="/capital/request" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><AdvanceRequest /></OSLayout></RequireRole></RequireAuth>} />
             <Route path="/capital/advances/:id" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><AdvanceDetail /></OSLayout></RequireRole></RequireAuth>} />
             <Route path="/insights" element={<RequireAuth><RequireRole roles={INSIGHTS_ROLES}><OSLayout><Insights /></OSLayout></RequireRole></RequireAuth>} />
+            <Route path="/copilot" element={<RequireAuth><RequireRole roles={INSIGHTS_ROLES}><OSLayout><Copilot /></OSLayout></RequireRole></RequireAuth>} />
             {/* /partner-dashboard removed — standalone partner portal */}
             <Route path="/settings/:section?" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><Settings /></OSLayout></RequireRole></RequireAuth>} />
             <Route path="/settings/integrations/xero" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><XeroIntegration /></OSLayout></RequireRole></RequireAuth>} />

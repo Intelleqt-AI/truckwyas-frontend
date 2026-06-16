@@ -44,11 +44,11 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
 
   // Role-based nav access control
   const NAV_ACCESS: Record<string, string[]> = {
-    ADMIN:      ["/", "/quotes", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/settings"],
-    MANAGER:    ["/", "/quotes", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/settings"],
-    OPERATOR:   ["/", "/quotes", "/bookings", "/fleet", "/invoices", "/capital", "/insights"],
-    DISPATCHER: ["/", "/quotes", "/bookings", "/fleet", "/invoices", "/capital", "/insights"],
-    VIEWER:     ["/", "/bookings", "/fleet", "/insights"],
+    ADMIN:      ["/", "/quotes", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot", "/settings"],
+    MANAGER:    ["/", "/quotes", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot", "/settings"],
+    OPERATOR:   ["/", "/quotes", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot"],
+    DISPATCHER: ["/", "/quotes", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot"],
+    VIEWER:     ["/", "/bookings", "/fleet", "/insights", "/copilot"],
     DRIVER:     ["/", "/bookings"],
   };
 
@@ -59,6 +59,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
     { path: '/invoices', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>, label: 'Finance' },
     { path: '/capital', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>, label: 'Capital' },
     { path: '/insights', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>, label: 'Insights' },
+    { path: '/copilot', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2a2 2 0 0 1 2 2v1h3a2 2 0 0 1 2 2v3a2 2 0 0 1 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 0-4V7a2 2 0 0 1 2-2h3V4a2 2 0 0 1 2-2z"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/></svg>, label: 'Copilot' },
     // Partner page removed — partner portal is a separate app at partners.truckwys.com
   ];
 

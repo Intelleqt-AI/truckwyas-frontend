@@ -64,7 +64,7 @@ export default function Bookings() {
     formData.append('pod_document', file);
     try {
       const token = localStorage.getItem('access');
-      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3700';
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
       const res = await fetch(`${baseURL}/api/v1/loads/${id}/upload_pod/`, {
         method: 'POST',
         headers: { Authorization: `Token ${token}` },

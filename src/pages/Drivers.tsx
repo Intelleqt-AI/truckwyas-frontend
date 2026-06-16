@@ -413,6 +413,7 @@ export default function Drivers() {
                       first_name: addForm.first_name,
                       last_name: addForm.last_name,
                       password: 'TruckWys2026!',
+                      role: 'DRIVER',
                     }});
                     await postData({ url: 'api/v1/drivers/', data: {
                       user: user.id,

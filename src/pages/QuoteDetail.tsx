@@ -576,7 +576,7 @@ export default function QuoteDetail() {
               <button
                 onClick={() => {
                   const token = localStorage.getItem('access');
-                  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3700';
+                  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
                   const url = `${baseURL}/api/v1/quotes/${id}/generate_pdf/`;
                   fetch(url, { headers: { Authorization: `Token ${token}` } })
                     .then(r => r.blob())

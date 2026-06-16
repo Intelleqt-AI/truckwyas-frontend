@@ -9,6 +9,7 @@ const Signup = () => {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     name: "",
+    company_name: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -70,7 +71,7 @@ const Signup = () => {
       const first_name = nameParts[0];
       const last_name = nameParts.slice(1).join(' ');
 
-      await postData({
+      const result = await postData({
         url: 'api/v1/auth/register/',
         data: {
           username: formData.email,
@@ -78,13 +79,28 @@ const Signup = () => {
           password: formData.password,
           first_name,
           last_name,
+          name: formData.name,
+          company_name: formData.company_name,
         }
       });
 
-      navigate("/login");
+      // Auto sign-in: the register endpoint returns a token + user, so we go
+      // straight into onboarding instead of bouncing back to the login screen.
+      if (result?.token) {
+        localStorage.setItem('access', result.token);
+        localStorage.setItem('user', JSON.stringify(result.user));
+        navigate('/onboarding');
+      } else {
+        navigate('/login');
+      }
     } catch (error: any) {
       console.error("Signup error:", error);
-      setError(error.message || "Failed to create account. Please try again.");
+      const msg = String(error?.message || '');
+      if (error?.status === 400 && /exist|already|unique/i.test(msg)) {
+        setError("An account with this email already exists. Try signing in instead.");
+      } else {
+        setError(msg || "Failed to create account. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -164,6 +180,19 @@ const Signup = () => {
                 {validationErrors.name}
               </div>
             )}
+          </div>
+
+          <div>
+            <label htmlFor="company_name" style={labelStyle}>Company Name</label>
+            <input
+              id="company_name"
+              name="company_name"
+              type="text"
+              placeholder="Acme Logistics (Pty) Ltd"
+              value={formData.company_name}
+              onChange={handleChange}
+              style={inputStyle}
+            />
           </div>
 
           <div>

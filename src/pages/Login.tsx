@@ -71,7 +71,11 @@ const Login = () => {
       },
       onError: (error: any) => {
         console.error("Login error:", error);
-        setError(error.message || "Invalid credentials");
+        setError(
+          error.status === 401
+            ? "Incorrect email or password. Please try again."
+            : (error.message || "Sign in failed. Please try again.")
+        );
       }
     });
   };

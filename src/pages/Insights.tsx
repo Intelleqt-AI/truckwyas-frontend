@@ -196,6 +196,14 @@ export default function Insights() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [briefing, setBriefing] = useState<{ narrative?: string; ai_available?: boolean } | null>(null);
+
+  // AI executive briefing (Claude when configured, deterministic summary otherwise)
+  useEffect(() => {
+    fetchData('api/v1/dashboard/briefing/')
+      .then(setBriefing)
+      .catch(() => setBriefing(null));
+  }, []);
 
   // Build period params
   const getPeriodParams = (): string => {
@@ -463,6 +471,30 @@ export default function Insights() {
           {/* TAB 1: BRIEFING */}
           {tab === 'briefing' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {/* AI EXECUTIVE BRIEFING */}
+              {briefing?.narrative && (
+                <div style={{
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 4,
+                  padding: 20,
+                  background: 'var(--bg-surface)',
+                }}>
+                  <div style={{
+                    fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
+                    textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 10,
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}>
+                    <span>AI Executive Briefing</span>
+                    <span style={{ color: briefing.ai_available ? 'var(--accent-primary)' : 'var(--text-tertiary)' }}>
+                      {briefing.ai_available ? 'CLAUDE' : 'SUMMARY'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+                    {briefing.narrative}
+                  </div>
+                </div>
+              )}
+
               {/* SECTION 1: BUSINESS PULSE */}
               <div>
                 <SectionHeader>BUSINESS PULSE</SectionHeader>

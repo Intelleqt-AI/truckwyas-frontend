@@ -16,6 +16,26 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Role guard — redirects to / when the logged-in user's role isn't permitted.
+// Server-side permissions remain the source of truth; this stops a VIEWER/DRIVER
+// from deep-linking into financial pages they shouldn't see.
+function RequireRole({ roles, children }: { roles: string[]; children: React.ReactNode }) {
+  let role: string | null = null;
+  if (typeof window !== 'undefined') {
+    try {
+      role = JSON.parse(localStorage.getItem('user') || '{}')?.role ?? null;
+    } catch {
+      role = null;
+    }
+  }
+  if (!role || !roles.includes(role)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+// Role sets mirror OSLayout's NAV_ACCESS so nav visibility and route access agree.
+const FINANCE_ROLES = ['ADMIN', 'MANAGER', 'OPERATOR', 'DISPATCHER'];
+const INSIGHTS_ROLES = ['ADMIN', 'MANAGER', 'OPERATOR', 'DISPATCHER', 'VIEWER'];
+
 // Public route — redirects to / if already logged in
 function PublicOnly({ children }: { children: React.ReactNode }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access') : null;
@@ -51,8 +71,6 @@ const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PasswordReset = lazy(() => import("./pages/PasswordReset"));
-const ForgotPassword = lazy(() => import("./pages/ForgotPassword").then(m => ({ default: m.ForgotPassword })));
-const ResetPassword = lazy(() => import("./pages/ResetPassword").then(m => ({ default: m.ResetPassword })));
 const InviteAccept = lazy(() => import("./pages/InviteAccept").then(m => ({ default: m.InviteAccept })));
 const Onboarding = lazy(() => import("./pages/Onboarding").then(m => ({ default: m.Onboarding })));
 const VehicleFinancialProfile = lazy(() => import("./pages/VehicleFinancialProfile"));
@@ -94,8 +112,10 @@ const App = () => (
             <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
             <Route path="/signup" element={<PublicOnly><Signup /></PublicOnly>} />
             <Route path="/password-reset" element={<PasswordReset />} />
-            <Route path="/forgot-password" element={<PublicOnly><ForgotPassword /></PublicOnly>} />
-            <Route path="/reset-password" element={<PublicOnly><ResetPassword /></PublicOnly>} />
+            {/* Consolidated onto the one working reset flow (the other two pages
+                posted the wrong payload / promised a link the backend never sends). */}
+            <Route path="/forgot-password" element={<Navigate to="/password-reset" replace />} />
+            <Route path="/reset-password" element={<Navigate to="/password-reset" replace />} />
             <Route path="/invite/:token" element={<PublicOnly><InviteAccept /></PublicOnly>} />
             <Route path="/quotes/view/:quoteId/:token" element={<ClientQuoteView />} />
             <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
@@ -126,16 +146,16 @@ const App = () => (
             <Route path="/finance/invoices/:id" element={<RequireAuth><OSLayout><InvoiceDetail /></OSLayout></RequireAuth>} />
             <Route path="/finance/expenses" element={<RequireAuth><OSLayout><Expenses /></OSLayout></RequireAuth>} />
             <Route path="/finance/reports" element={<RequireAuth><OSLayout><FinanceReports /></OSLayout></RequireAuth>} />
-            <Route path="/capital" element={<RequireAuth><OSLayout><Capital /></OSLayout></RequireAuth>} />
-            <Route path="/capital/request" element={<RequireAuth><OSLayout><AdvanceRequest /></OSLayout></RequireAuth>} />
-            <Route path="/capital/advances/:id" element={<RequireAuth><OSLayout><AdvanceDetail /></OSLayout></RequireAuth>} />
-            <Route path="/insights" element={<RequireAuth><OSLayout><Insights /></OSLayout></RequireAuth>} />
+            <Route path="/capital" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><Capital /></OSLayout></RequireRole></RequireAuth>} />
+            <Route path="/capital/request" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><AdvanceRequest /></OSLayout></RequireRole></RequireAuth>} />
+            <Route path="/capital/advances/:id" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><AdvanceDetail /></OSLayout></RequireRole></RequireAuth>} />
+            <Route path="/insights" element={<RequireAuth><RequireRole roles={INSIGHTS_ROLES}><OSLayout><Insights /></OSLayout></RequireRole></RequireAuth>} />
             {/* /partner-dashboard removed — standalone partner portal */}
-            <Route path="/settings/:section?" element={<RequireAuth><OSLayout><Settings /></OSLayout></RequireAuth>} />
-            <Route path="/settings/integrations/xero" element={<RequireAuth><OSLayout><XeroIntegration /></OSLayout></RequireAuth>} />
-            <Route path="/settings/integrations/fleet" element={<RequireAuth><OSLayout><FleetImport /></OSLayout></RequireAuth>} />
-            <Route path="/fleet/vehicles/:id/financial" element={<RequireAuth><OSLayout><VehicleFinancialProfile /></OSLayout></RequireAuth>} />
-            <Route path="/capital/risk-scores" element={<RequireAuth><OSLayout><RiskScoreView /></OSLayout></RequireAuth>} />
+            <Route path="/settings/:section?" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><Settings /></OSLayout></RequireRole></RequireAuth>} />
+            <Route path="/settings/integrations/xero" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><XeroIntegration /></OSLayout></RequireRole></RequireAuth>} />
+            <Route path="/settings/integrations/fleet" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><FleetImport /></OSLayout></RequireRole></RequireAuth>} />
+            <Route path="/fleet/vehicles/:id/financial" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><VehicleFinancialProfile /></OSLayout></RequireRole></RequireAuth>} />
+            <Route path="/capital/risk-scores" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><RiskScoreView /></OSLayout></RequireRole></RequireAuth>} />
             <Route path="/fleet/heatmap" element={<RequireAuth><OSLayout><FleetHeatmap /></OSLayout></RequireAuth>} />
 
             {/* Route aliases */}

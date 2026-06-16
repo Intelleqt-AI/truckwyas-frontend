@@ -12,7 +12,7 @@ export default function ClientQuoteView() {
   const { data: quote, isLoading, error } = useQuery({
     queryKey: ['public-quote', quoteId, token],
     queryFn: async () => {
-      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3700';
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
       const res = await fetch(`${baseURL}/api/v1/quotes/public/${quoteId}/${token}/`);
       if (!res.ok) {
         throw new Error('Quote not found or invalid link');
@@ -25,7 +25,7 @@ export default function ClientQuoteView() {
   // Respond to quote (accept/decline)
   const respondMutation = useMutation({
     mutationFn: async (action: 'accept' | 'decline') => {
-      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3700';
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
       const res = await fetch(`${baseURL}/api/v1/quotes/public/${quoteId}/${token}/respond/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -428,7 +428,15 @@ export default function Vehicles() {
                 onClick={async () => {
                   setSaving(true);
                   try {
-                    await postData({ url: 'api/v1/vehicles/', data: { ...addForm, year: Number(addForm.year), capacity: Number(addForm.capacity) || 0 } });
+                    // Link the vehicle_type FK by matching the chosen type name to
+                    // the company's seeded vehicle types (fixes the quoting base-rate link).
+                    let vehicleTypeId: number | undefined;
+                    try {
+                      const vt = await fetchData('api/v1/vehicle-types/');
+                      const list = (vt?.results ?? vt) as any[];
+                      vehicleTypeId = list?.find(t => t.name === addForm.type)?.id;
+                    } catch { /* picker still works without the FK */ }
+                    await postData({ url: 'api/v1/vehicles/', data: { ...addForm, year: Number(addForm.year), capacity: Number(addForm.capacity) || 0, ...(vehicleTypeId ? { vehicle_type: vehicleTypeId } : {}) } });
                     setShowAddForm(false);
                     setAddForm({ vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '', type: 'Rigid Truck', capacity: '', fuel_type: 'Diesel', status: 'AVAILABLE' });
                     // Refresh

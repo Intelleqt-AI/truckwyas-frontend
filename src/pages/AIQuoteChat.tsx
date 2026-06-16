@@ -294,12 +294,19 @@ export default function AIQuoteChat() {
   );
 
   return (
-    <div style={{
-      display: 'flex',
-      height: 'calc(100vh - 120px)',
-      gap: 16,
-      fontFamily: 'var(--font-sans)'
-    }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 90px)' }}>
+      <div style={{ marginBottom: 14 }}>
+        <button onClick={() => navigate('/quotes')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0, letterSpacing: '0.05em' }}>← BACK TO QUOTES</button>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>AI Quote</div>
+      </div>
+      <div style={{
+        display: 'flex',
+        flex: 1,
+        minHeight: 0,
+        gap: 16,
+        fontFamily: 'var(--font-sans)'
+      }}>
       {/* Left: Chat Panel (65%) */}
       <div style={{
         flex: '0 0 65%',
@@ -569,6 +576,7 @@ export default function AIQuoteChat() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

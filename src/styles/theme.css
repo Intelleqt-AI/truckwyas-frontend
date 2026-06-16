@@ -280,6 +280,11 @@ body {
   border-bottom: 1px solid var(--border-subtle);
   background: var(--header-bg);
   backdrop-filter: blur(10px);
+  /* Keep the header (and its dropdowns: notifications, profile menu) above the
+     main content's cards, which otherwise paint over absolutely-positioned
+     children of the header. */
+  position: relative;
+  z-index: 100;
 }
 
 .logo {

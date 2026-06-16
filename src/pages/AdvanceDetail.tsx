@@ -79,10 +79,11 @@ export default function AdvanceDetail() {
   const status = advance.status || 'REQUESTED';
   const invoiceNumber = advance.invoice_number || advance.invoiceNumber || 'N/A';
   const customerName = advance.customer_name || advance.customerName || 'N/A';
-  const grossAmount = advance.invoice_total || advance.gross_amount || advance.invoice_amount || advance.amount || 0;
-  const feePercent = advance.fee_percent || 2.0;
-  const feeAmount = advance.fee_amount || advance.fee || (grossAmount * feePercent / 100);
-  const netAmount = advance.net_amount || advance.advanced_amount || advance.advancedAmount || (grossAmount - feeAmount);
+  // API returns Decimal fields as strings — coerce to numbers before any math/toFixed.
+  const grossAmount = Number(advance.invoice_total || advance.gross_amount || advance.invoice_amount || advance.amount || 0);
+  const feePercent = Number(advance.fee_percent ?? 2.0) || 2.0;
+  const feeAmount = Number(advance.fee_amount || advance.fee || 0) || (grossAmount * feePercent / 100);
+  const netAmount = Number(advance.net_amount || advance.advanced_amount || advance.advancedAmount || 0) || (grossAmount - feeAmount);
   const createdAt = advance.created_at || advance.createdAt || new Date().toISOString();
   const approvedAt = advance.approved_at || advance.approvedAt || null;
   const disbursedAt = advance.disbursed_at || advance.disbursedAt || null;

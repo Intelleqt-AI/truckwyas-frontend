@@ -8,6 +8,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
     return (localStorage.getItem('tw-theme') as 'dark' | 'light') || 'dark';
   });
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [agentQuery, setAgentQuery] = useState('');
   const profileRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -92,7 +93,19 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
         </div>
         <div className="agent-command">
           <div className="agent-icon" />
-          <input type="text" className="agent-input" placeholder="Ask Agent anything..." />
+          <input
+            type="text"
+            className="agent-input"
+            placeholder="Ask Copilot anything..."
+            value={agentQuery}
+            onChange={e => setAgentQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && agentQuery.trim()) {
+                navigate(`/copilot?q=${encodeURIComponent(agentQuery.trim())}`);
+                setAgentQuery('');
+              }
+            }}
+          />
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <div className="status-badge active">

@@ -146,6 +146,8 @@ export default function NewQuote() {
   const [winProbAtAdjusted, setWinProbAtAdjusted] = useState<number | null>(null);
   const [showBenchmarkModal, setShowBenchmarkModal] = useState(false);
   const [guardExpanded, setGuardExpanded] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimal, setOptimal] = useState<any>(null);
 
   // Cost calculations — defined early so they can be used in callbacks/effects below
   // Mobile app formula implementation
@@ -238,6 +240,41 @@ export default function NewQuote() {
       }
     } finally {
       setLoadingAI(false);
+    }
+  };
+
+  // AI price optimizer — maximise expected profit = price × P(win). Always
+  // available (heuristic win-prob), unlike the ML suggest endpoint.
+  const fetchOptimal = async () => {
+    if (_total <= 0) return;
+    setOptimizing(true);
+    setOptimal(null);
+    try {
+      const marketRate = marketBenchmark?.market_avg_rate || _total * 1.15;
+      const data = await postData({ url: 'api/v1/quotes/optimize/', data: {
+        total_cost: Math.round(_total * 100) / 100,
+        market_rate: Math.round(marketRate),
+        client_tier: 'standard',
+      }});
+      if (data?.optimal_price) setOptimal(data);
+      else setError('Could not compute an optimal price');
+    } catch {
+      setError('Failed to optimise price');
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
+  // Back-solve the base rate/km so the quote total lands on the optimal price.
+  const applyOptimal = () => {
+    if (!optimal?.optimal_price || distanceKm <= 0) return;
+    const fixed = _fuelCost + _tollCost + _driverAllowance + _additionalCosts;
+    const ws = weightKg > 5000 ? 0.15 : 0;
+    const targetBaseCost = (optimal.optimal_price - fixed) / (1 + ws);
+    const perKm = targetBaseCost / distanceKm;
+    if (perKm > 0 && isFinite(perKm)) {
+      setBaseRatePerKm((Math.round(perKm * 100) / 100).toString());
+      setOptimal(null);
     }
   };
 
@@ -838,6 +875,54 @@ export default function NewQuote() {
                 </span>
               </div>
             </div>
+          </div>
+
+          {/* AI Price Optimizer — maximise expected profit (always available) */}
+          <div style={{ marginBottom: 16 }}>
+            <button
+              onClick={fetchOptimal}
+              disabled={optimizing || !canGoToStep3}
+              className="btn-action"
+              style={{ width: '100%', background: 'var(--accent-primary)', border: 'none', color: 'var(--bg-deep)', cursor: optimizing ? 'wait' : 'pointer', fontWeight: 600 }}
+            >
+              {optimizing ? 'OPTIMISING…' : '✦ FIND OPTIMAL PRICE'}
+            </button>
+
+            {optimal && (
+              <div style={{ marginTop: 12, padding: 16, background: 'var(--bg-surface-hover)', borderRadius: 2, border: '1px solid var(--accent-primary)' }}>
+                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 12 }}>
+                  AI OPTIMAL PRICE · maximises price × win-probability
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Optimal price:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--accent-primary)' }}>
+                      R {Math.round(optimal.optimal_price).toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Margin:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 600 }}>{optimal.optimal_margin_pct?.toFixed(1)}%</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Win probability:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 600 }}>{Math.round((optimal.win_probability_at_optimal || 0) * 100)}%</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Expected profit:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-success)', fontWeight: 600 }}>R {Math.round(optimal.expected_profit || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn-action" onClick={applyOptimal} style={{ flex: 1, background: 'var(--accent-primary)', border: 'none', color: 'var(--bg-deep)', fontWeight: 600 }}>
+                    APPLY THIS PRICE
+                  </button>
+                  <button className="btn-action" onClick={() => setOptimal(null)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                    DISMISS
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* AI Quote Suggestion Panel */}

@@ -12,9 +12,10 @@ interface Vehicle {
   year?: number;
   capacity?: number;
   status: string;
-  revenue_this_month?: number;
-  trips_this_month?: number;
-  fuel_efficiency?: number;
+  revenue_generated?: number;
+  total_trips?: number;
+  fuel_efficiency_score?: number;
+  utilisation_rate?: number;
   ai_health_score?: number;
   plate?: string;
   vin?: string;
@@ -40,7 +41,7 @@ interface FleetOverview {
   total_vehicles?: number;
   active_vehicles?: number;
   maintenance_vehicles?: number;
-  revenue_this_month?: number;
+  revenue_generated?: number;
 }
 
 interface FleetInsight {
@@ -131,7 +132,7 @@ export default function Vehicles() {
   // Sort vehicles
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === 'revenue') {
-      return (b.revenue_this_month || 0) - (a.revenue_this_month || 0);
+      return (b.revenue_generated || 0) - (a.revenue_generated || 0);
     }
     return 0;
   });
@@ -300,7 +301,7 @@ export default function Vehicles() {
                     <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles match your filters</td></tr>
                   )
                 ) : sorted.map((v, idx) => {
-                  const utilizationPercent = ((v.trips_this_month || 0) / 20) * 100;
+                  const utilizationPercent = ((v.total_trips || 0) / 20) * 100;
                   const utilizationColor = utilizationPercent > 70 ? 'var(--status-success)' : utilizationPercent >= 40 ? 'var(--status-warning)' : 'var(--status-danger)';
 
                   return (
@@ -335,13 +336,13 @@ export default function Vehicles() {
                         </span>
                       </td>
                       <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {v.revenue_this_month ? formatZAR(v.revenue_this_month) : '—'}
+                        {v.revenue_generated ? formatZAR(v.revenue_generated) : '—'}
                       </td>
                       <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {v.trips_this_month ?? 0}
+                        {v.total_trips ?? 0}
                       </td>
                       <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {v.fuel_efficiency ? `${parseFloat(v.fuel_efficiency as any).toFixed(1)} L/100km` : '—'}
+                        {v.fuel_efficiency_score ? `${parseFloat(v.fuel_efficiency_score as any).toFixed(0)}/100` : '—'}
                       </td>
                       <td style={{ padding: '12px 20px', textAlign: 'right' }}>
                         <button

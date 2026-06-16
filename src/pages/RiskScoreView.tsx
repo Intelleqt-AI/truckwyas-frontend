@@ -4,19 +4,19 @@ import { fetchData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
 
 const TIER_COLOR: Record<string, string> = {
-  EXCELLENT: 'var(--status-success)',
-  GOOD: 'var(--accent-primary)',
-  FAIR: 'var(--status-warning)',
+  PRIME: 'var(--status-success)',
+  STANDARD: 'var(--accent-primary)',
   ELEVATED: 'var(--status-warning)',
-  INELIGIBLE: 'var(--status-danger)',
+  HIGH: 'var(--status-danger)',
+  INELIGIBLE: 'var(--text-tertiary)',
 };
 
 const TIER_BG: Record<string, string> = {
-  EXCELLENT: 'var(--status-success-bg)',
-  GOOD: 'var(--status-success-bg)',
-  FAIR: 'var(--status-warning-bg)',
+  PRIME: 'var(--status-success-bg)',
+  STANDARD: 'var(--status-success-bg)',
   ELEVATED: 'var(--status-warning-bg)',
-  INELIGIBLE: 'var(--status-danger-bg)',
+  HIGH: 'var(--status-danger-bg)',
+  INELIGIBLE: 'var(--bg-surface-hover)',
 };
 
 const ScoreRing = ({ score, tier }: { score: number; tier: string }) => {
@@ -67,11 +67,11 @@ export default function RiskScoreView() {
     return { ...best, customer_name: cust?.name || `Customer ${cid}`, cid: parseInt(cid) };
   }).sort((a, b) => b.total_score - a.total_score);
 
-  const tiers = ['EXCELLENT', 'GOOD', 'FAIR', 'ELEVATED', 'INELIGIBLE'];
+  const tiers = ['PRIME', 'STANDARD', 'ELEVATED', 'HIGH', 'INELIGIBLE'];
   const tierCounts = tiers.reduce((acc, t) => ({ ...acc, [t]: customerScores.filter(c => c.tier === t).length }), {} as Record<string, number>);
   const avgScore = customerScores.length > 0 ? Math.round(customerScores.reduce((s, c) => s + c.total_score, 0) / customerScores.length) : 0;
 
-  const FEE_MAP: Record<string, number> = { EXCELLENT: 2.0, GOOD: 2.5, FAIR: 3.0, ELEVATED: 3.5, INELIGIBLE: 0 };
+  const FEE_MAP: Record<string, number> = { PRIME: 2.0, STANDARD: 2.5, ELEVATED: 3.5, HIGH: 4.5, INELIGIBLE: 0 };
 
   return (
     <div>
@@ -97,7 +97,7 @@ export default function RiskScoreView() {
         <div className="card" style={{ padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>PORTFOLIO OVERVIEW</div>
           <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-            <ScoreRing score={avgScore} tier={avgScore >= 85 ? 'EXCELLENT' : avgScore >= 70 ? 'GOOD' : avgScore >= 55 ? 'FAIR' : 'ELEVATED'} />
+            <ScoreRing score={avgScore} tier={avgScore >= 85 ? 'PRIME' : avgScore >= 70 ? 'STANDARD' : avgScore >= 55 ? 'ELEVATED' : avgScore >= 40 ? 'HIGH' : 'INELIGIBLE'} />
             <div>
               <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Portfolio Score: {avgScore}/100</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>{customerScores.length} customers scored</div>

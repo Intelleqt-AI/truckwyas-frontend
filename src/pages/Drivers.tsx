@@ -8,7 +8,7 @@ interface Driver {
   first_name?: string;
   last_name?: string;
   status: string;
-  trips_this_month?: number;
+  total_trips?: number;
   revenue_generated?: number;
   efficiency_score?: number;
   phone?: string;
@@ -298,7 +298,7 @@ export default function Drivers() {
                     </span>
                   </td>
                   <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                    {d.trips_this_month ?? 0}
+                    {d.total_trips ?? 0}
                   </td>
                   <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
                     {d.revenue_generated ? formatZAR(d.revenue_generated) : '—'}

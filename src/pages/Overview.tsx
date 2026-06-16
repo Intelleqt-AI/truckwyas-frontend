@@ -154,26 +154,34 @@ export default function Overview() {
         gap: 16,
         alignContent: 'start',
       }}>
-        {/* Real-time Clock */}
-        <div className="card" style={{ gridColumn: 'span 3', padding: '14px 20px', background: 'var(--bg-surface)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+        {/* Command bar — compact clock + actionable live pulse */}
+        <div className="card" style={{ gridColumn: 'span 3', padding: '12px 20px', background: 'var(--bg-surface)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            {/* Compact date / time */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   {formatDate(currentTime)}
                 </div>
-                <LiveBadge />
+                <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
+                  {formatTime(currentTime)} <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 4 }}>SAST</span>
+                </div>
               </div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
-                {formatTime(currentTime)} <span style={{ fontSize: 14, color: 'var(--text-secondary)', marginLeft: 8 }}>SAST</span>
-              </div>
+              <LiveBadge />
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.05em' }}>SYSTEM STATUS</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <div className="live-dot" />
-                <span style={{ fontSize: 12, color: 'var(--status-success)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>OPERATIONAL</span>
-              </div>
+
+            {/* Actionable pulse — clickable */}
+            <div style={{ display: 'flex', gap: 26, alignItems: 'center' }}>
+              {([
+                { label: 'Active loads', value: String(activeLoadsCount), route: '/bookings', warn: false },
+                { label: 'Fleet ready', value: `${activeVehicles}/${totalVehicles}`, route: '/fleet', warn: false },
+                { label: 'Advances pending', value: String(advances.filter((a: any) => a.status === 'REQUESTED').length), route: '/capital', warn: advances.filter((a: any) => a.status === 'REQUESTED').length > 0 },
+              ] as const).map(s => (
+                <div key={s.label} onClick={() => navigate(s.route)} style={{ cursor: 'pointer', textAlign: 'right' }}>
+                  <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{s.label}</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--font-mono)', color: s.warn ? 'var(--status-warning)' : 'var(--text-primary)' }}>{s.value}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

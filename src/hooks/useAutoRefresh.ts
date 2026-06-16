@@ -24,11 +24,15 @@ export function useAutoRefresh(refetch: () => void, intervalMs = 30000) {
     };
     const timer = setInterval(run, intervalMs);
     const onFocus = () => cb.current();
+    // Instant refresh when a real-time event is pushed over the WebSocket.
+    const onLiveEvent = () => cb.current();
     window.addEventListener('focus', onFocus);
+    window.addEventListener('tw:live-event', onLiveEvent as EventListener);
     document.addEventListener('visibilitychange', run);
     return () => {
       clearInterval(timer);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('tw:live-event', onLiveEvent as EventListener);
       document.removeEventListener('visibilitychange', run);
     };
   }, [intervalMs]);

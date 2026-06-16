@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { LiveEvents } from '@/components/LiveEvents';
 
 export function OSLayout({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -71,6 +72,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="os-container" style={{ gridTemplateColumns: '60px 1fr', gridTemplateRows: '60px 1fr' }}>
+      <LiveEvents />
       <div className="ambient-glow" />
 
       {/* HEADER */}

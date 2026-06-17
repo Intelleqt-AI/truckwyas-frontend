@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { fetchData, postData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
 import { QuotesList } from './QuotesList';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
+import { LiveBadge } from '@/components/LiveBadge';
 
 interface Load {
   id: number;
@@ -75,18 +77,22 @@ export default function LoadsList() {
     }
   };
 
-  useEffect(() => {
-    fetchData('/api/v1/loads/')
+  const load = () => {
+    return fetchData('/api/v1/loads/')
       .then((data: any) => {
         const loadsData = data?.results || data || [];
         setLoads(loadsData);
+        setError(null);
       })
       .catch(() => {
         setError('Failed to load bookings');
         setLoads([]);
       })
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { load(); }, []);
+  useAutoRefresh(load);
 
   const activeLoads = loads.filter(l => ACTIVE_STATUSES.includes(l.status));
   const historyLoads = loads.filter(l => HISTORY_STATUSES.includes(l.status));
@@ -225,7 +231,10 @@ export default function LoadsList() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Bookings</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{TAB_SUBTITLES[activeTab]}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{TAB_SUBTITLES[activeTab]}</div>
+            <LiveBadge />
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button

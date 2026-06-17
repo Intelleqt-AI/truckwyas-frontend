@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchData } from "@/lib/Api";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { LiveBadge } from "@/components/LiveBadge";
 
 const STATUS_COLOR: Record<string, string> = {
   IN_TRANSIT: 'var(--accent-primary)',
@@ -38,7 +40,7 @@ export default function FleetDashboard() {
     document.title = 'Fleet - TruckWys';
   }, []);
 
-  useEffect(() => {
+  const load = () => {
     Promise.all([
       fetchData('api/v1/vehicles/'),
       fetchData('api/v1/drivers/')
@@ -46,14 +48,16 @@ export default function FleetDashboard() {
       .then(([vehiclesData, driversData]) => {
         setVehicles(Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.results || []));
         setDrivers(Array.isArray(driversData) ? driversData : (driversData?.results || []));
+        setError(null);
       })
       .catch(() => {
         setError('Failed to load fleet data');
-        setVehicles([]);
-        setDrivers([]);
       })
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { load(); }, []);
+  useAutoRefresh(load); // live-refresh every 30s + on focus
 
   const activeVehicles = vehicles.filter(v => v.status === 'IN_USE').length;
   const idleVehicles = vehicles.filter(v => v.status === 'AVAILABLE').length;
@@ -95,7 +99,10 @@ export default function FleetDashboard() {
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
+            <LiveBadge />
+          </div>
         </div>
         <button className="btn-action" onClick={() => navigate(tab === 'vehicles' ? '/fleet/vehicles' : '/fleet/drivers')}>
           + ADD {tab === 'vehicles' ? 'VEHICLE' : 'DRIVER'}

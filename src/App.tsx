@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { OSLayout } from "./components/os/OSLayout";
 // Eager load — Overview for fast first load
@@ -47,7 +47,6 @@ const QuotesList = lazy(() => import("./pages/QuotesList").then(m => ({ default:
 const NewQuote = lazy(() => import("./pages/NewQuote"));
 const AIQuoteChat = lazy(() => import("./pages/AIQuoteChat"));
 const QuoteDetail = lazy(() => import("./pages/QuoteDetail"));
-const BookingsList = lazy(() => import("./pages/BookingsList").then(m => ({ default: m.BookingsList })));
 const Bookings = lazy(() => import("./pages/Bookings"));
 const LoadsList = lazy(() => import("./pages/LoadsList"));
 const Vehicles = lazy(() => import("./pages/Vehicles"));
@@ -63,6 +62,7 @@ const Capital = lazy(() => import("./pages/Capital"));
 const AdvanceRequest = lazy(() => import("./pages/AdvanceRequest"));
 const AdvanceDetail = lazy(() => import("./pages/AdvanceDetail"));
 const Insights = lazy(() => import("./pages/Insights"));
+const Copilot = lazy(() => import("./pages/Copilot"));
 // PartnerDashboard removed — moved to standalone partner portal
 const Settings = lazy(() => import("./pages/Settings"));
 const XeroIntegration = lazy(() => import("./pages/settings/XeroIntegration"));
@@ -82,7 +82,15 @@ const ClientQuoteView = lazy(() => import("./pages/ClientQuoteView"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 2, throwOnError: false, refetchOnWindowFocus: false, staleTime: 0 },
+    queries: {
+      retry: 2,
+      throwOnError: false,
+      staleTime: 15000,
+      refetchOnWindowFocus: true,      // refresh when the operator returns to the tab
+      refetchOnReconnect: true,
+      refetchInterval: 30000,          // live polling for React-Query screens
+      refetchIntervalInBackground: false, // …but not while the tab is hidden
+    },
   },
 });
 
@@ -100,6 +108,12 @@ const LoadingFallback = () => (
     Loading...
   </div>
 );
+
+// Legacy /loads/:id deep-links redirect to the bookings detail page.
+function LoadsRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/bookings/${id}`} replace />;
+}
 
 const App = () => (
   <BrowserRouter>
@@ -130,7 +144,9 @@ const App = () => (
             <Route path="/quotes/:id" element={<RequireAuth><OSLayout><QuoteDetail /></OSLayout></RequireAuth>} />
             <Route path="/bookings" element={<RequireAuth><OSLayout><LoadsList /></OSLayout></RequireAuth>} />
             <Route path="/bookings/:id" element={<RequireAuth><OSLayout><Bookings /></OSLayout></RequireAuth>} />
-            <Route path="/bookings/list" element={<RequireAuth><OSLayout><BookingsList /></OSLayout></RequireAuth>} />
+            {/* Safety: legacy /loads/:id deep-links (e.g. old notifications) → bookings detail */}
+            <Route path="/loads/:id" element={<LoadsRedirect />} />
+            <Route path="/bookings/list" element={<Navigate to="/bookings" replace />} />
             <Route path="/bookings/pipeline" element={<RequireAuth><OSLayout><QuotesList /></OSLayout></RequireAuth>} />
             <Route path="/bookings/pipeline/:id" element={<RequireAuth><OSLayout><NewQuote /></OSLayout></RequireAuth>} />
             <Route path="/fleet" element={<RequireAuth><OSLayout><Vehicles /></OSLayout></RequireAuth>} />
@@ -152,6 +168,9 @@ const App = () => (
             <Route path="/capital/request" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><AdvanceRequest /></OSLayout></RequireRole></RequireAuth>} />
             <Route path="/capital/advances/:id" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><AdvanceDetail /></OSLayout></RequireRole></RequireAuth>} />
             <Route path="/insights" element={<RequireAuth><RequireRole roles={INSIGHTS_ROLES}><OSLayout><Insights /></OSLayout></RequireRole></RequireAuth>} />
+            <Route path="/copilot" element={<RequireAuth><RequireRole roles={INSIGHTS_ROLES}><OSLayout><Copilot /></OSLayout></RequireRole></RequireAuth>} />
+            <Route path="/cash" element={<Navigate to="/insights" replace />} />
+            <Route path="/control" element={<Navigate to="/insights" replace />} />
             {/* /partner-dashboard removed — standalone partner portal */}
             <Route path="/settings/:section?" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><Settings /></OSLayout></RequireRole></RequireAuth>} />
             <Route path="/settings/integrations/xero" element={<RequireAuth><RequireRole roles={FINANCE_ROLES}><OSLayout><XeroIntegration /></OSLayout></RequireRole></RequireAuth>} />

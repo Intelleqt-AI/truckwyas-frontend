@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetchData, postData, patchData } from '../lib/Api';
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { LiveBadge } from "@/components/LiveBadge";
 
 interface Vehicle {
   id: number;
@@ -93,9 +95,8 @@ export default function Vehicles() {
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
   const [editForm, setEditForm] = useState<any>({});
 
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
+  const load = useCallback(() => {
+    return Promise.all([
       fetchData('api/v1/vehicles/'),
       fetchData('api/v1/fleet/overview/'),
       fetchData('api/v1/fleet/intelligence/')
@@ -122,6 +123,9 @@ export default function Vehicles() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useAutoRefresh(load);
 
   // Filter vehicles
   const filtered = vehicles.filter(v => {
@@ -188,7 +192,10 @@ export default function Vehicles() {
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
+            <LiveBadge />
+          </div>
           <div style={{ display: 'flex', gap: 12 }}>
             <button onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>HEATMAP</button>
             <button className="btn-action" onClick={() => setShowAddForm(true)}>+ ADD VEHICLE</button>

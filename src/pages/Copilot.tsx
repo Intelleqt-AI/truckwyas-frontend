@@ -165,10 +165,12 @@ export default function Copilot() {
     setLoading(true);
     try {
       const res: any = await postData({ url: a.endpoint, data: a.body });
+      const followUp: Action = a.type === 'request_advance'
+        ? { label: 'View in Fast Pay', route: res?.id ? `/capital/advances/${res.id}` : '/capital' }
+        : { label: 'Open Invoices', route: '/finance/invoices' };
       setMessages(prev => {
         const next = prev.map((m, i) => i === msgIndex ? { ...m, actionState: 'done' as const } : m);
-        return [...next, { role: 'assistant' as const, content: a.success_text || 'Done.', animate: true,
-          actions: [{ label: 'View in Fast Pay', route: res?.id ? `/capital/advances/${res.id}` : '/capital' }] }];
+        return [...next, { role: 'assistant' as const, content: a.success_text || 'Done.', animate: true, actions: [followUp] }];
       });
     } catch (e: any) {
       setMessages(prev => {

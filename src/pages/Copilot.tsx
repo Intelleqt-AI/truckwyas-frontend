@@ -1,14 +1,20 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { postData, fetchData, deleteData } from '@/lib/Api';
 
-const THREAD_KEY = 'copilot_thread';
-function loadCached(): Message[] | null {
+const CACHE_KEY = 'copilot_current';
+function loadCache(): { conversationId: number | null; messages: Message[] } | null {
   try {
-    const c = JSON.parse(localStorage.getItem(THREAD_KEY) || 'null');
-    if (Array.isArray(c) && c.length) return c as Message[];
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+    if (c && Array.isArray(c.messages) && c.messages.length) return c;
   } catch { /* ignore */ }
   return null;
+}
+function relTime(iso: string): string {
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (d < 1) return 'now'; if (d < 60) return `${d}m`;
+  const h = Math.floor(d / 60); if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
 }
 
 interface Action { label: string; route: string; }
@@ -57,10 +63,10 @@ const labelStyle: React.CSSProperties = {
 export default function Copilot() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const cached = loadCached();
-    return cached ? [INTRO, ...cached] : [INTRO];
-  });
+  const [messages, setMessages] = useState<Message[]>(() => loadCache()?.messages || [INTRO]);
+  const [conversationId, setConversationId] = useState<number | null>(() => loadCache()?.conversationId ?? null);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
@@ -72,26 +78,43 @@ export default function Copilot() {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
   useEffect(() => { document.title = 'Copilot - TruckWys'; }, []);
 
-  // Load the durable server-side thread on mount (authoritative — survives
-  // refresh and works across devices). The localStorage cache already gave an
-  // instant first paint above.
-  useEffect(() => {
-    fetchData('api/v1/agent/history/')
-      .then((d: any) => {
-        const hist = (d?.messages || []).map((m: any) => ({ role: m.role, content: m.content }));
-        if (hist.length) setMessages([INTRO, ...hist]);
-      })
-      .catch(() => { /* offline: keep the cached thread */ });
+  const refreshConversations = useCallback(() => {
+    fetchData('api/v1/agent/conversations/')
+      .then((d: any) => setConversations(d?.conversations || []))
+      .catch(() => {});
   }, []);
 
-  // Cache the live thread (sans transient fields) for instant restore next time.
+  const openConversation = useCallback((id: number) => {
+    setShowHistory(false);
+    fetchData(`api/v1/agent/conversations/${id}/`)
+      .then((d: any) => {
+        const hist = (d?.messages || []).map((m: any) => ({ role: m.role, content: m.content }));
+        setConversationId(id);
+        setMessages(hist.length ? [INTRO, ...hist] : [INTRO]);
+      })
+      .catch(() => {});
+  }, []);
+
+  // On mount: load the conversation list, and if we have no cached thread,
+  // restore the most recent conversation from the server.
+  useEffect(() => {
+    fetchData('api/v1/agent/conversations/')
+      .then((d: any) => {
+        const list = d?.conversations || [];
+        setConversations(list);
+        if (!loadCache() && list.length) openConversation(list[0].id);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cache the current conversation for instant restore next time.
   useEffect(() => {
     try {
-      const thread = messages.slice(1).map(m => ({ role: m.role, content: m.content }));
-      if (thread.length) localStorage.setItem(THREAD_KEY, JSON.stringify(thread));
-      else localStorage.removeItem(THREAD_KEY);
-    } catch { /* ignore quota errors */ }
-  }, [messages]);
+      if (messages.length > 1) localStorage.setItem(CACHE_KEY, JSON.stringify({ conversationId, messages }));
+      else localStorage.removeItem(CACHE_KEY);
+    } catch { /* ignore quota */ }
+  }, [messages, conversationId]);
 
   const autoGrow = () => {
     const ta = taRef.current;
@@ -110,13 +133,15 @@ export default function Copilot() {
     setLoading(true);
     try {
       const payload = history.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role: m.role, content: m.content }));
-      const res: any = await postData({ url: 'api/v1/agent/chat/', data: { messages: payload } });
+      const res: any = await postData({ url: 'api/v1/agent/chat/', data: { messages: payload, conversation_id: conversationId } });
       setAiAvailable(!!res?.ai_available);
+      if (res?.conversation_id && res.conversation_id !== conversationId) setConversationId(res.conversation_id);
       setMessages(prev => [...prev, {
         role: 'assistant', content: res?.reply || 'Sorry, I could not produce a response.',
         actions: res?.actions || [], proposedAction: res?.proposed_action || null,
         actionState: res?.proposed_action ? 'pending' : undefined, animate: true,
       }]);
+      refreshConversations();
     } catch (e: any) {
       setMessages(prev => [...prev, { role: 'assistant', content: e?.message || 'Something went wrong reaching the copilot.', animate: true }]);
     } finally {
@@ -155,10 +180,25 @@ export default function Copilot() {
     }
   };
   const dismissAction = (i: number) => setMessages(prev => prev.map((m, j) => j === i ? { ...m, actionState: 'dismissed' } : m));
-  const reset = () => {
-    setMessages([INTRO]); setInput(''); setAiAvailable(null);
-    try { localStorage.removeItem(THREAD_KEY); } catch { /* ignore */ }
-    deleteData({ url: 'api/v1/agent/history/' }).catch(() => {});
+
+  // New chat — starts a fresh conversation. The previous one is KEPT (browsable
+  // in History), never deleted.
+  const newChat = async () => {
+    setShowHistory(false); setInput(''); setAiAvailable(null); setMessages([INTRO]);
+    try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
+    try {
+      const res: any = await postData({ url: 'api/v1/agent/conversations/', data: {} });
+      setConversationId(res?.id ?? null);
+    } catch { setConversationId(null); }
+    refreshConversations();
+  };
+
+  const deleteConversation = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Delete this conversation?')) return;
+    await deleteData({ url: `api/v1/agent/conversations/${id}/` }).catch(() => {});
+    if (id === conversationId) { setMessages([INTRO]); setConversationId(null); try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ } }
+    refreshConversations();
   };
 
   const avatar = (role: 'user' | 'assistant') => (
@@ -198,9 +238,30 @@ export default function Copilot() {
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)' }} />
             {aiAvailable === null ? 'Ready' : aiAvailable ? 'Claude · Live' : 'Rules engine'}
           </span>
-          {!isEmpty && (
-            <button onClick={reset} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '6px 10px', borderRadius: 2, cursor: 'pointer' }}>New chat</button>
-          )}
+          {/* History dropdown — past conversations are kept, never lost */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => { setShowHistory(s => !s); if (!showHistory) refreshConversations(); }}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '6px 10px', borderRadius: 2, cursor: 'pointer' }}>
+              History{conversations.length ? ` (${conversations.length})` : ''}
+            </button>
+            {showHistory && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 300, maxHeight: 360, overflowY: 'auto', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', zIndex: 2000 }}>
+                {conversations.length === 0 ? (
+                  <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>No past conversations</div>
+                ) : conversations.map((c: any) => (
+                  <div key={c.id} onClick={() => openConversation(c.id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--border-row)', cursor: 'pointer', background: c.id === conversationId ? 'var(--bg-surface-hover)' : 'transparent' }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 12.5, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'New conversation'}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{c.message_count} msgs · {relTime(c.updated_at)}</div>
+                    </div>
+                    <button onClick={(e) => deleteConversation(c.id, e)} title="Delete" style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 13, padding: 2 }}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <button onClick={newChat} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', background: 'var(--accent-primary)', border: 'none', color: 'var(--bg-deep)', padding: '6px 10px', borderRadius: 2, cursor: 'pointer', fontWeight: 600 }}>+ New chat</button>
         </div>
       </div>
 

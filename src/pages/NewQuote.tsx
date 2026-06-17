@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { postData, patchData, fetchData } from "@/lib/Api";
+import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 // SA constants
 const DEFAULT_BASE_RATE_PER_KM = 10;
@@ -913,6 +914,43 @@ export default function NewQuote() {
                     <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-success)', fontWeight: 600 }}>R {Math.round(optimal.expected_profit || 0).toLocaleString()}</span>
                   </div>
                 </div>
+                {Array.isArray(optimal.curve) && optimal.curve.length > 1 && (() => {
+                  const data = optimal.curve.map((c: any) => ({
+                    margin: c.margin_pct,
+                    win: Math.round((c.win_probability || 0) * 100),
+                    profit: Math.round(c.expected_profit || 0),
+                  }));
+                  return (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 6 }}>
+                        PROFIT SWEET-SPOT · expected profit (area) vs win-rate (line) across margin
+                      </div>
+                      <ResponsiveContainer width="100%" height={150}>
+                        <ComposedChart data={data} margin={{ top: 8, right: 6, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="evGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="var(--status-success)" stopOpacity={0.35} />
+                              <stop offset="95%" stopColor="var(--status-success)" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <XAxis dataKey="margin" stroke="var(--text-tertiary)" tickFormatter={(v: number) => `${v}%`} style={{ fontSize: 10, fontFamily: 'var(--font-mono)' }} />
+                          <YAxis yAxisId="p" hide />
+                          <YAxis yAxisId="w" orientation="right" domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} stroke="var(--text-tertiary)" style={{ fontSize: 10, fontFamily: 'var(--font-mono)' }} width={32} />
+                          <Tooltip
+                            contentStyle={{ background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                            labelFormatter={(v: any) => `Margin ${v}%`}
+                            formatter={(val: any, name: any) => name === 'profit' ? [`R ${Number(val).toLocaleString()}`, 'Exp. profit'] : [`${val}%`, 'Win rate']}
+                          />
+                          <Area yAxisId="p" type="monotone" dataKey="profit" stroke="var(--status-success)" strokeWidth={2} fill="url(#evGrad)" />
+                          <Line yAxisId="w" type="monotone" dataKey="win" stroke="var(--accent-primary)" strokeWidth={2} dot={false} />
+                          {optimal.optimal_margin_pct != null && (
+                            <ReferenceLine yAxisId="p" x={Math.round(optimal.optimal_margin_pct * 10) / 10} stroke="var(--accent-primary)" strokeDasharray="3 3" />
+                          )}
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  );
+                })()}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button className="btn-action" onClick={applyOptimal} style={{ flex: 1, background: 'var(--accent-primary)', border: 'none', color: 'var(--bg-deep)', fontWeight: 600 }}>
                     APPLY THIS PRICE

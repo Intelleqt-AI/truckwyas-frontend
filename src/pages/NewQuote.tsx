@@ -80,6 +80,15 @@ interface ModelStats {
   synthetic_count: number;
   last_trained: string;
   model_version: string;
+  win_model?: {
+    mode: 'learned' | 'heuristic';
+    trained: boolean;
+    outcomes_collected: number;
+    outcomes_needed: number;
+    progress_pct: number;
+    auc?: number | null;
+    last_trained?: string | null;
+  } | null;
 }
 
 interface MarketBenchmark {
@@ -925,6 +934,14 @@ export default function NewQuote() {
                       <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 6 }}>
                         PROFIT SWEET-SPOT · expected profit (area) vs win-rate (line) across margin
                       </div>
+                      {modelStats?.win_model && (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontFamily: 'var(--font-mono)', padding: '2px 8px', borderRadius: 2, marginBottom: 8, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: 6, background: modelStats.win_model.mode === 'learned' ? 'var(--status-success)' : 'var(--status-warning)' }} />
+                          {modelStats.win_model.mode === 'learned'
+                            ? `Win model: learned${modelStats.win_model.auc != null ? ` · AUC ${modelStats.win_model.auc.toFixed(2)}` : ''} · ${modelStats.win_model.outcomes_collected} outcomes`
+                            : `Win model: heuristic · ${modelStats.win_model.outcomes_collected}/${modelStats.win_model.outcomes_needed} outcomes to learn`}
+                        </div>
+                      )}
                       <ResponsiveContainer width="100%" height={150}>
                         <ComposedChart data={data} margin={{ top: 8, right: 6, left: 0, bottom: 0 }}>
                           <defs>

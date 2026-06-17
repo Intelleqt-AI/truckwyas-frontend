@@ -21,16 +21,22 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
+// Distinct hue per pipeline stage so the board reads as progression
+// (the design system's --status-success and --accent-primary are the same blue,
+// which made Accepted / In-Transit / Completed indistinguishable).
 const STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'var(--text-tertiary)',
-  SENT: 'var(--status-warning)',
-  ACCEPTED: 'var(--status-success)',
-  IT: 'var(--accent-primary)',
-  COMPLETED: 'var(--status-success)',
+  DRAFT: 'var(--text-tertiary)',   // neutral grey
+  SENT: '#F59E0B',                 // amber — awaiting reply
+  ACCEPTED: '#22C55E',             // green — won
+  IT: 'var(--accent-primary)',     // blue — in motion
+  COMPLETED: '#14B8A6',            // teal — done
 };
 
+const WON_GREEN = '#22C55E';
+const WON_GREEN_BG = 'rgba(34,197,94,0.12)';
+
 const confidenceColor = (c?: string) =>
-  c === 'HIGH' ? 'var(--status-success)' : c === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)';
+  c === 'HIGH' ? WON_GREEN : c === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)';
 
 const routeOf = (q: any) =>
   `${q.origin || q.pickup_location || '—'} → ${q.destination || q.delivery_location || '—'}`;
@@ -63,7 +69,6 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
     cursor: isDragging ? 'grabbing' : 'grab',
     background: 'var(--bg-surface)',
     border: '1px solid var(--border-subtle)',
-    borderLeft: `2px solid ${accent}`,
     borderRadius: 2,
     boxShadow: isDragging ? '0 8px 16px rgba(0,0,0,0.25)' : 'none',
   };
@@ -80,13 +85,16 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
     >
       <div style={{ padding: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6 }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>{quote.quote_number}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 6, background: accent, flexShrink: 0 }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>{quote.quote_number}</span>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             {quote.fuel_alert && (
               <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 11 }}>⛽</span>
             )}
             {quote.outcome === 'accepted' && (
-              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: 'var(--status-success-bg)', color: 'var(--status-success)', border: '1px solid var(--status-success)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>✓ WON</span>
+              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>✓ WON</span>
             )}
             {quote.outcome === 'rejected' && (
               <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>✗ LOST</span>
@@ -106,7 +114,7 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
         {quote.status === 'ACCEPTED' && onConvertToLoad && (
           <button
             onClick={(e) => onConvertToLoad(e, quote)}
-            style={{ width: '100%', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.05em', padding: '7px 8px', background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)', borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
+            style={{ width: '100%', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.05em', padding: '7px 8px', background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
           >
             → CONVERT TO BOOKING
           </button>
@@ -357,8 +365,11 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
           {/* Drag Overlay */}
           <DragOverlay>
             {activeQuote ? (
-              <div style={{ padding: 12, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderLeft: `2px solid ${STATUS_COLOR[activeQuote.status] || 'var(--border-subtle)'}`, borderRadius: 2, boxShadow: '0 8px 16px rgba(0,0,0,0.25)' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6 }}>{activeQuote.quote_number}</div>
+              <div style={{ padding: 12, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, boxShadow: '0 8px 16px rgba(0,0,0,0.25)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 6, background: STATUS_COLOR[activeQuote.status] || 'var(--border-subtle)', flexShrink: 0 }} />
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>{activeQuote.quote_number}</span>
+                </div>
                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{activeQuote.customer_name || '—'}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
                   {routeOf(activeQuote)}
@@ -449,7 +460,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       {quote.outcome === 'accepted' && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: 'var(--status-success-bg)', color: 'var(--status-success)', border: '1px solid var(--status-success)', borderRadius: 2, fontWeight: 600 }}>✓ Won</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, borderRadius: 2, fontWeight: 600 }}>✓ Won</span>
                       )}
                       {quote.outcome === 'rejected' && (
                         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', borderRadius: 2, fontWeight: 600 }}>✗ Lost</span>
@@ -468,7 +479,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                       {quote.status === 'ACCEPTED' && (
                         <button
                           onClick={(e) => handleConvertToLoad(e, quote)}
-                          style={{ background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)', padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer' }}
+                          style={{ background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer' }}
                         >
                           → BOOKING
                         </button>

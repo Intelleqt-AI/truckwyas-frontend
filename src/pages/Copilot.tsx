@@ -220,50 +220,58 @@ export default function Copilot() {
         .cp-dot { width:5px; height:5px; border-radius:50%; background:var(--text-tertiary); display:inline-block; animation: cp-blink 1.2s infinite both; }
         .cp-card:hover { border-color: var(--accent-primary); }
         .cp-chip:hover { background: var(--accent-primary); color: var(--bg-deep); }
+        .cp-conv:hover { background: var(--bg-surface-hover); }
+        .cp-conv:hover .cp-del { opacity: 1; }
+        .cp-del:hover { color: var(--status-danger) !important; }
       `}</style>
 
-      {/* Header — matches the standard page pattern (eyebrow + title) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+      {/* Header — eyebrow + title + status pill */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
         <div>
           <div style={labelStyle}>Intelligence</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Copilot</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 10,
-            padding: '4px 9px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: '0.07em',
-            background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            color: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)' }} />
-            {aiAvailable === null ? 'Ready' : aiAvailable ? 'Claude · Live' : 'Rules engine'}
-          </span>
-          {/* History dropdown — past conversations are kept, never lost */}
-          <div style={{ position: 'relative' }}>
-            <button onClick={() => { setShowHistory(s => !s); if (!showHistory) refreshConversations(); }}
-              style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '6px 10px', borderRadius: 2, cursor: 'pointer' }}>
-              History{conversations.length ? ` (${conversations.length})` : ''}
-            </button>
-            {showHistory && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 300, maxHeight: 360, overflowY: 'auto', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', zIndex: 2000 }}>
-                {conversations.length === 0 ? (
-                  <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>No past conversations</div>
-                ) : conversations.map((c: any) => (
-                  <div key={c.id} onClick={() => openConversation(c.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--border-row)', cursor: 'pointer', background: c.id === conversationId ? 'var(--bg-surface-hover)' : 'transparent' }}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 12.5, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'New conversation'}</div>
-                      <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{c.message_count} msgs · {relTime(c.updated_at)}</div>
-                    </div>
-                    <button onClick={(e) => deleteConversation(c.id, e)} title="Delete" style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 13, padding: 2 }}>✕</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <button onClick={newChat} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase', background: 'var(--accent-primary)', border: 'none', color: 'var(--bg-deep)', padding: '6px 10px', borderRadius: 2, cursor: 'pointer', fontWeight: 600 }}>+ New chat</button>
-        </div>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 10,
+          padding: '4px 9px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: '0.07em',
+          background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+          color: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)' }} />
+          {aiAvailable === null ? 'Ready' : aiAvailable ? 'Claude · Live' : 'Rules engine'}
+        </span>
       </div>
+
+      {/* Two-pane: conversation history sidebar (left) + active chat (right) */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 12 }}>
+        {/* Sidebar */}
+        <div style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ padding: 10, borderBottom: '1px solid var(--border-subtle)' }}>
+            <button onClick={newChat} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, padding: '9px 12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New chat
+            </button>
+          </div>
+          <div style={{ padding: '10px 12px 4px', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Conversations</div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {conversations.length === 0 ? (
+              <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 11 }}>No conversations yet</div>
+            ) : conversations.map((c: any) => (
+              <div
+                key={c.id}
+                onClick={() => openConversation(c.id)}
+                className="cp-conv"
+                style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, padding: '10px 10px 10px 12px', cursor: 'pointer', borderLeft: c.id === conversationId ? '2px solid var(--accent-primary)' : '2px solid transparent', background: c.id === conversationId ? 'var(--bg-surface-hover)' : 'transparent' }}
+              >
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'New conversation'}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{c.message_count} msgs · {relTime(c.updated_at)}</div>
+                </div>
+                <button onClick={(e) => deleteConversation(c.id, e)} className="cp-del" title="Delete" style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 13, padding: 2, opacity: 0.6 }}>✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
 
       {/* Conversation card fills remaining height; input docked inside at the bottom */}
       <div className="card" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
@@ -356,6 +364,7 @@ export default function Copilot() {
             </button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

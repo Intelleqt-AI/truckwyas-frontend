@@ -47,7 +47,6 @@ const QuotesList = lazy(() => import("./pages/QuotesList").then(m => ({ default:
 const NewQuote = lazy(() => import("./pages/NewQuote"));
 const AIQuoteChat = lazy(() => import("./pages/AIQuoteChat"));
 const QuoteDetail = lazy(() => import("./pages/QuoteDetail"));
-const BookingsList = lazy(() => import("./pages/BookingsList").then(m => ({ default: m.BookingsList })));
 const Bookings = lazy(() => import("./pages/Bookings"));
 const LoadsList = lazy(() => import("./pages/LoadsList"));
 const Vehicles = lazy(() => import("./pages/Vehicles"));
@@ -147,7 +146,7 @@ const App = () => (
             <Route path="/bookings/:id" element={<RequireAuth><OSLayout><Bookings /></OSLayout></RequireAuth>} />
             {/* Safety: legacy /loads/:id deep-links (e.g. old notifications) → bookings detail */}
             <Route path="/loads/:id" element={<LoadsRedirect />} />
-            <Route path="/bookings/list" element={<RequireAuth><OSLayout><BookingsList /></OSLayout></RequireAuth>} />
+            <Route path="/bookings/list" element={<Navigate to="/bookings" replace />} />
             <Route path="/bookings/pipeline" element={<RequireAuth><OSLayout><QuotesList /></OSLayout></RequireAuth>} />
             <Route path="/bookings/pipeline/:id" element={<RequireAuth><OSLayout><NewQuote /></OSLayout></RequireAuth>} />
             <Route path="/fleet" element={<RequireAuth><OSLayout><Vehicles /></OSLayout></RequireAuth>} />

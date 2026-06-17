@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { postData, fetchData } from "@/lib/Api";
+import { postData, patchData, fetchData } from "@/lib/Api";
+import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 // SA constants
 const DEFAULT_BASE_RATE_PER_KM = 10;
@@ -79,6 +80,15 @@ interface ModelStats {
   synthetic_count: number;
   last_trained: string;
   model_version: string;
+  win_model?: {
+    mode: 'learned' | 'heuristic';
+    trained: boolean;
+    outcomes_collected: number;
+    outcomes_needed: number;
+    progress_pct: number;
+    auc?: number | null;
+    last_trained?: string | null;
+  } | null;
 }
 
 interface MarketBenchmark {
@@ -97,8 +107,12 @@ interface MarketBenchmark {
 
 export default function NewQuote() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { id: editId } = useParams();
+  const isEditing = !!editId;
   const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState('');
+  const [loadingQuote, setLoadingQuote] = useState(!!editId);
 
   // Step 1: Route data
   const [pickupLocation, setPickupLocation] = useState('');
@@ -142,6 +156,8 @@ export default function NewQuote() {
   const [winProbAtAdjusted, setWinProbAtAdjusted] = useState<number | null>(null);
   const [showBenchmarkModal, setShowBenchmarkModal] = useState(false);
   const [guardExpanded, setGuardExpanded] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimal, setOptimal] = useState<any>(null);
 
   // Cost calculations — defined early so they can be used in callbacks/effects below
   // Mobile app formula implementation
@@ -237,6 +253,41 @@ export default function NewQuote() {
     }
   };
 
+  // AI price optimizer — maximise expected profit = price × P(win). Always
+  // available (heuristic win-prob), unlike the ML suggest endpoint.
+  const fetchOptimal = async () => {
+    if (_total <= 0) return;
+    setOptimizing(true);
+    setOptimal(null);
+    try {
+      const marketRate = marketBenchmark?.market_avg_rate || _total * 1.15;
+      const data = await postData({ url: 'api/v1/quotes/optimize/', data: {
+        total_cost: Math.round(_total * 100) / 100,
+        market_rate: Math.round(marketRate),
+        client_tier: 'standard',
+      }});
+      if (data?.optimal_price) setOptimal(data);
+      else setError('Could not compute an optimal price');
+    } catch {
+      setError('Failed to optimise price');
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
+  // Back-solve the base rate/km so the quote total lands on the optimal price.
+  const applyOptimal = () => {
+    if (!optimal?.optimal_price || distanceKm <= 0) return;
+    const fixed = _fuelCost + _tollCost + _driverAllowance + _additionalCosts;
+    const ws = weightKg > 5000 ? 0.15 : 0;
+    const targetBaseCost = (optimal.optimal_price - fixed) / (1 + ws);
+    const perKm = targetBaseCost / distanceKm;
+    if (perKm > 0 && isFinite(perKm)) {
+      setBaseRatePerKm((Math.round(perKm * 100) / 100).toString());
+      setOptimal(null);
+    }
+  };
+
   // Fetch revenue guard assessment
   const fetchRevenueGuard = async () => {
     if (_total <= 0) return;
@@ -317,6 +368,63 @@ export default function NewQuote() {
     }
   };
 
+  // Edit mode: load the existing quote and prefill the form
+  useEffect(() => {
+    if (!editId) return;
+    let cancelled = false;
+    setLoadingQuote(true);
+    fetchData(`api/v1/quotes/${editId}/`)
+      .then((q: any) => {
+        if (cancelled || !q) return;
+        setPickupLocation(q.pickup_location || '');
+        setDeliveryLocation(q.delivery_location || '');
+        setWeight(q.weight != null ? String(q.weight) : '');
+        if (q.vehicle_type) setVehicleType(q.vehicle_type as VehicleType);
+        setCargoDescription(q.cargo_description || '');
+        setDriverAllowanceInput(q.driver_allowance != null ? String(q.driver_allowance) : '0');
+        setCustomerId(q.customer != null ? String(q.customer) : '');
+        setNotes(q.notes || '');
+        if (q.status === 'DRAFT' || q.status === 'SENT') setStatus(q.status);
+        if (q.confidence) setConfidence(q.confidence);
+        if (q.sla_hours != null) setSlaHours(String(q.sla_hours));
+        if (q.valid_until) setValidUntil(String(q.valid_until).split('T')[0]);
+        // Reconstruct cost state from the saved quote so totals render without re-running route calc
+        const dist = parseFloat(q.distance || '0');
+        if (dist > 0) {
+          setRouteData({
+            success: true,
+            distance_km: dist,
+            toll_cost_zar: parseFloat(q.toll_charges || '0'),
+          } as RouteData);
+          if (q.base_rate != null) setBaseRatePerKm(String((parseFloat(q.base_rate) || 0) / dist));
+        }
+        if (q.fuel_surcharge != null) setEditableFuelCost(parseFloat(q.fuel_surcharge));
+        if (q.toll_charges != null) setEditableTollCost(parseFloat(q.toll_charges));
+        setCurrentStep(3);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load quote for editing');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingQuote(false);
+      });
+    return () => { cancelled = true; };
+  }, [editId]);
+
+  // Prefill from the AI Quote Chat hand-off (navigate('/quotes/new', { state: { prefill }})).
+  useEffect(() => {
+    if (isEditing) return;
+    const p = (location.state as any)?.prefill;
+    if (!p) return;
+    if (p.pickup_location) setPickupLocation(p.pickup_location);
+    if (p.delivery_location) setDeliveryLocation(p.delivery_location);
+    if (p.weight != null && p.weight !== '') setWeight(String(p.weight));
+    if (p.cargo_description) setCargoDescription(p.cargo_description);
+    const VALID: VehicleType[] = ['Flatbed', 'Tautliner', 'Refrigerated', 'Box Truck', 'Tanker', 'Danger Load'];
+    if (p.vehicle_type && VALID.includes(p.vehicle_type)) setVehicleType(p.vehicle_type);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Cost calculations
   const distanceKm = routeData?.distance_km || 0;
   const baseCost = _baseCost;
@@ -338,9 +446,11 @@ export default function NewQuote() {
   };
 
   const mutation = useMutation({
-    mutationFn: (data: any) => postData({ url: 'api/v1/quotes/', data }),
-    onSuccess: () => navigate('/quotes'),
-    onError: (e: any) => setError(e?.message || 'Failed to create quote'),
+    mutationFn: (data: any) => isEditing
+      ? patchData({ url: `api/v1/quotes/${editId}/`, data })
+      : postData({ url: 'api/v1/quotes/', data }),
+    onSuccess: () => navigate(isEditing ? `/quotes/${editId}` : '/quotes'),
+    onError: (e: any) => setError(e?.message || (isEditing ? 'Failed to update quote' : 'Failed to create quote')),
   });
 
   const handleSave = () => {
@@ -395,6 +505,14 @@ export default function NewQuote() {
     </div>
   );
 
+  if (loadingQuote) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+        Loading quote…
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Header */}
@@ -409,7 +527,7 @@ export default function NewQuote() {
           Operations
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>New Quote</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{isEditing ? `Edit Quote #${editId}` : 'New Quote'}</div>
         </div>
       </div>
 
@@ -445,7 +563,7 @@ export default function NewQuote() {
 
       {/* STEP 1: Route Entry */}
       {currentStep === 1 && (
-        <div className="card" style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+        <div className="card" style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Step 1: Route Details</div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
@@ -636,7 +754,7 @@ export default function NewQuote() {
 
       {/* STEP 2: Freight Details */}
       {currentStep === 2 && (
-        <div className="card" style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+        <div className="card" style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Step 2: Freight Details</div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
@@ -767,6 +885,99 @@ export default function NewQuote() {
                 </span>
               </div>
             </div>
+          </div>
+
+          {/* AI Price Optimizer — maximise expected profit (always available) */}
+          <div style={{ marginBottom: 16 }}>
+            <button
+              onClick={fetchOptimal}
+              disabled={optimizing || !canGoToStep3}
+              className="btn-action"
+              style={{ width: '100%', background: 'var(--accent-primary)', border: 'none', color: 'var(--bg-deep)', cursor: optimizing ? 'wait' : 'pointer', fontWeight: 600 }}
+            >
+              {optimizing ? 'OPTIMISING…' : '✦ FIND OPTIMAL PRICE'}
+            </button>
+
+            {optimal && (
+              <div style={{ marginTop: 12, padding: 16, background: 'var(--bg-surface-hover)', borderRadius: 2, border: '1px solid var(--accent-primary)' }}>
+                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 12 }}>
+                  AI OPTIMAL PRICE · maximises price × win-probability
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Optimal price:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--accent-primary)' }}>
+                      R {Math.round(optimal.optimal_price).toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Margin:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 600 }}>{optimal.optimal_margin_pct?.toFixed(1)}%</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Win probability:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 600 }}>{Math.round((optimal.win_probability_at_optimal || 0) * 100)}%</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Expected profit:</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-success)', fontWeight: 600 }}>R {Math.round(optimal.expected_profit || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+                {Array.isArray(optimal.curve) && optimal.curve.length > 1 && (() => {
+                  const data = optimal.curve.map((c: any) => ({
+                    margin: c.margin_pct,
+                    win: Math.round((c.win_probability || 0) * 100),
+                    profit: Math.round(c.expected_profit || 0),
+                  }));
+                  return (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 6 }}>
+                        PROFIT SWEET-SPOT · expected profit (area) vs win-rate (line) across margin
+                      </div>
+                      {modelStats?.win_model && (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, fontFamily: 'var(--font-mono)', padding: '2px 8px', borderRadius: 2, marginBottom: 8, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: 6, background: modelStats.win_model.mode === 'learned' ? 'var(--status-success)' : 'var(--status-warning)' }} />
+                          {modelStats.win_model.mode === 'learned'
+                            ? `Win model: learned${modelStats.win_model.auc != null ? ` · AUC ${modelStats.win_model.auc.toFixed(2)}` : ''} · ${modelStats.win_model.outcomes_collected} outcomes`
+                            : `Win model: heuristic · ${modelStats.win_model.outcomes_collected}/${modelStats.win_model.outcomes_needed} outcomes to learn`}
+                        </div>
+                      )}
+                      <ResponsiveContainer width="100%" height={150}>
+                        <ComposedChart data={data} margin={{ top: 8, right: 6, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="evGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="var(--status-success)" stopOpacity={0.35} />
+                              <stop offset="95%" stopColor="var(--status-success)" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <XAxis dataKey="margin" stroke="var(--text-tertiary)" tickFormatter={(v: number) => `${v}%`} style={{ fontSize: 10, fontFamily: 'var(--font-mono)' }} />
+                          <YAxis yAxisId="p" hide />
+                          <YAxis yAxisId="w" orientation="right" domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} stroke="var(--text-tertiary)" style={{ fontSize: 10, fontFamily: 'var(--font-mono)' }} width={32} />
+                          <Tooltip
+                            contentStyle={{ background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                            labelFormatter={(v: any) => `Margin ${v}%`}
+                            formatter={(val: any, name: any) => name === 'profit' ? [`R ${Number(val).toLocaleString()}`, 'Exp. profit'] : [`${val}%`, 'Win rate']}
+                          />
+                          <Area yAxisId="p" type="monotone" dataKey="profit" stroke="var(--status-success)" strokeWidth={2} fill="url(#evGrad)" />
+                          <Line yAxisId="w" type="monotone" dataKey="win" stroke="var(--accent-primary)" strokeWidth={2} dot={false} />
+                          {optimal.optimal_margin_pct != null && (
+                            <ReferenceLine yAxisId="p" x={Math.round(optimal.optimal_margin_pct * 10) / 10} stroke="var(--accent-primary)" strokeDasharray="3 3" />
+                          )}
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  );
+                })()}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn-action" onClick={applyOptimal} style={{ flex: 1, background: 'var(--accent-primary)', border: 'none', color: 'var(--bg-deep)', fontWeight: 600 }}>
+                    APPLY THIS PRICE
+                  </button>
+                  <button className="btn-action" onClick={() => setOptimal(null)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                    DISMISS
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* AI Quote Suggestion Panel */}
@@ -959,7 +1170,7 @@ export default function NewQuote() {
 
       {/* STEP 3: Customer & Summary */}
       {currentStep === 3 && (
-        <div className="card" style={{ padding: 24, maxWidth: 600, margin: '0 auto' }}>
+        <div className="card" style={{ padding: 20, maxWidth: 600, margin: '0 auto' }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Step 3: Quote Summary</div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
@@ -1399,7 +1610,7 @@ export default function NewQuote() {
               className="btn-action"
               style={{ minWidth: 140 }}
             >
-              {mutation.isPending ? 'SAVING...' : 'SAVE QUOTE'}
+              {mutation.isPending ? 'SAVING...' : (isEditing ? 'UPDATE QUOTE' : 'SAVE QUOTE')}
             </button>
           </div>
         </div>

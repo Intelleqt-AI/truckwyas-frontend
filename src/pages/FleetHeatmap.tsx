@@ -105,13 +105,13 @@ export default function FleetHeatmap() {
 
   return (
     <div>
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>FLEET INTELLIGENCE</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Utilisation Heatmap</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Live fleet activity and route performance</div>
         </div>
-        <button onClick={() => navigate('/fleet')} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 14px', borderRadius: 2, cursor: 'pointer' }}>← FLEET</button>
+        <button onClick={() => navigate('/fleet')} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 12px', borderRadius: 2, cursor: 'pointer' }}>← FLEET</button>
       </div>
 
       {/* KPI strip */}
@@ -122,7 +122,7 @@ export default function FleetHeatmap() {
           { label: 'AVAILABLE', value: statusMap['AVAILABLE'] || 0, sub: 'Ready to deploy', color: 'var(--status-success)' },
           { label: 'MAINTENANCE', value: statusMap['MAINTENANCE'] || 0, sub: 'Off the road', color: 'var(--status-warning)' },
         ].map(k => (
-          <div key={k.label} className="card metric-card" style={{ padding: 16 }}>
+          <div key={k.label} className="card metric-card" style={{ padding: 20 }}>
             <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 8 }}>{k.label}</div>
             <div style={{ fontSize: 26, fontWeight: 500, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{k.sub}</div>
@@ -132,7 +132,7 @@ export default function FleetHeatmap() {
 
       {/* Utilisation gauge */}
       <div className="card" style={{ padding: 20, marginBottom: 20 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 14 }}>FLEET UTILISATION RATE</div>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>FLEET UTILISATION RATE</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ flex: 1, height: 12, background: 'var(--border-subtle)', borderRadius: 6 }}>
             <div style={{ height: 12, width: `${utilRate}%`, background: utilRate >= 70 ? 'var(--status-success)' : utilRate >= 40 ? 'var(--accent-primary)' : 'var(--status-warning)', borderRadius: 6, transition: 'width 0.6s ease' }} />

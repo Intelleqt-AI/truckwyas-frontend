@@ -138,7 +138,7 @@ export function InviteAccept() {
                   textTransform: 'uppercase' as const,
                   letterSpacing: '0.08em',
                   color: 'var(--text-tertiary)',
-                  marginBottom: 6,
+                  marginBottom: 8,
                 }}>
                   Email
                 </label>
@@ -148,7 +148,7 @@ export function InviteAccept() {
                   disabled
                   style={{
                     width: '100%',
-                    padding: '10px 14px',
+                    padding: '10px 12px',
                     background: 'var(--bg-deep)',
                     border: '1px solid var(--border-subtle)',
                     borderRadius: 2,
@@ -167,7 +167,7 @@ export function InviteAccept() {
                   textTransform: 'uppercase' as const,
                   letterSpacing: '0.08em',
                   color: 'var(--text-tertiary)',
-                  marginBottom: 6,
+                  marginBottom: 8,
                 }}>
                   Full Name
                 </label>
@@ -179,7 +179,7 @@ export function InviteAccept() {
                   autoFocus
                   style={{
                     width: '100%',
-                    padding: '10px 14px',
+                    padding: '10px 12px',
                     background: 'var(--input-bg)',
                     border: '1px solid var(--border-subtle)',
                     borderRadius: 2,
@@ -198,7 +198,7 @@ export function InviteAccept() {
                   textTransform: 'uppercase' as const,
                   letterSpacing: '0.08em',
                   color: 'var(--text-tertiary)',
-                  marginBottom: 6,
+                  marginBottom: 8,
                 }}>
                   Password
                 </label>
@@ -209,7 +209,7 @@ export function InviteAccept() {
                   placeholder="Min. 8 characters"
                   style={{
                     width: '100%',
-                    padding: '10px 14px',
+                    padding: '10px 12px',
                     background: 'var(--input-bg)',
                     border: '1px solid var(--border-subtle)',
                     borderRadius: 2,
@@ -228,7 +228,7 @@ export function InviteAccept() {
                   textTransform: 'uppercase' as const,
                   letterSpacing: '0.08em',
                   color: 'var(--text-tertiary)',
-                  marginBottom: 6,
+                  marginBottom: 8,
                 }}>
                   Confirm Password
                 </label>
@@ -239,7 +239,7 @@ export function InviteAccept() {
                   placeholder="Re-enter password"
                   style={{
                     width: '100%',
-                    padding: '10px 14px',
+                    padding: '10px 12px',
                     background: 'var(--input-bg)',
                     border: '1px solid var(--border-subtle)',
                     borderRadius: 2,

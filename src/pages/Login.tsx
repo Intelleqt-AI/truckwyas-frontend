@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import { useLogin } from "@/hooks/useLogin";
 import { fetchData } from "@/lib/Api";
 
@@ -12,6 +13,7 @@ const Login = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -55,9 +57,9 @@ const Login = () => {
         const onboardingDone = localStorage.getItem('onboarding_done');
         if (!onboardingDone) {
           try {
-            // Check if company has any vehicles or loads
-            const overview = await fetchData('api/v1/fleet/overview/');
-            const vehicleCount = overview?.total_vehicles || 0;
+            // fleet/overview has no total_vehicles field — use the vehicles count.
+            const v = await fetchData('api/v1/vehicles/');
+            const vehicleCount = v?.count ?? (Array.isArray(v) ? v.length : (v?.results?.length ?? 0));
 
             if (vehicleCount === 0) {
               navigate("/onboarding");
@@ -71,7 +73,11 @@ const Login = () => {
       },
       onError: (error: any) => {
         console.error("Login error:", error);
-        setError(error.message || "Invalid credentials");
+        setError(
+          error.status === 401
+            ? "Incorrect email or password. Please try again."
+            : (error.message || "Sign in failed. Please try again.")
+        );
       }
     });
   };
@@ -79,7 +85,7 @@ const Login = () => {
   const inputStyle: React.CSSProperties = {
     background: 'var(--bg-surface)',
     border: '1px solid var(--border-subtle)',
-    padding: '12px 14px',
+    padding: '10px 12px',
     color: 'var(--text-primary)',
     borderRadius: 2,
     fontSize: 13,
@@ -118,7 +124,7 @@ const Login = () => {
         background: 'var(--bg-surface)',
         border: '1px solid var(--border-subtle)',
         borderRadius: 2,
-        padding: 32,
+        padding: 40,
       }}>
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
@@ -146,7 +152,7 @@ const Login = () => {
               }}
             />
             {validationErrors.username && (
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
                 {validationErrors.username}
               </div>
             )}
@@ -166,20 +172,31 @@ const Login = () => {
                 Forgot password?
               </Link>
             </div>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              value={formData.password}
-              onChange={handleChange}
-              style={{
-                ...inputStyle,
-                borderColor: validationErrors.password ? 'var(--status-danger)' : 'var(--border-subtle)',
-              }}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                required
+                value={formData.password}
+                onChange={handleChange}
+                style={{
+                  ...inputStyle,
+                  borderColor: validationErrors.password ? 'var(--status-danger)' : 'var(--border-subtle)',
+                  paddingRight: 40,
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
             {validationErrors.password && (
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--status-danger)' }}>
+              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
                 {validationErrors.password}
               </div>
             )}
@@ -187,7 +204,7 @@ const Login = () => {
 
           {error && (
             <div style={{
-              padding: '10px 14px',
+              padding: '12px 16px',
               background: 'var(--status-danger-bg)',
               border: '1px solid var(--status-danger)',
               borderRadius: 2,

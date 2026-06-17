@@ -8,7 +8,9 @@ const TABS = [
   { id: 'cashflow', label: 'Cash Flow' },
   { id: 'customer', label: 'Customer' },
   { id: 'aging', label: 'Aging' },
+  { id: 'lanes', label: 'Lanes' },
   { id: 'capital', label: 'Capital' },
+  { id: 'fastpay', label: 'Fast-Pay' },
 ];
 
 export default function FinanceReports() {
@@ -23,6 +25,8 @@ export default function FinanceReports() {
   const [agingData, setAgingData] = useState<any>(null);
   const [facilities, setFacilities] = useState<any>(null);
   const [advances, setAdvances] = useState<any[]>([]);
+  const [laneData, setLaneData] = useState<any>(null);
+  const [fastpayData, setFastpayData] = useState<any>(null);
 
   const exportToCSV = () => {
     let csvContent = '';
@@ -83,6 +87,25 @@ export default function FinanceReports() {
           csvContent += `${adv.invoice_number},${adv.customer_name},${adv.advanced_amount || 0},${adv.fee_amount || 0},${adv.advanced_date || adv.created_at?.slice(0, 10)},${adv.status || 'ACTIVE'}\n`;
         });
         break;
+
+      case 'lanes':
+        filename = 'Margin_By_Lane.csv';
+        csvContent = 'Lane,Loads,Revenue,Est Cost,Est Margin,Margin %,Avg Distance (km),Revenue/km\n';
+        (laneData?.lanes || []).forEach((l: any) => {
+          csvContent += `"${l.lane}",${l.loads},${l.revenue || 0},${l.est_cost ?? ''},${l.est_margin ?? ''},${l.margin_pct ?? ''},${l.avg_distance_km ?? ''},${l.revenue_per_km ?? ''}\n`;
+        });
+        break;
+
+      case 'fastpay':
+        filename = 'FastPay_Value.csv';
+        csvContent = 'Metric,Value\n';
+        csvContent += `Advances Settled/Disbursed,${fastpayData?.count || 0}\n`;
+        csvContent += `Cash Accelerated,${fastpayData?.cash_accelerated || 0}\n`;
+        csvContent += `Avg Days Early,${fastpayData?.avg_days_early || 0}\n`;
+        csvContent += `Total Fees,${fastpayData?.total_fees || 0}\n`;
+        csvContent += `Avg Fee %,${fastpayData?.avg_fee_pct || 0}\n`;
+        csvContent += `Effective APR %,${fastpayData?.effective_apr ?? ''}\n`;
+        break;
     }
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -101,13 +124,15 @@ export default function FinanceReports() {
       setLoading(true);
       setError(null);
       try {
-        const [finance, cashflow, cust, aging, fac, adv] = await Promise.all([
+        const [finance, cashflow, cust, aging, fac, adv, lanes, fastpay] = await Promise.all([
           fetchData('api/v1/dashboard/finance/').catch(() => null),
           fetchData('api/v1/dashboard/cashflow/').catch(() => null),
           fetchData('api/v1/customers/').catch(() => []),
           fetchData('api/v1/invoices/aging/').catch(() => null),
           fetchData('api/v1/facilities/').catch(() => null),
           fetchData('api/v1/advances/').catch(() => []),
+          fetchData('api/v1/reports/margin-by-lane/').catch(() => null),
+          fetchData('api/v1/reports/fastpay-savings/').catch(() => null),
         ]);
         setFinanceData(finance);
         setCashflowData(cashflow);
@@ -116,6 +141,8 @@ export default function FinanceReports() {
         const facList = Array.isArray(fac) ? fac : (fac?.results || []);
         setFacilities(facList[0] || null);
         setAdvances(Array.isArray(adv) ? adv : (adv?.results || []));
+        setLaneData(lanes);
+        setFastpayData(fastpay);
       } catch (err) {
         console.error('Failed to load finance reports:', err);
         setError('Failed to load data');
@@ -167,7 +194,7 @@ export default function FinanceReports() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 24, borderBottom: '1px solid var(--border-subtle)' }}>
+      <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--border-subtle)' }}>
         {TABS.map(t => (
           <button
             key={t.id}
@@ -181,7 +208,8 @@ export default function FinanceReports() {
               fontSize: 11,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              padding: '10px 16px',
+              padding: '12px 0',
+              marginRight: 24,
               cursor: 'pointer',
               marginBottom: -1,
               whiteSpace: 'nowrap',
@@ -197,7 +225,7 @@ export default function FinanceReports() {
         <>
           {/* TAB 1: P&L */}
           {tab === 'pl' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
                 {[
                   { label: 'Total Revenue', value: formatCurrency(financeData?.total_revenue || 0), color: 'var(--accent-primary)' },
@@ -324,7 +352,7 @@ export default function FinanceReports() {
 
           {/* TAB 2: Cash Flow */}
           {tab === 'cashflow' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {(() => {
                 const forecast = cashflowData?.forecast || [];
                 // Calculate next 30 days summary
@@ -415,7 +443,7 @@ export default function FinanceReports() {
 
           {/* TAB 3: Customer */}
           {tab === 'customer' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* Top customer metrics */}
               {(() => {
                 const topCustomers = financeData?.top_customers || customers
@@ -565,7 +593,7 @@ export default function FinanceReports() {
 
           {/* TAB 4: Aging */}
           {tab === 'aging' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* Header metrics */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                 {[
@@ -601,8 +629,8 @@ export default function FinanceReports() {
                 return (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: 20 }}>
                     {/* Bar Chart */}
-                    <div className="card" style={{ padding: 24 }}>
-                      <div className="card-header" style={{ marginBottom: 20 }}>
+                    <div className="card" style={{ padding: 20 }}>
+                      <div className="card-header" style={{ marginBottom: 16 }}>
                         <span className="card-title">Aging Analysis</span>
                       </div>
                       {buckets.map((bucket: any, idx: number) => {
@@ -642,8 +670,8 @@ export default function FinanceReports() {
                     </div>
 
                     {/* PieChart (Donut) */}
-                    <div className="card" style={{ padding: 24 }}>
-                      <div className="card-header" style={{ marginBottom: 20 }}>
+                    <div className="card" style={{ padding: 20 }}>
+                      <div className="card-header" style={{ marginBottom: 16 }}>
                         <span className="card-title">Distribution</span>
                       </div>
                       <ResponsiveContainer width="100%" height={300}>
@@ -723,7 +751,7 @@ export default function FinanceReports() {
 
           {/* TAB 5: Capital */}
           {tab === 'capital' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
                 {[
                   { label: 'Facility Limit', value: formatCurrency(facilities?.facility_limit || 0), color: 'var(--accent-primary)' },
@@ -745,7 +773,7 @@ export default function FinanceReports() {
               {/* Fee summary */}
               <div className="card" style={{ padding: 20 }}>
                 <div className="card-header"><span className="card-title">Fee Summary</span></div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20, marginTop: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 16 }}>
                   <div>
                     <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 4 }}>Total Fees Paid</div>
                     <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
@@ -882,6 +910,110 @@ export default function FinanceReports() {
                 </div>
               ) : (
                 <EmptyState message="No advances found" />
+              )}
+            </div>
+          )}
+
+          {tab === 'lanes' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                {[
+                  { label: 'Lanes', value: laneData?.summary?.lane_count || 0, color: 'var(--accent-primary)' },
+                  { label: 'Lane Revenue', value: formatCurrency(laneData?.summary?.total_revenue || 0), color: 'var(--text-primary)' },
+                  { label: 'Best Margin', value: laneData?.summary?.best_lane ? formatPercent(laneData.summary.best_lane.margin_pct) : '—', color: 'var(--status-success)' },
+                  { label: 'Worst Margin', value: laneData?.summary?.worst_lane ? formatPercent(laneData.summary.worst_lane.margin_pct) : '—', color: 'var(--status-danger)' },
+                ].map(m => (
+                  <div key={m.label} className="card metric-card">
+                    <div className="card-header"><span className="card-title">{m.label}</span></div>
+                    <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {(laneData?.lanes || []).length > 0 ? (
+                <div className="card" style={{ padding: 20 }}>
+                  <div className="card-header" style={{ marginBottom: 8 }}>
+                    <span className="card-title">Margin by Lane</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 12 }}>
+                    True cost (fuel · driver · tolls · wear, deadheaded) — same engine as the quoting tool. Margin shown where distance is known.
+                  </div>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left' }}>Lane</th>
+                        <th style={{ textAlign: 'right' }}>Loads</th>
+                        <th style={{ textAlign: 'right' }}>Revenue</th>
+                        <th style={{ textAlign: 'right' }}>Est. Margin</th>
+                        <th style={{ textAlign: 'right' }}>Margin %</th>
+                        <th style={{ textAlign: 'right' }}>R / km</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {laneData.lanes.map((l: any, idx: number) => {
+                        const mpct = l.margin_pct;
+                        const mColor = mpct == null ? 'var(--text-tertiary)'
+                          : mpct < 0 ? 'var(--status-danger)'
+                          : mpct < 15 ? 'var(--status-warning)'
+                          : 'var(--status-success)';
+                        return (
+                          <tr key={idx}>
+                            <td style={{ color: 'var(--text-primary)' }}>{l.lane}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{l.loads}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{formatCurrency(l.revenue || 0)}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{l.est_margin == null ? '—' : formatCurrency(l.est_margin)}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600, color: mColor }}>{mpct == null ? '—' : formatPercent(mpct)}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{l.revenue_per_km == null ? '—' : formatCurrency(l.revenue_per_km)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyState message="No delivered loads to analyse yet" />
+              )}
+            </div>
+          )}
+
+          {tab === 'fastpay' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                {[
+                  { label: 'Cash Accelerated', value: formatCurrency(fastpayData?.cash_accelerated || 0), color: 'var(--accent-primary)' },
+                  { label: 'Avg Days Early', value: `${fastpayData?.avg_days_early || 0}`, color: 'var(--status-success)' },
+                  { label: 'Total Fees', value: formatCurrency(fastpayData?.total_fees || 0), color: 'var(--status-warning)' },
+                  { label: 'Effective APR', value: fastpayData?.effective_apr == null ? '—' : formatPercent(fastpayData.effective_apr), color: 'var(--text-primary)' },
+                ].map(m => (
+                  <div key={m.label} className="card metric-card">
+                    <div className="card-header"><span className="card-title">{m.label}</span></div>
+                    <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {(fastpayData?.count || 0) > 0 ? (
+                <div className="card" style={{ padding: 24 }}>
+                  <div className="card-header" style={{ marginBottom: 16 }}>
+                    <span className="card-title">What fast-pay delivered</span>
+                  </div>
+                  <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+                    Across <strong style={{ color: 'var(--text-primary)' }}>{fastpayData.count}</strong> advance{fastpayData.count === 1 ? '' : 's'}, you put{' '}
+                    <strong style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{formatCurrency(fastpayData.cash_accelerated || 0)}</strong>{' '}
+                    of invoice value to work an average of{' '}
+                    <strong style={{ color: 'var(--text-primary)' }}>{fastpayData.avg_days_early}</strong> days early — instead of waiting on customer terms.
+                    The cost was <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{formatPercent(fastpayData.avg_fee_pct || 0)}</strong> in fees
+                    {fastpayData.effective_apr != null && (
+                      <> (≈ <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{formatPercent(fastpayData.effective_apr)}</strong> annualised).</>
+                    )}
+                    {fastpayData.effective_apr == null && '.'}
+                  </p>
+                  <div style={{ marginTop: 16, fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                    {formatCurrency(fastpayData.rand_days_freed || 0).replace('R', '')} rand-days of working capital freed
+                  </div>
+                </div>
+              ) : (
+                <EmptyState message="No advances settled yet — fast-pay value appears once you draw and settle an advance" />
               )}
             </div>
           )}

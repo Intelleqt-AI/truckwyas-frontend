@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetchData, postData, patchData } from '../lib/Api';
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { LiveBadge } from "@/components/LiveBadge";
 
 interface Driver {
   id: number;
@@ -8,7 +10,7 @@ interface Driver {
   first_name?: string;
   last_name?: string;
   status: string;
-  trips_this_month?: number;
+  total_trips?: number;
   revenue_generated?: number;
   efficiency_score?: number;
   phone?: string;
@@ -77,9 +79,8 @@ export default function Drivers() {
   const [editForm, setEditForm] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
+  const load = useCallback(() => {
+    return Promise.all([
       fetchData('api/v1/drivers/'),
       fetchData('api/v1/drivers/overview/').catch(() => null),
       fetchData('api/v1/drivers/leaderboard/').catch(() => null),
@@ -142,6 +143,9 @@ export default function Drivers() {
     }).finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { load(); }, [load]);
+  useAutoRefresh(load);
+
   const filtered = drivers.filter(d => statusFilter === 'All' || d.status === statusFilter);
 
   const rankColor = (rank: number) => {
@@ -167,10 +171,13 @@ export default function Drivers() {
   return (
     <div>
       {/* Page header */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
+            <LiveBadge />
+          </div>
         </div>
         <button className="btn-action" onClick={() => setShowAddForm(true)}>+ ADD DRIVER</button>
       </div>
@@ -207,7 +214,7 @@ export default function Drivers() {
                 background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
                 border: '1px solid var(--border-subtle)',
                 color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                padding: '7px 14px',
+                padding: '6px 12px',
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11,
                 borderRadius: 2,
@@ -231,7 +238,7 @@ export default function Drivers() {
             <tr>
               {['Name', 'License', 'Status', 'Trips MTD', 'Revenue Generated', 'Performance', ''].map(h => (
                 <th key={h} style={{
-                  padding: '10px 20px', textAlign: 'left',
+                  padding: '12px 20px', textAlign: 'left',
                   fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
                   letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                   borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
@@ -273,7 +280,7 @@ export default function Drivers() {
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <td style={{ padding: '13px 20px', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
+                  <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{
                         width: 6,
@@ -285,10 +292,10 @@ export default function Drivers() {
                       {getDriverName(d)}
                     </div>
                   </td>
-                  <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
                     {d.license_number || '—'}
                   </td>
-                  <td style={{ padding: '13px 20px' }}>
+                  <td style={{ padding: '12px 20px' }}>
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 10,
                       color: STATUS_COLOR[d.status] || 'var(--text-secondary)',
@@ -297,13 +304,13 @@ export default function Drivers() {
                       {d.status?.replace('_', ' ')}
                     </span>
                   </td>
-                  <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                    {d.trips_this_month ?? 0}
+                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                    {d.total_trips ?? 0}
                   </td>
-                  <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
                     {d.revenue_generated ? formatZAR(d.revenue_generated) : '—'}
                   </td>
-                  <td style={{ padding: '13px 20px' }}>
+                  <td style={{ padding: '12px 20px' }}>
                     {efficiencyScore > 0 ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ flex: 1, maxWidth: 120, height: 6, background: 'var(--bg-surface-hover)', borderRadius: 3, overflow: 'hidden' }}>
@@ -323,7 +330,7 @@ export default function Drivers() {
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                     )}
                   </td>
-                  <td style={{ padding: '13px 20px', textAlign: 'right' }}>
+                  <td style={{ padding: '12px 20px', textAlign: 'right' }}>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -413,6 +420,7 @@ export default function Drivers() {
                       first_name: addForm.first_name,
                       last_name: addForm.last_name,
                       password: 'TruckWys2026!',
+                      role: 'DRIVER',
                     }});
                     await postData({ url: 'api/v1/drivers/', data: {
                       user: user.id,

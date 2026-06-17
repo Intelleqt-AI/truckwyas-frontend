@@ -233,7 +233,7 @@ export default function DriverProfile() {
       </div>
 
       {/* Recent Loads */}
-      <div className="card" style={{ padding: 20, marginTop: 20 }}>
+      <div className="card" style={{ padding: 20, marginTop: 24 }}>
         <div className="card-title" style={{ marginBottom: 16 }}>RECENT LOADS ({loads.length})</div>
         {loads.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No loads recorded</div>

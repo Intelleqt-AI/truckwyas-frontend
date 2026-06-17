@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 interface XeroConnection {
+  configured?: boolean;
   is_connected: boolean;
   tenant_name?: string;
   connected_since?: string;
@@ -46,17 +47,41 @@ export default function XeroIntegration() {
     "/api/integrations/xero/sync-log/"
   );
 
-  // Connect to Xero
+  // After the OAuth round-trip, Xero sends the user back here with ?xero=connected|error.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const outcome = params.get("xero");
+    if (!outcome) return;
+    if (outcome === "connected") {
+      toast.success("Xero connected successfully");
+      queryClient.invalidateQueries({
+        queryKey: ["/api/integrations/xero/status/"],
+      });
+    } else if (outcome === "error") {
+      toast.error("Xero authorization failed. Please try again.");
+    }
+    // Strip the query param so a refresh doesn't re-fire the toast.
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [queryClient]);
+
+  // Connect to Xero — redirect the whole tab into the OAuth flow, then Xero
+  // bounces back to this page via the backend callback.
   const { mutate: connectXero } = usePost({
     onSuccess: (data: any) => {
-      if (data.auth_url) {
-        // Open OAuth flow in new window
-        window.open(data.auth_url, "_blank", "width=600,height=700");
-        toast.info("Please complete the Xero authorization in the new window");
+      if (data?.auth_url) {
+        window.location.href = data.auth_url;
+      } else {
+        toast.error("Could not start Xero connection.");
       }
     },
-    onError: () => {
-      toast.error("Failed to initiate Xero connection");
+    onError: (error: any) => {
+      if (error?.response?.status === 503) {
+        toast.error(
+          "Xero isn't configured on the server yet. Add the Xero app credentials to enable it."
+        );
+      } else {
+        toast.error("Failed to initiate Xero connection");
+      }
     },
   });
 
@@ -166,7 +191,7 @@ export default function XeroIntegration() {
 
       {/* Connection Status Card */}
       <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-4">
+        <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Connection Status</CardTitle>
             {connection?.is_connected ? (
@@ -278,8 +303,16 @@ export default function XeroIntegration() {
                   Link your Xero account to automatically sync invoices and
                   payments between TruckWys and Xero.
                 </p>
+                {connection?.configured === false && (
+                  <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto">
+                    Xero isn't configured on this server yet. Add your Xero app's
+                    client ID and secret to the backend environment to enable the
+                    connection.
+                  </p>
+                )}
                 <Button
                   onClick={handleConnect}
+                  disabled={connection?.configured === false}
                   className=""
                 >
                   <CheckCircle2 className="w-4 h-4 mr-2" />

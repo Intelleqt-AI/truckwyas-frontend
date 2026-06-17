@@ -127,7 +127,7 @@ export default function QuoteDetail() {
   if (isLoading) {
     return (
       <div style={{ padding: 40 }}>
-        <div className="card" style={{ padding: 24 }}>
+        <div className="card" style={{ padding: 20 }}>
           <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
           <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
         </div>
@@ -209,7 +209,7 @@ export default function QuoteDetail() {
 
       {/* UPGRADE 2: Fuel Delta Alert */}
       {fuelAlert && fuelAlert.has_alert && (
-        <div style={{ padding: '14px 18px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid var(--status-warning)', borderRadius: 2, marginBottom: 20 }}>
+        <div style={{ padding: '14px 20px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid var(--status-warning)', borderRadius: 2, marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
             <div style={{ fontSize: 18 }}>⚠️</div>
             <div style={{ flex: 1 }}>
@@ -382,7 +382,7 @@ export default function QuoteDetail() {
 
           {/* UPGRADE 3: Win Probability Display */}
           {quote.win_probability && (quote.status === 'DRAFT' || quote.status === 'SENT') && (
-            <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+            <div className="card" style={{ padding: 20 }}>
               <div className="card-title" style={{ marginBottom: 12 }}>Win Probability</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                 <div style={{ flex: 1, height: 8, background: 'var(--bg-deep)', borderRadius: 4, overflow: 'hidden' }}>
@@ -404,7 +404,7 @@ export default function QuoteDetail() {
 
           {/* UPGRADE 1: Outcome Buttons */}
           {(quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome && (
-            <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+            <div className="card" style={{ padding: 20 }}>
               <div className="card-title" style={{ marginBottom: 12 }}>Mark Outcome</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
@@ -576,7 +576,7 @@ export default function QuoteDetail() {
               <button
                 onClick={() => {
                   const token = localStorage.getItem('access');
-                  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3700';
+                  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
                   const url = `${baseURL}/api/v1/quotes/${id}/generate_pdf/`;
                   fetch(url, { headers: { Authorization: `Token ${token}` } })
                     .then(r => r.blob())

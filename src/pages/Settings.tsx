@@ -11,6 +11,7 @@ import { IntegrationsSettings } from "./settings/IntegrationsSettings";
 import { CustomersDirectory } from "./settings/CustomersDirectory";
 import { VehiclesDirectory } from "./settings/VehiclesDirectory";
 import { VehicleTypesDirectory } from "./settings/VehicleTypesDirectory";
+import { DeveloperApi } from "./settings/DeveloperApi";
 
 const SECTIONS = [
   {
@@ -36,6 +37,12 @@ const SECTIONS = [
       { id: 'customers', label: 'Customers', component: CustomersDirectory },
       { id: 'vehicles', label: 'Vehicles', component: VehiclesDirectory },
       { id: 'vehicle-types', label: 'Vehicle Types', component: VehicleTypesDirectory },
+    ],
+  },
+  {
+    group: 'Developers',
+    items: [
+      { id: 'risk-api', label: 'Risk-Scoring API', component: DeveloperApi },
     ],
   },
 ];

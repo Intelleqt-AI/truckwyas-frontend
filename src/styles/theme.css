@@ -280,6 +280,11 @@ body {
   border-bottom: 1px solid var(--border-subtle);
   background: var(--header-bg);
   backdrop-filter: blur(10px);
+  /* Keep the header (and its dropdowns: notifications, profile menu) above the
+     main content's cards, which otherwise paint over absolutely-positioned
+     children of the header. */
+  position: relative;
+  z-index: 100;
 }
 
 .logo {
@@ -500,6 +505,9 @@ body {
 
 /* Metric Values */
 .metric-value {
+  /* Numbers render in the mono face everywhere — this class previously inherited
+     sans, so cards using it looked different from cards with inline mono. */
+  font-family: var(--font-mono);
   font-size: 28px;
   font-weight: 600;
   color: var(--text-primary);

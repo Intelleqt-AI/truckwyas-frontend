@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchData } from "@/lib/Api";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { LiveBadge } from "@/components/LiveBadge";
 
 const STATUS_COLOR: Record<string, string> = {
   IN_TRANSIT: 'var(--accent-primary)',
@@ -20,7 +22,8 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   fontSize: 11,
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
-  padding: '10px 18px',
+  padding: '12px 0',
+  marginRight: 24,
   cursor: 'pointer',
   marginBottom: -1,
 });
@@ -37,7 +40,7 @@ export default function FleetDashboard() {
     document.title = 'Fleet - TruckWys';
   }, []);
 
-  useEffect(() => {
+  const load = () => {
     Promise.all([
       fetchData('api/v1/vehicles/'),
       fetchData('api/v1/drivers/')
@@ -45,17 +48,19 @@ export default function FleetDashboard() {
       .then(([vehiclesData, driversData]) => {
         setVehicles(Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.results || []));
         setDrivers(Array.isArray(driversData) ? driversData : (driversData?.results || []));
+        setError(null);
       })
       .catch(() => {
         setError('Failed to load fleet data');
-        setVehicles([]);
-        setDrivers([]);
       })
       .finally(() => setLoading(false));
-  }, []);
+  };
 
-  const activeVehicles = vehicles.filter(v => v.status === 'IN_TRANSIT' || v.status === 'LOADING').length;
-  const idleVehicles = vehicles.filter(v => v.status === 'IDLE').length;
+  useEffect(() => { load(); }, []);
+  useAutoRefresh(load); // live-refresh every 30s + on focus
+
+  const activeVehicles = vehicles.filter(v => v.status === 'IN_USE').length;
+  const idleVehicles = vehicles.filter(v => v.status === 'AVAILABLE').length;
   const inMaintenance = vehicles.filter(v => v.status === 'MAINTENANCE').length;
   const activeDrivers = drivers.filter(d => d.status === 'ACTIVE').length;
 
@@ -66,7 +71,7 @@ export default function FleetDashboard() {
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
         </div>
-        <div className="card" style={{ padding: 24 }}>
+        <div className="card" style={{ padding: 20 }}>
           <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
           <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
         </div>
@@ -81,7 +86,7 @@ export default function FleetDashboard() {
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
         </div>
-        <div className="card" style={{ padding: 24, color: 'var(--status-danger)' }}>
+        <div className="card" style={{ padding: 20, color: 'var(--status-danger)' }}>
           {error}
         </div>
       </div>
@@ -94,7 +99,10 @@ export default function FleetDashboard() {
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
+            <LiveBadge />
+          </div>
         </div>
         <button className="btn-action" onClick={() => navigate(tab === 'vehicles' ? '/fleet/vehicles' : '/fleet/drivers')}>
           + ADD {tab === 'vehicles' ? 'VEHICLE' : 'DRIVER'}
@@ -102,7 +110,7 @@ export default function FleetDashboard() {
       </div>
 
       {/* Stats — always visible */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
           { label: 'Total Vehicles', value: vehicles.length, color: 'var(--text-primary)' },
           { label: 'Active', value: activeVehicles, color: 'var(--accent-primary)' },
@@ -135,7 +143,7 @@ export default function FleetDashboard() {
             <tbody>
               {vehicles.map(v => (
                 <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/vehicles/${v.id}`)}>
-                  <td className="mono">{v.registration || '—'}</td>
+                  <td className="mono">{v.plate || v.registration || '—'}</td>
                   <td>{v.make || ''} {v.model || ''}</td>
                   <td>{v.driver || '—'}</td>
                   <td>
@@ -168,9 +176,9 @@ export default function FleetDashboard() {
             <tbody>
               {drivers.map(d => (
                 <tr key={d.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/drivers/${d.id}`)}>
-                  <td>{d.name || '—'}</td>
-                  <td className="mono">{d.code || '—'}</td>
-                  <td className="mono">{d.trips !== undefined ? d.trips : '—'}</td>
+                  <td>{(d.user_details ? `${d.user_details.first_name || ''} ${d.user_details.last_name || ''}`.trim() : '') || d.name || `Driver ${d.id}`}</td>
+                  <td className="mono">{d.license_number || '—'}</td>
+                  <td className="mono">{d.total_trips ?? '—'}</td>
                   <td style={{ color: d.onTime >= 90 ? 'var(--accent-primary)' : d.onTime >= 80 ? 'var(--status-warning)' : 'var(--status-danger)', fontFamily: 'var(--font-mono)' }}>
                     {d.onTime !== undefined ? `${d.onTime}%` : '—'}
                   </td>

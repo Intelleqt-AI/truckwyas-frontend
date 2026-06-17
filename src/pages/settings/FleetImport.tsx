@@ -167,7 +167,7 @@ export default function FleetImport() {
     // Note: usePost with FormData requires special handling
     // For now, using the pattern - backend will handle multipart/form-data
     uploadFile({
-      url: "/api/integrations/fleet/import/",
+      url: "/api/v1/integrations/fleet/import-trips/",
       data: formData,
       config: {
         headers: {
@@ -422,7 +422,7 @@ export default function FleetImport() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-sm text-muted-foreground">
+            <div className="text-center py-10 text-sm text-muted-foreground">
               No import history yet. Upload your first file to get started.
             </div>
           )}

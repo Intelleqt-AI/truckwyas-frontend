@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "@/lib/formatters";
 import { fetchData, postData } from "@/lib/Api";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { LiveBadge } from "@/components/LiveBadge";
 
 const TIER_COLOR: Record<string, string> = {
   prime: 'var(--accent-primary)', standard: 'var(--status-success)',
@@ -108,36 +110,37 @@ export default function Capital() {
     document.title = 'Capital - TruckWys';
   }, []);
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Load facility data — paginated {count, results}
-        const facilityData = await fetchData('api/v1/facilities/');
-        const facilityList = Array.isArray(facilityData) ? facilityData : (facilityData?.results || []);
-        setFacility(facilityList[0] || null);
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      // Load facility data — paginated {count, results}
+      const facilityData = await fetchData('api/v1/facilities/');
+      const facilityList = Array.isArray(facilityData) ? facilityData : (facilityData?.results || []);
+      setFacility(facilityList[0] || null);
 
-        // Load active advances — paginated {count, results}
-        const advancesData = await fetchData('api/v1/advances/');
-        const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
-        const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
-        setAdvances(active);
+      // Load active advances — paginated {count, results}
+      const advancesData = await fetchData('api/v1/advances/');
+      const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
+      const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
+      setAdvances(active);
 
-        // Load eligible invoices from dedicated endpoint
-        const eligibleData = await fetchData('api/v1/capital/eligible/');
-        const eligible = eligibleData?.invoices || [];
-        setEligibleInvoices(eligible);
-      } catch (err) {
-        console.error('Failed to load capital data:', err);
-        setError('Failed to load capital data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
+      // Load eligible invoices from dedicated endpoint
+      const eligibleData = await fetchData('api/v1/capital/eligible/');
+      const eligible = eligibleData?.invoices || [];
+      setEligibleInvoices(eligible);
+    } catch (err) {
+      console.error('Failed to load capital data:', err);
+      setError('Failed to load capital data');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useAutoRefresh(load);
 
   if (loading) {
     return (
@@ -148,13 +151,13 @@ export default function Capital() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="card" style={{ padding: 24 }}>
+            <div key={i} className="card" style={{ padding: 20 }}>
               <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
               <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
             </div>
           ))}
         </div>
-        <div className="card" style={{ padding: 24 }}>
+        <div className="card" style={{ padding: 20 }}>
           <div style={{ height: 120, background: 'var(--bg-surface)', borderRadius: 4 }} />
         </div>
       </div>
@@ -180,7 +183,10 @@ export default function Capital() {
     <div>
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fast Pay Facility</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fast Pay Facility</div>
+          <LiveBadge />
+        </div>
 
       </div>
 
@@ -346,21 +352,24 @@ export default function Capital() {
             </thead>
             <tbody>
               {eligibleInvoices.map(inv => {
-                const tier = inv.risk_tier || inv.tier || 'standard';
-                const amount = inv.total_amount || inv.amount || 0;
-                const feeNum = tier === 'prime' ? 0.02 : 0.025;
-                const netPayout = amount * (1 - feeNum);
+                const tier = String(inv.risk_tier || inv.tier || 'standard');
+                const tierKey = tier.toLowerCase();
+                const amount = Number(inv.total_amount || inv.amount || inv.invoice_amount || 0);
+                // Use the backend's computed fee/net; only estimate if absent.
+                const feePct = inv.fee_rate_pct ?? inv.fee_percent;
+                const netPayout = inv.net_payout_zar ?? (amount * (1 - (feePct != null ? Number(feePct) / 100 : 0.025)));
+                const feeLabel = feePct != null ? `${Number(feePct).toFixed(1)}%` : (TIER_FEE[tierKey] || '—');
                 return (
                   <tr key={inv.id}>
                     <td className="mono">{inv.invoice_number || inv.invoiceNumber}</td>
                     <td>{inv.customer_name || inv.customerName}</td>
                     <td className="mono">{formatCurrency(amount)}</td>
                     <td>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: TIER_COLOR[tier], background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: TIER_COLOR[tierKey], background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase' }}>
                         {tier}
                       </span>
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{TIER_FEE[tier]}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{feeLabel}</td>
                     <td style={{ color: 'var(--status-success)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCurrency(netPayout)}</td>
                     <td className="text-right">
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>

@@ -1,6 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { postData } from '@/lib/Api';
+
+const RESEND_SECONDS = 180;
+
+function formatCountdown(s: number) {
+  const m = Math.floor(s / 60).toString().padStart(2, '0');
+  const sec = (s % 60).toString().padStart(2, '0');
+  return `${m}:${sec}`;
+}
 
 export default function PasswordReset() {
   const navigate = useNavigate();
@@ -11,18 +20,47 @@ export default function PasswordReset() {
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [msg, setMsg] = useState('');
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  // Resend countdown
+  const [countdown, setCountdown] = useState(RESEND_SECONDS);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startCountdown = () => {
+    setCountdown(RESEND_SECONDS);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) { clearInterval(timerRef.current!); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
   const requestReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
       await postData({ url: 'api/v1/auth/password-reset/', data: { email } });
-      setMsg('Reset code sent to your email.');
       setStep('confirm');
+      startCountdown();
     } catch (err: any) {
       setError(err?.data?.detail || err?.data?.email?.[0] || 'Failed to send reset email.');
     } finally { setLoading(false); }
+  };
+
+  const handleResend = async () => {
+    if (countdown > 0) return;
+    setError('');
+    try {
+      await postData({ url: 'api/v1/auth/password-reset/', data: { email } });
+      startCountdown();
+    } catch (err: any) {
+      setError(err?.data?.detail || 'Failed to resend code.');
+    }
   };
 
   const confirmReset = async (e: React.FormEvent) => {
@@ -37,6 +75,16 @@ export default function PasswordReset() {
     } catch (err: any) {
       setError(err?.data?.detail || err?.data?.code?.[0] || 'Invalid or expired reset code.');
     } finally { setLoading(false); }
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '10px 12px', background: 'var(--bg-base)',
+    border: '1px solid var(--border-subtle)', borderRadius: 4,
+    color: 'var(--text-primary)', fontSize: 13, outline: 'none', boxSizing: 'border-box',
+  };
+  const labelStyle: React.CSSProperties = {
+    fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
+    display: 'block', marginBottom: 6, letterSpacing: '0.08em',
   };
 
   return (
@@ -57,15 +105,18 @@ export default function PasswordReset() {
           </div>
         ) : (
           <>
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 6 }}>
                 {step === 'request' ? 'Reset Password' : 'Enter Reset Code'}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                {step === 'request'
-                  ? 'Enter your email address to receive a reset code.'
-                  : msg || `Code sent to ${email}. Enter it below with your new password.`}
-              </div>
+              {step === 'confirm' && (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Reset code sent to <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>
+                </div>
+              )}
+              {step === 'request' && (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Enter your email address to receive a reset code.</div>
+              )}
             </div>
 
             {error && (
@@ -77,12 +128,9 @@ export default function PasswordReset() {
             {step === 'request' ? (
               <form onSubmit={requestReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
-                  <label style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, letterSpacing: '0.08em' }}>EMAIL ADDRESS</label>
-                  <input
-                    type="email" required value={email} onChange={e => setEmail(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                    placeholder="your@email.com"
-                  />
+                  <label style={labelStyle}>EMAIL ADDRESS</label>
+                  <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                    style={inputStyle} placeholder="your@email.com" />
                 </div>
                 <button type="submit" className="btn-action" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
                   {loading ? 'SENDING...' : 'SEND RESET CODE'}
@@ -90,20 +138,51 @@ export default function PasswordReset() {
               </form>
             ) : (
               <form onSubmit={confirmReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {[
-                  { label: 'RESET CODE', val: code, set: setCode, type: 'text', ph: '6-digit code from email' },
-                  { label: 'NEW PASSWORD', val: newPassword, set: setNewPassword, type: 'password', ph: 'Min 8 characters' },
-                  { label: 'CONFIRM PASSWORD', val: confirm, set: setConfirm, type: 'password', ph: 'Repeat new password' },
-                ].map(f => (
-                  <div key={f.label}>
-                    <label style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, letterSpacing: '0.08em' }}>{f.label}</label>
-                    <input
-                      type={f.type} required value={f.val} onChange={e => f.set(e.target.value)}
-                      placeholder={f.ph}
-                      style={{ width: '100%', padding: '10px 12px', background: 'var(--bg-base)', border: '1px solid var(--border-subtle)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-                    />
+                {/* Resend row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                    {countdown > 0 ? `Resend in ${formatCountdown(countdown)}` : 'Didn\'t receive the code?'}
+                  </span>
+                  <button type="button" onClick={handleResend} disabled={countdown > 0}
+                    style={{ fontSize: 11, fontFamily: 'var(--font-mono)', background: 'none', border: 'none', cursor: countdown > 0 ? 'default' : 'pointer', color: countdown > 0 ? 'var(--text-tertiary)' : 'var(--accent-primary)', padding: 0, letterSpacing: '0.06em' }}>
+                    RESEND
+                  </button>
+                </div>
+
+                {/* Reset code */}
+                <div>
+                  <label style={labelStyle}>RESET CODE</label>
+                  <input type="text" required value={code} onChange={e => setCode(e.target.value)}
+                    placeholder="6-digit code from email" maxLength={6}
+                    style={{ ...inputStyle, letterSpacing: '0.2em', fontSize: 16, fontFamily: 'var(--font-mono)' }} />
+                </div>
+
+                {/* New password */}
+                <div>
+                  <label style={labelStyle}>NEW PASSWORD</label>
+                  <div style={{ position: 'relative' }}>
+                    <input type={showNew ? 'text' : 'password'} required value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                      placeholder="Min 8 characters" style={{ ...inputStyle, paddingRight: 40 }} />
+                    <button type="button" tabIndex={-1} onClick={() => setShowNew(v => !v)}
+                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}>
+                      {showNew ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
                   </div>
-                ))}
+                </div>
+
+                {/* Confirm password */}
+                <div>
+                  <label style={labelStyle}>CONFIRM PASSWORD</label>
+                  <div style={{ position: 'relative' }}>
+                    <input type={showConfirm ? 'text' : 'password'} required value={confirm} onChange={e => setConfirm(e.target.value)}
+                      placeholder="Repeat new password" style={{ ...inputStyle, paddingRight: 40 }} />
+                    <button type="button" tabIndex={-1} onClick={() => setShowConfirm(v => !v)}
+                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}>
+                      {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
+
                 <button type="submit" className="btn-action" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
                   {loading ? 'RESETTING...' : 'SET NEW PASSWORD'}
                 </button>

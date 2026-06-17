@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetchData, postData, patchData } from '../lib/Api';
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { LiveBadge } from "@/components/LiveBadge";
 
 interface Vehicle {
   id: number;
@@ -12,9 +14,10 @@ interface Vehicle {
   year?: number;
   capacity?: number;
   status: string;
-  revenue_this_month?: number;
-  trips_this_month?: number;
-  fuel_efficiency?: number;
+  revenue_generated?: number;
+  total_trips?: number;
+  fuel_efficiency_score?: number;
+  utilisation_rate?: number;
   ai_health_score?: number;
   plate?: string;
   vin?: string;
@@ -40,7 +43,7 @@ interface FleetOverview {
   total_vehicles?: number;
   active_vehicles?: number;
   maintenance_vehicles?: number;
-  revenue_this_month?: number;
+  revenue_generated?: number;
 }
 
 interface FleetInsight {
@@ -92,9 +95,8 @@ export default function Vehicles() {
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
   const [editForm, setEditForm] = useState<any>({});
 
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
+  const load = useCallback(() => {
+    return Promise.all([
       fetchData('api/v1/vehicles/'),
       fetchData('api/v1/fleet/overview/'),
       fetchData('api/v1/fleet/intelligence/')
@@ -122,6 +124,9 @@ export default function Vehicles() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { load(); }, [load]);
+  useAutoRefresh(load);
+
   // Filter vehicles
   const filtered = vehicles.filter(v => {
     if (statusFilter === 'All') return true;
@@ -131,7 +136,7 @@ export default function Vehicles() {
   // Sort vehicles
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === 'revenue') {
-      return (b.revenue_this_month || 0) - (a.revenue_this_month || 0);
+      return (b.revenue_generated || 0) - (a.revenue_generated || 0);
     }
     return 0;
   });
@@ -155,7 +160,7 @@ export default function Vehicles() {
 
   if (loading) {
     return (
-      <div style={{ padding: 40 }}>
+      <div>
         <div style={{ marginBottom: 24 }}>
           <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 8, width: '20%' }} />
           <div style={{ height: 24, background: 'var(--bg-surface)', borderRadius: 4, width: '30%' }} />
@@ -184,11 +189,14 @@ export default function Vehicles() {
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
+            <LiveBadge />
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
             <button onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>HEATMAP</button>
             <button className="btn-action" onClick={() => setShowAddForm(true)}>+ ADD VEHICLE</button>
           </div>
@@ -245,7 +253,7 @@ export default function Vehicles() {
                     background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
                     border: '1px solid var(--border-subtle)',
                     color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                    padding: '7px 14px',
+                    padding: '6px 12px',
                     fontFamily: 'var(--font-mono)',
                     fontSize: 11,
                     borderRadius: 2,
@@ -269,7 +277,7 @@ export default function Vehicles() {
                 <tr>
                   {['Registration', 'Make / Model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency', ''].map(h => (
                     <th key={h} style={{
-                      padding: '10px 20px', textAlign: 'left',
+                      padding: '12px 20px', textAlign: 'left',
                       fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
                       letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                       borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
@@ -300,7 +308,7 @@ export default function Vehicles() {
                     <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles match your filters</td></tr>
                   )
                 ) : sorted.map((v, idx) => {
-                  const utilizationPercent = ((v.trips_this_month || 0) / 20) * 100;
+                  const utilizationPercent = ((v.total_trips || 0) / 20) * 100;
                   const utilizationColor = utilizationPercent > 70 ? 'var(--status-success)' : utilizationPercent >= 40 ? 'var(--status-warning)' : 'var(--status-danger)';
 
                   return (
@@ -311,17 +319,17 @@ export default function Vehicles() {
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
-                      <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
+                      <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
                         {v.plate || v.registration || '—'}
                       </td>
-                      <td style={{ padding: '13px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
                         {[v.make, v.model].filter(Boolean).join(' ') || '—'}
                       </td>
-                      <td style={{ padding: '13px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
                         {v.vehicle_type_name || v.vehicle_type || '—'}
                       </td>
-                      <td style={{ padding: '13px 20px' }}>{getStatusBadge(v.status)}</td>
-                      <td style={{ padding: '13px 20px' }}>
+                      <td style={{ padding: '12px 20px' }}>{getStatusBadge(v.status)}</td>
+                      <td style={{ padding: '12px 20px' }}>
                         <span style={{
                           fontFamily: 'var(--font-mono)',
                           fontSize: 11,
@@ -334,16 +342,16 @@ export default function Vehicles() {
                           {Math.min(utilizationPercent, 100).toFixed(0)}%
                         </span>
                       </td>
-                      <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {v.revenue_this_month ? formatZAR(v.revenue_this_month) : '—'}
+                      <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {v.revenue_generated ? formatZAR(v.revenue_generated) : '—'}
                       </td>
-                      <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {v.trips_this_month ?? 0}
+                      <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {v.total_trips ?? 0}
                       </td>
-                      <td style={{ padding: '13px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
-                        {v.fuel_efficiency ? `${parseFloat(v.fuel_efficiency as any).toFixed(1)} L/100km` : '—'}
+                      <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {v.fuel_efficiency_score ? `${parseFloat(v.fuel_efficiency_score as any).toFixed(0)}/100` : '—'}
                       </td>
-                      <td style={{ padding: '13px 20px', textAlign: 'right' }}>
+                      <td style={{ padding: '12px 20px', textAlign: 'right' }}>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -428,7 +436,15 @@ export default function Vehicles() {
                 onClick={async () => {
                   setSaving(true);
                   try {
-                    await postData({ url: 'api/v1/vehicles/', data: { ...addForm, year: Number(addForm.year), capacity: Number(addForm.capacity) || 0 } });
+                    // Link the vehicle_type FK by matching the chosen type name to
+                    // the company's seeded vehicle types (fixes the quoting base-rate link).
+                    let vehicleTypeId: number | undefined;
+                    try {
+                      const vt = await fetchData('api/v1/vehicle-types/');
+                      const list = (vt?.results ?? vt) as any[];
+                      vehicleTypeId = list?.find(t => t.name === addForm.type)?.id;
+                    } catch { /* picker still works without the FK */ }
+                    await postData({ url: 'api/v1/vehicles/', data: { ...addForm, year: Number(addForm.year), capacity: Number(addForm.capacity) || 0, ...(vehicleTypeId ? { vehicle_type: vehicleTypeId } : {}) } });
                     setShowAddForm(false);
                     setAddForm({ vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '', type: 'Rigid Truck', capacity: '', fuel_type: 'Diesel', status: 'AVAILABLE' });
                     // Refresh

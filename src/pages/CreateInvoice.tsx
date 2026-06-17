@@ -100,7 +100,7 @@ export default function CreateInvoice() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 12 }}>Status</div>
+              <div className="card-title" style={{ marginBottom: 16 }}>Status</div>
               <select value={form.status} onChange={set('status')} style={inputStyle}>
                 <option value="DRAFT">Draft</option>
                 <option value="SENT">Send to Customer</option>
@@ -116,7 +116,7 @@ export default function CreateInvoice() {
               </div>
             </div>
 
-            {error && <div style={{ fontSize: 12, color: 'var(--status-danger)', padding: '10px 12px', background: 'var(--status-danger-bg)', borderRadius: 2 }}>{error}</div>}
+            {error && <div style={{ fontSize: 12, color: 'var(--status-danger)', padding: '12px 16px', background: 'var(--status-danger-bg)', borderRadius: 2 }}>{error}</div>}
 
             <button type="submit" className="btn-action" style={{ width: '100%', padding: '12px', fontSize: 12 }} disabled={mutation.isPending}>
               {mutation.isPending ? 'CREATING...' : 'CREATE INVOICE'}

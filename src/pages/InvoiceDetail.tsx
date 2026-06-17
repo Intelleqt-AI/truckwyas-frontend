@@ -32,6 +32,14 @@ export default function InvoiceDetail() {
     retry: 2,
   });
 
+  // Payments aren't embedded on the invoice serializer — fetch them.
+  const { data: paymentsResp } = useQuery({
+    queryKey: ['invoice-payments', id],
+    queryFn: () => fetchData(`api/v1/payments/?invoice=${id}`),
+    enabled: !!id,
+  });
+  const payments = Array.isArray(paymentsResp) ? paymentsResp : (paymentsResp?.results ?? []);
+
   const handleSendInvoice = async () => {
     if (!id) return;
     setSending(true);
@@ -163,12 +171,12 @@ export default function InvoiceDetail() {
       </div>
 
       {/* Line Items */}
-      {invoice.items && invoice.items.length > 0 && (
+      {invoice.line_items && invoice.line_items.length > 0 && (
         <div className="card table-card" style={{ marginBottom: 24 }}>
           <div className="card-header" style={{ marginBottom: 16 }}>
             <span className="card-title">Line Items</span>
             <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-              {invoice.items.length} item{invoice.items.length !== 1 ? 's' : ''}
+              {invoice.line_items.length} item{invoice.line_items.length !== 1 ? 's' : ''}
             </span>
           </div>
           <table className="data-table">
@@ -181,7 +189,7 @@ export default function InvoiceDetail() {
               </tr>
             </thead>
             <tbody>
-              {invoice.items.map((item: any, idx: number) => (
+              {invoice.line_items.map((item: any, idx: number) => (
                 <tr key={idx}>
                   <td>{item.description || item.item_description || '—'}</td>
                   <td className="mono text-right">{item.quantity || 1}</td>
@@ -205,12 +213,12 @@ export default function InvoiceDetail() {
       )}
 
       {/* Payment History */}
-      {invoice.payments && invoice.payments.length > 0 && (
+      {payments && payments.length > 0 && (
         <div className="card table-card" style={{ marginBottom: 24 }}>
           <div className="card-header" style={{ marginBottom: 16 }}>
             <span className="card-title">Payment History</span>
             <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-              {invoice.payments.length} payment{invoice.payments.length !== 1 ? 's' : ''}
+              {payments.length} payment{payments.length !== 1 ? 's' : ''}
             </span>
           </div>
           <table className="data-table">
@@ -223,7 +231,7 @@ export default function InvoiceDetail() {
               </tr>
             </thead>
             <tbody>
-              {invoice.payments.map((payment: any, idx: number) => (
+              {payments.map((payment: any, idx: number) => (
                 <tr key={idx}>
                   <td className="mono">{payment.payment_date?.slice(0, 10) || payment.date?.slice(0, 10) || '—'}</td>
                   <td>
@@ -251,7 +259,7 @@ export default function InvoiceDetail() {
               <tr style={{ borderTop: '2px solid var(--border-subtle)' }}>
                 <td colSpan={3} style={{ textAlign: 'right', fontWeight: 600, padding: '12px 0', fontSize: 13 }}>Total Paid:</td>
                 <td className="mono text-right" style={{ color: 'var(--status-success)', fontWeight: 700, fontSize: 16, padding: '12px 0' }}>
-                  {formatCurrency(invoice.payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0))}
+                  {formatCurrency(payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0))}
                 </td>
               </tr>
             </tfoot>

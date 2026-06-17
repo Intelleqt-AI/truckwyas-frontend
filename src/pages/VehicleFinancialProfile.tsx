@@ -81,7 +81,7 @@ export default function VehicleFinancialProfile() {
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 24 }}>
         <button
           onClick={() => navigate('/fleet')}
           style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}
@@ -97,7 +97,7 @@ export default function VehicleFinancialProfile() {
               {vehicle.make} {vehicle.model} · {vehicle.vehicle_type_name} · {vehicle.year} · {vehicle.fuel_type}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <button
               onClick={() => {
                 setShowEditForm(true);

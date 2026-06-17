@@ -21,17 +21,25 @@ interface QuotePreview extends ExtractedFields {
   estimated_cost?: number;
 }
 
+const AIQUOTE_KEY = 'aiquote_session';
+const GREETING: Message = {
+  role: 'assistant',
+  content: "Hi! Tell me about the load you need to quote. For example: 'I need to move 20 tons of palletised goods from Johannesburg to Cape Town on Friday, flatbed truck.'"
+};
+function loadQuoteSession(): { messages?: Message[]; quotePreview?: QuotePreview } | null {
+  try {
+    const s = JSON.parse(localStorage.getItem(AIQUOTE_KEY) || 'null');
+    if (s && Array.isArray(s.messages) && s.messages.length) return s;
+  } catch { /* ignore */ }
+  return null;
+}
+
 export default function AIQuoteChat() {
   const navigate = useNavigate();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: "Hi! Tell me about the load you need to quote. For example: 'I need to move 20 tons of palletised goods from Johannesburg to Cape Town on Friday, flatbed truck.'"
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => loadQuoteSession()?.messages || [GREETING]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [quotePreview, setQuotePreview] = useState<QuotePreview>({});
+  const [quotePreview, setQuotePreview] = useState<QuotePreview>(() => loadQuoteSession()?.quotePreview || {});
   const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -44,6 +52,23 @@ export default function AIQuoteChat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Persist the in-progress quote conversation so navigating away and back
+  // doesn't lose the work. Cleared once the quote is handed off / created.
+  useEffect(() => {
+    try {
+      const onlyGreeting = messages.length <= 1 && Object.keys(quotePreview).length === 0;
+      if (onlyGreeting) localStorage.removeItem(AIQUOTE_KEY);
+      else localStorage.setItem(AIQUOTE_KEY, JSON.stringify({ messages, quotePreview }));
+    } catch { /* ignore quota */ }
+  }, [messages, quotePreview]);
+
+  const startOver = () => {
+    setMessages([GREETING]);
+    setQuotePreview({});
+    setInput('');
+    try { localStorage.removeItem(AIQUOTE_KEY); } catch { /* ignore */ }
+  };
 
   // Local regex fallback for field extraction
   const extractFieldsLocally = (text: string): Partial<ExtractedFields> => {
@@ -108,14 +133,17 @@ export default function AIQuoteChat() {
     try {
       const result = await postData({
         url: 'api/v1/route/calculate/',
-        data: { pickup_location: pickup, delivery_location: delivery }
+        data: { origin: pickup, destination: delivery }
       });
 
-      if (result.distance && result.estimated_cost) {
+      // Backend returns distance_km / total_cost_zar (not distance / estimated_cost).
+      const km = result.distance_km ?? result.distance;
+      const cost = result.total_cost_zar ?? result.estimated_cost;
+      if (km && cost) {
         setQuotePreview(prev => ({
           ...prev,
-          distance: result.distance,
-          estimated_cost: result.estimated_cost
+          distance: km,
+          estimated_cost: cost
         }));
       }
     } catch (error) {
@@ -227,11 +255,13 @@ export default function AIQuoteChat() {
             }
           });
 
-          if (response.transcription) {
-            setInput(response.transcription);
+          // Backend returns the transcript under `text` (legacy: `transcription`).
+          const transcript = response.text || response.transcription;
+          if (transcript) {
+            setInput(transcript);
             // Auto-send the transcription
             setTimeout(() => {
-              setInput(response.transcription);
+              setInput(transcript);
               handleSend();
             }, 100);
           }
@@ -260,39 +290,28 @@ export default function AIQuoteChat() {
     }
   };
 
-  const handleCreateQuote = async () => {
-    if (!quotePreview.pickup_location || !quotePreview.delivery_location || !quotePreview.cargo_description) {
-      alert('Please provide at least pickup location, delivery location, and cargo description');
+  const handleCreateQuote = () => {
+    if (!quotePreview.pickup_location || !quotePreview.delivery_location) {
+      alert('Please provide at least a pickup and delivery location first.');
       return;
     }
-
-    try {
-      setIsLoading(true);
-      const result = await postData({
-        url: 'api/v1/quotes/',
-        data: {
+    // Handed off — clear the saved session so the next visit starts fresh.
+    try { localStorage.removeItem(AIQUOTE_KEY); } catch { /* ignore */ }
+    // Hand off to the full New Quote flow with the AI-parsed fields prefilled —
+    // the operator picks a customer and the live route/cost engine runs there.
+    // (Posting straight to the API fails: a quote needs a customer, base_rate,
+    // total_amount and valid_until, none of which the chat collects.)
+    navigate('/quotes/new', {
+      state: {
+        prefill: {
           pickup_location: quotePreview.pickup_location,
           delivery_location: quotePreview.delivery_location,
           cargo_description: quotePreview.cargo_description,
           weight: quotePreview.weight,
           vehicle_type: quotePreview.vehicle_type,
-          urgency: quotePreview.urgency,
-          distance: quotePreview.distance,
-          estimated_cost: quotePreview.estimated_cost
-        }
-      });
-
-      if (result.id) {
-        navigate(`/quotes/${result.id}`);
-      } else {
-        navigate('/quotes');
-      }
-    } catch (error: any) {
-      console.error('Failed to create quote:', error);
-      alert('Failed to create quote. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+        },
+      },
+    });
   };
 
   const canCreateQuote = Boolean(
@@ -302,12 +321,24 @@ export default function AIQuoteChat() {
   );
 
   return (
-    <div style={{
-      display: 'flex',
-      height: 'calc(100vh - 120px)',
-      gap: 16,
-      fontFamily: 'var(--font-sans)'
-    }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 90px)' }}>
+      <div style={{ marginBottom: 14 }}>
+        <button onClick={() => navigate('/quotes')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0, letterSpacing: '0.05em' }}>← BACK TO QUOTES</button>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>AI Quote</div>
+          {messages.length > 1 && (
+            <button onClick={startOver} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '6px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Start over</button>
+          )}
+        </div>
+      </div>
+      <div style={{
+        display: 'flex',
+        flex: 1,
+        minHeight: 0,
+        gap: 16,
+        fontFamily: 'var(--font-sans)'
+      }}>
       {/* Left: Chat Panel (65%) */}
       <div style={{
         flex: '0 0 65%',
@@ -577,6 +608,7 @@ export default function AIQuoteChat() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

@@ -24,10 +24,16 @@ import { CSS } from "@dnd-kit/utilities";
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',
   SENT: 'var(--status-warning)',
-  ACCEPTED: '#22c55e',
+  ACCEPTED: 'var(--status-success)',
   IT: 'var(--accent-primary)',
-  COMPLETED: '#22c55e',
+  COMPLETED: 'var(--status-success)',
 };
+
+const confidenceColor = (c?: string) =>
+  c === 'HIGH' ? 'var(--status-success)' : c === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)';
+
+const routeOf = (q: any) =>
+  `${q.origin || q.pickup_location || '—'} → ${q.destination || q.delivery_location || '—'}`;
 
 const COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'IT', 'COMPLETED'];
 const COLUMN_LABELS: Record<string, string> = {
@@ -49,11 +55,17 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
     isDragging,
   } = useSortable({ id: String(quote.id) });
 
+  const accent = STATUS_COLOR[quote.status] || 'var(--border-subtle)';
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     cursor: isDragging ? 'grabbing' : 'grab',
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border-subtle)',
+    borderLeft: `2px solid ${accent}`,
+    borderRadius: 2,
+    boxShadow: isDragging ? '0 8px 16px rgba(0,0,0,0.25)' : 'none',
   };
 
   return (
@@ -62,48 +74,41 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
       style={style}
       {...attributes}
       {...listeners}
-      className="card"
       onClick={onClick}
+      onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.background = 'var(--bg-surface-hover)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-surface)'; }}
     >
-      <div style={{ padding: 12, borderLeft: `2px solid ${STATUS_COLOR[quote.status] || 'var(--border-subtle)'}` }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+      <div style={{ padding: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6 }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>{quote.quote_number}</div>
-          {/* UPGRADE 1: Outcome badges */}
-          {quote.outcome && quote.outcome !== 'pending' && (
-            <span style={{
-              fontSize: 9,
-              padding: '2px 6px',
-              borderRadius: 2,
-              background: quote.outcome === 'accepted' ? 'var(--status-success)' : quote.outcome === 'rejected' ? 'var(--status-danger)' : 'var(--bg-surface)',
-              color: quote.outcome === 'accepted' ? '#000' : quote.outcome === 'rejected' ? '#fff' : 'var(--text-tertiary)',
-              fontFamily: 'var(--font-mono)',
-              fontWeight: 600
-            }}>
-              {quote.outcome === 'accepted' && '✓'}
-              {quote.outcome === 'rejected' && '✗'}
-              {quote.outcome === 'pending' && '⏳'}
-            </span>
-          )}
-          {/* UPGRADE 2: Fuel alert icon */}
-          {quote.fuel_alert && (
-            <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 11 }}>⛽</span>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {quote.fuel_alert && (
+              <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 11 }}>⛽</span>
+            )}
+            {quote.outcome === 'accepted' && (
+              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: 'var(--status-success-bg)', color: 'var(--status-success)', border: '1px solid var(--status-success)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>✓ WON</span>
+            )}
+            {quote.outcome === 'rejected' && (
+              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>✗ LOST</span>
+            )}
+          </div>
         </div>
-        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{quote.customer_name}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
-          {quote.origin} → {quote.destination}
+        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{quote.customer_name || '—'}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10 }}>
+          {routeOf(quote)}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: quote.status === 'ACCEPTED' ? 8 : 0 }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent-primary)' }}>{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
-          <span style={{ fontSize: 10, color: quote.confidence === 'HIGH' ? '#22c55e' : quote.confidence === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)' }}>{quote.confidence}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: quote.status === 'ACCEPTED' ? 10 : 0 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
+          {quote.confidence && (
+            <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 2, color: confidenceColor(quote.confidence), border: `1px solid ${confidenceColor(quote.confidence)}` }}>{quote.confidence}</span>
+          )}
         </div>
         {quote.status === 'ACCEPTED' && onConvertToLoad && (
           <button
             onClick={(e) => onConvertToLoad(e, quote)}
-            className="btn-action"
-            style={{ width: '100%', fontSize: 9, padding: '6px 8px', background: 'var(--status-success)', border: 'none', pointerEvents: 'auto' }}
+            style={{ width: '100%', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.05em', padding: '7px 8px', background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)', borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
           >
-            ✓ CONVERT TO BOOKING
+            → CONVERT TO BOOKING
           </button>
         )}
       </div>
@@ -113,12 +118,18 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
 
 // Droppable Column Component
 function DroppableColumn({ columnId, items, children }: { columnId: string; items: any[]; children: React.ReactNode }) {
-  const { setNodeRef } = useDroppable({
+  const { setNodeRef, isOver } = useDroppable({
     id: columnId,
   });
 
   return (
-    <div ref={setNodeRef} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div ref={setNodeRef} style={{
+      display: 'flex', flexDirection: 'column', gap: 8,
+      minHeight: 80, padding: 4, borderRadius: 4,
+      background: isOver ? 'var(--bg-surface)' : 'transparent',
+      outline: isOver ? '1px dashed var(--accent-primary)' : '1px solid transparent',
+      transition: 'background 0.15s ease',
+    }}>
       <SortableContext items={items.map(q => String(q.id))} strategy={verticalListSortingStrategy}>
         {children}
       </SortableContext>
@@ -310,15 +321,23 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
         >
           {/* Quotes Kanban */}
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 16 }}>QUOTES PIPELINE — DRAG TO UPDATE STATUS</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
-            {COLUMNS.map(col => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24, alignItems: 'start' }}>
+            {COLUMNS.map(col => {
+              const colItems = quotesByStatus[col] || [];
+              const colTotal = colItems.reduce((s, q) => s + parseFloat(q.total_amount || '0'), 0);
+              return (
               <div key={col}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '0 2px' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[col] || 'var(--text-secondary)', letterSpacing: '0.08em' }}>{COLUMN_LABELS[col]}</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2 }}>{quotesByStatus[col]?.length || 0}</span>
+                <div style={{ borderTop: `2px solid ${STATUS_COLOR[col] || 'var(--border-subtle)'}`, paddingTop: 8, marginBottom: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[col] || 'var(--text-secondary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{COLUMN_LABELS[col]}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-secondary)', background: 'var(--bg-surface-hover)', padding: '2px 7px', borderRadius: 10 }}>{colItems.length}</span>
+                  </div>
+                  {colTotal > 0 && (
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', padding: '4px 2px 0' }}>{formatCurrency(colTotal)}</div>
+                  )}
                 </div>
-                <DroppableColumn columnId={col} items={quotesByStatus[col] || []}>
-                  {(quotesByStatus[col] || []).map((q: any) => (
+                <DroppableColumn columnId={col} items={colItems}>
+                  {colItems.map((q: any) => (
                     <DraggableQuoteCard
                       key={q.id}
                       quote={q}
@@ -326,26 +345,29 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                       onConvertToLoad={handleConvertToLoad}
                     />
                   ))}
-                  {(quotesByStatus[col] || []).length === 0 && (
-                    <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12, border: '1px dashed var(--border-subtle)', borderRadius: 2 }}>—</div>
+                  {colItems.length === 0 && (
+                    <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 11, border: '1px dashed var(--border-subtle)', borderRadius: 2 }}>Drop here</div>
                   )}
                 </DroppableColumn>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Drag Overlay */}
           <DragOverlay>
             {activeQuote ? (
-              <div className="card" style={{ padding: 12, borderLeft: `2px solid ${STATUS_COLOR[activeQuote.status] || 'var(--border-subtle)'}`, opacity: 0.9, boxShadow: '0 8px 16px rgba(0,0,0,0.2)' }}>
+              <div style={{ padding: 12, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderLeft: `2px solid ${STATUS_COLOR[activeQuote.status] || 'var(--border-subtle)'}`, borderRadius: 2, boxShadow: '0 8px 16px rgba(0,0,0,0.25)' }}>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6 }}>{activeQuote.quote_number}</div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{activeQuote.customer_name}</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{activeQuote.customer_name || '—'}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                  {activeQuote.origin} → {activeQuote.destination}
+                  {routeOf(activeQuote)}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent-primary)' }}>{formatCurrency(parseFloat(activeQuote.total_amount || '0'))}</span>
-                  <span style={{ fontSize: 10, color: activeQuote.confidence === 'HIGH' ? '#22c55e' : activeQuote.confidence === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)' }}>{activeQuote.confidence}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(activeQuote.total_amount || '0'))}</span>
+                  {activeQuote.confidence && (
+                    <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 600, padding: '2px 6px', borderRadius: 2, color: confidenceColor(activeQuote.confidence), border: `1px solid ${confidenceColor(activeQuote.confidence)}` }}>{activeQuote.confidence}</span>
+                  )}
                 </div>
               </div>
             ) : null}
@@ -380,66 +402,73 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
             ))}
           </div>
 
-          <div className="card table-card">
-            <table className="data-table">
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr><th>Quote #</th><th>Customer</th><th>Route</th><th>Total</th><th>Status</th><th>Outcome</th><th className="text-right">Created</th><th>Actions</th></tr>
+                <tr style={{ background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)' }}>
+                  {['QUOTE #', 'CUSTOMER', 'ROUTE', 'STATUS', 'OUTCOME', 'CREATED', 'AMOUNT', 'ACTION'].map(h => (
+                    <th key={h} style={{
+                      padding: '12px 16px',
+                      textAlign: h === 'AMOUNT' ? 'right' : h === 'ACTION' ? 'center' : 'left',
+                      fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
+                      fontWeight: 600, letterSpacing: '0.1em',
+                    }}>{h}</th>
+                  ))}
+                </tr>
               </thead>
               <tbody>
-                {filteredQuotes.map((quote: any) => (
-                  <tr key={quote.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/quotes/${quote.id}`)}>
-                    <td className="mono">
+                {filteredQuotes.map((quote: any, idx: number) => (
+                  <tr
+                    key={quote.id}
+                    onClick={() => navigate(`/quotes/${quote.id}`)}
+                    style={{
+                      borderBottom: idx < filteredQuotes.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                      cursor: 'pointer', transition: 'background 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 600 }}>
                       {quote.quote_number}
-                      {/* UPGRADE 2: Fuel alert icon */}
                       {quote.fuel_alert && (
                         <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 11, marginLeft: 6 }}>⛽</span>
                       )}
                     </td>
-                    <td>{quote.customer_name}</td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{quote.origin} → {quote.destination}</td>
-                    <td style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{formatCurrency(parseFloat(quote.total_amount || '0'))}</td>
-                    <td>
+                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-primary)' }}>{quote.customer_name || '—'}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>{routeOf(quote)}</td>
+                    <td style={{ padding: '12px 16px' }}>
                       <span style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 10,
+                        fontFamily: 'var(--font-mono)', fontSize: 10,
                         color: STATUS_COLOR[quote.status] || 'var(--text-secondary)',
-                        padding: '2px 6px',
-                        background: 'var(--bg-surface-hover)',
-                        borderRadius: 2
+                        padding: '4px 8px',
+                        border: `1px solid ${STATUS_COLOR[quote.status] || 'var(--border-subtle)'}`,
+                        borderRadius: 2,
                       }}>
                         {COLUMN_LABELS[quote.status] || quote.status}
                       </span>
                     </td>
-                    {/* UPGRADE 1: Outcome column */}
-                    <td>
-                      {quote.outcome && quote.outcome !== 'pending' && (
-                        <span style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 10,
-                          padding: '2px 6px',
-                          background: quote.outcome === 'accepted' ? 'var(--status-success)' : quote.outcome === 'rejected' ? 'var(--status-danger)' : 'var(--bg-surface-hover)',
-                          color: quote.outcome === 'accepted' ? '#000' : quote.outcome === 'rejected' ? '#fff' : 'var(--text-tertiary)',
-                          borderRadius: 2,
-                          fontWeight: 600
-                        }}>
-                          {quote.outcome === 'accepted' && '✓ Accepted'}
-                          {quote.outcome === 'rejected' && '✗ Rejected'}
-                          {quote.outcome === 'pending' && '⏳ Pending'}
-                        </span>
+                    <td style={{ padding: '12px 16px' }}>
+                      {quote.outcome === 'accepted' && (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: 'var(--status-success-bg)', color: 'var(--status-success)', border: '1px solid var(--status-success)', borderRadius: 2, fontWeight: 600 }}>✓ Won</span>
+                      )}
+                      {quote.outcome === 'rejected' && (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', borderRadius: 2, fontWeight: 600 }}>✗ Lost</span>
                       )}
                       {(!quote.outcome || quote.outcome === 'pending') && (
                         <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>—</span>
                       )}
                     </td>
-                    <td className="text-right" style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                    <td style={{ padding: '12px 16px', fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
                       {quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '—'}
                     </td>
-                    <td onClick={(e) => e.stopPropagation()}>
+                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600 }}>
+                      {formatCurrency(parseFloat(quote.total_amount || '0'))}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                       {quote.status === 'ACCEPTED' && (
                         <button
                           onClick={(e) => handleConvertToLoad(e, quote)}
-                          className="btn-action"
-                          style={{ fontSize: 9, padding: '4px 8px', background: 'var(--status-success)', border: 'none' }}
+                          style={{ background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)', padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer' }}
                         >
                           → BOOKING
                         </button>

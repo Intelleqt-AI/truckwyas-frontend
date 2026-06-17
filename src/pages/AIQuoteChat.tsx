@@ -21,17 +21,25 @@ interface QuotePreview extends ExtractedFields {
   estimated_cost?: number;
 }
 
+const AIQUOTE_KEY = 'aiquote_session';
+const GREETING: Message = {
+  role: 'assistant',
+  content: "Hi! Tell me about the load you need to quote. For example: 'I need to move 20 tons of palletised goods from Johannesburg to Cape Town on Friday, flatbed truck.'"
+};
+function loadQuoteSession(): { messages?: Message[]; quotePreview?: QuotePreview } | null {
+  try {
+    const s = JSON.parse(localStorage.getItem(AIQUOTE_KEY) || 'null');
+    if (s && Array.isArray(s.messages) && s.messages.length) return s;
+  } catch { /* ignore */ }
+  return null;
+}
+
 export default function AIQuoteChat() {
   const navigate = useNavigate();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: "Hi! Tell me about the load you need to quote. For example: 'I need to move 20 tons of palletised goods from Johannesburg to Cape Town on Friday, flatbed truck.'"
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => loadQuoteSession()?.messages || [GREETING]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [quotePreview, setQuotePreview] = useState<QuotePreview>({});
+  const [quotePreview, setQuotePreview] = useState<QuotePreview>(() => loadQuoteSession()?.quotePreview || {});
   const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -44,6 +52,23 @@ export default function AIQuoteChat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Persist the in-progress quote conversation so navigating away and back
+  // doesn't lose the work. Cleared once the quote is handed off / created.
+  useEffect(() => {
+    try {
+      const onlyGreeting = messages.length <= 1 && Object.keys(quotePreview).length === 0;
+      if (onlyGreeting) localStorage.removeItem(AIQUOTE_KEY);
+      else localStorage.setItem(AIQUOTE_KEY, JSON.stringify({ messages, quotePreview }));
+    } catch { /* ignore quota */ }
+  }, [messages, quotePreview]);
+
+  const startOver = () => {
+    setMessages([GREETING]);
+    setQuotePreview({});
+    setInput('');
+    try { localStorage.removeItem(AIQUOTE_KEY); } catch { /* ignore */ }
+  };
 
   // Local regex fallback for field extraction
   const extractFieldsLocally = (text: string): Partial<ExtractedFields> => {
@@ -270,6 +295,8 @@ export default function AIQuoteChat() {
       alert('Please provide at least a pickup and delivery location first.');
       return;
     }
+    // Handed off — clear the saved session so the next visit starts fresh.
+    try { localStorage.removeItem(AIQUOTE_KEY); } catch { /* ignore */ }
     // Hand off to the full New Quote flow with the AI-parsed fields prefilled —
     // the operator picks a customer and the live route/cost engine runs there.
     // (Posting straight to the API fails: a quote needs a customer, base_rate,
@@ -298,7 +325,12 @@ export default function AIQuoteChat() {
       <div style={{ marginBottom: 14 }}>
         <button onClick={() => navigate('/quotes')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0, letterSpacing: '0.05em' }}>← BACK TO QUOTES</button>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>AI Quote</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>AI Quote</div>
+          {messages.length > 1 && (
+            <button onClick={startOver} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '6px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Start over</button>
+          )}
+        </div>
       </div>
       <div style={{
         display: 'flex',

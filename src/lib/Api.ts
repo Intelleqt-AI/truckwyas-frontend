@@ -89,3 +89,9 @@ export const loginUser = async ({ username, password }: { username: string; pass
   const res = await api.post('api/v1/auth/login/', { username, password });
   return res.data;
 };
+
+export const downloadBlob = async (url: string): Promise<Blob> => {
+  if (!url) throw new Error('No URL provided');
+  const response = await api.get(url, { responseType: 'blob' });
+  return response.data;
+};

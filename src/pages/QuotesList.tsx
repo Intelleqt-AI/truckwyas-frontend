@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
 import { LiveBadge } from "@/components/LiveBadge";
+import { toast } from "@/lib/toast";
+import { ConfirmModal } from "@/components/ConfirmModal";
 import {
   DndContext,
   DragEndEvent,
@@ -152,6 +154,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
   const [view, setView] = useState<'board' | 'list'>('board');
   const [activeQuoteId, setActiveQuoteId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -190,20 +193,24 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
         url: `api/v1/quotes/${quote.id}/convert_to_load/`,
         data: {},
       }),
-    onSuccess: () => {
+    onSuccess: (_data, quote) => {
       queryClient.invalidateQueries({ queryKey: ['loads'] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      toast.success(`Quote ${quote.quote_number} converted to load`);
     },
-    onError: () => {
-      // Error handling - could add state here if needed
+    onError: (err: any) => {
+      toast.error(err?.message || 'Failed to convert quote to load');
     },
   });
 
   const handleConvertToLoad = (e: React.MouseEvent, quote: any) => {
     e.stopPropagation();
-    if (confirm(`Convert quote ${quote.quote_number} to a booking/load?`)) {
-      convertToLoadMutation.mutate(quote);
-    }
+    setConfirmOpts({
+      title: 'Convert to Booking',
+      message: `Convert ${quote.quote_number} to an active booking/load?`,
+      confirmLabel: 'Convert',
+      onConfirm: () => convertToLoadMutation.mutate(quote),
+    });
   };
 
   const filteredLoads = loads.filter(l =>
@@ -275,13 +282,13 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
               <LiveBadge />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-action" style={{ background: 'var(--accent-primary)', color: 'var(--bg-deep)' }} onClick={() => navigate('/quotes/ai-chat')}>
+              <button className="btn-action" style={{ background: 'var(--accent-primary)', color: 'var(--bg-deep)' }} onClick={() => navigate('/bookings/quotes/ai-chat')}>
                 AI QUOTE
               </button>
-              <button className="btn-action" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={() => navigate('/quotes/new')}>
+              <button className="btn-action" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={() => navigate('/bookings/quotes/new')}>
                 + NEW QUOTE
               </button>
-              <button className="btn-action" onClick={() => navigate('/quotes/new')}>+ NEW LOAD</button>
+              <button className="btn-action" onClick={() => navigate('/bookings/quotes/new')}>+ NEW LOAD</button>
             </div>
           </div>
         </div>
@@ -349,7 +356,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                     <DraggableQuoteCard
                       key={q.id}
                       quote={q}
-                      onClick={() => navigate(`/quotes/${q.id}`)}
+                      onClick={() => navigate(`/bookings/quotes/${q.id}`)}
                       onConvertToLoad={handleConvertToLoad}
                     />
                   ))}
@@ -431,7 +438,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                 {filteredQuotes.map((quote: any, idx: number) => (
                   <tr
                     key={quote.id}
-                    onClick={() => navigate(`/quotes/${quote.id}`)}
+                    onClick={() => navigate(`/bookings/quotes/${quote.id}`)}
                     style={{
                       borderBottom: idx < filteredQuotes.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                       cursor: 'pointer', transition: 'background 0.15s ease',
@@ -492,6 +499,16 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
             {filteredQuotes.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No quotes found</div>}
           </div>
         </>
+      )}
+
+      {confirmOpts && (
+        <ConfirmModal
+          title={confirmOpts.title}
+          message={confirmOpts.message}
+          confirmLabel={confirmOpts.confirmLabel}
+          onConfirm={confirmOpts.onConfirm}
+          onCancel={() => setConfirmOpts(null)}
+        />
       )}
     </div>
   );

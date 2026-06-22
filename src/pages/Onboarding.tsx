@@ -519,7 +519,7 @@ export function Onboarding() {
             </button>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12 }}>
-              <a href="/quotes/new" style={{
+              <a href="/bookings/quotes/new" style={{
                 padding: '10px',
                 background: 'var(--bg-deep)',
                 border: '1px solid var(--border-subtle)',

@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchData, postData, deleteData } from '@/lib/Api';
+import { toast } from '@/lib/toast';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 interface Expense {
   id: number;
@@ -69,6 +71,9 @@ export default function Expenses() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [confirmOpts, setConfirmOpts] = useState<{
+    title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
+  } | null>(null);
   const perPage = 10;
 
   const loadData = () => {
@@ -142,37 +147,52 @@ export default function Expenses() {
   const totalPages = Math.ceil(sorted.length / perPage);
   const rows = sorted.slice((page - 1) * perPage, page * perPage);
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Delete this expense?')) return;
-    setDeletingId(id);
-    try {
-      await deleteData({ url: `/api/v1/expenses/${id}/` });
-      loadData();
-    } catch (err) {
-      alert('Failed to delete expense');
-    } finally {
-      setDeletingId(null);
-    }
+  const handleDelete = (id: number) => {
+    setConfirmOpts({
+      title: 'Delete Expense',
+      message: 'Delete this expense? This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+      onConfirm: async () => {
+        setDeletingId(id);
+        try {
+          await deleteData({ url: `/api/v1/expenses/${id}/` });
+          toast.success('Expense deleted');
+          loadData();
+        } catch {
+          toast.error('Failed to delete expense');
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.size} selected expense(s)?`)) return;
-
-    setBulkDeleting(true);
-    try {
-      await Promise.all(
-        Array.from(selectedIds).map(id =>
-          deleteData({ url: `/api/v1/expenses/${id}/` })
-        )
-      );
-      setSelectedIds(new Set());
-      loadData();
-    } catch (err) {
-      alert('Some expenses failed to delete');
-    } finally {
-      setBulkDeleting(false);
-    }
+    setConfirmOpts({
+      title: 'Delete Expenses',
+      message: `Delete ${selectedIds.size} selected expense${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`,
+      confirmLabel: `Delete ${selectedIds.size}`,
+      danger: true,
+      onConfirm: async () => {
+        setBulkDeleting(true);
+        try {
+          await Promise.all(
+            Array.from(selectedIds).map(id =>
+              deleteData({ url: `/api/v1/expenses/${id}/` })
+            )
+          );
+          toast.success(`${selectedIds.size} expense${selectedIds.size === 1 ? '' : 's'} deleted`);
+          setSelectedIds(new Set());
+          loadData();
+        } catch {
+          toast.error('Some expenses could not be deleted');
+        } finally {
+          setBulkDeleting(false);
+        }
+      },
+    });
   };
 
   const toggleSelectAll = () => {
@@ -679,6 +699,17 @@ export default function Expenses() {
       {/* Add/Edit Expense Modal */}
       {showAdd && <ExpenseModal vehicles={vehicles} onClose={() => { setShowAdd(false); loadData(); }} />}
       {editingExpense && <ExpenseModal expense={editingExpense} vehicles={vehicles} onClose={() => { setEditingExpense(null); loadData(); }} />}
+
+      {confirmOpts && (
+        <ConfirmModal
+          title={confirmOpts.title}
+          message={confirmOpts.message}
+          confirmLabel={confirmOpts.confirmLabel}
+          danger={confirmOpts.danger}
+          onConfirm={confirmOpts.onConfirm}
+          onCancel={() => setConfirmOpts(null)}
+        />
+      )}
     </div>
   );
 }
@@ -721,8 +752,8 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
         await postData({ url: 'api/v1/expenses/', data });
         onClose();
       }
-    } catch (err) {
-      alert('Failed to save expense');
+    } catch {
+      toast.error('Failed to save expense');
       setSubmitting(false);
     }
   };

@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, fetchData } from "@/lib/Api";
 
 export default function CreateInvoice() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [form, setForm] = useState({
     customer: '',
     invoice_number: `INV-${Date.now().toString().slice(-6)}`,
@@ -20,7 +21,10 @@ export default function CreateInvoice() {
 
   const mutation = useMutation({
     mutationFn: (data: any) => postData({ url: 'api/v1/invoices/', data }),
-    onSuccess: () => navigate('/finance/invoices'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      navigate('/finance/invoices');
+    },
     onError: (e: any) => setError(e?.message || 'Failed to create invoice'),
   });
 

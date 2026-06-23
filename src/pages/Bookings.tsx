@@ -1,8 +1,10 @@
 import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData, patchData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
+import { toast } from "@/lib/toast";
+import { ConfirmModal } from "@/components/ConfirmModal";
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: 'var(--text-tertiary)',
@@ -14,7 +16,18 @@ const STATUS_COLOR: Record<string, string> = {
   CANCELLED: 'var(--status-danger)',
 };
 
-const STATUS_CHOICES = ['PENDING', 'LOADING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED', 'CANCELLED'];
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  PENDING:    ['ASSIGNED', 'LOADING', 'CANCELLED'],
+  LOADING:    ['ASSIGNED', 'IN_TRANSIT', 'CANCELLED'],
+  ASSIGNED:   ['LOADING', 'IN_TRANSIT', 'CANCELLED'],
+  IN_TRANSIT: ['DELIVERED', 'CANCELLED'],
+  DELIVERED:  ['INVOICED'],
+  INVOICED:   [],
+  CANCELLED:  ['PENDING'],
+};
+
+const fmt = (dateStr?: string) =>
+  dateStr ? new Date(dateStr).toLocaleDateString('en-ZA') : '—';
 
 export default function Bookings() {
   const { id } = useParams();
@@ -23,9 +36,10 @@ export default function Bookings() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [converting, setConverting] = useState(false);
-  const [uploadMsg, setUploadMsg] = useState('');
-  const [convertResult, setConvertResult] = useState<any>(null);
-  const [statusMsg, setStatusMsg] = useState('');
+  const [createdInvoiceId, setCreatedInvoiceId] = useState<string | null>(null);
+  const [confirmOpts, setConfirmOpts] = useState<{
+    title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
+  } | null>(null);
 
   const { data: load, isLoading } = useQuery({
     queryKey: ['load', id],
@@ -34,51 +48,72 @@ export default function Bookings() {
   });
 
   const updateStatus = async (newStatus: string) => {
-    setStatusMsg('');
+    const currentStatus = load?.status;
+    const allowed = VALID_TRANSITIONS[currentStatus] || [];
+
+    if (!allowed.includes(newStatus)) {
+      toast.error(`Cannot transition from ${currentStatus} to ${newStatus.replace('_', ' ')}`);
+      return;
+    }
+
+    if (newStatus === 'CANCELLED' && !['PENDING', 'LOADING'].includes(currentStatus)) {
+      setConfirmOpts({
+        title: 'Cancel Load',
+        message: `Cancel this load? The load is currently ${currentStatus.replace('_', ' ')}. This action is difficult to reverse.`,
+        confirmLabel: 'Cancel Load',
+        danger: true,
+        onConfirm: async () => {
+          try {
+            await patchData({ url: `api/v1/loads/${id}/`, data: { status: newStatus } });
+            qc.invalidateQueries({ queryKey: ['load', id] });
+            toast.success('Load cancelled');
+          } catch (e: any) {
+            toast.error(e?.message || 'Failed to update status');
+          }
+        },
+      });
+      return;
+    }
+
     try {
       await patchData({ url: `api/v1/loads/${id}/`, data: { status: newStatus } });
       qc.invalidateQueries({ queryKey: ['load', id] });
-      setStatusMsg(`Status updated to ${newStatus}`);
-    } catch {
-      setStatusMsg('Failed to update status');
+      toast.success(`Status updated to ${newStatus.replace('_', ' ')}`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update status');
     }
   };
 
   const convertToInvoice = async () => {
     setConverting(true);
-    setConvertResult(null);
     try {
       const result = await postData({ url: `api/v1/loads/${id}/convert_to_invoice/`, data: {} });
-      setConvertResult(result);
+      setCreatedInvoiceId(result.invoice_id);
       qc.invalidateQueries({ queryKey: ['load', id] });
+      toast.success(`Invoice ${result.invoice_number} created`);
     } catch (e: any) {
-      setConvertResult({ error: e?.message || 'Failed to create invoice' });
+      const existingId = (e as any)?.data?.invoice_id;
+      if (existingId) {
+        setCreatedInvoiceId(existingId);
+        toast.info('Invoice already exists for this load');
+      } else {
+        toast.error(e?.message || 'Failed to create invoice');
+      }
     } finally {
       setConverting(false);
     }
   };
 
   const uploadPOD = async (file: File) => {
-    setUploadMsg('Uploading...');
+    toast.info('Uploading POD...');
     const formData = new FormData();
     formData.append('pod_document', file);
     try {
-      const token = localStorage.getItem('access');
-      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const res = await fetch(`${baseURL}/api/v1/loads/${id}/upload_pod/`, {
-        method: 'POST',
-        headers: { Authorization: `Token ${token}` },
-        body: formData,
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setUploadMsg(`POD uploaded: ${data.filename}`);
-        qc.invalidateQueries({ queryKey: ['load', id] });
-      } else {
-        setUploadMsg(`ERROR: ${data.error || 'Upload failed'}`);
-      }
-    } catch {
-      setUploadMsg("Upload failed");
+      const data = await postData({ url: `api/v1/loads/${id}/upload_pod/`, data: formData });
+      qc.invalidateQueries({ queryKey: ['load', id] });
+      toast.success(`POD uploaded: ${data.filename}`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Upload failed');
     }
   };
 
@@ -94,9 +129,12 @@ export default function Bookings() {
   );
 
   const hasPOD = !!(load.pod_signature || load.pod_received_by);
-  const hasInvoice = !!(load.invoice_id || convertResult?.invoice_id);
+  const invoiceId = createdInvoiceId || load.invoice_id;
+  const hasInvoice = !!invoiceId;
+  const allowedNextStatuses = VALID_TRANSITIONS[load.status] || [];
 
   return (
+    <>
     <div>
       {/* Header */}
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -107,41 +145,55 @@ export default function Bookings() {
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{load.customer_name}</div>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          {/* Status dropdown */}
           <select
             value={load.status}
             onChange={e => updateStatus(e.target.value)}
             style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: STATUS_COLOR[load.status] || 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 12px', borderRadius: 2, cursor: 'pointer' }}
           >
-            {STATUS_CHOICES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            <option value={load.status}>{load.status.replace('_', ' ')}</option>
+            {allowedNextStatuses.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
           </select>
         </div>
       </div>
 
-      {statusMsg && <div style={{ marginBottom: 12, fontSize: 12, color: statusMsg.includes('Failed') ? 'var(--status-danger)' : 'var(--status-success)', fontFamily: 'var(--font-mono)' }}>{statusMsg}</div>}
-
       {/* Status bar */}
-      <div className="card" style={{ padding: '12px 20px', marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 0 }}>
-          {['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED'].map((s, i) => {
-            const statuses = ['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED'];
-            const currentIdx = statuses.indexOf(load.status);
-            const stepIdx = statuses.indexOf(s) !== -1 ? statuses.indexOf(s) : 4;
-            const isInvoiced = s === 'INVOICED' && hasInvoice;
-            const done = isInvoiced ? hasInvoice : stepIdx <= currentIdx;
-            const active = !isInvoiced && s === load.status;
-            return (
-              <div key={s} style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                <div style={{ flex: 1, height: 3, background: done ? 'var(--accent-primary)' : 'var(--border-subtle)', transition: 'background 0.3s' }} />
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '0 8px' }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: done ? 'var(--accent-primary)' : active ? 'var(--accent-primary)' : 'var(--border-subtle)', border: `2px solid ${active ? 'var(--accent-primary)' : 'transparent'}` }} />
-                  <div style={{ fontSize: 9, fontFamily: 'var(--font-mono)', color: done || active ? 'var(--accent-primary)' : 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>{s.replace('_', ' ')}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {(() => {
+        const STEPS = ['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED'];
+        const currentIdx = STEPS.indexOf(load.status);
+        return (
+          <div className="card" style={{ padding: '12px 20px', marginBottom: 20 }}>
+            <div style={{ display: 'flex', gap: 0 }}>
+              {STEPS.map((step, stepIdx) => {
+                const isActive = stepIdx === currentIdx;
+                const isPast   = stepIdx <= currentIdx;
+                return (
+                  <div key={step} style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                    <div style={{ flex: 1, height: 3, background: isPast ? 'var(--accent-primary)' : 'var(--border-subtle)', transition: 'background 0.3s' }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '0 8px' }}>
+                      <div style={{
+                        width: isActive ? 12 : 10,
+                        height: isActive ? 12 : 10,
+                        borderRadius: '50%',
+                        background: isPast ? 'var(--accent-primary)' : 'var(--border-subtle)',
+                        boxShadow: isActive ? '0 0 0 3px rgba(77,158,255,0.25)' : 'none',
+                        transition: 'all 0.3s',
+                      }} />
+                      <div style={{
+                        fontSize: 9, fontFamily: 'var(--font-mono)',
+                        color: isPast ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                        fontWeight: isActive ? 600 : 400,
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {step.replace('_', ' ')}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Key metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
@@ -167,7 +219,7 @@ export default function Bookings() {
               <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>PICKUP</div>
               <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{load.pickup_location}</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{load.pickup_city}, {load.pickup_state}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>{load.pickup_date?.slice(0, 10)}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>{fmt(load.pickup_date)}</div>
             </div>
             <div style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16 }}>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{load.cargo_description}</div>
@@ -176,7 +228,7 @@ export default function Bookings() {
               <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>DELIVERY</div>
               <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{load.delivery_location}</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{load.delivery_city}, {load.delivery_state}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>{load.delivery_date?.slice(0, 10)}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>{fmt(load.delivery_date)}</div>
             </div>
           </div>
         </div>
@@ -203,8 +255,6 @@ export default function Bookings() {
           <div className="card" style={{ padding: 20 }}>
             <div className="card-title" style={{ marginBottom: 16 }}>Actions</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-              {/* Convert to Invoice */}
               {!hasInvoice ? (
                 <button
                   className="btn-action"
@@ -212,33 +262,20 @@ export default function Bookings() {
                   onClick={convertToInvoice}
                   disabled={converting}
                 >
-                  {converting ? 'CREATING INVOICE...' : '+ CONVERT TO INVOICE'}
+                  {converting ? 'CREATING INVOICE...' : '+ CREATE INVOICE'}
                 </button>
               ) : (
                 <button
                   className="btn-action"
-                  style={{ width: '100%', background: 'var(--status-success)' }}
-                  onClick={() => navigate(`/finance/invoices/${convertResult?.invoice_id || ''}`)}
+                  style={{ width: '100%', background: 'var(--status-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                  onClick={() => navigate(`/finance/invoices/${invoiceId}`)}
                 >
-                  ✓ VIEW INVOICE
+                  <span>✓ INVOICE CREATED</span>
+                  <span style={{ opacity: 0.7, fontSize: 10 }}>—</span>
+                  <span>SEE INVOICE →</span>
                 </button>
               )}
 
-              {convertResult && (
-                <div style={{
-                  padding: '12px 16px',
-                  borderRadius: 4,
-                  background: convertResult.error ? 'var(--status-danger-dim)' : 'var(--status-success-dim)',
-                  border: `1px solid ${convertResult.error ? 'var(--status-danger)' : 'var(--status-success)'}`,
-                  fontSize: 12,
-                  color: convertResult.error ? 'var(--status-danger)' : 'var(--status-success)',
-                  fontFamily: 'var(--font-mono)',
-                }}>
-                  {convertResult.error ? `ERROR: ${convertResult.error}` : `${convertResult.invoice_number} — ${formatCurrency(convertResult.total_amount)}`}
-                </div>
-              )}
-
-              {/* POD Upload */}
               <input
                 ref={fileRef}
                 type="file"
@@ -264,11 +301,6 @@ export default function Bookings() {
               >
                 {hasPOD ? `✓ POD: ${load.pod_received_by || 'Uploaded'}` : '↑ UPLOAD POD'}
               </button>
-              {uploadMsg && (
-                <div style={{ fontSize: 11, color: uploadMsg.startsWith('POD uploaded') ? 'var(--status-success)' : uploadMsg === 'Uploading...' ? 'var(--text-secondary)' : 'var(--status-danger)', fontFamily: 'var(--font-mono)' }}>
-                  {uploadMsg}
-                </div>
-              )}
             </div>
           </div>
 
@@ -288,5 +320,17 @@ export default function Bookings() {
         </div>
       </div>
     </div>
+
+    {confirmOpts && (
+      <ConfirmModal
+        title={confirmOpts.title}
+        message={confirmOpts.message}
+        confirmLabel={confirmOpts.confirmLabel}
+        danger={confirmOpts.danger}
+        onConfirm={confirmOpts.onConfirm}
+        onCancel={() => setConfirmOpts(null)}
+      />
+    )}
+    </>
   );
 }

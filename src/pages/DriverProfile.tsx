@@ -194,12 +194,13 @@ export default function DriverProfile() {
           <div className="card-title" style={{ marginBottom: 16 }}>DETAILS</div>
           {[
             { label: 'LICENSE NUMBER', value: driver.license_number },
+            { label: 'LICENSE STATE', value: driver.license_state },
             { label: 'PHONE', value: phone },
             { label: 'EMAIL', value: email },
-            { label: 'ID NUMBER', value: driver.id_number },
-            { label: 'DATE OF BIRTH', value: driver.date_of_birth?.slice(0, 10) },
-            { label: 'ADDRESS', value: driver.address },
-            { label: 'VEHICLE', value: driver.vehicle_plate || driver.assigned_vehicle || '—' },
+            { label: 'ADDRESS', value: ud.address },
+            { label: 'HIRE DATE', value: driver.hire_date?.slice(0, 10) },
+            { label: 'EMERGENCY CONTACT', value: driver.emergency_contact || driver.emergency_phone },
+            { label: 'VEHICLE', value: driver.assigned_vehicle },
           ].map(r => (
             <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
               <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>

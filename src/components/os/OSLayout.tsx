@@ -47,10 +47,10 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
 
   // Role-based nav access control
   const NAV_ACCESS: Record<string, string[]> = {
-    ADMIN:      ["/", "/quotes", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot", "/settings"],
-    MANAGER:    ["/", "/quotes", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot", "/settings"],
-    OPERATOR:   ["/", "/quotes", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot"],
-    DISPATCHER: ["/", "/quotes", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot"],
+    ADMIN:      ["/", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot", "/settings"],
+    MANAGER:    ["/", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot", "/settings"],
+    OPERATOR:   ["/", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot"],
+    DISPATCHER: ["/", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot"],
     VIEWER:     ["/", "/bookings", "/fleet", "/insights", "/copilot"],
     DRIVER:     ["/", "/bookings"],
   };

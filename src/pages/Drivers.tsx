@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { fetchData, postData, patchData } from '../lib/Api';
+import { fetchData, postData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
+import { toast } from '@/lib/toast';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 interface Driver {
   id: number;
@@ -64,6 +66,7 @@ export default function Drivers() {
   const navigate = useNavigate();
   const location = useLocation();
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [vehicles, setVehicles] = useState<{ id: number; plate: string; make?: string; model?: string; driver_id?: number | null }[]>([]);
   const [overview, setOverview] = useState<DriverOverview | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,20 +74,33 @@ export default function Drivers() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addForm, setAddForm] = useState({
-    first_name: '', last_name: '', email: '', phone: '',
-    license_number: '', license_expiry: '', license_state: 'GP',
+    first_name: '', last_name: '', email: '', phone: '', address: '',
+    license_number: '', license_expiry: '', medical_card_expiry: '', license_state: 'GP',
     hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE',
+    emergency_contact: '', vehicle: '',
   });
   const [editDriver, setEditDriver] = useState<Driver | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpts, setConfirmOpts] = useState<{
+    title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
+  } | null>(null);
 
   const load = useCallback(() => {
     return Promise.all([
       fetchData('api/v1/drivers/'),
       fetchData('api/v1/drivers/overview/').catch(() => null),
       fetchData('api/v1/drivers/leaderboard/').catch(() => null),
-    ]).then(([driversData, overviewData, leaderboardData]) => {
+      fetchData('api/v1/vehicles/').catch(() => null),
+    ]).then(([driversData, overviewData, leaderboardData, vehicleData]) => {
+      const vehicleList = Array.isArray(vehicleData) ? vehicleData : (vehicleData?.results || []);
+      setVehicles(vehicleList.map((v: any) => ({
+        id: v.id,
+        plate: v.plate || v.registration || `Vehicle ${v.id}`,
+        make: v.make,
+        model: v.model,
+        driver_id: v.driver ?? null,
+      })));
       const driverList = Array.isArray(driversData) ? driversData : (driversData?.results || []);
 
       // Parse leaderboard data
@@ -238,7 +254,7 @@ export default function Drivers() {
             <tr>
               {['Name', 'License', 'Status', 'Trips MTD', 'Revenue Generated', 'Performance', ''].map(h => (
                 <th key={h} style={{
-                  padding: '12px 20px', textAlign: 'left',
+                  padding: '12px 20px 12px 32px', textAlign: 'left',
                   fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
                   letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                   borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
@@ -280,7 +296,7 @@ export default function Drivers() {
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
+                  <td style={{ padding: '12px 20px 12px 32px', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{
                         width: 6,
@@ -292,10 +308,10 @@ export default function Drivers() {
                       {getDriverName(d)}
                     </div>
                   </td>
-                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
                     {d.license_number || '—'}
                   </td>
-                  <td style={{ padding: '12px 20px' }}>
+                  <td style={{ padding: '12px 20px 12px 32px' }}>
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 10,
                       color: STATUS_COLOR[d.status] || 'var(--text-secondary)',
@@ -304,13 +320,13 @@ export default function Drivers() {
                       {d.status?.replace('_', ' ')}
                     </span>
                   </td>
-                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                  <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
                     {d.total_trips ?? 0}
                   </td>
-                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                  <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
                     {d.revenue_generated ? formatZAR(d.revenue_generated) : '—'}
                   </td>
-                  <td style={{ padding: '12px 20px' }}>
+                  <td style={{ padding: '12px 20px 12px 32px' }}>
                     {efficiencyScore > 0 ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ flex: 1, maxWidth: 120, height: 6, background: 'var(--bg-surface-hover)', borderRadius: 3, overflow: 'hidden' }}>
@@ -331,25 +347,63 @@ export default function Drivers() {
                     )}
                   </td>
                   <td style={{ padding: '12px 20px', textAlign: 'right' }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditDriver(d);
-                        setEditForm({
-                          first_name: d.first_name || '',
-                          last_name: d.last_name || '',
-                          license_number: d.license_number || '',
-                          license_expiry: d.license_expiry || '',
-                          license_state: d.license_state || 'GP',
-                          medical_card_expiry: d.medical_card_expiry || '',
-                          hire_date: d.hire_date || '',
-                          status: d.status || 'ACTIVE',
-                          emergency_contact: d.emergency_contact || '',
-                          emergency_phone: d.emergency_phone || d.phone || '',
-                        });
-                      }}
-                      style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
-                    >EDIT</button>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditDriver(d);
+                          const dUd = d.user_details || {};
+                          setEditForm({
+                            first_name: d.first_name || '',
+                            last_name: d.last_name || '',
+                            email: dUd.email || '',
+                            phone: dUd.phone || '',
+                            address: dUd.address || '',
+                            license_number: d.license_number || '',
+                            license_expiry: d.license_expiry || '',
+                            medical_card_expiry: d.medical_card_expiry || '',
+                            hire_date: d.hire_date || '',
+                            status: d.status || 'ACTIVE',
+                            license_state: d.license_state || 'GP',
+                            emergency_contact: d.emergency_contact || d.emergency_phone || '',
+                            vehicle: vehicles.find(v => v.driver_id === d.id)?.id?.toString() ?? '',
+                          });
+                        }}
+                        style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
+                      >EDIT</button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmOpts({
+                            title: 'Delete Driver',
+                            message: `Remove ${getDriverName(d)} from your team? This cannot be undone.`,
+                            confirmLabel: 'Delete',
+                            danger: true,
+                            onConfirm: async () => {
+                              try {
+                                await deleteData({ url: `api/v1/drivers/${d.id}/` });
+                                toast.success('Driver deleted');
+                                const res = await fetchData('api/v1/drivers/');
+                                const driverList = Array.isArray(res) ? res : (res?.results || []);
+                                setDrivers(driverList.map((driver: any) => {
+                                  const ud = driver.user_details || {};
+                                  return {
+                                    ...driver,
+                                    first_name: driver.first_name || ud.first_name || '',
+                                    last_name: driver.last_name || ud.last_name || '',
+                                    name: driver.name || ud.name || (ud.first_name ? `${ud.first_name} ${ud.last_name || ''}`.trim() : ''),
+                                    phone: driver.phone || ud.phone || '',
+                                  };
+                                }));
+                              } catch (err: any) {
+                                toast.error(err?.message || 'Failed to delete driver');
+                              }
+                            },
+                          });
+                        }}
+                        style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
+                      >DEL</button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -372,9 +426,12 @@ export default function Drivers() {
               { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter' },
               { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
               { key: 'phone', label: 'Phone', placeholder: 'e.g. 082 123 4567' },
+              { key: 'address', label: 'Address', placeholder: 'e.g. 12 Main Street, Cape Town' },
               { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001' },
               { key: 'license_expiry', label: 'License Expiry', type: 'date' },
+              { key: 'medical_card_expiry', label: 'Medical Card Expiry', type: 'date' },
               { key: 'hire_date', label: 'Hire Date', type: 'date' },
+              { key: 'emergency_contact', label: 'Emergency Contact', placeholder: 'e.g. Jane Doe or 082 123 4567' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
@@ -402,12 +459,27 @@ export default function Drivers() {
                 </select>
               </div>
             ))}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Vehicle</label>
+              <select
+                value={addForm.vehicle}
+                onChange={e => setAddForm(prev => ({ ...prev, vehicle: e.target.value }))}
+                style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+              >
+                <option value="">— No vehicle assigned —</option>
+                {vehicles.map(v => (
+                  <option key={v.id} value={v.id}>
+                    {v.plate}{v.make || v.model ? ` — ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
                 disabled={saving}
                 onClick={async () => {
                   if (!addForm.first_name || !addForm.last_name || !addForm.license_number || !addForm.license_expiry) {
-                    alert('Please fill in all required fields');
+                    toast.warning('Please fill in all required fields');
                     return;
                   }
                   setSaving(true);
@@ -419,20 +491,26 @@ export default function Drivers() {
                       email: addForm.email || `${username}@truckwys.co.za`,
                       first_name: addForm.first_name,
                       last_name: addForm.last_name,
+                      phone: addForm.phone,
+                      address: addForm.address,
                       password: 'TruckWys2026!',
                       role: 'DRIVER',
                     }});
-                    await postData({ url: 'api/v1/drivers/', data: {
+                    const newDriver = await postData({ url: 'api/v1/drivers/', data: {
                       user: user.id,
                       license_number: addForm.license_number,
                       license_expiry: addForm.license_expiry,
+                      medical_card_expiry: addForm.medical_card_expiry || undefined,
                       license_state: addForm.license_state,
                       hire_date: addForm.hire_date,
                       status: addForm.status,
-                      emergency_phone: addForm.phone,
+                      emergency_contact: addForm.emergency_contact,
                     }});
+                    if (addForm.vehicle && newDriver?.id) {
+                      await patchData({ url: `api/v1/vehicles/${addForm.vehicle}/`, data: { driver: newDriver.id } });
+                    }
                     setShowAddForm(false);
-                    setAddForm({ first_name: '', last_name: '', email: '', phone: '', license_number: '', license_expiry: '', license_state: 'GP', hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE' });
+                    setAddForm({ first_name: '', last_name: '', email: '', phone: '', address: '', license_number: '', license_expiry: '', medical_card_expiry: '', license_state: 'GP', hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE', emergency_contact: '', vehicle: '' });
                     // Refresh with user_details flattening
                     const d = await fetchData('api/v1/drivers/');
                     const driverList = Array.isArray(d) ? d : (d?.results || []);
@@ -447,7 +525,7 @@ export default function Drivers() {
                       };
                     });
                     setDrivers(driversWithNames);
-                  } catch (e: any) { alert(e?.message || 'Failed to create driver'); }
+                  } catch (e: any) { toast.error(e?.message || 'Failed to create driver'); }
                   setSaving(false);
                 }}
                 style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
@@ -482,31 +560,21 @@ export default function Drivers() {
             {[
               { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan' },
               { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter' },
-            ].map(f => (
-              <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <input
-                  type="text"
-                  placeholder={f.placeholder}
-                  value={(editForm as any)[f.key]}
-                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
-            ))}
-            {[
+              { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
+              { key: 'phone', label: 'Phone', placeholder: 'e.g. 082 123 4567' },
+              { key: 'address', label: 'Address', placeholder: 'e.g. 12 Main Street, Cape Town' },
               { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001' },
               { key: 'license_expiry', label: 'License Expiry', type: 'date' },
               { key: 'medical_card_expiry', label: 'Medical Card Expiry', type: 'date' },
-              { key: 'emergency_contact', label: 'Emergency Contact', placeholder: 'e.g. Jane Doe' },
-              { key: 'emergency_phone', label: 'Emergency Phone', placeholder: 'e.g. 082 123 4567' },
+              { key: 'hire_date', label: 'Hire Date', type: 'date' },
+              { key: 'emergency_contact', label: 'Emergency Contact', placeholder: 'e.g. Jane Doe or 082 123 4567' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
                 <input
                   type={f.type || 'text'}
                   placeholder={f.placeholder}
-                  value={(editForm as any)[f.key]}
+                  value={(editForm as any)[f.key] ?? ''}
                   onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
                   style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
                 />
@@ -527,6 +595,21 @@ export default function Drivers() {
                 </select>
               </div>
             ))}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Vehicle</label>
+              <select
+                value={editForm.vehicle ?? ''}
+                onChange={e => setEditForm((prev: any) => ({ ...prev, vehicle: e.target.value }))}
+                style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+              >
+                <option value="">— No vehicle assigned —</option>
+                {vehicles.map(v => (
+                  <option key={v.id} value={v.id}>
+                    {v.plate}{v.make || v.model ? ` — ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
                 disabled={saving}
@@ -534,16 +617,23 @@ export default function Drivers() {
                   setSaving(true);
                   setError(null);
                   try {
-                    // Update driver license and status fields
-                    const { first_name, last_name, ...driverFields } = editForm;
+                    const { first_name, last_name, email, phone, address, vehicle, ...driverFields } = editForm;
                     await patchData({ url: `api/v1/drivers/${editDriver.id}/`, data: driverFields });
 
-                    // Update user name if user_details exists
-                    if (editDriver.user_details?.id && (first_name || last_name)) {
+                    if (editDriver.user_details?.id) {
                       await patchData({
                         url: `api/v1/users/${editDriver.user_details.id}/`,
-                        data: { first_name, last_name }
+                        data: { first_name, last_name, email, phone, address }
                       });
+                    }
+
+                    // Handle vehicle assignment change
+                    const prevVehicle = vehicles.find(v => v.driver_id === editDriver.id);
+                    if (vehicle && String(prevVehicle?.id) !== vehicle) {
+                      if (prevVehicle) await patchData({ url: `api/v1/vehicles/${prevVehicle.id}/`, data: { driver: null } });
+                      await patchData({ url: `api/v1/vehicles/${vehicle}/`, data: { driver: editDriver.id } });
+                    } else if (!vehicle && prevVehicle) {
+                      await patchData({ url: `api/v1/vehicles/${prevVehicle.id}/`, data: { driver: null } });
                     }
 
                     setEditDriver(null);
@@ -581,6 +671,17 @@ export default function Drivers() {
             </div>
           </div>
         </div>
+      )}
+
+      {confirmOpts && (
+        <ConfirmModal
+          title={confirmOpts.title}
+          message={confirmOpts.message}
+          confirmLabel={confirmOpts.confirmLabel || 'Confirm'}
+          danger={confirmOpts.danger}
+          onConfirm={confirmOpts.onConfirm}
+          onCancel={() => setConfirmOpts(null)}
+        />
       )}
     </div>
   );

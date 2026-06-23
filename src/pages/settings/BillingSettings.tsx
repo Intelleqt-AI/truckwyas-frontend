@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchData, postData } from "@/lib/Api";
-// postData signature: ({ url, data }) => Promise
 import { toast } from "@/lib/toast";
+import { ConfirmModal } from "@/components/ConfirmModal";
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -60,6 +60,9 @@ export function BillingSettings() {
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [confirmOpts, setConfirmOpts] = useState<{
+    title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
+  } | null>(null);
 
   useEffect(() => {
     fetchData('api/v1/company/profile/')
@@ -105,18 +108,25 @@ export function BillingSettings() {
     }
   };
 
-  const handleCancel = async () => {
-    if (!window.confirm('Are you sure you want to cancel your subscription?')) return;
-    setCancelling(true);
-    try {
-      await postData({ url: 'api/v1/billing/cancel/', data: {} });
-      toast.success('Subscription cancelled.');
-      setProfile(prev => prev ? { ...prev, subscription_status: 'cancelled' } : prev);
-    } catch {
-      toast.error('Failed to cancel subscription. Please contact support.');
-    } finally {
-      setCancelling(false);
-    }
+  const handleCancel = () => {
+    setConfirmOpts({
+      title: 'Cancel Subscription',
+      message: 'Are you sure you want to cancel your TruckWys Pro subscription? You will lose access to Pro features at the end of your billing period.',
+      confirmLabel: 'Cancel Plan',
+      danger: true,
+      onConfirm: async () => {
+        setCancelling(true);
+        try {
+          await postData({ url: 'api/v1/billing/cancel/', data: {} });
+          toast.success('Subscription cancelled.');
+          setProfile(prev => prev ? { ...prev, subscription_status: 'cancelled' } : prev);
+        } catch {
+          toast.error('Failed to cancel subscription. Please contact support.');
+        } finally {
+          setCancelling(false);
+        }
+      },
+    });
   };
 
   const planKey = profile?.subscription_plan?.toLowerCase() || 'free';
@@ -252,6 +262,16 @@ export function BillingSettings() {
           )}
         </div>
       )}
+    {confirmOpts && (
+      <ConfirmModal
+        title={confirmOpts.title}
+        message={confirmOpts.message}
+        confirmLabel={confirmOpts.confirmLabel}
+        danger={confirmOpts.danger}
+        onConfirm={confirmOpts.onConfirm}
+        onCancel={() => setConfirmOpts(null)}
+      />
+    )}
     </div>
   );
 }

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchData, patchData, deleteData, postData } from '@/lib/Api';
+import { fetchData, patchData, deleteData, postData, downloadBlob } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
+import { toast } from '@/lib/toast';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',
@@ -17,11 +19,7 @@ export default function QuoteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [convertSuccess, setConvertSuccess] = useState<any>(null);
-  const [convertError, setConvertError] = useState<string | null>(null);
-
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [shareError, setShareError] = useState<string | null>(null);
 
   // Sprint 1 features
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
@@ -29,6 +27,7 @@ export default function QuoteDetail() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [finalPrice, setFinalPrice] = useState('');
   const [fuelAlert, setFuelAlert] = useState<any>(null);
+  const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void; danger?: boolean } | null>(null);
 
   const { data: quote, isLoading, error } = useQuery({
     queryKey: ['quote', id],
@@ -62,20 +61,26 @@ export default function QuoteDetail() {
   const sendToCustomerMutation = useMutation({
     mutationFn: () => postData({ url: `api/v1/quotes/${id}/send_to_customer/`, data: {} }),
     onSuccess: (data) => {
-      setShareUrl(data.share_url);
-      setShareError(null);
+      // Rewrite the origin so the link always points to THIS environment
+      // (backend FRONTEND_URL may be hardcoded to production)
+      try {
+        const path = new URL(data.share_url).pathname;
+        setShareUrl(`${window.location.origin}${path}`);
+      } catch {
+        setShareUrl(data.share_url);
+      }
+      toast.success('Share link ready — copy and send to your customer');
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
     },
     onError: (error: any) => {
-      setShareError(error?.message || 'Failed to generate share link');
-      setShareUrl(null);
+      toast.error(error?.message || 'Failed to generate share link');
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteData({ url: `api/v1/quotes/${id}/` }),
     onSuccess: () => {
-      navigate('/quotes');
+      navigate('/bookings/quotes');
     },
   });
 
@@ -87,15 +92,13 @@ export default function QuoteDetail() {
       }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['loads'] });
-      setConvertSuccess(data);
-      setConvertError(null);
+      toast.success('Quote converted to booking');
       if (data?.id) {
         navigate(`/bookings/${data.id}`);
       }
     },
     onError: (error: any) => {
-      setConvertError(error?.message || 'Failed to convert quote to booking');
-      setConvertSuccess(null);
+      toast.error(error?.message || 'Failed to convert quote to booking');
     },
   });
 
@@ -113,15 +116,22 @@ export default function QuoteDetail() {
   });
 
   const handleDelete = () => {
-    if (confirm(`Delete quote ${quote?.quote_number}? This cannot be undone.`)) {
-      deleteMutation.mutate();
-    }
+    setConfirmOpts({
+      title: 'Delete Quote',
+      message: `Delete ${quote?.quote_number}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+      onConfirm: () => deleteMutation.mutate(),
+    });
   };
 
   const handleConvertToLoad = () => {
-    if (confirm(`Convert quote ${quote?.quote_number} to a booking/load?`)) {
-      convertToLoadMutation.mutate();
-    }
+    setConfirmOpts({
+      title: 'Convert to Booking',
+      message: `Convert ${quote?.quote_number} to an active booking/load?`,
+      confirmLabel: 'Convert',
+      onConfirm: () => convertToLoadMutation.mutate(),
+    });
   };
 
   if (isLoading) {
@@ -139,7 +149,7 @@ export default function QuoteDetail() {
     return (
       <div style={{ padding: 40 }}>
         <div style={{ fontSize: 13, color: 'var(--status-danger)', marginBottom: 12 }}>Quote not found</div>
-        <button className="btn-action" onClick={() => navigate('/quotes')}>Back to Quotes</button>
+        <button className="btn-action" onClick={() => navigate('/bookings/quotes')}>Back to Quotes</button>
       </div>
     );
   }
@@ -167,7 +177,7 @@ export default function QuoteDetail() {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <button
-          onClick={() => navigate('/quotes')}
+          onClick={() => navigate('/bookings/quotes')}
           style={{
             background: 'none',
             border: 'none',
@@ -281,6 +291,18 @@ export default function QuoteDetail() {
                 {label('Distance (km)')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.distance ? Math.round(parseFloat(quote.distance)).toLocaleString() : '—'}</div>
               </div>
+              {quote.vehicle_display && (
+                <div>
+                  {label('Assigned Vehicle')}
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.vehicle_display}</div>
+                </div>
+              )}
+              {quote.driver_display && (
+                <div>
+                  {label('Assigned Driver')}
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.driver_display}</div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -360,7 +382,7 @@ export default function QuoteDetail() {
                 <div>
                   {label('Valid Until')}
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                    {new Date(quote.valid_until).toLocaleDateString()}
+                    {new Date(quote.valid_until).toLocaleDateString('en-ZA')}
                     {new Date(quote.valid_until).getTime() - Date.now() < 48 * 60 * 60 * 1000 && (
                       <span style={{ color: 'var(--status-danger)', marginLeft: 8 }}>
                         ({Math.ceil((new Date(quote.valid_until).getTime() - Date.now()) / (1000 * 60 * 60))}h left)
@@ -373,7 +395,7 @@ export default function QuoteDetail() {
                 <div>
                   {label('Created')}
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                    {new Date(quote.created_at).toLocaleDateString()}
+                    {new Date(quote.created_at).toLocaleDateString('en-ZA')}
                   </div>
                 </div>
               )}
@@ -438,7 +460,7 @@ export default function QuoteDetail() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button
                 className="btn-action"
-                onClick={() => navigate(`/quotes/${id}/edit`)}
+                onClick={() => navigate(`/bookings/quotes/${id}/edit`)}
                 style={{ width: '100%', fontSize: 11, padding: '10px 16px' }}
               >
                 EDIT QUOTE
@@ -482,7 +504,7 @@ export default function QuoteDetail() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(shareUrl);
-                      alert('Link copied to clipboard!');
+                      toast.success('Link copied to clipboard');
                     }}
                     style={{
                       padding: '6px 12px',
@@ -501,20 +523,6 @@ export default function QuoteDetail() {
                 </div>
               )}
 
-              {shareError && (
-                <div style={{
-                  padding: '10px 14px',
-                  borderRadius: 2,
-                  background: 'var(--status-danger-bg)',
-                  border: '1px solid var(--status-danger)',
-                  fontSize: 12,
-                  color: 'var(--status-danger)',
-                  fontFamily: 'var(--font-mono)',
-                }}>
-                  {shareError}
-                </div>
-              )}
-
               {quote.status === 'ACCEPTED' && (
                 <>
                   <button
@@ -525,32 +533,6 @@ export default function QuoteDetail() {
                   >
                     {convertToLoadMutation.isPending ? 'CONVERTING...' : '✓ CONVERT TO BOOKING'}
                   </button>
-                  {convertSuccess && (
-                    <div style={{
-                      padding: '10px 14px',
-                      borderRadius: 2,
-                      background: 'var(--status-success-bg)',
-                      border: '1px solid var(--status-success)',
-                      fontSize: 12,
-                      color: 'var(--status-success)',
-                      fontFamily: 'var(--font-mono)',
-                    }}>
-                      ✓ Quote converted to booking successfully
-                    </div>
-                  )}
-                  {convertError && (
-                    <div style={{
-                      padding: '10px 14px',
-                      borderRadius: 2,
-                      background: 'var(--status-danger-bg)',
-                      border: '1px solid var(--status-danger)',
-                      fontSize: 12,
-                      color: 'var(--status-danger)',
-                      fontFamily: 'var(--font-mono)',
-                    }}>
-                      ❌ {convertError}
-                    </div>
-                  )}
                 </>
               )}
 
@@ -575,17 +557,15 @@ export default function QuoteDetail() {
               {/* PDF Download */}
               <button
                 onClick={() => {
-                  const token = localStorage.getItem('access');
-                  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-                  const url = `${baseURL}/api/v1/quotes/${id}/generate_pdf/`;
-                  fetch(url, { headers: { Authorization: `Token ${token}` } })
-                    .then(r => r.blob())
+                  downloadBlob(`api/v1/quotes/${id}/generate_pdf/`)
                     .then(blob => {
                       const a = document.createElement('a');
                       a.href = URL.createObjectURL(blob);
                       a.download = `Quote-${quote?.quote_number || id}.pdf`;
                       a.click();
-                    });
+                      URL.revokeObjectURL(a.href);
+                    })
+                    .catch((e: any) => toast.error(e?.message || 'PDF download failed'));
                 }}
                 style={{
                   padding: '10px 16px',
@@ -714,6 +694,17 @@ export default function QuoteDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {confirmOpts && (
+        <ConfirmModal
+          title={confirmOpts.title}
+          message={confirmOpts.message}
+          confirmLabel={confirmOpts.confirmLabel}
+          danger={confirmOpts.danger}
+          onConfirm={confirmOpts.onConfirm}
+          onCancel={() => setConfirmOpts(null)}
+        />
       )}
     </div>
   );

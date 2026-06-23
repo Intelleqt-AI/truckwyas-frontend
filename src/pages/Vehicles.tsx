@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { fetchData, postData, patchData } from '../lib/Api';
+import { fetchData, postData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
+import { toast } from '@/lib/toast';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 interface Vehicle {
   id: number;
@@ -22,6 +24,7 @@ interface Vehicle {
   plate?: string;
   vin?: string;
   mileage?: number;
+  driver?: number | null;
   insurance_expiry?: string;
   registration_expiry?: string;
   fuel_type?: string;
@@ -80,6 +83,8 @@ export default function Vehicles() {
   const navigate = useNavigate();
   const location = useLocation();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehicleTypes, setVehicleTypes] = useState<{ id: number; name: string }[]>([]);
+  const [drivers, setDrivers] = useState<{ id: number; name: string }[]>([]);
   const [overview, setOverview] = useState<FleetOverview | null>(null);
   const [insights, setInsights] = useState<FleetInsight[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,28 +95,44 @@ export default function Vehicles() {
   const [saving, setSaving] = useState(false);
   const [addForm, setAddForm] = useState({
     vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '',
-    type: 'Rigid Truck', capacity: '', fuel_type: 'Diesel', status: 'AVAILABLE',
+    type: 'Rigid Truck', capacity: '', mileage: '', fuel_type: 'Diesel', status: 'AVAILABLE',
+    insurance_expiry: '', registration_expiry: '', last_maintenance_date: '', next_maintenance_due: '',
+    driver: '',
   });
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
   const [editForm, setEditForm] = useState<any>({});
+  const [confirmOpts, setConfirmOpts] = useState<{
+    title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
+  } | null>(null);
 
   const load = useCallback(() => {
     return Promise.all([
       fetchData('api/v1/vehicles/'),
       fetchData('api/v1/fleet/overview/'),
-      fetchData('api/v1/fleet/intelligence/')
+      fetchData('api/v1/fleet/intelligence/'),
+      fetchData('api/v1/vehicle-types/'),
+      fetchData('api/v1/drivers/'),
     ])
-      .then(([vehData, overviewData, insightsData]) => {
-        // Handle paginated response for vehicles
+      .then(([vehData, overviewData, insightsData, vtData, driverData]) => {
         const vehiclesArray = Array.isArray(vehData) ? vehData : (vehData?.results || []);
         setVehicles(vehiclesArray);
 
-        // Overview data comes in {header, banner, kpi_cards} format
         setOverview(overviewData);
 
-        // Intelligence data comes in {title, active_count, opportunities} format
         const insightsArray = Array.isArray(insightsData) ? insightsData : (insightsData?.opportunities || []);
         setInsights(insightsArray);
+
+        const vtList = Array.isArray(vtData) ? vtData : (vtData?.results || []);
+        setVehicleTypes(vtList.map((vt: any) => ({ id: vt.id, name: vt.name })));
+
+        const driverList = Array.isArray(driverData) ? driverData : (driverData?.results || []);
+        setDrivers(driverList.map((d: any) => {
+          const ud = d.user_details || {};
+          const fn = d.first_name || ud.first_name || '';
+          const ln = d.last_name || ud.last_name || '';
+          const name = fn && ln ? `${fn} ${ln}` : fn || ln || d.name || `Driver ${d.id}`;
+          return { id: d.id, name };
+        }));
 
         setError(null);
       })
@@ -243,7 +264,7 @@ export default function Vehicles() {
         <div>
           {/* Status Filter Tabs */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            {['All', 'ACTIVE', 'MAINTENANCE', 'INACTIVE'].map(status => {
+            {['All', 'AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE'].map(status => {
               const isActive = statusFilter === status;
               return (
                 <button
@@ -277,7 +298,7 @@ export default function Vehicles() {
                 <tr>
                   {['Registration', 'Make / Model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency', ''].map(h => (
                     <th key={h} style={{
-                      padding: '12px 20px', textAlign: 'left',
+                      padding: '12px 20px 12px 32px', textAlign: 'left',
                       fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
                       letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                       borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
@@ -319,17 +340,17 @@ export default function Vehicles() {
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
-                      <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
                         {v.plate || v.registration || '—'}
                       </td>
-                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)' }}>
                         {[v.make, v.model].filter(Boolean).join(' ') || '—'}
                       </td>
-                      <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
-                        {v.vehicle_type_name || v.vehicle_type || '—'}
+                      <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                        {v.vehicle_type_name || '—'}
                       </td>
-                      <td style={{ padding: '12px 20px' }}>{getStatusBadge(v.status)}</td>
-                      <td style={{ padding: '12px 20px' }}>
+                      <td style={{ padding: '12px 20px 12px 32px' }}>{getStatusBadge(v.status)}</td>
+                      <td style={{ padding: '12px 20px 12px 32px' }}>
                         <span style={{
                           fontFamily: 'var(--font-mono)',
                           fontSize: 11,
@@ -342,39 +363,64 @@ export default function Vehicles() {
                           {Math.min(utilizationPercent, 100).toFixed(0)}%
                         </span>
                       </td>
-                      <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
                         {v.revenue_generated ? formatZAR(v.revenue_generated) : '—'}
                       </td>
-                      <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
                         {v.total_trips ?? 0}
                       </td>
-                      <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
                         {v.fuel_efficiency_score ? `${parseFloat(v.fuel_efficiency_score as any).toFixed(0)}/100` : '—'}
                       </td>
                       <td style={{ padding: '12px 20px', textAlign: 'right' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditVehicle(v);
-                            setEditForm({
-                              vin: v.vin || '',
-                              make: v.make || '',
-                              model: v.model || '',
-                              year: v.year || new Date().getFullYear(),
-                              plate: v.plate || v.registration || '',
-                              type: v.vehicle_type || 'Rigid Truck',
-                              capacity: v.capacity || '',
-                              fuel_type: v.fuel_type || 'Diesel',
-                              status: v.status || 'AVAILABLE',
-                              mileage: v.mileage || '',
-                              insurance_expiry: v.insurance_expiry || '',
-                              registration_expiry: v.registration_expiry || '',
-                              last_maintenance_date: v.last_maintenance_date || '',
-                              next_maintenance_due: v.next_maintenance_due || '',
-                            });
-                          }}
-                          style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
-                        >EDIT</button>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditVehicle(v);
+                              setEditForm({
+                                vin: v.vin || '',
+                                make: v.make || '',
+                                model: v.model || '',
+                                year: v.year || new Date().getFullYear(),
+                                plate: v.plate || v.registration || '',
+                                type: v.vehicle_type_name || '',
+                                capacity: v.capacity || '',
+                                fuel_type: v.fuel_type || 'Diesel',
+                                status: v.status || 'AVAILABLE',
+                                mileage: v.mileage || '',
+                                insurance_expiry: v.insurance_expiry || '',
+                                registration_expiry: v.registration_expiry || '',
+                                last_maintenance_date: v.last_maintenance_date || '',
+                                next_maintenance_due: v.next_maintenance_due || '',
+                                driver: v.driver ?? '',
+                              });
+                            }}
+                            style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
+                          >EDIT</button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmOpts({
+                                title: 'Delete Vehicle',
+                                message: `Remove ${v.plate || v.registration} from your fleet? This cannot be undone.`,
+                                confirmLabel: 'Delete',
+                                danger: true,
+                                onConfirm: async () => {
+                                  try {
+                                    await deleteData({ url: `api/v1/vehicles/${v.id}/` });
+                                    toast.success('Vehicle deleted');
+                                    const d = await fetchData('api/v1/vehicles/');
+                                    setVehicles(Array.isArray(d) ? d : d?.results || []);
+                                  } catch (err: any) {
+                                    toast.error(err?.message || 'Failed to delete vehicle');
+                                  }
+                                },
+                              });
+                            }}
+                            style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
+                          >DEL</button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -402,6 +448,11 @@ export default function Vehicles() {
               { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
               { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
               { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
+              { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
+              { key: 'insurance_expiry', label: 'Insurance Expiry', type: 'date' },
+              { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
+              { key: 'last_maintenance_date', label: 'Last Maintenance', type: 'date' },
+              { key: 'next_maintenance_due', label: 'Next Maintenance Due', type: 'date' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
@@ -415,9 +466,9 @@ export default function Vehicles() {
               </div>
             ))}
             {[
-              { key: 'type', label: 'Vehicle Type', options: ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck'] },
+              { key: 'type', label: 'Vehicle Type', options: vehicleTypes.length > 0 ? vehicleTypes.map(vt => vt.name) : ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck', 'Tautliner', 'Box Truck'] },
               { key: 'fuel_type', label: 'Fuel Type', options: ['Diesel', 'Petrol', 'Electric', 'Hybrid'] },
-              { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE'] },
+              { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE', 'OUT_OF_SERVICE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
@@ -430,27 +481,42 @@ export default function Vehicles() {
                 </select>
               </div>
             ))}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Driver</label>
+              <select
+                value={addForm.driver}
+                onChange={e => setAddForm(prev => ({ ...prev, driver: e.target.value }))}
+                style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+              >
+                <option value="">— No driver assigned —</option>
+                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
                 disabled={saving}
                 onClick={async () => {
                   setSaving(true);
                   try {
-                    // Link the vehicle_type FK by matching the chosen type name to
-                    // the company's seeded vehicle types (fixes the quoting base-rate link).
-                    let vehicleTypeId: number | undefined;
-                    try {
-                      const vt = await fetchData('api/v1/vehicle-types/');
-                      const list = (vt?.results ?? vt) as any[];
-                      vehicleTypeId = list?.find(t => t.name === addForm.type)?.id;
-                    } catch { /* picker still works without the FK */ }
-                    await postData({ url: 'api/v1/vehicles/', data: { ...addForm, year: Number(addForm.year), capacity: Number(addForm.capacity) || 0, ...(vehicleTypeId ? { vehicle_type: vehicleTypeId } : {}) } });
+                    const vehicleTypeId = vehicleTypes.find(vt => vt.name === addForm.type)?.id;
+                    const { type: _t, ...addFormWithoutType } = addForm;
+                    await postData({
+                      url: 'api/v1/vehicles/',
+                      data: {
+                        ...addFormWithoutType,
+                        year: Number(addForm.year),
+                        capacity: Number(addForm.capacity) || 0,
+                        mileage: addForm.mileage ? Number(addForm.mileage) : undefined,
+                        driver: addForm.driver ? Number(addForm.driver) : null,
+                        ...(vehicleTypeId ? { vehicle_type: vehicleTypeId } : {}),
+                      },
+                    });
                     setShowAddForm(false);
-                    setAddForm({ vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '', type: 'Rigid Truck', capacity: '', fuel_type: 'Diesel', status: 'AVAILABLE' });
+                    setAddForm({ vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '', type: 'Rigid Truck', capacity: '', mileage: '', fuel_type: 'Diesel', status: 'AVAILABLE', insurance_expiry: '', registration_expiry: '', last_maintenance_date: '', next_maintenance_due: '', driver: '' });
                     // Refresh
                     const d = await fetchData('api/v1/vehicles/');
                     setVehicles(Array.isArray(d) ? d : d?.results || []);
-                  } catch (e: any) { alert(e?.message || 'Failed to create vehicle'); }
+                  } catch (e: any) { toast.error(e?.message || 'Failed to create vehicle'); }
                   setSaving(false);
                 }}
                 style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
@@ -507,7 +573,7 @@ export default function Vehicles() {
               </div>
             ))}
             {[
-              { key: 'type', label: 'Vehicle Type', options: ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck'] },
+              { key: 'type', label: 'Vehicle Type', options: vehicleTypes.length > 0 ? vehicleTypes.map(vt => vt.name) : ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck', 'Tautliner', 'Box Truck'] },
               { key: 'fuel_type', label: 'Fuel Type', options: ['Diesel', 'Petrol', 'Electric', 'Hybrid'] },
               { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE', 'OUT_OF_SERVICE'] },
             ].map(f => (
@@ -522,6 +588,17 @@ export default function Vehicles() {
                 </select>
               </div>
             ))}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Driver</label>
+              <select
+                value={editForm.driver ?? ''}
+                onChange={e => setEditForm((prev: any) => ({ ...prev, driver: e.target.value }))}
+                style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+              >
+                <option value="">— No driver assigned —</option>
+                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
                 disabled={saving}
@@ -529,11 +606,15 @@ export default function Vehicles() {
                   setSaving(true);
                   setError(null);
                   try {
+                    const { type, ...formWithoutType } = editForm;
+                    const vehicleTypeId = vehicleTypes.find(vt => vt.name === type)?.id;
                     const payload = {
-                      ...editForm,
+                      ...formWithoutType,
                       year: editForm.year ? Number(editForm.year) : undefined,
                       capacity: editForm.capacity ? Number(editForm.capacity) : undefined,
                       mileage: editForm.mileage ? Number(editForm.mileage) : undefined,
+                      driver: editForm.driver !== '' && editForm.driver != null ? Number(editForm.driver) : null,
+                      ...(vehicleTypeId ? { vehicle_type: vehicleTypeId } : {}),
                     };
                     await patchData({ url: `api/v1/vehicles/${editVehicle.id}/`, data: payload });
                     setEditVehicle(null);
@@ -558,6 +639,17 @@ export default function Vehicles() {
             </div>
           </div>
         </div>
+      )}
+
+      {confirmOpts && (
+        <ConfirmModal
+          title={confirmOpts.title}
+          message={confirmOpts.message}
+          confirmLabel={confirmOpts.confirmLabel || 'Confirm'}
+          danger={confirmOpts.danger}
+          onConfirm={confirmOpts.onConfirm}
+          onCancel={() => setConfirmOpts(null)}
+        />
       )}
     </div>
   );

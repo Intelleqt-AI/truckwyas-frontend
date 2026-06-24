@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fetchData, patchData } from "@/lib/Api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -52,11 +53,6 @@ const inputStyle: React.CSSProperties = {
   transition: 'border-color 0.15s',
 };
 
-const selectStyle: React.CSSProperties = {
-  ...inputStyle,
-  cursor: 'pointer',
-  appearance: 'auto' as const,
-};
 
 const gridStyle: React.CSSProperties = {
   display: 'grid',
@@ -184,29 +180,44 @@ export function ProfileSettings() {
           <div style={{ ...gridStyle, marginBottom: 16 }}>
             <div>
               <label style={labelStyle}>Timezone</label>
-              <select style={selectStyle} value={form.timezone} onChange={e => set('timezone', e.target.value)}>
-                <option value="Africa/Johannesburg">South Africa (UTC+2)</option>
-                <option value="UTC">UTC</option>
-                <option value="Europe/London">London (UTC+0)</option>
-                <option value="America/New_York">New York (UTC-5)</option>
-              </select>
+              <Select value={form.timezone} onValueChange={val => set('timezone', val)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Africa/Johannesburg">South Africa (UTC+2)</SelectItem>
+                  <SelectItem value="UTC">UTC</SelectItem>
+                  <SelectItem value="Europe/London">London (UTC+0)</SelectItem>
+                  <SelectItem value="America/New_York">New York (UTC-5)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label style={labelStyle}>Language</label>
-              <select style={selectStyle} value={form.language} onChange={e => set('language', e.target.value)}>
-                <option value="en">English</option>
-                <option value="af">Afrikaans</option>
-                <option value="zu">Zulu</option>
-              </select>
+              <Select value={form.language} onValueChange={val => set('language', val)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="af">Afrikaans</SelectItem>
+                  <SelectItem value="zu">Zulu</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div style={{ marginBottom: 20, maxWidth: 240 }}>
             <label style={labelStyle}>Date Format</label>
-            <select style={selectStyle} value={form.date_format} onChange={e => set('date_format', e.target.value)}>
-              <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-              <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-            </select>
+            <Select value={form.date_format} onValueChange={val => set('date_format', val)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+                <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
+                <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
+import { DatePicker } from '@/components/ui/date-picker';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 
 // ========== TYPES ==========
@@ -402,34 +403,18 @@ export default function Insights() {
         ))}
         {period === 'CUSTOM' && (
           <>
-            <input
-              type="date"
+            <DatePicker
               value={customFrom}
-              onChange={e => setCustomFrom(e.target.value)}
-              style={{
-                background: 'var(--input-bg)',
-                border: '1px solid var(--border-subtle)',
-                color: 'var(--text-primary)',
-                padding: '6px 10px',
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
-                borderRadius: 2,
-              }}
+              onChange={setCustomFrom}
+              placeholder="From"
+              style={{ width: 130, padding: '6px 10px', fontSize: 11 }}
             />
             <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>to</span>
-            <input
-              type="date"
+            <DatePicker
               value={customTo}
-              onChange={e => setCustomTo(e.target.value)}
-              style={{
-                background: 'var(--input-bg)',
-                border: '1px solid var(--border-subtle)',
-                color: 'var(--text-primary)',
-                padding: '6px 10px',
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
-                borderRadius: 2,
-              }}
+              onChange={setCustomTo}
+              placeholder="To"
+              style={{ width: 130, padding: '6px 10px', fontSize: 11 }}
             />
           </>
         )}

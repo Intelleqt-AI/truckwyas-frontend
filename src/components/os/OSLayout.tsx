@@ -47,11 +47,11 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
 
   // Role-based nav access control
   const NAV_ACCESS: Record<string, string[]> = {
-    ADMIN:      ["/", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot", "/settings"],
-    MANAGER:    ["/", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot", "/settings"],
-    OPERATOR:   ["/", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot"],
-    DISPATCHER: ["/", "/bookings", "/fleet", "/invoices", "/capital", "/insights", "/copilot"],
-    VIEWER:     ["/", "/bookings", "/fleet", "/insights", "/copilot"],
+    ADMIN:      ["/", "/bookings", "/fleet", "/customers", "/invoices", "/capital", "/insights", "/copilot", "/settings"],
+    MANAGER:    ["/", "/bookings", "/fleet", "/customers", "/invoices", "/capital", "/insights", "/copilot", "/settings"],
+    OPERATOR:   ["/", "/bookings", "/fleet", "/customers", "/invoices", "/capital", "/insights", "/copilot"],
+    DISPATCHER: ["/", "/bookings", "/fleet", "/customers", "/invoices", "/capital", "/insights", "/copilot"],
+    VIEWER:     ["/", "/bookings", "/fleet", "/customers", "/insights", "/copilot"],
     DRIVER:     ["/", "/bookings"],
   };
 
@@ -59,6 +59,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
     { path: '/', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>, label: 'Home' },
     { path: '/bookings', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, label: 'Bookings' },
     { path: '/fleet', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>, label: 'Fleet' },
+    { path: '/customers', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, label: 'Customers' },
     { path: '/invoices', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>, label: 'Finance' },
     { path: '/capital', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>, label: 'Capital' },
     { path: '/insights', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>, label: 'Insights' },

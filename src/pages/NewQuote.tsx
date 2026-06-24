@@ -5,6 +5,8 @@ import { postData, patchData, fetchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { LocationInput, type LocationCoords } from "@/components/LocationInput";
 import { MapLocationPicker } from "@/components/MapLocationPicker";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   ComposedChart,
   Area,
@@ -147,6 +149,15 @@ export default function NewQuote() {
   // Step 3: Customer & Summary
   const [customerId, setCustomerId] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Quick-create customer
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: "", company_name: "", email: "", phone: "",
+    city: "", state: "", zip_code: "", address: "",
+    billing_address: "", payment_terms_default: "NET30", credit_limit: "",
+  });
+  const [savingCustomer, setSavingCustomer] = useState(false);
   const [status, setStatus] = useState<"DRAFT" | "SENT">("DRAFT");
   const [confidence, setConfidence] = useState<"HIGH" | "MEDIUM" | "LOW">(
     "MEDIUM",
@@ -419,7 +430,8 @@ export default function NewQuote() {
   const applyOptimal = () => {
     if (!optimal?.optimal_price || distanceKm <= 0) return;
     const fixed = _fuelCost + _tollCost + _driverAllowance + _additionalCosts;
-    const ws = weightKg > 5000 ? 0.15 : 0;
+    const threshold = weightThreshold || 5000;
+    const ws = weightKg > threshold ? weightSurchargePct : 0;
     const targetBaseCost = (optimal.optimal_price - fixed) / (1 + ws);
     const perKm = targetBaseCost / distanceKm;
     if (perKm > 0 && isFinite(perKm)) {
@@ -570,6 +582,11 @@ export default function NewQuote() {
             success: true,
             distance_km: dist,
             toll_cost_zar: parseFloat(q.toll_charges || "0"),
+            fuel_cost_zar: parseFloat(q.fuel_surcharge || "0"),
+            duration_minutes: 0,
+            fuel_usage_litres: 0,
+            total_cost_zar: 0,
+            source: "estimated",
           } as RouteData);
           if (q.base_rate != null)
             setBaseRatePerKm(String((parseFloat(q.base_rate) || 0) / dist));
@@ -1378,7 +1395,11 @@ export default function NewQuote() {
               onClick={() => setCurrentStep(2)}
               disabled={!canGoToStep2}
               className="btn-action"
-              style={{ minWidth: 120 }}>
+              style={{
+                minWidth: 120,
+                opacity: canGoToStep2 ? 1 : 0.4,
+                cursor: canGoToStep2 ? "pointer" : "not-allowed",
+              }}>
               NEXT →
             </button>
           </div>
@@ -1432,88 +1453,99 @@ export default function NewQuote() {
             </div>
             <div>
               {label("Vehicle Type")}
-              <select
+              <Select
                 value={vehicleType}
-                onChange={(e) => {
-                  setVehicleType(e.target.value);
+                onValueChange={(val) => {
+                  setVehicleType(val);
                   setSelectedVehicleId("");
                   setSelectedDriverId("");
                   setAiSuggestion(null);
                   setShowAISuggestion(false);
-                }}
-                style={inputStyle}>
-                {vehicleTypes.length > 0
-                  ? vehicleTypes.map((vt) => (
-                      <option key={vt.id} value={vt.name}>
-                        {vt.name}
-                      </option>
-                    ))
-                  : [
-                      "Semi-Trailer Truck",
-                      "Rigid Truck",
-                      "Flatbed Truck",
-                      "Refrigerated Truck",
-                      "Tanker",
-                      "Tautliner",
-                      "Box Truck",
-                    ].map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-              </select>
+                }}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicleTypes.length > 0
+                    ? vehicleTypes.map((vt) => (
+                        <SelectItem key={vt.id} value={vt.name}>
+                          {vt.name}
+                        </SelectItem>
+                      ))
+                    : [
+                        "Semi-Trailer Truck",
+                        "Rigid Truck",
+                        "Flatbed Truck",
+                        "Refrigerated Truck",
+                        "Tanker",
+                        "Tautliner",
+                        "Box Truck",
+                      ].map((n) => (
+                        <SelectItem key={n} value={n}>
+                          {n}
+                        </SelectItem>
+                      ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               {label("Vehicle")}
-              <select
+              <Select
                 value={selectedVehicleId}
-                onChange={(e) => {
-                  const vid = e.target.value;
+                onValueChange={(vid) => {
                   setSelectedVehicleId(vid);
                   // Auto-select the driver assigned to this vehicle
                   const v = vehicles.find((v) => v.id === parseInt(vid));
                   setSelectedDriverId(v?.driver != null ? String(v.driver) : "");
-                }}
-                style={inputStyle}>
-                <option value="">— Select a vehicle (optional) —</option>
-                {vehicles.map((v) => (
-                  <option key={v.id} value={String(v.id)}>
-                    {v.make} {v.model} · {v.plate}
-                    {v.vehicle_type_name ? ` · ${v.vehicle_type_name}` : ""}
-                    {v.status !== "active" ? ` (${v.status})` : ""}
-                  </option>
-                ))}
-              </select>
+                }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="— Select a vehicle (optional) —" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      {v.make} {v.model} · {v.plate}
+                      {v.vehicle_type_name ? ` · ${v.vehicle_type_name}` : ""}
+                      {v.status !== "active" ? ` (${v.status})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               {label("Driver")}
-              <select
+              <Select
                 value={selectedDriverId}
-                onChange={(e) => setSelectedDriverId(e.target.value)}
-                style={inputStyle}>
-                <option value="">
-                  {selectedVehicle?.driver != null
-                    ? "— No driver assigned to this vehicle —"
-                    : "— Select a driver (optional) —"}
-                </option>
-                {drivers.map((d) => {
-                  const name =
-                    d.user_details?.name ||
-                    [d.user_details?.first_name, d.user_details?.last_name]
-                      .filter(Boolean)
-                      .join(" ") ||
-                    d.user_details?.username ||
-                    `Driver #${d.id}`;
-                  return (
-                    <option key={d.id} value={String(d.id)}>
-                      {name}
-                      {d.status !== "active" ? ` (${d.status})` : ""}
-                    </option>
-                  );
-                })}
-              </select>
+                onValueChange={setSelectedDriverId}>
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      selectedVehicle?.driver != null
+                        ? "— No driver assigned to this vehicle —"
+                        : "— Select a driver (optional) —"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {drivers.map((d) => {
+                    const name =
+                      d.user_details?.name ||
+                      [d.user_details?.first_name, d.user_details?.last_name]
+                        .filter(Boolean)
+                        .join(" ") ||
+                      d.user_details?.username ||
+                      `Driver #${d.id}`;
+                    return (
+                      <SelectItem key={d.id} value={String(d.id)}>
+                        {name}
+                        {d.status !== "active" ? ` (${d.status})` : ""}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* UPGRADE 2: Live Fuel Price Badge */}
@@ -2129,23 +2161,19 @@ export default function NewQuote() {
           <div style={{ marginBottom: 16 }}>
             <button
               onClick={fetchAISuggestion}
-              disabled={loadingAI || !canGoToStep3 || showAISuggestion}
+              disabled={loadingAI || !canGoToStep3}
               className="btn-action"
               style={{
                 width: "100%",
-                background: showAISuggestion
-                  ? "var(--bg-surface)"
-                  : "var(--bg-surface)",
+                background: "var(--bg-surface)",
                 border: "1px solid var(--accent-primary)",
-                color: showAISuggestion
-                  ? "var(--text-tertiary)"
-                  : "var(--accent-primary)",
-                cursor: showAISuggestion ? "not-allowed" : "pointer",
+                color: "var(--accent-primary)",
+                cursor: loadingAI || !canGoToStep3 ? "not-allowed" : "pointer",
               }}>
               {loadingAI
                 ? "GETTING AI SUGGESTION..."
                 : showAISuggestion
-                  ? "AI SUGGESTION LOADED"
+                  ? "REFRESH SUGGESTION"
                   : "GET AI SUGGESTION"}
             </button>
 
@@ -2280,7 +2308,7 @@ export default function NewQuote() {
                       borderRadius: 2,
                     }}>
                     Model trained on{" "}
-                    {modelStats.synthetic_count.toLocaleString()} synthetic +{" "}
+                    {(modelStats.synthetic_count ?? modelStats.real_quotes_count ?? 0).toLocaleString()} quotes +{" "}
                     <span
                       style={{
                         color: "var(--accent-primary)",
@@ -2568,18 +2596,28 @@ export default function NewQuote() {
               marginBottom: 16,
             }}>
             <div>
-              {label("Customer")}
-              <select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                style={inputStyle}>
-                <option value="">Select customer...</option>
-                {customers.map((c: any) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.08em" }}>CUSTOMER</div>
+                <button
+                  type="button"
+                  onClick={() => { setNewCustomerForm({ name: "", company_name: "", email: "", phone: "", city: "", state: "", zip_code: "", address: "", billing_address: "", payment_terms_default: "NET30", credit_limit: "" }); setShowNewCustomer(true); }}
+                  style={{ background: "none", border: "none", color: "var(--accent-primary)", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", cursor: "pointer", padding: 0, textTransform: "uppercase" }}
+                >
+                  + New Customer
+                </button>
+              </div>
+              <Select value={customerId} onValueChange={setCustomerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select customer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(customers as { id: number; name: string; company_name?: string }[]).map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}{c.company_name ? ` — ${c.company_name}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               {label("Notes (Optional)")}
@@ -2599,28 +2637,34 @@ export default function NewQuote() {
               }}>
               <div>
                 {label("Status")}
-                <select
+                <Select
                   value={status}
-                  onChange={(e) =>
-                    setStatus(e.target.value as "DRAFT" | "SENT")
-                  }
-                  style={inputStyle}>
-                  <option value="DRAFT">Draft</option>
-                  <option value="SENT">Send to Customer</option>
-                </select>
+                  onValueChange={(val) => setStatus(val as "DRAFT" | "SENT")}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DRAFT">Draft</SelectItem>
+                    <SelectItem value="SENT">Send to Customer</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 {label("Confidence")}
-                <select
+                <Select
                   value={confidence}
-                  onChange={(e) =>
-                    setConfidence(e.target.value as "HIGH" | "MEDIUM" | "LOW")
-                  }
-                  style={inputStyle}>
-                  <option value="HIGH">High</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="LOW">Low</option>
-                </select>
+                  onValueChange={(val) =>
+                    setConfidence(val as "HIGH" | "MEDIUM" | "LOW")
+                  }>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="HIGH">High</SelectItem>
+                    <SelectItem value="MEDIUM">Medium</SelectItem>
+                    <SelectItem value="LOW">Low</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div
@@ -2641,12 +2685,7 @@ export default function NewQuote() {
               </div>
               <div>
                 {label("Valid Until")}
-                <input
-                  type="date"
-                  value={validUntil}
-                  onChange={(e) => setValidUntil(e.target.value)}
-                  style={inputStyle}
-                />
+                <DatePicker value={validUntil} onChange={setValidUntil} />
               </div>
             </div>
           </div>
@@ -3724,6 +3763,105 @@ export default function NewQuote() {
                   ? "UPDATE QUOTE"
                   : "SAVE QUOTE"}
             </button>
+          </div>
+        </div>
+      )}
+      {/* Quick-create customer slide-out */}
+      {showNewCustomer && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1100, display: "flex", justifyContent: "flex-end" }}>
+          <div style={{ position: "absolute", inset: 0, background: "var(--modal-backdrop)" }} onClick={() => setShowNewCustomer(false)} />
+          <div style={{ position: "relative", width: 440, background: "var(--bg-deep)", borderLeft: "1px solid var(--border-subtle)", padding: 28, overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>New Customer</div>
+              <button onClick={() => setShowNewCustomer(false)} style={{ background: "none", border: "none", color: "var(--text-tertiary)", cursor: "pointer", fontSize: 18 }}>✕</button>
+            </div>
+            {[
+              { key: "name", label: "Full Name", placeholder: "e.g. John Doe", required: true },
+              { key: "company_name", label: "Company Name", placeholder: "e.g. Acme Logistics" },
+              { key: "email", label: "Email", placeholder: "e.g. john@company.com", required: true, type: "email" },
+              { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000" },
+              { key: "city", label: "City", placeholder: "e.g. Johannesburg" },
+              { key: "state", label: "Province / State", placeholder: "e.g. Gauteng" },
+              { key: "zip_code", label: "Zip Code", placeholder: "e.g. 2000" },
+              { key: "address", label: "Address", placeholder: "Street address" },
+              { key: "billing_address", label: "Billing Address", placeholder: "Leave blank if same as address" },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.06em", marginBottom: 6, textTransform: "uppercase" }}>
+                  {f.label}{f.required && <span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>}
+                </label>
+                <input
+                  type={f.type || "text"}
+                  placeholder={f.placeholder}
+                  value={newCustomerForm[f.key as keyof typeof newCustomerForm]}
+                  onChange={e => setNewCustomerForm(p => ({ ...p, [f.key]: e.target.value }))}
+                  style={{ width: "100%", background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", padding: "10px 12px", borderRadius: 2, fontSize: 12, fontFamily: "var(--font-mono)", outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+            ))}
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.06em", marginBottom: 6, textTransform: "uppercase" }}>Payment Terms</label>
+              <Select
+                value={newCustomerForm.payment_terms_default}
+                onValueChange={val => setNewCustomerForm(p => ({ ...p, payment_terms_default: val }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NET30">Net 30 Days</SelectItem>
+                  <SelectItem value="NET60">Net 60 Days</SelectItem>
+                  <SelectItem value="NET90">Net 90 Days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.06em", marginBottom: 6, textTransform: "uppercase" }}>Credit Limit (R)</label>
+              <input
+                type="number"
+                placeholder="e.g. 50000"
+                value={newCustomerForm.credit_limit}
+                onChange={e => setNewCustomerForm(p => ({ ...p, credit_limit: e.target.value }))}
+                style={{ width: "100%", background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", padding: "10px 12px", borderRadius: 2, fontSize: 12, fontFamily: "var(--font-mono)", outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+              <button
+                disabled={savingCustomer}
+                onClick={async () => {
+                  if (!newCustomerForm.name.trim() || !newCustomerForm.email.trim()) {
+                    toast.warning("Name and email are required");
+                    return;
+                  }
+                  setSavingCustomer(true);
+                  try {
+                    const payload: Record<string, string | number | null> = { ...newCustomerForm };
+                    if (!newCustomerForm.credit_limit) delete payload.credit_limit;
+                    else payload.credit_limit = parseFloat(newCustomerForm.credit_limit);
+                    const created = await postData({ url: "api/v1/customers/", data: payload });
+                    await queryClient.invalidateQueries({ queryKey: ["customers"] });
+                    setCustomerId(String(created.id));
+                    setShowNewCustomer(false);
+                    setNewCustomerForm({ name: "", company_name: "", email: "", phone: "", city: "", state: "", zip_code: "", address: "", billing_address: "", payment_terms_default: "NET30", credit_limit: "" });
+                    toast.success(`"${created.name}" added and selected`);
+                  } catch (e) {
+                    toast.error((e as Error)?.message || "Failed to create customer");
+                  }
+                  setSavingCustomer(false);
+                }}
+                style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.06em", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: savingCustomer ? "wait" : "pointer", fontWeight: 600 }}
+              >
+                {savingCustomer ? "SAVING..." : "CREATE & SELECT"}
+              </button>
+              <button
+                onClick={() => setShowNewCustomer(false)}
+                style={{ padding: "10px 20px", fontFamily: "var(--font-mono)", fontSize: 11, background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
+              >
+                CANCEL
+              </button>
+            </div>
           </div>
         </div>
       )}

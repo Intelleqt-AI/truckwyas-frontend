@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { RouteMapView } from '@/components/RouteMapView';
 
 // Hardcoded light-theme tokens — this is a public page outside the app shell
 const C = {
@@ -88,12 +89,20 @@ export default function ClientQuoteView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       });
-      if (!res.ok) throw new Error('Failed to respond to quote');
-      return res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw Object.assign(new Error(data.error || 'Failed to respond to quote'), { status: res.status, data });
+      return data;
     },
     onSuccess: (data) => {
       setResponded(true);
       setResponseMessage(data.message);
+    },
+    onError: (err: any) => {
+      if (err.status === 409) {
+        setResponded(true);
+        const alreadyAccepted = err.data?.status === 'ACCEPTED';
+        setResponseMessage(alreadyAccepted ? 'Quote accepted — your operator will be in touch' : 'Quote declined');
+      }
     },
   });
 
@@ -138,7 +147,7 @@ export default function ClientQuoteView() {
             <div style={{ fontSize: 18, fontWeight: 600, color: accepted ? C.success : C.text, marginBottom: 8 }}>
               {responseMessage}
             </div>
-            <div style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>
               {accepted ? 'The freight company will be in touch to confirm arrangements.' : 'Thank you for letting us know.'}
             </div>
           </div>
@@ -147,6 +156,7 @@ export default function ClientQuoteView() {
     );
   }
 
+  const alreadyActioned = quote.status === 'ACCEPTED' || quote.status === 'DECLINED';
   const validUntilDate = new Date(quote.valid_until);
   const isExpiringSoon = validUntilDate.getTime() - Date.now() < 48 * 60 * 60 * 1000;
   const isExpired = validUntilDate.getTime() < Date.now();
@@ -200,7 +210,7 @@ export default function ClientQuoteView() {
         {/* Route */}
         <Card>
           <div style={{ fontSize: 11, fontFamily: C.mono, color: C.faint, letterSpacing: '0.1em', marginBottom: 20 }}>ROUTE</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginBottom: 20 }}>
             <div>
               <Label>Pickup</Label>
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
@@ -215,6 +225,12 @@ export default function ClientQuoteView() {
               </div>
             </div>
           </div>
+          {(quote.pickup_location || quote.origin) && (quote.delivery_location || quote.destination) && (
+            <RouteMapView
+              pickup={quote.pickup_location || quote.origin}
+              delivery={quote.delivery_location || quote.destination}
+            />
+          )}
         </Card>
 
         {/* Cargo details */}
@@ -286,8 +302,33 @@ export default function ClientQuoteView() {
           </div>
         </Card>
 
-        {/* Accept / Decline */}
-        {!isExpired && (
+        {/* Accept / Decline / Already responded / Expired */}
+        {alreadyActioned ? (
+          <div style={{
+            marginTop: 8,
+            padding: '20px 24px',
+            borderRadius: 6,
+            background: quote.status === 'ACCEPTED' ? C.successBg : C.dangerBg,
+            border: `1px solid ${quote.status === 'ACCEPTED' ? C.success : C.danger}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}>
+            <span style={{ fontSize: 20 }}>{quote.status === 'ACCEPTED' ? '✓' : '✗'}</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: quote.status === 'ACCEPTED' ? C.success : C.danger }}>
+                {quote.status === 'ACCEPTED' ? 'Quote Accepted' : 'Quote Declined'}
+              </div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                This quote has already been responded to and no further actions are available.
+              </div>
+            </div>
+          </div>
+        ) : isExpired ? (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: C.danger, fontSize: 13 }}>
+            This quote has expired and can no longer be accepted.
+          </div>
+        ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, marginTop: 8 }}>
             <button
               onClick={() => respondMutation.mutate('accept')}
@@ -325,12 +366,6 @@ export default function ClientQuoteView() {
             >
               DECLINE
             </button>
-          </div>
-        )}
-
-        {isExpired && (
-          <div style={{ textAlign: 'center', padding: '20px 0', color: C.danger, fontSize: 13 }}>
-            This quote has expired and can no longer be accepted.
           </div>
         )}
 

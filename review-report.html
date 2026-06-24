@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TruckWys — Full System Review</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; line-height: 1.6; }
+  .header { background: linear-gradient(135deg, #1a1f2e 0%, #0f1117 100%); border-bottom: 1px solid #2d3748; padding: 32px 40px; }
+  .header h1 { font-size: 22px; font-weight: 700; color: #f7fafc; }
+  .header p { color: #718096; font-size: 13px; margin-top: 4px; }
+  .meta { display: flex; gap: 24px; margin-top: 16px; }
+  .meta-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #a0aec0; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 40px; }
+
+  /* Summary cards */
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 36px; }
+  .summary-card { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 10px; padding: 16px 20px; text-align: center; }
+  .summary-card .count { font-size: 32px; font-weight: 800; line-height: 1; }
+  .summary-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #718096; margin-top: 4px; }
+  .c { color: #fc8181; }
+  .h { color: #f6ad55; }
+  .m { color: #faf089; }
+  .l { color: #68d391; }
+
+  /* Section */
+  .section { margin-bottom: 40px; }
+  .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #718096; border-bottom: 1px solid #2d3748; padding-bottom: 8px; margin-bottom: 16px; }
+  .section-title span { margin-right: 8px; }
+
+  /* Finding cards */
+  .finding { background: #1a1f2e; border: 1px solid #2d3748; border-left: 4px solid; border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+  .finding.critical { border-left-color: #fc8181; }
+  .finding.high     { border-left-color: #f6ad55; }
+  .finding.medium   { border-left-color: #faf089; }
+  .finding.low      { border-left-color: #68d391; }
+  .finding.pass     { border-left-color: #48bb78; }
+
+  .finding-header { padding: 12px 16px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; user-select: none; }
+  .badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+  .badge.critical { background: #742a2a; color: #fc8181; }
+  .badge.high     { background: #744210; color: #f6ad55; }
+  .badge.medium   { background: #744210; color: #faf089; }
+  .badge.low      { background: #1c4532; color: #68d391; }
+  .badge.pass     { background: #1c4532; color: #48bb78; }
+  .badge.bug      { background: #2a2e4a; color: #90cdf4; }
+  .badge.broken   { background: #742a2a; color: #fca5a5; }
+  .badge.mismatch { background: #44337a; color: #d6bcfa; }
+  .badge.ux       { background: #2a2e4a; color: #a0aec0; }
+
+  .finding-title { font-size: 14px; font-weight: 600; color: #e2e8f0; flex: 1; }
+  .finding-location { font-size: 11px; color: #718096; margin-top: 2px; font-family: 'Menlo', 'Consolas', monospace; }
+
+  .finding-body { padding: 0 16px 14px 52px; font-size: 13px; color: #a0aec0; }
+  .finding-body p { margin-bottom: 8px; }
+  .finding-body code { background: #0f1117; color: #90cdf4; padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Menlo', 'Consolas', monospace; }
+  .fix { background: #0d2616; border-left: 3px solid #48bb78; border-radius: 4px; padding: 8px 12px; margin-top: 6px; font-size: 12px; color: #9ae6b4; }
+  .fix strong { color: #68d391; display: block; margin-bottom: 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; background: #2d3748; color: #718096; margin-right: 4px; font-family: monospace; }
+
+  /* Pass section */
+  .pass-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pass-item { background: #0d2616; border: 1px solid #276749; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #68d391; display: flex; align-items: center; gap: 8px; }
+  .pass-item::before { content: '✓'; font-weight: 700; }
+
+  @media (max-width: 700px) {
+    .summary { grid-template-columns: repeat(2, 1fr); }
+    .pass-grid { grid-template-columns: 1fr; }
+    .container { padding: 20px; }
+    .header { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>TruckWys — Full System Review</h1>
+  <p>Security · Quote Flow · API Correctness · Data Integrity</p>
+  <div class="meta">
+    <div class="meta-item">📅 2026-06-24</div>
+    <div class="meta-item">🔍 3 review agents · backend + frontend</div>
+    <div class="meta-item">📁 core/views.py · serializers.py · signals.py · tasks.py · NewQuote.tsx · QuoteDetail.tsx · ClientQuoteView.tsx</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="summary">
+    <div class="summary-card"><div class="count c">4</div><div class="label">Critical</div></div>
+    <div class="summary-card"><div class="count h">8</div><div class="label">High</div></div>
+    <div class="summary-card"><div class="count m">10</div><div class="label">Medium</div></div>
+    <div class="summary-card"><div class="count l">7</div><div class="label">Low / Pass</div></div>
+  </div>
+
+  <!-- CRITICAL -->
+  <div class="section">
+    <div class="section-title"><span>🔴</span>Critical — Fix Immediately</div>
+
+    <div class="finding critical">
+      <div class="finding-header">
+        <span class="badge critical">Critical</span>
+        <div>
+          <div class="finding-title">Cross-tenant data leak — 6 dashboard views have no company filter</div>
+          <div class="finding-location">core/views.py · FleetOverviewView:401, DriverOverviewView:825, DriverPerformanceLeaderboardView:927, QuotesPipelineOverviewView:1000, DashboardOverviewView:2278, DashboardSignalsView:2321</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>These six <code>APIView</code> subclasses query <code>Vehicle</code>, <code>Driver</code>, <code>Quote</code>, <code>Invoice</code>, and <code>Load</code> without filtering by <code>request.user.company</code>. Any authenticated user on any tenant sees every other company's fleet, pipeline, and financial data.</p>
+        <div class="fix"><strong>Fix</strong>Add <code>company=request.user.company</code> to every queryset in these views. Example: <code>Driver.objects.filter(status='ACTIVE', company=request.user.company)</code>. The <code>CompanyFilterMixin</code> already handles this correctly on all ViewSets — apply the same pattern manually here.</div>
+      </div>
+    </div>
+
+    <div class="finding critical">
+      <div class="finding-header">
+        <span class="badge critical">Critical</span>
+        <div>
+          <div class="finding-title">Share token truncated to 8 chars — brute-forceable with sequential quote_id</div>
+          <div class="finding-location">core/views.py · send_to_customer:1758, PublicQuoteView:1775, PublicQuoteRespondView:1826</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>The full 256-bit <code>secrets.token_urlsafe(32)</code> is generated but only the first 8 characters are embedded in the share URL: <code>quote.token[:8]</code>. Validation uses <code>quote.token.startswith(token)</code> — so guessing 8 URL-safe chars (~47 bits) against a sequential integer <code>quote_id</code> is feasible with a small automated probe.</p>
+        <div class="fix"><strong>Fix</strong>Use the full token in the URL. Replace <code>quote.token[:8]</code> → <code>quote.token</code> everywhere. Replace <code>startswith</code> comparison with <code>hmac.compare_digest(quote.token, token)</code> to prevent timing attacks.</div>
+      </div>
+    </div>
+
+    <div class="finding critical">
+      <div class="finding-header">
+        <span class="badge critical">Critical</span>
+        <div>
+          <div class="finding-title">assign_driver allows cross-tenant driver/vehicle assignment — no ownership check</div>
+          <div class="finding-location">core/views.py · assign_driver:1406-1423</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>The load is fetched via <code>get_object()</code> (company-scoped ✓) but the <code>driver_id</code> and <code>vehicle_id</code> from the request body are assigned directly: <code>load.driver_id = driver_id</code> with no check that the driver/vehicle belongs to the same company. Any user can link their load to another tenant's driver or vehicle.</p>
+        <div class="fix"><strong>Fix</strong>Validate before assignment: <code>Driver.objects.get(id=driver_id, company=request.user.company)</code> and same for vehicle. Raise <code>Http404</code> if the lookup fails.</div>
+      </div>
+    </div>
+
+    <div class="finding critical">
+      <div class="finding-header">
+        <span class="badge critical">Critical</span>
+        <div>
+          <div class="finding-title">ActivityEventViewSet returns all tenants' events — no isolation at all</div>
+          <div class="finding-location">core/views.py · ActivityEventViewSet:2811</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p><code>ActivityEvent.objects.all()[:50]</code> — any authenticated user sees the last 50 system-wide events across every company: load numbers, invoice amounts, customer names, quote values from all tenants. The <code>ActivityEvent</code> model has no direct <code>company</code> FK so it must be scoped via the related entity.</p>
+        <div class="fix"><strong>Fix</strong>Add a <code>company = models.ForeignKey('Company', ...)</code> field to <code>ActivityEvent</code> and stamp it on creation, then filter: <code>ActivityEvent.objects.filter(company=request.user.company).order_by('-created_at')[:50]</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HIGH -->
+  <div class="section">
+    <div class="section-title"><span>🟠</span>High — Fix Before Production</div>
+
+    <div class="finding high">
+      <div class="finding-header">
+        <span class="badge high">High</span>
+        <div>
+          <div class="finding-title">OTP and password reset codes use non-cryptographic random.randint()</div>
+          <div class="finding-location">core/views.py · lines 108, 163, 2473</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>Email verification OTPs and password reset codes are generated with <code>random.randint(100000, 999999)</code> — Python's seeded, predictable PRNG. Only 900,000 combinations, predictable from system time.</p>
+        <div class="fix"><strong>Fix</strong>Replace with <code>secrets.randbelow(900000) + 100000</code>.</div>
+      </div>
+    </div>
+
+    <div class="finding high">
+      <div class="finding-header">
+        <span class="badge high">High</span>
+        <div>
+          <div class="finding-title">No rate limiting on email verify, resend, and password reset endpoints</div>
+          <div class="finding-location">core/views.py · EmailVerifyView:124, ResendVerificationView:148, PasswordResetRequestView:2457, PasswordResetConfirmView:2492</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>Login has <code>ScopedRateThrottle</code> with <code>throttle_scope = 'login'</code>, but these four adjacent unauthenticated endpoints have no throttle at all. Enables OTP brute-force (900k combos, no delay) and email bombing via the resend endpoint.</p>
+        <div class="fix"><strong>Fix</strong>Add <code>throttle_classes = [ScopedRateThrottle]</code> and <code>throttle_scope = 'login'</code> to all four views.</div>
+      </div>
+    </div>
+
+    <div class="finding high">
+      <div class="finding-header">
+        <span class="badge high">High</span>
+        <div>
+          <div class="finding-title">POD and company logo uploads have no file type validation</div>
+          <div class="finding-location">core/views.py · upload_pod:1464-1481, CompanyLogoUploadView:371-386</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p><code>upload_pod</code> accepts any file type. <code>CompanyLogoUploadView</code> checks file size (2 MB) but not content type. An attacker can upload HTML/SVG files with embedded JavaScript as "logos" or "POD documents" — if served directly, this causes stored XSS.</p>
+        <div class="fix"><strong>Fix</strong>Whitelist allowed MIME types: <code>{'application/pdf', 'image/jpeg', 'image/png', 'image/webp'}</code>. Verify magic bytes with <code>python-magic</code>. Serve files with <code>Content-Disposition: attachment</code>.</div>
+      </div>
+    </div>
+
+    <div class="finding high">
+      <div class="finding-header">
+        <span class="badge high">High</span>
+        <div>
+          <div class="finding-title">User plan limits never enforced on invite / user creation</div>
+          <div class="finding-location">core/views.py · UserViewSet.perform_create:1160, InviteView.post:2548 · core/middleware/plan_limits.py:143</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p><code>check_user_limit()</code> exists in <code>plan_limits.py</code> but is never called in <code>UserViewSet.perform_create()</code> or <code>InviteView.post()</code>. Vehicle limits are correctly enforced but user limits are silently bypassed — a free-plan tenant with a 3-user cap can invite unlimited users.</p>
+        <div class="fix"><strong>Fix</strong>Call <code>check_user_limit(request.user.company)</code> at the top of both <code>perform_create</code> and <code>InviteView.post</code>, raising <code>PermissionDenied</code> if the limit is exceeded.</div>
+      </div>
+    </div>
+
+    <div class="finding high">
+      <div class="finding-header">
+        <span class="badge high">High</span>
+        <div>
+          <div class="finding-title">actual_delivered_at is writable by clients — bypasses signal stamp</div>
+          <div class="finding-location">core/serializers.py · LoadSerializer</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p><code>actual_delivered_at</code> is not in <code>read_only_fields</code>. Clients can PATCH any timestamp they want, defeating the signal logic and allowing fake delivery timestamps that corrupt on-time rate calculations.</p>
+        <div class="fix"><strong>Fix</strong>Add <code>'actual_delivered_at'</code> to <code>LoadSerializer.Meta.read_only_fields</code>.</div>
+      </div>
+    </div>
+
+    <div class="finding high">
+      <div class="finding-header">
+        <span class="badge high">High</span>
+        <div>
+          <div class="finding-title">Vehicle and driver FK fields in serializers not company-scoped</div>
+          <div class="finding-location">core/serializers.py · QuoteSerializer, LoadSerializer</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>The <code>vehicle</code>, <code>driver</code>, and <code>customer</code> FK fields on <code>QuoteSerializer</code> and <code>LoadSerializer</code> accept any integer ID. A client can set <code>vehicle=999</code> to reference another company's vehicle without any ownership validation.</p>
+        <div class="fix"><strong>Fix</strong>Use <code>PrimaryKeyRelatedField(queryset=Vehicle.objects.filter(company=...))</code> — override <code>get_fields()</code> to inject the request's company into the queryset scope.</div>
+      </div>
+    </div>
+
+    <div class="finding high">
+      <div class="finding-header">
+        <span class="badge high">High</span>
+        <div>
+          <div class="finding-title">SessionsView PATCH allows any user to self-promote their role</div>
+          <div class="finding-location">core/views.py · SessionsView:272-277</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p><code>SessionsView</code> has a PATCH method wired to <code>UserSerializer</code>. The serializer declares <code>role = serializers.CharField(required=False)</code> with a loose validator. Any authenticated user can PATCH their own role to <code>ADMIN</code> via <code>PATCH /api/v1/auth/sessions/</code>.</p>
+        <div class="fix"><strong>Fix</strong>Remove the PATCH method from <code>SessionsView</code>. Profile updates should go through <code>PATCH /api/v1/auth/me/</code> with <code>role</code> explicitly excluded for self-edits.</div>
+      </div>
+    </div>
+
+    <div class="finding high">
+      <div class="finding-header">
+        <span class="badge high">High</span>
+        <div>
+          <div class="finding-title">company field writable on CustomerSerializer, InvoiceSerializer, LoadSerializer</div>
+          <div class="finding-location">core/serializers.py · CustomerSerializer, InvoiceSerializer, LoadSerializer</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>All three serializers use <code>fields = '__all__'</code> without declaring <code>company</code> as read-only. A PATCH request with <code>{"company": 7}</code> reassigns the record to a different company. <code>perform_create</code> stamps the company on create only — it does not protect PATCH.</p>
+        <div class="fix"><strong>Fix</strong>Add <code>'company'</code> to each serializer's <code>read_only_fields</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MEDIUM -->
+  <div class="section">
+    <div class="section-title"><span>🟡</span>Medium — Fix Soon</div>
+
+    <div class="finding medium">
+      <div class="finding-header">
+        <span class="badge medium">Medium</span>
+        <div>
+          <div class="finding-title">"Other" custom rejection reason input disappears on first keystroke</div>
+          <div class="finding-location">src/pages/QuoteDetail.tsx · lines 648-655</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>The free-text input is shown when <code>rejectionReason === 'Other'</code>. But typing in it changes the state away from "Other", which immediately hides the input. The user can never type a custom rejection reason — it vanishes after the first character.</p>
+        <div class="fix"><strong>Fix</strong>Use a separate state variable <code>customRejectionReason</code> for the free-text field. Show the input when <code>rejectionReason === 'Other'</code> and submit <code>customRejectionReason</code> as the value.</div>
+      </div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-header">
+        <span class="badge medium">Medium</span>
+        <div>
+          <div class="finding-title">win_probability scale ambiguity — model stores 0-100, UI multiplies by 100</div>
+          <div class="finding-location">src/pages/QuoteDetail.tsx:412-419 · core/models/quote.py:70</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>The model's <code>help_text</code> says "0-100" but the frontend renders <code>{Math.round(quote.win_probability * 100)}%</code> — treating it as 0-1. If the backend stores 75 (meaning 75%), the UI shows 7500%. The bar width would overflow.</p>
+        <div class="fix"><strong>Fix</strong>Verify what the ML model / view actually writes. Pick one convention (0-1 preferred), update the field <code>help_text</code>, and align the frontend render accordingly.</div>
+      </div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-header">
+        <span class="badge medium">Medium</span>
+        <div>
+          <div class="finding-title">Edit mode reconstructs incomplete RouteData — NaN shown in cost breakdown</div>
+          <div class="finding-location">src/pages/NewQuote.tsx · lines 580-592</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>When loading a quote for edit, only partial <code>routeData</code> is restored (<code>distance_km</code>, <code>toll_cost_zar</code>). Fields like <code>fuel_cost_zar</code>, <code>duration_minutes</code>, and <code>fuel_usage_litres</code> are missing, so Step 2's cost breakdown shows <code>R NaN</code> or <code>R 0</code>.</p>
+        <div class="fix"><strong>Fix</strong>Reconstruct all RouteData fields from the stored quote values on load, or re-trigger the route calculation API call when entering edit mode.</div>
+      </div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-header">
+        <span class="badge medium">Medium</span>
+        <div>
+          <div class="finding-title">QuoteOutcomeView bypasses CompanyFilterMixin — any user can mark outcomes on any quote</div>
+          <div class="finding-location">core/views_ai_quote.py · QuoteOutcomeView:569</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>This standalone <code>APIView</code> does not use <code>CompanyFilterMixin</code>. Any authenticated user who knows a <code>quote_id</code> can PATCH the outcome (win/loss) on a quote belonging to another company.</p>
+        <div class="fix"><strong>Fix</strong>Add <code>quote = get_object_or_404(Quote, pk=quote_id, company=request.user.company)</code> before the update.</div>
+      </div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-header">
+        <span class="badge medium">Medium</span>
+        <div>
+          <div class="finding-title">Quote/load number uniqueness check has TOCTOU race condition</div>
+          <div class="finding-location">core/views.py · lines 1496-1570</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>The <code>while Quote.objects.filter(quote_number=...).exists(): ...</code> loop has a check-then-act race. Two concurrent requests can generate the same number, resulting in a DB uniqueness constraint 500 error surfaced to the user. Same pattern for <code>load_number</code> and <code>expense_number</code>.</p>
+        <div class="fix"><strong>Fix</strong>Ensure <code>quote_number</code> has <code>unique=True</code> on the model and catch <code>IntegrityError</code> in the view to retry. Or switch to a DB sequence / UUID suffix.</div>
+      </div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-header">
+        <span class="badge medium">Medium</span>
+        <div>
+          <div class="finding-title">Signal chain fragility — multiple receivers without dispatch_uid risk double-firing</div>
+          <div class="finding-location">core/signals.py · load_saved, audit_load_save</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>Two separate <code>@receiver(post_save, sender='core.Load')</code> signals are registered without <code>dispatch_uid</code>. During Django's auto-reload in dev, signals can register twice, causing double-stamping of <code>actual_delivered_at</code> and double-firing of Celery tasks.</p>
+        <div class="fix"><strong>Fix</strong>Add unique <code>dispatch_uid</code> to every signal receiver: <code>@receiver(post_save, sender=Load, dispatch_uid='truckwys.load_saved')</code>.</div>
+      </div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-header">
+        <span class="badge medium">Medium</span>
+        <div>
+          <div class="finding-title">outcomeMutation has no onError handler — failures are silent</div>
+          <div class="finding-location">src/pages/QuoteDetail.tsx · lines 106-117</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>If the outcome PATCH fails (network error, 403, 500), the modal stays open with no feedback. The save button stops spinning and nothing happens. Users have no way to know the action failed.</p>
+        <div class="fix"><strong>Fix</strong>Add <code>onError: (err) => toast.error('Failed to save outcome. Please try again.')</code> to the mutation options.</div>
+      </div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-header">
+        <span class="badge medium">Medium</span>
+        <div>
+          <div class="finding-title">FuelPriceData interface declares diesel_inland but primary response key is inland_price</div>
+          <div class="finding-location">src/pages/NewQuote.tsx · FuelPriceData interface:53 · core/views_ai_quote.py:40</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>The backend returns both <code>inland_price</code> (new) and <code>diesel_inland</code> (legacy alias). The TS interface declares only <code>diesel_inland</code>. If the legacy alias is ever removed, <code>fuelPriceData?.diesel_inland</code> silently returns <code>undefined</code> and fuel costs show as R 0 without any type error.</p>
+        <div class="fix"><strong>Fix</strong>Add <code>inland_price: number</code> and <code>coastal_price: number</code> to the interface and migrate usages to the primary field.</div>
+      </div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-header">
+        <span class="badge medium">Medium</span>
+        <div>
+          <div class="finding-title">applyOptimal hardcodes weight surcharge threshold — ignores company profile</div>
+          <div class="finding-location">src/pages/NewQuote.tsx · line 433</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p><code>const ws = weightKg > 5000 ? 0.15 : 0</code> — hardcoded at 5 000 kg / 15%, ignoring <code>weightThreshold</code> and <code>weightSurchargePct</code> from the company profile used elsewhere in the same file. Produces wrong back-calculated <code>base_rate</code> for companies with different surcharge settings.</p>
+        <div class="fix"><strong>Fix</strong>Use <code>weightKg > weightThreshold ? weightSurchargePct / 100 : 0</code>, ensuring the company profile values are in scope.</div>
+      </div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-header">
+        <span class="badge medium">Medium</span>
+        <div>
+          <div class="finding-title">Public quote endpoints have no rate limiting</div>
+          <div class="finding-location">core/views.py · PublicQuoteView:1767, PublicQuoteRespondView:1826</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>These <code>AllowAny</code> endpoints return full cost breakdowns (base rate, fuel surcharge, driver allowance, totals) and accept accept/decline responses with no throttle. Combined with sequential <code>quote_id</code>, a scanner can probe the quote range freely.</p>
+        <div class="fix"><strong>Fix</strong>Add <code>AnonRateThrottle</code> (e.g. 10/min) and the full token (not 8-char prefix) to make enumeration impractical.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOW -->
+  <div class="section">
+    <div class="section-title"><span>🟢</span>Low / Improvements</div>
+
+    <div class="finding low">
+      <div class="finding-header">
+        <span class="badge low">Low</span>
+        <div>
+          <div class="finding-title">AI Suggestion button permanently disabled after first use</div>
+          <div class="finding-location">src/pages/NewQuote.tsx · line 2158</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p><code>disabled={loadingAI || !canGoToStep3 || showAISuggestion}</code> — once loaded, the button can never be clicked again. If the user changes weight or vehicle type, they cannot refresh the suggestion without reloading the page.</p>
+        <div class="fix"><strong>Fix</strong>Remove <code>showAISuggestion</code> from the disabled condition. Show a "Refresh suggestion" label when it was previously loaded.</div>
+      </div>
+    </div>
+
+    <div class="finding low">
+      <div class="finding-header">
+        <span class="badge low">Low</span>
+        <div>
+          <div class="finding-title">Duplicate URL pattern for invite accept — second silently shadows first</div>
+          <div class="finding-location">core/urls.py · lines 130, 133</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p><code>path('auth/invite/&lt;str:token&gt;/accept/', ...)</code> appears twice with two different views. Django uses the first match — the second entry (<code>InviteAcceptView</code>) is unreachable.</p>
+        <div class="fix"><strong>Fix</strong>Remove the duplicate on line 133 or consolidate both views into one.</div>
+      </div>
+    </div>
+
+    <div class="finding low">
+      <div class="finding-header">
+        <span class="badge low">Low</span>
+        <div>
+          <div class="finding-title">assign_driver returns raw exception text to client</div>
+          <div class="finding-location">core/views.py · line 1419</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p><code>return Response({'error': str(e)}, status=400)</code> can expose raw SQL constraint errors like <code>duplicate key value violates unique constraint "core_load_driver_id_key"</code> to the client.</p>
+        <div class="fix"><strong>Fix</strong>Log the exception with <code>logger.exception(...)</code> and return a generic user-facing message.</div>
+      </div>
+    </div>
+
+    <div class="finding low">
+      <div class="finding-header">
+        <span class="badge low">Low</span>
+        <div>
+          <div class="finding-title">TestEmailView uses ad-hoc is_staff check instead of IsAdmin permission class</div>
+          <div class="finding-location">core/views.py · TestEmailView:2814-2822</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>The view checks <code>not request.user.is_staff</code> manually instead of using the project's <code>IsAdmin</code> permission class. Inconsistent with the rest of the codebase and can be confused by Django's <code>is_staff</code> vs the app role system.</p>
+        <div class="fix"><strong>Fix</strong>Replace with <code>permission_classes = [IsAdmin]</code>.</div>
+      </div>
+    </div>
+
+    <div class="finding low">
+      <div class="finding-header">
+        <span class="badge low">Low</span>
+        <div>
+          <div class="finding-title">Bare except clauses catch BaseException</div>
+          <div class="finding-location">core/views_ai_quote.py · line 741 and others</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p><code>except: fuel_current = 20.0</code> — bare <code>except</code> catches <code>KeyboardInterrupt</code>, <code>SystemExit</code>, and <code>GeneratorExit</code>. Can mask serious process-level signals.</p>
+        <div class="fix"><strong>Fix</strong>Replace all bare <code>except:</code> with <code>except Exception:</code>.</div>
+      </div>
+    </div>
+
+    <div class="finding low">
+      <div class="finding-header">
+        <span class="badge low">Low</span>
+        <div>
+          <div class="finding-title">InviteView.get() returns raw cache tokens in response</div>
+          <div class="finding-location">core/views.py · line 2543</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>The pending-invites list response includes the raw invite token for each pending user. If responses are logged (e.g., in an API gateway), tokens end up in log files where they could be replayed.</p>
+        <div class="fix"><strong>Fix</strong>Omit the token from list responses. Use a separate "resend" action that generates a fresh token on demand.</div>
+      </div>
+    </div>
+
+    <div class="finding low">
+      <div class="finding-header">
+        <span class="badge low">Low</span>
+        <div>
+          <div class="finding-title">VehicleInsightsView entirely hardcoded with fake data</div>
+          <div class="finding-location">core/views.py · VehicleInsightsView:540-661</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>The vehicle insights table returns fake plate numbers (TRK-001 through TRK-089) and invented driver names (John Smith, Mike Johnson…). Real vehicles from the DB are never queried. The table shows the same demo data for every user on every tenant.</p>
+        <div class="fix"><strong>Fix</strong>Replace the hardcoded list with a queryset over <code>Vehicle.objects.filter(company=request.user.company).select_related('driver__user')</code> and map the stored computed fields (<code>ai_health_score</code>, <code>cost_per_km</code>, <code>margin_per_trip</code>, <code>uptime_percentage</code>).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSES -->
+  <div class="section">
+    <div class="section-title"><span>✅</span>Confirmed Working</div>
+    <div class="pass-grid">
+      <div class="pass-item">CompanyFilterMixin on all 10 core ViewSets</div>
+      <div class="pass-item">Migration 0052 — all Driver + Load fields present</div>
+      <div class="pass-item">actual_delivered_at signal stamp — uses .update(), no loop</div>
+      <div class="pass-item">None-ID guards in signals before Celery dispatch</div>
+      <div class="pass-item">Division-by-zero guards in all Celery task helpers</div>
+      <div class="pass-item">Quote share URL path resolves correctly from frontend</div>
+      <div class="pass-item">send_to_customer endpoint method + URL correct</div>
+      <div class="pass-item">Driver score fields stored + serialized correctly</div>
+      <div class="pass-item">VehicleTypeViewSet non-superuser company isolation</div>
+      <div class="pass-item">DriverPerformanceLeaderboardView uses real stored fields</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

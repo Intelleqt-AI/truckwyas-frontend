@@ -430,7 +430,8 @@ export default function NewQuote() {
   const applyOptimal = () => {
     if (!optimal?.optimal_price || distanceKm <= 0) return;
     const fixed = _fuelCost + _tollCost + _driverAllowance + _additionalCosts;
-    const ws = weightKg > 5000 ? 0.15 : 0;
+    const threshold = weightThreshold || 5000;
+    const ws = weightKg > threshold ? weightSurchargePct : 0;
     const targetBaseCost = (optimal.optimal_price - fixed) / (1 + ws);
     const perKm = targetBaseCost / distanceKm;
     if (perKm > 0 && isFinite(perKm)) {
@@ -581,6 +582,11 @@ export default function NewQuote() {
             success: true,
             distance_km: dist,
             toll_cost_zar: parseFloat(q.toll_charges || "0"),
+            fuel_cost_zar: parseFloat(q.fuel_surcharge || "0"),
+            duration_minutes: 0,
+            fuel_usage_litres: 0,
+            total_cost_zar: 0,
+            source: "estimated",
           } as RouteData);
           if (q.base_rate != null)
             setBaseRatePerKm(String((parseFloat(q.base_rate) || 0) / dist));
@@ -2155,23 +2161,19 @@ export default function NewQuote() {
           <div style={{ marginBottom: 16 }}>
             <button
               onClick={fetchAISuggestion}
-              disabled={loadingAI || !canGoToStep3 || showAISuggestion}
+              disabled={loadingAI || !canGoToStep3}
               className="btn-action"
               style={{
                 width: "100%",
-                background: showAISuggestion
-                  ? "var(--bg-surface)"
-                  : "var(--bg-surface)",
+                background: "var(--bg-surface)",
                 border: "1px solid var(--accent-primary)",
-                color: showAISuggestion
-                  ? "var(--text-tertiary)"
-                  : "var(--accent-primary)",
-                cursor: showAISuggestion ? "not-allowed" : "pointer",
+                color: "var(--accent-primary)",
+                cursor: loadingAI || !canGoToStep3 ? "not-allowed" : "pointer",
               }}>
               {loadingAI
                 ? "GETTING AI SUGGESTION..."
                 : showAISuggestion
-                  ? "AI SUGGESTION LOADED"
+                  ? "REFRESH SUGGESTION"
                   : "GET AI SUGGESTION"}
             </button>
 
@@ -2306,7 +2308,7 @@ export default function NewQuote() {
                       borderRadius: 2,
                     }}>
                     Model trained on{" "}
-                    {modelStats.synthetic_count.toLocaleString()} synthetic +{" "}
+                    {(modelStats.synthetic_count ?? modelStats.real_quotes_count ?? 0).toLocaleString()} quotes +{" "}
                     <span
                       style={{
                         color: "var(--accent-primary)",

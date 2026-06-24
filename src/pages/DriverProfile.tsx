@@ -80,7 +80,7 @@ export default function DriverProfile() {
   const bestTripAmount = loads.length > 0 ? Math.max(...loads.map((l: any) => parseFloat(l.total_amount || '0'))) : 0;
 
   // Performance scores
-  const onTimeRate = driver.on_time_rate ?? 85;
+  const onTimeRate = driver.on_time_rate ?? 0;
   const safetyScore = Math.max(0, Math.min(100, 100 - (driver.violation_count ?? 0) * 10 - (driver.accident_history ?? 0) * 20));
   const experienceScore = Math.min(100, ((driver.experience_years ?? 0) / 15) * 100);
   const complianceScore = driver.license_expiry && new Date(driver.license_expiry) > new Date() ? 100 : 0;

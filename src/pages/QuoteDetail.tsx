@@ -26,6 +26,7 @@ export default function QuoteDetail() {
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
   const [outcomeType, setOutcomeType] = useState<'accepted' | 'rejected' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [customRejectionReason, setCustomRejectionReason] = useState('');
   const [finalPrice, setFinalPrice] = useState('');
   const [fuelAlert, setFuelAlert] = useState<any>(null);
   const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void; danger?: boolean } | null>(null);
@@ -112,7 +113,11 @@ export default function QuoteDetail() {
       setShowOutcomeModal(false);
       setOutcomeType(null);
       setRejectionReason('');
+      setCustomRejectionReason('');
       setFinalPrice('');
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'Failed to save outcome');
     },
   });
 
@@ -649,8 +654,8 @@ export default function QuoteDetail() {
                   <input
                     type="text"
                     placeholder="Please specify reason"
-                    value={rejectionReason}
-                    onChange={e => setRejectionReason(e.target.value)}
+                    value={customRejectionReason}
+                    onChange={e => setCustomRejectionReason(e.target.value)}
                     style={{ ...inputStyle, marginTop: 10 }}
                   />
                 )}
@@ -663,6 +668,7 @@ export default function QuoteDetail() {
                   setShowOutcomeModal(false);
                   setOutcomeType(null);
                   setRejectionReason('');
+                  setCustomRejectionReason('');
                   setFinalPrice('');
                 }}
                 className="btn-action"
@@ -674,14 +680,14 @@ export default function QuoteDetail() {
                 onClick={() => {
                   const data: any = { outcome: outcomeType };
                   if (outcomeType === 'rejected' && rejectionReason) {
-                    data.rejection_reason = rejectionReason;
+                    data.rejection_reason = rejectionReason === 'Other' ? customRejectionReason : rejectionReason;
                   }
                   if (outcomeType === 'accepted' && finalPrice) {
                     data.final_price = parseFloat(finalPrice);
                   }
                   outcomeMutation.mutate(data);
                 }}
-                disabled={outcomeType === 'rejected' && !rejectionReason}
+                disabled={outcomeType === 'rejected' && (!rejectionReason || (rejectionReason === 'Other' && !customRejectionReason))}
                 className="btn-action"
                 style={{
                   flex: 1,

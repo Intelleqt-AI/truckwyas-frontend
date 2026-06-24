@@ -4,6 +4,8 @@ import { formatCurrency, formatDate } from "@/lib/formatters";
 import { fetchData, postData, putData, deleteData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUS_COLOR: Record<string, string> = {
   PAID: 'var(--status-success)', SENT: 'var(--status-warning)',
@@ -447,28 +449,20 @@ export default function Invoices() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Category *</label>
-                    <select
-                      value={expenseForm.category}
-                      onChange={(e) => handleExpenseFormChange('category', e.target.value)}
-                      style={{
-                        width: '100%',
-                        background: 'var(--bg-surface)',
-                        border: '1px solid var(--border-subtle)',
-                        padding: '10px 12px',
-                        color: 'var(--text-primary)',
-                        borderRadius: 2,
-                        fontSize: 13,
-                        fontFamily: 'var(--font-sans)',
-                      }}
-                    >
-                      <option value="FUEL">Fuel</option>
-                      <option value="TOLLS">Tolls</option>
-                      <option value="MAINTENANCE">Maintenance</option>
-                      <option value="DRIVER_COST">Driver Cost</option>
-                      <option value="INSURANCE">Insurance</option>
-                      <option value="OVERHEAD">Overhead</option>
-                      <option value="OTHER">Other</option>
-                    </select>
+                    <Select value={expenseForm.category} onValueChange={val => handleExpenseFormChange('category', val)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="FUEL">Fuel</SelectItem>
+                        <SelectItem value="TOLLS">Tolls</SelectItem>
+                        <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                        <SelectItem value="DRIVER_COST">Driver Cost</SelectItem>
+                        <SelectItem value="INSURANCE">Insurance</SelectItem>
+                        <SelectItem value="OVERHEAD">Overhead</SelectItem>
+                        <SelectItem value="OTHER">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div>
@@ -563,43 +557,23 @@ export default function Invoices() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <div>
                       <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date *</label>
-                      <input
-                        type="date"
+                      <DatePicker
                         value={expenseForm.expense_date}
-                        onChange={(e) => handleExpenseFormChange('expense_date', e.target.value)}
-                        style={{
-                          width: '100%',
-                          background: 'var(--bg-surface)',
-                          border: '1px solid var(--border-subtle)',
-                          padding: '10px 12px',
-                          color: 'var(--text-primary)',
-                          borderRadius: 2,
-                          fontSize: 13,
-                          fontFamily: 'var(--font-mono)',
-                        }}
+                        onChange={val => handleExpenseFormChange('expense_date', val)}
                       />
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vehicle</label>
-                      <select
-                        value={expenseForm.vehicle}
-                        onChange={(e) => handleExpenseFormChange('vehicle', e.target.value)}
-                        style={{
-                          width: '100%',
-                          background: 'var(--bg-surface)',
-                          border: '1px solid var(--border-subtle)',
-                          padding: '10px 12px',
-                          color: 'var(--text-primary)',
-                          borderRadius: 2,
-                          fontSize: 13,
-                          fontFamily: 'var(--font-sans)',
-                        }}
-                      >
-                        <option value="">Select vehicle...</option>
-                        {vehicles.map(v => (
-                          <option key={v.id} value={v.id}>{v.registration || v.vehicle_number}</option>
-                        ))}
-                      </select>
+                      <Select value={expenseForm.vehicle} onValueChange={val => handleExpenseFormChange('vehicle', val)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select vehicle..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vehicles.map(v => (
+                            <SelectItem key={v.id} value={String(v.id)}>{v.registration || v.vehicle_number}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -778,25 +752,16 @@ export default function Invoices() {
                 fontFamily: 'var(--font-sans)',
               }}
             />
-            <select
-              value={categoryFilter}
-              onChange={e => { setCategoryFilter(e.target.value); setExpensePage(1); }}
-              style={{
-                background: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                padding: '6px 10px',
-                color: 'var(--text-primary)',
-                borderRadius: 2,
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              {expenseCategories.map(c => (
-                <option key={c} value={c}>{c === 'All' ? 'All Categories' : c.replace('_', ' ')}</option>
-              ))}
-            </select>
+            <Select value={categoryFilter} onValueChange={val => { setCategoryFilter(val); setExpensePage(1); }}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                {expenseCategories.map(c => (
+                  <SelectItem key={c} value={c}>{c === 'All' ? 'All Categories' : c.replace('_', ' ')}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div style={{ display: 'flex', gap: 8 }}>
               {expenseStatuses.map(s => (
                 <button

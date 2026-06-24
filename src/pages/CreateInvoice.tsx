@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, fetchData } from "@/lib/Api";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function CreateInvoice() {
   const navigate = useNavigate();
@@ -79,10 +81,14 @@ export default function CreateInvoice() {
                 ))}
                 <div>
                   <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>CUSTOMER</div>
-                  <select value={form.customer} onChange={set('customer')} style={inputStyle}>
-                    <option value="">Select customer...</option>
-                    {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <Select value={form.customer} onValueChange={val => setForm(f => ({ ...f, customer: val }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select customer..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
@@ -91,7 +97,7 @@ export default function CreateInvoice() {
                   </div>
                   <div>
                     <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>DUE DATE</div>
-                    <input type="date" value={form.due_date} onChange={set('due_date')} style={inputStyle} />
+                    <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} />
                   </div>
                 </div>
                 <div>
@@ -105,10 +111,15 @@ export default function CreateInvoice() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="card" style={{ padding: 20 }}>
               <div className="card-title" style={{ marginBottom: 16 }}>Status</div>
-              <select value={form.status} onChange={set('status')} style={inputStyle}>
-                <option value="DRAFT">Draft</option>
-                <option value="SENT">Send to Customer</option>
-              </select>
+              <Select value={form.status} onValueChange={val => setForm(f => ({ ...f, status: val }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DRAFT">Draft</SelectItem>
+                  <SelectItem value="SENT">Send to Customer</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="card" style={{ padding: 20 }}>

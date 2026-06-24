@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { fetchData, postData, deleteData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Expense {
   id: number;
@@ -544,40 +546,31 @@ export default function Expenses() {
       {/* Filters & Actions */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: 8 }}>
-          <select
-            value={categoryFilter}
-            onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
-            style={{
-              background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-primary)', padding: '6px 10px',
-              fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
-            }}
-          >
-            {CATS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
-          </select>
-          <select
-            value={vehicleFilter}
-            onChange={e => { setVehicleFilter(e.target.value); setPage(1); }}
-            style={{
-              background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-primary)', padding: '6px 10px',
-              fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
-            }}
-          >
-            <option value="All">All Vehicles</option>
-            {vehicles.map(v => <option key={v.id} value={v.id}>{v.registration}</option>)}
-          </select>
-          <select
-            value={dateFilter}
-            onChange={e => { setDateFilter(e.target.value); setPage(1); }}
-            style={{
-              background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-primary)', padding: '6px 10px',
-              fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer',
-            }}
-          >
-            {DATE_FILTERS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-          </select>
+          <Select value={categoryFilter} onValueChange={val => { setCategoryFilter(val); setPage(1); }}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CATS.map(c => <SelectItem key={c.value} value={c.value}>{c.icon} {c.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={vehicleFilter} onValueChange={val => { setVehicleFilter(val); setPage(1); }}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Vehicles" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All Vehicles</SelectItem>
+              {vehicles.map(v => <SelectItem key={v.id} value={String(v.id)}>{v.registration}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={dateFilter} onValueChange={val => { setDateFilter(val); setPage(1); }}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DATE_FILTERS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <input
             placeholder="Search expenses..."
             value={search}
@@ -770,10 +763,14 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={labelStyle}>Category</label>
-            <select value={category} onChange={e => setCategory(e.target.value)} required style={inputStyle}>
-              <option value="">Select category</option>
-              {CATS.slice(1).map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {CATS.slice(1).map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label style={labelStyle}>Amount (ZAR)</label>
@@ -781,16 +778,21 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
           </div>
           <div>
             <label style={labelStyle}>Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} required style={inputStyle} />
+            <DatePicker value={date} onChange={setDate} />
           </div>
           <div>
             <label style={labelStyle}>Vehicle (optional)</label>
-            <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={inputStyle}>
-              <option value="">No vehicle</option>
-              {vehicles.map(v => (
-                <option key={v.id} value={v.id}>{v.registration}</option>
-              ))}
-            </select>
+            <Select value={vehicleId} onValueChange={setVehicleId}>
+              <SelectTrigger>
+                <SelectValue placeholder="No vehicle" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No vehicle</SelectItem>
+                {vehicles.map(v => (
+                  <SelectItem key={v.id} value={String(v.id)}>{v.registration}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label style={labelStyle}>Description</label>

@@ -5,6 +5,7 @@ import { fetchData, patchData, deleteData, postData, downloadBlob } from '@/lib/
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',
@@ -354,19 +355,19 @@ export default function QuoteDetail() {
               </div>
               <div>
                 {label('Status')}
-                <select
-                  value={quote.status}
-                  onChange={(e) => statusMutation.mutate(e.target.value)}
-                  disabled={statusMutation.isPending}
-                  style={inputStyle}
-                >
-                  <option value="DRAFT">Draft</option>
-                  <option value="SENT">Sent</option>
-                  <option value="ACCEPTED">Accepted</option>
-                  <option value="DECLINED">Declined</option>
-                  <option value="IT">In-Transit</option>
-                  <option value="COMPLETED">Completed</option>
-                </select>
+                <Select value={quote.status} onValueChange={(val) => statusMutation.mutate(val)} disabled={statusMutation.isPending}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DRAFT">Draft</SelectItem>
+                    <SelectItem value="SENT">Sent</SelectItem>
+                    <SelectItem value="ACCEPTED">Accepted</SelectItem>
+                    <SelectItem value="DECLINED">Declined</SelectItem>
+                    <SelectItem value="IT">In-Transit</SelectItem>
+                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 {label('Confidence')}
@@ -633,17 +634,17 @@ export default function QuoteDetail() {
             {outcomeType === 'rejected' && (
               <div style={{ marginBottom: 16 }}>
                 {label('Rejection Reason')}
-                <select
-                  value={rejectionReason}
-                  onChange={e => setRejectionReason(e.target.value)}
-                  style={inputStyle}
-                >
-                  <option value="">Select reason...</option>
-                  <option value="Price too high">Price too high</option>
-                  <option value="Went with competitor">Went with competitor</option>
-                  <option value="Job cancelled">Job cancelled</option>
-                  <option value="Other">Other (please specify)</option>
-                </select>
+                <Select value={rejectionReason} onValueChange={setRejectionReason}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select reason..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Price too high">Price too high</SelectItem>
+                    <SelectItem value="Went with competitor">Went with competitor</SelectItem>
+                    <SelectItem value="Job cancelled">Job cancelled</SelectItem>
+                    <SelectItem value="Other">Other (please specify)</SelectItem>
+                  </SelectContent>
+                </Select>
                 {rejectionReason === 'Other' && (
                   <input
                     type="text"

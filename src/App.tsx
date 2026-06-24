@@ -67,6 +67,8 @@ const Vehicles = lazy(() => import("./pages/Vehicles"));
 const Drivers = lazy(() => import("./pages/Drivers"));
 const DriverProfile = lazy(() => import("./pages/DriverProfile"));
 const FleetDashboard = lazy(() => import("./pages/FleetDashboard"));
+const Customers = lazy(() => import("./pages/Customers"));
+const CustomerDetail = lazy(() => import("./pages/CustomerDetail"));
 const Invoices = lazy(() => import("./pages/Invoices"));
 const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
 const CreateInvoice = lazy(() => import("./pages/CreateInvoice"));
@@ -111,11 +113,9 @@ const queryClient = new QueryClient({
     queries: {
       retry: 2,
       throwOnError: false,
-      staleTime: 15000,
-      refetchOnWindowFocus: true, // refresh when the operator returns to the tab
+      staleTime: 5 * 60 * 1000, // 5 min — avoids refetch on every page revisit
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
-      refetchInterval: 30000, // live polling for React-Query screens
-      refetchIntervalInBackground: false, // …but not while the tab is hidden
     },
   },
 });
@@ -596,6 +596,38 @@ const App = () => (
                   <RequireAuth>
                     <OSLayout>
                       <FleetHeatmap />
+                    </OSLayout>
+                  </RequireAuth>
+                }
+              />
+
+              {/* Customers */}
+              <Route
+                path="/customers"
+                element={
+                  <RequireAuth>
+                    <OSLayout>
+                      <Customers />
+                    </OSLayout>
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/customers/new"
+                element={
+                  <RequireAuth>
+                    <OSLayout>
+                      <Customers />
+                    </OSLayout>
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/customers/:id"
+                element={
+                  <RequireAuth>
+                    <OSLayout>
+                      <CustomerDetail />
                     </OSLayout>
                   </RequireAuth>
                 }

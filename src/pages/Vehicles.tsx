@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetchData, postData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Vehicle {
   id: number;
@@ -90,6 +92,11 @@ export default function Vehicles() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('All');
+  const [search, setSearch] = useState('');
+  const searchRef = useRef('');
+  searchRef.current = search;
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const didMountVehicles = useRef(false);
   const [sortBy, setSortBy] = useState('revenue');
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -106,8 +113,12 @@ export default function Vehicles() {
   } | null>(null);
 
   const load = useCallback(() => {
+    const q = searchRef.current;
+    const vehiclesUrl = q
+      ? `api/v1/vehicles/?search=${encodeURIComponent(q)}`
+      : 'api/v1/vehicles/';
     return Promise.all([
-      fetchData('api/v1/vehicles/'),
+      fetchData(vehiclesUrl),
       fetchData('api/v1/fleet/overview/'),
       fetchData('api/v1/fleet/intelligence/'),
       fetchData('api/v1/vehicle-types/'),
@@ -147,6 +158,13 @@ export default function Vehicles() {
 
   useEffect(() => { load(); }, [load]);
   useAutoRefresh(load);
+
+  useEffect(() => {
+    if (!didMountVehicles.current) { didMountVehicles.current = true; return; }
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(load, 300);
+    return () => clearTimeout(searchTimer.current);
+  }, [search, load]);
 
   // Filter vehicles
   const filtered = vehicles.filter(v => {
@@ -262,33 +280,52 @@ export default function Vehicles() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
         {/* Vehicle Table */}
         <div>
-          {/* Status Filter Tabs */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            {['All', 'AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE'].map(status => {
-              const isActive = statusFilter === status;
-              return (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  style={{
-                    background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                    padding: '6px 12px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    fontWeight: isActive ? 600 : 400,
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {status === 'All' ? 'ALL' : status.replace('_', ' ')}
-                </button>
-              );
-            })}
+          {/* Search + Status Filter Toolbar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <input
+              type="text"
+              placeholder="Search VIN, plate, make, model..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                width: 280,
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                color: 'var(--text-primary)',
+                padding: '8px 12px',
+                borderRadius: 2,
+                fontSize: 12,
+                fontFamily: 'var(--font-mono)',
+                outline: 'none',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              {['All', 'AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE'].map(status => {
+                const isActive = statusFilter === status;
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    style={{
+                      background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                      border: '1px solid var(--border-subtle)',
+                      color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                      padding: '6px 12px',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      borderRadius: 2,
+                      cursor: 'pointer',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      fontWeight: isActive ? 600 : 400,
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Table */}
@@ -456,13 +493,20 @@ export default function Vehicles() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <input
-                  type={f.type || 'text'}
-                  placeholder={f.placeholder}
-                  value={(addForm as any)[f.key]}
-                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: f.type === 'number' ? e.target.value : e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
-                />
+                {f.type === 'date' ? (
+                  <DatePicker
+                    value={(addForm as any)[f.key]}
+                    onChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}
+                  />
+                ) : (
+                  <input
+                    type={f.type || 'text'}
+                    placeholder={f.placeholder}
+                    value={(addForm as any)[f.key]}
+                    onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                )}
               </div>
             ))}
             {[
@@ -472,25 +516,32 @@ export default function Vehicles() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <select
+                <Select
                   value={(addForm as any)[f.key]}
-                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                  onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}
                 >
-                  {f.options.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {f.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Driver</label>
-              <select
+              <Select
                 value={addForm.driver}
-                onChange={e => setAddForm(prev => ({ ...prev, driver: e.target.value }))}
-                style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                onValueChange={val => setAddForm(prev => ({ ...prev, driver: val }))}
               >
-                <option value="">— No driver assigned —</option>
-                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="— No driver assigned —" />
+                </SelectTrigger>
+                <SelectContent>
+                  {drivers.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
@@ -563,13 +614,20 @@ export default function Vehicles() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <input
-                  type={f.type || 'text'}
-                  placeholder={f.placeholder}
-                  value={(editForm as any)[f.key]}
-                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
-                />
+                {f.type === 'date' ? (
+                  <DatePicker
+                    value={(editForm as any)[f.key]}
+                    onChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}
+                  />
+                ) : (
+                  <input
+                    type={f.type || 'text'}
+                    placeholder={f.placeholder}
+                    value={(editForm as any)[f.key]}
+                    onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                )}
               </div>
             ))}
             {[
@@ -579,25 +637,32 @@ export default function Vehicles() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <select
+                <Select
                   value={(editForm as any)[f.key]}
-                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                  onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}
                 >
-                  {f.options.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {f.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Driver</label>
-              <select
-                value={editForm.driver ?? ''}
-                onChange={e => setEditForm((prev: any) => ({ ...prev, driver: e.target.value }))}
-                style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+              <Select
+                value={editForm.driver != null && editForm.driver !== '' ? String(editForm.driver) : ''}
+                onValueChange={val => setEditForm((prev: any) => ({ ...prev, driver: val }))}
               >
-                <option value="">— No driver assigned —</option>
-                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="— No driver assigned —" />
+                </SelectTrigger>
+                <SelectContent>
+                  {drivers.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button

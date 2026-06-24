@@ -5,6 +5,7 @@ import { fetchData, patchData, deleteData, postData, downloadBlob } from '@/lib/
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',
@@ -25,6 +26,7 @@ export default function QuoteDetail() {
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
   const [outcomeType, setOutcomeType] = useState<'accepted' | 'rejected' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [customRejectionReason, setCustomRejectionReason] = useState('');
   const [finalPrice, setFinalPrice] = useState('');
   const [fuelAlert, setFuelAlert] = useState<any>(null);
   const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void; danger?: boolean } | null>(null);
@@ -111,7 +113,11 @@ export default function QuoteDetail() {
       setShowOutcomeModal(false);
       setOutcomeType(null);
       setRejectionReason('');
+      setCustomRejectionReason('');
       setFinalPrice('');
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'Failed to save outcome');
     },
   });
 
@@ -354,19 +360,19 @@ export default function QuoteDetail() {
               </div>
               <div>
                 {label('Status')}
-                <select
-                  value={quote.status}
-                  onChange={(e) => statusMutation.mutate(e.target.value)}
-                  disabled={statusMutation.isPending}
-                  style={inputStyle}
-                >
-                  <option value="DRAFT">Draft</option>
-                  <option value="SENT">Sent</option>
-                  <option value="ACCEPTED">Accepted</option>
-                  <option value="DECLINED">Declined</option>
-                  <option value="IT">In-Transit</option>
-                  <option value="COMPLETED">Completed</option>
-                </select>
+                <Select value={quote.status} onValueChange={(val) => statusMutation.mutate(val)} disabled={statusMutation.isPending}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DRAFT">Draft</SelectItem>
+                    <SelectItem value="SENT">Sent</SelectItem>
+                    <SelectItem value="ACCEPTED">Accepted</SelectItem>
+                    <SelectItem value="DECLINED">Declined</SelectItem>
+                    <SelectItem value="IT">In-Transit</SelectItem>
+                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 {label('Confidence')}
@@ -633,23 +639,23 @@ export default function QuoteDetail() {
             {outcomeType === 'rejected' && (
               <div style={{ marginBottom: 16 }}>
                 {label('Rejection Reason')}
-                <select
-                  value={rejectionReason}
-                  onChange={e => setRejectionReason(e.target.value)}
-                  style={inputStyle}
-                >
-                  <option value="">Select reason...</option>
-                  <option value="Price too high">Price too high</option>
-                  <option value="Went with competitor">Went with competitor</option>
-                  <option value="Job cancelled">Job cancelled</option>
-                  <option value="Other">Other (please specify)</option>
-                </select>
+                <Select value={rejectionReason} onValueChange={setRejectionReason}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select reason..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Price too high">Price too high</SelectItem>
+                    <SelectItem value="Went with competitor">Went with competitor</SelectItem>
+                    <SelectItem value="Job cancelled">Job cancelled</SelectItem>
+                    <SelectItem value="Other">Other (please specify)</SelectItem>
+                  </SelectContent>
+                </Select>
                 {rejectionReason === 'Other' && (
                   <input
                     type="text"
                     placeholder="Please specify reason"
-                    value={rejectionReason}
-                    onChange={e => setRejectionReason(e.target.value)}
+                    value={customRejectionReason}
+                    onChange={e => setCustomRejectionReason(e.target.value)}
                     style={{ ...inputStyle, marginTop: 10 }}
                   />
                 )}
@@ -662,6 +668,7 @@ export default function QuoteDetail() {
                   setShowOutcomeModal(false);
                   setOutcomeType(null);
                   setRejectionReason('');
+                  setCustomRejectionReason('');
                   setFinalPrice('');
                 }}
                 className="btn-action"
@@ -673,14 +680,14 @@ export default function QuoteDetail() {
                 onClick={() => {
                   const data: any = { outcome: outcomeType };
                   if (outcomeType === 'rejected' && rejectionReason) {
-                    data.rejection_reason = rejectionReason;
+                    data.rejection_reason = rejectionReason === 'Other' ? customRejectionReason : rejectionReason;
                   }
                   if (outcomeType === 'accepted' && finalPrice) {
                     data.final_price = parseFloat(finalPrice);
                   }
                   outcomeMutation.mutate(data);
                 }}
-                disabled={outcomeType === 'rejected' && !rejectionReason}
+                disabled={outcomeType === 'rejected' && (!rejectionReason || (rejectionReason === 'Other' && !customRejectionReason))}
                 className="btn-action"
                 style={{
                   flex: 1,

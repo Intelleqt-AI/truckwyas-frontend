@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TruckWys — Re-Audit Report</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; line-height: 1.6; }
+  .header { background: linear-gradient(135deg, #1a1f2e 0%, #0f1117 100%); border-bottom: 1px solid #2d3748; padding: 32px 40px; }
+  .header h1 { font-size: 22px; font-weight: 700; color: #f7fafc; }
+  .header p { color: #718096; font-size: 13px; margin-top: 4px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 40px; }
+
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 36px; }
+  .summary-card { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 10px; padding: 16px 20px; text-align: center; }
+  .summary-card .count { font-size: 32px; font-weight: 800; line-height: 1; }
+  .summary-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #718096; margin-top: 4px; }
+  .verified-count { color: #48bb78; }
+  .new-count { color: #f6ad55; }
+  .fixed-count { color: #90cdf4; }
+  .open-count { color: #faf089; }
+
+  .section { margin-bottom: 36px; }
+  .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #718096; border-bottom: 1px solid #2d3748; padding-bottom: 8px; margin-bottom: 16px; }
+
+  .finding { background: #1a1f2e; border: 1px solid #2d3748; border-left: 4px solid; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .finding.verified { border-left-color: #48bb78; }
+  .finding.new-bug   { border-left-color: #fc8181; }
+  .finding.new-med   { border-left-color: #f6ad55; }
+  .finding.new-low   { border-left-color: #faf089; }
+  .finding.open      { border-left-color: #a0aec0; }
+
+  .finding-header { padding: 12px 16px; display: flex; align-items: flex-start; gap: 12px; }
+  .badge { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+  .badge.verified { background: #1c4532; color: #48bb78; }
+  .badge.new-bug  { background: #742a2a; color: #fc8181; }
+  .badge.new-med  { background: #744210; color: #f6ad55; }
+  .badge.new-low  { background: #4a3800; color: #faf089; }
+  .badge.open     { background: #2d3748; color: #a0aec0; }
+
+  .finding-title { font-size: 14px; font-weight: 600; color: #e2e8f0; flex: 1; }
+  .finding-location { font-size: 11px; color: #718096; margin-top: 2px; font-family: 'Menlo', monospace; }
+  .finding-body { padding: 0 16px 14px 52px; font-size: 13px; color: #a0aec0; }
+  .finding-body p { margin-bottom: 6px; }
+  .finding-body code { background: #0f1117; color: #90cdf4; padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'Menlo', monospace; }
+  .fix { background: #0d2616; border-left: 3px solid #48bb78; border-radius: 4px; padding: 8px 12px; margin-top: 6px; font-size: 12px; color: #9ae6b4; }
+  .fix strong { color: #68d391; display: block; margin-bottom: 2px; font-size: 11px; text-transform: uppercase; }
+
+  .pass-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pass-item { background: #0d2616; border: 1px solid #276749; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #68d391; display: flex; align-items: flex-start; gap: 8px; }
+  .pass-item::before { content: '✓'; font-weight: 700; flex-shrink: 0; }
+  .pass-loc { font-size: 10px; color: #38a169; font-family: monospace; margin-top: 2px; }
+
+  @media(max-width:700px){ .summary{grid-template-columns:repeat(2,1fr);} .pass-grid{grid-template-columns:1fr;} .container{padding:20px;} }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>TruckWys — Re-Audit Report (Post-Fix)</h1>
+  <p>Verifying all previous fixes landed · Finding remaining issues · 2026-06-24</p>
+</div>
+
+<div class="container">
+
+  <div class="summary">
+    <div class="summary-card"><div class="count verified-count">10</div><div class="label">Verified Fixed</div></div>
+    <div class="summary-card"><div class="count new-count">5</div><div class="label">New Findings</div></div>
+    <div class="summary-card"><div class="count fixed-count">1</div><div class="label">Runtime Crash</div></div>
+    <div class="summary-card"><div class="count open-count">2</div><div class="label">Open / Low</div></div>
+  </div>
+
+  <!-- ALL VERIFIED -->
+  <div class="section">
+    <div class="section-title">✅ All Previous Fixes — Verified</div>
+    <div class="pass-grid">
+      <div class="pass-item"><div><div>Cross-tenant leak: 6 dashboard views scoped to company</div><div class="pass-loc">views.py · FleetOverview, DriverOverview, DriverLeaderboard, QuotesPipeline, DashboardOverview, DashboardSignals</div></div></div>
+      <div class="pass-item"><div><div>Share token: full 256-bit token + hmac.compare_digest</div><div class="pass-loc">views.py · lines 1764, 1780, 1831</div></div></div>
+      <div class="pass-item"><div><div>assign_driver: validates driver + vehicle belong to company</div><div class="pass-loc">views.py · lines 1404–1413</div></div></div>
+      <div class="pass-item"><div><div>ActivityEventViewSet: scoped to company</div><div class="pass-loc">views.py · line 2838</div></div></div>
+      <div class="pass-item"><div><div>OTP: secrets.randbelow in Register, Resend, PasswordReset</div><div class="pass-loc">views.py · lines 108, 167, 493</div></div></div>
+      <div class="pass-item"><div><div>Rate limiting: ScopedRateThrottle on 4 auth endpoints</div><div class="pass-loc">views.py · EmailVerify, Resend, PWReset request+confirm</div></div></div>
+      <div class="pass-item"><div><div>File upload MIME validation: POD + company logo</div><div class="pass-loc">views.py · lines 1473, 381</div></div></div>
+      <div class="pass-item"><div><div>User plan limits: enforced on UserViewSet + InviteView</div><div class="pass-loc">views.py · lines 1148, 2593</div></div></div>
+      <div class="pass-item"><div><div>SessionsView: PATCH method removed</div><div class="pass-loc">views.py · SessionsView has GET only</div></div></div>
+      <div class="pass-item"><div><div>Serializers: actual_delivered_at + company read-only on Load, Customer, Invoice</div><div class="pass-loc">serializers.py · line 195, 57, 249</div></div></div>
+      <div class="pass-item"><div><div>QuoteOutcomeView: company-scoped (was bypass, now fixed)</div><div class="pass-loc">views_ai_quote.py · line 583</div></div></div>
+      <div class="pass-item"><div><div>Frontend: customRejectionReason, onError, routeData, AI button, applyOptimal, onTimeRate</div><div class="pass-loc">QuoteDetail.tsx, NewQuote.tsx, DriverProfile.tsx</div></div></div>
+    </div>
+  </div>
+
+  <!-- NEW FINDINGS -->
+  <div class="section">
+    <div class="section-title">🔴 Runtime Crash — Fix Now</div>
+
+    <div class="finding new-bug">
+      <div class="finding-header">
+        <span class="badge new-bug">Bug · Crash</span>
+        <div>
+          <div class="finding-title">modelStats.synthetic_count is undefined → TypeError crash</div>
+          <div class="finding-location">src/pages/NewQuote.tsx · line 2311</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>Frontend calls <code>.toLocaleString()</code> on <code>modelStats.synthetic_count</code>, but the backend <code>/api/v1/quotes/model-stats/</code> never returns that key — it returns <code>real_quotes_count</code> and <code>training_sample_count</code>. The TypeScript interface declares it but the value is always <code>undefined</code> at runtime.</p>
+        <p>This causes a <code>TypeError: Cannot read properties of undefined</code> crash whenever the AI suggestion panel renders.</p>
+        <div class="fix"><strong>Fix</strong>Either add <code>synthetic_count</code> to the backend model-stats response, or replace the frontend reference with <code>modelStats.training_sample_count</code> and guard: <code>{(modelStats?.synthetic_count ?? modelStats?.training_sample_count ?? 0).toLocaleString()}</code></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🟠 Medium — Fix Soon</div>
+
+    <div class="finding new-med">
+      <div class="finding-header">
+        <span class="badge new-med">Medium</span>
+        <div>
+          <div class="finding-title">QuoteWinProbabilityView: cross-tenant Customer lookup</div>
+          <div class="finding-location">core/views_ai_quote.py · line 1024</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p><code>Customer.objects.get(id=client_id)</code> has no <code>company=request.user.company</code> filter. An authenticated user can probe any customer ID across tenants. While no customer data is returned in the response directly, the foreign customer's quote history is used to compute the <code>historical_acceptance_rate</code> that informs the win probability prediction.</p>
+        <div class="fix"><strong>Fix</strong><code>Customer.objects.get(id=client_id, company=request.user.company)</code> — raises <code>DoesNotExist</code> if cross-tenant.</div>
+      </div>
+    </div>
+
+    <div class="finding new-med">
+      <div class="finding-header">
+        <span class="badge new-med">Medium</span>
+        <div>
+          <div class="finding-title">InviteView.get() returns raw invite cache tokens to admins</div>
+          <div class="finding-location">core/views.py · line 2556–2568</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>The pending invites list response includes <code>'token': cache.get(f'invite_user_{u.id}')</code> — the live invite token. Any ADMIN can retrieve valid tokens for pending users and replay the invite accept flow without the user's knowledge. Tokens in API responses end up in request logs.</p>
+        <div class="fix"><strong>Fix</strong>Remove the <code>'token'</code> field from the list response. Return <code>'has_pending_invite': True</code> instead. Generate a fresh token only in the resend action.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🟡 Low — Clean Up</div>
+
+    <div class="finding new-low">
+      <div class="finding-header">
+        <span class="badge new-low">Low</span>
+        <div>
+          <div class="finding-title">4 bare except: clauses swallow KeyboardInterrupt / SystemExit</div>
+          <div class="finding-location">core/views_ai_quote.py · lines 740, 801, 1042 · core/views.py · line 1701</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>Bare <code>except:</code> (no exception type) catches everything including <code>KeyboardInterrupt</code> and <code>SystemExit</code>. Masks real errors silently.</p>
+        <div class="fix"><strong>Fix</strong>Replace all 4 with <code>except Exception:</code>.</div>
+      </div>
+    </div>
+
+    <div class="finding new-low">
+      <div class="finding-header">
+        <span class="badge new-low">Low</span>
+        <div>
+          <div class="finding-title">Duplicate URL: auth/invite/&lt;token&gt;/accept/ — InviteAcceptView unreachable</div>
+          <div class="finding-location">core/urls.py · lines 130, 133</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>Two different views are registered on the same URL path. Django resolves to the first match — <code>InviteAcceptView</code> (line 133) is dead code and can never be reached.</p>
+        <div class="fix"><strong>Fix</strong>Remove the duplicate on line 133 or consolidate the two views.</div>
+      </div>
+    </div>
+
+    <div class="finding new-low">
+      <div class="finding-header">
+        <span class="badge new-low">Low</span>
+        <div>
+          <div class="finding-title">PasswordResetConfirmView OTP comparison not timing-safe</div>
+          <div class="finding-location">core/views.py · line 2534</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p><code>stored_code != code</code> uses regular string equality. Share token and invite token comparisons use <code>hmac.compare_digest</code> — this one should too for consistency.</p>
+        <div class="fix"><strong>Fix</strong><code>not hmac.compare_digest(stored_code, code)</code></div>
+      </div>
+    </div>
+
+    <div class="finding open">
+      <div class="finding-header">
+        <span class="badge open">Ambiguous</span>
+        <div>
+          <div class="finding-title">win_probability: DB field says 0-100, frontend multiplies by 100, field never written</div>
+          <div class="finding-location">core/models/quote.py:70 · src/pages/QuoteDetail.tsx:418</div>
+        </div>
+      </div>
+      <div class="finding-body">
+        <p>The model <code>help_text</code> says "0-100" but no view ever writes this field to the DB. The frontend treats it as 0–1 and multiplies by 100. The display block is guarded by <code>{quote.win_probability && ...}</code> so it never renders — safe for now. If anyone adds code to write the field, the scale will be wrong.</p>
+        <div class="fix"><strong>Fix</strong>Decide on one convention (0–1 recommended), update <code>help_text</code>, and align the frontend. Then wire up writing the field when AI suggestion is accepted.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

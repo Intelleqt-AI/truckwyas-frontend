@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CompanyProfile {
   company_name: string;
@@ -262,29 +263,19 @@ export function Onboarding() {
                   }}>
                     Industry
                   </label>
-                  <select
-                    value={industry}
-                    onChange={(e) => setIndustry(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      background: 'var(--input-bg)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: 2,
-                      color: 'var(--text-primary)',
-                      fontSize: 13,
-                      outline: 'none',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <option value="">Select industry</option>
-                    <option value="general_freight">General Freight</option>
-                    <option value="refrigerated">Refrigerated Transport</option>
-                    <option value="hazmat">Hazmat / Dangerous Goods</option>
-                    <option value="construction">Construction Materials</option>
-                    <option value="agriculture">Agriculture</option>
-                    <option value="other">Other</option>
-                  </select>
+                  <Select value={industry} onValueChange={setIndustry}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select industry" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general_freight">General Freight</SelectItem>
+                      <SelectItem value="refrigerated">Refrigerated Transport</SelectItem>
+                      <SelectItem value="hazmat">Hazmat / Dangerous Goods</SelectItem>
+                      <SelectItem value="construction">Construction Materials</SelectItem>
+                      <SelectItem value="agriculture">Agriculture</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
@@ -408,16 +399,16 @@ export function Onboarding() {
                   </div>
                   <div>
                     <label style={lblSt}>Vehicle Type *</label>
-                    <select
-                      value={vehicleTypeId}
-                      onChange={(e) => setVehicleTypeId(e.target.value)}
-                      style={selSt}
-                    >
-                      <option value="">Select type</option>
-                      {vehicleTypes.map((vt) => (
-                        <option key={vt.id} value={vt.id}>{vt.name}</option>
-                      ))}
-                    </select>
+                    <Select value={vehicleTypeId} onValueChange={setVehicleTypeId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vehicleTypes.map((vt) => (
+                          <SelectItem key={vt.id} value={String(vt.id)}>{vt.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -438,16 +429,17 @@ export function Onboarding() {
                   </div>
                   <div>
                     <label style={lblSt}>Fuel Type *</label>
-                    <select
-                      value={fuelType}
-                      onChange={(e) => setFuelType(e.target.value)}
-                      style={selSt}
-                    >
-                      <option value="DIESEL">Diesel</option>
-                      <option value="PETROL">Petrol</option>
-                      <option value="ELECTRIC">Electric</option>
-                      <option value="HYBRID">Hybrid</option>
-                    </select>
+                    <Select value={fuelType} onValueChange={setFuelType}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="DIESEL">Diesel</SelectItem>
+                        <SelectItem value="PETROL">Petrol</SelectItem>
+                        <SelectItem value="ELECTRIC">Electric</SelectItem>
+                        <SelectItem value="HYBRID">Hybrid</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

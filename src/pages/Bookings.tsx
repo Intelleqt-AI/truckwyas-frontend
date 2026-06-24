@@ -5,6 +5,7 @@ import { fetchData, postData, patchData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: 'var(--text-tertiary)',
@@ -145,14 +146,15 @@ export default function Bookings() {
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{load.customer_name}</div>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <select
-            value={load.status}
-            onChange={e => updateStatus(e.target.value)}
-            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: STATUS_COLOR[load.status] || 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 12px', borderRadius: 2, cursor: 'pointer' }}
-          >
-            <option value={load.status}>{load.status.replace('_', ' ')}</option>
-            {allowedNextStatuses.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-          </select>
+          <Select value={load.status} onValueChange={updateStatus}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={load.status}>{load.status.replace('_', ' ')}</SelectItem>
+              {allowedNextStatuses.map(s => <SelectItem key={s} value={s}>{s.replace('_', ' ')}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const VEHICLE_STATUSES = ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'OUT_OF_SERVICE'] as const;
 
@@ -430,25 +431,32 @@ export default function VehicleFinancialProfile() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <select
+                <Select
                   value={editForm[f.key] ?? ''}
-                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                  onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}
                 >
-                  {f.options.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {f.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Driver</label>
-              <select
-                value={editForm.driver ?? ''}
-                onChange={e => setEditForm((prev: any) => ({ ...prev, driver: e.target.value }))}
-                style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+              <Select
+                value={String(editForm.driver ?? '')}
+                onValueChange={val => setEditForm((prev: any) => ({ ...prev, driver: val }))}
               >
-                <option value="">— No driver assigned —</option>
-                {driversList.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="— No driver assigned —" />
+                </SelectTrigger>
+                <SelectContent>
+                  {driversList.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button

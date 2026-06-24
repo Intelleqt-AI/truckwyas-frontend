@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchData, postData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUS_COLOR: Record<string, string> = {
   PAID: 'var(--accent-primary)',
@@ -318,22 +320,22 @@ export default function InvoiceDetail() {
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   style={{ padding: '8px', fontSize: 12, border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                 />
-                <input
-                  type="date"
+                <DatePicker
                   value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                  style={{ padding: '8px', fontSize: 12, border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+                  onChange={setPaymentDate}
+                  style={{ padding: '8px', fontSize: 12 }}
                 />
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  style={{ padding: '8px', fontSize: 12, border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
-                >
-                  <option value="EFT">EFT</option>
-                  <option value="CASH">Cash</option>
-                  <option value="CARD">Card</option>
-                  <option value="CHEQUE">Cheque</option>
-                </select>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EFT">EFT</SelectItem>
+                    <SelectItem value="CASH">Cash</SelectItem>
+                    <SelectItem value="CARD">Card</SelectItem>
+                    <SelectItem value="CHEQUE">Cheque</SelectItem>
+                  </SelectContent>
+                </Select>
                 <input
                   type="text"
                   placeholder="Reference (optional)"

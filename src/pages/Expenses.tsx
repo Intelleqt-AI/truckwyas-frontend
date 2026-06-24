@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData, deleteData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -58,10 +59,23 @@ function getCategoryIcon(cat: string) {
 }
 
 export default function Expenses() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading: loading, isError, refetch } = useQuery({
+    queryKey: ["expenses-page"],
+    queryFn: async () => {
+      const [expData, vehData] = await Promise.all([
+        fetchData('api/v1/expenses/'),
+        fetchData('api/v1/vehicles/'),
+      ]);
+      return {
+        expenses: (Array.isArray(expData) ? expData : (expData?.results || [])) as Expense[],
+        vehicles: (Array.isArray(vehData) ? vehData : (vehData?.results || [])) as Vehicle[],
+      };
+    },
+  });
+
+  const expenses = data?.expenses ?? [];
+  const vehicles = data?.vehicles ?? [];
+  const error = isError ? 'Failed to load expenses' : null;
 
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [vehicleFilter, setVehicleFilter] = useState('All');
@@ -77,29 +91,6 @@ export default function Expenses() {
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
   const perPage = 10;
-
-  const loadData = () => {
-    setLoading(true);
-    Promise.all([
-      fetchData('api/v1/expenses/'),
-      fetchData('api/v1/vehicles/')
-    ])
-      .then(([expData, vehData]) => {
-        setExpenses(Array.isArray(expData) ? expData : (expData?.results || []));
-        setVehicles(Array.isArray(vehData) ? vehData : (vehData?.results || []));
-        setError(null);
-      })
-      .catch(() => {
-        setError('Failed to load expenses');
-        setExpenses([]);
-        setVehicles([]);
-      })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   // Calculate date range
   const now = new Date();
@@ -160,7 +151,7 @@ export default function Expenses() {
         try {
           await deleteData({ url: `/api/v1/expenses/${id}/` });
           toast.success('Expense deleted');
-          loadData();
+          refetch();
         } catch {
           toast.error('Failed to delete expense');
         } finally {
@@ -187,7 +178,7 @@ export default function Expenses() {
           );
           toast.success(`${selectedIds.size} expense${selectedIds.size === 1 ? '' : 's'} deleted`);
           setSelectedIds(new Set());
-          loadData();
+          refetch();
         } catch {
           toast.error('Some expenses could not be deleted');
         } finally {
@@ -690,8 +681,8 @@ export default function Expenses() {
       </div>
 
       {/* Add/Edit Expense Modal */}
-      {showAdd && <ExpenseModal vehicles={vehicles} onClose={() => { setShowAdd(false); loadData(); }} />}
-      {editingExpense && <ExpenseModal expense={editingExpense} vehicles={vehicles} onClose={() => { setEditingExpense(null); loadData(); }} />}
+      {showAdd && <ExpenseModal vehicles={vehicles} onClose={() => { setShowAdd(false); refetch(); }} />}
+      {editingExpense && <ExpenseModal expense={editingExpense} vehicles={vehicles} onClose={() => { setEditingExpense(null); refetch(); }} />}
 
       {confirmOpts && (
         <ConfirmModal

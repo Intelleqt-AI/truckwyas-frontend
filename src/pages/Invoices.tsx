@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { fetchData, postData, putData, deleteData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -32,30 +33,72 @@ const PAGE_SIZE = 10;
 
 type FinanceTab = 'invoices' | 'expenses';
 
+// Fetches invoices + stats. Lives in the queryFn so the result is cached by
+// TanStack Query (keyed below) and survives navigation — revisiting the page
+// no longer refires these requests until the cache goes stale.
+async function loadInvoicesPage() {
+  const [data, statsData] = await Promise.all([
+    fetchData('/api/v1/invoices/'),
+    fetchData('/api/v1/invoices/stats/').catch(() => null),
+  ]);
+  // API returns paginated {count, results} — extract results
+  return {
+    invoices: Array.isArray(data) ? data : (data?.results || []),
+    stats: statsData,
+  };
+}
+
+// Fetches expenses + vehicles together (mirrors the original Promise.all
+// grouping). Cached under its own key so the expenses tab survives navigation.
+async function loadFinanceExpenses() {
+  const [expensesData, vehiclesData] = await Promise.all([
+    fetchData('/api/v1/expenses/'),
+    fetchData('/api/v1/vehicles/').catch(() => []),
+  ]);
+  return {
+    expenses: Array.isArray(expensesData) ? expensesData : (expensesData?.results || []),
+    vehicles: Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.results || []),
+  };
+}
+
 export default function Invoices() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<FinanceTab>('invoices');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [invoices, setInvoices] = useState<any[]>([]);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [stats, setStats] = useState<any>(null);
   const statuses = ['All', 'SENT', 'OVERDUE', 'PAID', 'DRAFT'];
 
+  // Invoices + stats, cached across navigations.
+  const { data: invoicesData, isLoading: loading, refetch: refetchInvoices } = useQuery({
+    queryKey: ['invoices-page'],
+    queryFn: loadInvoicesPage,
+  });
+  const invoices: any[] = invoicesData?.invoices ?? [];
+  const stats: any = invoicesData?.stats ?? null;
+
+  // Expenses + vehicles, cached across navigations. Only fetched once the
+  // expenses tab is opened, mirroring the original lazy load.
+  const { data: expensesData, isLoading: expensesQueryLoading, refetch: refetchExpenses } = useQuery({
+    queryKey: ['finance-expenses'],
+    queryFn: loadFinanceExpenses,
+    enabled: activeTab === 'expenses',
+  });
+  const expenses: any[] = expensesData?.expenses ?? [];
+  const vehicles: any[] = expensesData?.vehicles ?? [];
+  // Show the skeleton only before the first expenses fetch resolves.
+  const expensesLoading = activeTab === 'expenses' && expensesQueryLoading;
+
   // Expenses state
-  const [expenses, setExpenses] = useState<any[]>([]);
-  const [expensesLoading, setExpensesLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [expenseStatusFilter, setExpenseStatusFilter] = useState('All');
   const [expenseSearch, setExpenseSearch] = useState('');
   const [expensePage, setExpensePage] = useState(1);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any>(null);
-  const [vehicles, setVehicles] = useState<any[]>([]);
   const [expenseForm, setExpenseForm] = useState({
     category: 'FUEL',
     description: '',
@@ -76,60 +119,12 @@ export default function Invoices() {
     document.title = 'Invoices - TruckWys';
   }, []);
 
-  // Single stable loader: fetches invoices + stats, and (when the expenses
-  // tab is active) expenses + vehicles. Refreshes silently — never flips the
-  // main loading flag back on, only off in finally — so auto-refresh doesn't
-  // flash skeletons every interval.
-  const load = async () => {
-    const tasks: Promise<void>[] = [];
-
-    tasks.push((async () => {
-      try {
-        const [data, statsData] = await Promise.all([
-          fetchData('/api/v1/invoices/'),
-          fetchData('/api/v1/invoices/stats/').catch(() => null),
-        ]);
-        // API returns paginated {count, results} — extract results
-        setInvoices(Array.isArray(data) ? data : (data?.results || []));
-        setStats(statsData);
-      } catch (error) {
-        console.error('Failed to load invoices:', error);
-        setInvoices([]);
-      } finally {
-        setLoading(false);
-      }
-    })());
-
-    if (activeTab === 'expenses') {
-      tasks.push((async () => {
-        try {
-          const [expensesData, vehiclesData] = await Promise.all([
-            fetchData('/api/v1/expenses/'),
-            fetchData('/api/v1/vehicles/').catch(() => []),
-          ]);
-          setExpenses(Array.isArray(expensesData) ? expensesData : (expensesData?.results || []));
-          setVehicles(Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.results || []));
-        } catch (error) {
-          console.error('Failed to load expenses:', error);
-          setExpenses([]);
-        } finally {
-          setExpensesLoading(false);
-        }
-      })());
-    }
-
-    await Promise.all(tasks);
-  };
-
-  useEffect(() => { load(); }, []);
-  useAutoRefresh(load);
-
-  // Load expenses when switching to expenses tab
-  useEffect(() => {
-    if (activeTab === 'expenses') {
-      load();
-    }
-  }, [activeTab]);
+  // Live-refresh both datasets on the auto-refresh tick / focus / live events.
+  // The expenses query is a no-op until its tab has been opened (enabled flag).
+  useAutoRefresh(() => {
+    refetchInvoices();
+    if (activeTab === 'expenses') refetchExpenses();
+  });
 
   // Expense handlers
   const handleExpenseFormChange = (field: string, value: any) => {
@@ -168,11 +163,11 @@ export default function Invoices() {
       if (editingExpense) {
         await putData({ url: `/api/v1/expenses/${editingExpense.id}/`, data: payload });
         setToast('Expense updated!');
-        setExpenses(prev => prev.map(e => e.id === editingExpense.id ? { ...e, ...payload } : e));
+        refetchExpenses();
       } else {
-        const newExpense = await postData({ url: '/api/v1/expenses/', data: payload });
+        await postData({ url: '/api/v1/expenses/', data: payload });
         setToast('Expense added!');
-        setExpenses(prev => [newExpense, ...prev]);
+        refetchExpenses();
       }
 
       setTimeout(() => setToast(null), 3000);
@@ -202,7 +197,7 @@ export default function Invoices() {
       await postData({ url: `/api/v1/expenses/${expenseId}/approve/` });
       setToast('Expense approved!');
       setTimeout(() => setToast(null), 3000);
-      setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, status: 'APPROVED' } : e));
+      refetchExpenses();
     } catch (error) {
       console.error('Failed to approve expense:', error);
       setToast('Failed to approve expense');
@@ -215,7 +210,7 @@ export default function Invoices() {
       await postData({ url: `/api/v1/expenses/${expenseId}/reject/` });
       setToast('Expense rejected!');
       setTimeout(() => setToast(null), 3000);
-      setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, status: 'REJECTED' } : e));
+      refetchExpenses();
     } catch (error) {
       console.error('Failed to reject expense:', error);
       setToast('Failed to reject expense');
@@ -256,7 +251,7 @@ export default function Invoices() {
       await deleteData({ url: `/api/v1/expenses/${expenseId}/` });
       setToast('Expense deleted!');
       setTimeout(() => setToast(null), 3000);
-      setExpenses(prev => prev.filter(e => e.id !== expenseId));
+      refetchExpenses();
     } catch (error) {
       console.error('Failed to delete expense:', error);
       setToast('Failed to delete expense');
@@ -271,8 +266,7 @@ export default function Invoices() {
       await postData({ url: `/api/v1/invoices/${invoiceId}/send_invoice/` });
       setToast('Invoice sent!');
       setTimeout(() => setToast(null), 3000);
-      // Optimistically update status
-      setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: 'SENT' } : inv));
+      refetchInvoices();
     } catch (error) {
       console.error('Failed to send invoice:', error);
       setToast('Failed to send invoice');

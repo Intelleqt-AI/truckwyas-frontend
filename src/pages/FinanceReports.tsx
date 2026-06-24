@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
@@ -15,18 +16,47 @@ const TABS = [
 
 export default function FinanceReports() {
   const [tab, setTab] = useState('pl');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Data states
-  const [financeData, setFinanceData] = useState<any>(null);
-  const [cashflowData, setCashflowData] = useState<any>(null);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [agingData, setAgingData] = useState<any>(null);
-  const [facilities, setFacilities] = useState<any>(null);
-  const [advances, setAdvances] = useState<any[]>([]);
-  const [laneData, setLaneData] = useState<any>(null);
-  const [fastpayData, setFastpayData] = useState<any>(null);
+  // All report data is fetched + derived inside the queryFn so the result is
+  // cached by TanStack Query and survives navigation — revisiting the page no
+  // longer refires these 8 requests until the cache goes stale.
+  const { data, isLoading: loading, isError } = useQuery({
+    queryKey: ["finance-reports"],
+    queryFn: async () => {
+      const [finance, cashflow, cust, aging, fac, adv, lanes, fastpay] = await Promise.all([
+        fetchData('api/v1/dashboard/finance/').catch(() => null),
+        fetchData('api/v1/dashboard/cashflow/').catch(() => null),
+        fetchData('api/v1/customers/').catch(() => []),
+        fetchData('api/v1/invoices/aging/').catch(() => null),
+        fetchData('api/v1/facilities/').catch(() => null),
+        fetchData('api/v1/advances/').catch(() => []),
+        fetchData('api/v1/reports/margin-by-lane/').catch(() => null),
+        fetchData('api/v1/reports/fastpay-savings/').catch(() => null),
+      ]);
+      const facList = Array.isArray(fac) ? fac : (fac?.results || []);
+      return {
+        financeData: finance,
+        cashflowData: cashflow,
+        customers: Array.isArray(cust) ? cust : (cust?.results || []),
+        agingData: aging,
+        facilities: facList[0] || null,
+        advances: Array.isArray(adv) ? adv : (adv?.results || []),
+        laneData: lanes,
+        fastpayData: fastpay,
+      };
+    },
+  });
+
+  // Cached data drives the view; defaults keep the first render safe.
+  const error = isError ? 'Failed to load data' : null;
+  const financeData = data?.financeData ?? null;
+  const cashflowData = data?.cashflowData ?? null;
+  const customers = data?.customers ?? [];
+  const agingData = data?.agingData ?? null;
+  const facilities = data?.facilities ?? null;
+  const advances = data?.advances ?? [];
+  const laneData = data?.laneData ?? null;
+  const fastpayData = data?.fastpayData ?? null;
 
   const exportToCSV = () => {
     let csvContent = '';
@@ -118,40 +148,6 @@ export default function FinanceReports() {
     link.click();
     document.body.removeChild(link);
   };
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [finance, cashflow, cust, aging, fac, adv, lanes, fastpay] = await Promise.all([
-          fetchData('api/v1/dashboard/finance/').catch(() => null),
-          fetchData('api/v1/dashboard/cashflow/').catch(() => null),
-          fetchData('api/v1/customers/').catch(() => []),
-          fetchData('api/v1/invoices/aging/').catch(() => null),
-          fetchData('api/v1/facilities/').catch(() => null),
-          fetchData('api/v1/advances/').catch(() => []),
-          fetchData('api/v1/reports/margin-by-lane/').catch(() => null),
-          fetchData('api/v1/reports/fastpay-savings/').catch(() => null),
-        ]);
-        setFinanceData(finance);
-        setCashflowData(cashflow);
-        setCustomers(Array.isArray(cust) ? cust : (cust?.results || []));
-        setAgingData(aging);
-        const facList = Array.isArray(fac) ? fac : (fac?.results || []);
-        setFacilities(facList[0] || null);
-        setAdvances(Array.isArray(adv) ? adv : (adv?.results || []));
-        setLaneData(lanes);
-        setFastpayData(fastpay);
-      } catch (err) {
-        console.error('Failed to load finance reports:', err);
-        setError('Failed to load data');
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, []);
 
   const LoadingSkeleton = () => (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>

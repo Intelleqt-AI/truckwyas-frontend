@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
@@ -43,9 +44,12 @@ const TAB_SUBTITLES: Record<BookingTab, string> = {
 };
 
 export default function LoadsList() {
-  const [loads, setLoads] = useState<Load[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading: loading, isError, refetch } = useQuery({
+    queryKey: ["loads-list"],
+    queryFn: () => fetchData('/api/v1/loads/'),
+  });
+  const loads = (data?.results || data || []) as Load[];
+  const error = isError ? 'Failed to load bookings' : null;
   const [convertingIds, setConvertingIds] = useState<Set<number>>(new Set());
   const [orderFilter, setOrderFilter] = useState('All');
   const [historyFilter, setHistoryFilter] = useState('All');
@@ -82,22 +86,7 @@ export default function LoadsList() {
     }
   };
 
-  const load = () => {
-    return fetchData('/api/v1/loads/')
-      .then((data: any) => {
-        const loadsData = data?.results || data || [];
-        setLoads(loadsData);
-        setError(null);
-      })
-      .catch(() => {
-        setError('Failed to load bookings');
-        setLoads([]);
-      })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, []);
-  useAutoRefresh(load);
+  useAutoRefresh(refetch);
 
   const activeLoads = loads.filter(l => ACTIVE_STATUSES.includes(l.status));
   const historyLoads = loads.filter(l => HISTORY_STATUSES.includes(l.status));

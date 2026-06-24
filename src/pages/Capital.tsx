@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/formatters";
 import { fetchData, postData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -16,11 +17,35 @@ const tierEligible = (t: string) => t === 'prime' || t === 'standard';
 
 export default function Capital() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [facility, setFacility] = useState<any>(null);
-  const [advances, setAdvances] = useState<any[]>([]);
-  const [eligibleInvoices, setEligibleInvoices] = useState<any[]>([]);
+  const { data, isLoading: loading, refetch } = useQuery({
+    queryKey: ["capital-page"],
+    queryFn: async () => {
+      // Load facility data — paginated {count, results}
+      const facilityData = await fetchData('api/v1/facilities/');
+      const facilityList = Array.isArray(facilityData) ? facilityData : (facilityData?.results || []);
+
+      // Load active advances — paginated {count, results}
+      const advancesData = await fetchData('api/v1/advances/');
+      const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
+      const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
+
+      // Load eligible invoices from dedicated endpoint
+      const eligibleData = await fetchData('api/v1/capital/eligible/');
+      const eligible = eligibleData?.invoices || [];
+
+      return {
+        facility: facilityList[0] || null,
+        advances: active,
+        eligibleInvoices: eligible,
+      };
+    },
+  });
+
+  // Cached data drives the view; defaults keep the first render safe.
+  const facility = data?.facility ?? null;
+  const advances = data?.advances ?? [];
+  const eligibleInvoices = data?.eligibleInvoices ?? [];
   const [requestingIds, setRequestingIds] = useState<Set<number>>(new Set());
   const [settlingIds, setSettlingIds] = useState<Set<number>>(new Set());
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -45,15 +70,8 @@ export default function Capital() {
       });
 
       setSuccessMessage(`Advance request submitted for ${invoice.invoice_number}`);
-      // Reload data
-      const advancesData = await fetchData('api/v1/advances/');
-      const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
-      const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
-      setAdvances(active);
-
-      const eligibleData = await fetchData('api/v1/capital/eligible/');
-      const eligible = eligibleData?.invoices || [];
-      setEligibleInvoices(eligible);
+      // Reload cached data
+      await refetch();
 
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: any) {
@@ -79,11 +97,8 @@ export default function Capital() {
       });
 
       setSuccessMessage(`Advance ${advance.invoice_number} settled successfully`);
-      // Reload data
-      const advancesData = await fetchData('api/v1/advances/');
-      const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
-      const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
-      setAdvances(active);
+      // Reload cached data
+      await refetch();
 
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: any) {
@@ -110,37 +125,7 @@ export default function Capital() {
     document.title = 'Capital - TruckWys';
   }, []);
 
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      // Load facility data — paginated {count, results}
-      const facilityData = await fetchData('api/v1/facilities/');
-      const facilityList = Array.isArray(facilityData) ? facilityData : (facilityData?.results || []);
-      setFacility(facilityList[0] || null);
-
-      // Load active advances — paginated {count, results}
-      const advancesData = await fetchData('api/v1/advances/');
-      const advancesList = Array.isArray(advancesData) ? advancesData : (advancesData?.results || []);
-      const active = advancesList.filter((a: any) => a.status === 'ACTIVE' || a.status === 'FUNDED' || a.status === 'DISBURSED');
-      setAdvances(active);
-
-      // Load eligible invoices from dedicated endpoint
-      const eligibleData = await fetchData('api/v1/capital/eligible/');
-      const eligible = eligibleData?.invoices || [];
-      setEligibleInvoices(eligible);
-    } catch (err) {
-      console.error('Failed to load capital data:', err);
-      setError('Failed to load capital data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  useAutoRefresh(load);
+  useAutoRefresh(refetch);
 
   if (loading) {
     return (

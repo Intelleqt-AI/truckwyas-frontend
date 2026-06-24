@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -81,22 +82,50 @@ const STATUS_COLOR: Record<string, string> = {
 const formatZAR = (v: number) =>
   'R ' + v.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
+// Fetches all fleet data + derives lists. Lives in the queryFn so the result is
+// cached by TanStack Query (keyed by search below) and survives navigation —
+// revisiting the page no longer refires these requests until the cache goes stale.
+async function loadFleet(q: string) {
+  const vehiclesUrl = q
+    ? `api/v1/vehicles/?search=${encodeURIComponent(q)}`
+    : 'api/v1/vehicles/';
+  const [vehData, overviewData, insightsData, vtData, driverData] = await Promise.all([
+    fetchData(vehiclesUrl),
+    fetchData('api/v1/fleet/overview/'),
+    fetchData('api/v1/fleet/intelligence/'),
+    fetchData('api/v1/vehicle-types/'),
+    fetchData('api/v1/drivers/'),
+  ]);
+
+  const vehicles: Vehicle[] = Array.isArray(vehData) ? vehData : (vehData?.results || []);
+
+  const overview: FleetOverview | null = overviewData;
+
+  const insights: FleetInsight[] = Array.isArray(insightsData) ? insightsData : (insightsData?.opportunities || []);
+
+  const vtList = Array.isArray(vtData) ? vtData : (vtData?.results || []);
+  const vehicleTypes = vtList.map((vt: any) => ({ id: vt.id, name: vt.name }));
+
+  const driverList = Array.isArray(driverData) ? driverData : (driverData?.results || []);
+  const drivers = driverList.map((d: any) => {
+    const ud = d.user_details || {};
+    const fn = d.first_name || ud.first_name || '';
+    const ln = d.last_name || ud.last_name || '';
+    const name = fn && ln ? `${fn} ${ln}` : fn || ln || d.name || `Driver ${d.id}`;
+    return { id: d.id, name };
+  });
+
+  return { vehicles, overview, insights, vehicleTypes, drivers };
+}
+
 export default function Vehicles() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [vehicleTypes, setVehicleTypes] = useState<{ id: number; name: string }[]>([]);
-  const [drivers, setDrivers] = useState<{ id: number; name: string }[]>([]);
-  const [overview, setOverview] = useState<FleetOverview | null>(null);
-  const [insights, setInsights] = useState<FleetInsight[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('All');
   const [search, setSearch] = useState('');
-  const searchRef = useRef('');
-  searchRef.current = search;
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
-  const didMountVehicles = useRef(false);
   const [sortBy, setSortBy] = useState('revenue');
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -112,59 +141,26 @@ export default function Vehicles() {
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
 
-  const load = useCallback(() => {
-    const q = searchRef.current;
-    const vehiclesUrl = q
-      ? `api/v1/vehicles/?search=${encodeURIComponent(q)}`
-      : 'api/v1/vehicles/';
-    return Promise.all([
-      fetchData(vehiclesUrl),
-      fetchData('api/v1/fleet/overview/'),
-      fetchData('api/v1/fleet/intelligence/'),
-      fetchData('api/v1/vehicle-types/'),
-      fetchData('api/v1/drivers/'),
-    ])
-      .then(([vehData, overviewData, insightsData, vtData, driverData]) => {
-        const vehiclesArray = Array.isArray(vehData) ? vehData : (vehData?.results || []);
-        setVehicles(vehiclesArray);
+  const { data, isLoading: loading, refetch } = useQuery({
+    // search drives the vehicles fetch URL (server-side search), so it must be
+    // part of the key — statusFilter / sortBy are applied client-side in render.
+    queryKey: ['vehicles-page', debouncedSearch],
+    queryFn: () => loadFleet(debouncedSearch),
+  });
 
-        setOverview(overviewData);
+  // Cached data drives the view; defaults keep the first render safe.
+  const vehicles = data?.vehicles ?? [];
+  const vehicleTypes = data?.vehicleTypes ?? [];
+  const drivers = data?.drivers ?? [];
 
-        const insightsArray = Array.isArray(insightsData) ? insightsData : (insightsData?.opportunities || []);
-        setInsights(insightsArray);
-
-        const vtList = Array.isArray(vtData) ? vtData : (vtData?.results || []);
-        setVehicleTypes(vtList.map((vt: any) => ({ id: vt.id, name: vt.name })));
-
-        const driverList = Array.isArray(driverData) ? driverData : (driverData?.results || []);
-        setDrivers(driverList.map((d: any) => {
-          const ud = d.user_details || {};
-          const fn = d.first_name || ud.first_name || '';
-          const ln = d.last_name || ud.last_name || '';
-          const name = fn && ln ? `${fn} ${ln}` : fn || ln || d.name || `Driver ${d.id}`;
-          return { id: d.id, name };
-        }));
-
-        setError(null);
-      })
-      .catch(() => {
-        setError('Failed to load fleet data');
-        setVehicles([]);
-        setOverview(null);
-        setInsights([]);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-  useAutoRefresh(load);
-
-  useEffect(() => {
-    if (!didMountVehicles.current) { didMountVehicles.current = true; return; }
+  // Mirror the typed-search value into the debounced value (300ms) used by the query key.
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
     clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(load, 300);
-    return () => clearTimeout(searchTimer.current);
-  }, [search, load]);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(val), 300);
+  };
+
+  useAutoRefresh(refetch);
 
   // Filter vehicles
   const filtered = vehicles.filter(v => {
@@ -286,7 +282,7 @@ export default function Vehicles() {
               type="text"
               placeholder="Search VIN, plate, make, model..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => handleSearchChange(e.target.value)}
               style={{
                 width: 280,
                 background: 'var(--bg-surface)',
@@ -447,8 +443,7 @@ export default function Vehicles() {
                                   try {
                                     await deleteData({ url: `api/v1/vehicles/${v.id}/` });
                                     toast.success('Vehicle deleted');
-                                    const d = await fetchData('api/v1/vehicles/');
-                                    setVehicles(Array.isArray(d) ? d : d?.results || []);
+                                    refetch();
                                   } catch (err: any) {
                                     toast.error(err?.message || 'Failed to delete vehicle');
                                   }
@@ -565,8 +560,7 @@ export default function Vehicles() {
                     setShowAddForm(false);
                     setAddForm({ vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '', type: 'Rigid Truck', capacity: '', mileage: '', fuel_type: 'Diesel', status: 'AVAILABLE', insurance_expiry: '', registration_expiry: '', last_maintenance_date: '', next_maintenance_due: '', driver: '' });
                     // Refresh
-                    const d = await fetchData('api/v1/vehicles/');
-                    setVehicles(Array.isArray(d) ? d : d?.results || []);
+                    refetch();
                   } catch (e: any) { toast.error(e?.message || 'Failed to create vehicle'); }
                   setSaving(false);
                 }}
@@ -684,8 +678,7 @@ export default function Vehicles() {
                     await patchData({ url: `api/v1/vehicles/${editVehicle.id}/`, data: payload });
                     setEditVehicle(null);
                     setEditForm({});
-                    const d = await fetchData('api/v1/vehicles/');
-                    setVehicles(Array.isArray(d) ? d : d?.results || []);
+                    refetch();
                   } catch (e: any) {
                     setError(e?.message || 'Failed to update vehicle');
                   }

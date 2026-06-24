@@ -26,10 +26,18 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui': ['lucide-react'],
-        }
+        // Function form — the rolldown-based bundler (Vite 8) requires a
+        // function here; the legacy object form throws "manualChunks is not a function".
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (/[\\/]node_modules[\\/](react|react-dom|react-router-dom|react-router)[\\/]/.test(id)) {
+              return 'vendor';
+            }
+            if (id.includes('lucide-react')) {
+              return 'ui';
+            }
+          }
+        },
       }
     },
     chunkSizeWarningLimit: 600,

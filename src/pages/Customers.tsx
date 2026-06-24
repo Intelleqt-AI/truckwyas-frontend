@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { fetchData, postData, patchData, deleteData } from "../lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -66,11 +67,8 @@ export default function Customers() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const searchRef = useRef("");
-  searchRef.current = search;
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
   const didMountCustomers = useRef(false);
   const [sortBy, setSortBy] = useState("name_asc");
@@ -96,28 +94,25 @@ export default function Customers() {
     }
   }, [location.pathname]);
 
-  const load = useCallback(() => {
-    const q = searchRef.current;
-    const url = q
-      ? `api/v1/customers/?search=${encodeURIComponent(q)}`
-      : "api/v1/customers/";
-    return fetchData(url)
-      .then((data) => {
-        setCustomers(Array.isArray(data) ? data : data?.results || []);
-      })
-      .catch(() => setCustomers([]))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data, isLoading: loading, refetch } = useQuery({
+    queryKey: ["customers-page", debouncedSearch],
+    queryFn: () => {
+      const url = debouncedSearch
+        ? `api/v1/customers/?search=${encodeURIComponent(debouncedSearch)}`
+        : "api/v1/customers/";
+      return fetchData(url);
+    },
+  });
+  const customers: Customer[] = Array.isArray(data) ? data : data?.results || [];
 
-  useEffect(() => { load(); }, [load]);
-  useAutoRefresh(load);
+  useAutoRefresh(refetch);
 
   useEffect(() => {
     if (!didMountCustomers.current) { didMountCustomers.current = true; return; }
     clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(load, 300);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(searchTimer.current);
-  }, [search, load]);
+  }, [search]);
 
   const customerStatus = (c: Customer) =>
     c.is_active === false || c.status === "INACTIVE" ? "INACTIVE" : "ACTIVE";
@@ -293,7 +288,7 @@ export default function Customers() {
                               try {
                                 await deleteData({ url: `api/v1/customers/${c.id}/` });
                                 toast.success("Customer deleted");
-                                setCustomers(prev => prev.filter(x => x.id !== c.id));
+                                refetch();
                               } catch (err: any) {
                                 toast.error(err?.message || "Failed to delete");
                               }
@@ -380,8 +375,8 @@ export default function Customers() {
                     const payload: any = { ...addForm };
                     if (payload.credit_limit === "") delete payload.credit_limit;
                     else if (payload.credit_limit) payload.credit_limit = parseFloat(String(payload.credit_limit));
-                    const created = await postData({ url: "api/v1/customers/", data: payload });
-                    setCustomers(prev => [created, ...prev]);
+                    await postData({ url: "api/v1/customers/", data: payload });
+                    refetch();
                     setShowAddForm(false);
                     setAddForm({ ...EMPTY_FORM });
                     toast.success("Customer created");
@@ -484,8 +479,8 @@ export default function Customers() {
                     if (payload.credit_limit === "") payload.credit_limit = null;
                     else if (payload.credit_limit) payload.credit_limit = parseFloat(String(payload.credit_limit));
                     payload.is_active = payload.status !== "INACTIVE";
-                    const updated = await patchData({ url: `api/v1/customers/${editCustomer.id}/`, data: payload });
-                    setCustomers(prev => prev.map(c => c.id === editCustomer.id ? { ...c, ...updated } : c));
+                    await patchData({ url: `api/v1/customers/${editCustomer.id}/`, data: payload });
+                    refetch();
                     setEditCustomer(null);
                     toast.success("Customer updated");
                   } catch (e: any) {

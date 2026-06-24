@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -31,33 +32,33 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
 export default function FleetDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<'vehicles' | 'drivers'>('vehicles');
-  const [vehicles, setVehicles] = useState<any[]>([]);
-  const [drivers, setDrivers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // Fetch lives in the queryFn so the result is cached by TanStack Query
+  // (keyed below) and survives navigation — revisiting the page no longer
+  // refires these requests until the cache goes stale.
+  const { data, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ["fleet-dashboard"],
+    queryFn: async () => {
+      const [vehiclesData, driversData] = await Promise.all([
+        fetchData('api/v1/vehicles/'),
+        fetchData('api/v1/drivers/')
+      ]);
+      return {
+        vehicles: Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.results || []),
+        drivers: Array.isArray(driversData) ? driversData : (driversData?.results || []),
+      };
+    },
+  });
+
+  const vehicles: any[] = data?.vehicles ?? [];
+  const drivers: any[] = data?.drivers ?? [];
+  const error = queryError ? 'Failed to load fleet data' : null;
 
   useEffect(() => {
     document.title = 'Fleet - TruckWys';
   }, []);
 
-  const load = () => {
-    Promise.all([
-      fetchData('api/v1/vehicles/'),
-      fetchData('api/v1/drivers/')
-    ])
-      .then(([vehiclesData, driversData]) => {
-        setVehicles(Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.results || []));
-        setDrivers(Array.isArray(driversData) ? driversData : (driversData?.results || []));
-        setError(null);
-      })
-      .catch(() => {
-        setError('Failed to load fleet data');
-      })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, []);
-  useAutoRefresh(load); // live-refresh every 30s + on focus
+  useAutoRefresh(refetch); // live-refresh every 30s + on focus
 
   const activeVehicles = vehicles.filter(v => v.status === 'IN_USE').length;
   const idleVehicles = vehicles.filter(v => v.status === 'AVAILABLE').length;

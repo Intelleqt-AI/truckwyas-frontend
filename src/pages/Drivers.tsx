@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -67,17 +68,8 @@ const getDriverName = (d: Driver) => {
 export default function Drivers() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [vehicles, setVehicles] = useState<{ id: number; plate: string; make?: string; model?: string; driver_id?: number | null }[]>([]);
-  const [overview, setOverview] = useState<DriverOverview | null>(null);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('All');
   const [search, setSearch] = useState('');
-  const searchRef = useRef('');
-  searchRef.current = search;
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
-  const didMountDrivers = useRef(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -93,25 +85,39 @@ export default function Drivers() {
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
 
-  const load = useCallback(() => {
-    const q = searchRef.current;
-    const driversUrl = q
-      ? `api/v1/drivers/?search=${encodeURIComponent(q)}`
-      : 'api/v1/drivers/';
-    return Promise.all([
-      fetchData(driversUrl),
-      fetchData('api/v1/drivers/overview/').catch(() => null),
-      fetchData('api/v1/drivers/leaderboard/').catch(() => null),
-      fetchData('api/v1/vehicles/').catch(() => null),
-    ]).then(([driversData, overviewData, leaderboardData, vehicleData]) => {
+  // Debounce search into the queryKey so typing doesn't refire on every keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const didMountDrivers = useRef(false);
+  useEffect(() => {
+    if (!didMountDrivers.current) { didMountDrivers.current = true; setDebouncedSearch(search); return; }
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(searchTimer.current);
+  }, [search]);
+
+  const { data, isLoading: loading, refetch } = useQuery({
+    queryKey: ['drivers-page', debouncedSearch],
+    queryFn: async () => {
+      const q = debouncedSearch;
+      const driversUrl = q
+        ? `api/v1/drivers/?search=${encodeURIComponent(q)}`
+        : 'api/v1/drivers/';
+      const [driversData, overviewData, leaderboardData, vehicleData] = await Promise.all([
+        fetchData(driversUrl),
+        fetchData('api/v1/drivers/overview/').catch(() => null),
+        fetchData('api/v1/drivers/leaderboard/').catch(() => null),
+        fetchData('api/v1/vehicles/').catch(() => null),
+      ]);
+
       const vehicleList = Array.isArray(vehicleData) ? vehicleData : (vehicleData?.results || []);
-      setVehicles(vehicleList.map((v: any) => ({
+      const vehicles = vehicleList.map((v: any) => ({
         id: v.id,
         plate: v.plate || v.registration || `Vehicle ${v.id}`,
         make: v.make,
         model: v.model,
         driver_id: v.driver ?? null,
-      })));
+      }));
       const driverList = Array.isArray(driversData) ? driversData : (driversData?.results || []);
 
       // Parse leaderboard data
@@ -126,7 +132,7 @@ export default function Drivers() {
       }));
 
       // Flatten user_details into driver and merge leaderboard data
-      const driversWithPerformance = driverList.map((driver: any) => {
+      const drivers = driverList.map((driver: any) => {
         const ud = driver.user_details || {};
         const flattened: Driver = {
           ...driver,
@@ -142,43 +148,37 @@ export default function Drivers() {
         return flattened;
       });
 
-      setDrivers(driversWithPerformance);
-      setLeaderboard(leaderboardEntries);
-
+      let overview: DriverOverview;
       if (overviewData?.kpi_cards) {
         const cards = overviewData.kpi_cards as any[];
         const findVal = (kw: string) => {
           const c = cards.find((c: any) => (c.key || c.label || '').toString().toLowerCase().includes(kw));
           return parseFloat(c?.value) || 0;
         };
-        setOverview({
+        overview = {
           total_drivers: findVal('total') || driversData?.count || driverList.length,
           active_drivers: findVal('active') || driverList.filter((d: any) => d.status === 'ACTIVE').length,
           avg_revenue_per_driver: findVal('revenue') || findVal('avg') || 0,
-        });
+        };
       } else if (overviewData) {
-        setOverview(overviewData);
+        overview = overviewData;
       } else {
-        setOverview({
+        overview = {
           total_drivers: driverList.length,
           active_drivers: driverList.filter((d: any) => d.status === 'ACTIVE').length,
           avg_revenue_per_driver: 0,
-        });
+        };
       }
-    }).catch(() => {
-      setDrivers([]);
-    }).finally(() => setLoading(false));
-  }, []);
 
-  useEffect(() => { load(); }, [load]);
-  useAutoRefresh(load);
+      return { drivers, vehicles, overview, leaderboard: leaderboardEntries };
+    },
+  });
 
-  useEffect(() => {
-    if (!didMountDrivers.current) { didMountDrivers.current = true; return; }
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(load, 300);
-    return () => clearTimeout(searchTimer.current);
-  }, [search, load]);
+  const drivers: Driver[] = data?.drivers ?? [];
+  const vehicles: { id: number; plate: string; make?: string; model?: string; driver_id?: number | null }[] = data?.vehicles ?? [];
+  const overview: DriverOverview | null = data?.overview ?? null;
+
+  useAutoRefresh(refetch);
 
   const filtered = drivers.filter(d => statusFilter === 'All' || d.status === statusFilter);
 
@@ -389,7 +389,7 @@ export default function Drivers() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditDriver(d);
-                          const dUd = d.user_details || {};
+                          const dUd: any = d.user_details || {};
                           setEditForm({
                             first_name: d.first_name || '',
                             last_name: d.last_name || '',
@@ -420,18 +420,7 @@ export default function Drivers() {
                               try {
                                 await deleteData({ url: `api/v1/drivers/${d.id}/` });
                                 toast.success('Driver deleted');
-                                const res = await fetchData('api/v1/drivers/');
-                                const driverList = Array.isArray(res) ? res : (res?.results || []);
-                                setDrivers(driverList.map((driver: any) => {
-                                  const ud = driver.user_details || {};
-                                  return {
-                                    ...driver,
-                                    first_name: driver.first_name || ud.first_name || '',
-                                    last_name: driver.last_name || ud.last_name || '',
-                                    name: driver.name || ud.name || (ud.first_name ? `${ud.first_name} ${ud.last_name || ''}`.trim() : ''),
-                                    phone: driver.phone || ud.phone || '',
-                                  };
-                                }));
+                                refetch();
                               } catch (err: any) {
                                 toast.error(err?.message || 'Failed to delete driver');
                               }
@@ -556,20 +545,8 @@ export default function Drivers() {
                     }
                     setShowAddForm(false);
                     setAddForm({ first_name: '', last_name: '', email: '', phone: '', address: '', license_number: '', license_expiry: '', medical_card_expiry: '', license_state: 'GP', hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE', emergency_contact: '', vehicle: '' });
-                    // Refresh with user_details flattening
-                    const d = await fetchData('api/v1/drivers/');
-                    const driverList = Array.isArray(d) ? d : (d?.results || []);
-                    const driversWithNames = driverList.map((driver: any) => {
-                      const ud = driver.user_details || {};
-                      return {
-                        ...driver,
-                        first_name: driver.first_name || ud.first_name || '',
-                        last_name: driver.last_name || ud.last_name || '',
-                        name: driver.name || ud.name || (ud.first_name ? `${ud.first_name} ${ud.last_name || ''}`.trim() : ''),
-                        phone: driver.phone || ud.phone || '',
-                      };
-                    });
-                    setDrivers(driversWithNames);
+                    // Refresh
+                    refetch();
                   } catch (e: any) { toast.error(e?.message || 'Failed to create driver'); }
                   setSaving(false);
                 }}
@@ -692,20 +669,8 @@ export default function Drivers() {
                     setEditDriver(null);
                     setEditForm({});
 
-                    // Re-fetch with user_details flattening
-                    const d = await fetchData('api/v1/drivers/');
-                    const driverList = Array.isArray(d) ? d : (d?.results || []);
-                    const driversWithNames = driverList.map((driver: any) => {
-                      const ud = driver.user_details || {};
-                      return {
-                        ...driver,
-                        first_name: driver.first_name || ud.first_name || '',
-                        last_name: driver.last_name || ud.last_name || '',
-                        name: driver.name || ud.name || (ud.first_name ? `${ud.first_name} ${ud.last_name || ''}`.trim() : ''),
-                        phone: driver.phone || ud.phone || '',
-                      };
-                    });
-                    setDrivers(driversWithNames);
+                    // Refresh
+                    refetch();
                   } catch (e: any) {
                     setError(e?.message || 'Failed to update driver');
                   }

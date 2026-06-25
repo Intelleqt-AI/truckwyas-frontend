@@ -417,10 +417,10 @@ export default function Vehicles() {
                                 fuel_type: v.fuel_type || 'Diesel',
                                 status: v.status || 'AVAILABLE',
                                 mileage: v.mileage || '',
-                                insurance_expiry: v.insurance_expiry || '',
                                 registration_expiry: v.registration_expiry || '',
                                 last_maintenance_date: v.last_maintenance_date || '',
-                                next_maintenance_due: v.next_maintenance_due || '',
+                                service_interval_km: v.service_interval_km ?? '',
+                                last_service_mileage: v.last_service_mileage ?? '',
                                 driver: v.driver ?? '',
                               });
                             }}
@@ -487,10 +487,10 @@ export default function Vehicles() {
               { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
               { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
               { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
-              { key: 'insurance_expiry', label: 'Insurance Expiry', type: 'date' },
               { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
-              { key: 'last_maintenance_date', label: 'Last Maintenance', type: 'date' },
-              { key: 'next_maintenance_due', label: 'Next Maintenance Due', type: 'date' },
+              { key: 'last_maintenance_date', label: 'Last Maintenance Date', type: 'date' },
+              { key: 'service_interval_km', label: 'Service Interval (km)', placeholder: 'e.g. 10000', type: 'number' },
+              { key: 'last_service_mileage', label: 'Last Service Odometer (km)', placeholder: 'e.g. 145000', type: 'number' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
@@ -558,6 +558,8 @@ export default function Vehicles() {
                       year: editForm.year ? Number(editForm.year) : undefined,
                       capacity: editForm.capacity ? Number(editForm.capacity) : undefined,
                       mileage: editForm.mileage ? Number(editForm.mileage) : undefined,
+                      service_interval_km: editForm.service_interval_km ? Number(editForm.service_interval_km) : null,
+                      last_service_mileage: editForm.last_service_mileage ? Number(editForm.last_service_mileage) : null,
                       driver: editForm.driver !== '' && editForm.driver != null ? Number(editForm.driver) : null,
                       ...(vehicleTypeId ? { vehicle_type: vehicleTypeId } : {}),
                     };

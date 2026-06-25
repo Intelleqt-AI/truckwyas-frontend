@@ -45,9 +45,13 @@ export function NotificationBell() {
       .catch(() => {});
   }, []);
 
-  // Load once on mount. Auto-refresh (interval poll + live-event push) is
-  // disabled for now — notifications only refresh when the app remounts.
+  // Load on mount, and re-load whenever a live WS event arrives.
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener('tw:live-event', handler);
+    return () => window.removeEventListener('tw:live-event', handler);
+  }, [load]);
 
   // Close on outside click
   useEffect(() => {

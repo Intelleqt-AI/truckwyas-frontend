@@ -13,7 +13,8 @@ interface Props {
 const EMPTY_FORM = {
   vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '',
   type: 'Rigid Truck', capacity: '', mileage: '', fuel_type: 'Diesel', status: 'AVAILABLE',
-  insurance_expiry: '', registration_expiry: '', last_maintenance_date: '', next_maintenance_due: '',
+  registration_expiry: '', last_maintenance_date: '',
+  service_interval_km: '', last_service_mileage: '',
   driver: '',
 };
 
@@ -25,10 +26,10 @@ const TEXT_FIELDS = [
   { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
   { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
   { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
-  { key: 'insurance_expiry', label: 'Insurance Expiry', type: 'date' },
   { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
-  { key: 'last_maintenance_date', label: 'Last Maintenance', type: 'date' },
-  { key: 'next_maintenance_due', label: 'Next Maintenance Due', type: 'date' },
+  { key: 'last_maintenance_date', label: 'Last Maintenance Date', type: 'date' },
+  { key: 'service_interval_km', label: 'Service Interval (km)', placeholder: 'e.g. 10000', type: 'number' },
+  { key: 'last_service_mileage', label: 'Last Service Odometer (km)', placeholder: 'e.g. 145000', type: 'number' },
 ];
 
 const labelStyle: React.CSSProperties = {
@@ -78,6 +79,8 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
           year: Number(form.year),
           capacity: Number(form.capacity) || 0,
           mileage: form.mileage ? Number(form.mileage) : undefined,
+          service_interval_km: form.service_interval_km ? Number(form.service_interval_km) : null,
+          last_service_mileage: form.last_service_mileage ? Number(form.last_service_mileage) : null,
           driver: form.driver ? Number(form.driver) : null,
           ...(vehicleTypeId ? { vehicle_type: vehicleTypeId } : {}),
         },

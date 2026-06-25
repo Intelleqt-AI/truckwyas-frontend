@@ -14,7 +14,10 @@ import { VehiclesDirectory } from "./settings/VehiclesDirectory";
 import { VehicleTypesDirectory } from "./settings/VehicleTypesDirectory";
 import { DeveloperApi } from "./settings/DeveloperApi";
 
-const SECTIONS = [
+type SectionItem = { id: string; label: string; component: () => JSX.Element; adminOnly?: boolean };
+type Section = { group: string; items: SectionItem[] };
+
+const SECTIONS: Section[] = [
   {
     group: 'My Account',
     items: [

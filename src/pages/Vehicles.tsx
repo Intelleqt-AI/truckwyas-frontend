@@ -131,6 +131,7 @@ export default function Vehicles() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
   const [editForm, setEditForm] = useState<any>({});
+  const [saving, setSaving] = useState(false); // used by the edit-vehicle modal
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);

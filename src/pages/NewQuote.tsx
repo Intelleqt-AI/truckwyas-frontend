@@ -3784,7 +3784,7 @@ export default function NewQuote() {
                   {f.label}<span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>
                 </label>
                 <input
-                  type={f.type || "text"}
+                  type={(f as any).type || "text"}
                   placeholder={f.placeholder}
                   value={newCustomerForm[f.key]}
                   onChange={e => setNewCustomerForm(p => ({ ...p, [f.key]: e.target.value }))}

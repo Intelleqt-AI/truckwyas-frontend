@@ -79,9 +79,9 @@ export const putData = async ({ url, data }: { url: string; data: any }) => {
   return response.data;
 };
 
-export const patchData = async ({ url, data }: { url: string; data: any }) => {
+export const patchData = async ({ url, data, config = {} }: { url: string; data: any; config?: any }) => {
   if (!url) throw new Error('No patch URL provided');
-  const response = await api.patch(url, data);
+  const response = await api.patch(url, data, config);
   return response.data;
 };
 

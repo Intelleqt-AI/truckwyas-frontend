@@ -153,9 +153,7 @@ export default function NewQuote() {
   // Quick-create customer
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCustomerForm, setNewCustomerForm] = useState({
-    name: "", company_name: "", email: "", phone: "",
-    city: "", state: "", zip_code: "", address: "",
-    billing_address: "", payment_terms_default: "NET30", credit_limit: "",
+    name: "", email: "", phone: "", city: "",
   });
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [status, setStatus] = useState<"DRAFT" | "SENT">("DRAFT");
@@ -2600,7 +2598,7 @@ export default function NewQuote() {
                 <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.08em" }}>CUSTOMER</div>
                 <button
                   type="button"
-                  onClick={() => { setNewCustomerForm({ name: "", company_name: "", email: "", phone: "", city: "", state: "", zip_code: "", address: "", billing_address: "", payment_terms_default: "NET30", credit_limit: "" }); setShowNewCustomer(true); }}
+                  onClick={() => { setNewCustomerForm({ name: "", email: "", phone: "", city: "" }); setShowNewCustomer(true); }}
                   style={{ background: "none", border: "none", color: "var(--accent-primary)", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", cursor: "pointer", padding: 0, textTransform: "uppercase" }}
                 >
                   + New Customer
@@ -3775,76 +3773,41 @@ export default function NewQuote() {
               <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>New Customer</div>
               <button onClick={() => setShowNewCustomer(false)} style={{ background: "none", border: "none", color: "var(--text-tertiary)", cursor: "pointer", fontSize: 18 }}>✕</button>
             </div>
-            {[
+            {([
               { key: "name", label: "Full Name", placeholder: "e.g. John Doe", required: true },
-              { key: "company_name", label: "Company Name", placeholder: "e.g. Acme Logistics" },
               { key: "email", label: "Email", placeholder: "e.g. john@company.com", required: true, type: "email" },
-              { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000" },
-              { key: "city", label: "City", placeholder: "e.g. Johannesburg" },
-              { key: "state", label: "Province / State", placeholder: "e.g. Gauteng" },
-              { key: "zip_code", label: "Zip Code", placeholder: "e.g. 2000" },
-              { key: "address", label: "Address", placeholder: "Street address" },
-              { key: "billing_address", label: "Billing Address", placeholder: "Leave blank if same as address" },
-            ].map(f => (
+              { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000", required: true },
+              { key: "city", label: "City", placeholder: "e.g. Johannesburg", required: true },
+            ] as const).map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.06em", marginBottom: 6, textTransform: "uppercase" }}>
-                  {f.label}{f.required && <span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>}
+                  {f.label}<span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>
                 </label>
                 <input
                   type={f.type || "text"}
                   placeholder={f.placeholder}
-                  value={newCustomerForm[f.key as keyof typeof newCustomerForm]}
+                  value={newCustomerForm[f.key]}
                   onChange={e => setNewCustomerForm(p => ({ ...p, [f.key]: e.target.value }))}
                   style={{ width: "100%", background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", padding: "10px 12px", borderRadius: 2, fontSize: 12, fontFamily: "var(--font-mono)", outline: "none", boxSizing: "border-box" }}
                 />
               </div>
             ))}
 
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.06em", marginBottom: 6, textTransform: "uppercase" }}>Payment Terms</label>
-              <Select
-                value={newCustomerForm.payment_terms_default}
-                onValueChange={val => setNewCustomerForm(p => ({ ...p, payment_terms_default: val }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NET30">Net 30 Days</SelectItem>
-                  <SelectItem value="NET60">Net 60 Days</SelectItem>
-                  <SelectItem value="NET90">Net 90 Days</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.06em", marginBottom: 6, textTransform: "uppercase" }}>Credit Limit (R)</label>
-              <input
-                type="number"
-                placeholder="e.g. 50000"
-                value={newCustomerForm.credit_limit}
-                onChange={e => setNewCustomerForm(p => ({ ...p, credit_limit: e.target.value }))}
-                style={{ width: "100%", background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", padding: "10px 12px", borderRadius: 2, fontSize: 12, fontFamily: "var(--font-mono)", outline: "none", boxSizing: "border-box" }}
-              />
-            </div>
-
             <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
               <button
                 disabled={savingCustomer}
                 onClick={async () => {
-                  if (!newCustomerForm.name.trim() || !newCustomerForm.email.trim()) {
-                    toast.warning("Name and email are required");
+                  if (!newCustomerForm.name.trim() || !newCustomerForm.email.trim() || !newCustomerForm.phone.trim() || !newCustomerForm.city.trim()) {
+                    toast.warning("All fields are required");
                     return;
                   }
                   setSavingCustomer(true);
                   try {
-                    const payload: Record<string, string | number | null> = { ...newCustomerForm };
-                    if (!newCustomerForm.credit_limit) delete payload.credit_limit;
-                    else payload.credit_limit = parseFloat(newCustomerForm.credit_limit);
-                    const created = await postData({ url: "api/v1/customers/", data: payload });
+                    const created = await postData({ url: "api/v1/customers/", data: { ...newCustomerForm, status: "ACTIVE" } });
                     await queryClient.invalidateQueries({ queryKey: ["customers"] });
                     setCustomerId(String(created.id));
                     setShowNewCustomer(false);
-                    setNewCustomerForm({ name: "", company_name: "", email: "", phone: "", city: "", state: "", zip_code: "", address: "", billing_address: "", payment_terms_default: "NET30", credit_limit: "" });
+                    setNewCustomerForm({ name: "", email: "", phone: "", city: "" });
                     toast.success(`"${created.name}" added and selected`);
                   } catch (e) {
                     toast.error((e as Error)?.message || "Failed to create customer");

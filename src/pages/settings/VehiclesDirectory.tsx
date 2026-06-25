@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { fetchData, deleteData } from "@/lib/Api";
+import { AddVehicleDrawer } from "@/components/AddVehicleDrawer";
 
 interface Vehicle {
   id: number;
@@ -29,10 +29,10 @@ const sectionStyle: React.CSSProperties = {
 };
 
 export function VehiclesDirectory() {
-  const navigate = useNavigate();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showAddDrawer, setShowAddDrawer] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -82,7 +82,7 @@ export function VehiclesDirectory() {
                 fontSize: 12, outline: 'none', width: 180,
               }}
             />
-            <button className="btn-action" onClick={() => navigate('/fleet/vehicles')}>+ ADD VEHICLE</button>
+            <button className="btn-action" onClick={() => setShowAddDrawer(true)}>+ ADD VEHICLE</button>
           </div>
         </div>
 
@@ -145,6 +145,11 @@ export function VehiclesDirectory() {
           </table>
         )}
       </div>
+      <AddVehicleDrawer
+        open={showAddDrawer}
+        onClose={() => setShowAddDrawer(false)}
+        onCreated={load}
+      />
     </div>
   );
 }

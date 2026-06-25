@@ -5,6 +5,7 @@ import { Toaster as ToastProvider } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams } from 'react-router-dom';
+import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OSLayout } from './components/os/OSLayout';
 // Eager load — Overview for fast first load
@@ -35,17 +36,10 @@ function ProtectedLayout() {
   );
 }
 
-// Role-gated layout — nests under ProtectedLayout so the chrome stays mounted even
-// when a role check redirects. Mirrors RequireRole but renders an <Outlet/>.
+// Role-gated layout — reads role from AuthContext so it reacts to role changes.
 function RoleRoute({ roles }: { roles: string[] }) {
-  let role: string | null = null;
-  if (typeof window !== 'undefined') {
-    try {
-      role = JSON.parse(localStorage.getItem('user') || '{}')?.role ?? null;
-    } catch {
-      role = null;
-    }
-  }
+  const { user } = useAuth();
+  const role = user?.role ?? null;
   if (!role || !roles.includes(role)) return <Navigate to="/" replace />;
   return <Outlet />;
 }
@@ -135,12 +129,13 @@ function LoadsRedirect() {
 }
 
 const App = () => (
-  <BrowserRouter>
-    <QueryClientProvider client={queryClient}>
-      <ErrorBoundary>
-        <TooltipProvider>
-          <Toaster />
-          <ToastProvider />
+  <AuthProvider>
+    <BrowserRouter>
+      <QueryClientProvider client={queryClient}>
+        <ErrorBoundary>
+          <TooltipProvider>
+            <Toaster />
+            <ToastProvider />
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
               {/* Public routes — no auth required */}
@@ -272,9 +267,10 @@ const App = () => (
             </Routes>
           </Suspense>
         </TooltipProvider>
-      </ErrorBoundary>
-    </QueryClientProvider>
-  </BrowserRouter>
+        </ErrorBoundary>
+      </QueryClientProvider>
+    </BrowserRouter>
+  </AuthProvider>
 );
 
 export default App;

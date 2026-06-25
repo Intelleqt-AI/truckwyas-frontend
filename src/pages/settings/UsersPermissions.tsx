@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/lib/AuthContext';
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -55,15 +56,10 @@ interface PendingInvite {
   expires_at?: string;
 }
 
-interface CurrentUser {
-  id: number;
-  role: string;
-}
-
 export function UsersPermissions() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingInvites, setLoadingInvites] = useState(true);
   const [search, setSearch] = useState('');
@@ -75,7 +71,6 @@ export function UsersPermissions() {
 
   useEffect(() => {
     loadUsers();
-    loadCurrentUser();
     loadPendingInvites();
   }, []);
 
@@ -90,22 +85,6 @@ export function UsersPermissions() {
         toast.error('Failed to load users');
       })
       .finally(() => setLoading(false));
-  };
-
-  const loadCurrentUser = () => {
-    fetchData('api/v1/auth/me/')
-      .then((data: any) => setCurrentUser(data))
-      .catch(() => {
-        // Fallback: try to get from localStorage
-        const stored = localStorage.getItem('user');
-        if (stored) {
-          try {
-            setCurrentUser(JSON.parse(stored));
-          } catch {
-            setCurrentUser(null);
-          }
-        }
-      });
   };
 
   const loadPendingInvites = () => {
@@ -237,7 +216,7 @@ export function UsersPermissions() {
                 fontSize: 12, outline: 'none', width: 180,
               }}
             />
-            <button className="btn-action" onClick={() => setShowInvite(!showInvite)}>+ INVITE</button>
+            {isAdmin && <button className="btn-action" onClick={() => setShowInvite(!showInvite)}>+ INVITE</button>}
           </div>
         </div>
 
@@ -333,8 +312,8 @@ export function UsersPermissions() {
                   </div>
                 </td>
                 <td style={{ padding: '12px 20px' }}>
-                  {isAdmin ? (
-                    <Select value={u.role} onValueChange={val => handleRoleChange(u.id, val)}>
+                  {isAdmin && u.id !== currentUser?.id ? (
+                    <Select value={u.role?.toLowerCase()} onValueChange={val => handleRoleChange(u.id, val)}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -359,7 +338,7 @@ export function UsersPermissions() {
                 <td style={{ padding: '12px 20px' }}>
                   <span style={{
                     fontFamily: 'var(--font-mono)', fontSize: 10,
-                    color: u.status === 'active' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                    color: u.status?.toLowerCase() === 'active' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
                     textTransform: 'uppercase' as const,
                   }}>{u.status}</span>
                 </td>

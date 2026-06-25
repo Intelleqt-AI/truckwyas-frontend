@@ -82,7 +82,7 @@ export function BillingSettings() {
         plan: 'pro',
         return_url: `${window.location.origin}/settings/billing?success=1`,
         cancel_url: `${window.location.origin}/settings/billing?cancelled=1`,
-        notify_url: `${window.location.origin}/api/v1/billing/itn/`,
+        notify_url: `${import.meta.env.VITE_API_URL}api/v1/billing/itn/`,
       }});
       if ((data.payfast_url || data.payment_url) && data.form_data) {
         // PayFast requires a form POST — build and auto-submit a hidden form
@@ -131,7 +131,7 @@ export function BillingSettings() {
 
   const planKey = profile?.subscription_plan?.toLowerCase() || 'free';
   const isActive = profile?.subscription_status === 'active';
-  const isPro = planKey === 'pro' && isActive;
+  const isPro = ['pro', 'growth', 'enterprise'].includes(planKey) && isActive;
 
   return (
     <div style={{ maxWidth: 720 }}>

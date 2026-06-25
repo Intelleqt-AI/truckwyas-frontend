@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchData, patchData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/lib/toast';
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -51,7 +52,7 @@ const grid3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 
 export function CompanySettings() {
   const [form, setForm] = useState({
     company_name: '', registration_number: '', vat_number: '',
-    industry: 'logistics', website: '', description: '',
+    industry: '', website: '', description: '',
     street: '', city: '', province: '', postal_code: '', country: 'South Africa',
     phone: '', email: '', support_email: '',
   });
@@ -64,7 +65,7 @@ export function CompanySettings() {
         company_name: d.company_name || '',
         registration_number: d.registration_number || '',
         vat_number: d.vat_number || '',
-        industry: d.industry || 'logistics',
+        industry: d.industry || '',
         website: d.website || '',
         description: d.description || '',
         street: d.address?.street || '',
@@ -76,7 +77,7 @@ export function CompanySettings() {
         email: d.contact?.email || '',
         support_email: d.contact?.support_email || '',
       });
-    }).catch(() => {});
+    }).catch(() => { toast.error('Failed to load company details'); });
   }, []);
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
@@ -94,8 +95,12 @@ export function CompanySettings() {
         address: { street: form.street, city: form.city, province: form.province, postal_code: form.postal_code, country: form.country },
         contact: { phone: form.phone, email: form.email, support_email: form.support_email },
       } });
-      setSaved(true); setTimeout(() => setSaved(false), 2000);
-    } catch {}
+      setSaved(true);
+      toast.success('Company details saved');
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to save company details');
+    }
     setSaving(false);
   };
 
@@ -122,10 +127,12 @@ export function CompanySettings() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="logistics">Logistics</SelectItem>
-                  <SelectItem value="road_freight">Road Freight</SelectItem>
-                  <SelectItem value="courier">Courier</SelectItem>
-                  <SelectItem value="warehousing">Warehousing</SelectItem>
+                  <SelectItem value="general_freight">General Freight</SelectItem>
+                  <SelectItem value="refrigerated">Refrigerated Transport</SelectItem>
+                  <SelectItem value="hazmat">Hazmat / Dangerous Goods</SelectItem>
+                  <SelectItem value="construction">Construction Materials</SelectItem>
+                  <SelectItem value="agriculture">Agriculture</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>

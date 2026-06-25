@@ -63,7 +63,7 @@ export default function Settings() {
   const current = ALL_ITEMS.find(i => i.id === section);
 
   // Redirect non-admins away from admin-only sections
-  if (current?.adminOnly && !isAdmin) {
+  if ((current as any)?.adminOnly && !isAdmin) {
     return <Navigate to="/settings/profile" replace />;
   }
 
@@ -71,7 +71,7 @@ export default function Settings() {
 
   const visibleSections = SECTIONS.map(s => ({
     ...s,
-    items: s.items.filter(item => !item.adminOnly || isAdmin),
+    items: s.items.filter(item => !(item as any).adminOnly || isAdmin),
   })).filter(s => s.items.length > 0);
 
   return (

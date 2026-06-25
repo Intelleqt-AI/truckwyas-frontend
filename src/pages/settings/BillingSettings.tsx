@@ -90,6 +90,10 @@ export function BillingSettings() {
         form.method = 'POST';
         form.action = data.payfast_url || data.payment_url;
         Object.entries(data.form_data).forEach(([key, value]) => {
+          // Skip empty values — PayFast signs only non-empty fields, so the
+          // submitted set must match (posting an empty field PayFast didn't
+          // sign triggers a generic "could not process" 400).
+          if (value === '' || value === null || value === undefined) return;
           const input = document.createElement('input');
           input.type = 'hidden';
           input.name = key;

@@ -1,17 +1,29 @@
 import { useState, useEffect } from "react";
-import { fetchData, deleteData } from "@/lib/Api";
+import { fetchData, deleteData, patchData } from "@/lib/Api";
 import { AddVehicleDrawer } from "@/components/AddVehicleDrawer";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
+import { ConfirmModal } from "@/components/ConfirmModal";
 
 interface Vehicle {
   id: number;
   plate: string;
+  vin?: string;
   make?: string;
   model?: string;
-  vehicle_type?: string;
-  vehicle_type_name?: string;
+  year?: number;
+  capacity?: string | number;
+  mileage?: string | number;
+  fuel_type?: string;
   status: string;
+  vehicle_type?: number;
+  vehicle_type_name?: string;
+  driver?: number | null;
   driver_name?: string;
   last_maintenance_date?: string;
+  registration_expiry?: string;
+  service_interval_km?: number | null;
+  last_service_mileage?: string | number | null;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -28,11 +40,31 @@ const sectionStyle: React.CSSProperties = {
   borderRadius: 'var(--card-radius)',
 };
 
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)',
+  color: 'var(--text-tertiary)', letterSpacing: '0.06em',
+  marginBottom: 6, textTransform: 'uppercase',
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+  color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2,
+  fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box',
+};
+
 export function VehiclesDirectory() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showAddDrawer, setShowAddDrawer] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [editErr, setEditErr] = useState('');
+  const [vehicleTypes, setVehicleTypes] = useState<{ id: number; name: string }[]>([]);
+  const [drivers, setDrivers] = useState<{ id: number; name: string }[]>([]);
 
   const load = () => {
     setLoading(true);
@@ -51,9 +83,73 @@ export function VehiclesDirectory() {
   );
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Delete this vehicle?')) return;
     await deleteData({ url: `api/v1/vehicles/${id}/` }).catch(() => {});
     load();
+  };
+
+  const openEdit = async (v: Vehicle) => {
+    setEditVehicle(v);
+    setEditForm({
+      vin: v.vin || '',
+      plate: v.plate || '',
+      make: v.make || '',
+      model: v.model || '',
+      year: v.year || '',
+      capacity: v.capacity != null ? String(v.capacity) : '',
+      mileage: v.mileage != null ? String(v.mileage) : '',
+      fuel_type: v.fuel_type || 'Diesel',
+      status: v.status || 'AVAILABLE',
+      vehicle_type_name: v.vehicle_type_name || '',
+      driver: v.driver != null ? String(v.driver) : '',
+      registration_expiry: v.registration_expiry?.slice(0, 10) || '',
+      last_maintenance_date: v.last_maintenance_date?.slice(0, 10) || '',
+      service_interval_km: v.service_interval_km != null ? String(v.service_interval_km) : '',
+      last_service_mileage: v.last_service_mileage != null ? String(v.last_service_mileage) : '',
+    });
+    setEditErr('');
+    // Fetch types and drivers in parallel
+    const [vtData, drData] = await Promise.all([
+      fetchData('api/v1/vehicle-types/').catch(() => []),
+      fetchData('api/v1/drivers/').catch(() => []),
+    ]);
+    setVehicleTypes(
+      (Array.isArray(vtData) ? vtData : vtData?.results || []).map((vt: any) => ({ id: vt.id, name: vt.name }))
+    );
+    setDrivers(
+      (Array.isArray(drData) ? drData : drData?.results || []).map((d: any) => ({
+        id: d.id,
+        name: [d.first_name || d.user_details?.first_name, d.last_name || d.user_details?.last_name].filter(Boolean).join(' ') || `Driver ${d.id}`,
+      }))
+    );
+  };
+
+  const handleEditSave = async () => {
+    if (!editVehicle) return;
+    setEditSaving(true);
+    setEditErr('');
+    try {
+      const typeId = vehicleTypes.find(vt => vt.name === editForm.vehicle_type_name)?.id;
+      const { vehicle_type_name, ...rest } = editForm;
+      await patchData({
+        url: `api/v1/vehicles/${editVehicle.id}/`,
+        data: {
+          ...rest,
+          year: editForm.year ? Number(editForm.year) : undefined,
+          capacity: editForm.capacity ? Number(editForm.capacity) : undefined,
+          mileage: editForm.mileage ? Number(editForm.mileage) : undefined,
+          service_interval_km: editForm.service_interval_km ? Number(editForm.service_interval_km) : null,
+          last_service_mileage: editForm.last_service_mileage ? Number(editForm.last_service_mileage) : null,
+          driver: editForm.driver !== '' && editForm.driver != null ? Number(editForm.driver) : null,
+          ...(typeId ? { vehicle_type: typeId } : {}),
+        },
+      });
+      setEditVehicle(null);
+      load();
+    } catch (e: any) {
+      setEditErr(e?.message || 'Failed to update vehicle');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   return (
@@ -127,17 +223,41 @@ export function VehiclesDirectory() {
                     {v.driver_name || '—'}
                   </td>
                   <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
-                    {v.last_maintenance_date || '—'}
+                    {(() => {
+                      if (v.service_interval_km && v.last_service_mileage && v.mileage) {
+                        const nextAt = parseFloat(String(v.last_service_mileage)) + Number(v.service_interval_km);
+                        const remaining = nextAt - parseFloat(String(v.mileage));
+                        return remaining > 0
+                          ? `${Math.round(remaining).toLocaleString('en-ZA')} km left`
+                          : 'OVERDUE';
+                      }
+                      if (v.last_service_mileage) {
+                        return `At ${parseFloat(String(v.last_service_mileage)).toLocaleString('en-ZA')} km`;
+                      }
+                      return v.last_maintenance_date || '—';
+                    })()}
                   </td>
                   <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
-                    <button
-                      onClick={() => handleDelete(v.id)}
-                      style={{
-                        background: 'none', border: '1px solid var(--border-subtle)',
-                        color: 'var(--text-tertiary)', padding: '4px 8px',
-                        fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                      }}
-                    >···</button>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => openEdit(v)}
+                        style={{
+                          background: 'none', border: '1px solid var(--border-subtle)',
+                          color: 'var(--text-secondary)', padding: '4px 10px',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                          letterSpacing: '0.06em',
+                        }}
+                      >EDIT</button>
+                      <button
+                        onClick={() => setDeleteTarget({ id: v.id, name: v.plate || `Vehicle ${v.id}` })}
+                        style={{
+                          background: 'none', border: '1px solid var(--status-danger)',
+                          color: 'var(--status-danger)', padding: '4px 10px',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                          letterSpacing: '0.06em',
+                        }}
+                      >DELETE</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -145,11 +265,113 @@ export function VehiclesDirectory() {
           </table>
         )}
       </div>
+
       <AddVehicleDrawer
         open={showAddDrawer}
         onClose={() => setShowAddDrawer(false)}
         onCreated={load}
       />
+
+      {deleteTarget && (
+        <ConfirmModal
+          title="Delete Vehicle"
+          message={`Are you sure you want to delete vehicle "${deleteTarget.name}"? This cannot be undone.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => handleDelete(deleteTarget.id)}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {/* Edit slide-out */}
+      {editVehicle && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditVehicle(null)} />
+          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Vehicle</div>
+              <button onClick={() => setEditVehicle(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            {editErr && (
+              <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+                {editErr}
+              </div>
+            )}
+            {([
+              { key: 'vin', label: 'VIN Number', type: 'text' },
+              { key: 'plate', label: 'Registration Plate', type: 'text' },
+              { key: 'make', label: 'Make', type: 'text' },
+              { key: 'model', label: 'Model', type: 'text' },
+              { key: 'year', label: 'Year', type: 'number' },
+              { key: 'capacity', label: 'Capacity (kg)', type: 'number' },
+              { key: 'mileage', label: 'Mileage (km)', type: 'number' },
+              { key: 'service_interval_km', label: 'Service Interval (km)', type: 'number' },
+              { key: 'last_service_mileage', label: 'Last Service Odometer (km)', type: 'number' },
+            ] as const).map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>{f.label}</label>
+                <input
+                  type={f.type}
+                  value={editForm[f.key] ?? ''}
+                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                  style={inputStyle}
+                />
+              </div>
+            ))}
+            {([
+              { key: 'registration_expiry', label: 'Registration Expiry' },
+              { key: 'last_maintenance_date', label: 'Last Maintenance Date' },
+            ] as const).map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>{f.label}</label>
+                <DatePicker
+                  value={editForm[f.key]}
+                  onChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}
+                />
+              </div>
+            ))}
+            {([
+              { key: 'vehicle_type_name', label: 'Vehicle Type', options: vehicleTypes.length > 0 ? vehicleTypes.map(vt => vt.name) : ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck'] },
+              { key: 'fuel_type', label: 'Fuel Type', options: ['Diesel', 'Petrol', 'Electric', 'Hybrid'] },
+              { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE', 'OUT_OF_SERVICE'] },
+            ] as const).map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>{f.label}</label>
+                <Select value={editForm[f.key] ?? ''} onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {f.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Assigned Driver</label>
+              <Select value={String(editForm.driver ?? '')} onValueChange={val => setEditForm((prev: any) => ({ ...prev, driver: val }))}>
+                <SelectTrigger><SelectValue placeholder="— No driver assigned —" /></SelectTrigger>
+                <SelectContent>
+                  {drivers.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+              <button
+                disabled={editSaving}
+                onClick={handleEditSave}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: editSaving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase' }}
+              >
+                {editSaving ? 'SAVING...' : 'SAVE CHANGES'}
+              </button>
+              <button
+                onClick={() => setEditVehicle(null)}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase' }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

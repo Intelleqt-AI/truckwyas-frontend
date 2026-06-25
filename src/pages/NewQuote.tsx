@@ -672,6 +672,8 @@ export default function NewQuote() {
       delivery_location: deliveryLocation,
       origin: extractCode(pickupLocation),
       destination: extractCode(deliveryLocation),
+      ...(pickupCoords ? { pickup_lat: parseFloat(pickupCoords.lat.toFixed(7)), pickup_lng: parseFloat(pickupCoords.lon.toFixed(7)) } : {}),
+      ...(deliveryCoords ? { delivery_lat: parseFloat(deliveryCoords.lat.toFixed(7)), delivery_lng: parseFloat(deliveryCoords.lon.toFixed(7)) } : {}),
       cargo_description: cargoDescription || `${weight}kg ${vehicleType}`,
       weight: parseFloat(weight || "0"),
       distance: distanceKm,

@@ -37,7 +37,8 @@ api.interceptors.response.use(
     const data = error.response?.data;
     let serverMsg: string | undefined;
     if (typeof data === 'string') {
-      serverMsg = data;
+      // Never surface raw HTML (Django debug pages, nginx error pages, etc.)
+      serverMsg = data.trim().startsWith('<') ? undefined : data;
     } else if (data && typeof data === 'object') {
       const obj = data as Record<string, any>;
       const firstField = obj.error ?? obj.detail ?? obj[Object.keys(obj)[0]];

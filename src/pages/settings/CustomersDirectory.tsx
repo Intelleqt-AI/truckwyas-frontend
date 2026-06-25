@@ -4,7 +4,7 @@ import { fetchData, deleteData, postData } from "@/lib/Api";
 interface Customer {
   id: number;
   name: string;
-  company?: string;
+  company_name?: string;
   email: string;
   phone?: string;
   city?: string;
@@ -46,7 +46,7 @@ export function CustomersDirectory() {
 
   const filtered = customers.filter(c =>
     c.name?.toLowerCase().includes(search.toLowerCase()) ||
-    c.company?.toLowerCase().includes(search.toLowerCase()) ||
+    c.company_name?.toLowerCase().includes(search.toLowerCase()) ||
     c.email?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -58,6 +58,9 @@ export function CustomersDirectory() {
 
   const handleAdd = async () => {
     if (!form.name.trim()) { setAddErr('Name is required'); return; }
+    if (!form.email.trim()) { setAddErr('Email is required'); return; }
+    if (!form.phone.trim()) { setAddErr('Phone is required'); return; }
+    if (!form.city.trim()) { setAddErr('City is required'); return; }
     setSaving(true);
     setAddErr('');
     try {
@@ -117,9 +120,9 @@ export function CustomersDirectory() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12 }}>
               {([
                 { k: 'name', ph: 'Name *' },
-                { k: 'email', ph: 'Email' },
-                { k: 'phone', ph: 'Phone' },
-                { k: 'city', ph: 'City' },
+                { k: 'email', ph: 'Email *' },
+                { k: 'phone', ph: 'Phone *' },
+                { k: 'city', ph: 'City *' },
               ] as const).map(f => (
                 <input
                   key={f.k}
@@ -167,7 +170,7 @@ export function CustomersDirectory() {
                 <tr key={c.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
                   <td style={{ padding: '12px 20px' }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 1 }}>{c.name}</div>
-                    {c.company && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{c.company}</div>}
+                    {c.company_name && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{c.company_name}</div>}
                   </td>
                   <td style={{ padding: '12px 20px' }}>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 1 }}>{c.email}</div>

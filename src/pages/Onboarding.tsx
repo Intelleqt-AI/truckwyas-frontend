@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 interface CompanyProfile {
   company_name: string;
   industry: string;
-  phone: string;
+  contact?: { phone?: string; email?: string };
 }
 
 interface VehicleType {
@@ -17,6 +17,15 @@ interface VehicleType {
 
 export function Onboarding() {
   const navigate = useNavigate();
+
+  // Onboarding is only for admins — redirect everyone else to the dashboard
+  useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    if (storedUser?.role?.toUpperCase() !== 'ADMIN') {
+      navigate('/', { replace: true });
+    }
+  }, [navigate]);
+
   const [step, setStep] = useState(1);
 
   // Step 1: Company details
@@ -45,7 +54,7 @@ export function Onboarding() {
       .then((data: CompanyProfile) => {
         setCompanyName(data.company_name || '');
         setIndustry(data.industry || '');
-        setPhone(data.phone || '');
+        setPhone(data.contact?.phone || '');
       })
       .catch(() => {
         toast.error('Failed to load company info');
@@ -80,7 +89,7 @@ export function Onboarding() {
     try {
       await patchData({
         url: 'api/v1/company/profile/',
-        data: { company_name: companyName, industry, phone },
+        data: { company_name: companyName, industry, contact: { phone } },
       });
       toast.success('Company details saved');
       setStep(2);

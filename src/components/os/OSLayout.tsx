@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { LiveEvents } from '@/components/LiveEvents';
 import { NotificationBell } from '@/components/NotificationBell';
+import { useAuth } from '@/lib/AuthContext';
 
 export function OSLayout({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -13,16 +14,9 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get user initials and role from stored user data
-  const storedUser = (() => {
-    try {
-      return JSON.parse(localStorage.getItem('user') || '{}');
-    } catch {
-      return {};
-    }
-  })();
-  const userName = storedUser.name || storedUser.username || 'User';
-  const userRole = (storedUser.role || 'VIEWER').toUpperCase();
+  const { user: authUser } = useAuth();
+  const userName = authUser?.name || authUser?.username || 'User';
+  const userRole = (authUser?.role || 'VIEWER').toUpperCase();
   const initials =
     userName
       .split(' ')
@@ -266,7 +260,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
                     {userName}
                   </div>
                   <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                    {storedUser.email || storedUser.username || ''}
+                    {authUser?.email || authUser?.username || ''}
                   </div>
                 </div>
                 <div

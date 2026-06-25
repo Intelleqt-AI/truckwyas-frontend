@@ -317,18 +317,18 @@ export default function Customers() {
             </div>
 
             {[
-              { key: "name", label: "Full Name", placeholder: "e.g. John Doe" },
+              { key: "name", label: "Full Name", placeholder: "e.g. John Doe", required: true },
               { key: "company_name", label: "Company Name", placeholder: "e.g. Acme Logistics" },
-              { key: "email", label: "Email", placeholder: "e.g. john@company.com", type: "email" },
-              { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000" },
-              { key: "city", label: "City", placeholder: "e.g. Johannesburg" },
+              { key: "email", label: "Email", placeholder: "e.g. john@company.com", type: "email", required: true },
+              { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000", required: true },
+              { key: "city", label: "City", placeholder: "e.g. Johannesburg", required: true },
               { key: "state", label: "Province / State", placeholder: "e.g. Gauteng" },
               { key: "zip_code", label: "Zip Code", placeholder: "e.g. 2000" },
               { key: "address", label: "Address", placeholder: "Street address" },
               { key: "billing_address", label: "Billing Address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{f.label}</label>
+                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>}</label>
                 <input
                   type={f.type || "text"}
                   placeholder={f.placeholder}
@@ -411,18 +411,18 @@ export default function Customers() {
             </div>
 
             {[
-              { key: "name", label: "Full Name", placeholder: "e.g. John Doe" },
+              { key: "name", label: "Full Name", placeholder: "e.g. John Doe", required: true },
               { key: "company_name", label: "Company Name", placeholder: "e.g. Acme Logistics" },
-              { key: "email", label: "Email", placeholder: "e.g. john@company.com", type: "email" },
-              { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000" },
-              { key: "city", label: "City", placeholder: "e.g. Johannesburg" },
+              { key: "email", label: "Email", placeholder: "e.g. john@company.com", type: "email", required: true },
+              { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000", required: true },
+              { key: "city", label: "City", placeholder: "e.g. Johannesburg", required: true },
               { key: "state", label: "Province / State", placeholder: "e.g. Gauteng" },
               { key: "zip_code", label: "Zip Code", placeholder: "e.g. 2000" },
               { key: "address", label: "Address", placeholder: "Street address" },
               { key: "billing_address", label: "Billing Address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{f.label}</label>
+                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>}</label>
                 <input
                   type={f.type || "text"}
                   placeholder={f.placeholder}

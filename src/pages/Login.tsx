@@ -53,20 +53,23 @@ const Login = () => {
 
     login(formData, {
       onSuccess: async () => {
-        // Check if onboarding is needed
-        const onboardingDone = localStorage.getItem('onboarding_done');
-        if (!onboardingDone) {
-          try {
-            // fleet/overview has no total_vehicles field — use the vehicles count.
-            const v = await fetchData('api/v1/vehicles/');
-            const vehicleCount = v?.count ?? (Array.isArray(v) ? v.length : (v?.results?.length ?? 0));
+        // Onboarding is admin-only — non-admins go straight to the dashboard
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const isAdmin = storedUser?.role?.toUpperCase() === 'ADMIN';
 
-            if (vehicleCount === 0) {
-              navigate("/onboarding");
-              return;
+        if (isAdmin) {
+          const onboardingDone = localStorage.getItem('onboarding_done');
+          if (!onboardingDone) {
+            try {
+              const v = await fetchData('api/v1/vehicles/');
+              const vehicleCount = v?.count ?? (Array.isArray(v) ? v.length : (v?.results?.length ?? 0));
+              if (vehicleCount === 0) {
+                navigate("/onboarding");
+                return;
+              }
+            } catch {
+              // If API fails, skip onboarding check
             }
-          } catch {
-            // If API fails, skip onboarding check
           }
         }
         navigate("/");

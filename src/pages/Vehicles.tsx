@@ -1,13 +1,14 @@
 import { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from '@tanstack/react-query';
-import { fetchData, postData, patchData, deleteData } from '../lib/Api';
+import { fetchData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AddVehicleDrawer } from '@/components/AddVehicleDrawer';
 
 interface Vehicle {
   id: number;
@@ -128,13 +129,6 @@ export default function Vehicles() {
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
   const [sortBy, setSortBy] = useState('revenue');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [addForm, setAddForm] = useState({
-    vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '',
-    type: 'Rigid Truck', capacity: '', mileage: '', fuel_type: 'Diesel', status: 'AVAILABLE',
-    insurance_expiry: '', registration_expiry: '', last_maintenance_date: '', next_maintenance_due: '',
-    driver: '',
-  });
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [confirmOpts, setConfirmOpts] = useState<{
@@ -464,120 +458,11 @@ export default function Vehicles() {
 
       </div>
 
-      {/* Add Vehicle Slide-out */}
-      {showAddForm && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setShowAddForm(false)} />
-          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Add Vehicle</div>
-              <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
-            </div>
-            {[
-              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. WDB9634031L123456' },
-              { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz' },
-              { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
-              { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
-              { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
-              { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
-              { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
-              { key: 'insurance_expiry', label: 'Insurance Expiry', type: 'date' },
-              { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
-              { key: 'last_maintenance_date', label: 'Last Maintenance', type: 'date' },
-              { key: 'next_maintenance_due', label: 'Next Maintenance Due', type: 'date' },
-            ].map(f => (
-              <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                {f.type === 'date' ? (
-                  <DatePicker
-                    value={(addForm as any)[f.key]}
-                    onChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}
-                  />
-                ) : (
-                  <input
-                    type={f.type || 'text'}
-                    placeholder={f.placeholder}
-                    value={(addForm as any)[f.key]}
-                    onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                )}
-              </div>
-            ))}
-            {[
-              { key: 'type', label: 'Vehicle Type', options: vehicleTypes.length > 0 ? vehicleTypes.map(vt => vt.name) : ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck', 'Tautliner', 'Box Truck'] },
-              { key: 'fuel_type', label: 'Fuel Type', options: ['Diesel', 'Petrol', 'Electric', 'Hybrid'] },
-              { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE', 'OUT_OF_SERVICE'] },
-            ].map(f => (
-              <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <Select
-                  value={(addForm as any)[f.key]}
-                  onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {f.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Driver</label>
-              <Select
-                value={addForm.driver}
-                onValueChange={val => setAddForm(prev => ({ ...prev, driver: val }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="— No driver assigned —" />
-                </SelectTrigger>
-                <SelectContent>
-                  {drivers.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
-              <button
-                disabled={saving}
-                onClick={async () => {
-                  setSaving(true);
-                  try {
-                    const vehicleTypeId = vehicleTypes.find(vt => vt.name === addForm.type)?.id;
-                    const { type: _t, ...addFormWithoutType } = addForm;
-                    await postData({
-                      url: 'api/v1/vehicles/',
-                      data: {
-                        ...addFormWithoutType,
-                        year: Number(addForm.year),
-                        capacity: Number(addForm.capacity) || 0,
-                        mileage: addForm.mileage ? Number(addForm.mileage) : undefined,
-                        driver: addForm.driver ? Number(addForm.driver) : null,
-                        ...(vehicleTypeId ? { vehicle_type: vehicleTypeId } : {}),
-                      },
-                    });
-                    setShowAddForm(false);
-                    setAddForm({ vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '', type: 'Rigid Truck', capacity: '', mileage: '', fuel_type: 'Diesel', status: 'AVAILABLE', insurance_expiry: '', registration_expiry: '', last_maintenance_date: '', next_maintenance_due: '', driver: '' });
-                    // Refresh
-                    refetch();
-                  } catch (e: any) { toast.error(e?.message || 'Failed to create vehicle'); }
-                  setSaving(false);
-                }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
-              >
-                {saving ? 'SAVING...' : 'CREATE VEHICLE'}
-              </button>
-              <button
-                onClick={() => setShowAddForm(false)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
-              >
-                CANCEL
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddVehicleDrawer
+        open={showAddForm}
+        onClose={() => setShowAddForm(false)}
+        onCreated={refetch}
+      />
 
       {/* Edit Vehicle Slide-out */}
       {editVehicle && (

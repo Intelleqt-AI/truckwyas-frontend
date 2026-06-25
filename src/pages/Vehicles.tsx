@@ -35,6 +35,8 @@ interface Vehicle {
   type?: string;
   last_maintenance_date?: string;
   next_maintenance_due?: string;
+  service_interval_km?: number | null;
+  last_service_mileage?: number | string | null;
 }
 
 interface FleetOverview {
@@ -131,7 +133,7 @@ export default function Vehicles() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
   const [editForm, setEditForm] = useState<any>({});
-  const [saving, setSaving] = useState(false); // used by the edit-vehicle modal
+  const [saving, setSaving] = useState(false);
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);

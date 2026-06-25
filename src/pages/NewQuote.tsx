@@ -3780,7 +3780,7 @@ export default function NewQuote() {
               { key: "email", label: "Email", placeholder: "e.g. john@company.com", required: true, type: "email" },
               { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000", required: true },
               { key: "city", label: "City", placeholder: "e.g. Johannesburg", required: true },
-            ] as const).map(f => (
+            ] as { key: "name" | "email" | "phone" | "city"; label: string; placeholder: string; required: boolean; type?: string }[]).map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.06em", marginBottom: 6, textTransform: "uppercase" }}>
                   {f.label}<span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>

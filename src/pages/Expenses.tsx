@@ -5,6 +5,7 @@ import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatCurrency, formatDate } from '@/lib/formatters';
 
 interface Expense {
   id: number;
@@ -14,22 +15,16 @@ interface Expense {
   date: string;
   expense_date?: string;
   vehicle?: number;
+  vehicle_info?: string;
   vehicle_registration?: string;
   status?: string;
 }
 
 interface Vehicle {
   id: number;
-  registration: string;
+  plate?: string;
+  registration?: string;
 }
-
-const formatZAR = (v: number) =>
-  'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-const formatDate = (dateStr: string) => {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' });
-};
 
 const CATS = [
   { value: 'All', label: 'All Categories', icon: '📊' },
@@ -47,11 +42,6 @@ const DATE_FILTERS = [
   { value: 'last_month', label: 'Last Month' },
   { value: 'custom', label: 'Custom Range' },
 ];
-
-function getCategoryLabel(cat: string) {
-  const c = CATS.find(x => x.value === cat);
-  return c ? `${c.icon} ${c.label}` : cat;
-}
 
 function getCategoryIcon(cat: string) {
   const c = CATS.find(x => x.value === cat);
@@ -79,14 +69,13 @@ export default function Expenses() {
 
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [vehicleFilter, setVehicleFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [dateFilter, setDateFilter] = useState('this_month');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
@@ -110,6 +99,7 @@ export default function Expenses() {
     const catOk = categoryFilter === 'All' || e.category === categoryFilter;
     const vehOk = vehicleFilter === 'All' || (e.vehicle && e.vehicle.toString() === vehicleFilter);
     const srchOk = !search || e.description?.toLowerCase().includes(search.toLowerCase());
+    const statOk = statusFilter === 'ALL' || (e.status || 'PENDING').toUpperCase() === statusFilter;
 
     let dateOk = true;
     if (startDate && endDate) {
@@ -117,7 +107,7 @@ export default function Expenses() {
       dateOk = eDate >= startDate && eDate <= endDate;
     }
 
-    return catOk && vehOk && srchOk && dateOk;
+    return catOk && vehOk && srchOk && statOk && dateOk;
   });
 
   // Sort by date desc
@@ -161,51 +151,6 @@ export default function Expenses() {
     });
   };
 
-  const handleBulkDelete = () => {
-    if (selectedIds.size === 0) return;
-    setConfirmOpts({
-      title: 'Delete Expenses',
-      message: `Delete ${selectedIds.size} selected expense${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`,
-      confirmLabel: `Delete ${selectedIds.size}`,
-      danger: true,
-      onConfirm: async () => {
-        setBulkDeleting(true);
-        try {
-          await Promise.all(
-            Array.from(selectedIds).map(id =>
-              deleteData({ url: `/api/v1/expenses/${id}/` })
-            )
-          );
-          toast.success(`${selectedIds.size} expense${selectedIds.size === 1 ? '' : 's'} deleted`);
-          setSelectedIds(new Set());
-          refetch();
-        } catch {
-          toast.error('Some expenses could not be deleted');
-        } finally {
-          setBulkDeleting(false);
-        }
-      },
-    });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === rows.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(rows.map(e => e.id)));
-    }
-  };
-
-  const toggleSelect = (id: number) => {
-    const newSet = new Set(selectedIds);
-    if (newSet.has(id)) {
-      newSet.delete(id);
-    } else {
-      newSet.add(id);
-    }
-    setSelectedIds(newSet);
-  };
-
   const handleExportCSV = () => {
     const headers = ['Date', 'Category', 'Description', 'Vehicle', 'Amount', 'Status'];
     const csvRows = [
@@ -228,37 +173,6 @@ export default function Expenses() {
     a.download = `expenses-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-  };
-
-  const getStatusBadge = (status?: string) => {
-    const s = status?.toUpperCase() || 'PENDING';
-    let color = 'var(--status-warning)';
-    let bg = 'var(--status-warning-bg)';
-
-    if (s === 'APPROVED') {
-      color = 'var(--accent-primary)';
-      bg = 'var(--status-success-bg)';
-    } else if (s === 'REJECTED') {
-      color = 'var(--status-danger)';
-      bg = 'var(--status-danger-bg)';
-    }
-
-    return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '2px 8px',
-        borderRadius: '100px',
-        background: bg,
-        fontSize: 10,
-        color: color,
-        fontWeight: 600,
-        fontFamily: 'var(--font-mono)',
-        textTransform: 'uppercase',
-      }}>
-        {s}
-      </span>
-    );
   };
 
   if (loading) return (
@@ -310,7 +224,7 @@ export default function Expenses() {
               <span>{categoryBreakdown[0].icon}</span>
               <strong style={{ color: 'var(--accent-primary)' }}>{categoryBreakdown[0].label}</strong>
               <span>is your #1 expense this month</span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>({formatZAR(categoryBreakdown[0].total)})</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>({formatCurrency(categoryBreakdown[0].total)})</span>
             </div>
           )}
         </div>
@@ -342,7 +256,7 @@ export default function Expenses() {
                   {cat.label}
                 </span>
               </div>
-              <div className="metric-value" style={{ fontSize: 20 }}>{formatZAR(cat.total)}</div>
+              <div className="metric-value" style={{ fontSize: 20 }}>{formatCurrency(cat.total)}</div>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
                 {percentage}% of total
               </div>
@@ -451,7 +365,7 @@ export default function Expenses() {
                 })()}
                 <circle cx="100" cy="90" r="40" fill="var(--bg-deep)" />
                 <text x="100" y="85" textAnchor="middle" fontSize="20" fill="var(--text-primary)" fontWeight="700">
-                  {formatZAR(totalExpenses).replace('R ', '')}
+                  {formatCurrency(totalExpenses).replace('R ', '')}
                 </text>
                 <text x="100" y="100" textAnchor="middle" fontSize="10" fill="var(--text-tertiary)" fontFamily="var(--font-mono)">
                   TOTAL
@@ -499,13 +413,13 @@ export default function Expenses() {
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>ACTUAL</div>
                       <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: isOverBudget ? 'var(--status-danger)' : 'var(--text-primary)', fontWeight: 600 }}>
-                        {formatZAR(item.actual)}
+                        {formatCurrency(item.actual)}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>BUDGET</div>
                       <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                        {formatZAR(item.budget)}
+                        {formatCurrency(item.budget)}
                       </div>
                     </div>
                     <div style={{
@@ -534,131 +448,123 @@ export default function Expenses() {
         </div>
       </div>
 
-      {/* Filters & Actions */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Select value={categoryFilter} onValueChange={val => { setCategoryFilter(val); setPage(1); }}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CATS.map(c => <SelectItem key={c.value} value={c.value}>{c.icon} {c.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={vehicleFilter} onValueChange={val => { setVehicleFilter(val); setPage(1); }}>
-            <SelectTrigger>
-              <SelectValue placeholder="All Vehicles" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Vehicles</SelectItem>
-              {vehicles.map(v => <SelectItem key={v.id} value={String(v.id)}>{v.registration}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={dateFilter} onValueChange={val => { setDateFilter(val); setPage(1); }}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DATE_FILTERS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <input
-            placeholder="Search expenses..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
-            style={{
-              background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-primary)', padding: '6px 10px',
-              fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, width: 240,
-            }}
-          />
-        </div>
-        {selectedIds.size > 0 && (
+      {/* Filters — single flex row */}
+      <div style={{ display: 'flex', flexDirection: 'row', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+        <input
+          placeholder="Search expenses..."
+          value={search}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
+          style={{
+            background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+            color: 'var(--text-primary)', padding: '7px 10px',
+            fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
+            width: 180,
+          }}
+        />
+        <select
+          value={categoryFilter}
+          onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
+          style={{
+            background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+            color: 'var(--text-primary)', padding: '7px 10px',
+            fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
+            width: 160, cursor: 'pointer',
+          }}
+        >
+          {CATS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+        </select>
+        <select
+          value={vehicleFilter}
+          onChange={e => { setVehicleFilter(e.target.value); setPage(1); }}
+          style={{
+            background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+            color: 'var(--text-primary)', padding: '7px 10px',
+            fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
+            width: 150, cursor: 'pointer',
+          }}
+        >
+          <option value="All">All Vehicles</option>
+          {vehicles.map(v => <option key={v.id} value={String(v.id)}>{v.plate || v.registration}</option>)}
+        </select>
+        <select
+          value={dateFilter}
+          onChange={e => { setDateFilter(e.target.value); setPage(1); }}
+          style={{
+            background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+            color: 'var(--text-primary)', padding: '7px 10px',
+            fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
+            width: 140, cursor: 'pointer',
+          }}
+        >
+          {DATE_FILTERS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+        </select>
+        {/* Status tabs */}
+        {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map(s => (
           <button
-            onClick={handleBulkDelete}
-            disabled={bulkDeleting}
+            key={s}
+            onClick={() => { setStatusFilter(s); setPage(1); }}
             style={{
-              fontSize: 11,
-              padding: '6px 12px',
-              background: 'var(--status-danger)',
-              border: 'none',
-              color: 'white',
-              fontFamily: 'var(--font-mono)',
-              cursor: bulkDeleting ? 'not-allowed' : 'pointer',
-              borderRadius: 2,
-              fontWeight: 600,
+              padding: '7px 12px', fontSize: 10, fontFamily: 'var(--font-mono)',
+              fontWeight: 600, borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap',
+              border: statusFilter === s ? 'none' : '1px solid var(--border-subtle)',
+              background: statusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
+              color: statusFilter === s ? 'black' : 'var(--text-secondary)',
             }}
           >
-            {bulkDeleting ? 'DELETING...' : `DELETE ${selectedIds.size} SELECTED`}
+            {s}
           </button>
-        )}
+        ))}
       </div>
 
       {/* Table */}
-      <div className="card" style={{ padding: 0 }}>
+      <div className="card table-card">
         <table className="data-table">
           <thead>
             <tr>
-              <th style={{ width: 40 }}>
-                <input
-                  type="checkbox"
-                  checked={rows.length > 0 && selectedIds.size === rows.length}
-                  onChange={toggleSelectAll}
-                  style={{ cursor: 'pointer' }}
-                />
-              </th>
               <th>Date</th>
               <th>Category</th>
               <th>Description</th>
               <th>Vehicle</th>
+              <th>Amount</th>
               <th>Status</th>
-              <th className="text-right">Amount</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No expenses found</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No expenses found</td></tr>
             ) : rows.map(exp => (
               <tr key={exp.id}>
+                <td className="mono" style={{ fontSize: 12 }}>{formatDate(exp.expense_date || exp.date)}</td>
+                <td style={{ fontSize: 12 }}>{exp.category.replace('_', ' ')}</td>
+                <td style={{ fontSize: 12 }}>{exp.description}</td>
+                <td className="mono" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{exp.vehicle_info || exp.vehicle_registration || 'N/A'}</td>
+                <td className="mono" style={{ fontSize: 13, fontWeight: 500 }}>{formatCurrency(exp.amount)}</td>
                 <td>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(exp.id)}
-                    onChange={() => toggleSelect(exp.id)}
-                    style={{ cursor: 'pointer' }}
-                  />
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 10,
+                    color: exp.status === 'APPROVED' ? 'var(--status-success)' : exp.status === 'REJECTED' ? 'var(--status-danger)' : 'var(--status-warning)',
+                    padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2,
+                  }}>
+                    {exp.status || 'PENDING'}
+                  </span>
                 </td>
-                <td className="mono">{formatDate(exp.expense_date || exp.date)}</td>
-                <td>{getCategoryLabel(exp.category)}</td>
-                <td>{exp.description}</td>
-                <td className="mono">{exp.vehicle_registration || '—'}</td>
-                <td>{getStatusBadge(exp.status)}</td>
-                <td className="text-right mono">{formatZAR(exp.amount)}</td>
                 <td>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       onClick={() => setEditingExpense(exp)}
                       className="btn-action"
-                      style={{ fontSize: 10, padding: '4px 12px' }}
+                      style={{ fontSize: 10, padding: '4px 10px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
                     >
                       EDIT
                     </button>
                     <button
                       onClick={() => handleDelete(exp.id)}
                       disabled={deletingId === exp.id}
-                      style={{
-                        fontSize: 10,
-                        padding: '4px 10px',
-                        background: 'none',
-                        border: '1px solid var(--status-danger)',
-                        color: 'var(--status-danger)',
-                        fontFamily: 'var(--font-mono)',
-                        cursor: deletingId === exp.id ? 'not-allowed' : 'pointer',
-                        borderRadius: 2,
-                      }}
+                      className="btn-action"
+                      style={{ fontSize: 10, padding: '4px 10px', background: 'transparent', border: '1px solid var(--status-danger)', color: 'var(--status-danger)' }}
                     >
-                      {deletingId === exp.id ? '...' : 'DELETE'}
+                      {deletingId === exp.id ? '...' : 'DEL'}
                     </button>
                   </div>
                 </td>
@@ -780,7 +686,7 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
               <SelectContent>
                 <SelectItem value="">No vehicle</SelectItem>
                 {vehicles.map(v => (
-                  <SelectItem key={v.id} value={String(v.id)}>{v.registration}</SelectItem>
+                  <SelectItem key={v.id} value={String(v.id)}>{v.plate || v.registration}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

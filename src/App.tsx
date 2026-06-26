@@ -92,6 +92,7 @@ const VehicleFinancialProfile = lazy(() => import('./pages/VehicleFinancialProfi
 const RiskScoreView = lazy(() => import('./pages/RiskScoreView'));
 const FleetHeatmap = lazy(() => import('./pages/FleetHeatmap'));
 const ClientQuoteView = lazy(() => import('./pages/ClientQuoteView'));
+const PublicInvoice = lazy(() => import('./pages/PublicInvoice'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -182,6 +183,8 @@ const App = () => (
                 }
               />
               <Route path="/quotes/view/:quoteId/:token" element={<ClientQuoteView />} />
+              <Route path="/invoice/view/:id/:token" element={<PublicInvoice />} />
+              <Route path="/invoice/view/:id" element={<PublicInvoice />} />
               <Route
                 path="/onboarding"
                 element={

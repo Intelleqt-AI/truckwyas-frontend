@@ -24,7 +24,7 @@ export default function CreateInvoice() {
   const mutation = useMutation({
     mutationFn: (data: any) => postData({ url: 'api/v1/invoices/', data }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices-page'] });
       navigate('/finance/invoices');
     },
     onError: (e: any) => setError(e?.message || 'Failed to create invoice'),

@@ -323,6 +323,16 @@ export default function Invoices() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const filteredExpenses = expenses.filter(e => {
+    const matchCategory = categoryFilter === 'All' || e.category === categoryFilter;
+    const matchStatus = expenseStatusFilter === 'All' || e.status === expenseStatusFilter;
+    const matchSearch = !expenseSearch ||
+      e.description?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
+      e.vendor?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
+      e.expense_number?.toLowerCase().includes(expenseSearch.toLowerCase());
+    return matchCategory && matchStatus && matchSearch;
+  });
+
   const outstanding = allInvoices.filter(i => i.status === 'SENT').reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
   const overdue = allInvoices.filter(i => i.status === 'OVERDUE').reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
   const paid = allInvoices.filter(i => i.status === 'PAID').reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
@@ -564,7 +574,7 @@ export default function Invoices() {
                         </SelectTrigger>
                         <SelectContent>
                           {vehicles.map(v => (
-                            <SelectItem key={v.id} value={String(v.id)}>{v.registration || v.vehicle_number}</SelectItem>
+                            <SelectItem key={v.id} value={String(v.id)}>{v.plate || v.registration || v.vehicle_number}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -728,7 +738,7 @@ export default function Invoices() {
           )}
 
           {/* Filters */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'row', gap: 8, marginBottom: 20, alignItems: 'center' }}>
             <input
               type="text"
               placeholder="Search expenses..."
@@ -746,65 +756,59 @@ export default function Invoices() {
                 fontFamily: 'var(--font-sans)',
               }}
             />
-            <Select value={categoryFilter} onValueChange={val => { setCategoryFilter(val); setExpensePage(1); }}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                {expenseCategories.map(c => (
-                  <SelectItem key={c} value={c}>{c === 'All' ? 'All Categories' : c.replace('_', ' ')}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {expenseStatuses.map(s => (
-                <button
-                  key={s}
-                  onClick={() => { setExpenseStatusFilter(s); setExpensePage(1); }}
-                  style={{
-                    background: expenseStatusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    color: expenseStatusFilter === s ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                    padding: '6px 12px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    fontWeight: expenseStatusFilter === s ? 600 : 400,
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {s}
-                </button>
+            <select
+              value={categoryFilter}
+              onChange={e => { setCategoryFilter(e.target.value); setExpensePage(1); }}
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                padding: '6px 10px',
+                color: 'var(--text-primary)',
+                borderRadius: 2,
+                fontSize: 12,
+                width: 160,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+              }}
+            >
+              {expenseCategories.map(c => (
+                <option key={c} value={c}>{c === 'All' ? 'All Categories' : c.replace('_', ' ')}</option>
               ))}
-            </div>
+            </select>
+            {expenseStatuses.map(s => (
+              <button
+                key={s}
+                onClick={() => { setExpenseStatusFilter(s); setExpensePage(1); }}
+                style={{
+                  background: expenseStatusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  color: expenseStatusFilter === s ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                  padding: '6px 12px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  fontWeight: expenseStatusFilter === s ? 600 : 400,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {s}
+              </button>
+            ))}
+            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
+              {filteredExpenses.length} expenses
+            </span>
           </div>
 
           {/* Expenses Table */}
           {(() => {
-            const filteredExpenses = expenses.filter(e => {
-              const matchCategory = categoryFilter === 'All' || e.category === categoryFilter;
-              const matchStatus = expenseStatusFilter === 'All' || e.status === expenseStatusFilter;
-              const matchSearch = !expenseSearch ||
-                e.description?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
-                e.vendor?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
-                e.expense_number?.toLowerCase().includes(expenseSearch.toLowerCase());
-              return matchCategory && matchStatus && matchSearch;
-            });
-
             const totalPages = Math.max(1, Math.ceil(filteredExpenses.length / PAGE_SIZE));
             const expenseRows = filteredExpenses.slice((expensePage - 1) * PAGE_SIZE, expensePage * PAGE_SIZE);
 
             return (
               <>
-                <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
-                    {filteredExpenses.length} expenses
-                  </span>
-                </div>
-
                 <div className="card table-card">
                   <table className="data-table">
                     <thead>
@@ -813,9 +817,9 @@ export default function Invoices() {
                         <th>Category</th>
                         <th>Description</th>
                         <th>Vehicle</th>
-                        <th className="text-right">Amount</th>
+                        <th>Amount</th>
                         <th>Status</th>
-                        <th className="text-right">Actions</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -845,9 +849,8 @@ export default function Invoices() {
                           </tr>
                         )
                       ) : expenseRows.map(exp => {
-                        const vehicleName = vehicles.find(v => v.id === exp.vehicle)?.registration ||
-                                          vehicles.find(v => v.id === exp.vehicle)?.vehicle_number ||
-                                          'N/A';
+                        const veh = vehicles.find(v => v.id === exp.vehicle);
+                        const vehicleName = veh?.plate || veh?.registration || veh?.vehicle_number || 'N/A';
 
                         return (
                           <tr key={exp.id}>
@@ -863,7 +866,7 @@ export default function Invoices() {
                             <td className="mono" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                               {vehicleName}
                             </td>
-                            <td className="mono text-right" style={{ fontSize: 13, fontWeight: 500 }}>
+                            <td className="mono" style={{ fontSize: 13, fontWeight: 500 }}>
                               {formatCurrency(exp.amount)}
                             </td>
                             <td>
@@ -878,8 +881,8 @@ export default function Invoices() {
                                 {exp.status}
                               </span>
                             </td>
-                            <td className="text-right">
-                              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <td>
+                              <div style={{ display: 'flex', gap: 8 }}>
                                 {exp.status === 'PENDING' && (
                                   <>
                                     <button
@@ -994,10 +997,10 @@ export default function Invoices() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           {[
-            { label: 'Total Invoiced MTD', value: formatCurrency(stats?.total_invoiced_mtd || outstanding), color: 'var(--text-primary)' },
-            { label: 'Collected', value: formatCurrency(stats?.total_collected_mtd || paid), color: 'var(--status-success)' },
-            { label: 'Overdue', value: `${stats?.overdue_count || Math.floor(overdue / 40000)} / ${formatCurrency(stats?.overdue_amount || overdue)}`, color: 'var(--status-danger)' },
-            { label: 'Collection Rate', value: `${Math.round((stats?.collection_rate || 0.71) * 100)}%`, color: 'var(--accent-primary)' },
+            { label: 'Total Invoiced MTD', value: formatCurrency(stats?.total_invoiced_mtd ?? outstanding), color: 'var(--text-primary)' },
+            { label: 'Collected', value: formatCurrency(stats?.total_collected_mtd ?? paid), color: 'var(--status-success)' },
+            { label: 'Overdue', value: `${stats?.overdue_count ?? 0} / ${formatCurrency(stats?.overdue_amount ?? overdue)}`, color: 'var(--status-danger)' },
+            { label: 'Collection Rate', value: `${Math.round((stats?.collection_rate ?? 0) * 100)}%`, color: 'var(--accent-primary)' },
           ].map(m => (
             <div key={m.label} className="card metric-card">
               <div className="card-header"><span className="card-title">{m.label}</span></div>
@@ -1042,7 +1045,7 @@ export default function Invoices() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Invoice #</th><th>Customer</th><th>Amount</th><th>Status</th><th>Due Date</th><th className="text-right">Actions</th>
+              <th>Invoice #</th><th>Customer</th><th>Amount</th><th>Status</th><th>Due Date</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1102,8 +1105,8 @@ export default function Invoices() {
                       )}
                     </div>
                   </td>
-                  <td className="text-right" onClick={e => e.stopPropagation()}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <td onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', gap: 8 }}>
                       {invStatus === 'DRAFT' && (
                         <button className="btn-action" style={{ fontSize: 10, padding: '4px 12px' }} onClick={(e) => handleSendInvoice(e, inv.id)} disabled={sendingId === inv.id}>
                           {sendingId === inv.id ? 'SENDING...' : 'SEND'}

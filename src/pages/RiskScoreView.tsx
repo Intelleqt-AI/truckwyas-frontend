@@ -39,7 +39,7 @@ const ScoreRing = ({ score, tier }: { score: number; tier: string }) => {
 export default function RiskScoreView() {
   const navigate = useNavigate();
 
-  const { data: riskData, isLoading } = useQuery({
+  const { data: riskData, isLoading: loadingScores } = useQuery({
     queryKey: ['risk-scores'],
     queryFn: () => fetchData('api/v1/risk/score/'),
   });
@@ -49,10 +49,18 @@ export default function RiskScoreView() {
     queryFn: () => fetchData('api/v1/customers/'),
   });
 
+  const { data: eligibleData, isLoading: loadingEligible } = useQuery({
+    queryKey: ['eligible-invoices-risk'],
+    queryFn: () => fetchData('api/v1/capital/eligible/'),
+  });
+
+  const isLoading = loadingScores || loadingEligible;
+
   const scores = Array.isArray(riskData) ? riskData : (riskData?.results || []);
   const customers = Array.isArray(customersData) ? customersData : (customersData?.results || []);
+  const eligibleInvoices: any[] = eligibleData?.invoices || [];
 
-  // Group scores by customer
+  // Build a map of stored risk scores keyed by customer_id (best score per customer)
   const byCustomer: Record<number, any[]> = {};
   for (const s of scores) {
     const cid = s.customer || s.customer_id;
@@ -60,11 +68,34 @@ export default function RiskScoreView() {
     byCustomer[cid].push(s);
   }
 
+  // Merge in eligible invoice scores for customers not yet in byCustomer
+  for (const inv of eligibleInvoices) {
+    const cid = inv.customer_id;
+    if (!cid) continue;
+    if (!byCustomer[cid]) {
+      // Shape it to match stored risk score structure
+      byCustomer[cid] = [{
+        id: `eligible-${inv.id}`,
+        customer: cid,
+        customer_id: cid,
+        customer_name: inv.customer,
+        total_score: Math.round(inv.risk_score || 0),
+        tier: String(inv.risk_tier || inv.tier || 'HIGH').toUpperCase(),
+        fee_percent: inv.fee_rate_pct,
+        is_eligible: true,
+        factor_payment_history: null,
+        factor_invoice_age: null,
+        factor_pod_quality: null,
+      }];
+    }
+  }
+
   // Get best score per customer
   const customerScores = Object.entries(byCustomer).map(([cid, ss]) => {
     const best = ss.sort((a, b) => b.total_score - a.total_score)[0];
     const cust = customers.find((c: any) => c.id === parseInt(cid));
-    return { ...best, customer_name: cust?.name || `Customer ${cid}`, cid: parseInt(cid) };
+    const name = best.customer_name || cust?.name || `Customer ${cid}`;
+    return { ...best, customer_name: name, cid: parseInt(cid) };
   }).sort((a, b) => b.total_score - a.total_score);
 
   const tiers = ['PRIME', 'STANDARD', 'ELEVATED', 'HIGH', 'INELIGIBLE'];
@@ -142,7 +173,7 @@ export default function RiskScoreView() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--bg-surface-hover)' }}>
-                {['CUSTOMER', 'SCORE', 'TIER', 'PAYMENT HIST', 'OVERDUE', 'POD', 'FAST PAY FEE', 'ELIGIBLE'].map(h => (
+                {['CUSTOMER', 'SCORE', 'TIER', 'PAYMENT HIST', 'INVOICE AGE', 'POD', 'FAST PAY FEE', 'ELIGIBLE'].map(h => (
                   <th key={h} style={{ padding: '12px 16px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textAlign: 'left', letterSpacing: '0.08em', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
                 ))}
               </tr>
@@ -150,7 +181,7 @@ export default function RiskScoreView() {
             <tbody>
               {customerScores.map((cs: any) => (
                 <tr key={cs.id} style={{ cursor: 'pointer', borderBottom: '1px solid var(--border-row)' }}
-                  onClick={() => navigate(`/capital`)}
+                  onClick={() => navigate(`/customers/${cs.cid}`)}
                 >
                   <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{cs.customer_name}</td>
                   <td style={{ padding: '12px 16px' }}>

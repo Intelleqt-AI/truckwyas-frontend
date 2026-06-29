@@ -593,14 +593,15 @@ body {
   text-transform: uppercase;
   color: var(--text-secondary);
   font-weight: 600;
-  padding-bottom: 12px;
+  padding: 0 16px 12px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .data-table td {
-  padding: 12px 0;
+  padding: 12px 16px 12px 0;
   border-bottom: 1px solid var(--border-row);
   color: var(--text-tertiary);
+  text-align: left;
 }
 
 .data-table tr:last-child td {
@@ -758,7 +759,7 @@ body {
   background: var(--accent-primary);
   color: var(--btn-action-color);
   border: none;
-  padding: 8px 14px;
+  padding: 8px 16px;
   border-radius: 2px;
   font-size: 11px;
   font-family: var(--font-mono);
@@ -766,6 +767,8 @@ body {
   font-weight: 600;
   cursor: pointer;
   width: fit-content;
+  min-width: 120px;
+  text-align: center;
   white-space: nowrap;
   transition: opacity 0.2s;
   box-shadow: var(--btn-action-shadow);

@@ -72,7 +72,7 @@ export function InviteAccept() {
       toast.success('Welcome to Truckwys!');
       navigate('/');
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Failed to accept invite');
+      toast.error(err?.message || 'Failed to accept invite');
     } finally {
       setSubmitting(false);
     }
@@ -120,13 +120,28 @@ export function InviteAccept() {
           </>
         ) : (
           <>
-            <div style={{ textAlign: 'center', marginBottom: 32 }}>
-              <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+            <div style={{ textAlign: 'center', marginBottom: 28 }}>
+              <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
                 Join {inviteDetails?.company_name}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                {inviteDetails?.inviter_name} has invited you to join their team
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+                <strong style={{ color: 'var(--text-primary)' }}>{inviteDetails?.inviter_name}</strong> has invited you to join their team
               </div>
+              {inviteDetails?.role && (
+                <span style={{
+                  display: 'inline-block',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  textTransform: 'uppercase' as const,
+                  letterSpacing: '0.08em',
+                  padding: '4px 10px',
+                  border: '1px solid var(--accent-primary)',
+                  color: 'var(--accent-primary)',
+                  borderRadius: 2,
+                }}>
+                  {inviteDetails.role} Role
+                </span>
+              )}
             </div>
 
             <form onSubmit={handleSubmit}>

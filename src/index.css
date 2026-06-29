@@ -1,6 +1,43 @@
 /* OS Theme first — defines all CSS variables and layout classes */
 @import './styles/theme.css';
 
+/* ── React-Toastify overrides ─────────────────────────────────────────────── */
+/* Use explicit values — CSS variable refs are unreliable across the portal   */
+.Toastify__toast {
+  background: #0f0f0f !important;
+  color: #ededed !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 3px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45) !important;
+  font-family: var(--font-mono), monospace !important;
+  font-size: 12px !important;
+  letter-spacing: 0.03em !important;
+  min-height: 48px !important;
+  padding: 10px 14px !important;
+}
+
+.Toastify__toast-body {
+  color: #ededed !important;
+  font-family: var(--font-mono), monospace !important;
+  font-size: 12px !important;
+}
+
+.Toastify__toast--success { border-left: 3px solid #22c55e !important; }
+.Toastify__toast--error   { border-left: 3px solid #ef4444 !important; }
+.Toastify__toast--warning { border-left: 3px solid #f59e0b !important; }
+.Toastify__toast--info    { border-left: 3px solid #4d9eff !important; }
+
+.Toastify__progress-bar--success { background: #22c55e !important; }
+.Toastify__progress-bar--error   { background: #ef4444 !important; }
+.Toastify__progress-bar--warning { background: #f59e0b !important; }
+.Toastify__progress-bar--info    { background: #4d9eff !important; }
+.Toastify__progress-bar          { opacity: 0.6 !important; height: 2px !important; }
+
+.Toastify__close-button { color: #6b6b6b !important; opacity: 1 !important; }
+.Toastify__close-button:hover { color: #ededed !important; }
+
+.Toastify__toast-icon svg { width: 16px !important; height: 16px !important; }
+
 /* Tailwind utilities only — no base reset (it fights our OS vars) */
 @tailwind components;
 @tailwind utilities;
@@ -32,4 +69,78 @@ body {
 
 .skeleton-pulse {
   animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* ── Themed Select (Radix) ──────────────────────────────────────────────────── */
+.tw-select-trigger:hover {
+  border-color: var(--accent-primary) !important;
+}
+
+.tw-select-trigger[data-state="open"] {
+  border-color: var(--accent-primary) !important;
+}
+
+.tw-select-item:hover,
+.tw-select-item[data-highlighted] {
+  background: var(--accent-glow) !important;
+  color: var(--accent-primary) !important;
+  outline: none !important;
+}
+
+/* ── react-day-picker: strip all injected borders/outlines ─────────────────── */
+.rdp-cell,
+.rdp-day,
+.rdp-head_cell,
+.rdp-button {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.rdp-table {
+  border-collapse: collapse !important;
+}
+
+/* Day button base */
+.rdp-day-btn {
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.rdp-day-btn:hover {
+  background: var(--border-subtle) !important;
+}
+
+/* Today: subtle accent ring */
+.rdp-day-today {
+  color: var(--accent-primary) !important;
+  font-weight: 600;
+  position: relative;
+}
+
+.rdp-day-today::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+}
+
+/* Selected: solid accent fill */
+.rdp-day-selected {
+  background: var(--accent-primary) !important;
+  color: #ffffff !important;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.rdp-day-selected:hover {
+  background: var(--accent-primary) !important;
+  opacity: 0.9;
 }

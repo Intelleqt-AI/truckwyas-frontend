@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TruckWys — Update Notes</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #111; padding: 32px 16px; }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  .header { margin-bottom: 32px; }
+  .header .date { font-size: 12px; color: #888; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+  .header h1 { font-size: 26px; font-weight: 700; }
+  .header p { font-size: 14px; color: #555; margin-top: 6px; }
+  .section { background: #fff; border-radius: 10px; padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 14px; }
+  .new { color: #0057ff; }
+  .fix { color: #16a34a; }
+  ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.5; color: #222; }
+  li .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .footer { text-align: center; font-size: 12px; color: #aaa; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="date">22 June 2026</div>
+    <h1>TruckWys Update</h1>
+    <p>Here's what's new and improved today.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-label new">✦ New</div>
+    <ul>
+      <li><span class="icon">🗺️</span>Map now draws the route along real roads — just like Google Maps.</li>
+      <li><span class="icon">🚛</span>Select a specific Vehicle and Driver when creating a quote. Driver auto-fills when you pick a vehicle.</li>
+      <li><span class="icon">🔗</span>Assigned vehicle and driver now appear on the quote detail page and the customer's shared link.</li>
+      <li><span class="icon">📍</span>After clicking pickup on the map, the Delivery button activates automatically.</li>
+      <li><span class="icon">💡</span>"AI Suggestion" now always returns a price recommendation — no more blank response.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-label" style="color:#7c3aed;">🚛 Fleet — Vehicles</div>
+    <ul>
+      <li><span class="icon">✅</span>Add Vehicle form now matches the Edit Vehicle form — same fields, fully consistent.</li>
+      <li><span class="icon">✅</span>Vehicle list table alignment fixed.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-label" style="color:#7c3aed;">👤 Fleet — Drivers</div>
+    <ul>
+      <li><span class="icon">✅</span>Driver list table alignment fixed.</li>
+      <li><span class="icon">✅</span>Add &amp; Edit Driver forms now have identical fields — fully consistent.</li>
+      <li><span class="icon">✦</span><strong>New:</strong> Assign a vehicle directly from the driver form.</li>
+      <li><span class="icon">✦</span><strong>New:</strong> Driver detail page now shows accurate info — License State, Hire Date, Emergency Contact, and Assigned Vehicle.</li>
+      <li><span class="icon">✅</span>Address, phone, and email properly save and display throughout.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-label fix">✓ Fixed</div>
+    <ul>
+      <li><span class="icon">📊</span>Revenue Guard was always showing 0% margin — now shows real margin based on actual operating costs.</li>
+      <li><span class="icon">🔘</span>Buttons and badges with coloured backgrounds now show white text correctly.</li>
+      <li><span class="icon">🧭</span>Removed the duplicate "Fleet" label at the top of the Fleet page.</li>
+    </ul>
+  </div>
+
+  <div class="footer">TruckWys · Built by Intelleqt</div>
+</div>
+</body>
+</html>

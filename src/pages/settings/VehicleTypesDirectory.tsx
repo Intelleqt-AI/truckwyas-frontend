@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { fetchData, deleteData, postData } from "@/lib/Api";
+import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ConfirmModal } from "@/components/ConfirmModal";
 
 interface VehicleType {
   id: number;
@@ -17,6 +19,18 @@ const sectionStyle: React.CSSProperties = {
   borderRadius: 'var(--card-radius)',
 };
 
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)',
+  color: 'var(--text-tertiary)', letterSpacing: '0.06em',
+  marginBottom: 6, textTransform: 'uppercase',
+};
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+  color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2,
+  fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box',
+};
+
 export function VehicleTypesDirectory() {
   const [types, setTypes] = useState<VehicleType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +39,12 @@ export function VehicleTypesDirectory() {
   const [saving, setSaving] = useState(false);
   const [addErr, setAddErr] = useState('');
   const [form, setForm] = useState({ name: '', description: '', capacity: '', base_rate: '' });
+
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [editType, setEditType] = useState<VehicleType | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', description: '', capacity: '', base_rate: '', active: 'true' });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editErr, setEditErr] = useState('');
 
   const load = () => {
     setLoading(true);
@@ -45,7 +65,6 @@ export function VehicleTypesDirectory() {
   );
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Delete this vehicle type?')) return;
     await deleteData({ url: `api/v1/vehicle-types/${id}/` }).catch(() => {});
     load();
   };
@@ -69,6 +88,40 @@ export function VehicleTypesDirectory() {
       setAddErr(e?.message || 'Failed to add vehicle type');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openEdit = (t: VehicleType) => {
+    setEditType(t);
+    setEditForm({
+      name: t.name || '',
+      description: t.description || '',
+      capacity: t.capacity != null ? String(t.capacity) : '',
+      base_rate: t.base_rate != null ? String(t.base_rate) : '',
+      active: t.active ? 'true' : 'false',
+    });
+    setEditErr('');
+  };
+
+  const handleEditSave = async () => {
+    if (!editType) return;
+    if (!editForm.name.trim()) { setEditErr('Name is required'); return; }
+    setEditSaving(true);
+    setEditErr('');
+    try {
+      await patchData({ url: `api/v1/vehicle-types/${editType.id}/`, data: {
+        name: editForm.name.trim(),
+        description: editForm.description.trim(),
+        capacity: editForm.capacity ? Number(editForm.capacity) : 0,
+        base_rate: editForm.base_rate ? Number(editForm.base_rate) : 0,
+        active: editForm.active === 'true',
+      }});
+      setEditType(null);
+      load();
+    } catch (e: any) {
+      setEditErr(e?.message || 'Failed to update vehicle type');
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -180,14 +233,26 @@ export function VehicleTypesDirectory() {
                     }}>{t.active ? 'Active' : 'Inactive'}</span>
                   </td>
                   <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
-                    <button
-                      onClick={() => handleDelete(t.id)}
-                      style={{
-                        background: 'none', border: '1px solid var(--border-subtle)',
-                        color: 'var(--text-tertiary)', padding: '4px 8px',
-                        fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                      }}
-                    >···</button>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => openEdit(t)}
+                        style={{
+                          background: 'none', border: '1px solid var(--border-subtle)',
+                          color: 'var(--text-secondary)', padding: '4px 10px',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                          letterSpacing: '0.06em',
+                        }}
+                      >EDIT</button>
+                      <button
+                        onClick={() => setDeleteTarget({ id: t.id, name: t.name })}
+                        style={{
+                          background: 'none', border: '1px solid var(--status-danger)',
+                          color: 'var(--status-danger)', padding: '4px 10px',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                          letterSpacing: '0.06em',
+                        }}
+                      >DELETE</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -195,6 +260,76 @@ export function VehicleTypesDirectory() {
           </table>
         )}
       </div>
+
+      {deleteTarget && (
+        <ConfirmModal
+          title="Delete Vehicle Type"
+          message={`Are you sure you want to delete "${deleteTarget.name}"? This cannot be undone.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => handleDelete(deleteTarget.id)}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {/* Edit slide-out */}
+      {editType && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditType(null)} />
+          <div style={{ position: 'relative', width: 420, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Vehicle Type</div>
+              <button onClick={() => setEditType(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            {editErr && (
+              <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+                {editErr}
+              </div>
+            )}
+            {([
+              { key: 'name', label: 'Name', type: 'text' },
+              { key: 'description', label: 'Description', type: 'text' },
+              { key: 'capacity', label: 'Capacity (ton)', type: 'number' },
+              { key: 'base_rate', label: 'Base Rate (R/km)', type: 'number' },
+            ] as const).map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>{f.label}</label>
+                <input
+                  type={f.type}
+                  value={editForm[f.key]}
+                  onChange={e => setEditForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  style={inputStyle}
+                />
+              </div>
+            ))}
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Status</label>
+              <Select value={editForm.active} onValueChange={val => setEditForm(prev => ({ ...prev, active: val }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Active</SelectItem>
+                  <SelectItem value="false">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+              <button
+                disabled={editSaving}
+                onClick={handleEditSave}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: editSaving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase' }}
+              >
+                {editSaving ? 'SAVING...' : 'SAVE CHANGES'}
+              </button>
+              <button
+                onClick={() => setEditType(null)}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase' }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

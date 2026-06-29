@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
+import { toast } from '@/lib/toast';
 import { QuotesList } from './QuotesList';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { LiveBadge } from '@/components/LiveBadge';
@@ -42,15 +44,22 @@ const TAB_SUBTITLES: Record<BookingTab, string> = {
 };
 
 export default function LoadsList() {
-  const [loads, setLoads] = useState<Load[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading: loading, isError, refetch } = useQuery({
+    queryKey: ["loads-list"],
+    queryFn: () => fetchData('/api/v1/loads/'),
+  });
+  const loads = (data?.results || data || []) as Load[];
+  const error = isError ? 'Failed to load bookings' : null;
   const [convertingIds, setConvertingIds] = useState<Set<number>>(new Set());
-  const [activeTab, setActiveTab] = useState<BookingTab>('orders');
   const [orderFilter, setOrderFilter] = useState('All');
   const [historyFilter, setHistoryFilter] = useState('All');
   const [historySearch, setHistorySearch] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
+  const urlSegment = location.pathname.split('/').pop();
+  const activeTab: BookingTab = (['quotes', 'orders', 'history'] as BookingTab[]).includes(urlSegment as BookingTab)
+    ? (urlSegment as BookingTab)
+    : 'orders';
 
   const handleConvertToInvoice = async (load: Load, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -63,11 +72,11 @@ export default function LoadsList() {
       });
 
       if (response?.invoice_id) {
+        toast.success(`Invoice created for ${load.load_number}`);
         navigate(`/finance/invoices/${response.invoice_id}`);
       }
-    } catch (err) {
-      console.error('Failed to convert load to invoice:', err);
-      alert('Failed to create invoice. Please try again.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to create invoice');
     } finally {
       setConvertingIds(prev => {
         const next = new Set(prev);
@@ -77,22 +86,7 @@ export default function LoadsList() {
     }
   };
 
-  const load = () => {
-    return fetchData('/api/v1/loads/')
-      .then((data: any) => {
-        const loadsData = data?.results || data || [];
-        setLoads(loadsData);
-        setError(null);
-      })
-      .catch(() => {
-        setError('Failed to load bookings');
-        setLoads([]);
-      })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, []);
-  useAutoRefresh(load);
+  useAutoRefresh(refetch);
 
   const activeLoads = loads.filter(l => ACTIVE_STATUSES.includes(l.status));
   const historyLoads = loads.filter(l => HISTORY_STATUSES.includes(l.status));
@@ -191,7 +185,7 @@ export default function LoadsList() {
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
               Get started by creating your first quote or booking
             </div>
-            <button onClick={() => navigate('/quotes/new')} className="btn-action">
+            <button onClick={() => navigate('/bookings/quotes/new')} className="btn-action">
               CREATE QUOTE
             </button>
           </div>
@@ -238,7 +232,7 @@ export default function LoadsList() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={() => navigate('/quotes/ai-chat')}
+            onClick={() => navigate('/bookings/quotes/ai-chat')}
             style={{
               background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)',
               padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono)',
@@ -246,7 +240,7 @@ export default function LoadsList() {
             }}
           >AI QUOTE</button>
           <button
-            onClick={() => navigate('/quotes/new')}
+            onClick={() => navigate('/bookings/quotes/new')}
             style={{
               background: 'var(--accent-primary)', border: 'none', color: 'var(--bg-deep)',
               padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono)',
@@ -265,7 +259,7 @@ export default function LoadsList() {
         ]).map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => navigate(`/bookings/${tab.id}`)}
             style={{
               background: 'transparent',
               border: 'none',

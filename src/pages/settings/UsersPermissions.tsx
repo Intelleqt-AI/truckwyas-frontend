@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/lib/AuthContext';
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -54,15 +56,10 @@ interface PendingInvite {
   expires_at?: string;
 }
 
-interface CurrentUser {
-  id: number;
-  role: string;
-}
-
 export function UsersPermissions() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingInvites, setLoadingInvites] = useState(true);
   const [search, setSearch] = useState('');
@@ -74,7 +71,6 @@ export function UsersPermissions() {
 
   useEffect(() => {
     loadUsers();
-    loadCurrentUser();
     loadPendingInvites();
   }, []);
 
@@ -89,22 +85,6 @@ export function UsersPermissions() {
         toast.error('Failed to load users');
       })
       .finally(() => setLoading(false));
-  };
-
-  const loadCurrentUser = () => {
-    fetchData('api/v1/auth/me/')
-      .then((data: any) => setCurrentUser(data))
-      .catch(() => {
-        // Fallback: try to get from localStorage
-        const stored = localStorage.getItem('user');
-        if (stored) {
-          try {
-            setCurrentUser(JSON.parse(stored));
-          } catch {
-            setCurrentUser(null);
-          }
-        }
-      });
   };
 
   const loadPendingInvites = () => {
@@ -236,7 +216,7 @@ export function UsersPermissions() {
                 fontSize: 12, outline: 'none', width: 180,
               }}
             />
-            <button className="btn-action" onClick={() => setShowInvite(!showInvite)}>+ INVITE</button>
+            {isAdmin && <button className="btn-action" onClick={() => setShowInvite(!showInvite)}>+ INVITE</button>}
           </div>
         </div>
 
@@ -269,19 +249,19 @@ export function UsersPermissions() {
                 fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
                 letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: 6,
               }}>Role</div>
-              <select style={{
-                background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                borderRadius: 2, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 12,
-                outline: 'none', cursor: 'pointer',
-              }}
-                value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="operator">Operator</option>
-                <option value="dispatcher">Dispatcher</option>
-                <option value="viewer">Viewer</option>
-                <option value="driver">Driver</option>
-              </select>
+              <Select value={inviteRole} onValueChange={setInviteRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="operator">Operator</SelectItem>
+                  <SelectItem value="dispatcher">Dispatcher</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                  <SelectItem value="driver">Driver</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <button className="btn-action" onClick={handleInvite} disabled={inviting}>
               {inviting ? 'SENDING...' : 'SEND INVITE'}
@@ -332,25 +312,20 @@ export function UsersPermissions() {
                   </div>
                 </td>
                 <td style={{ padding: '12px 20px' }}>
-                  {isAdmin ? (
-                    <select
-                      value={u.role}
-                      onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                      style={{
-                        fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 7px',
-                        border: `1px solid ${roleColor(u.role)}`,
-                        color: roleColor(u.role), borderRadius: 2,
-                        textTransform: 'uppercase' as const, letterSpacing: '0.06em',
-                        background: 'transparent', cursor: 'pointer', outline: 'none',
-                      }}
-                    >
-                      <option value="admin">ADMIN</option>
-                      <option value="manager">MANAGER</option>
-                      <option value="operator">OPERATOR</option>
-                      <option value="dispatcher">DISPATCHER</option>
-                      <option value="viewer">VIEWER</option>
-                      <option value="driver">DRIVER</option>
-                    </select>
+                  {isAdmin && u.id !== currentUser?.id ? (
+                    <Select value={u.role?.toLowerCase()} onValueChange={val => handleRoleChange(u.id, val)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">ADMIN</SelectItem>
+                        <SelectItem value="manager">MANAGER</SelectItem>
+                        <SelectItem value="operator">OPERATOR</SelectItem>
+                        <SelectItem value="dispatcher">DISPATCHER</SelectItem>
+                        <SelectItem value="viewer">VIEWER</SelectItem>
+                        <SelectItem value="driver">DRIVER</SelectItem>
+                      </SelectContent>
+                    </Select>
                   ) : (
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 7px',
@@ -363,7 +338,7 @@ export function UsersPermissions() {
                 <td style={{ padding: '12px 20px' }}>
                   <span style={{
                     fontFamily: 'var(--font-mono)', fontSize: 10,
-                    color: u.status === 'active' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                    color: u.status?.toLowerCase() === 'active' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
                     textTransform: 'uppercase' as const,
                   }}>{u.status}</span>
                 </td>

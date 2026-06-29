@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 
 /**
  * Global real-time event client. Mounted once (in OSLayout) for authenticated
@@ -26,24 +26,44 @@ function wsUrl(): string | null {
 }
 
 const EVENT_TITLES: Record<string, string> = {
-  'booking.created': 'New booking',
-  'booking.status': 'Booking updated',
-  'advance.created': 'Advance requested',
-  'advance.status': 'Capital',
-  'invoice.status': 'Invoice updated',
+  // Bookings / Loads
+  'booking.created':    'New booking',
+  'booking.assigned':   'Booking assigned',
+  'booking.in_transit': 'Booking in transit',
+  'booking.delivered':  'Booking delivered',
+  'booking.cancelled':  'Booking cancelled',
+  // Quotes
+  'quote.created':   'New quote',
+  'quote.sent':      'Quote sent',
+  'quote.accepted':  'Quote accepted',
+  'quote.declined':  'Quote declined',
+  'quote.completed': 'Quote completed',
+  // Invoices
+  'invoice.auto_created': 'Invoice raised',
+  'invoice.paid':         'Invoice paid',
+  'invoice.overdue':      'Invoice overdue',
+  'invoice.status':       'Invoice updated',
+  // Capital
+  'advance.approved': 'Advance approved',
+  'advance.disbursed': 'Funds disbursed',
+  // Customers
+  'customer.created': 'New customer',
 };
 
 export function LiveEvents() {
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
-  const stoppedRef = useRef(false);
 
   useEffect(() => {
-    stoppedRef.current = false;
+    // `stopped` is closure-local so each effect instance has its own flag.
+    // Using a shared ref causes a race in React StrictMode: cleanup sets the ref
+    // to true, then the remount resets it to false before the old WS fires
+    // onclose — creating a phantom third connection.
+    let stopped = false;
 
     const connect = () => {
       const url = wsUrl();
-      if (!url || stoppedRef.current) return;
+      if (!url || stopped) return;
       let ws: WebSocket;
       try {
         ws = new WebSocket(url);
@@ -59,16 +79,21 @@ export function LiveEvents() {
         try { msg = JSON.parse(e.data); } catch { return; }
         if (!msg || msg.type === 'connected' || msg.type === 'pong') return;
         if (msg.type === 'event') {
-          // Tell every live screen to refresh now.
           window.dispatchEvent(new CustomEvent('tw:live-event', { detail: msg }));
-          const title = EVENT_TITLES[msg.event] || 'Update';
-          if (msg.message) toast(title, { description: msg.message });
+          if (msg.message) {
+            const label = EVENT_TITLES[msg.event] || 'Update';
+            const text = label === msg.message ? label : `${label} — ${msg.message}`;
+            const ntype = (msg.data?.type || '').toLowerCase();
+            if (ntype === 'success') toast.success(text);
+            else if (ntype === 'alert') toast.error(text);
+            else toast.info(text);
+          }
         }
       };
 
       ws.onclose = () => {
         wsRef.current = null;
-        if (stoppedRef.current) return;
+        if (stopped) return;
         const delay = Math.min(30000, 1000 * 2 ** retryRef.current);
         retryRef.current += 1;
         setTimeout(connect, delay);
@@ -80,7 +105,7 @@ export function LiveEvents() {
     connect();
 
     return () => {
-      stoppedRef.current = true;
+      stopped = true;
       try { wsRef.current?.close(); } catch { /* noop */ }
       wsRef.current = null;
     };

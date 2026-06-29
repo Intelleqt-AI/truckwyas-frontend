@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData } from "@/lib/Api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -52,11 +53,6 @@ const inputStyle: React.CSSProperties = {
   transition: 'border-color 0.15s',
 };
 
-const selectStyle: React.CSSProperties = {
-  ...inputStyle,
-  cursor: 'pointer',
-  appearance: 'auto' as const,
-};
 
 const gridStyle: React.CSSProperties = {
   display: 'grid',
@@ -74,21 +70,45 @@ export function ProfileSettings() {
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchData('api/auth/me/').then((d: any) => {
-      if (d) setForm({
-        first_name: d.first_name || '',
-        last_name: d.last_name || '',
-        email: d.email || '',
-        job_title: d.job_title || '',
-        phone: d.phone || '',
-        timezone: d.timezone || 'Africa/Johannesburg',
-        language: d.language || 'en',
-        date_format: d.date_format || 'DD/MM/YYYY',
-      });
+      if (d) {
+        setForm({
+          first_name: d.first_name || '',
+          last_name: d.last_name || '',
+          email: d.email || '',
+          job_title: d.job_title || '',
+          phone: d.phone || '',
+          timezone: d.timezone || 'Africa/Johannesburg',
+          language: d.language || 'en',
+          date_format: d.date_format || 'DD/MM/YYYY',
+        });
+        if (d.avatar) setAvatarUrl(d.avatar);
+      }
     }).catch(() => {});
   }, []);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image must be under 2MB.');
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      const result = await patchData({ url: 'api/auth/me/', data: formData });
+      if (result?.avatar) setAvatarUrl(result.avatar);
+    } catch {}
+    setUploadingAvatar(false);
+    e.target.value = '';
+  };
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -119,22 +139,45 @@ export function ProfileSettings() {
           <span style={sectionTitleStyle}>Profile Picture</span>
         </div>
         <div style={{ ...sectionBodyStyle, display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{
-            width: 52, height: 52, borderRadius: '50%',
-            background: 'var(--accent-dim)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 600,
-            color: 'var(--accent-primary)', flexShrink: 0,
-          }}>
-            {(form.first_name[0] || '') + (form.last_name[0] || '') || 'AU'}
-          </div>
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt="Profile"
+              style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+            />
+          ) : (
+            <div style={{
+              width: 52, height: 52, borderRadius: '50%',
+              background: 'var(--accent-dim)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 600,
+              color: 'var(--accent-primary)', flexShrink: 0,
+            }}>
+              {(form.first_name[0] || '') + (form.last_name[0] || '') || 'AU'}
+            </div>
+          )}
           <div>
-            <button style={{
-              background: 'none', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-secondary)', padding: '6px 12px',
-              fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
-              cursor: 'pointer', letterSpacing: '0.05em',
-            }}>CHANGE PICTURE</button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif"
+              style={{ display: 'none' }}
+              onChange={handleAvatarChange}
+            />
+            <button
+              style={{
+                background: 'none', border: '1px solid var(--border-subtle)',
+                color: 'var(--text-secondary)', padding: '6px 12px',
+                fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
+                cursor: uploadingAvatar ? 'not-allowed' : 'pointer',
+                letterSpacing: '0.05em',
+                opacity: uploadingAvatar ? 0.6 : 1,
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingAvatar}
+            >
+              {uploadingAvatar ? 'UPLOADING...' : 'CHANGE PICTURE'}
+            </button>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
               JPG, GIF or PNG. Max size 2MB.
             </div>
@@ -184,29 +227,44 @@ export function ProfileSettings() {
           <div style={{ ...gridStyle, marginBottom: 16 }}>
             <div>
               <label style={labelStyle}>Timezone</label>
-              <select style={selectStyle} value={form.timezone} onChange={e => set('timezone', e.target.value)}>
-                <option value="Africa/Johannesburg">South Africa (UTC+2)</option>
-                <option value="UTC">UTC</option>
-                <option value="Europe/London">London (UTC+0)</option>
-                <option value="America/New_York">New York (UTC-5)</option>
-              </select>
+              <Select value={form.timezone} onValueChange={val => set('timezone', val)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Africa/Johannesburg">South Africa (UTC+2)</SelectItem>
+                  <SelectItem value="UTC">UTC</SelectItem>
+                  <SelectItem value="Europe/London">London (UTC+0)</SelectItem>
+                  <SelectItem value="America/New_York">New York (UTC-5)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label style={labelStyle}>Language</label>
-              <select style={selectStyle} value={form.language} onChange={e => set('language', e.target.value)}>
-                <option value="en">English</option>
-                <option value="af">Afrikaans</option>
-                <option value="zu">Zulu</option>
-              </select>
+              <Select value={form.language} onValueChange={val => set('language', val)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="af">Afrikaans</SelectItem>
+                  <SelectItem value="zu">Zulu</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div style={{ marginBottom: 20, maxWidth: 240 }}>
             <label style={labelStyle}>Date Format</label>
-            <select style={selectStyle} value={form.date_format} onChange={e => set('date_format', e.target.value)}>
-              <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-              <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-            </select>
+            <Select value={form.date_format} onValueChange={val => set('date_format', val)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+                <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
+                <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button

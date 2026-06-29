@@ -1,4 +1,5 @@
 import { useParams, NavLink, Navigate } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
 
 // Import individual setting pages
 import { ProfileSettings } from "./settings/ProfileSettings";
@@ -13,7 +14,10 @@ import { VehiclesDirectory } from "./settings/VehiclesDirectory";
 import { VehicleTypesDirectory } from "./settings/VehicleTypesDirectory";
 import { DeveloperApi } from "./settings/DeveloperApi";
 
-const SECTIONS = [
+type SectionItem = { id: string; label: string; component: () => JSX.Element; adminOnly?: boolean };
+type Section = { group: string; items: SectionItem[] };
+
+const SECTIONS: Section[] = [
   {
     group: 'My Account',
     items: [
@@ -25,10 +29,10 @@ const SECTIONS = [
   {
     group: 'Workspace',
     items: [
-      { id: 'company', label: 'Company Details', component: CompanySettings },
-      { id: 'users', label: 'Users & Permissions', component: UsersPermissions },
-      { id: 'billing', label: 'Billing', component: BillingSettings },
-      { id: 'integrations', label: 'Integrations', component: IntegrationsSettings },
+      { id: 'company', label: 'Company Details', component: CompanySettings, adminOnly: true },
+      { id: 'users', label: 'Users & Permissions', component: UsersPermissions, adminOnly: true },
+      { id: 'billing', label: 'Billing', component: BillingSettings, adminOnly: true },
+      { id: 'integrations', label: 'Integrations', component: IntegrationsSettings, adminOnly: true },
     ],
   },
   {
@@ -42,7 +46,7 @@ const SECTIONS = [
   {
     group: 'Developers',
     items: [
-      { id: 'risk-api', label: 'Risk-Scoring API', component: DeveloperApi },
+      { id: 'risk-api', label: 'Risk-Scoring API', component: DeveloperApi, adminOnly: true },
     ],
   },
 ];
@@ -51,11 +55,24 @@ const ALL_ITEMS = SECTIONS.flatMap(s => s.items);
 
 export default function Settings() {
   const { section } = useParams();
+  const { user } = useAuth();
+  const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
 
   if (!section) return <Navigate to="/settings/profile" replace />;
 
   const current = ALL_ITEMS.find(i => i.id === section);
+
+  // Redirect non-admins away from admin-only sections
+  if ((current as any)?.adminOnly && !isAdmin) {
+    return <Navigate to="/settings/profile" replace />;
+  }
+
   const CurrentComponent = current?.component || ProfileSettings;
+
+  const visibleSections = SECTIONS.map(s => ({
+    ...s,
+    items: s.items.filter(item => !(item as any).adminOnly || isAdmin),
+  })).filter(s => s.items.length > 0);
 
   return (
     <div style={{ display: 'flex', minHeight: '100%', gap: 0 }}>
@@ -67,8 +84,8 @@ export default function Settings() {
         paddingTop: 8,
         paddingBottom: 24,
       }}>
-        {SECTIONS.map((s, idx) => (
-          <div key={s.group} style={{ marginBottom: idx < SECTIONS.length - 1 ? 20 : 0 }}>
+        {visibleSections.map((s, idx) => (
+          <div key={s.group} style={{ marginBottom: idx < visibleSections.length - 1 ? 20 : 0 }}>
             <div style={{
               fontSize: 10,
               fontFamily: 'var(--font-mono)',

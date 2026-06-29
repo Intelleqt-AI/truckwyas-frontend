@@ -80,7 +80,7 @@ export default function DriverProfile() {
   const bestTripAmount = loads.length > 0 ? Math.max(...loads.map((l: any) => parseFloat(l.total_amount || '0'))) : 0;
 
   // Performance scores
-  const onTimeRate = driver.on_time_rate ?? 85;
+  const onTimeRate = driver.on_time_rate ?? 0;
   const safetyScore = Math.max(0, Math.min(100, 100 - (driver.violation_count ?? 0) * 10 - (driver.accident_history ?? 0) * 20));
   const experienceScore = Math.min(100, ((driver.experience_years ?? 0) / 15) * 100);
   const complianceScore = driver.license_expiry && new Date(driver.license_expiry) > new Date() ? 100 : 0;
@@ -194,12 +194,13 @@ export default function DriverProfile() {
           <div className="card-title" style={{ marginBottom: 16 }}>DETAILS</div>
           {[
             { label: 'LICENSE NUMBER', value: driver.license_number },
+            { label: 'LICENSE STATE', value: driver.license_state },
             { label: 'PHONE', value: phone },
             { label: 'EMAIL', value: email },
-            { label: 'ID NUMBER', value: driver.id_number },
-            { label: 'DATE OF BIRTH', value: driver.date_of_birth?.slice(0, 10) },
-            { label: 'ADDRESS', value: driver.address },
-            { label: 'VEHICLE', value: driver.vehicle_plate || driver.assigned_vehicle || '—' },
+            { label: 'ADDRESS', value: ud.address },
+            { label: 'HIRE DATE', value: driver.hire_date?.slice(0, 10) },
+            { label: 'EMERGENCY CONTACT', value: driver.emergency_contact || driver.emergency_phone },
+            { label: 'VEHICLE', value: driver.assigned_vehicle },
           ].map(r => (
             <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
               <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>

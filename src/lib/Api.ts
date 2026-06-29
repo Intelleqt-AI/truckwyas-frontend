@@ -37,7 +37,8 @@ api.interceptors.response.use(
     const data = error.response?.data;
     let serverMsg: string | undefined;
     if (typeof data === 'string') {
-      serverMsg = data;
+      // Never surface raw HTML (Django debug pages, nginx error pages, etc.)
+      serverMsg = data.trim().startsWith('<') ? undefined : data;
     } else if (data && typeof data === 'object') {
       const obj = data as Record<string, any>;
       const firstField = obj.error ?? obj.detail ?? obj[Object.keys(obj)[0]];
@@ -79,13 +80,19 @@ export const putData = async ({ url, data }: { url: string; data: any }) => {
   return response.data;
 };
 
-export const patchData = async ({ url, data }: { url: string; data: any }) => {
+export const patchData = async ({ url, data, config = {} }: { url: string; data: any; config?: any }) => {
   if (!url) throw new Error('No patch URL provided');
-  const response = await api.patch(url, data);
+  const response = await api.patch(url, data, config);
   return response.data;
 };
 
 export const loginUser = async ({ username, password }: { username: string; password: string }) => {
   const res = await api.post('api/v1/auth/login/', { username, password });
   return res.data;
+};
+
+export const downloadBlob = async (url: string): Promise<Blob> => {
+  if (!url) throw new Error('No URL provided');
+  const response = await api.get(url, { responseType: 'blob' });
+  return response.data;
 };

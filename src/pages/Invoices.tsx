@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { fetchData, postData, putData, deleteData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUS_COLOR: Record<string, string> = {
   PAID: 'var(--status-success)', SENT: 'var(--status-warning)',
@@ -30,30 +33,72 @@ const PAGE_SIZE = 10;
 
 type FinanceTab = 'invoices' | 'expenses';
 
+// Fetches invoices + stats. Lives in the queryFn so the result is cached by
+// TanStack Query (keyed below) and survives navigation — revisiting the page
+// no longer refires these requests until the cache goes stale.
+async function loadInvoicesPage() {
+  const [data, statsData] = await Promise.all([
+    fetchData('/api/v1/invoices/'),
+    fetchData('/api/v1/invoices/stats/').catch(() => null),
+  ]);
+  // API returns paginated {count, results} — extract results
+  return {
+    invoices: Array.isArray(data) ? data : (data?.results || []),
+    stats: statsData,
+  };
+}
+
+// Fetches expenses + vehicles together (mirrors the original Promise.all
+// grouping). Cached under its own key so the expenses tab survives navigation.
+async function loadFinanceExpenses() {
+  const [expensesData, vehiclesData] = await Promise.all([
+    fetchData('/api/v1/expenses/'),
+    fetchData('/api/v1/vehicles/').catch(() => []),
+  ]);
+  return {
+    expenses: Array.isArray(expensesData) ? expensesData : (expensesData?.results || []),
+    vehicles: Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.results || []),
+  };
+}
+
 export default function Invoices() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<FinanceTab>('invoices');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [invoices, setInvoices] = useState<any[]>([]);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [stats, setStats] = useState<any>(null);
   const statuses = ['All', 'SENT', 'OVERDUE', 'PAID', 'DRAFT'];
 
+  // Invoices + stats, cached across navigations.
+  const { data: invoicesData, isLoading: loading, refetch: refetchInvoices } = useQuery({
+    queryKey: ['invoices-page'],
+    queryFn: loadInvoicesPage,
+  });
+  const invoices: any[] = invoicesData?.invoices ?? [];
+  const stats: any = invoicesData?.stats ?? null;
+
+  // Expenses + vehicles, cached across navigations. Only fetched once the
+  // expenses tab is opened, mirroring the original lazy load.
+  const { data: expensesData, isLoading: expensesQueryLoading, refetch: refetchExpenses } = useQuery({
+    queryKey: ['finance-expenses'],
+    queryFn: loadFinanceExpenses,
+    enabled: activeTab === 'expenses',
+  });
+  const expenses: any[] = expensesData?.expenses ?? [];
+  const vehicles: any[] = expensesData?.vehicles ?? [];
+  // Show the skeleton only before the first expenses fetch resolves.
+  const expensesLoading = activeTab === 'expenses' && expensesQueryLoading;
+
   // Expenses state
-  const [expenses, setExpenses] = useState<any[]>([]);
-  const [expensesLoading, setExpensesLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [expenseStatusFilter, setExpenseStatusFilter] = useState('All');
   const [expenseSearch, setExpenseSearch] = useState('');
   const [expensePage, setExpensePage] = useState(1);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any>(null);
-  const [vehicles, setVehicles] = useState<any[]>([]);
   const [expenseForm, setExpenseForm] = useState({
     category: 'FUEL',
     description: '',
@@ -74,60 +119,12 @@ export default function Invoices() {
     document.title = 'Invoices - TruckWys';
   }, []);
 
-  // Single stable loader: fetches invoices + stats, and (when the expenses
-  // tab is active) expenses + vehicles. Refreshes silently — never flips the
-  // main loading flag back on, only off in finally — so auto-refresh doesn't
-  // flash skeletons every interval.
-  const load = async () => {
-    const tasks: Promise<void>[] = [];
-
-    tasks.push((async () => {
-      try {
-        const [data, statsData] = await Promise.all([
-          fetchData('/api/v1/invoices/'),
-          fetchData('/api/v1/invoices/stats/').catch(() => null),
-        ]);
-        // API returns paginated {count, results} — extract results
-        setInvoices(Array.isArray(data) ? data : (data?.results || []));
-        setStats(statsData);
-      } catch (error) {
-        console.error('Failed to load invoices:', error);
-        setInvoices([]);
-      } finally {
-        setLoading(false);
-      }
-    })());
-
-    if (activeTab === 'expenses') {
-      tasks.push((async () => {
-        try {
-          const [expensesData, vehiclesData] = await Promise.all([
-            fetchData('/api/v1/expenses/'),
-            fetchData('/api/v1/vehicles/').catch(() => []),
-          ]);
-          setExpenses(Array.isArray(expensesData) ? expensesData : (expensesData?.results || []));
-          setVehicles(Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.results || []));
-        } catch (error) {
-          console.error('Failed to load expenses:', error);
-          setExpenses([]);
-        } finally {
-          setExpensesLoading(false);
-        }
-      })());
-    }
-
-    await Promise.all(tasks);
-  };
-
-  useEffect(() => { load(); }, []);
-  useAutoRefresh(load);
-
-  // Load expenses when switching to expenses tab
-  useEffect(() => {
-    if (activeTab === 'expenses') {
-      load();
-    }
-  }, [activeTab]);
+  // Live-refresh both datasets on the auto-refresh tick / focus / live events.
+  // The expenses query is a no-op until its tab has been opened (enabled flag).
+  useAutoRefresh(() => {
+    refetchInvoices();
+    if (activeTab === 'expenses') refetchExpenses();
+  });
 
   // Expense handlers
   const handleExpenseFormChange = (field: string, value: any) => {
@@ -166,11 +163,11 @@ export default function Invoices() {
       if (editingExpense) {
         await putData({ url: `/api/v1/expenses/${editingExpense.id}/`, data: payload });
         setToast('Expense updated!');
-        setExpenses(prev => prev.map(e => e.id === editingExpense.id ? { ...e, ...payload } : e));
+        refetchExpenses();
       } else {
-        const newExpense = await postData({ url: '/api/v1/expenses/', data: payload });
+        await postData({ url: '/api/v1/expenses/', data: payload });
         setToast('Expense added!');
-        setExpenses(prev => [newExpense, ...prev]);
+        refetchExpenses();
       }
 
       setTimeout(() => setToast(null), 3000);
@@ -200,7 +197,7 @@ export default function Invoices() {
       await postData({ url: `/api/v1/expenses/${expenseId}/approve/` });
       setToast('Expense approved!');
       setTimeout(() => setToast(null), 3000);
-      setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, status: 'APPROVED' } : e));
+      refetchExpenses();
     } catch (error) {
       console.error('Failed to approve expense:', error);
       setToast('Failed to approve expense');
@@ -213,7 +210,7 @@ export default function Invoices() {
       await postData({ url: `/api/v1/expenses/${expenseId}/reject/` });
       setToast('Expense rejected!');
       setTimeout(() => setToast(null), 3000);
-      setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, status: 'REJECTED' } : e));
+      refetchExpenses();
     } catch (error) {
       console.error('Failed to reject expense:', error);
       setToast('Failed to reject expense');
@@ -254,7 +251,7 @@ export default function Invoices() {
       await deleteData({ url: `/api/v1/expenses/${expenseId}/` });
       setToast('Expense deleted!');
       setTimeout(() => setToast(null), 3000);
-      setExpenses(prev => prev.filter(e => e.id !== expenseId));
+      refetchExpenses();
     } catch (error) {
       console.error('Failed to delete expense:', error);
       setToast('Failed to delete expense');
@@ -269,8 +266,7 @@ export default function Invoices() {
       await postData({ url: `/api/v1/invoices/${invoiceId}/send_invoice/` });
       setToast('Invoice sent!');
       setTimeout(() => setToast(null), 3000);
-      // Optimistically update status
-      setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: 'SENT' } : inv));
+      refetchInvoices();
     } catch (error) {
       console.error('Failed to send invoice:', error);
       setToast('Failed to send invoice');
@@ -326,6 +322,16 @@ export default function Invoices() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const filteredExpenses = expenses.filter(e => {
+    const matchCategory = categoryFilter === 'All' || e.category === categoryFilter;
+    const matchStatus = expenseStatusFilter === 'All' || e.status === expenseStatusFilter;
+    const matchSearch = !expenseSearch ||
+      e.description?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
+      e.vendor?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
+      e.expense_number?.toLowerCase().includes(expenseSearch.toLowerCase());
+    return matchCategory && matchStatus && matchSearch;
+  });
 
   const outstanding = allInvoices.filter(i => i.status === 'SENT').reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
   const overdue = allInvoices.filter(i => i.status === 'OVERDUE').reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
@@ -447,28 +453,20 @@ export default function Invoices() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Category *</label>
-                    <select
-                      value={expenseForm.category}
-                      onChange={(e) => handleExpenseFormChange('category', e.target.value)}
-                      style={{
-                        width: '100%',
-                        background: 'var(--bg-surface)',
-                        border: '1px solid var(--border-subtle)',
-                        padding: '10px 12px',
-                        color: 'var(--text-primary)',
-                        borderRadius: 2,
-                        fontSize: 13,
-                        fontFamily: 'var(--font-sans)',
-                      }}
-                    >
-                      <option value="FUEL">Fuel</option>
-                      <option value="TOLLS">Tolls</option>
-                      <option value="MAINTENANCE">Maintenance</option>
-                      <option value="DRIVER_COST">Driver Cost</option>
-                      <option value="INSURANCE">Insurance</option>
-                      <option value="OVERHEAD">Overhead</option>
-                      <option value="OTHER">Other</option>
-                    </select>
+                    <Select value={expenseForm.category} onValueChange={val => handleExpenseFormChange('category', val)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="FUEL">Fuel</SelectItem>
+                        <SelectItem value="TOLLS">Tolls</SelectItem>
+                        <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                        <SelectItem value="DRIVER_COST">Driver Cost</SelectItem>
+                        <SelectItem value="INSURANCE">Insurance</SelectItem>
+                        <SelectItem value="OVERHEAD">Overhead</SelectItem>
+                        <SelectItem value="OTHER">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div>
@@ -563,43 +561,23 @@ export default function Invoices() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <div>
                       <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date *</label>
-                      <input
-                        type="date"
+                      <DatePicker
                         value={expenseForm.expense_date}
-                        onChange={(e) => handleExpenseFormChange('expense_date', e.target.value)}
-                        style={{
-                          width: '100%',
-                          background: 'var(--bg-surface)',
-                          border: '1px solid var(--border-subtle)',
-                          padding: '10px 12px',
-                          color: 'var(--text-primary)',
-                          borderRadius: 2,
-                          fontSize: 13,
-                          fontFamily: 'var(--font-mono)',
-                        }}
+                        onChange={val => handleExpenseFormChange('expense_date', val)}
                       />
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vehicle</label>
-                      <select
-                        value={expenseForm.vehicle}
-                        onChange={(e) => handleExpenseFormChange('vehicle', e.target.value)}
-                        style={{
-                          width: '100%',
-                          background: 'var(--bg-surface)',
-                          border: '1px solid var(--border-subtle)',
-                          padding: '10px 12px',
-                          color: 'var(--text-primary)',
-                          borderRadius: 2,
-                          fontSize: 13,
-                          fontFamily: 'var(--font-sans)',
-                        }}
-                      >
-                        <option value="">Select vehicle...</option>
-                        {vehicles.map(v => (
-                          <option key={v.id} value={v.id}>{v.registration || v.vehicle_number}</option>
-                        ))}
-                      </select>
+                      <Select value={expenseForm.vehicle} onValueChange={val => handleExpenseFormChange('vehicle', val)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select vehicle..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vehicles.map(v => (
+                            <SelectItem key={v.id} value={String(v.id)}>{v.plate || v.registration || v.vehicle_number}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -760,7 +738,7 @@ export default function Invoices() {
           )}
 
           {/* Filters */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'row', gap: 8, marginBottom: 20, alignItems: 'center' }}>
             <input
               type="text"
               placeholder="Search expenses..."
@@ -787,65 +765,50 @@ export default function Invoices() {
                 padding: '6px 10px',
                 color: 'var(--text-primary)',
                 borderRadius: 2,
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
-                outline: 'none',
+                fontSize: 12,
+                width: 160,
                 cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
               }}
             >
               {expenseCategories.map(c => (
                 <option key={c} value={c}>{c === 'All' ? 'All Categories' : c.replace('_', ' ')}</option>
               ))}
             </select>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {expenseStatuses.map(s => (
-                <button
-                  key={s}
-                  onClick={() => { setExpenseStatusFilter(s); setExpensePage(1); }}
-                  style={{
-                    background: expenseStatusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    color: expenseStatusFilter === s ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                    padding: '6px 12px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    fontWeight: expenseStatusFilter === s ? 600 : 400,
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+            {expenseStatuses.map(s => (
+              <button
+                key={s}
+                onClick={() => { setExpenseStatusFilter(s); setExpensePage(1); }}
+                style={{
+                  background: expenseStatusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  color: expenseStatusFilter === s ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                  padding: '6px 12px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  fontWeight: expenseStatusFilter === s ? 600 : 400,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {s}
+              </button>
+            ))}
+            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
+              {filteredExpenses.length} expenses
+            </span>
           </div>
 
           {/* Expenses Table */}
           {(() => {
-            const filteredExpenses = expenses.filter(e => {
-              const matchCategory = categoryFilter === 'All' || e.category === categoryFilter;
-              const matchStatus = expenseStatusFilter === 'All' || e.status === expenseStatusFilter;
-              const matchSearch = !expenseSearch ||
-                e.description?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
-                e.vendor?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
-                e.expense_number?.toLowerCase().includes(expenseSearch.toLowerCase());
-              return matchCategory && matchStatus && matchSearch;
-            });
-
             const totalPages = Math.max(1, Math.ceil(filteredExpenses.length / PAGE_SIZE));
             const expenseRows = filteredExpenses.slice((expensePage - 1) * PAGE_SIZE, expensePage * PAGE_SIZE);
 
             return (
               <>
-                <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
-                    {filteredExpenses.length} expenses
-                  </span>
-                </div>
-
                 <div className="card table-card">
                   <table className="data-table">
                     <thead>
@@ -854,9 +817,9 @@ export default function Invoices() {
                         <th>Category</th>
                         <th>Description</th>
                         <th>Vehicle</th>
-                        <th className="text-right">Amount</th>
+                        <th>Amount</th>
                         <th>Status</th>
-                        <th className="text-right">Actions</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -886,9 +849,8 @@ export default function Invoices() {
                           </tr>
                         )
                       ) : expenseRows.map(exp => {
-                        const vehicleName = vehicles.find(v => v.id === exp.vehicle)?.registration ||
-                                          vehicles.find(v => v.id === exp.vehicle)?.vehicle_number ||
-                                          'N/A';
+                        const veh = vehicles.find(v => v.id === exp.vehicle);
+                        const vehicleName = veh?.plate || veh?.registration || veh?.vehicle_number || 'N/A';
 
                         return (
                           <tr key={exp.id}>
@@ -904,7 +866,7 @@ export default function Invoices() {
                             <td className="mono" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                               {vehicleName}
                             </td>
-                            <td className="mono text-right" style={{ fontSize: 13, fontWeight: 500 }}>
+                            <td className="mono" style={{ fontSize: 13, fontWeight: 500 }}>
                               {formatCurrency(exp.amount)}
                             </td>
                             <td>
@@ -919,8 +881,8 @@ export default function Invoices() {
                                 {exp.status}
                               </span>
                             </td>
-                            <td className="text-right">
-                              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <td>
+                              <div style={{ display: 'flex', gap: 8 }}>
                                 {exp.status === 'PENDING' && (
                                   <>
                                     <button
@@ -1035,10 +997,10 @@ export default function Invoices() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
           {[
-            { label: 'Total Invoiced MTD', value: formatCurrency(stats?.total_invoiced_mtd || outstanding), color: 'var(--text-primary)' },
-            { label: 'Collected', value: formatCurrency(stats?.total_collected_mtd || paid), color: 'var(--status-success)' },
-            { label: 'Overdue', value: `${stats?.overdue_count || Math.floor(overdue / 40000)} / ${formatCurrency(stats?.overdue_amount || overdue)}`, color: 'var(--status-danger)' },
-            { label: 'Collection Rate', value: `${Math.round((stats?.collection_rate || 0.71) * 100)}%`, color: 'var(--accent-primary)' },
+            { label: 'Total Invoiced MTD', value: formatCurrency(stats?.total_invoiced_mtd ?? outstanding), color: 'var(--text-primary)' },
+            { label: 'Collected', value: formatCurrency(stats?.total_collected_mtd ?? paid), color: 'var(--status-success)' },
+            { label: 'Overdue', value: `${stats?.overdue_count ?? 0} / ${formatCurrency(stats?.overdue_amount ?? overdue)}`, color: 'var(--status-danger)' },
+            { label: 'Collection Rate', value: `${Math.round((stats?.collection_rate ?? 0) * 100)}%`, color: 'var(--accent-primary)' },
           ].map(m => (
             <div key={m.label} className="card metric-card">
               <div className="card-header"><span className="card-title">{m.label}</span></div>
@@ -1083,7 +1045,7 @@ export default function Invoices() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Invoice #</th><th>Customer</th><th>Amount</th><th>Status</th><th>Due Date</th><th className="text-right">Actions</th>
+              <th>Invoice #</th><th>Customer</th><th>Amount</th><th>Status</th><th>Due Date</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1143,8 +1105,8 @@ export default function Invoices() {
                       )}
                     </div>
                   </td>
-                  <td className="text-right" onClick={e => e.stopPropagation()}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <td onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', gap: 8 }}>
                       {invStatus === 'DRAFT' && (
                         <button className="btn-action" style={{ fontSize: 10, padding: '4px 12px' }} onClick={(e) => handleSendInvoice(e, inv.id)} disabled={sendingId === inv.id}>
                           {sendingId === inv.id ? 'SENDING...' : 'SEND'}

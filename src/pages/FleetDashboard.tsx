@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -31,33 +32,33 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
 export default function FleetDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<'vehicles' | 'drivers'>('vehicles');
-  const [vehicles, setVehicles] = useState<any[]>([]);
-  const [drivers, setDrivers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // Fetch lives in the queryFn so the result is cached by TanStack Query
+  // (keyed below) and survives navigation — revisiting the page no longer
+  // refires these requests until the cache goes stale.
+  const { data, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ["fleet-dashboard"],
+    queryFn: async () => {
+      const [vehiclesData, driversData] = await Promise.all([
+        fetchData('api/v1/vehicles/'),
+        fetchData('api/v1/drivers/')
+      ]);
+      return {
+        vehicles: Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.results || []),
+        drivers: Array.isArray(driversData) ? driversData : (driversData?.results || []),
+      };
+    },
+  });
+
+  const vehicles: any[] = data?.vehicles ?? [];
+  const drivers: any[] = data?.drivers ?? [];
+  const error = queryError ? 'Failed to load fleet data' : null;
 
   useEffect(() => {
     document.title = 'Fleet - TruckWys';
   }, []);
 
-  const load = () => {
-    Promise.all([
-      fetchData('api/v1/vehicles/'),
-      fetchData('api/v1/drivers/')
-    ])
-      .then(([vehiclesData, driversData]) => {
-        setVehicles(Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.results || []));
-        setDrivers(Array.isArray(driversData) ? driversData : (driversData?.results || []));
-        setError(null);
-      })
-      .catch(() => {
-        setError('Failed to load fleet data');
-      })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, []);
-  useAutoRefresh(load); // live-refresh every 30s + on focus
+  useAutoRefresh(refetch); // live-refresh every 30s + on focus
 
   const activeVehicles = vehicles.filter(v => v.status === 'IN_USE').length;
   const idleVehicles = vehicles.filter(v => v.status === 'AVAILABLE').length;
@@ -68,7 +69,6 @@ export default function FleetDashboard() {
     return (
       <div>
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
         </div>
         <div className="card" style={{ padding: 20 }}>
@@ -83,7 +83,6 @@ export default function FleetDashboard() {
     return (
       <div>
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
         </div>
         <div className="card" style={{ padding: 20, color: 'var(--status-danger)' }}>
@@ -98,7 +97,6 @@ export default function FleetDashboard() {
       {/* Header */}
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
             <LiveBadge />

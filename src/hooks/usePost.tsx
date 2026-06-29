@@ -1,10 +1,22 @@
 // hooks/usePost.ts
 import { postData } from '@/lib/Api';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-export const usePost = (options = {}) => {
-  return useMutation({
-    mutationFn: ({ url, data, config }: { url: string; data: any; config?: any }) => postData({ url, data, config }),
-    ...options,
+export const usePost = (options: any = {}) => {
+  const { invalidate, onSuccess, ...rest } = options;
+  const queryClient = useQueryClient();
+
+  return useMutation<any, any, { url: string; data?: any; config?: any }>({
+    mutationFn: ({ url, data, config }) => postData({ url, data, config }),
+    onSuccess: (...args) => {
+      if (invalidate) {
+        const keys = Array.isArray(invalidate) ? invalidate : [invalidate];
+        keys.forEach((key: any) =>
+          queryClient.invalidateQueries({ queryKey: Array.isArray(key) ? key : [key] })
+        );
+      }
+      onSuccess?.(...args);
+    },
+    ...rest,
   });
 };

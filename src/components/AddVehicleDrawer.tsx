@@ -47,11 +47,12 @@ const inputStyle: React.CSSProperties = {
 export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [vehicleTypes, setVehicleTypes] = useState<{ id: number; name: string }[]>([]);
   const [drivers, setDrivers] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { setSubmitError(null); return; }
     fetchData('api/v1/vehicle-types/').then((d: any) => {
       const arr = Array.isArray(d) ? d : (d?.results || []);
       setVehicleTypes(arr.map((vt: any) => ({ id: vt.id, name: vt.name })));
@@ -69,6 +70,7 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
 
   const handleCreate = async () => {
     setSaving(true);
+    setSubmitError(null);
     try {
       const vehicleTypeId = vehicleTypes.find(vt => vt.name === form.type)?.id;
       const { type: _t, ...rest } = form;
@@ -86,10 +88,13 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
         },
       });
       setForm(EMPTY_FORM);
+      setSubmitError(null);
       onCreated();
       onClose();
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to create vehicle');
+      const msg = e?.message || 'Failed to create vehicle';
+      setSubmitError(msg);
+      toast.error(msg);
     }
     setSaving(false);
   };
@@ -108,6 +113,29 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
           <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Add Vehicle</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
         </div>
+
+        {submitError && (
+          <div style={{
+            marginBottom: 20,
+            padding: '12px 14px',
+            background: 'var(--status-danger-bg, #fef2f2)',
+            border: '1px solid var(--status-danger, #dc2626)',
+            borderRadius: 4,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+          }}>
+            <span style={{ color: 'var(--status-danger, #dc2626)', fontWeight: 700, fontSize: 15, lineHeight: 1 }}>!</span>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-danger, #dc2626)', marginBottom: 2 }}>
+                Failed to create vehicle
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--status-danger, #dc2626)', opacity: 0.85 }}>
+                {submitError}
+              </div>
+            </div>
+          </div>
+        )}
 
         {TEXT_FIELDS.map(f => (
           <div key={f.key} style={{ marginBottom: 16 }}>

@@ -44,9 +44,16 @@ const TAB_SUBTITLES: Record<BookingTab, string> = {
 };
 
 export default function LoadsList() {
-  const { data, isLoading: loading, isError, refetch } = useQuery({
+  const { data, isLoading: loading, isError, isFetching, refetch } = useQuery({
     queryKey: ["loads-list"],
     queryFn: () => fetchData('/api/v1/loads/'),
+    // Give the backend enough time to wake from a cold start (Render free tier ~20-30s).
+    // Retry up to 4 times with increasing delays: 3s, 6s, 9s, 12s.
+    retry: (failureCount, error: any) => {
+      if (error?.status === 401 || error?.status === 403) return false;
+      return failureCount < 4;
+    },
+    retryDelay: (attempt) => Math.min(3000 * (attempt + 1), 12000),
   });
   const loads = (data?.results || data || []) as Load[];
   const error = isError ? 'Failed to load bookings' : null;
@@ -213,8 +220,20 @@ export default function LoadsList() {
   if (error) {
     return (
       <div style={{ padding: 40 }}>
-        <div style={{ fontSize: 13, color: 'var(--status-error)', marginBottom: 12 }}>{error}</div>
-        <button className="btn-action" onClick={() => window.location.reload()}>Retry</button>
+        <div style={{ fontSize: 13, color: 'var(--status-danger)', marginBottom: 4 }}>
+          Unable to reach the server.
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 16 }}>
+          The server may be starting up — this usually resolves in 20–30 seconds.
+        </div>
+        <button
+          className="btn-action"
+          disabled={isFetching}
+          onClick={() => refetch()}
+          style={{ opacity: isFetching ? 0.6 : 1 }}
+        >
+          {isFetching ? 'Connecting…' : 'Retry'}
+        </button>
       </div>
     );
   }

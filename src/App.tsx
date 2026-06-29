@@ -97,11 +97,17 @@ const PublicInvoice = lazy(() => import('./pages/PublicInvoice'));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
+      // Don't retry auth errors — retry everything else up to 4×.
+      // Delays: 3s, 6s, 9s, 12s — enough for a Render free-tier cold start (~20-30s).
+      retry: (failureCount, error: unknown) => {
+        const status = (error as { status?: number })?.status;
+        if (status === 401 || status === 403) return false;
+        return failureCount < 4;
+      },
+      retryDelay: (attempt) => Math.min(3000 * (attempt + 1), 12000),
       throwOnError: false,
-      staleTime: 5 * 60 * 1000, // 5 min — avoids refetch on every page revisit
+      staleTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
-      // refetchOnReconnect: true,
     },
   },
 });

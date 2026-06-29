@@ -132,8 +132,15 @@ export default function Copilot() {
     if (taRef.current) taRef.current.style.height = 'auto';
     setLoading(true);
     try {
-      const payload = history.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role: m.role, content: m.content }));
-      const res: any = await postData({ url: 'api/v1/agent/chat/', data: { messages: payload, conversation_id: conversationId } });
+      // Each conversation has its own chat endpoint; the server owns the history,
+      // so we only send the new message. Create a conversation first if needed.
+      let convId = conversationId;
+      if (!convId) {
+        const created: any = await postData({ url: 'api/v1/agent/conversations/', data: {} });
+        convId = created?.id ?? null;
+        if (convId) setConversationId(convId);
+      }
+      const res: any = await postData({ url: `api/v1/agent/conversations/${convId}/chat/`, data: { message: content } });
       setAiAvailable(!!res?.ai_available);
       if (res?.conversation_id && res.conversation_id !== conversationId) setConversationId(res.conversation_id);
       setMessages(prev => [...prev, {

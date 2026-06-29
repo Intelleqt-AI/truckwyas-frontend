@@ -527,9 +527,25 @@ export default function NewQuote() {
     }
   }, [currentStep, pickupLocation, deliveryLocation, vehicleType, _total, _returnRate]);
 
-  // Calculate route(s) — both legs when ROUND_TRIP
-  const calculateRoute = async () => {
-    if (!pickupLocation.trim() || !deliveryLocation.trim()) {
+  // Calculate route(s) — both legs when ROUND_TRIP. Accepts optional overrides
+  // so callers (e.g. the AI-chat prefill) can pass freshly-resolved values
+  // immediately after setState, before state settles.
+  const calculateRoute = async (opts?: {
+    origin?: string;
+    destination?: string;
+    originCoords?: LocationCoords | null;
+    destCoords?: LocationCoords | null;
+  }) => {
+    const origin = (opts?.origin ?? pickupLocation).trim();
+    const destination = (opts?.destination ?? deliveryLocation).trim();
+    // `!== undefined` is load-bearing: a caller passing `null` (geocode found
+    // nothing) must NOT silently fall back to stale state coords.
+    const oCoords =
+      opts?.originCoords !== undefined ? opts.originCoords : pickupCoords;
+    const dCoords =
+      opts?.destCoords !== undefined ? opts.destCoords : deliveryCoords;
+
+    if (!origin || !destination) {
       setError("Please enter both pickup and delivery locations");
       return;
     }
@@ -548,10 +564,16 @@ export default function NewQuote() {
       const outbound = await postData({
         url: "/api/v1/route/calculate/",
         data: {
-          origin: pickupLocation.trim(),
-          destination: deliveryLocation.trim(),
-          ...(pickupCoords && { origin_lat: pickupCoords.lat, origin_lon: pickupCoords.lon }),
-          ...(deliveryCoords && { dest_lat: deliveryCoords.lat, dest_lon: deliveryCoords.lon }),
+          origin,
+          destination,
+          ...(oCoords && {
+            origin_lat: oCoords.lat,
+            origin_lon: oCoords.lon,
+          }),
+          ...(dCoords && {
+            dest_lat: dCoords.lat,
+            dest_lon: dCoords.lon,
+          }),
           vehicle_type: vehicleType,
           cross_border_enabled: crossBorderEnabled,
           weight_kg: parseFloat(weight || "20000"),
@@ -660,7 +682,26 @@ export default function NewQuote() {
     };
   }, [editId]);
 
+  // Geocode a free-text location to coords via the same backend endpoint the
+  // LocationInput autocomplete uses. Returns null on no match / no key / error.
+  const geocodeFirst = async (q: string): Promise<LocationCoords | null> => {
+    try {
+      const r = await fetchData(
+        `api/v1/location/suggest/?q=${encodeURIComponent(q)}`,
+      );
+      const s = Array.isArray(r) ? r[0] : null;
+      return s && typeof s.lat === "number" && typeof s.lon === "number"
+        ? { lat: s.lat, lon: s.lon }
+        : null;
+    } catch {
+      return null;
+    }
+  };
+
   // Prefill from the AI Quote Chat hand-off (navigate('/quotes/new', { state: { prefill }})).
+  // The chat passes only text (pickup/delivery/cargo/weight/vehicle), so we
+  // geocode the locations to coords (drives the map markers + route) and
+  // auto-calculate the route so the operator doesn't re-enter or re-calculate.
   useEffect(() => {
     if (isEditing) return;
     const p = (location.state as any)?.prefill;
@@ -670,6 +711,33 @@ export default function NewQuote() {
     if (p.weight != null && p.weight !== "") setWeight(String(p.weight));
     if (p.cargo_description) setCargoDescription(p.cargo_description);
     if (p.vehicle_type) setVehicleType(p.vehicle_type);
+
+    if (!p.pickup_location || !p.delivery_location) return;
+
+    let cancelled = false;
+    (async () => {
+      const [pc, dc] = await Promise.all([
+        geocodeFirst(p.pickup_location),
+        geocodeFirst(p.delivery_location),
+      ]);
+      if (cancelled) return;
+      // Setting coords makes MapLocationPicker draw markers, fit bounds and
+      // fetch the road route automatically.
+      if (pc) setPickupCoords(pc);
+      if (dc) setDeliveryCoords(dc);
+      // Auto-calc with the resolved values directly (state isn't settled yet).
+      // Falls back to text-only when geocoding found nothing — the backend
+      // still resolves the names, so distance + cost appear regardless.
+      calculateRoute({
+        origin: p.pickup_location,
+        destination: p.delivery_location,
+        originCoords: pc,
+        destCoords: dc,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1175,7 +1243,7 @@ export default function NewQuote() {
           )}
 
           <button
-            onClick={calculateRoute}
+            onClick={() => calculateRoute()}
             disabled={
               calculatingRoute ||
               !pickupLocation.trim() ||

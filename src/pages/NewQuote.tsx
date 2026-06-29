@@ -606,6 +606,10 @@ export default function NewQuote() {
         if (cancelled || !q) return;
         setPickupLocation(q.pickup_location || "");
         setDeliveryLocation(q.delivery_location || "");
+        if (q.pickup_lat != null && q.pickup_lng != null)
+          setPickupCoords({ lat: parseFloat(q.pickup_lat), lon: parseFloat(q.pickup_lng) });
+        if (q.delivery_lat != null && q.delivery_lng != null)
+          setDeliveryCoords({ lat: parseFloat(q.delivery_lat), lon: parseFloat(q.delivery_lng) });
         setWeight(q.weight != null ? String(q.weight) : "");
         if (q.vehicle_type) setVehicleType(q.vehicle_type);
         if (q.vehicle != null) setSelectedVehicleId(String(q.vehicle));
@@ -643,6 +647,8 @@ export default function NewQuote() {
         // Round trip fields
         if (q.trip_type) setTripType(q.trip_type);
         if (q.return_location) setReturnLocation(q.return_location);
+        if (q.return_lat != null && q.return_lng != null)
+          setReturnCoords({ lat: parseFloat(q.return_lat), lon: parseFloat(q.return_lng) });
         if (q.return_cargo) setReturnCargo(q.return_cargo);
         if (q.return_date) setReturnDate(String(q.return_date).split("T")[0]);
         if (q.return_base_rate != null) setReturnBaseRate(String(q.return_base_rate));
@@ -698,7 +704,11 @@ export default function NewQuote() {
     if (upper.includes("PE") || upper.includes("PORT ELIZABETH")) return "PE";
     if (upper.includes("BFN") || upper.includes("BLOEMFONTEIN")) return "BFN";
     if (upper.includes("PTA") || upper.includes("PRETORIA")) return "PTA";
-    return location.substring(0, 3).toUpperCase();
+    // Fallback: take the last word before the first comma (most specific place name)
+    const primaryPart = location.split(",")[0].trim();
+    const words = primaryPart.split(/\s+/).filter(Boolean);
+    const lastWord = words[words.length - 1] || primaryPart;
+    return lastWord.substring(0, 3).toUpperCase();
   };
 
   const mutation = useMutation({
@@ -790,6 +800,7 @@ export default function NewQuote() {
     routeData && routeData.success &&
     (tripType === "ONE_WAY" || (returnRouteData && returnRouteData.success));
   const canGoToStep3 = canGoToStep2 && weight && parseFloat(weight) > 0;
+  const canSave = !!(canGoToStep3 && customerId && validUntil);
 
   const inputStyle: React.CSSProperties = {
     background: "var(--bg-surface)",
@@ -3930,7 +3941,7 @@ export default function NewQuote() {
             </button>
             <button
               onClick={handleSave}
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !canSave}
               className="btn-action"
               style={{ minWidth: 140 }}>
               {mutation.isPending

@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/formatters";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+
 const STATUS_COLOR: Record<string, string> = {
   PAID: 'var(--accent-primary)',
   SENT: 'var(--status-warning)',
@@ -29,6 +30,7 @@ export default function InvoiceDetail() {
   const [paymentMethod, setPaymentMethod] = useState('EFT');
   const [paymentReference, setPaymentReference] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
+  const [requestingCapital, setRequestingCapital] = useState(false);
 
   const { data: invoice, isLoading, isError, refetch } = useQuery({
     queryKey: ['invoice', id],
@@ -36,6 +38,32 @@ export default function InvoiceDetail() {
     enabled: !!id,
     retry: 2,
   });
+
+  // Capital eligibility — shared cache with invoices list
+  const { data: capitalData } = useQuery({
+    queryKey: ['capital-eligible'],
+    queryFn: () => fetchData('api/v1/capital/eligible/').catch(() => null),
+    staleTime: 60_000,
+  });
+  const eligibleInvoices: any[] = capitalData?.invoices || [];
+  const capitalEntry = eligibleInvoices.find((e: any) => String(e.id) === String(id));
+
+  const handleRequestCapital = async () => {
+    if (!id) return;
+    setRequestingCapital(true);
+    try {
+      await postData({ url: 'api/v1/advances/', data: { invoice_id: id } });
+      setToast({ msg: 'Capital requested successfully!' });
+      queryClient.invalidateQueries({ queryKey: ['capital-eligible'] });
+      queryClient.invalidateQueries({ queryKey: ['capital-page'] });
+    } catch (err: any) {
+      const reason = err?.data?.reason || err?.data?.error || err?.message || 'Failed to request capital';
+      setToast({ msg: `Capital request failed: ${reason}`, isError: true });
+    } finally {
+      setRequestingCapital(false);
+      setTimeout(() => setToast(null), 5000);
+    }
+  };
 
   // Payments aren't embedded on the invoice serializer — fetch them.
   const { data: paymentsResp } = useQuery({
@@ -349,6 +377,11 @@ export default function InvoiceDetail() {
             )}
             {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE' || invoice.status === 'PARTIALLY_PAID') && !showPaymentForm && (
               <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>RECORD PAYMENT</button>
+            )}
+            {capitalEntry && (
+              <button className="btn-action" onClick={handleRequestCapital} disabled={requestingCapital} style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}>
+                {requestingCapital ? 'REQUESTING...' : 'REQUEST CAPITAL'}
+              </button>
             )}
           </div>
 

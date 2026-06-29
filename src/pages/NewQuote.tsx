@@ -69,6 +69,10 @@ interface AISuggestion {
   win_probability?: number;
   win_probability_at_lower_price?: number;
   win_probability_at_higher_price?: number;
+  rationale?: string;
+  source?: string;
+  market_rate?: number;
+  market_rate_source?: string;
 }
 
 interface RevenueGuard {
@@ -376,6 +380,10 @@ export default function NewQuote() {
           toll_cost: _tollCost,
           driver_cost: _driverAllowance,
           actual_cost: _total,
+          // Lane lets the backend ground the market rate in real benchmark data.
+          origin: extractCode(pickupLocation),
+          destination: extractCode(deliveryLocation),
+          vehicle_type: vehicleType,
         },
       });
 
@@ -406,6 +414,8 @@ export default function NewQuote() {
     setOptimizing(true);
     setOptimal(null);
     try {
+      // Pass the lane so the backend grounds the market rate in real benchmark
+      // data; market_rate here is only a fallback hint if no benchmark exists.
       const marketRate = marketBenchmark?.market_avg_rate || _total * 1.15;
       const data = await postData({
         url: "api/v1/quotes/optimize/",
@@ -413,6 +423,9 @@ export default function NewQuote() {
           total_cost: Math.round(_total * 100) / 100,
           market_rate: Math.round(marketRate),
           client_tier: "standard",
+          origin: extractCode(pickupLocation),
+          destination: extractCode(deliveryLocation),
+          vehicle_type: vehicleType,
         },
       });
       if (data?.optimal_price) setOptimal(data);
@@ -2295,6 +2308,44 @@ export default function NewQuote() {
                   </div>
                 </div>
 
+                {/* AI rationale + provenance — transparent basis for the number */}
+                {aiSuggestion.rationale && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-secondary)",
+                      fontFamily: "var(--font-sans)",
+                      lineHeight: 1.5,
+                      marginBottom: 10,
+                      padding: "8px 10px",
+                      background: "var(--bg-surface)",
+                      borderRadius: 2,
+                      borderLeft: "2px solid var(--accent-primary)",
+                    }}>
+                    {aiSuggestion.rationale}
+                  </div>
+                )}
+                {(aiSuggestion.source || aiSuggestion.market_rate) && (
+                  <div
+                    style={{
+                      fontSize: 9.5,
+                      color: "var(--text-tertiary)",
+                      fontFamily: "var(--font-mono)",
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      marginBottom: 12,
+                    }}>
+                    {aiSuggestion.source === "openai"
+                      ? "OpenAI"
+                      : aiSuggestion.source === "optimizer"
+                        ? "Optimizer"
+                        : "Rule-based"}
+                    {aiSuggestion.market_rate
+                      ? ` · market R${Math.round(aiSuggestion.market_rate).toLocaleString()} (${aiSuggestion.market_rate_source})`
+                      : ""}
+                  </div>
+                )}
+
                 {/* UPGRADE 1: Model stats */}
                 {modelStats && (
                   <div
@@ -2536,17 +2587,35 @@ export default function NewQuote() {
 
                 <button
                   onClick={() => {
-                    // Auto-fill the total with suggested price (or adjusted price if slider was used)
                     const priceToUse =
                       adjustedPrice !== null
                         ? adjustedPrice
                         : aiSuggestion.suggested_price;
-                    const suggestedTotal = Math.round(priceToUse);
-                    const currentCosts = fuelCost + tollCost + driverAllowance;
-                    const newBaseRate =
-                      (suggestedTotal - currentCosts) / distanceKm;
-                    setBaseRatePerKm(newBaseRate.toFixed(2));
-                    setShowAISuggestion(false);
+                    if (!priceToUse || distanceKm <= 0) {
+                      toast.error("Set a valid route first, then apply the price.");
+                      return;
+                    }
+                    // Back-solve base rate/km so the quote TOTAL lands exactly on the
+                    // suggested price — accounting for the weight surcharge + additional
+                    // costs (same maths as APPLY THIS PRICE / applyOptimal), so the
+                    // breakdown actually reconciles.
+                    const fixed =
+                      _fuelCost + _tollCost + _driverAllowance + _additionalCosts;
+                    const threshold = weightThreshold || 5000;
+                    const ws = weightKg > threshold ? weightSurchargePct : 0;
+                    const perKm = (priceToUse - fixed) / (1 + ws) / distanceKm;
+                    if (perKm > 0 && isFinite(perKm)) {
+                      setBaseRatePerKm((Math.round(perKm * 100) / 100).toString());
+                      setShowAISuggestion(false);
+                      setAdjustedPrice(null);
+                      toast.success(
+                        `Price applied — R${Math.round(priceToUse).toLocaleString()}.`,
+                      );
+                      // Move forward to finalise (Customer & Summary).
+                      if (canGoToStep3) setCurrentStep(3);
+                    } else {
+                      toast.error("Couldn't apply that price to the current route.");
+                    }
                   }}
                   className="btn-action"
                   style={{ width: "100%", fontSize: 11 }}>

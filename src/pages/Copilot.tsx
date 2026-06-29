@@ -2,14 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { postData, fetchData, deleteData } from '@/lib/Api';
 
-const CACHE_KEY = 'copilot_current';
-function loadCache(): { conversationId: number | null; messages: Message[] } | null {
-  try {
-    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-    if (c && Array.isArray(c.messages) && c.messages.length) return c;
-  } catch { /* ignore */ }
-  return null;
-}
 function relTime(iso: string): string {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
   if (d < 1) return 'now'; if (d < 60) return `${d}m`;
@@ -63,8 +55,8 @@ const labelStyle: React.CSSProperties = {
 export default function Copilot() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [messages, setMessages] = useState<Message[]>(() => loadCache()?.messages || [INTRO]);
-  const [conversationId, setConversationId] = useState<number | null>(() => loadCache()?.conversationId ?? null);
+  const [messages, setMessages] = useState<Message[]>([INTRO]);
+  const [conversationId, setConversationId] = useState<number | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState('');
@@ -95,26 +87,13 @@ export default function Copilot() {
       .catch(() => {});
   }, []);
 
-  // On mount: load the conversation list, and if we have no cached thread,
-  // restore the most recent conversation from the server.
+  // On mount (e.g. clicking "Copilot" in the sidebar): always start a fresh
+  // chat. We only load the conversation list so past chats stay browsable in
+  // the history sidebar — we do NOT auto-open the last one.
   useEffect(() => {
-    fetchData('api/v1/agent/conversations/')
-      .then((d: any) => {
-        const list = d?.conversations || [];
-        setConversations(list);
-        if (!loadCache() && list.length) openConversation(list[0].id);
-      })
-      .catch(() => {});
+    refreshConversations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Cache the current conversation for instant restore next time.
-  useEffect(() => {
-    try {
-      if (messages.length > 1) localStorage.setItem(CACHE_KEY, JSON.stringify({ conversationId, messages }));
-      else localStorage.removeItem(CACHE_KEY);
-    } catch { /* ignore quota */ }
-  }, [messages, conversationId]);
 
   const autoGrow = () => {
     const ta = taRef.current;
@@ -132,8 +111,15 @@ export default function Copilot() {
     if (taRef.current) taRef.current.style.height = 'auto';
     setLoading(true);
     try {
-      const payload = history.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role: m.role, content: m.content }));
-      const res: any = await postData({ url: 'api/v1/agent/chat/', data: { messages: payload, conversation_id: conversationId } });
+      // Each conversation has its own chat endpoint; the server owns the history,
+      // so we only send the new message. Create a conversation first if needed.
+      let convId = conversationId;
+      if (!convId) {
+        const created: any = await postData({ url: 'api/v1/agent/conversations/', data: {} });
+        convId = created?.id ?? null;
+        if (convId) setConversationId(convId);
+      }
+      const res: any = await postData({ url: `api/v1/agent/conversations/${convId}/chat/`, data: { message: content } });
       setAiAvailable(!!res?.ai_available);
       if (res?.conversation_id && res.conversation_id !== conversationId) setConversationId(res.conversation_id);
       setMessages(prev => [...prev, {
@@ -183,23 +169,19 @@ export default function Copilot() {
   };
   const dismissAction = (i: number) => setMessages(prev => prev.map((m, j) => j === i ? { ...m, actionState: 'dismissed' } : m));
 
-  // New chat — starts a fresh conversation. The previous one is KEPT (browsable
-  // in History), never deleted.
-  const newChat = async () => {
-    setShowHistory(false); setInput(''); setAiAvailable(null); setMessages([INTRO]);
-    try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
-    try {
-      const res: any = await postData({ url: 'api/v1/agent/conversations/', data: {} });
-      setConversationId(res?.id ?? null);
-    } catch { setConversationId(null); }
-    refreshConversations();
+  // New chat — resets to an empty thread WITHOUT touching the server. The
+  // conversation row is created lazily on the first message (see send()), so an
+  // unused "New chat" never gets saved to history. The previous thread is KEPT.
+  const newChat = () => {
+    setShowHistory(false); setInput(''); setAiAvailable(null);
+    setMessages([INTRO]); setConversationId(null);
   };
 
   const deleteConversation = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Delete this conversation?')) return;
     await deleteData({ url: `api/v1/agent/conversations/${id}/` }).catch(() => {});
-    if (id === conversationId) { setMessages([INTRO]); setConversationId(null); try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ } }
+    if (id === conversationId) { setMessages([INTRO]); setConversationId(null); }
     refreshConversations();
   };
 

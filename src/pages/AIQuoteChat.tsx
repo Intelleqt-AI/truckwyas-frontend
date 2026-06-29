@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { postData } from '@/lib/Api';
+import { toast } from '@/lib/toast';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -22,6 +23,10 @@ interface QuotePreview extends ExtractedFields {
 }
 
 const AIQUOTE_KEY = 'aiquote_session';
+// Phrases that mean "go ahead and create the quote". When one is sent AND the
+// essentials (pickup + delivery + cargo) are captured, we hand off to the New
+// Quote form just like the CREATE QUOTE button — instead of only replying.
+const CREATE_INTENT = /\b(create|confirm|proceed|book it|go ahead|make (?:the |a )?quote|generate (?:the )?quote|do it)\b/i;
 const GREETING: Message = {
   role: 'assistant',
   content: "Hi! Tell me about the load you need to quote. For example: 'I need to move 20 tons of palletised goods from Johannesburg to Cape Town on Friday, flatbed truck.'"
@@ -41,6 +46,10 @@ export default function AIQuoteChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [quotePreview, setQuotePreview] = useState<QuotePreview>(() => loadQuoteSession()?.quotePreview || {});
   const [isRecording, setIsRecording] = useState(false);
+  // Holds a freshly transcribed voice message waiting to be auto-sent. We route
+  // the send through an effect (not the MediaRecorder.onstop closure) so it runs
+  // with the current messages/quotePreview rather than stale snapshots.
+  const [pendingTranscript, setPendingTranscript] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -152,10 +161,11 @@ export default function AIQuoteChat() {
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (textOverride?: string) => {
+    const userMessage = (textOverride ?? input).trim();
+    if (!userMessage || isLoading) return;
 
-    const userMessage = input.trim();
+    const wantsCreate = CREATE_INTENT.test(userMessage);
     setInput('');
     setIsLoading(true);
 
@@ -184,6 +194,13 @@ export default function AIQuoteChat() {
       const updatedPreview = { ...quotePreview, ...extractedFields };
       setQuotePreview(updatedPreview);
 
+      // User asked to create AND we have the essentials → hand off now (same as
+      // clicking CREATE QUOTE), instead of only replying in chat.
+      if (wantsCreate && updatedPreview.pickup_location && updatedPreview.delivery_location && updatedPreview.cargo_description) {
+        createQuoteFrom(updatedPreview);
+        return;
+      }
+
       // Calculate route if we have both locations
       if (updatedPreview.pickup_location && updatedPreview.delivery_location && !updatedPreview.distance) {
         await calculateRoute(updatedPreview.pickup_location, updatedPreview.delivery_location);
@@ -210,6 +227,12 @@ export default function AIQuoteChat() {
 
       setMessages([...newMessages, { role: 'assistant', content: fallbackResponse }]);
 
+      // Same create hand-off on the offline/regex path.
+      if (wantsCreate && updatedPreview.pickup_location && updatedPreview.delivery_location && updatedPreview.cargo_description) {
+        createQuoteFrom(updatedPreview);
+        return;
+      }
+
       // Calculate route if we have both locations
       if (updatedPreview.pickup_location && updatedPreview.delivery_location && !updatedPreview.distance) {
         await calculateRoute(updatedPreview.pickup_location, updatedPreview.delivery_location);
@@ -225,6 +248,17 @@ export default function AIQuoteChat() {
       handleSend();
     }
   };
+
+  // Auto-send a completed voice transcription. Runs after the recording state
+  // has settled, so handleSend sees the current conversation rather than the
+  // snapshot captured when recording began.
+  useEffect(() => {
+    if (pendingTranscript && !isLoading) {
+      handleSend(pendingTranscript);
+      setPendingTranscript(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingTranscript, isLoading]);
 
   const startRecording = async () => {
     try {
@@ -245,28 +279,27 @@ export default function AIQuoteChat() {
           const formData = new FormData();
           formData.append('audio', audioBlob, 'recording.webm');
 
+          // No explicit Content-Type: let axios/the browser set
+          // `multipart/form-data; boundary=...`. Setting it manually drops the
+          // boundary and the server can't parse the upload.
           const response = await postData({
             url: 'api/v1/ai/voice-quote/',
             data: formData,
-            config: {
-              headers: {
-                'Content-Type': 'multipart/form-data'
-              }
-            }
           });
 
           // Backend returns the transcript under `text` (legacy: `transcription`).
-          const transcript = response.text || response.transcription;
+          const transcript = (response.text || response.transcription || '').trim();
           if (transcript) {
+            // Show it immediately, then let the effect auto-send it with the
+            // current conversation state (not this stale closure's snapshot).
             setInput(transcript);
-            // Auto-send the transcription
-            setTimeout(() => {
-              setInput(transcript);
-              handleSend();
-            }, 100);
+            setPendingTranscript(transcript);
+          } else {
+            toast.info("Didn't catch that — please try again.");
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Voice transcription failed:', error);
+          toast.error(error?.message || 'Voice transcription failed');
         } finally {
           setIsLoading(false);
         }
@@ -279,7 +312,7 @@ export default function AIQuoteChat() {
       setIsRecording(true);
     } catch (error) {
       console.error('Failed to start recording:', error);
-      alert('Microphone access denied or not available');
+      toast.error('Microphone access denied or not available');
     }
   };
 
@@ -290,29 +323,33 @@ export default function AIQuoteChat() {
     }
   };
 
-  const handleCreateQuote = () => {
-    if (!quotePreview.pickup_location || !quotePreview.delivery_location) {
+  // Hand off to the full New Quote flow with the AI-parsed fields prefilled —
+  // the operator picks a customer and the live route/cost engine runs there.
+  // (Posting straight to the API fails: a quote needs a customer, base_rate,
+  // total_amount and valid_until, none of which the chat collects.)
+  // Takes the preview explicitly so callers can pass freshly-merged fields
+  // (React state updates are async, so closing over `quotePreview` can be stale).
+  const createQuoteFrom = (preview: QuotePreview) => {
+    if (!preview.pickup_location || !preview.delivery_location) {
       alert('Please provide at least a pickup and delivery location first.');
       return;
     }
     // Handed off — clear the saved session so the next visit starts fresh.
     try { localStorage.removeItem(AIQUOTE_KEY); } catch { /* ignore */ }
-    // Hand off to the full New Quote flow with the AI-parsed fields prefilled —
-    // the operator picks a customer and the live route/cost engine runs there.
-    // (Posting straight to the API fails: a quote needs a customer, base_rate,
-    // total_amount and valid_until, none of which the chat collects.)
     navigate('/bookings/quotes/new', {
       state: {
         prefill: {
-          pickup_location: quotePreview.pickup_location,
-          delivery_location: quotePreview.delivery_location,
-          cargo_description: quotePreview.cargo_description,
-          weight: quotePreview.weight,
-          vehicle_type: quotePreview.vehicle_type,
+          pickup_location: preview.pickup_location,
+          delivery_location: preview.delivery_location,
+          cargo_description: preview.cargo_description,
+          weight: preview.weight,
+          vehicle_type: preview.vehicle_type,
         },
       },
     });
   };
+
+  const handleCreateQuote = () => createQuoteFrom(quotePreview);
 
   const canCreateQuote = Boolean(
     quotePreview.pickup_location &&
@@ -469,7 +506,7 @@ export default function AIQuoteChat() {
             }}
           />
           <button
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={!input.trim() || isLoading || isRecording}
             style={{
               background: 'var(--accent-primary)',

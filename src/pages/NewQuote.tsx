@@ -133,6 +133,17 @@ export default function NewQuote() {
   );
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [calculatingRoute, setCalculatingRoute] = useState(false);
+  const [activeMapField, setActiveMapField] = useState<"pickup" | "delivery" | "return">("pickup");
+
+  // Round trip state
+  const [tripType, setTripType] = useState<"ONE_WAY" | "ROUND_TRIP">("ONE_WAY");
+  const [returnLocation, setReturnLocation] = useState("");
+  const [returnCoords, setReturnCoords] = useState<LocationCoords | null>(null);
+  const [returnCargo, setReturnCargo] = useState("");
+  const [returnDate, setReturnDate] = useState("");
+  const [returnBaseRate, setReturnBaseRate] = useState("0");
+  const [returnNotes, setReturnNotes] = useState("");
+  const [returnRouteData, setReturnRouteData] = useState<RouteData | null>(null);
 
   // Step 2: Freight details
   const [weight, setWeight] = useState("");
@@ -301,15 +312,17 @@ export default function NewQuote() {
     (routeData?.additional_costs?.non_sa_tolls || 0);
 
   const _driverAllowance = parseFloat(driverAllowanceInput || "0");
+  const _returnRate = tripType === "ROUND_TRIP" ? parseFloat(returnBaseRate || "0") : 0;
 
-  // Total: baseCost + fuelCost + tollCost + weightSurcharge + additionalCosts + driverAllowance
+  // Total: baseCost + fuelCost + tollCost + weightSurcharge + additionalCosts + driverAllowance + returnRate
   const _total =
     _baseCost +
     _fuelCost +
     _tollCost +
     _weightSurcharge +
     _additionalCosts +
-    _driverAllowance;
+    _driverAllowance +
+    _returnRate;
 
   const { data: customersData } = useQuery({
     queryKey: ["customers"],
@@ -375,7 +388,7 @@ export default function NewQuote() {
           fuel_cost: _fuelCost,
           toll_cost: _tollCost,
           driver_cost: _driverAllowance,
-          actual_cost: _total,
+          actual_cost: _total - _returnRate,
         },
       });
 
@@ -406,11 +419,12 @@ export default function NewQuote() {
     setOptimizing(true);
     setOptimal(null);
     try {
-      const marketRate = marketBenchmark?.market_avg_rate || _total * 1.15;
+      const outboundTotal = _total - _returnRate;
+      const marketRate = marketBenchmark?.market_avg_rate || outboundTotal * 1.15;
       const data = await postData({
         url: "api/v1/quotes/optimize/",
         data: {
-          total_cost: Math.round(_total * 100) / 100,
+          total_cost: Math.round(outboundTotal * 100) / 100,
           market_rate: Math.round(marketRate),
           client_tier: "standard",
         },
@@ -427,6 +441,7 @@ export default function NewQuote() {
   // Back-solve the base rate/km so the quote total lands on the optimal price.
   const applyOptimal = () => {
     if (!optimal?.optimal_price || distanceKm <= 0) return;
+    // Back-solve outbound rate only — return leg rate is separate
     const fixed = _fuelCost + _tollCost + _driverAllowance + _additionalCosts;
     const threshold = weightThreshold || 5000;
     const ws = weightKg > threshold ? weightSurchargePct : 0;
@@ -453,7 +468,7 @@ export default function NewQuote() {
         url: "/api/v1/quotes/guard/",
         data: {
           total_cost: Math.round(directCosts * 100) / 100,
-          quote_price: Math.round(_total * 100) / 100,
+          quote_price: Math.round((_total - _returnRate) * 100) / 100,
           distance_km: routeData?.distance_km || 0,
           fuel_cost: _fuelCost,
           toll_cost: _tollCost,
@@ -496,53 +511,78 @@ export default function NewQuote() {
             typeof data.market_avg_rate === "number" &&
             typeof data.your_vs_market_pct === "number"
           ) {
-            setMarketBenchmark({ ...data, your_rate: _total });
+            setMarketBenchmark({ ...data, your_rate: _total - _returnRate });
           }
         })
         .catch(() => {
           // Silently fail — not critical
         });
     }
-  }, [currentStep, pickupLocation, deliveryLocation, vehicleType, _total]);
+  }, [currentStep, pickupLocation, deliveryLocation, vehicleType, _total, _returnRate]);
 
-  // Calculate route via TomTom backend
+  // Calculate route(s) — both legs when ROUND_TRIP
   const calculateRoute = async () => {
     if (!pickupLocation.trim() || !deliveryLocation.trim()) {
       setError("Please enter both pickup and delivery locations");
+      return;
+    }
+    if (tripType === "ROUND_TRIP" && !returnLocation.trim()) {
+      setError("Please enter a return destination for the round trip");
       return;
     }
 
     setCalculatingRoute(true);
     setError("");
     setRouteData(null);
+    setReturnRouteData(null);
 
     try {
-      const data = await postData({
+      // Always calculate outbound leg
+      const outbound = await postData({
         url: "/api/v1/route/calculate/",
         data: {
           origin: pickupLocation.trim(),
           destination: deliveryLocation.trim(),
-          ...(pickupCoords && {
-            origin_lat: pickupCoords.lat,
-            origin_lon: pickupCoords.lon,
-          }),
-          ...(deliveryCoords && {
-            dest_lat: deliveryCoords.lat,
-            dest_lon: deliveryCoords.lon,
-          }),
+          ...(pickupCoords && { origin_lat: pickupCoords.lat, origin_lon: pickupCoords.lon }),
+          ...(deliveryCoords && { dest_lat: deliveryCoords.lat, dest_lon: deliveryCoords.lon }),
           vehicle_type: vehicleType,
           cross_border_enabled: crossBorderEnabled,
           weight_kg: parseFloat(weight || "20000"),
         },
       });
 
-      if (data.success) {
-        setRouteData(data);
-        setError("");
-      } else {
-        setError(data.error || "Failed to calculate route");
+      if (!outbound.success) {
+        setError(outbound.error || "Failed to calculate outbound route");
+        return;
       }
-    } catch (err) {
+      setRouteData(outbound);
+
+      // Also calculate return leg for ROUND_TRIP
+      if (tripType === "ROUND_TRIP") {
+        const ret = await postData({
+          url: "/api/v1/route/calculate/",
+          data: {
+            origin: deliveryLocation.trim(),
+            destination: returnLocation.trim(),
+            ...(deliveryCoords && { origin_lat: deliveryCoords.lat, origin_lon: deliveryCoords.lon }),
+            ...(returnCoords && { dest_lat: returnCoords.lat, dest_lon: returnCoords.lon }),
+            vehicle_type: vehicleType,
+            cross_border_enabled: crossBorderEnabled,
+            weight_kg: parseFloat(weight || "20000"),
+          },
+        });
+        if (ret.success) {
+          setReturnRouteData(ret);
+          const d = ret.distance_km || 0;
+          const retBase = d * parseFloat(baseRatePerKm || "0");
+          const retFuel = (d * fuelConsumption * fuelPrice) / 100;
+          const retToll = ret.toll_cost_zar || d * tollRatePerKm;
+          setReturnBaseRate(String(Math.round(retBase + retFuel + retToll)));
+        } else {
+          setError(ret.error || "Failed to calculate return route");
+        }
+      }
+    } catch {
       setError("Failed to calculate route. Please try again.");
     } finally {
       setCalculatingRoute(false);
@@ -593,6 +633,13 @@ export default function NewQuote() {
           setEditableFuelCost(parseFloat(q.fuel_surcharge));
         if (q.toll_charges != null)
           setEditableTollCost(parseFloat(q.toll_charges));
+        // Round trip fields
+        if (q.trip_type) setTripType(q.trip_type);
+        if (q.return_location) setReturnLocation(q.return_location);
+        if (q.return_cargo) setReturnCargo(q.return_cargo);
+        if (q.return_date) setReturnDate(String(q.return_date).split("T")[0]);
+        if (q.return_base_rate != null) setReturnBaseRate(String(q.return_base_rate));
+        if (q.return_notes) setReturnNotes(q.return_notes);
         setCurrentStep(3);
       })
       .catch(() => {
@@ -618,6 +665,14 @@ export default function NewQuote() {
     if (p.vehicle_type) setVehicleType(p.vehicle_type);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-fill return destination with pickup location when ROUND TRIP is active
+  // and the user hasn't manually set a different return location yet.
+  useEffect(() => {
+    if (tripType === "ROUND_TRIP" && pickupLocation && !returnLocation) {
+      setReturnLocation(pickupLocation);
+    }
+  }, [tripType, pickupLocation]); // returnLocation omitted — adding it would re-fill when user clears the field
 
   // Cost calculations
   const distanceKm = routeData?.distance_km || 0;
@@ -701,11 +756,32 @@ export default function NewQuote() {
       confidence,
       sla_hours: parseInt(slaHours),
       valid_until: validUntil,
+      trip_type: tripType,
+      ...(tripType === "ROUND_TRIP"
+        ? {
+            return_location: returnLocation,
+            ...(returnCoords
+              ? { return_lat: parseFloat(returnCoords.lat.toFixed(7)), return_lng: parseFloat(returnCoords.lon.toFixed(7)) }
+              : {}),
+            return_cargo: returnCargo,
+            return_date: returnDate || null,
+            return_base_rate: parseFloat(returnBaseRate || "0"),
+            return_notes: returnNotes,
+          }
+        : {
+            return_location: "",
+            return_cargo: "",
+            return_date: null,
+            return_base_rate: null,
+            return_notes: "",
+          }),
     });
   };
 
   // Step validation
-  const canGoToStep2 = routeData && routeData.success;
+  const canGoToStep2 =
+    routeData && routeData.success &&
+    (tripType === "ONE_WAY" || (returnRouteData && returnRouteData.success));
   const canGoToStep3 = canGoToStep2 && weight && parseFloat(weight) > 0;
 
   const inputStyle: React.CSSProperties = {
@@ -887,6 +963,34 @@ export default function NewQuote() {
             Step 1: Route Details
           </div>
 
+          {/* Trip Type Toggle — top of form */}
+          <div style={{ marginBottom: 16 }}>
+            {label("Trip Type")}
+            <div style={{ display: "flex", border: "1px solid var(--border-subtle)", borderRadius: 2, overflow: "hidden" }}>
+              {(["ONE_WAY", "ROUND_TRIP"] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => {
+                    setTripType(type);
+                    if (type === "ROUND_TRIP" && !returnLocation && pickupLocation) {
+                      setReturnLocation(pickupLocation);
+                    }
+                  }}
+                  style={{
+                    flex: 1, padding: "9px 0", border: "none",
+                    background: tripType === type ? "var(--accent-primary)" : "var(--bg-surface)",
+                    color: tripType === type ? "#fff" : "var(--text-secondary)",
+                    fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.06em",
+                    cursor: "pointer", fontWeight: tripType === type ? 700 : 400,
+                    transition: "all 0.15s",
+                  }}>
+                  {type === "ONE_WAY" ? "ONE WAY" : "ROUND TRIP"}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div
             style={{
               display: "flex",
@@ -899,6 +1003,7 @@ export default function NewQuote() {
               <LocationInput
                 placeholder="e.g. Johannesburg Depot"
                 value={pickupLocation}
+                onFocus={() => setActiveMapField("pickup")}
                 onChange={(val, coords) => {
                   setPickupLocation(val);
                   setPickupCoords(coords ?? null);
@@ -925,6 +1030,7 @@ export default function NewQuote() {
               <LocationInput
                 placeholder="e.g. Cape Town Warehouse"
                 value={deliveryLocation}
+                onFocus={() => setActiveMapField("delivery")}
                 onChange={(val, coords) => {
                   setDeliveryLocation(val);
                   setDeliveryCoords(coords ?? null);
@@ -951,13 +1057,21 @@ export default function NewQuote() {
           <MapLocationPicker
             pickupCoords={pickupCoords}
             deliveryCoords={deliveryCoords}
+            returnCoords={tripType === "ROUND_TRIP" ? returnCoords : null}
+            showReturn={tripType === "ROUND_TRIP"}
+            activeField={activeMapField}
+            onActiveFieldChange={setActiveMapField}
             onLocationSelect={(field, label, coords) => {
               if (field === "pickup") {
                 setPickupLocation(label);
                 setPickupCoords(coords);
-              } else {
+              } else if (field === "delivery") {
                 setDeliveryLocation(label);
                 setDeliveryCoords(coords);
+              } else {
+                setReturnLocation(label);
+                setReturnCoords(coords);
+                setReturnRouteData(null);
               }
               setRouteData(null);
               setAiSuggestion(null);
@@ -1012,6 +1126,47 @@ export default function NewQuote() {
             )}
           </label>
 
+          {/* Return Leg section (visible when ROUND_TRIP) */}
+          {tripType === "ROUND_TRIP" && (
+            <div style={{ marginBottom: 16, padding: "16px", background: "var(--bg-surface-hover)", borderRadius: 2, border: "1px solid var(--border-subtle)" }}>
+              <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--accent-primary)", letterSpacing: "0.08em", marginBottom: 12 }}>
+                RETURN LEG · Truck continues after delivery
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", marginBottom: 12 }}>
+                Return from: <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>{deliveryLocation || "Delivery Location"}</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  {label("Return Destination")}
+                  <LocationInput
+                    placeholder="e.g. Johannesburg Depot (or different city)"
+                    value={returnLocation}
+                    onFocus={() => setActiveMapField("return")}
+                    onChange={(val, coords) => {
+                      setReturnLocation(val);
+                      setReturnCoords(coords ?? null);
+                      setReturnRouteData(null);
+                    }}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  {label("Return Cargo (leave blank if empty return)")}
+                  <textarea
+                    value={returnCargo}
+                    onChange={(e) => setReturnCargo(e.target.value)}
+                    placeholder="e.g. 8000kg Maize Bags — or leave empty for empty return"
+                    rows={2}
+                    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
+                  />
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
+                  Return rate will be auto-calculated when you click Calculate Route below.
+                </div>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={calculateRoute}
             disabled={
@@ -1021,7 +1176,11 @@ export default function NewQuote() {
             }
             className="btn-action"
             style={{ width: "100%", marginBottom: 16 }}>
-            {calculatingRoute ? "CALCULATING ROUTE..." : "CALCULATE ROUTE"}
+            {calculatingRoute
+              ? tripType === "ROUND_TRIP" ? "CALCULATING BOTH ROUTES..." : "CALCULATING ROUTE..."
+              : tripType === "ROUND_TRIP"
+              ? "CALCULATE BOTH ROUTES"
+              : "CALCULATE ROUTE"}
           </button>
 
           {error && (
@@ -1040,187 +1199,95 @@ export default function NewQuote() {
           )}
 
           {routeData && routeData.success && (
-            <div
-              style={{
-                padding: "16px",
-                background: "var(--bg-surface-hover)",
-                borderRadius: 2,
-                border: `1px solid ${routeData.source === "tomtom" ? "var(--accent-primary)" : "var(--status-warning)"}`,
-                marginBottom: 16,
-              }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 12,
-                }}>
+            <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+
+              {/* Helper to render a single leg result */}
+              {[
+                { rd: routeData, leg: tripType === "ROUND_TRIP" ? "LEG 1 — OUTBOUND" : "ROUTE CALCULATED", from: pickupLocation, to: deliveryLocation },
+                ...(tripType === "ROUND_TRIP" && returnRouteData?.success
+                  ? [{ rd: returnRouteData, leg: "LEG 2 — RETURN", from: deliveryLocation, to: returnLocation }]
+                  : []),
+              ].map(({ rd, leg, from, to }) => (
                 <div
+                  key={leg}
                   style={{
-                    fontSize: 10,
-                    fontFamily: "var(--font-mono)",
-                    color: "var(--text-tertiary)",
-                    letterSpacing: "0.08em",
-                  }}>
-                  ROUTE CALCULATED
-                </div>
-                <span
-                  style={{
-                    padding: "2px 8px",
-                    background:
-                      routeData.source === "tomtom"
-                        ? "var(--accent-glow)"
-                        : "var(--bg-surface-hover)",
-                    border: `1px solid ${routeData.source === "tomtom" ? "var(--accent-primary)" : "var(--status-warning)"}`,
+                    padding: "14px 16px",
+                    background: "var(--bg-surface-hover)",
                     borderRadius: 2,
-                    fontSize: 9,
-                    color:
-                      routeData.source === "tomtom"
-                        ? "var(--accent-primary)"
-                        : "var(--status-warning)",
-                    fontWeight: 600,
-                    fontFamily: "var(--font-mono)",
+                    border: `1px solid ${rd.source === "tomtom" ? "var(--accent-primary)" : "var(--status-warning)"}`,
                   }}>
-                  {routeData.source === "tomtom" ? "LIVE" : "ESTIMATED"}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 12,
-                  marginBottom: 12,
-                  fontSize: 11,
-                  fontFamily: "var(--font-mono)",
-                }}>
-                <div>
-                  <div
-                    style={{
-                      color: "var(--text-tertiary)",
-                      fontSize: 9,
-                      marginBottom: 3,
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.08em" }}>
+                      {leg}
+                    </div>
+                    <span style={{
+                      padding: "2px 8px",
+                      background: rd.source === "tomtom" ? "var(--accent-glow)" : "var(--bg-surface-hover)",
+                      border: `1px solid ${rd.source === "tomtom" ? "var(--accent-primary)" : "var(--status-warning)"}`,
+                      borderRadius: 2, fontSize: 9, fontWeight: 600, fontFamily: "var(--font-mono)",
+                      color: rd.source === "tomtom" ? "var(--accent-primary)" : "var(--status-warning)",
                     }}>
-                    DISTANCE
-                  </div>
-                  <div
-                    style={{
-                      color: "var(--text-primary)",
-                      fontWeight: 700,
-                      fontSize: 16,
-                    }}>
-                    {Math.round(routeData.distance_km)} km
-                  </div>
-                </div>
-                <div>
-                  <div
-                    style={{
-                      color: "var(--text-tertiary)",
-                      fontSize: 9,
-                      marginBottom: 3,
-                    }}>
-                    DURATION
-                  </div>
-                  <div
-                    style={{
-                      color: "var(--text-primary)",
-                      fontWeight: 700,
-                      fontSize: 16,
-                    }}>
-                    {Math.floor(routeData.duration_minutes / 60)}h{" "}
-                    {routeData.duration_minutes % 60}m
-                  </div>
-                </div>
-                <div>
-                  <div
-                    style={{
-                      color: "var(--text-tertiary)",
-                      fontSize: 9,
-                      marginBottom: 3,
-                    }}>
-                    FUEL
-                  </div>
-                  <div
-                    style={{
-                      color: "var(--text-primary)",
-                      fontWeight: 700,
-                      fontSize: 16,
-                    }}>
-                    {Math.round(routeData.fuel_usage_litres)} L
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  borderTop: "1px solid var(--border-subtle)",
-                  paddingTop: 10,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6,
-                  fontSize: 12,
-                }}>
-                <div
-                  style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span
-                    style={{
-                      color: "var(--text-secondary)",
-                      fontFamily: "var(--font-sans)",
-                    }}>
-                    Fuel Cost:
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      color: "var(--status-success)",
-                      fontWeight: 600,
-                    }}>
-                    R {Math.round(routeData.fuel_cost_zar).toLocaleString()}
-                  </span>
-                </div>
-                <div
-                  style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span
-                    style={{
-                      color: "var(--text-secondary)",
-                      fontFamily: "var(--font-sans)",
-                    }}>
-                    Toll Cost:
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      color: "var(--status-success)",
-                      fontWeight: 600,
-                    }}>
-                    R {Math.round(routeData.toll_cost_zar).toLocaleString()}
-                  </span>
-                </div>
-                {fuelPriceData && (
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: 10,
-                      marginTop: 4,
-                    }}>
-                    <span
-                      style={{
-                        color: "var(--text-tertiary)",
-                        fontFamily: "var(--font-sans)",
-                      }}>
-                      Live Fuel Price (FIASA):
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-tertiary)",
-                      }}>
-                      R {fuelPriceData.diesel_inland.toFixed(2)}/L
+                      {rd.source === "tomtom" ? "LIVE" : "ESTIMATED"}
                     </span>
                   </div>
-                )}
-              </div>
+                  <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", marginBottom: 10 }}>
+                    {from} → {to}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 10, fontSize: 11, fontFamily: "var(--font-mono)" }}>
+                    <div>
+                      <div style={{ color: "var(--text-tertiary)", fontSize: 9, marginBottom: 3 }}>DISTANCE</div>
+                      <div style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: 16 }}>{Math.round(rd.distance_km)} km</div>
+                    </div>
+                    <div>
+                      <div style={{ color: "var(--text-tertiary)", fontSize: 9, marginBottom: 3 }}>DURATION</div>
+                      <div style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: 16 }}>
+                        {Math.floor(rd.duration_minutes / 60)}h {rd.duration_minutes % 60}m
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ color: "var(--text-tertiary)", fontSize: 9, marginBottom: 3 }}>FUEL</div>
+                      <div style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: 16 }}>{Math.round(rd.fuel_usage_litres)} L</div>
+                    </div>
+                  </div>
+                  <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6, fontSize: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Fuel Cost:</span>
+                      <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-success)", fontWeight: 600 }}>
+                        R {Math.round(rd.fuel_cost_zar).toLocaleString()}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Toll Cost:</span>
+                      <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-success)", fontWeight: 600 }}>
+                        R {Math.round(rd.toll_cost_zar).toLocaleString()}
+                      </span>
+                    </div>
+                    {fuelPriceData && (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, marginTop: 2 }}>
+                        <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>Live Fuel Price (FIASA):</span>
+                        <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-tertiary)" }}>
+                          R {fuelPriceData.diesel_inland.toFixed(2)}/L
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Editable return rate — shown after both legs calculated */}
+              {tripType === "ROUND_TRIP" && returnRouteData?.success && (
+                <div style={{ padding: "12px 14px", background: "var(--bg-surface)", borderRadius: 2, border: "1px solid var(--border-subtle)" }}>
+                  <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.08em", marginBottom: 8 }}>
+                    RETURN LEG RATE (AUTO-CALCULATED, EDITABLE)
+                  </div>
+                  <input
+                    type="number"
+                    value={returnBaseRate}
+                    onChange={(e) => setReturnBaseRate(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -1674,7 +1741,7 @@ export default function NewQuote() {
                 letterSpacing: "0.08em",
                 marginBottom: 10,
               }}>
-              COST BREAKDOWN (EDITABLE)
+              {tripType === "ROUND_TRIP" ? "OUTBOUND COST BREAKDOWN — LEG 1 (EDITABLE)" : "COST BREAKDOWN (EDITABLE)"}
             </div>
             <div
               style={{
@@ -1689,7 +1756,7 @@ export default function NewQuote() {
                     color: "var(--text-secondary)",
                     fontFamily: "var(--font-sans)",
                   }}>
-                  Base Cost ({Math.round(distanceKm)} km × R{baseRatePerKm}/km):
+                  {tripType === "ROUND_TRIP" ? "Leg 1 Base Cost" : "Base Cost"} ({Math.round(distanceKm)} km × R{baseRatePerKm}/km):
                 </span>
                 <span
                   style={{
@@ -1834,6 +1901,25 @@ export default function NewQuote() {
                   }}
                 />
               </div>
+              {tripType === "ROUND_TRIP" && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 8,
+                    paddingTop: 8,
+                    borderTop: "1px dashed var(--border-subtle)",
+                  }}>
+                  <span style={{ color: "var(--accent-primary)", fontFamily: "var(--font-sans)", fontSize: 11 }}>
+                    Return Leg ({returnLocation ? `→ ${returnLocation}` : "no destination set"}
+                    {returnCargo ? "" : " · empty return"}):
+                  </span>
+                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-primary)", fontWeight: 600 }}>
+                    R {Math.round(_returnRate).toLocaleString()}
+                  </span>
+                </div>
+              )}
               <div
                 style={{
                   borderTop: "1px solid var(--border-subtle)",
@@ -1847,7 +1933,7 @@ export default function NewQuote() {
                     color: "var(--text-primary)",
                     fontFamily: "var(--font-sans)",
                   }}>
-                  Total:
+                  Total{tripType === "ROUND_TRIP" ? " (both legs)" : ""}:
                 </span>
                 <span
                   style={{
@@ -3027,13 +3113,22 @@ export default function NewQuote() {
                 fontSize: 12,
                 marginBottom: 12,
               }}>
+              {/* Trip type badge */}
+              {tripType === "ROUND_TRIP" && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Trip Type:</span>
+                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-primary)", fontWeight: 700, fontSize: 11 }}>
+                    ROUND TRIP
+                  </span>
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span
                   style={{
                     color: "var(--text-secondary)",
                     fontFamily: "var(--font-sans)",
                   }}>
-                  Route:
+                  {tripType === "ROUND_TRIP" ? "Leg 1 Route:" : "Route:"}
                 </span>
                 <span
                   style={{
@@ -3043,6 +3138,14 @@ export default function NewQuote() {
                   {pickupLocation} → {deliveryLocation}
                 </span>
               </div>
+              {tripType === "ROUND_TRIP" && returnLocation && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Leg 2 Route:</span>
+                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-primary)" }}>
+                    {deliveryLocation} → {returnLocation}
+                  </span>
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span
                   style={{
@@ -3192,6 +3295,16 @@ export default function NewQuote() {
                   R {driverAllowance.toLocaleString()}
                 </span>
               </div>
+              {tripType === "ROUND_TRIP" && _returnRate > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 8, borderTop: "1px dashed var(--border-subtle)" }}>
+                  <span style={{ color: "var(--accent-primary)", fontFamily: "var(--font-sans)" }}>
+                    Return Leg ({returnCargo ? "with cargo" : "empty return"}):
+                  </span>
+                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-primary)", fontWeight: 600 }}>
+                    R {Math.round(_returnRate).toLocaleString()}
+                  </span>
+                </div>
+              )}
               <div
                 style={{
                   borderTop: "1px solid var(--border-subtle)",
@@ -3206,7 +3319,7 @@ export default function NewQuote() {
                     fontSize: 14,
                     fontFamily: "var(--font-sans)",
                   }}>
-                  Quote Total:
+                  {tripType === "ROUND_TRIP" ? "Total (both legs):" : "Quote Total:"}
                 </span>
                 <span
                   style={{

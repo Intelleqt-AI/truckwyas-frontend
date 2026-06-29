@@ -4,6 +4,7 @@ import type { Map as LeafletMap, Marker, Polyline, LeafletMouseEvent } from 'lea
 import type { LocationCoords } from './LocationInput';
 
 type LeafletModule = typeof import('leaflet');
+type MapField = 'pickup' | 'delivery' | 'return';
 
 const TOMTOM_KEY = import.meta.env.VITE_TOMTOM_API_KEY as string | undefined;
 const SA_CENTER: [number, number] = [-28.4793, 24.6727];
@@ -11,11 +12,13 @@ const SA_CENTER: [number, number] = [-28.4793, 24.6727];
 interface MapLocationPickerProps {
   pickupCoords: LocationCoords | null;
   deliveryCoords: LocationCoords | null;
-  onLocationSelect: (field: 'pickup' | 'delivery', label: string, coords: LocationCoords) => void;
+  returnCoords?: LocationCoords | null;
+  showReturn?: boolean;
+  activeField: MapField;
+  onActiveFieldChange: (field: MapField) => void;
+  onLocationSelect: (field: MapField, label: string, coords: LocationCoords) => void;
 }
 
-/** Fetch a road-following route between two points.
- *  Tries TomTom Routing API first, falls back to OSRM (free, no key). */
 async function fetchRoute(
   from: { lat: number; lon: number },
   to: { lat: number; lon: number },
@@ -36,7 +39,6 @@ async function fetchRoute(
     }
   }
 
-  // OSRM fallback — free, no key
   try {
     const res = await fetch(
       `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson`
@@ -44,18 +46,16 @@ async function fetchRoute(
     const data = await res.json();
     const coords: [number, number][] = data?.routes?.[0]?.geometry?.coordinates ?? [];
     if (coords.length > 1) {
-      return coords.map(([lng, lat]) => [lat, lng]); // GeoJSON is [lng,lat], Leaflet wants [lat,lng]
+      return coords.map(([lng, lat]) => [lat, lng]);
     }
   } catch {
-    // fall through to straight line
+    // fall through
   }
 
-  // Final fallback: straight line
   return [[from.lat, from.lon], [to.lat, to.lon]];
 }
 
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  // Try TomTom first if key is available
   if (TOMTOM_KEY) {
     try {
       const res = await fetch(
@@ -69,7 +69,6 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
     }
   }
 
-  // Nominatim fallback (free, no key needed)
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
@@ -77,7 +76,6 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
     );
     const data = await res.json();
     if (data?.display_name) {
-      // Trim to most useful parts: road/suburb, city, country
       const a = data.address || {};
       const parts = [
         a.road || a.suburb || a.neighbourhood,
@@ -93,19 +91,33 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
-export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSelect }: MapLocationPickerProps) {
+export function MapLocationPicker({
+  pickupCoords,
+  deliveryCoords,
+  returnCoords,
+  showReturn = false,
+  activeField,
+  onActiveFieldChange,
+  onLocationSelect,
+}: MapLocationPickerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const instanceRef = useRef<{ map: LeafletMap; L: LeafletModule } | null>(null);
   const pickupMarkerRef = useRef<Marker | null>(null);
   const deliveryMarkerRef = useRef<Marker | null>(null);
+  const returnMarkerRef = useRef<Marker | null>(null);
   const lineRef = useRef<Polyline | null>(null);
-  const activeFieldRef = useRef<'pickup' | 'delivery'>('pickup');
+  const returnLineRef = useRef<Polyline | null>(null);
+  const activeFieldRef = useRef<MapField>(activeField);
+  const onActiveFieldChangeRef = useRef(onActiveFieldChange);
   const onLocationSelectRef = useRef(onLocationSelect);
-  const [activeField, setActiveField] = useState<'pickup' | 'delivery'>('pickup');
+  const showReturnRef = useRef(showReturn);
   const [geocoding, setGeocoding] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => { activeFieldRef.current = activeField; }, [activeField]);
+  useEffect(() => { onActiveFieldChangeRef.current = onActiveFieldChange; }, [onActiveFieldChange]);
   useEffect(() => { onLocationSelectRef.current = onLocationSelect; }, [onLocationSelect]);
+  useEffect(() => { showReturnRef.current = showReturn; }, [showReturn]);
 
   // Init map once
   useEffect(() => {
@@ -141,9 +153,10 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
         try {
           const label = await reverseGeocode(lat, lng);
           onLocationSelectRef.current(field, label, { lat, lon: lng });
-          // After setting pickup, auto-switch to delivery so the next click sets it
           if (field === 'pickup') {
-            setActiveField('delivery');
+            onActiveFieldChangeRef.current('delivery');
+          } else if (field === 'delivery' && showReturnRef.current) {
+            onActiveFieldChangeRef.current('return');
           }
         } finally {
           setGeocoding(false);
@@ -151,6 +164,7 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
       });
 
       instanceRef.current = { map, L };
+      setMapReady(true);
     })();
 
     return () => {
@@ -159,19 +173,21 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
         instanceRef.current.map.remove();
         instanceRef.current = null;
       }
+      setMapReady(false);
     };
   }, []);
 
-  // Update markers + line whenever coords change
+  // Update markers + lines whenever coords change (mapReady ensures this re-runs after remount)
   useEffect(() => {
     const inst = instanceRef.current;
-    if (!inst) return;
+    if (!inst || !mapReady) return;
     const { map, L } = inst;
 
-    // Remove old markers and line
     if (pickupMarkerRef.current) { map.removeLayer(pickupMarkerRef.current); pickupMarkerRef.current = null; }
     if (deliveryMarkerRef.current) { map.removeLayer(deliveryMarkerRef.current); deliveryMarkerRef.current = null; }
+    if (returnMarkerRef.current) { map.removeLayer(returnMarkerRef.current); returnMarkerRef.current = null; }
     if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
+    if (returnLineRef.current) { map.removeLayer(returnLineRef.current); returnLineRef.current = null; }
 
     if (pickupCoords) {
       pickupMarkerRef.current = L.marker([pickupCoords.lat, pickupCoords.lon], {
@@ -195,29 +211,51 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
       }).addTo(map);
     }
 
-    // Draw road-following route between P and D when both are set
+    if (returnCoords) {
+      returnMarkerRef.current = L.marker([returnCoords.lat, returnCoords.lon], {
+        icon: L.divIcon({
+          html: '<div style="background:#16a34a;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">R</div>',
+          className: '',
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        }),
+      }).addTo(map);
+    }
+
+    // Outbound leg: P → D
     if (pickupCoords && deliveryCoords) {
-      // Fit bounds immediately using straight-line corners while route loads
       map.fitBounds(
         [[pickupCoords.lat, pickupCoords.lon], [deliveryCoords.lat, deliveryCoords.lon]],
         { padding: [40, 40], maxZoom: 12 }
       );
-
-      fetchRoute(pickupCoords, deliveryCoords).then((routePoints) => {
+      fetchRoute(pickupCoords, deliveryCoords).then((pts) => {
         if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
-        lineRef.current = L.polyline(routePoints, {
-          color: '#0057FF',
-          weight: 4,
-          opacity: 0.85,
-        }).addTo(map);
-        map.fitBounds(lineRef.current.getBounds(), { padding: [40, 40], maxZoom: 12 });
+        lineRef.current = L.polyline(pts, { color: '#0057FF', weight: 4, opacity: 0.85 }).addTo(map);
+        // Fit to include return marker too if present
+        const bounds = lineRef.current.getBounds();
+        if (returnCoords) bounds.extend([returnCoords.lat, returnCoords.lon]);
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
       });
     } else if (pickupCoords) {
       map.setView([pickupCoords.lat, pickupCoords.lon], 12);
     } else if (deliveryCoords) {
       map.setView([deliveryCoords.lat, deliveryCoords.lon], 12);
     }
-  }, [pickupCoords, deliveryCoords]);
+
+    // Return leg: D → R
+    if (deliveryCoords && returnCoords) {
+      fetchRoute(deliveryCoords, returnCoords).then((pts) => {
+        if (returnLineRef.current) { map.removeLayer(returnLineRef.current); returnLineRef.current = null; }
+        returnLineRef.current = L.polyline(pts, { color: '#16a34a', weight: 4, opacity: 0.8, dashArray: '8 5' }).addTo(map);
+      });
+    }
+  }, [pickupCoords, deliveryCoords, returnCoords, mapReady]);
+
+  const FIELD_CONFIG: { key: MapField; label: string; color: string; visible: boolean }[] = [
+    { key: 'pickup', label: '● PICKUP', color: '#0057FF', visible: true },
+    { key: 'delivery', label: '● DELIVERY', color: '#e85d04', visible: true },
+    { key: 'return', label: '● RETURN', color: '#16a34a', visible: showReturn },
+  ];
 
   const btnBase: React.CSSProperties = {
     flex: 1,
@@ -234,30 +272,21 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
   return (
     <div style={{ marginBottom: 4 }}>
       <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-        <button
-          type="button"
-          onClick={() => setActiveField('pickup')}
-          style={{
-            ...btnBase,
-            background: activeField === 'pickup' ? '#0057FF' : 'var(--bg-surface)',
-            border: `1px solid ${activeField === 'pickup' ? '#0057FF' : 'var(--border-subtle)'}`,
-            color: activeField === 'pickup' ? '#fff' : 'var(--text-tertiary)',
-          }}
-        >
-          ● PICKUP
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveField('delivery')}
-          style={{
-            ...btnBase,
-            background: activeField === 'delivery' ? '#e85d04' : 'var(--bg-surface)',
-            border: `1px solid ${activeField === 'delivery' ? '#e85d04' : 'var(--border-subtle)'}`,
-            color: activeField === 'delivery' ? '#fff' : 'var(--text-tertiary)',
-          }}
-        >
-          ● DELIVERY
-        </button>
+        {FIELD_CONFIG.filter((f) => f.visible).map(({ key, label, color }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onActiveFieldChange(key)}
+            style={{
+              ...btnBase,
+              background: activeField === key ? color : 'var(--bg-surface)',
+              border: `1px solid ${activeField === key ? color : 'var(--border-subtle)'}`,
+              color: activeField === key ? '#fff' : 'var(--text-tertiary)',
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div style={{ position: 'relative', border: '1px solid var(--border-subtle)', borderRadius: 3, overflow: 'hidden' }}>

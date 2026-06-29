@@ -256,7 +256,16 @@ export default function QuoteDetail() {
 
           {/* Route */}
           <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 16 }}>Route</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div className="card-title" style={{ marginBottom: 0 }}>
+                {quote.trip_type === 'ROUND_TRIP' ? 'Leg 1 — Outbound Route' : 'Route'}
+              </div>
+              {quote.trip_type === 'ROUND_TRIP' && (
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 2, fontWeight: 700 }}>
+                  ROUND TRIP
+                </span>
+              )}
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 {label('Pickup Location')}
@@ -276,6 +285,53 @@ export default function QuoteDetail() {
               </div>
             </div>
           </div>
+
+          {/* Return Leg — visible only for ROUND_TRIP quotes */}
+          {quote.trip_type === 'ROUND_TRIP' && (
+            <div className="card" style={{ padding: 20, border: '1px solid var(--accent-primary)', borderLeft: '3px solid var(--accent-primary)' }}>
+              <div className="card-title" style={{ marginBottom: 16, color: 'var(--accent-primary)' }}>
+                Leg 2 — Return Route
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  {label('Returns From')}
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
+                </div>
+                <div>
+                  {label('Return Destination')}
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.return_location || '—'}</div>
+                </div>
+                <div>
+                  {label('Return Cargo')}
+                  <div style={{ fontSize: 13, color: quote.return_cargo ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
+                    {quote.return_cargo || 'Empty return'}
+                  </div>
+                </div>
+                {quote.return_date && (
+                  <div>
+                    {label('Return Date')}
+                    <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {new Date(quote.return_date).toLocaleDateString('en-ZA')}
+                    </div>
+                  </div>
+                )}
+                {quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
+                  <div>
+                    {label('Return Rate')}
+                    <div style={{ fontSize: 13, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                      {formatCurrency(parseFloat(quote.return_base_rate))}
+                    </div>
+                  </div>
+                )}
+                {quote.return_notes && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    {label('Return Notes')}
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{quote.return_notes}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Cargo Details */}
           <div className="card" style={{ padding: 20 }}>
@@ -330,8 +386,20 @@ export default function QuoteDetail() {
                   </span>
                 </div>
               ))}
+              {quote.trip_type === 'ROUND_TRIP' && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed var(--accent-primary)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--accent-primary)' }}>
+                    Return Leg ({quote.return_cargo ? 'with cargo' : 'empty return'})
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--accent-primary)', fontWeight: 600 }}>
+                    {formatCurrency(parseFloat(quote.return_base_rate))}
+                  </span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 12, marginTop: 4 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Total Amount</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {quote.trip_type === 'ROUND_TRIP' ? 'Total (both legs)' : 'Total Amount'}
+                </span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--accent-primary)' }}>
                   {formatCurrency(parseFloat(quote.total_amount || '0'))}
                 </span>

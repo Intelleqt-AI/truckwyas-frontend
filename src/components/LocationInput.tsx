@@ -17,9 +17,10 @@ interface LocationInputProps {
   onChange: (value: string, coords?: LocationCoords) => void;
   placeholder?: string;
   style?: React.CSSProperties;
+  onFocus?: () => void;
 }
 
-export function LocationInput({ value, onChange, placeholder, style }: LocationInputProps) {
+export function LocationInput({ value, onChange, placeholder, style, onFocus }: LocationInputProps) {
   const [mode, setMode] = useState<'search' | 'gps'>('search');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -156,7 +157,7 @@ export function LocationInput({ value, onChange, placeholder, style }: LocationI
         placeholder={placeholder}
         value={value}
         onChange={handleSearchChange}
-        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        onFocus={() => { suggestions.length > 0 && setOpen(true); onFocus?.(); }}
         style={style}
         autoComplete="off"
       />

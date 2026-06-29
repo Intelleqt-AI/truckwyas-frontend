@@ -186,17 +186,19 @@ export default function Insights() {
   const [period, setPeriod] = useState<PeriodType>('THIS_MONTH');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
-  // AI executive briefing (Claude when configured, deterministic summary otherwise).
-  // Cached so it isn't refetched on every visit.
+  // AI executive briefing (LLM when configured, deterministic summary otherwise),
+  // grounded in the company's DB via RAG. Period-aware: re-fetches when the filter
+  // changes so the narrative matches the selected window. getPeriodParams() is only
+  // called inside queryFn (it's declared below), never synchronously in the key.
   const { data: briefing = null } = useQuery<{ narrative?: string; ai_available?: boolean } | null>({
-    queryKey: ['insights-briefing'],
-    queryFn: () => fetchData('api/v1/dashboard/briefing/').catch(() => null),
+    queryKey: ['insights-briefing', period, customFrom, customTo],
+    queryFn: () => fetchData(`api/v1/dashboard/briefing/?${getPeriodParams()}`).catch(() => null),
   });
 
   // Build period params
   const getPeriodParams = (): string => {
     if (period === 'CUSTOM' && customFrom && customTo) {
-      return `date_from=${customFrom}&date_to=${customTo}`;
+      return `from=${customFrom}&to=${customTo}`;
     }
     const now = new Date();
     let from = '';
@@ -221,7 +223,7 @@ export default function Insights() {
         from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString().slice(0, 10);
         break;
     }
-    return `date_from=${from}&date_to=${to}`;
+    return `from=${from}&to=${to}`;
   };
 
   // Per-tab data, cached per (tab, period, range) combination — revisiting a tab
@@ -233,7 +235,7 @@ export default function Insights() {
       switch (tab) {
         case 'briefing': {
           const [kpi, insights, loadsResp] = await Promise.all([
-            fetchData('api/v1/dashboard/kpi/').catch(() => null),
+            fetchData(`api/v1/dashboard/kpi/?${params}`).catch(() => null),
             fetchData('api/v1/dashboard/insights/').catch(() => ({ recommendations: [] })),
             fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
           ]);

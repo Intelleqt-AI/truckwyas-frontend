@@ -138,6 +138,7 @@ export default function NewQuote() {
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [calculatingRoute, setCalculatingRoute] = useState(false);
   const [activeMapField, setActiveMapField] = useState<"pickup" | "delivery" | "return">("pickup");
+  const [mapExpanded, setMapExpanded] = useState(false);
 
   // Round trip state
   const [tripType, setTripType] = useState<"ONE_WAY" | "ROUND_TRIP">("ONE_WAY");
@@ -151,7 +152,7 @@ export default function NewQuote() {
 
   // Step 2: Freight details
   const [weight, setWeight] = useState("");
-  const [vehicleType, setVehicleType] = useState<string>("Flatbed Truck");
+  const [vehicleType, setVehicleType] = useState<string>("");
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
   const [selectedDriverId, setSelectedDriverId] = useState<string>("");
   const [baseRatePerKm, setBaseRatePerKm] = useState("10");
@@ -220,6 +221,7 @@ export default function NewQuote() {
     id: number;
     name: string;
     fuel_consumption_l_per_100km?: string | number;
+    base_rate?: string | number;
   }[] = vehicleTypesRaw?.results || vehicleTypesRaw || [];
 
   type VehicleOption = {
@@ -272,6 +274,11 @@ export default function NewQuote() {
   // Mobile app formula implementation
   const distance = routeData?.distance_km || 0;
   const _baseCost = distance * parseFloat(baseRatePerKm || "0");
+
+  const selectedVehicleTypeBaseRate = (() => {
+    const vt = vehicleTypes.find((v) => v.name === vehicleType);
+    return vt?.base_rate != null ? parseFloat(String(vt.base_rate)) : null;
+  })();
 
   // Fuel cost: (distance × fuelConsumptionL100km × fuelPricePerLitre) / 100
   const fuelConsumption = (() => {
@@ -1079,6 +1086,7 @@ export default function NewQuote() {
             showReturn={tripType === "ROUND_TRIP"}
             activeField={activeMapField}
             onActiveFieldChange={setActiveMapField}
+            onExpand={() => setMapExpanded(true)}
             onLocationSelect={(field, label, coords) => {
               if (field === "pickup") {
                 setPickupLocation(label);
@@ -1096,6 +1104,50 @@ export default function NewQuote() {
               setShowAISuggestion(false);
             }}
           />
+
+          {/* Fullscreen map modal */}
+          {mapExpanded && (
+            <div
+              style={{
+                position: "fixed", inset: 0, zIndex: 1000,
+                background: "rgba(0,0,0,0.85)",
+                display: "flex", flexDirection: "column",
+              }}
+              onKeyDown={(e) => e.key === "Escape" && setMapExpanded(false)}
+            >
+              <div style={{
+                flex: 1, display: "flex", flexDirection: "column",
+                padding: 16, gap: 12, overflow: "hidden",
+              }}>
+                <MapLocationPicker
+                  pickupCoords={pickupCoords}
+                  deliveryCoords={deliveryCoords}
+                  returnCoords={tripType === "ROUND_TRIP" ? returnCoords : null}
+                  showReturn={tripType === "ROUND_TRIP"}
+                  activeField={activeMapField}
+                  onActiveFieldChange={setActiveMapField}
+                  onClose={() => setMapExpanded(false)}
+                  mapHeight={window.innerHeight - 120}
+                  onLocationSelect={(field, label, coords) => {
+                    if (field === "pickup") {
+                      setPickupLocation(label);
+                      setPickupCoords(coords);
+                    } else if (field === "delivery") {
+                      setDeliveryLocation(label);
+                      setDeliveryCoords(coords);
+                    } else {
+                      setReturnLocation(label);
+                      setReturnCoords(coords);
+                      setReturnRouteData(null);
+                    }
+                    setRouteData(null);
+                    setAiSuggestion(null);
+                    setShowAISuggestion(false);
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Cross-border toggle */}
           <label
@@ -1185,12 +1237,51 @@ export default function NewQuote() {
             </div>
           )}
 
+          <div style={{ marginBottom: 16 }}>
+            {label("Vehicle Type")}
+            <Select
+              value={vehicleType}
+              onValueChange={(val) => {
+                setVehicleType(val);
+                setSelectedVehicleId("");
+                setSelectedDriverId("");
+                setAiSuggestion(null);
+                setShowAISuggestion(false);
+              }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select vehicle type..." />
+              </SelectTrigger>
+              <SelectContent>
+                {vehicleTypes.length > 0
+                  ? vehicleTypes.map((vt) => (
+                      <SelectItem key={vt.id} value={vt.name}>
+                        {vt.name}
+                      </SelectItem>
+                    ))
+                  : [
+                      "Semi-Trailer Truck",
+                      "Rigid Truck",
+                      "Flatbed Truck",
+                      "Refrigerated Truck",
+                      "Tanker",
+                      "Tautliner",
+                      "Box Truck",
+                    ].map((n) => (
+                      <SelectItem key={n} value={n}>
+                        {n}
+                      </SelectItem>
+                    ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <button
             onClick={calculateRoute}
             disabled={
               calculatingRoute ||
               !pickupLocation.trim() ||
-              !deliveryLocation.trim()
+              !deliveryLocation.trim() ||
+              !vehicleType
             }
             className="btn-action"
             style={{ width: "100%", marginBottom: 16 }}>
@@ -1280,6 +1371,14 @@ export default function NewQuote() {
                         R {Math.round(rd.toll_cost_zar).toLocaleString()}
                       </span>
                     </div>
+                    {selectedVehicleTypeBaseRate != null && (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, marginTop: 2 }}>
+                        <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>Base Rate ({vehicleType}):</span>
+                        <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-tertiary)" }}>
+                          R {selectedVehicleTypeBaseRate.toFixed(2)}/km
+                        </span>
+                      </div>
+                    )}
                     {fuelPriceData && (
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, marginTop: 2 }}>
                         <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>Live Fuel Price (FIASA):</span>

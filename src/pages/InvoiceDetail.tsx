@@ -43,10 +43,14 @@ export default function InvoiceDetail() {
   const { data: capitalData } = useQuery({
     queryKey: ['capital-eligible'],
     queryFn: () => fetchData('api/v1/capital/eligible/').catch(() => null),
-    staleTime: 60_000,
   });
   const eligibleInvoices: any[] = capitalData?.invoices || [];
   const capitalEntry = eligibleInvoices.find((e: any) => String(e.id) === String(id));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ineligibleInvoices: any[] = capitalData?.ineligible_invoices || [];
+  const ineligibleEntry = !capitalEntry
+    ? ineligibleInvoices.find((e: any) => String(e.id) === String(id))
+    : null;
 
   const handleRequestCapital = async () => {
     if (!id) return;
@@ -81,6 +85,7 @@ export default function InvoiceDetail() {
       setToast({ msg: 'Invoice sent!' });
       setTimeout(() => setToast(null), 3000);
       refetch();
+      queryClient.invalidateQueries({ queryKey: ['capital-eligible'] });
     } catch (error) {
       console.error('Failed to send invoice:', error);
       setToast({ msg: error instanceof Error ? error.message : 'Failed to send invoice', isError: true });
@@ -382,6 +387,12 @@ export default function InvoiceDetail() {
               <button className="btn-action" onClick={handleRequestCapital} disabled={requestingCapital} style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}>
                 {requestingCapital ? 'REQUESTING...' : 'REQUEST CAPITAL'}
               </button>
+            )}
+            {ineligibleEntry && (
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: 2, padding: '8px 10px', lineHeight: 1.4 }}>
+                <div style={{ color: 'var(--text-secondary)', marginBottom: 3, fontSize: 10, letterSpacing: '0.05em' }}>NOT ELIGIBLE FOR CAPITAL</div>
+                {ineligibleEntry.reason}
+              </div>
             )}
           </div>
 

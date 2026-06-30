@@ -778,6 +778,12 @@ body {
   opacity: 0.9;
 }
 
+.btn-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .btn-ghost {
   background: transparent;
   border: 1px solid var(--accent-primary);

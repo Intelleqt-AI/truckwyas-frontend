@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/formatters";
 import { fetchData, postData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -24,7 +24,10 @@ const tierEligible = (t: string) => t === "prime" || t === "standard";
 
 export default function Capital() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+
+  // Facility + advances — page-level data
   const {
     data,
     isLoading: loading,
@@ -32,13 +35,11 @@ export default function Capital() {
   } = useQuery({
     queryKey: ["capital-page"],
     queryFn: async () => {
-      // Load facility data — paginated {count, results}
       const facilityData = await fetchData("api/v1/facilities/");
       const facilityList = Array.isArray(facilityData)
         ? facilityData
         : facilityData?.results || [];
 
-      // Load active advances — paginated {count, results}
       const advancesData = await fetchData("api/v1/advances/");
       const advancesList = Array.isArray(advancesData)
         ? advancesData
@@ -47,22 +48,23 @@ export default function Capital() {
         ["REQUESTED", "ACTIVE", "FUNDED", "DISBURSED"].includes(a.status),
       );
 
-      // Load eligible invoices from dedicated endpoint
-      const eligibleData = await fetchData("api/v1/capital/eligible/");
-      const eligible = eligibleData?.invoices || [];
-
-      return {
-        facility: facilityList[0] || null,
-        advances: active,
-        eligibleInvoices: eligible,
-      };
+      return { facility: facilityList[0] || null, advances: active };
     },
+  });
+
+  // Eligible invoices — shared cache with Invoices + InvoiceDetail pages
+  const { data: eligibleData } = useQuery({
+    queryKey: ["capital-eligible"],
+    queryFn: () => fetchData("api/v1/capital/eligible/").catch(() => null),
   });
 
   // Cached data drives the view; defaults keep the first render safe.
   const facility = data?.facility ?? null;
   const advances = data?.advances ?? [];
-  const eligibleInvoices = data?.eligibleInvoices ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const eligibleInvoices: any[] = eligibleData?.invoices ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ineligibleInvoices: any[] = eligibleData?.ineligible_invoices ?? [];
   const [requestingIds, setRequestingIds] = useState<Set<number>>(new Set());
   const [settlingIds, setSettlingIds] = useState<Set<number>>(new Set());
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -70,6 +72,7 @@ export default function Capital() {
     {},
   );
   const [activeTab, setActiveTab] = useState<"active" | "eligible">("eligible");
+  const [showIneligible, setShowIneligible] = useState(false);
 
   const handleRequestAdvance = async (invoice: any) => {
     setRequestingIds((prev) => new Set(prev).add(invoice.id));
@@ -91,7 +94,8 @@ export default function Capital() {
       setSuccessMessage(
         `Advance request submitted for ${invoice.invoice_number}`,
       );
-      // Reload cached data
+      // Reload both caches so invoices list also updates immediately
+      queryClient.invalidateQueries({ queryKey: ["capital-eligible"] });
       await refetch();
 
       setTimeout(() => setSuccessMessage(null), 3000);
@@ -786,6 +790,58 @@ export default function Capital() {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Ineligible invoices — collapsible, shown only on eligible tab */}
+      {activeTab === "eligible" && ineligibleInvoices.length > 0 && (
+        <div className="card table-card" style={{ marginTop: 16 }}>
+          <div
+            className="card-header"
+            style={{ marginBottom: showIneligible ? 16 : 0, cursor: "pointer" }}
+            onClick={() => setShowIneligible((v) => !v)}>
+            <span className="card-title" style={{ color: "var(--text-secondary)" }}>
+              Not Eligible ({ineligibleInvoices.length})
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                color: "var(--text-tertiary)",
+                fontFamily: "var(--font-mono)",
+                userSelect: "none",
+              }}>
+              {showIneligible ? "▲ HIDE" : "▼ SHOW REASONS"}
+            </span>
+          </div>
+          {showIneligible && (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Invoice #</th>
+                  <th>Customer</th>
+                  <th>Amount</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ineligibleInvoices.map((inv) => (
+                  <tr key={inv.id}>
+                    <td className="mono">{inv.invoice_number}</td>
+                    <td>{inv.customer}</td>
+                    <td className="mono">{formatCurrency(inv.amount)}</td>
+                    <td
+                      style={{
+                        color: "var(--status-danger)",
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 11,
+                      }}>
+                      {inv.reason}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}

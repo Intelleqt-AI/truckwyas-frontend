@@ -250,8 +250,37 @@ export default function QuoteDetail() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Customer */}
           <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 16 }}>Customer</div>
-            <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)' }}>{quote.customer_name}</div>
+            <div className="card-title" style={{ marginBottom: 14 }}>Customer</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>NAME</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{quote.customer_name || '—'}</div>
+              </div>
+              {quote.customer_company && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>COMPANY</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_company}</div>
+                </div>
+              )}
+              {quote.customer_email && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>EMAIL</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_email}</div>
+                </div>
+              )}
+              {quote.customer_phone && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>PHONE</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_phone}</div>
+                </div>
+              )}
+              {quote.customer_city && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>CITY</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_city}</div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Route */}
@@ -274,14 +303,6 @@ export default function QuoteDetail() {
               <div>
                 {label('Delivery Location')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
-              </div>
-              <div>
-                {label('Origin')}
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.origin || '—'}</div>
-              </div>
-              <div>
-                {label('Destination')}
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.destination || '—'}</div>
               </div>
             </div>
           </div>

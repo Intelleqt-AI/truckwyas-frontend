@@ -194,7 +194,9 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
         data: {},
       }),
     onSuccess: (_data, quote) => {
+      // Invalidate both keys — QuotesList uses 'loads', LoadsList uses 'loads-list'
       queryClient.invalidateQueries({ queryKey: ['loads'] });
+      queryClient.invalidateQueries({ queryKey: ['loads-list'] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       toast.success(`Quote ${quote.quote_number} converted to load`);
     },
@@ -264,8 +266,12 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
     const quote = quotes.find(q => String(q.id) === quoteId);
     if (!quote || quote.status === newStatus) return;
 
-    // Optimistically update UI and call API
-    statusMutation.mutate({ id: quoteId, status: newStatus });
+    // Dragging to In-Transit must create a load record, not just patch status
+    if (newStatus === 'IT') {
+      convertToLoadMutation.mutate(quote);
+    } else {
+      statusMutation.mutate({ id: quoteId, status: newStatus });
+    }
   };
 
   const activeQuote = activeQuoteId ? quotes.find(q => String(q.id) === activeQuoteId) : null;

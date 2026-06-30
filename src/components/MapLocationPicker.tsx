@@ -17,6 +17,9 @@ interface MapLocationPickerProps {
   activeField: MapField;
   onActiveFieldChange: (field: MapField) => void;
   onLocationSelect: (field: MapField, label: string, coords: LocationCoords) => void;
+  onExpand?: () => void;
+  onClose?: () => void;
+  mapHeight?: number;
 }
 
 async function fetchRoute(
@@ -99,6 +102,9 @@ export function MapLocationPicker({
   activeField,
   onActiveFieldChange,
   onLocationSelect,
+  onExpand,
+  onClose,
+  mapHeight = 270,
 }: MapLocationPickerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const instanceRef = useRef<{ map: LeafletMap; L: LeafletModule } | null>(null);
@@ -290,7 +296,7 @@ export function MapLocationPicker({
       </div>
 
       <div style={{ position: 'relative', border: '1px solid var(--border-subtle)', borderRadius: 3, overflow: 'hidden' }}>
-        <div ref={mapRef} style={{ height: 270, width: '100%' }} />
+        <div ref={mapRef} style={{ height: mapHeight, width: '100%' }} />
 
         <div style={{
           position: 'absolute', bottom: 8, left: 8, zIndex: 500,
@@ -311,6 +317,40 @@ export function MapLocationPicker({
           }}>
             LOCATING…
           </div>
+        )}
+
+        {onExpand && (
+          <button
+            type="button"
+            onClick={onExpand}
+            title="Expand map"
+            style={{
+              position: 'absolute', top: 8, right: 8, zIndex: 500,
+              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+              border: 'none', borderRadius: 3, width: 28, height: 28,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: '#fff', fontSize: 14,
+            }}
+          >
+            ⛶
+          </button>
+        )}
+
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            title="Close fullscreen"
+            style={{
+              position: 'absolute', top: 8, right: 8, zIndex: 500,
+              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+              border: 'none', borderRadius: 3, width: 32, height: 32,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: '#fff', fontSize: 18, lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
         )}
       </div>
     </div>

@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/formatters";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+
 const STATUS_COLOR: Record<string, string> = {
   PAID: 'var(--accent-primary)',
   SENT: 'var(--status-warning)',
@@ -29,6 +30,7 @@ export default function InvoiceDetail() {
   const [paymentMethod, setPaymentMethod] = useState('EFT');
   const [paymentReference, setPaymentReference] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
+  const [requestingCapital, setRequestingCapital] = useState(false);
 
   const { data: invoice, isLoading, isError, refetch } = useQuery({
     queryKey: ['invoice', id],
@@ -36,6 +38,36 @@ export default function InvoiceDetail() {
     enabled: !!id,
     retry: 2,
   });
+
+  // Capital eligibility — shared cache with invoices list
+  const { data: capitalData } = useQuery({
+    queryKey: ['capital-eligible'],
+    queryFn: () => fetchData('api/v1/capital/eligible/').catch(() => null),
+  });
+  const eligibleInvoices: any[] = capitalData?.invoices || [];
+  const capitalEntry = eligibleInvoices.find((e: any) => String(e.id) === String(id));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ineligibleInvoices: any[] = capitalData?.ineligible_invoices || [];
+  const ineligibleEntry = !capitalEntry
+    ? ineligibleInvoices.find((e: any) => String(e.id) === String(id))
+    : null;
+
+  const handleRequestCapital = async () => {
+    if (!id) return;
+    setRequestingCapital(true);
+    try {
+      await postData({ url: 'api/v1/advances/', data: { invoice_id: id } });
+      setToast({ msg: 'Capital requested successfully!' });
+      queryClient.invalidateQueries({ queryKey: ['capital-eligible'] });
+      queryClient.invalidateQueries({ queryKey: ['capital-page'] });
+    } catch (err: any) {
+      const reason = err?.data?.reason || err?.data?.error || err?.message || 'Failed to request capital';
+      setToast({ msg: `Capital request failed: ${reason}`, isError: true });
+    } finally {
+      setRequestingCapital(false);
+      setTimeout(() => setToast(null), 5000);
+    }
+  };
 
   // Payments aren't embedded on the invoice serializer — fetch them.
   const { data: paymentsResp } = useQuery({
@@ -53,6 +85,7 @@ export default function InvoiceDetail() {
       setToast({ msg: 'Invoice sent!' });
       setTimeout(() => setToast(null), 3000);
       refetch();
+      queryClient.invalidateQueries({ queryKey: ['capital-eligible'] });
     } catch (error) {
       console.error('Failed to send invoice:', error);
       setToast({ msg: error instanceof Error ? error.message : 'Failed to send invoice', isError: true });
@@ -349,6 +382,17 @@ export default function InvoiceDetail() {
             )}
             {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE' || invoice.status === 'PARTIALLY_PAID') && !showPaymentForm && (
               <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>RECORD PAYMENT</button>
+            )}
+            {capitalEntry && (
+              <button className="btn-action" onClick={handleRequestCapital} disabled={requestingCapital} style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}>
+                {requestingCapital ? 'REQUESTING...' : 'REQUEST CAPITAL'}
+              </button>
+            )}
+            {ineligibleEntry && (
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: 2, padding: '8px 10px', lineHeight: 1.4 }}>
+                <div style={{ color: 'var(--text-secondary)', marginBottom: 3, fontSize: 10, letterSpacing: '0.05em' }}>NOT ELIGIBLE FOR CAPITAL</div>
+                {ineligibleEntry.reason}
+              </div>
             )}
           </div>
 

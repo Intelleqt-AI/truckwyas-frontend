@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, patchData, fetchData } from "@/lib/Api";
@@ -29,6 +29,32 @@ const FUEL_CONSUMPTION_FALLBACK: Record<string, number> = {
   "Box Truck": 25,
 };
 
+interface RouteGeoPoint {
+  lat: number;
+  lon: number;
+}
+
+// One route option returned by TomTom (best + alternatives). No custom ranking.
+interface RouteOption {
+  index: number;
+  is_best: boolean;
+  label: string;
+  distance_km: number;
+  duration_minutes: number;
+  traffic_delay_minutes?: number | null;
+  no_traffic_minutes?: number | null;
+  historic_minutes?: number | null;
+  live_minutes?: number | null;
+  departure_time?: string | null;
+  arrival_time?: string | null;
+  fuel_usage_litres: number;
+  fuel_cost_zar: number;
+  toll_cost_zar: number;
+  total_cost_zar: number;
+  sections?: Array<Record<string, unknown>>;
+  geometry: RouteGeoPoint[];
+}
+
 interface RouteData {
   distance_km: number;
   duration_minutes: number;
@@ -48,6 +74,8 @@ interface RouteData {
     weighbridge_fees?: number;
     non_sa_tolls?: number;
   };
+  routes?: RouteOption[];
+  best_index?: number;
 }
 
 interface FuelPriceData {
@@ -136,6 +164,9 @@ export default function NewQuote() {
     null,
   );
   const [routeData, setRouteData] = useState<RouteData | null>(null);
+  // 3 TomTom routes (best + 2 alternatives) for the outbound leg, and which one is chosen.
+  const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
   const [calculatingRoute, setCalculatingRoute] = useState(false);
   const [activeMapField, setActiveMapField] = useState<"pickup" | "delivery" | "return">("pickup");
   const [mapExpanded, setMapExpanded] = useState(false);
@@ -272,7 +303,9 @@ export default function NewQuote() {
 
   // Cost calculations — defined early so they can be used in callbacks/effects below
   // Mobile app formula implementation
-  const distance = routeData?.distance_km || 0;
+  // The chosen route (best by default, or an alternative the user clicked) drives cost + time.
+  const selectedRoute: RouteOption | null = routeData ? routeOptions[selectedRouteIndex] ?? null : null;
+  const distance = (routeData ? selectedRoute?.distance_km ?? routeData.distance_km : 0) || 0;
   const _baseCost = distance * parseFloat(baseRatePerKm || "0");
 
   const selectedVehicleTypeBaseRate = (() => {
@@ -564,6 +597,8 @@ export default function NewQuote() {
     setCalculatingRoute(true);
     setError("");
     setRouteData(null);
+    setRouteOptions([]);
+    setSelectedRouteIndex(0);
     setReturnRouteData(null);
 
     try {
@@ -592,6 +627,9 @@ export default function NewQuote() {
         return;
       }
       setRouteData(outbound);
+      // Capture all TomTom routes; default selection = TomTom's best (best_index).
+      setRouteOptions(outbound.routes || []);
+      setSelectedRouteIndex(outbound.best_index ?? 0);
 
       // Also calculate return leg for ROUND_TRIP
       if (tripType === "ROUND_TRIP") {
@@ -624,6 +662,17 @@ export default function NewQuote() {
       setCalculatingRoute(false);
     }
   };
+
+  // Re-calculate (re-call TomTom + fuel/toll) when the vehicle type changes after an initial
+  // calc, so fuel & toll reflect the new vehicle. Skip the first run (mount / edit prefill).
+  const vtFirstRun = useRef(true);
+  useEffect(() => {
+    if (vtFirstRun.current) { vtFirstRun.current = false; return; }
+    if (routeData && !calculatingRoute && pickupCoords && deliveryCoords) {
+      calculateRoute();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleType]);
 
   // Edit mode: load the existing quote and prefill the form
   useEffect(() => {
@@ -763,7 +812,7 @@ export default function NewQuote() {
   }, [tripType, pickupLocation]); // returnLocation omitted — adding it would re-fill when user clears the field
 
   // Cost calculations
-  const distanceKm = routeData?.distance_km || 0;
+  const distanceKm = distance;
   const baseCost = _baseCost;
   const fuelCost = _fuelCost;
   const tollCost = _tollCost;
@@ -824,6 +873,9 @@ export default function NewQuote() {
       cargo_description: cargoDescription || `${weight}kg ${vehicleType}`,
       weight: parseFloat(weight || "0"),
       distance: distanceKm,
+      // Best route's travel time (or the alternative the user picked) — the quote's default time.
+      estimated_duration_minutes:
+        selectedRoute?.duration_minutes ?? routeData?.duration_minutes ?? null,
       vehicle_type: vehicleType,
       ...(selectedVehicleId ? { vehicle: parseInt(selectedVehicleId) } : {}),
       ...(selectedDriverId ? { driver: parseInt(selectedDriverId) } : {}),
@@ -1155,6 +1207,9 @@ export default function NewQuote() {
             activeField={activeMapField}
             onActiveFieldChange={setActiveMapField}
             onExpand={() => setMapExpanded(true)}
+            routeOptions={routeData ? routeOptions : []}
+            selectedRouteIndex={selectedRouteIndex}
+            onSelectRoute={setSelectedRouteIndex}
             onLocationSelect={(field, label, coords) => {
               if (field === "pickup") {
                 setPickupLocation(label);
@@ -1196,6 +1251,9 @@ export default function NewQuote() {
                   onActiveFieldChange={setActiveMapField}
                   onClose={() => setMapExpanded(false)}
                   mapHeight={window.innerHeight - 120}
+                  routeOptions={routeData ? routeOptions : []}
+                  selectedRouteIndex={selectedRouteIndex}
+                  onSelectRoute={setSelectedRouteIndex}
                   onLocationSelect={(field, label, coords) => {
                     if (field === "pickup") {
                       setPickupLocation(label);
@@ -1375,12 +1433,51 @@ export default function NewQuote() {
             </div>
           )}
 
+          {routeData && routeOptions.length > 1 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.08em", marginBottom: 8 }}>
+                ROUTE OPTIONS — TAP TO CHOOSE
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {routeOptions.map((r) => {
+                  const isSel = r.index === selectedRouteIndex;
+                  return (
+                    <button
+                      key={r.index}
+                      type="button"
+                      onClick={() => setSelectedRouteIndex(r.index)}
+                      style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                        padding: "10px 12px", borderRadius: 2, cursor: "pointer", textAlign: "left",
+                        background: isSel ? "var(--accent-glow)" : "var(--bg-surface)",
+                        border: `1px solid ${isSel ? "#16a34a" : "var(--border-subtle)"}`,
+                      }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ width: 12, height: 12, borderRadius: 2, background: isSel ? "#16a34a" : "#334155", display: "inline-block" }} />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>
+                          {r.is_best ? "Best Routes" : r.label}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-secondary)", display: "flex", gap: 12 }}>
+                        <span>{Math.floor(r.duration_minutes / 60)}h {r.duration_minutes % 60}m</span>
+                        <span>{Math.round(r.distance_km)} km</span>
+                        {!!r.traffic_delay_minutes && r.traffic_delay_minutes > 0 && (
+                          <span style={{ color: "var(--status-warning)" }}>+{Math.round(r.traffic_delay_minutes)}m</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {routeData && routeData.success && (
             <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
 
               {/* Helper to render a single leg result */}
               {[
-                { rd: routeData, leg: tripType === "ROUND_TRIP" ? "LEG 1 — OUTBOUND" : "ROUTE CALCULATED", from: pickupLocation, to: deliveryLocation },
+                { rd: (selectedRoute ? ({ ...routeData, ...selectedRoute } as RouteData) : routeData), leg: tripType === "ROUND_TRIP" ? "LEG 1 — OUTBOUND" : "ROUTE CALCULATED", from: pickupLocation, to: deliveryLocation },
                 ...(tripType === "ROUND_TRIP" && returnRouteData?.success
                   ? [{ rd: returnRouteData, leg: "LEG 2 — RETURN", from: deliveryLocation, to: returnLocation }]
                   : []),

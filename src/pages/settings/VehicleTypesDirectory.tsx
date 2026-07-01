@@ -128,7 +128,7 @@ export function VehicleTypesDirectory() {
   const formatRate = (v: any) => v ? `R ${parseFloat(v).toLocaleString('en-ZA', { minimumFractionDigits: 0 })}` : '—';
 
   return (
-    <div style={{ maxWidth: 840 }}>
+    <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Vehicle Types</div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Configure vehicle categories and rate settings</div>

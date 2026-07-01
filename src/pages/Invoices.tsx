@@ -568,6 +568,27 @@ export default function Invoices() {
             {tab.label}
           </button>
         ))}
+        <button
+          onClick={() => navigate("/finance/reports")}
+          style={{
+            background: "transparent",
+            border: "none",
+            borderBottom: "2px solid transparent",
+            color: "var(--text-secondary)",
+            padding: "12px 0",
+            marginBottom: -1,
+            fontSize: 13,
+            fontWeight: 400,
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            fontFamily: "var(--font-mono)",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; }}>
+          Reports
+        </button>
       </div>
 
       {/* Tab Content */}

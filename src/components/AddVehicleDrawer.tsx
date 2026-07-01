@@ -24,7 +24,7 @@ const TEXT_FIELDS = [
   { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
   { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
   { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
-  { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
+  { key: 'capacity', label: 'Capacity (ton)', placeholder: 'e.g. 30', type: 'number' },
   { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
   { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
   { key: 'last_maintenance_date', label: 'Last Maintenance Date', type: 'date' },
@@ -79,7 +79,7 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
         data: {
           ...rest,
           year: Number(form.year),
-          capacity: Number(form.capacity) || 0,
+          capacity: (Number(form.capacity) || 0) * 1000,
           mileage: form.mileage ? Number(form.mileage) : undefined,
           service_interval_km: form.service_interval_km ? Number(form.service_interval_km) : null,
           last_service_mileage: form.last_service_mileage ? Number(form.last_service_mileage) : null,

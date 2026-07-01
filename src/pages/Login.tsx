@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useLogin } from "@/hooks/useLogin";
-import { fetchData } from "@/lib/Api";
+import { postLoginNavigate } from "@/lib/postLogin";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -52,27 +52,15 @@ const Login = () => {
     }
 
     login(formData, {
-      onSuccess: async () => {
-        // Onboarding is admin-only — non-admins go straight to the dashboard
-        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-        const isAdmin = storedUser?.role?.toUpperCase() === 'ADMIN';
-
-        if (isAdmin) {
-          const onboardingDone = localStorage.getItem('onboarding_done');
-          if (!onboardingDone) {
-            try {
-              const v = await fetchData('api/v1/vehicles/');
-              const vehicleCount = v?.count ?? (Array.isArray(v) ? v.length : (v?.results?.length ?? 0));
-              if (vehicleCount === 0) {
-                navigate("/onboarding");
-                return;
-              }
-            } catch {
-              // If API fails, skip onboarding check
-            }
-          }
+      onSuccess: async (data: any) => {
+        // 2FA enabled → no token yet; go collect the emailed sign-in code.
+        if (data?.otp_required) {
+          navigate("/login/verify-otp", {
+            state: { pendingToken: data.pending_token, email: data.email },
+          });
+          return;
         }
-        navigate("/");
+        await postLoginNavigate(navigate);
       },
       onError: (error: any) => {
         console.error("Login error:", error);

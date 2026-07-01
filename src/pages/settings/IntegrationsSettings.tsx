@@ -81,8 +81,23 @@ export function IntegrationsSettings() {
       .finally(() => setLoadingXero(false));
   };
 
-  const handleXeroConnect = () => {
-    window.location.href = `${import.meta.env.VITE_API_URL}/api/v1/integrations/xero/connect/`;
+  const handleXeroConnect = async () => {
+    // Fetch the Xero OAuth authorization URL (authenticated GET — axios injects the
+    // token and builds a clean URL), then redirect the whole tab into the flow.
+    try {
+      const data = await fetchData('api/v1/integrations/xero/connect/');
+      if (data?.auth_url) {
+        window.location.href = data.auth_url;
+      } else {
+        toast.error('Could not start Xero connection.');
+      }
+    } catch (err: any) {
+      toast.error(
+        err?.status === 503
+          ? "Xero isn't configured on the server yet."
+          : 'Could not start Xero connection.'
+      );
+    }
   };
 
   const handleXeroDisconnect = async () => {

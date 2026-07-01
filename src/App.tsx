@@ -77,6 +77,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const XeroIntegration = lazy(() => import('./pages/settings/XeroIntegration'));
 const FleetImport = lazy(() => import('./pages/settings/FleetImport'));
 const Login = lazy(() => import('./pages/Login'));
+const LoginOtp = lazy(() => import('./pages/LoginOtp').then(m => ({ default: m.LoginOtp })));
 const Signup = lazy(() => import('./pages/Signup'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const PasswordReset = lazy(() => import('./pages/PasswordReset'));
@@ -151,6 +152,14 @@ const App = () => (
                 element={
                   <PublicOnly>
                     <Login />
+                  </PublicOnly>
+                }
+              />
+              <Route
+                path="/login/verify-otp"
+                element={
+                  <PublicOnly>
+                    <LoginOtp />
                   </PublicOnly>
                 }
               />

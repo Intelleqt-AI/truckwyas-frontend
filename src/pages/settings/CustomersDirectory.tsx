@@ -136,7 +136,7 @@ export function CustomersDirectory() {
   };
 
   return (
-    <div style={{ maxWidth: 840 }}>
+    <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Customers</div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Your customer directory</div>

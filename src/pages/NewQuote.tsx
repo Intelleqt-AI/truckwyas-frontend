@@ -200,6 +200,7 @@ export default function NewQuote() {
   const [selectedDriverId, setSelectedDriverId] = useState<string>("");
   const [baseRatePerKm, setBaseRatePerKm] = useState("10");
   const [crossBorderEnabled, setCrossBorderEnabled] = useState(true);
+  const [cbPopoverOpen, setCbPopoverOpen] = useState(false);
   const [cargoDescription, setCargoDescription] = useState("");
   const [driverAllowanceInput, setDriverAllowanceInput] = useState("0");
   const [editableFuelCost, setEditableFuelCost] = useState<number | null>(null);
@@ -1608,161 +1609,181 @@ export default function NewQuote() {
                       International Crossing Detected
                     </span>
                   </div>
-                  <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--status-warning)" }}>
-                    +R {Math.round(totalAdditional).toLocaleString()}
-                  </span>
-                </div>
-
-                <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 14 }}>
-
-                  {/* Country journey */}
-                  <div>
-                    <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 8 }}>ROUTE COUNTRIES</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      {countries.map((code, i) => (
-                        <div key={code} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <div style={{ textAlign: "center" }}>
-                            <div style={{ fontSize: 20 }}>{CB_FLAGS[code] ?? "🏳️"}</div>
-                            <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                              {CB_COUNTRY_NAMES[code] ?? code}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--status-warning)" }}>
+                      +R {Math.round(totalAdditional).toLocaleString()}
+                    </span>
+                    {/* Info icon with popover */}
+                    <div
+                      style={{ position: "relative" }}
+                      onMouseEnter={() => setCbPopoverOpen(true)}
+                      onMouseLeave={() => setCbPopoverOpen(false)}
+                    >
+                      <div style={{
+                        width: 18, height: 18, borderRadius: "50%",
+                        border: "1.5px solid var(--status-warning)",
+                        color: "var(--status-warning)", fontSize: 10, fontWeight: 700,
+                        fontFamily: "var(--font-mono)", display: "flex", alignItems: "center",
+                        justifyContent: "center", cursor: "default", userSelect: "none",
+                        opacity: 0.8,
+                      }}>i</div>
+                      {cbPopoverOpen && (
+                        <div style={{
+                          position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 200,
+                          width: 320, background: "var(--bg-deep)",
+                          border: "1px solid var(--border-subtle)", borderRadius: 4,
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+                          padding: "14px 16px",
+                          display: "flex", flexDirection: "column", gap: 14,
+                        }}>
+                          {/* Route Countries */}
+                          <div>
+                            <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 8 }}>ROUTE COUNTRIES</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                              {countries.map((code, i) => (
+                                <div key={code} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <div style={{ textAlign: "center" }}>
+                                    <div style={{ fontSize: 18 }}>{CB_FLAGS[code] ?? "🏳️"}</div>
+                                    <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                                      {CB_COUNTRY_NAMES[code] ?? code}
+                                    </div>
+                                  </div>
+                                  {i < countries.length - 1 && (
+                                    <span style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 10 }}>→</span>
+                                  )}
+                                </div>
+                              ))}
                             </div>
                           </div>
-                          {i < countries.length - 1 && (
-                            <span style={{ fontSize: 14, color: "var(--text-tertiary)", marginBottom: 12 }}>→</span>
+
+                          {/* Border posts */}
+                          {crossings.some(k => CB_BORDER_POSTS[k]) && (
+                            <div>
+                              <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>BORDER POSTS</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                                {crossings.map(key => {
+                                  const post = CB_BORDER_POSTS[key];
+                                  if (!post) return null;
+                                  const [from, to] = key.split('-');
+                                  return (
+                                    <div key={key} style={{ background: "var(--bg-surface)", borderRadius: 2, padding: "7px 9px" }}>
+                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+                                        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)", fontFamily: "var(--font-sans)" }}>
+                                          {CB_FLAGS[from]} → {CB_FLAGS[to]}  {post.name}
+                                        </span>
+                                        <span style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--status-success)", fontWeight: 600 }}>
+                                          ⏰ {post.hours}
+                                        </span>
+                                      </div>
+                                      <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
+                                        ℹ️ {post.note}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Currency */}
+                          {foreignCountries.some(c => CB_CURRENCY[c]) && (
+                            <div>
+                              <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>CURRENCY</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                {foreignCountries.filter(c => CB_CURRENCY[c]).map(c => (
+                                  <div key={c} style={{ display: "flex", gap: 6, fontSize: 11, fontFamily: "var(--font-sans)" }}>
+                                    <span>{CB_FLAGS[c]}</span>
+                                    <span style={{ color: "var(--text-secondary)" }}>{CB_COUNTRY_NAMES[c]}:</span>
+                                    <span style={{ color: "var(--text-primary)" }}>{CB_CURRENCY[c]}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Required documents */}
+                          <div>
+                            <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>REQUIRED DOCUMENTS</div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                              {countries.filter(c => CB_DOCS[c]).map(c => (
+                                <div key={c}>
+                                  <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-secondary)", marginBottom: 3 }}>
+                                    {CB_FLAGS[c]} {CB_COUNTRY_NAMES[c] ?? c}
+                                  </div>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                    {CB_DOCS[c].map(doc => (
+                                      <div key={doc} style={{ display: "flex", gap: 6, fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
+                                        <span style={{ color: "var(--status-success)", flexShrink: 0 }}>✓</span>
+                                        <span>{doc}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Driver notes */}
+                          {routeData.warnings && routeData.warnings.length > 0 && (
+                            <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10 }}>
+                              <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>DRIVER NOTES</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                {routeData.warnings.map((w, idx) => (
+                                  <div key={idx} style={{ display: "flex", gap: 6, fontSize: 11, fontFamily: "var(--font-sans)", color: "var(--status-warning)" }}>
+                                    <span style={{ flexShrink: 0 }}>⚠️</span>
+                                    <span>{w}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Border posts */}
-                  {crossings.some(k => CB_BORDER_POSTS[k]) && (
-                    <div>
-                      <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>BORDER POSTS</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {crossings.map(key => {
-                          const post = CB_BORDER_POSTS[key];
-                          if (!post) return null;
-                          const [from, to] = key.split('-');
-                          return (
-                            <div key={key} style={{ background: "var(--bg-surface)", borderRadius: 2, padding: "8px 10px" }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", fontFamily: "var(--font-sans)" }}>
-                                  {CB_FLAGS[from]} → {CB_FLAGS[to]}  {post.name}
-                                </span>
-                                <span style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--status-success)", fontWeight: 600 }}>
-                                  ⏰ {post.hours}
-                                </span>
-                              </div>
-                              <div style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
-                                ℹ️ {post.note}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Cost breakdown */}
-                  <div>
-                    <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>ADDITIONAL COST BREAKDOWN</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 11 }}>
-                      {(routeData.additional_costs?.border_fees ?? 0) > 0 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                          <div>
-                            <div style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Border Crossing Fees</div>
-                            <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
-                              {crossings.map(k => k.split('-').join(' → ')).join(', ')}
-                            </div>
-                          </div>
-                          <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-warning)", fontWeight: 600 }}>
-                            R {Math.round(routeData.additional_costs!.border_fees!).toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                      {(routeData.additional_costs?.weighbridge_fees ?? 0) > 0 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                          <div>
-                            <div style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Weighbridge Fees</div>
-                            <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
-                              {foreignCountries.map(c => CB_COUNTRY_NAMES[c] ?? c).join(', ')} · per country
-                            </div>
-                          </div>
-                          <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-warning)", fontWeight: 600 }}>
-                            R {Math.round(routeData.additional_costs!.weighbridge_fees!).toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                      {(routeData.additional_costs?.non_sa_tolls ?? 0) > 0 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                          <div>
-                            <div style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>International Tolls</div>
-                            <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
-                              {foreignCountries.map(c => CB_COUNTRY_NAMES[c] ?? c).join(', ')} · distance-based
-                            </div>
-                          </div>
-                          <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-warning)", fontWeight: 600 }}>
-                            R {Math.round(routeData.additional_costs!.non_sa_tolls!).toLocaleString()}
-                          </span>
-                        </div>
                       )}
                     </div>
                   </div>
+                </div>
 
-                  {/* Currency */}
-                  {foreignCountries.some(c => CB_CURRENCY[c]) && (
-                    <div>
-                      <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>CURRENCY</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        {foreignCountries.filter(c => CB_CURRENCY[c]).map(c => (
-                          <div key={c} style={{ display: "flex", gap: 6, fontSize: 11, fontFamily: "var(--font-sans)" }}>
-                            <span>{CB_FLAGS[c]}</span>
-                            <span style={{ color: "var(--text-secondary)" }}>{CB_COUNTRY_NAMES[c]}:</span>
-                            <span style={{ color: "var(--text-primary)" }}>{CB_CURRENCY[c]}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Required documents */}
-                  <div>
-                    <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>REQUIRED DOCUMENTS</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {countries.filter(c => CB_DOCS[c]).map(c => (
-                        <div key={c}>
-                          <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-secondary)", marginBottom: 3 }}>
-                            {CB_FLAGS[c]} {CB_COUNTRY_NAMES[c] ?? c}
-                          </div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            {CB_DOCS[c].map(doc => (
-                              <div key={doc} style={{ display: "flex", gap: 6, fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
-                                <span style={{ color: "var(--status-success)", flexShrink: 0 }}>✓</span>
-                                <span>{doc}</span>
-                              </div>
-                            ))}
-                          </div>
+                {/* Cost breakdown — stays visible */}
+                <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 5, fontSize: 11 }}>
+                  {(routeData.additional_costs?.border_fees ?? 0) > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <div style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Border Crossing Fees</div>
+                        <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
+                          {crossings.map(k => k.split('-').join(' → ')).join(', ')}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Warnings / driver notes */}
-                  {routeData.warnings && routeData.warnings.length > 0 && (
-                    <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10 }}>
-                      <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>DRIVER NOTES</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        {routeData.warnings.map((w, idx) => (
-                          <div key={idx} style={{ display: "flex", gap: 6, fontSize: 11, fontFamily: "var(--font-sans)", color: "var(--status-warning)" }}>
-                            <span style={{ flexShrink: 0 }}>⚠️</span>
-                            <span>{w}</span>
-                          </div>
-                        ))}
                       </div>
+                      <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-warning)", fontWeight: 600 }}>
+                        R {Math.round(routeData.additional_costs!.border_fees!).toLocaleString()}
+                      </span>
                     </div>
                   )}
-
+                  {(routeData.additional_costs?.weighbridge_fees ?? 0) > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <div style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Weighbridge Fees</div>
+                        <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
+                          {foreignCountries.map(c => CB_COUNTRY_NAMES[c] ?? c).join(', ')} · per country
+                        </div>
+                      </div>
+                      <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-warning)", fontWeight: 600 }}>
+                        R {Math.round(routeData.additional_costs!.weighbridge_fees!).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {(routeData.additional_costs?.non_sa_tolls ?? 0) > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <div style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>International Tolls</div>
+                        <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
+                          {foreignCountries.map(c => CB_COUNTRY_NAMES[c] ?? c).join(', ')} · distance-based
+                        </div>
+                      </div>
+                      <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-warning)", fontWeight: 600 }}>
+                        R {Math.round(routeData.additional_costs!.non_sa_tolls!).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             );

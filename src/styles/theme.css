@@ -447,7 +447,7 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   transition: border-color 0.2s, box-shadow 0.2s;
   box-shadow: var(--shadow-card);
 }

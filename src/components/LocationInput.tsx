@@ -18,9 +18,10 @@ interface LocationInputProps {
   placeholder?: string;
   style?: React.CSSProperties;
   onFocus?: () => void;
+  resolvedText?: string;
 }
 
-export function LocationInput({ value, onChange, placeholder, style, onFocus }: LocationInputProps) {
+export function LocationInput({ value, onChange, placeholder, style, onFocus, resolvedText }: LocationInputProps) {
   const [mode, setMode] = useState<'search' | 'gps'>('search');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -199,9 +200,40 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus }: 
           ))}
         </div>
       )}
-      <button type="button" style={toggleLink} onClick={switchToGps}>
-        Enter GPS coordinates →
-      </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button type="button" style={{ ...toggleLink, marginTop: 4 }} onClick={switchToGps}>
+          Enter GPS coordinates →
+        </button>
+        {resolvedText && <ResolvedInfo text={resolvedText} />}
+      </div>
     </div>
+  );
+}
+
+function ResolvedInfo({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      <span
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        style={{ cursor: 'help', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: 1, userSelect: 'none', marginTop: 4 }}
+        aria-label={text}
+      >
+        ⓘ
+      </span>
+      {show && (
+        <div style={{
+          position: 'absolute', bottom: '100%', right: 0, zIndex: 20, marginBottom: 6,
+          background: '#fff', border: '1px solid var(--border-subtle)',
+          borderRadius: 4, padding: '8px 12px',
+          fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)',
+          whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          pointerEvents: 'none',
+        }}>
+          {text}
+        </div>
+      )}
+    </span>
   );
 }

@@ -95,7 +95,7 @@ export function VehiclesDirectory() {
       make: v.make || '',
       model: v.model || '',
       year: v.year || '',
-      capacity: v.capacity != null ? String(v.capacity) : '',
+      capacity: v.capacity != null ? String(Number(v.capacity) / 1000) : '',
       mileage: v.mileage != null ? String(v.mileage) : '',
       fuel_type: v.fuel_type || 'Diesel',
       status: v.status || 'AVAILABLE',
@@ -135,7 +135,7 @@ export function VehiclesDirectory() {
         data: {
           ...rest,
           year: editForm.year ? Number(editForm.year) : undefined,
-          capacity: editForm.capacity ? Number(editForm.capacity) : undefined,
+          capacity: editForm.capacity ? Number(editForm.capacity) * 1000 : undefined,
           mileage: editForm.mileage ? Number(editForm.mileage) : undefined,
           service_interval_km: editForm.service_interval_km ? Number(editForm.service_interval_km) : null,
           last_service_mileage: editForm.last_service_mileage ? Number(editForm.last_service_mileage) : null,
@@ -153,7 +153,7 @@ export function VehiclesDirectory() {
   };
 
   return (
-    <div style={{ maxWidth: 840 }}>
+    <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Vehicles</div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Fleet vehicle directory</div>
@@ -303,7 +303,7 @@ export function VehiclesDirectory() {
               { key: 'make', label: 'Make', type: 'text' },
               { key: 'model', label: 'Model', type: 'text' },
               { key: 'year', label: 'Year', type: 'number' },
-              { key: 'capacity', label: 'Capacity (kg)', type: 'number' },
+              { key: 'capacity', label: 'Capacity (ton)', type: 'number' },
               { key: 'mileage', label: 'Mileage (km)', type: 'number' },
               { key: 'service_interval_km', label: 'Service Interval (km)', type: 'number' },
               { key: 'last_service_mileage', label: 'Last Service Odometer (km)', type: 'number' },

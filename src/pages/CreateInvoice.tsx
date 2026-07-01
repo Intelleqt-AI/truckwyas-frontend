@@ -45,9 +45,20 @@ export default function CreateInvoice() {
     fontFamily: 'var(--font-sans)',
   };
 
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+
+  const dueDateValid = (() => {
+    if (!form.due_date) return false;
+    const d = new Date(form.due_date);
+    return !isNaN(d.getTime()) && d <= today;
+  })();
+
+  const canSubmit = !!form.customer && !!form.amount && parseFloat(form.amount) > 0 && dueDateValid;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.customer || !form.amount) { setError('Customer and amount are required'); return; }
+    if (!canSubmit) return;
     const subtotal = parseFloat(form.amount) || 0;
     mutation.mutate({
       ...form,
@@ -97,7 +108,7 @@ export default function CreateInvoice() {
                   </div>
                   <div>
                     <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>DUE DATE</div>
-                    <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} />
+                    <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} maxDate={today} />
                   </div>
                 </div>
                 <div>
@@ -133,7 +144,7 @@ export default function CreateInvoice() {
 
             {error && <div style={{ fontSize: 12, color: 'var(--status-danger)', padding: '12px 16px', background: 'var(--status-danger-bg)', borderRadius: 2 }}>{error}</div>}
 
-            <button type="submit" className="btn-action" style={{ width: '100%', padding: '12px', fontSize: 12 }} disabled={mutation.isPending}>
+            <button type="submit" className="btn-action" style={{ width: '100%', padding: '12px', fontSize: 12, opacity: (!canSubmit || mutation.isPending) ? 0.45 : 1, cursor: (!canSubmit || mutation.isPending) ? 'not-allowed' : 'pointer' }} disabled={!canSubmit || mutation.isPending}>
               {mutation.isPending ? 'CREATING...' : 'CREATE INVOICE'}
             </button>
             <button type="button" onClick={() => navigate('/finance/invoices')} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '10px', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', width: '100%' }}>

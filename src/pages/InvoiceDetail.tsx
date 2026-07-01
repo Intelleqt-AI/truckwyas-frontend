@@ -421,6 +421,7 @@ export default function InvoiceDetail() {
                   value={paymentDate}
                   onChange={setPaymentDate}
                   style={{ padding: '8px', fontSize: 12 }}
+                  maxDate={new Date()}
                 />
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                   <SelectTrigger>

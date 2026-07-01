@@ -7,9 +7,13 @@ export const useLogin = () => {
   return useMutation({
     mutationFn: loginUser,
     onSuccess: (data) => {
-      localStorage.setItem("access", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      setUser(data.user);
+      // A 2FA response has no token yet (it carries `otp_required` + a
+      // pending_token instead) — only persist once we actually get a token.
+      if (data?.token) {
+        localStorage.setItem("access", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        setUser(data.user);
+      }
     },
   });
 };

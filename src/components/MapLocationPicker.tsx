@@ -128,6 +128,7 @@ export function MapLocationPicker({
   const lineRef = useRef<Polyline | null>(null);
   const returnLineRef = useRef<Polyline | null>(null);
   const routeLinesRef = useRef<Polyline[]>([]);
+  const routeLabelsRef = useRef<Marker[]>([]);
   const trafficLayerRef = useRef<TileLayer | null>(null);
   const activeFieldRef = useRef<MapField>(activeField);
   const onActiveFieldChangeRef = useRef(onActiveFieldChange);
@@ -232,6 +233,8 @@ export function MapLocationPicker({
     if (returnLineRef.current) { map.removeLayer(returnLineRef.current); returnLineRef.current = null; }
     routeLinesRef.current.forEach((ln) => map.removeLayer(ln));
     routeLinesRef.current = [];
+    routeLabelsRef.current.forEach((m) => map.removeLayer(m));
+    routeLabelsRef.current = [];
 
     if (pickupCoords) {
       pickupMarkerRef.current = L.marker([pickupCoords.lat, pickupCoords.lon], {
@@ -273,9 +276,10 @@ export function MapLocationPicker({
         { padding: [40, 40], maxZoom: 12 }
       );
       if (routeOptions && routeOptions.length > 0) {
-        // Draw all TomTom routes from backend geometry: selected/best = green, rest = grey & clickable.
+        // Distinct color per route so users can match map lines to the option list.
+        const ROUTE_COLORS = ['#16a34a', '#2563eb', '#ea580c', '#7c3aed'];
         const allPts: [number, number][] = [];
-        // Draw non-selected first so the selected (green) route ends up on top.
+        // Draw non-selected first so the selected route ends up on top.
         const ordered = [...routeOptions].sort(
           (a, b) => Number(a.index === selectedRouteIndex) - Number(b.index === selectedRouteIndex)
         );
@@ -283,16 +287,30 @@ export function MapLocationPicker({
           const pts = (r.geometry || []).map((p) => [p.lat, p.lon] as [number, number]);
           if (pts.length < 2) return;
           const isSel = r.index === selectedRouteIndex;
+          const color = ROUTE_COLORS[r.index % ROUTE_COLORS.length];
           const line = L.polyline(
             pts,
             isSel
-              ? { color: '#16a34a', weight: 6, opacity: 0.95 }
-              : { color: '#334155', weight: 5, opacity: 0.85 }
+              ? { color, weight: 6, opacity: 0.95 }
+              : { color, weight: 4, opacity: 0.45 }
           ).addTo(map);
           if (onSelectRoute) line.on('click', () => onSelectRoute(r.index));
           if (isSel) line.bringToFront();
           routeLinesRef.current.push(line);
           pts.forEach((pt) => allPts.push(pt));
+
+          // Numbered badge at the midpoint of each route
+          const mid = pts[Math.floor(pts.length / 2)];
+          const label = L.marker(mid, {
+            icon: L.divIcon({
+              html: `<div style="background:${color};color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);opacity:${isSel ? 1 : 0.65}">${r.index + 1}</div>`,
+              className: '',
+              iconSize: [20, 20],
+              iconAnchor: [10, 10],
+            }),
+            interactive: false,
+          }).addTo(map);
+          routeLabelsRef.current.push(label);
         });
         if (allPts.length) {
           const bounds = L.latLngBounds(allPts);

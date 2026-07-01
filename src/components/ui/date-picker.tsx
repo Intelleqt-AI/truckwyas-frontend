@@ -10,6 +10,7 @@ interface DatePickerProps {
   onChange: (value: string) => void
   placeholder?: string
   style?: React.CSSProperties
+  maxDate?: Date
 }
 
 // Formats tried in order when parsing typed input
@@ -23,7 +24,7 @@ function tryParse(raw: string): Date | null {
   return null
 }
 
-export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style }: DatePickerProps) {
+export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style, maxDate }: DatePickerProps) {
   const [open, setOpen] = useState(false)
   const [inputVal, setInputVal] = useState('')
   const [month, setMonth] = useState<Date>(new Date())
@@ -49,7 +50,7 @@ export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style 
       return
     }
     const d = tryParse(raw)
-    if (d) {
+    if (d && (!maxDate || d <= maxDate)) {
       onChange(format(d, 'yyyy-MM-dd'))
       setMonth(d)
     }
@@ -68,6 +69,7 @@ export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style 
   }
 
   const handleCalendarSelect = (date: Date | undefined) => {
+    if (date && maxDate && date > maxDate) return
     onChange(date ? format(date, 'yyyy-MM-dd') : '')
     setOpen(false)
   }
@@ -144,6 +146,7 @@ export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style 
           month={month}
           onMonthChange={setMonth}
           onSelect={handleCalendarSelect}
+          disabled={maxDate ? (day: Date) => day > maxDate : undefined}
           initialFocus
         />
       </PopoverContent>

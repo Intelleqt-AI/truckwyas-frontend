@@ -3,6 +3,11 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { LiveEvents } from '@/components/LiveEvents';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useAuth } from '@/lib/AuthContext';
+import { fetchData, postData } from '@/lib/Api';
+import { toast } from '@/lib/toast';
+import { useIdleLogout } from '@/hooks/useIdleLogout';
+
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // "Auto sign out after 30 minutes of inactivity"
 
 export function OSLayout({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -10,6 +15,8 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   });
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [agentQuery, setAgentQuery] = useState('');
+  // Default ON to match the backend default; corrected by the fetch below.
+  const [sessionTimeoutEnabled, setSessionTimeoutEnabled] = useState(true);
   const profileRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,13 +43,45 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleLogout = () => {
+  const signOut = (message?: string) => {
+    // Best-effort server-side session kill; the local token is cleared regardless.
+    postData({ url: 'api/v1/auth/logout/' }).catch(() => { /* dead/failed token: proceed anyway */ });
     localStorage.removeItem('access');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('onboarding_done');
+    if (message) toast.info(message);
     navigate('/login');
   };
+
+  const handleLogout = () => signOut();
+
+  // Track the "Session timeout" preference: fetch once, then react live when it's
+  // toggled on the Security Settings page (via a window event, no reload needed).
+  useEffect(() => {
+    let alive = true;
+    fetchData('api/v1/auth/security-settings/')
+      .then((s: any) => { if (alive && s && typeof s === 'object') setSessionTimeoutEnabled(!!s.session_timeout); })
+      .catch(() => { /* keep the secure default on failure */ });
+    const onChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && typeof detail === 'object' && 'session_timeout' in detail) {
+        setSessionTimeoutEnabled(!!detail.session_timeout);
+      }
+    };
+    window.addEventListener('tw:security-settings-changed', onChange as EventListener);
+    return () => {
+      alive = false;
+      window.removeEventListener('tw:security-settings-changed', onChange as EventListener);
+    };
+  }, []);
+
+  // Auto sign-out after 30 min of inactivity when the preference is enabled.
+  useIdleLogout({
+    enabled: sessionTimeoutEnabled,
+    timeoutMs: IDLE_TIMEOUT_MS,
+    onTimeout: () => signOut('Signed out due to inactivity'),
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);

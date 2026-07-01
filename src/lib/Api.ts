@@ -20,7 +20,9 @@ api.interceptors.response.use(
   res => res,
   error => {
     const reqUrl: string = error.config?.url || '';
-    const isAuthEndpoint = reqUrl.includes('auth/login') || reqUrl.includes('auth/register');
+    // A 401 on login/register means "wrong credentials"; on logout it means the
+    // session is already gone — none of these are an expired-session-mid-use event.
+    const isAuthEndpoint = reqUrl.includes('auth/login') || reqUrl.includes('auth/register') || reqUrl.includes('auth/logout');
 
     if (error.response?.status === 401 && !isAuthEndpoint) {
       toast.error('Session expired');

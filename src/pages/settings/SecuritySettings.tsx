@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { fetchData, postData } from "@/lib/Api";
+import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
+import { formatRelativeTime } from "@/lib/formatters";
+import { toast } from "@/lib/toast";
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -99,9 +101,11 @@ export function SecuritySettings() {
   const [pwForm, setPwForm] = useState({ current: '', new1: '', new2: '' });
   const [sessions, setSessions] = useState<any[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData('api/v1/auth/sessions/')
+  const loadSessions = () => {
+    setLoadingSessions(true);
+    return fetchData('api/v1/auth/sessions/')
       .then((d: any) => {
         setSessions(Array.isArray(d) ? d : (d?.results || []));
       })
@@ -109,7 +113,53 @@ export function SecuritySettings() {
         setSessions([]);
       })
       .finally(() => setLoadingSessions(false));
+  };
+
+  useEffect(() => {
+    loadSessions();
+    // Load persisted security toggles
+    fetchData('api/v1/auth/security-settings/')
+      .then((s: any) => {
+        if (s && typeof s === 'object') {
+          setTwoFactor(!!s.two_factor);
+          setSessionTimeout(!!s.session_timeout);
+          setLoginAlerts(!!s.login_alerts);
+        }
+      })
+      .catch(() => { /* keep defaults on failure */ });
   }, []);
+
+  // Optimistically flip a toggle and persist it; revert on failure.
+  const updateSecuritySetting = async (
+    key: 'two_factor' | 'session_timeout' | 'login_alerts',
+    value: boolean,
+    setter: (v: boolean) => void,
+  ) => {
+    setter(value);
+    try {
+      await patchData({ url: 'api/v1/auth/security-settings/', data: { [key]: value } });
+      // Let other parts of the app (e.g. the idle-logout watcher in OSLayout)
+      // react immediately, without a reload.
+      window.dispatchEvent(new CustomEvent('tw:security-settings-changed', { detail: { [key]: value } }));
+    } catch (err) {
+      setter(!value);
+      toast.error('Failed to update setting');
+    }
+  };
+
+  const handleRevokeSession = async (id: string) => {
+    if (!window.confirm('Sign out this device? It will need to log in again.')) return;
+    setRevokingId(id);
+    try {
+      await deleteData({ url: `api/v1/auth/sessions/${id}/` });
+      await loadSessions();
+      toast.success('Session revoked');
+    } catch (err) {
+      toast.error('Failed to revoke session');
+    } finally {
+      setRevokingId(null);
+    }
+  };
 
   const handleChangePassword = async () => {
     if (!pwForm.current || !pwForm.new1) return;
@@ -131,7 +181,7 @@ export function SecuritySettings() {
   };
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
           Security Settings
@@ -175,9 +225,9 @@ export function SecuritySettings() {
           <span style={sectionTitleStyle}>Security Options</span>
         </div>
         <div style={{ paddingBottom: 4 }}>
-          <ToggleRow label="Two-factor authentication" description="Require OTP on login in addition to password" checked={twoFactor} onChange={setTwoFactor} badge="Recommended" />
-          <ToggleRow label="Session timeout" description="Auto sign out after 30 minutes of inactivity" checked={sessionTimeout} onChange={setSessionTimeout} />
-          <ToggleRow label="Login alerts" description="Email me when a new device signs in" checked={loginAlerts} onChange={setLoginAlerts} />
+          <ToggleRow label="Two-factor authentication" description="Require OTP on login in addition to password" checked={twoFactor} onChange={(v) => updateSecuritySetting('two_factor', v, setTwoFactor)} badge="Recommended" />
+          <ToggleRow label="Session timeout" description="Auto sign out after 30 minutes of inactivity" checked={sessionTimeout} onChange={(v) => updateSecuritySetting('session_timeout', v, setSessionTimeout)} />
+          <ToggleRow label="Login alerts" description="Email me when a new device signs in" checked={loginAlerts} onChange={(v) => updateSecuritySetting('login_alerts', v, setLoginAlerts)} />
         </div>
       </div>
 
@@ -208,15 +258,20 @@ export function SecuritySettings() {
                     }}>Current</span>
                   )}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{s.location} · {s.time}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{s.location} · {formatRelativeTime(s.time)}</div>
               </div>
               {!s.current && (
-                <button style={{
-                  background: 'none', border: '1px solid var(--status-danger)',
-                  color: 'var(--status-danger)', padding: '5px 10px',
-                  fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
-                  cursor: 'pointer', letterSpacing: '0.05em',
-                }}>REVOKE</button>
+                <button
+                  onClick={() => handleRevokeSession(s.id)}
+                  disabled={revokingId === s.id}
+                  style={{
+                    background: 'none', border: '1px solid var(--status-danger)',
+                    color: 'var(--status-danger)', padding: '5px 10px',
+                    fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                    cursor: revokingId === s.id ? 'default' : 'pointer',
+                    letterSpacing: '0.05em', opacity: revokingId === s.id ? 0.5 : 1,
+                  }}
+                >{revokingId === s.id ? 'REVOKING...' : 'REVOKE'}</button>
               )}
             </div>
           ))}

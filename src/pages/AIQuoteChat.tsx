@@ -619,7 +619,9 @@ export default function AIQuoteChat() {
               marginTop: 8,
               background: canCreateQuote ? 'var(--status-success)' : 'var(--bg-surface-hover)',
               border: 'none',
-              color: canCreateQuote ? 'var(--text-primary)' : 'var(--text-tertiary)',
+              // White stays readable on the coloured button in BOTH themes —
+              // var(--text-primary) flips to black in light mode (the bug).
+              color: canCreateQuote ? '#fff' : 'var(--text-tertiary)',
               padding: '12px 20px',
               borderRadius: 2,
               fontSize: 11,

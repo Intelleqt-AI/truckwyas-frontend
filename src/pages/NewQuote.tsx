@@ -6,7 +6,13 @@ import { toast } from "@/lib/toast";
 import { LocationInput, type LocationCoords } from "@/components/LocationInput";
 import { MapLocationPicker } from "@/components/MapLocationPicker";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ComposedChart,
   Area,
@@ -24,8 +30,8 @@ const FUEL_CONSUMPTION_FALLBACK: Record<string, number> = {
   "Rigid Truck": 28,
   "Flatbed Truck": 36,
   "Refrigerated Truck": 42,
-  "Tanker": 40,
-  "Tautliner": 36,
+  Tanker: 40,
+  Tautliner: 36,
   "Box Truck": 25,
 };
 
@@ -161,9 +167,13 @@ export default function NewQuote() {
   // 3 TomTom routes (best + 2 alternatives) for the outbound leg, and which one is chosen.
   const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
-  const [expandedRouteIndex, setExpandedRouteIndex] = useState<number | null>(0);
+  const [expandedRouteIndex, setExpandedRouteIndex] = useState<number | null>(
+    0,
+  );
   const [calculatingRoute, setCalculatingRoute] = useState(false);
-  const [activeMapField, setActiveMapField] = useState<"pickup" | "delivery" | "return">("pickup");
+  const [activeMapField, setActiveMapField] = useState<
+    "pickup" | "delivery" | "return"
+  >("pickup");
   const [mapExpanded, setMapExpanded] = useState(false);
 
   // Round trip state
@@ -174,7 +184,9 @@ export default function NewQuote() {
   const [returnDate, setReturnDate] = useState("");
   const [returnBaseRate, setReturnBaseRate] = useState("0");
   const [returnNotes, setReturnNotes] = useState("");
-  const [returnRouteData, setReturnRouteData] = useState<RouteData | null>(null);
+  const [returnRouteData, setReturnRouteData] = useState<RouteData | null>(
+    null,
+  );
 
   // Step 2: Freight details
   const [weight, setWeight] = useState("");
@@ -188,6 +200,8 @@ export default function NewQuote() {
   const [driverAllowanceInput, setDriverAllowanceInput] = useState("0");
   const [editableFuelCost, setEditableFuelCost] = useState<number | null>(null);
   const [editableTollCost, setEditableTollCost] = useState<number | null>(null);
+  const [serviceCharge, setServiceCharge] = useState<number>(0);
+  const [editableTotalCostStr, setEditableTotalCostStr] = useState<string>("");
 
   // Step 3: Customer & Summary
   const [customerId, setCustomerId] = useState("");
@@ -196,7 +210,10 @@ export default function NewQuote() {
   // Quick-create customer
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCustomerForm, setNewCustomerForm] = useState({
-    name: "", email: "", phone: "", city: "",
+    name: "",
+    email: "",
+    phone: "",
+    city: "",
   });
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [status, setStatus] = useState<"DRAFT" | "SENT">("DRAFT");
@@ -211,6 +228,7 @@ export default function NewQuote() {
   });
 
   const [customFuelPricePerL, setCustomFuelPricePerL] = useState<string>("");
+  const [costMode, setCostMode] = useState<"fuel" | "base_rate">("fuel");
 
   // New Phase 2 features
   const [fuelPriceData, setFuelPriceData] = useState<FuelPriceData | null>(
@@ -259,7 +277,12 @@ export default function NewQuote() {
   type DriverOption = {
     id: number;
     status: string;
-    user_details?: { name?: string; first_name?: string; last_name?: string; username?: string };
+    user_details?: {
+      name?: string;
+      first_name?: string;
+      last_name?: string;
+      username?: string;
+    };
   };
 
   // Re-fetch vehicles whenever vehicleType changes — available only
@@ -269,7 +292,7 @@ export default function NewQuote() {
       fetchData(
         vehicleType
           ? `api/v1/vehicles/?vehicle_type__name=${encodeURIComponent(vehicleType)}&status=AVAILABLE`
-          : "api/v1/vehicles/?status=AVAILABLE"
+          : "api/v1/vehicles/?status=AVAILABLE",
       ),
     staleTime: 60 * 1000,
   });
@@ -277,7 +300,7 @@ export default function NewQuote() {
 
   // The currently selected vehicle object (needed to resolve its driver)
   const selectedVehicle: VehicleOption | undefined = vehicles.find(
-    (v) => v.id === parseInt(selectedVehicleId || "0")
+    (v) => v.id === parseInt(selectedVehicleId || "0"),
   );
 
   // Re-fetch drivers whenever the selected vehicle changes.
@@ -296,8 +319,12 @@ export default function NewQuote() {
   // Cost calculations — defined early so they can be used in callbacks/effects below
   // Mobile app formula implementation
   // The chosen route (best by default, or an alternative the user clicked) drives cost + time.
-  const selectedRoute: RouteOption | null = routeData ? routeOptions[selectedRouteIndex] ?? null : null;
-  const distance = (routeData ? selectedRoute?.distance_km ?? routeData.distance_km : 0) || 0;
+  const selectedRoute: RouteOption | null = routeData
+    ? (routeOptions[selectedRouteIndex] ?? null)
+    : null;
+  const distance =
+    (routeData ? (selectedRoute?.distance_km ?? routeData.distance_km) : 0) ||
+    0;
   const _baseCost = distance * parseFloat(baseRatePerKm || "0");
 
   const selectedVehicleTypeBaseRate = (() => {
@@ -330,7 +357,8 @@ export default function NewQuote() {
     ? parseFloat(companyProfile.default_toll_rate_per_km)
     : 0.5;
   const calculatedTollCost =
-    (selectedRoute?.toll_cost_zar ?? routeData?.toll_cost_zar) || distance * tollRatePerKm;
+    (selectedRoute?.toll_cost_zar ?? routeData?.toll_cost_zar) ||
+    distance * tollRatePerKm;
   const _tollCost =
     editableTollCost !== null ? editableTollCost : calculatedTollCost;
 
@@ -339,7 +367,7 @@ export default function NewQuote() {
   const weightThreshold = companyProfile?.weight_surcharge_threshold_kg ?? 5000;
   const weightSurchargePct = (companyProfile?.weight_surcharge_pct ?? 15) / 100;
   const _weightSurcharge =
-    weightKg > weightThreshold ? _baseCost * weightSurchargePct : 0;
+    weightKg > weightThreshold ? _fuelCost * weightSurchargePct : 0;
 
   // Additional costs (cross-border only)
   const _additionalCosts =
@@ -348,16 +376,17 @@ export default function NewQuote() {
     (routeData?.additional_costs?.non_sa_tolls || 0);
 
   const _driverAllowance = parseFloat(driverAllowanceInput || "0");
-  const _returnRate = tripType === "ROUND_TRIP" ? parseFloat(returnBaseRate || "0") : 0;
+  const _returnRate =
+    tripType === "ROUND_TRIP" ? parseFloat(returnBaseRate || "0") : 0;
 
-  // Total: baseCost + fuelCost + tollCost + weightSurcharge + additionalCosts + driverAllowance + returnRate
+  // Total: fuelCost + tollCost + weightSurcharge + additionalCosts + driverAllowance + serviceCharge + returnRate
   const _total =
-    _baseCost +
     _fuelCost +
     _tollCost +
     _weightSurcharge +
     _additionalCosts +
     _driverAllowance +
+    serviceCharge +
     _returnRate;
 
   const { data: customersData } = useQuery({
@@ -415,7 +444,8 @@ export default function NewQuote() {
     setOptimal(null);
     try {
       const outboundTotal = _total - _returnRate;
-      const marketRate = marketBenchmark?.market_avg_rate || outboundTotal * 1.15;
+      const marketRate =
+        marketBenchmark?.market_avg_rate || outboundTotal * 1.15;
       const data = await postData({
         url: "api/v1/quotes/optimize/",
         data: {
@@ -436,19 +466,13 @@ export default function NewQuote() {
     }
   };
 
-  // Back-solve the base rate/km so the quote total lands on the optimal price.
+  // Apply the optimal price by setting a service charge to bridge the gap.
   const applyOptimal = () => {
-    if (!optimal?.optimal_price || distanceKm <= 0) return;
-    // Back-solve outbound rate only — return leg rate is separate
-    const fixed = _fuelCost + _tollCost + _driverAllowance + _additionalCosts;
-    const threshold = weightThreshold || 5000;
-    const ws = weightKg > threshold ? weightSurchargePct : 0;
-    const targetBaseCost = (optimal.optimal_price - fixed) / (1 + ws);
-    const perKm = targetBaseCost / distanceKm;
-    if (perKm > 0 && isFinite(perKm)) {
-      setBaseRatePerKm((Math.round(perKm * 100) / 100).toString());
-      setOptimal(null);
-    }
+    if (!optimal?.optimal_price) return;
+    const currentCosts = _fuelCost + _tollCost + _weightSurcharge + _additionalCosts + _driverAllowance;
+    const diff = optimal.optimal_price - _returnRate - currentCosts;
+    setServiceCharge(Math.max(0, Math.round(diff)));
+    setOptimal(null);
   };
 
   // Fetch revenue guard assessment
@@ -460,7 +484,11 @@ export default function NewQuote() {
       // fuel + tolls + driver allowance + cross-border fees + weight surcharge.
       // The base rate covers vehicle ownership, overhead, and profit — it IS the margin.
       const directCosts =
-        _fuelCost + _tollCost + _driverAllowance + _additionalCosts + _weightSurcharge;
+        _fuelCost +
+        _tollCost +
+        _driverAllowance +
+        _additionalCosts +
+        _weightSurcharge;
 
       const data = await postData({
         url: "/api/v1/quotes/guard/",
@@ -517,7 +545,14 @@ export default function NewQuote() {
           // Silently fail — not critical
         });
     }
-  }, [currentStep, pickupLocation, deliveryLocation, vehicleType, _total, _returnRate]);
+  }, [
+    currentStep,
+    pickupLocation,
+    deliveryLocation,
+    vehicleType,
+    _total,
+    _returnRate,
+  ]);
 
   // Calculate route(s) — both legs when ROUND_TRIP. Accepts optional overrides
   // so callers (e.g. the AI-chat prefill) can pass freshly-resolved values
@@ -588,8 +623,14 @@ export default function NewQuote() {
           data: {
             origin: deliveryLocation.trim(),
             destination: returnLocation.trim(),
-            ...(deliveryCoords && { origin_lat: deliveryCoords.lat, origin_lon: deliveryCoords.lon }),
-            ...(returnCoords && { dest_lat: returnCoords.lat, dest_lon: returnCoords.lon }),
+            ...(deliveryCoords && {
+              origin_lat: deliveryCoords.lat,
+              origin_lon: deliveryCoords.lon,
+            }),
+            ...(returnCoords && {
+              dest_lat: returnCoords.lat,
+              dest_lon: returnCoords.lon,
+            }),
             vehicle_type: vehicleType,
             cross_border_enabled: crossBorderEnabled,
             weight_kg: parseFloat(weight || "20") * 1000,
@@ -617,7 +658,10 @@ export default function NewQuote() {
   // calc, so fuel & toll reflect the new vehicle. Skip the first run (mount / edit prefill).
   const vtFirstRun = useRef(true);
   useEffect(() => {
-    if (vtFirstRun.current) { vtFirstRun.current = false; return; }
+    if (vtFirstRun.current) {
+      vtFirstRun.current = false;
+      return;
+    }
     if (routeData && !calculatingRoute && pickupCoords && deliveryCoords) {
       calculateRoute();
     }
@@ -627,7 +671,14 @@ export default function NewQuote() {
   // Preview route alternatives as soon as both locations are pinned — no weight/vehicle needed.
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!pickupCoords || !deliveryCoords || routeData || calculatingRoute || currentStep !== 1) return;
+    if (
+      !pickupCoords ||
+      !deliveryCoords ||
+      routeData ||
+      calculatingRoute ||
+      currentStep !== 1
+    )
+      return;
     if (previewTimer.current) clearTimeout(previewTimer.current);
     previewTimer.current = setTimeout(async () => {
       try {
@@ -670,9 +721,15 @@ export default function NewQuote() {
         setPickupLocation(q.pickup_location || "");
         setDeliveryLocation(q.delivery_location || "");
         if (q.pickup_lat != null && q.pickup_lng != null)
-          setPickupCoords({ lat: parseFloat(q.pickup_lat), lon: parseFloat(q.pickup_lng) });
+          setPickupCoords({
+            lat: parseFloat(q.pickup_lat),
+            lon: parseFloat(q.pickup_lng),
+          });
         if (q.delivery_lat != null && q.delivery_lng != null)
-          setDeliveryCoords({ lat: parseFloat(q.delivery_lat), lon: parseFloat(q.delivery_lng) });
+          setDeliveryCoords({
+            lat: parseFloat(q.delivery_lat),
+            lon: parseFloat(q.delivery_lng),
+          });
         setWeight(q.weight != null ? String(q.weight / 1000) : "");
         if (q.vehicle_type) setVehicleType(q.vehicle_type);
         if (q.vehicle != null) setSelectedVehicleId(String(q.vehicle));
@@ -711,10 +768,14 @@ export default function NewQuote() {
         if (q.trip_type) setTripType(q.trip_type);
         if (q.return_location) setReturnLocation(q.return_location);
         if (q.return_lat != null && q.return_lng != null)
-          setReturnCoords({ lat: parseFloat(q.return_lat), lon: parseFloat(q.return_lng) });
+          setReturnCoords({
+            lat: parseFloat(q.return_lat),
+            lon: parseFloat(q.return_lng),
+          });
         if (q.return_cargo) setReturnCargo(q.return_cargo);
         if (q.return_date) setReturnDate(String(q.return_date).split("T")[0]);
-        if (q.return_base_rate != null) setReturnBaseRate(String(q.return_base_rate));
+        if (q.return_base_rate != null)
+          setReturnBaseRate(String(q.return_base_rate));
         if (q.return_notes) setReturnNotes(q.return_notes);
         setCurrentStep(3);
       })
@@ -755,7 +816,8 @@ export default function NewQuote() {
     if (!p) return;
     if (p.pickup_location) setPickupLocation(p.pickup_location);
     if (p.delivery_location) setDeliveryLocation(p.delivery_location);
-    if (p.weight != null && p.weight !== "") setWeight(String(parseFloat(String(p.weight)) / 1000));
+    if (p.weight != null && p.weight !== "")
+      setWeight(String(parseFloat(String(p.weight)) / 1000));
     if (p.cargo_description) setCargoDescription(p.cargo_description);
     if (p.vehicle_type) setVehicleType(p.vehicle_type);
 
@@ -853,8 +915,18 @@ export default function NewQuote() {
       delivery_location: deliveryLocation,
       origin: extractCode(pickupLocation),
       destination: extractCode(deliveryLocation),
-      ...(pickupCoords ? { pickup_lat: parseFloat(pickupCoords.lat.toFixed(7)), pickup_lng: parseFloat(pickupCoords.lon.toFixed(7)) } : {}),
-      ...(deliveryCoords ? { delivery_lat: parseFloat(deliveryCoords.lat.toFixed(7)), delivery_lng: parseFloat(deliveryCoords.lon.toFixed(7)) } : {}),
+      ...(pickupCoords
+        ? {
+            pickup_lat: parseFloat(pickupCoords.lat.toFixed(7)),
+            pickup_lng: parseFloat(pickupCoords.lon.toFixed(7)),
+          }
+        : {}),
+      ...(deliveryCoords
+        ? {
+            delivery_lat: parseFloat(deliveryCoords.lat.toFixed(7)),
+            delivery_lng: parseFloat(deliveryCoords.lon.toFixed(7)),
+          }
+        : {}),
       cargo_description: cargoDescription || `${weight}t ${vehicleType}`,
       weight: parseFloat(weight || "0") * 1000,
       distance: distanceKm,
@@ -890,7 +962,10 @@ export default function NewQuote() {
         ? {
             return_location: returnLocation,
             ...(returnCoords
-              ? { return_lat: parseFloat(returnCoords.lat.toFixed(7)), return_lng: parseFloat(returnCoords.lon.toFixed(7)) }
+              ? {
+                  return_lat: parseFloat(returnCoords.lat.toFixed(7)),
+                  return_lng: parseFloat(returnCoords.lon.toFixed(7)),
+                }
               : {}),
             return_cargo: returnCargo,
             return_date: returnDate || null,
@@ -911,18 +986,24 @@ export default function NewQuote() {
   const kgToTon = (kg: number) => Math.round((kg / 1000) * 10) / 10;
 
   const selectedVtCap: number | null = (() => {
-    const vt = vehicleTypes.find(v => v.name === vehicleType);
-    return vt?.capacity != null ? kgToTon(parseFloat(String(vt.capacity))) : null;
+    const vt = vehicleTypes.find((v) => v.name === vehicleType);
+    return vt?.capacity != null
+      ? kgToTon(parseFloat(String(vt.capacity)))
+      : null;
   })();
-  const effectiveCap = selectedVehicle?.capacity != null
-    ? kgToTon(parseFloat(String(selectedVehicle.capacity)))
-    : selectedVtCap;
-  const weightExceedsCap = effectiveCap != null && parseFloat(weight || "0") > effectiveCap;
+  const effectiveCap =
+    selectedVehicle?.capacity != null
+      ? kgToTon(parseFloat(String(selectedVehicle.capacity)))
+      : selectedVtCap;
+  const weightExceedsCap =
+    effectiveCap != null && parseFloat(weight || "0") > effectiveCap;
 
   // Step validation
   const canGoToStep2 =
-    routeData && routeData.success &&
-    weight && parseFloat(weight) > 0 &&
+    routeData &&
+    routeData.success &&
+    weight &&
+    parseFloat(weight) > 0 &&
     !weightExceedsCap &&
     (tripType === "ONE_WAY" || (returnRouteData && returnRouteData.success));
   // Step 3 (summary) is reachable only once ALL mandatory data is in — route +
@@ -1102,1096 +1183,2635 @@ export default function NewQuote() {
 
       {/* STEP 1: Route Entry */}
       {currentStep === 1 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 1200, margin: "0 auto", width: "100%" }}>
-        <div className="step1-layout" style={{ margin: 0 }}>
         <div
-          className="card step1-left">
-          <div className="card-title" style={{ marginBottom: 16 }}>
-            Step 1: Route Details
-          </div>
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            maxWidth: 1200,
+            margin: "0 auto",
+            width: "100%",
+          }}>
+          <div className="step1-layout" style={{ margin: 0 }}>
+            <div className="card step1-left">
+              <div className="card-title" style={{ marginBottom: 16 }}>
+                Step 1: Route Details
+              </div>
 
-          {/* Trip Type Toggle — top of form */}
-          <div style={{ marginBottom: 16 }}>
-            {label("Trip Type")}
-            <div style={{ display: "flex", border: "1px solid var(--border-subtle)", borderRadius: 2, overflow: "hidden" }}>
-              {(["ONE_WAY", "ROUND_TRIP"] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => {
-                    setTripType(type);
-                    if (type === "ROUND_TRIP" && !returnLocation && pickupLocation) {
-                      setReturnLocation(pickupLocation);
-                    }
-                  }}
+              {/* Trip Type Toggle — top of form */}
+              <div style={{ marginBottom: 16 }}>
+                {label("Trip Type")}
+                <div
                   style={{
-                    flex: 1, padding: "9px 0", border: "none",
-                    background: tripType === type ? "var(--accent-primary)" : "var(--bg-surface)",
-                    color: tripType === type ? "#fff" : "var(--text-secondary)",
-                    fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.06em",
-                    cursor: "pointer", fontWeight: tripType === type ? 700 : 400,
-                    transition: "all 0.15s",
+                    display: "flex",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 2,
+                    overflow: "hidden",
                   }}>
-                  {type === "ONE_WAY" ? "ONE WAY" : "ROUND TRIP"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              marginBottom: 16,
-            }}>
-            <div>
-              {label("Pickup Location")}
-              <LocationInput
-                placeholder="e.g. Johannesburg Depot"
-                value={pickupLocation}
-                onFocus={() => setActiveMapField("pickup")}
-                onChange={(val, coords) => {
-                  setPickupLocation(val);
-                  setPickupCoords(coords ?? null);
-                  setRouteData(null);
-                  setRouteOptions([]);
-                }}
-                resolvedText={routeData?.origin_resolved}
-                style={inputStyle}
-              />
-            </div>
-            <div>
-              {label("Delivery Location")}
-              <LocationInput
-                placeholder="e.g. Cape Town Warehouse"
-                value={deliveryLocation}
-                onFocus={() => setActiveMapField("delivery")}
-                onChange={(val, coords) => {
-                  setDeliveryLocation(val);
-                  setDeliveryCoords(coords ?? null);
-                  setRouteData(null);
-                  setRouteOptions([]);
-                }}
-                resolvedText={routeData?.dest_resolved}
-                style={inputStyle}
-              />
-            </div>
-          </div>
-
-          <MapLocationPicker
-            pickupCoords={pickupCoords}
-            deliveryCoords={deliveryCoords}
-            returnCoords={tripType === "ROUND_TRIP" ? returnCoords : null}
-            showReturn={tripType === "ROUND_TRIP"}
-            activeField={activeMapField}
-            onActiveFieldChange={setActiveMapField}
-            onExpand={() => setMapExpanded(true)}
-            routeOptions={routeOptions}
-            selectedRouteIndex={selectedRouteIndex}
-            onSelectRoute={setSelectedRouteIndex}
-            onLocationSelect={(field, label, coords) => {
-              if (field === "pickup") {
-                setPickupLocation(label);
-                setPickupCoords(coords);
-              } else if (field === "delivery") {
-                setDeliveryLocation(label);
-                setDeliveryCoords(coords);
-              } else {
-                setReturnLocation(label);
-                setReturnCoords(coords);
-                setReturnRouteData(null);
-              }
-              setRouteData(null);
-            }}
-          />
-
-          {/* Fullscreen map modal */}
-          {mapExpanded && (
-            <div
-              style={{
-                position: "fixed", inset: 0, zIndex: 1000,
-                background: "rgba(0,0,0,0.85)",
-                display: "flex", flexDirection: "column",
-              }}
-              onKeyDown={(e) => e.key === "Escape" && setMapExpanded(false)}
-            >
-              <div style={{
-                flex: 1, display: "flex", flexDirection: "column",
-                padding: 16, gap: 12, overflow: "hidden",
-              }}>
-                <MapLocationPicker
-                  pickupCoords={pickupCoords}
-                  deliveryCoords={deliveryCoords}
-                  returnCoords={tripType === "ROUND_TRIP" ? returnCoords : null}
-                  showReturn={tripType === "ROUND_TRIP"}
-                  activeField={activeMapField}
-                  onActiveFieldChange={setActiveMapField}
-                  onClose={() => setMapExpanded(false)}
-                  mapHeight={window.innerHeight - 120}
-                  routeOptions={routeOptions}
-                  selectedRouteIndex={selectedRouteIndex}
-                  onSelectRoute={setSelectedRouteIndex}
-                  onLocationSelect={(field, label, coords) => {
-                    if (field === "pickup") {
-                      setPickupLocation(label);
-                      setPickupCoords(coords);
-                    } else if (field === "delivery") {
-                      setDeliveryLocation(label);
-                      setDeliveryCoords(coords);
-                    } else {
-                      setReturnLocation(label);
-                      setReturnCoords(coords);
-                      setReturnRouteData(null);
-                    }
-                    setRouteData(null);
-                  }}
-                />
+                  {(["ONE_WAY", "ROUND_TRIP"] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        setTripType(type);
+                        if (
+                          type === "ROUND_TRIP" &&
+                          !returnLocation &&
+                          pickupLocation
+                        ) {
+                          setReturnLocation(pickupLocation);
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: "9px 0",
+                        border: "none",
+                        background:
+                          tripType === type
+                            ? "var(--accent-primary)"
+                            : "var(--bg-surface)",
+                        color:
+                          tripType === type ? "#fff" : "var(--text-secondary)",
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 11,
+                        letterSpacing: "0.06em",
+                        cursor: "pointer",
+                        fontWeight: tripType === type ? 700 : 400,
+                        transition: "all 0.15s",
+                      }}>
+                      {type === "ONE_WAY" ? "ONE WAY" : "ROUND TRIP"}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
 
-          {/* Cross-border toggle */}
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 14,
-              cursor:
-                companyProfile?.allow_cross_border === false
-                  ? "not-allowed"
-                  : "pointer",
-              opacity: companyProfile?.allow_cross_border === false ? 0.4 : 1,
-            }}>
-            <input
-              type="checkbox"
-              checked={crossBorderEnabled}
-              disabled={companyProfile?.allow_cross_border === false}
-              onChange={(e) => {
-                setCrossBorderEnabled(e.target.checked);
-                setRouteData(null);
-              }}
-              style={{
-                accentColor: "var(--accent-primary)",
-                width: 14,
-                height: 14,
-              }}
-            />
-            <span
-              style={{
-                fontSize: 12,
-                color: "var(--text-secondary)",
-                fontFamily: "var(--font-sans)",
-              }}>
-              Allow cross-border routes
-            </span>
-            {companyProfile?.allow_cross_border === false && (
-              <span
+              <div
                 style={{
-                  fontSize: 10,
-                  color: "var(--text-tertiary)",
-                  fontFamily: "var(--font-mono)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                  marginBottom: 16,
                 }}>
-                DISABLED BY COMPANY SETTINGS
-              </span>
-            )}
-          </label>
-
-          {/* Return Leg section (visible when ROUND_TRIP) */}
-          {tripType === "ROUND_TRIP" && (
-            <div style={{ marginBottom: 16, padding: "16px", background: "var(--bg-surface-hover)", borderRadius: 2, border: "1px solid var(--border-subtle)" }}>
-              <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--accent-primary)", letterSpacing: "0.08em", marginBottom: 12 }}>
-                RETURN LEG · Truck continues after delivery
-              </div>
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", marginBottom: 12 }}>
-                Return from: <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>{deliveryLocation || "Delivery Location"}</span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
-                  {label("Return Destination")}
+                  {label("Pickup Location")}
                   <LocationInput
-                    placeholder="e.g. Johannesburg Depot (or different city)"
-                    value={returnLocation}
-                    onFocus={() => setActiveMapField("return")}
+                    placeholder="e.g. Johannesburg Depot"
+                    value={pickupLocation}
+                    onFocus={() => setActiveMapField("pickup")}
                     onChange={(val, coords) => {
-                      setReturnLocation(val);
-                      setReturnCoords(coords ?? null);
-                      setReturnRouteData(null);
+                      setPickupLocation(val);
+                      setPickupCoords(coords ?? null);
+                      setRouteData(null);
+                      setRouteOptions([]);
                     }}
+                    resolvedText={routeData?.origin_resolved}
                     style={inputStyle}
                   />
                 </div>
                 <div>
-                  {label("Return Cargo (leave blank if empty return)")}
-                  <textarea
-                    value={returnCargo}
-                    onChange={(e) => setReturnCargo(e.target.value)}
-                    placeholder="e.g. 8000kg Maize Bags — or leave empty for empty return"
-                    rows={2}
-                    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
+                  {label("Delivery Location")}
+                  <LocationInput
+                    placeholder="e.g. Cape Town Warehouse"
+                    value={deliveryLocation}
+                    onFocus={() => setActiveMapField("delivery")}
+                    onChange={(val, coords) => {
+                      setDeliveryLocation(val);
+                      setDeliveryCoords(coords ?? null);
+                      setRouteData(null);
+                      setRouteOptions([]);
+                    }}
+                    resolvedText={routeData?.dest_resolved}
+                    style={inputStyle}
                   />
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
-                  Return rate will be auto-calculated when you click Calculate Route below.
+              </div>
+
+              <MapLocationPicker
+                pickupCoords={pickupCoords}
+                deliveryCoords={deliveryCoords}
+                returnCoords={tripType === "ROUND_TRIP" ? returnCoords : null}
+                showReturn={tripType === "ROUND_TRIP"}
+                activeField={activeMapField}
+                onActiveFieldChange={setActiveMapField}
+                onExpand={() => setMapExpanded(true)}
+                routeOptions={routeOptions}
+                selectedRouteIndex={selectedRouteIndex}
+                onSelectRoute={setSelectedRouteIndex}
+                onLocationSelect={(field, label, coords) => {
+                  if (field === "pickup") {
+                    setPickupLocation(label);
+                    setPickupCoords(coords);
+                  } else if (field === "delivery") {
+                    setDeliveryLocation(label);
+                    setDeliveryCoords(coords);
+                  } else {
+                    setReturnLocation(label);
+                    setReturnCoords(coords);
+                    setReturnRouteData(null);
+                  }
+                  setRouteData(null);
+                }}
+              />
+
+              {/* Fullscreen map modal */}
+              {mapExpanded && (
+                <div
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: 1000,
+                    background: "rgba(0,0,0,0.85)",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                  onKeyDown={(e) =>
+                    e.key === "Escape" && setMapExpanded(false)
+                  }>
+                  <div
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      padding: 16,
+                      gap: 12,
+                      overflow: "hidden",
+                    }}>
+                    <MapLocationPicker
+                      pickupCoords={pickupCoords}
+                      deliveryCoords={deliveryCoords}
+                      returnCoords={
+                        tripType === "ROUND_TRIP" ? returnCoords : null
+                      }
+                      showReturn={tripType === "ROUND_TRIP"}
+                      activeField={activeMapField}
+                      onActiveFieldChange={setActiveMapField}
+                      onClose={() => setMapExpanded(false)}
+                      mapHeight={window.innerHeight - 120}
+                      routeOptions={routeOptions}
+                      selectedRouteIndex={selectedRouteIndex}
+                      onSelectRoute={setSelectedRouteIndex}
+                      onLocationSelect={(field, label, coords) => {
+                        if (field === "pickup") {
+                          setPickupLocation(label);
+                          setPickupCoords(coords);
+                        } else if (field === "delivery") {
+                          setDeliveryLocation(label);
+                          setDeliveryCoords(coords);
+                        } else {
+                          setReturnLocation(label);
+                          setReturnCoords(coords);
+                          setReturnRouteData(null);
+                        }
+                        setRouteData(null);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Cross-border toggle */}
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 14,
+                  cursor:
+                    companyProfile?.allow_cross_border === false
+                      ? "not-allowed"
+                      : "pointer",
+                  opacity:
+                    companyProfile?.allow_cross_border === false ? 0.4 : 1,
+                }}>
+                <input
+                  type="checkbox"
+                  checked={crossBorderEnabled}
+                  disabled={companyProfile?.allow_cross_border === false}
+                  onChange={(e) => {
+                    setCrossBorderEnabled(e.target.checked);
+                    setRouteData(null);
+                  }}
+                  style={{
+                    accentColor: "var(--accent-primary)",
+                    width: 14,
+                    height: 14,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-secondary)",
+                    fontFamily: "var(--font-sans)",
+                  }}>
+                  Allow cross-border routes
+                </span>
+                {companyProfile?.allow_cross_border === false && (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      color: "var(--text-tertiary)",
+                      fontFamily: "var(--font-mono)",
+                    }}>
+                    DISABLED BY COMPANY SETTINGS
+                  </span>
+                )}
+              </label>
+
+              {/* Return Leg section (visible when ROUND_TRIP) */}
+              {tripType === "ROUND_TRIP" && (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    padding: "16px",
+                    background: "var(--bg-surface-hover)",
+                    borderRadius: 2,
+                    border: "1px solid var(--border-subtle)",
+                  }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--accent-primary)",
+                      letterSpacing: "0.08em",
+                      marginBottom: 12,
+                    }}>
+                    RETURN LEG · Truck continues after delivery
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-tertiary)",
+                      fontFamily: "var(--font-sans)",
+                      marginBottom: 12,
+                    }}>
+                    Return from:{" "}
+                    <span
+                      style={{
+                        color: "var(--text-secondary)",
+                        fontWeight: 600,
+                      }}>
+                      {deliveryLocation || "Delivery Location"}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                    }}>
+                    <div>
+                      {label("Return Destination")}
+                      <LocationInput
+                        placeholder="e.g. Johannesburg Depot (or different city)"
+                        value={returnLocation}
+                        onFocus={() => setActiveMapField("return")}
+                        onChange={(val, coords) => {
+                          setReturnLocation(val);
+                          setReturnCoords(coords ?? null);
+                          setReturnRouteData(null);
+                        }}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      {label("Return Cargo (leave blank if empty return)")}
+                      <textarea
+                        value={returnCargo}
+                        onChange={(e) => setReturnCargo(e.target.value)}
+                        placeholder="e.g. 8000kg Maize Bags — or leave empty for empty return"
+                        rows={2}
+                        style={{
+                          ...inputStyle,
+                          resize: "vertical",
+                          lineHeight: 1.5,
+                        }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text-tertiary)",
+                        fontFamily: "var(--font-sans)",
+                      }}>
+                      Return rate will be auto-calculated when you click
+                      Calculate Route below.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                  marginBottom: 16,
+                }}>
+                <div>
+                  {label("Vehicle Type")}
+                  <Select
+                    value={vehicleType}
+                    onValueChange={(val) => {
+                      setVehicleType(val);
+                      setSelectedVehicleId("");
+                      setSelectedDriverId("");
+                    }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select vehicle type..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vehicleTypes.length > 0
+                        ? vehicleTypes.map((vt) => (
+                            <SelectItem key={vt.id} value={vt.name}>
+                              {vt.name
+                                .replace(/\s*\([\d\s\-–.]+\s*tonn?e?s?\)/gi, "")
+                                .trim()}
+                            </SelectItem>
+                          ))
+                        : [
+                            "Semi-Trailer Truck",
+                            "Rigid Truck",
+                            "Flatbed Truck",
+                            "Refrigerated Truck",
+                            "Tanker",
+                            "Tautliner",
+                            "Box Truck",
+                          ].map((n) => (
+                            <SelectItem key={n} value={n}>
+                              {n}
+                            </SelectItem>
+                          ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  {label("Vehicle")}
+                  <Select
+                    value={selectedVehicleId}
+                    disabled={!vehicleType}
+                    onValueChange={(vid) => {
+                      setSelectedVehicleId(vid);
+                      const v = vehicles.find((v) => v.id === parseInt(vid));
+                      setSelectedDriverId(
+                        v?.driver != null ? String(v.driver) : "",
+                      );
+                    }}>
+                    <SelectTrigger style={{ opacity: vehicleType ? 1 : 0.5 }}>
+                      <SelectValue
+                        placeholder={
+                          vehicleType
+                            ? "— Select a vehicle (optional) —"
+                            : "Select vehicle type first"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vehicles.length === 0 ? (
+                        <SelectItem value="__none__" disabled>
+                          No available vehicles for this type
+                        </SelectItem>
+                      ) : (
+                        vehicles.map((v) => (
+                          <SelectItem key={v.id} value={String(v.id)}>
+                            {v.make} {v.model} · {v.plate}
+                            {v.capacity != null
+                              ? ` · ${kgToTon(parseFloat(String(v.capacity)))} ton`
+                              : ""}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  {label("Weight (tons)")}
+                  <input
+                    type="number"
+                    placeholder={
+                      !vehicleType
+                        ? "Select vehicle type first"
+                        : !selectedVehicleId
+                          ? `e.g. 15${selectedVtCap != null ? ` (type max ${selectedVtCap} ton)` : ""}`
+                          : selectedVehicle?.capacity != null
+                            ? `e.g. 15 (max ${kgToTon(parseFloat(String(selectedVehicle.capacity)))} ton)`
+                            : "e.g. 15"
+                    }
+                    value={weight}
+                    min={0}
+                    max={effectiveCap ?? undefined}
+                    disabled={!vehicleType}
+                    onChange={(e) => {
+                      setWeight(e.target.value);
+                    }}
+                    style={{
+                      ...inputStyle,
+                      opacity: vehicleType ? 1 : 0.5,
+                      cursor: vehicleType ? "auto" : "not-allowed",
+                    }}
+                  />
+                  {(() => {
+                    const cap = effectiveCap;
+                    const capLabel =
+                      selectedVehicle?.capacity != null
+                        ? `${selectedVehicle.make ?? ""} ${selectedVehicle.model ?? ""}`.trim() ||
+                          "this vehicle"
+                        : vehicleType;
+                    if (cap == null) return null;
+                    const w = parseFloat(weight || "0");
+                    const overLimit = w > 0 && w > cap;
+                    const nearLimit = w > 0 && !overLimit && w > cap * 0.9;
+                    return (
+                      <div
+                        style={{
+                          marginTop: 5,
+                          fontSize: 11,
+                          fontFamily: "var(--font-mono)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          color: overLimit
+                            ? "var(--status-danger)"
+                            : nearLimit
+                              ? "var(--status-warning)"
+                              : "var(--text-tertiary)",
+                        }}>
+                        {overLimit ? "⚠️" : nearLimit ? "⚠️" : "ℹ️"}
+                        {overLimit
+                          ? `${w} ton exceeds ${capLabel} capacity of ${cap} ton`
+                          : nearLimit
+                            ? `Near capacity — ${capLabel} max ${cap} ton`
+                            : `${capLabel} capacity: ${cap} ton`}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
-            </div>
-          )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-            <div>
-              {label("Vehicle Type")}
-              <Select
-                value={vehicleType}
-                onValueChange={(val) => {
-                  setVehicleType(val);
-                  setSelectedVehicleId("");
-                  setSelectedDriverId("");
-                }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select vehicle type..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {vehicleTypes.length > 0
-                    ? vehicleTypes.map((vt) => (
-                        <SelectItem key={vt.id} value={vt.name}>
-                          {vt.name.replace(/\s*\([\d\s\-–.]+\s*tonn?e?s?\)/gi, "").trim()}
-                        </SelectItem>
-                      ))
-                    : [
-                        "Semi-Trailer Truck", "Rigid Truck", "Flatbed Truck",
-                        "Refrigerated Truck", "Tanker", "Tautliner", "Box Truck",
-                      ].map((n) => (
-                        <SelectItem key={n} value={n}>{n}</SelectItem>
-                      ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              {label("Vehicle")}
-              <Select
-                value={selectedVehicleId}
-                disabled={!vehicleType}
-                onValueChange={(vid) => {
-                  setSelectedVehicleId(vid);
-                  const v = vehicles.find((v) => v.id === parseInt(vid));
-                  setSelectedDriverId(v?.driver != null ? String(v.driver) : "");
-                }}>
-                <SelectTrigger style={{ opacity: vehicleType ? 1 : 0.5 }}>
-                  <SelectValue placeholder={vehicleType ? "— Select a vehicle (optional) —" : "Select vehicle type first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {vehicles.length === 0
-                    ? <SelectItem value="__none__" disabled>No available vehicles for this type</SelectItem>
-                    : vehicles.map((v) => (
-                      <SelectItem key={v.id} value={String(v.id)}>
-                        {v.make} {v.model} · {v.plate}
-                        {v.capacity != null ? ` · ${kgToTon(parseFloat(String(v.capacity)))} ton` : ""}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              {label("Weight (tons)")}
-              <input
-                type="number"
-                placeholder={
-                  !vehicleType ? "Select vehicle type first"
-                  : !selectedVehicleId ? `e.g. 15${selectedVtCap != null ? ` (type max ${selectedVtCap} ton)` : ""}`
-                  : selectedVehicle?.capacity != null ? `e.g. 15 (max ${kgToTon(parseFloat(String(selectedVehicle.capacity)))} ton)`
-                  : "e.g. 15"
+              <button
+                onClick={() => calculateRoute()}
+                disabled={
+                  calculatingRoute ||
+                  !pickupLocation.trim() ||
+                  !deliveryLocation.trim() ||
+                  !vehicleType ||
+                  !weight ||
+                  weightExceedsCap
                 }
-                value={weight}
-                min={0}
-                max={effectiveCap ?? undefined}
-                disabled={!vehicleType}
-                onChange={(e) => {
-                  setWeight(e.target.value);
-                }}
-                style={{ ...inputStyle, opacity: vehicleType ? 1 : 0.5, cursor: vehicleType ? "auto" : "not-allowed" }}
-              />
-              {(() => {
-                const cap = effectiveCap;
-                const capLabel = selectedVehicle?.capacity != null
-                  ? `${selectedVehicle.make ?? ""} ${selectedVehicle.model ?? ""}`.trim() || "this vehicle"
-                  : vehicleType;
-                if (cap == null) return null;
-                const w = parseFloat(weight || "0");
-                const overLimit = w > 0 && w > cap;
-                const nearLimit = w > 0 && !overLimit && w > cap * 0.9;
-                return (
-                  <div style={{ marginTop: 5, fontSize: 11, fontFamily: "var(--font-mono)", display: "flex", alignItems: "center", gap: 4,
-                    color: overLimit ? "var(--status-danger)" : nearLimit ? "var(--status-warning)" : "var(--text-tertiary)" }}>
-                    {overLimit ? "⚠️" : nearLimit ? "⚠️" : "ℹ️"}
-                    {overLimit
-                      ? `${w} ton exceeds ${capLabel} capacity of ${cap} ton`
-                      : nearLimit
-                      ? `Near capacity — ${capLabel} max ${cap} ton`
-                      : `${capLabel} capacity: ${cap} ton`}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
+                className="btn-action"
+                style={{ width: "100%", marginBottom: 16 }}>
+                {calculatingRoute
+                  ? tripType === "ROUND_TRIP"
+                    ? "CALCULATING BOTH ROUTES..."
+                    : "CALCULATING ROUTE..."
+                  : tripType === "ROUND_TRIP"
+                    ? "CALCULATE BOTH ROUTES"
+                    : "CALCULATE ROUTE"}
+              </button>
 
-          <button
-            onClick={() => calculateRoute()}
-            disabled={
-              calculatingRoute ||
-              !pickupLocation.trim() ||
-              !deliveryLocation.trim() ||
-              !vehicleType ||
-              !weight ||
-              weightExceedsCap
-            }
-            className="btn-action"
-            style={{ width: "100%", marginBottom: 16 }}>
-            {calculatingRoute
-              ? tripType === "ROUND_TRIP" ? "CALCULATING BOTH ROUTES..." : "CALCULATING ROUTE..."
-              : tripType === "ROUND_TRIP"
-              ? "CALCULATE BOTH ROUTES"
-              : "CALCULATE ROUTE"}
-          </button>
+              {error && (
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--status-danger)",
+                    borderRadius: 2,
+                    color: "var(--status-danger)",
+                    fontSize: 12,
+                    marginBottom: 16,
+                  }}>
+                  {error}
+                </div>
+              )}
 
-          {error && (
-            <div
-              style={{
-                padding: "10px 12px",
-                background: "var(--bg-surface)",
-                border: "1px solid var(--status-danger)",
-                borderRadius: 2,
-                color: "var(--status-danger)",
-                fontSize: 12,
-                marginBottom: 16,
-              }}>
-              {error}
-            </div>
-          )}
+              {routeData &&
+                routeData.cross_border &&
+                (() => {
+                  const CB_COUNTRY_NAMES: Record<string, string> = {
+                    SA: "South Africa",
+                    SZ: "Eswatini",
+                    MZ: "Mozambique",
+                    ZW: "Zimbabwe",
+                    BW: "Botswana",
+                    NA: "Namibia",
+                    LS: "Lesotho",
+                    ZM: "Zambia",
+                    MW: "Malawi",
+                    TZ: "Tanzania",
+                    KE: "Kenya",
+                  };
+                  const CB_FLAGS: Record<string, string> = {
+                    SA: "🇿🇦",
+                    SZ: "🇸🇿",
+                    MZ: "🇲🇿",
+                    ZW: "🇿🇼",
+                    BW: "🇧🇼",
+                    NA: "🇳🇦",
+                    LS: "🇱🇸",
+                    ZM: "🇿🇲",
+                    MW: "🇲🇼",
+                    TZ: "🇹🇿",
+                    KE: "🇰🇪",
+                  };
+                  const CB_BORDER_POSTS: Record<
+                    string,
+                    { name: string; hours: string; note: string }
+                  > = {
+                    "SA-SZ": {
+                      name: "Oshoek / Ngwenya",
+                      hours: "07:00–22:00",
+                      note: "Use Golela (N2) for 24h heavy-truck access",
+                    },
+                    "SA-MZ": {
+                      name: "Lebombo / Ressano Garcia",
+                      hours: "24 hours",
+                      note: "Main freight corridor via N4",
+                    },
+                    "SA-ZW": {
+                      name: "Beit Bridge (N1)",
+                      hours: "24 hours",
+                      note: "Busiest SA land border — expect 4–8h delays",
+                    },
+                    "SA-BW": {
+                      name: "Ramatlabama / Tlokweng Gate",
+                      hours: "06:00–22:00",
+                      note: "Tlokweng preferred for heavy vehicles",
+                    },
+                    "SA-NA": {
+                      name: "Nakop / Ariamsvlei (N10)",
+                      hours: "24 hours",
+                      note: "Main route; Vioolsdrif alt for N7 corridor",
+                    },
+                    "SA-LS": {
+                      name: "Maseru Bridge / Caledonspoort",
+                      hours: "24 hours",
+                      note: "Multiple posts available along border",
+                    },
+                    "ZW-ZM": {
+                      name: "Chirundu / Kazungula",
+                      hours: "06:00–22:00",
+                      note: "Chirundu is primary freight crossing",
+                    },
+                    "ZM-MW": {
+                      name: "Mchinji / Chipata",
+                      hours: "06:00–20:00",
+                      note: "Allow extra time for customs clearance",
+                    },
+                    "ZM-TZ": {
+                      name: "Nakonde / Tunduma",
+                      hours: "06:00–22:00",
+                      note: "High-volume corridor; congestion common",
+                    },
+                    "TZ-KE": {
+                      name: "Namanga / Lunga Lunga",
+                      hours: "24 hours",
+                      note: "Namanga is main A104 freight route",
+                    },
+                  };
+                  const CB_DOCS: Record<string, string[]> = {
+                    SA: [
+                      "Vehicle registration + roadworthy",
+                      "Driver's licence (PrDP)",
+                      "Customs export declaration (SAD500)",
+                    ],
+                    SZ: [
+                      "Commercial invoice",
+                      "Packing list",
+                      "ASYCUDA customs clearance",
+                      "Phytosanitary cert (if applicable)",
+                    ],
+                    MZ: [
+                      "Commercial invoice",
+                      "Packing list",
+                      "SAD500 import declaration",
+                      "Transit permit",
+                      "Cargo insurance cert",
+                    ],
+                    ZW: [
+                      "Commercial invoice",
+                      "Packing list",
+                      "ZIMRA declaration",
+                      "Cross-border road permit",
+                      "SADC certificate of origin",
+                    ],
+                    BW: [
+                      "Commercial invoice",
+                      "Packing list",
+                      "SAD customs declaration",
+                      "SADC certificate of origin",
+                    ],
+                    NA: [
+                      "Commercial invoice",
+                      "Packing list",
+                      "NamRA customs declaration",
+                      "Transit permit",
+                    ],
+                    LS: [
+                      "Commercial invoice",
+                      "Packing list",
+                      "LRCA customs form",
+                      "Roadworthy certificate",
+                    ],
+                    ZM: [
+                      "Commercial invoice",
+                      "Packing list",
+                      "ZRA customs declaration",
+                      "Transit permit",
+                      "Yellow fever cert (driver)",
+                    ],
+                    MW: [
+                      "Commercial invoice",
+                      "Packing list",
+                      "MRA declaration",
+                      "Transit permit",
+                    ],
+                    TZ: [
+                      "Commercial invoice",
+                      "Packing list",
+                      "TRA declaration",
+                      "EAC regional transit permit",
+                    ],
+                    KE: [
+                      "Commercial invoice",
+                      "Packing list",
+                      "KRA declaration",
+                      "EAC transit permit",
+                    ],
+                  };
+                  const CB_CURRENCY: Record<string, string> = {
+                    SZ: "SZL / ZAR (pegged — Rand accepted)",
+                    MZ: "MZN Metical · carry USD for border fees",
+                    ZW: "ZiG / USD (USD widely accepted)",
+                    BW: "BWP Pula · exchange at border",
+                    NA: "NAD / ZAR (pegged — Rand accepted)",
+                    LS: "LSL / ZAR (pegged — Rand accepted)",
+                    ZM: "ZMW Kwacha · USD also accepted",
+                    MW: "MWK Kwacha · exchange at border",
+                    TZ: "TZS · USD also accepted",
+                    KE: "KES Shilling · M-Pesa available",
+                  };
 
-          {routeData && routeData.cross_border && (() => {
-            const CB_COUNTRY_NAMES: Record<string, string> = {
-              SA:'South Africa', SZ:'Eswatini', MZ:'Mozambique', ZW:'Zimbabwe',
-              BW:'Botswana', NA:'Namibia', LS:'Lesotho', ZM:'Zambia',
-              MW:'Malawi', TZ:'Tanzania', KE:'Kenya',
-            };
-            const CB_FLAGS: Record<string, string> = {
-              SA:'🇿🇦', SZ:'🇸🇿', MZ:'🇲🇿', ZW:'🇿🇼', BW:'🇧🇼',
-              NA:'🇳🇦', LS:'🇱🇸', ZM:'🇿🇲', MW:'🇲🇼', TZ:'🇹🇿', KE:'🇰🇪',
-            };
-            const CB_BORDER_POSTS: Record<string, { name: string; hours: string; note: string }> = {
-              'SA-SZ': { name: 'Oshoek / Ngwenya', hours: '07:00–22:00', note: 'Use Golela (N2) for 24h heavy-truck access' },
-              'SA-MZ': { name: 'Lebombo / Ressano Garcia', hours: '24 hours', note: 'Main freight corridor via N4' },
-              'SA-ZW': { name: 'Beit Bridge (N1)', hours: '24 hours', note: 'Busiest SA land border — expect 4–8h delays' },
-              'SA-BW': { name: 'Ramatlabama / Tlokweng Gate', hours: '06:00–22:00', note: 'Tlokweng preferred for heavy vehicles' },
-              'SA-NA': { name: 'Nakop / Ariamsvlei (N10)', hours: '24 hours', note: 'Main route; Vioolsdrif alt for N7 corridor' },
-              'SA-LS': { name: 'Maseru Bridge / Caledonspoort', hours: '24 hours', note: 'Multiple posts available along border' },
-              'ZW-ZM': { name: 'Chirundu / Kazungula', hours: '06:00–22:00', note: 'Chirundu is primary freight crossing' },
-              'ZM-MW': { name: 'Mchinji / Chipata', hours: '06:00–20:00', note: 'Allow extra time for customs clearance' },
-              'ZM-TZ': { name: 'Nakonde / Tunduma', hours: '06:00–22:00', note: 'High-volume corridor; congestion common' },
-              'TZ-KE': { name: 'Namanga / Lunga Lunga', hours: '24 hours', note: 'Namanga is main A104 freight route' },
-            };
-            const CB_DOCS: Record<string, string[]> = {
-              SA:['Vehicle registration + roadworthy', "Driver's licence (PrDP)", 'Customs export declaration (SAD500)'],
-              SZ:['Commercial invoice', 'Packing list', 'ASYCUDA customs clearance', 'Phytosanitary cert (if applicable)'],
-              MZ:['Commercial invoice', 'Packing list', 'SAD500 import declaration', 'Transit permit', 'Cargo insurance cert'],
-              ZW:['Commercial invoice', 'Packing list', 'ZIMRA declaration', 'Cross-border road permit', 'SADC certificate of origin'],
-              BW:['Commercial invoice', 'Packing list', 'SAD customs declaration', 'SADC certificate of origin'],
-              NA:['Commercial invoice', 'Packing list', 'NamRA customs declaration', 'Transit permit'],
-              LS:['Commercial invoice', 'Packing list', 'LRCA customs form', 'Roadworthy certificate'],
-              ZM:['Commercial invoice', 'Packing list', 'ZRA customs declaration', 'Transit permit', 'Yellow fever cert (driver)'],
-              MW:['Commercial invoice', 'Packing list', 'MRA declaration', 'Transit permit'],
-              TZ:['Commercial invoice', 'Packing list', 'TRA declaration', 'EAC regional transit permit'],
-              KE:['Commercial invoice', 'Packing list', 'KRA declaration', 'EAC transit permit'],
-            };
-            const CB_CURRENCY: Record<string, string> = {
-              SZ:'SZL / ZAR (pegged — Rand accepted)', MZ:'MZN Metical · carry USD for border fees',
-              ZW:'ZiG / USD (USD widely accepted)', BW:'BWP Pula · exchange at border',
-              NA:'NAD / ZAR (pegged — Rand accepted)', LS:'LSL / ZAR (pegged — Rand accepted)',
-              ZM:'ZMW Kwacha · USD also accepted', MW:'MWK Kwacha · exchange at border',
-              TZ:'TZS · USD also accepted', KE:'KES Shilling · M-Pesa available',
-            };
+                  const countries = routeData.countries ?? [];
+                  const foreignCountries = countries.filter((c) => c !== "SA");
+                  const crossings = countries
+                    .slice(0, -1)
+                    .map((from, i) => `${from}-${countries[i + 1]}`);
+                  const totalAdditional =
+                    (routeData.additional_costs?.border_fees ?? 0) +
+                    (routeData.additional_costs?.weighbridge_fees ?? 0) +
+                    (routeData.additional_costs?.non_sa_tolls ?? 0);
 
-            const countries = routeData.countries ?? [];
-            const foreignCountries = countries.filter(c => c !== 'SA');
-            const crossings = countries.slice(0,-1).map((from, i) => `${from}-${countries[i+1]}`);
-            const totalAdditional = (routeData.additional_costs?.border_fees ?? 0)
-              + (routeData.additional_costs?.weighbridge_fees ?? 0)
-              + (routeData.additional_costs?.non_sa_tolls ?? 0);
-
-            return (
-              <div style={{ marginTop: 4, border: "1px solid var(--status-warning)", borderRadius: 2 }}>
-                {/* Header */}
-                <div style={{ padding: "10px 14px", background: "rgba(245,158,11,0.08)", borderBottom: "1px solid var(--status-warning)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ padding: "2px 8px", border: "1px solid var(--status-warning)", borderRadius: 2, fontSize: 9, color: "var(--status-warning)", fontWeight: 600, fontFamily: "var(--font-mono)" }}>
-                      CROSS-BORDER ROUTE
-                    </span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", fontFamily: "var(--font-sans)" }}>
-                      International Crossing Detected
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--status-warning)" }}>
-                      +R {Math.round(totalAdditional).toLocaleString()}
-                    </span>
-                    {/* Info icon with popover */}
+                  return (
                     <div
-                      style={{ position: "relative" }}
-                      onMouseEnter={() => setCbPopoverOpen(true)}
-                      onMouseLeave={() => setCbPopoverOpen(false)}
-                    >
-                      <div style={{
-                        width: 18, height: 18, borderRadius: "50%",
-                        border: "1.5px solid var(--status-warning)",
-                        color: "var(--status-warning)", fontSize: 10, fontWeight: 700,
-                        fontFamily: "var(--font-mono)", display: "flex", alignItems: "center",
-                        justifyContent: "center", cursor: "default", userSelect: "none",
-                        opacity: 0.8,
-                      }}>i</div>
-                      {cbPopoverOpen && (
-                        <div style={{
-                          position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 200,
-                          width: 320, background: "var(--bg-deep)",
-                          border: "1px solid var(--border-subtle)", borderRadius: 4,
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-                          padding: "14px 16px",
-                          display: "flex", flexDirection: "column", gap: 14,
+                      style={{
+                        marginTop: 4,
+                        border: "1px solid var(--status-warning)",
+                        borderRadius: 2,
+                      }}>
+                      {/* Header */}
+                      <div
+                        style={{
+                          padding: "10px 14px",
+                          background: "rgba(245,158,11,0.08)",
+                          borderBottom: "1px solid var(--status-warning)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
                         }}>
-                          {/* Route Countries */}
-                          <div>
-                            <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 8 }}>ROUTE COUNTRIES</div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                              {countries.map((code, i) => (
-                                <div key={code} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                  <div style={{ textAlign: "center" }}>
-                                    <div style={{ fontSize: 18 }}>{CB_FLAGS[code] ?? "🏳️"}</div>
-                                    <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                                      {CB_COUNTRY_NAMES[code] ?? code}
-                                    </div>
-                                  </div>
-                                  {i < countries.length - 1 && (
-                                    <span style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 10 }}>→</span>
-                                  )}
-                                </div>
-                              ))}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}>
+                          <span
+                            style={{
+                              padding: "2px 8px",
+                              border: "1px solid var(--status-warning)",
+                              borderRadius: 2,
+                              fontSize: 9,
+                              color: "var(--status-warning)",
+                              fontWeight: 600,
+                              fontFamily: "var(--font-mono)",
+                            }}>
+                            CROSS-BORDER ROUTE
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "var(--text-primary)",
+                              fontFamily: "var(--font-sans)",
+                            }}>
+                            International Crossing Detected
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}>
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              fontFamily: "var(--font-mono)",
+                              color: "var(--status-warning)",
+                            }}>
+                            +R {Math.round(totalAdditional).toLocaleString()}
+                          </span>
+                          {/* Info icon with popover */}
+                          <div
+                            style={{ position: "relative" }}
+                            onMouseEnter={() => setCbPopoverOpen(true)}
+                            onMouseLeave={() => setCbPopoverOpen(false)}>
+                            <div
+                              style={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: "50%",
+                                border: "1.5px solid var(--status-warning)",
+                                color: "var(--status-warning)",
+                                fontSize: 10,
+                                fontWeight: 700,
+                                fontFamily: "var(--font-mono)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "default",
+                                userSelect: "none",
+                                opacity: 0.8,
+                              }}>
+                              i
                             </div>
-                          </div>
-
-                          {/* Border posts */}
-                          {crossings.some(k => CB_BORDER_POSTS[k]) && (
-                            <div>
-                              <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>BORDER POSTS</div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                                {crossings.map(key => {
-                                  const post = CB_BORDER_POSTS[key];
-                                  if (!post) return null;
-                                  const [from, to] = key.split('-');
-                                  return (
-                                    <div key={key} style={{ background: "var(--bg-surface)", borderRadius: 2, padding: "7px 9px" }}>
-                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
-                                        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)", fontFamily: "var(--font-sans)" }}>
-                                          {CB_FLAGS[from]} → {CB_FLAGS[to]}  {post.name}
-                                        </span>
-                                        <span style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--status-success)", fontWeight: 600 }}>
-                                          ⏰ {post.hours}
-                                        </span>
-                                      </div>
-                                      <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
-                                        ℹ️ {post.note}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Currency */}
-                          {foreignCountries.some(c => CB_CURRENCY[c]) && (
-                            <div>
-                              <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>CURRENCY</div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                {foreignCountries.filter(c => CB_CURRENCY[c]).map(c => (
-                                  <div key={c} style={{ display: "flex", gap: 6, fontSize: 11, fontFamily: "var(--font-sans)" }}>
-                                    <span>{CB_FLAGS[c]}</span>
-                                    <span style={{ color: "var(--text-secondary)" }}>{CB_COUNTRY_NAMES[c]}:</span>
-                                    <span style={{ color: "var(--text-primary)" }}>{CB_CURRENCY[c]}</span>
+                            {cbPopoverOpen && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "calc(100% + 8px)",
+                                  right: 0,
+                                  zIndex: 200,
+                                  width: 320,
+                                  background: "var(--bg-deep)",
+                                  border: "1px solid var(--border-subtle)",
+                                  borderRadius: 4,
+                                  boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+                                  padding: "14px 16px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 14,
+                                }}>
+                                {/* Route Countries */}
+                                <div>
+                                  <div
+                                    style={{
+                                      fontSize: 9,
+                                      fontFamily: "var(--font-mono)",
+                                      color: "var(--text-tertiary)",
+                                      letterSpacing: "0.07em",
+                                      marginBottom: 8,
+                                    }}>
+                                    ROUTE COUNTRIES
                                   </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Required documents */}
-                          <div>
-                            <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>REQUIRED DOCUMENTS</div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                              {countries.filter(c => CB_DOCS[c]).map(c => (
-                                <div key={c}>
-                                  <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-secondary)", marginBottom: 3 }}>
-                                    {CB_FLAGS[c]} {CB_COUNTRY_NAMES[c] ?? c}
-                                  </div>
-                                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                                    {CB_DOCS[c].map(doc => (
-                                      <div key={doc} style={{ display: "flex", gap: 6, fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
-                                        <span style={{ color: "var(--status-success)", flexShrink: 0 }}>✓</span>
-                                        <span>{doc}</span>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 6,
+                                      flexWrap: "wrap",
+                                    }}>
+                                    {countries.map((code, i) => (
+                                      <div
+                                        key={code}
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 6,
+                                        }}>
+                                        <div style={{ textAlign: "center" }}>
+                                          <div style={{ fontSize: 18 }}>
+                                            {CB_FLAGS[code] ?? "🏳️"}
+                                          </div>
+                                          <div
+                                            style={{
+                                              fontSize: 9,
+                                              fontFamily: "var(--font-mono)",
+                                              color: "var(--text-secondary)",
+                                              whiteSpace: "nowrap",
+                                            }}>
+                                            {CB_COUNTRY_NAMES[code] ?? code}
+                                          </div>
+                                        </div>
+                                        {i < countries.length - 1 && (
+                                          <span
+                                            style={{
+                                              fontSize: 12,
+                                              color: "var(--text-tertiary)",
+                                              marginBottom: 10,
+                                            }}>
+                                            →
+                                          </span>
+                                        )}
                                       </div>
                                     ))}
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
 
-                          {/* Driver notes */}
-                          {routeData.warnings && routeData.warnings.length > 0 && (
-                            <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10 }}>
-                              <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>DRIVER NOTES</div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                {routeData.warnings.map((w, idx) => (
-                                  <div key={idx} style={{ display: "flex", gap: 6, fontSize: 11, fontFamily: "var(--font-sans)", color: "var(--status-warning)" }}>
-                                    <span style={{ flexShrink: 0 }}>⚠️</span>
-                                    <span>{w}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cost breakdown — stays visible */}
-                <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 5, fontSize: 11 }}>
-                  {(routeData.additional_costs?.border_fees ?? 0) > 0 && (
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div>
-                        <div style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Border Crossing Fees</div>
-                        <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
-                          {crossings.map(k => k.split('-').join(' → ')).join(', ')}
-                        </div>
-                      </div>
-                      <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-warning)", fontWeight: 600 }}>
-                        R {Math.round(routeData.additional_costs!.border_fees!).toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-                  {(routeData.additional_costs?.weighbridge_fees ?? 0) > 0 && (
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div>
-                        <div style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Weighbridge Fees</div>
-                        <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
-                          {foreignCountries.map(c => CB_COUNTRY_NAMES[c] ?? c).join(', ')} · per country
-                        </div>
-                      </div>
-                      <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-warning)", fontWeight: 600 }}>
-                        R {Math.round(routeData.additional_costs!.weighbridge_fees!).toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-                  {(routeData.additional_costs?.non_sa_tolls ?? 0) > 0 && (
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div>
-                        <div style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>International Tolls</div>
-                        <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>
-                          {foreignCountries.map(c => CB_COUNTRY_NAMES[c] ?? c).join(', ')} · distance-based
-                        </div>
-                      </div>
-                      <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-warning)", fontWeight: 600 }}>
-                        R {Math.round(routeData.additional_costs!.non_sa_tolls!).toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-
-        </div>
-
-        {/* RIGHT PANEL: visible when pickup + delivery selected and routes/results available */}
-        {(routeOptions.length > 0 || (routeData && routeData.success)) && (
-          <div className="step1-right">
-
-            {routeOptions.length > 0 && (
-              <div className="card" style={{ padding: 16 }}>
-                <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                  ROUTE OPTIONS
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {routeOptions.map((r) => {
-                    const ROUTE_COLORS = ['#16a34a', '#2563eb', '#ea580c', '#7c3aed'];
-                    const color = ROUTE_COLORS[r.index % ROUTE_COLORS.length];
-                    const isSel = r.index === selectedRouteIndex;
-                    const isExp = r.index === expandedRouteIndex;
-
-                    const severityColor = r.max_traffic_severity == null ? 'var(--text-tertiary)'
-                      : r.max_traffic_severity === 0 ? 'var(--status-success)'
-                      : r.max_traffic_severity === 1 ? '#a3a300'
-                      : r.max_traffic_severity === 2 ? 'var(--status-warning)'
-                      : 'var(--status-danger)';
-
-                    const terrainIcons: Record<string, string> = {
-                      'Coastal': '🌊',
-                      'Mountain Passes': '⛰️',
-                      'Karoo': '🏜️',
-                      'Escarpment': '🗻',
-                      'Bushveld': '🌿',
-                      'Highveld / Flat': '🟫',
-                    };
-
-                    return (
-                      <div
-                        key={r.index}
-                        style={{
-                          borderRadius: 2,
-                          background: isSel ? `${color}12` : "var(--bg-surface)",
-                          border: `1px solid ${isSel ? color : "var(--border-subtle)"}`,
-                          overflow: "hidden",
-                        }}>
-
-                        {/* Summary row — always visible, click to expand */}
-                        <button
-                          type="button"
-                          onClick={() => setExpandedRouteIndex(isExp ? null : r.index)}
-                          aria-expanded={isExp}
-                          style={{
-                            width: "100%", display: "flex", alignItems: "center",
-                            padding: "11px 14px", cursor: "pointer", textAlign: "left",
-                            background: "transparent", border: "none", gap: 10,
-                          }}>
-                          <span style={{
-                            width: 22, height: 22, borderRadius: "50%", background: color,
-                            display: "inline-flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0,
-                            opacity: isSel ? 1 : 0.65,
-                          }}>{r.index + 1}</span>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", flex: 1 }}>
-                            {r.is_best ? "Best Route" : r.label}
-                          </span>
-                          {r.road_type && (
-                            <span style={{ fontSize: 9, fontFamily: "var(--font-mono)", padding: "2px 6px",
-                              background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
-                              borderRadius: 2, color: "var(--text-tertiary)", letterSpacing: "0.04em" }}>
-                              {r.road_type.toUpperCase()}
-                            </span>
-                          )}
-                          {/* inline traffic dot */}
-                          <span style={{ width: 7, height: 7, borderRadius: "50%", background: severityColor, flexShrink: 0 }} />
-                          <div style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--text-secondary)", display: "flex", gap: 8, flexShrink: 0 }}>
-                            <span style={{ fontWeight: 700 }}>{Math.floor(r.duration_minutes / 60)}h {r.duration_minutes % 60}m</span>
-                            <span>{Math.round(r.distance_km)} km</span>
-                          </div>
-                          <span style={{ fontSize: 10, color: "var(--text-tertiary)", marginLeft: 2 }}>
-                            {isExp ? '▲' : '▼'}
-                          </span>
-                        </button>
-
-                        {/* Expanded details */}
-                        {isExp && (
-                          <div style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
-
-                            {/* Row 1: Traffic + Tolls + Congestion */}
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-
-                              {/* Traffic */}
-                              <div style={{ background: "var(--bg-elevated)", borderRadius: 2, padding: "10px 11px" }}>
-                                <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", marginBottom: 6, letterSpacing: "0.07em" }}>TRAFFIC</div>
-                                <div style={{ fontSize: 12, fontWeight: 700, color: severityColor, fontFamily: "var(--font-mono)", marginBottom: 4 }}>
-                                  {r.traffic_status || 'Unknown'}
-                                </div>
-                                <div style={{ fontSize: 10, color: "var(--text-secondary)", fontFamily: "var(--font-sans)", marginBottom: 2 }}>
-                                  {r.traffic_delay_minutes != null && r.traffic_delay_minutes > 0
-                                    ? <span style={{ color: severityColor }}>+{Math.round(r.traffic_delay_minutes)} min delay</span>
-                                    : <span style={{ color: "var(--status-success)" }}>No delay</span>}
-                                </div>
-                                {r.traffic_vs_historic != null && (
-                                  <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: r.traffic_vs_historic > 0 ? 'var(--status-warning)' : 'var(--status-success)' }}>
-                                    {r.traffic_vs_historic > 0 ? `+${r.traffic_vs_historic}m` : `${r.traffic_vs_historic}m`} vs avg
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Tolls */}
-                              <div style={{ background: "var(--bg-elevated)", borderRadius: 2, padding: "10px 11px" }}>
-                                <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", marginBottom: 6, letterSpacing: "0.07em" }}>TOLL PLAZAS</div>
-                                <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--font-mono)", lineHeight: 1, marginBottom: 4 }}>
-                                  {r.toll_count != null ? r.toll_count : '—'}
-                                  <span style={{ fontSize: 10, fontWeight: 400, color: "var(--text-tertiary)", marginLeft: 4 }}>
-                                    {r.toll_count === 1 ? 'plaza' : 'plazas'}
-                                  </span>
-                                </div>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", fontFamily: "var(--font-mono)", marginBottom: 2 }}>
-                                  R {Math.round(r.toll_cost_zar).toLocaleString()}
-                                </div>
-                                {r.toll_count != null && r.toll_count > 1 && r.toll_cost_zar > 0 && (
-                                  <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                                    ~R {Math.round(r.toll_cost_zar / r.toll_count).toLocaleString()} avg
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Congestion */}
-                              <div style={{ background: "var(--bg-elevated)", borderRadius: 2, padding: "10px 11px" }}>
-                                <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", marginBottom: 6, letterSpacing: "0.07em" }}>CONGESTION</div>
-                                <div style={{ fontSize: 18, fontWeight: 700, lineHeight: 1, marginBottom: 4,
-                                  color: r.congested_km != null && r.congested_km > 0 ? 'var(--status-warning)' : 'var(--status-success)',
-                                  fontFamily: "var(--font-mono)" }}>
-                                  {r.congested_km != null && r.congested_km > 0 ? `${r.congested_km}` : '0'}
-                                  <span style={{ fontSize: 10, fontWeight: 400, marginLeft: 3 }}>km</span>
-                                </div>
-                                <div style={{ fontSize: 10, color: "var(--text-secondary)", fontFamily: "var(--font-sans)", marginBottom: 2 }}>
-                                  {r.congested_km != null && r.congested_km > 0 ? 'congested sections' : 'free-flowing'}
-                                </div>
-                                {r.traffic_vs_historic != null && (
-                                  <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: r.traffic_vs_historic > 0 ? 'var(--status-warning)' : 'var(--status-success)' }}>
-                                    {r.traffic_vs_historic > 0 ? `+${r.traffic_vs_historic}m` : `${r.traffic_vs_historic}m`} vs typical
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Row 2: Road + Journey time + Highway% */}
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-
-                              {/* Road type */}
-                              <div style={{ background: "var(--bg-elevated)", borderRadius: 2, padding: "10px 11px" }}>
-                                <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", marginBottom: 6, letterSpacing: "0.07em" }}>ROAD TYPE</div>
-                                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--font-sans)", marginBottom: 4 }}>
-                                  {r.road_type || '—'}
-                                </div>
-                                <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                                  {r.motorway_pct != null ? `${r.motorway_pct}% motorway` : ''}
-                                </div>
-                                {r.has_tunnel && (
-                                  <div style={{ fontSize: 9, color: "var(--text-secondary)", fontFamily: "var(--font-sans)", marginTop: 2 }}>🚇 includes tunnel</div>
-                                )}
-                              </div>
-
-                              {/* Without traffic */}
-                              <div style={{ background: "var(--bg-elevated)", borderRadius: 2, padding: "10px 11px" }}>
-                                <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", marginBottom: 6, letterSpacing: "0.07em" }}>WITHOUT TRAFFIC</div>
-                                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--font-mono)", lineHeight: 1, marginBottom: 4 }}>
-                                  {r.no_traffic_minutes != null
-                                    ? `${Math.floor(r.no_traffic_minutes / 60)}h ${(r.no_traffic_minutes % 60).toFixed(2)}m`
-                                    : '—'}
-                                </div>
-                                {r.no_traffic_minutes != null && r.duration_minutes > r.no_traffic_minutes && (
-                                  <div style={{ fontSize: 9, color: 'var(--status-warning)', fontFamily: "var(--font-mono)" }}>
-                                    +{(r.duration_minutes - r.no_traffic_minutes).toFixed(2)}m with traffic
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Countries */}
-                              <div style={{ background: "var(--bg-elevated)", borderRadius: 2, padding: "10px 11px" }}>
-                                <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", marginBottom: 6, letterSpacing: "0.07em" }}>COUNTRIES</div>
-                                {r.country_codes && r.country_codes.length > 0 ? (
-                                  <>
-                                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--status-warning)', fontFamily: "var(--font-mono)", marginBottom: 4 }}>
-                                      🌍 {r.country_codes.join(' → ')}
+                                {/* Border posts */}
+                                {crossings.some((k) => CB_BORDER_POSTS[k]) && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        fontFamily: "var(--font-mono)",
+                                        color: "var(--text-tertiary)",
+                                        letterSpacing: "0.07em",
+                                        marginBottom: 6,
+                                      }}>
+                                      BORDER POSTS
                                     </div>
-                                    <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>cross-border route</div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--status-success)", fontFamily: "var(--font-mono)", marginBottom: 4 }}>ZA only</div>
-                                    <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>domestic route</div>
-                                  </>
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 5,
+                                      }}>
+                                      {crossings.map((key) => {
+                                        const post = CB_BORDER_POSTS[key];
+                                        if (!post) return null;
+                                        const [from, to] = key.split("-");
+                                        return (
+                                          <div
+                                            key={key}
+                                            style={{
+                                              background: "var(--bg-surface)",
+                                              borderRadius: 2,
+                                              padding: "7px 9px",
+                                            }}>
+                                            <div
+                                              style={{
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                                marginBottom: 2,
+                                              }}>
+                                              <span
+                                                style={{
+                                                  fontSize: 11,
+                                                  fontWeight: 600,
+                                                  color: "var(--text-primary)",
+                                                  fontFamily:
+                                                    "var(--font-sans)",
+                                                }}>
+                                                {CB_FLAGS[from]} →{" "}
+                                                {CB_FLAGS[to]} {post.name}
+                                              </span>
+                                              <span
+                                                style={{
+                                                  fontSize: 9,
+                                                  fontFamily:
+                                                    "var(--font-mono)",
+                                                  color:
+                                                    "var(--status-success)",
+                                                  fontWeight: 600,
+                                                }}>
+                                                ⏰ {post.hours}
+                                              </span>
+                                            </div>
+                                            <div
+                                              style={{
+                                                fontSize: 9,
+                                                color: "var(--text-tertiary)",
+                                                fontFamily: "var(--font-sans)",
+                                              }}>
+                                              ℹ️ {post.note}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
                                 )}
-                              </div>
-                            </div>
 
-                            {/* Terrain tags */}
-                            {((r.terrain && r.terrain.length > 0) || r.has_tunnel) && (
-                              <div>
-                                <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>TERRAIN</div>
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                                  {r.terrain?.map(t => (
-                                    <span key={t} style={{ fontSize: 10, padding: "3px 9px", borderRadius: 10,
-                                      background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
-                                      color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>
-                                      {terrainIcons[t] ?? '📍'} {t}
-                                    </span>
-                                  ))}
-                                  {r.has_tunnel && (
-                                    <span style={{ fontSize: 10, padding: "3px 9px", borderRadius: 10,
-                                      background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
-                                      color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>
-                                      🚇 Tunnel
-                                    </span>
-                                  )}
+                                {/* Currency */}
+                                {foreignCountries.some(
+                                  (c) => CB_CURRENCY[c],
+                                ) && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        fontFamily: "var(--font-mono)",
+                                        color: "var(--text-tertiary)",
+                                        letterSpacing: "0.07em",
+                                        marginBottom: 6,
+                                      }}>
+                                      CURRENCY
+                                    </div>
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 4,
+                                      }}>
+                                      {foreignCountries
+                                        .filter((c) => CB_CURRENCY[c])
+                                        .map((c) => (
+                                          <div
+                                            key={c}
+                                            style={{
+                                              display: "flex",
+                                              gap: 6,
+                                              fontSize: 11,
+                                              fontFamily: "var(--font-sans)",
+                                            }}>
+                                            <span>{CB_FLAGS[c]}</span>
+                                            <span
+                                              style={{
+                                                color: "var(--text-secondary)",
+                                              }}>
+                                              {CB_COUNTRY_NAMES[c]}:
+                                            </span>
+                                            <span
+                                              style={{
+                                                color: "var(--text-primary)",
+                                              }}>
+                                              {CB_CURRENCY[c]}
+                                            </span>
+                                          </div>
+                                        ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Required documents */}
+                                <div>
+                                  <div
+                                    style={{
+                                      fontSize: 9,
+                                      fontFamily: "var(--font-mono)",
+                                      color: "var(--text-tertiary)",
+                                      letterSpacing: "0.07em",
+                                      marginBottom: 6,
+                                    }}>
+                                    REQUIRED DOCUMENTS
+                                  </div>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: 8,
+                                    }}>
+                                    {countries
+                                      .filter((c) => CB_DOCS[c])
+                                      .map((c) => (
+                                        <div key={c}>
+                                          <div
+                                            style={{
+                                              fontSize: 10,
+                                              fontFamily: "var(--font-mono)",
+                                              color: "var(--text-secondary)",
+                                              marginBottom: 3,
+                                            }}>
+                                            {CB_FLAGS[c]}{" "}
+                                            {CB_COUNTRY_NAMES[c] ?? c}
+                                          </div>
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              flexDirection: "column",
+                                              gap: 2,
+                                            }}>
+                                            {CB_DOCS[c].map((doc) => (
+                                              <div
+                                                key={doc}
+                                                style={{
+                                                  display: "flex",
+                                                  gap: 6,
+                                                  fontSize: 10,
+                                                  color: "var(--text-tertiary)",
+                                                  fontFamily:
+                                                    "var(--font-sans)",
+                                                }}>
+                                                <span
+                                                  style={{
+                                                    color:
+                                                      "var(--status-success)",
+                                                    flexShrink: 0,
+                                                  }}>
+                                                  ✓
+                                                </span>
+                                                <span>{doc}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
                                 </div>
+
+                                {/* Driver notes */}
+                                {routeData.warnings &&
+                                  routeData.warnings.length > 0 && (
+                                    <div
+                                      style={{
+                                        borderTop:
+                                          "1px solid var(--border-subtle)",
+                                        paddingTop: 10,
+                                      }}>
+                                      <div
+                                        style={{
+                                          fontSize: 9,
+                                          fontFamily: "var(--font-mono)",
+                                          color: "var(--text-tertiary)",
+                                          letterSpacing: "0.07em",
+                                          marginBottom: 6,
+                                        }}>
+                                        DRIVER NOTES
+                                      </div>
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          gap: 4,
+                                        }}>
+                                        {routeData.warnings.map((w, idx) => (
+                                          <div
+                                            key={idx}
+                                            style={{
+                                              display: "flex",
+                                              gap: 6,
+                                              fontSize: 11,
+                                              fontFamily: "var(--font-sans)",
+                                              color: "var(--status-warning)",
+                                            }}>
+                                            <span style={{ flexShrink: 0 }}>
+                                              ⚠️
+                                            </span>
+                                            <span>{w}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                               </div>
                             )}
+                          </div>
+                        </div>
+                      </div>
 
-                            {/* Select button */}
-                            <button
-                              type="button"
-                              onClick={() => setSelectedRouteIndex(r.index)}
+                      {/* Cost breakdown — stays visible */}
+                      <div
+                        style={{
+                          padding: "10px 14px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 5,
+                          fontSize: 11,
+                        }}>
+                        {(routeData.additional_costs?.border_fees ?? 0) > 0 && (
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                            }}>
+                            <div>
+                              <div
+                                style={{
+                                  color: "var(--text-secondary)",
+                                  fontFamily: "var(--font-sans)",
+                                }}>
+                                Border Crossing Fees
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 9,
+                                  color: "var(--text-tertiary)",
+                                  fontFamily: "var(--font-sans)",
+                                }}>
+                                {crossings
+                                  .map((k) => k.split("-").join(" → "))
+                                  .join(", ")}
+                              </div>
+                            </div>
+                            <span
                               style={{
-                                padding: "10px 0", borderRadius: 2, cursor: isSel ? "default" : "pointer",
-                                fontWeight: 700, fontSize: 11, fontFamily: "var(--font-mono)", letterSpacing: "0.07em",
-                                background: isSel ? color : "transparent",
-                                color: isSel ? "#fff" : color,
-                                border: `1.5px solid ${color}`,
-                                transition: "all 0.15s",
+                                fontFamily: "var(--font-mono)",
+                                color: "var(--status-warning)",
+                                fontWeight: 600,
                               }}>
-                              {isSel ? `✓ ROUTE ${r.index + 1} SELECTED` : `SELECT ROUTE ${r.index + 1}`}
-                            </button>
+                              R{" "}
+                              {Math.round(
+                                routeData.additional_costs!.border_fees!,
+                              ).toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        {(routeData.additional_costs?.weighbridge_fees ?? 0) >
+                          0 && (
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                            }}>
+                            <div>
+                              <div
+                                style={{
+                                  color: "var(--text-secondary)",
+                                  fontFamily: "var(--font-sans)",
+                                }}>
+                                Weighbridge Fees
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 9,
+                                  color: "var(--text-tertiary)",
+                                  fontFamily: "var(--font-sans)",
+                                }}>
+                                {foreignCountries
+                                  .map((c) => CB_COUNTRY_NAMES[c] ?? c)
+                                  .join(", ")}{" "}
+                                · per country
+                              </div>
+                            </div>
+                            <span
+                              style={{
+                                fontFamily: "var(--font-mono)",
+                                color: "var(--status-warning)",
+                                fontWeight: 600,
+                              }}>
+                              R{" "}
+                              {Math.round(
+                                routeData.additional_costs!.weighbridge_fees!,
+                              ).toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        {(routeData.additional_costs?.non_sa_tolls ?? 0) >
+                          0 && (
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                            }}>
+                            <div>
+                              <div
+                                style={{
+                                  color: "var(--text-secondary)",
+                                  fontFamily: "var(--font-sans)",
+                                }}>
+                                International Tolls
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 9,
+                                  color: "var(--text-tertiary)",
+                                  fontFamily: "var(--font-sans)",
+                                }}>
+                                {foreignCountries
+                                  .map((c) => CB_COUNTRY_NAMES[c] ?? c)
+                                  .join(", ")}{" "}
+                                · distance-based
+                              </div>
+                            </div>
+                            <span
+                              style={{
+                                fontFamily: "var(--font-mono)",
+                                color: "var(--status-warning)",
+                                fontWeight: 600,
+                              }}>
+                              R{" "}
+                              {Math.round(
+                                routeData.additional_costs!.non_sa_tolls!,
+                              ).toLocaleString()}
+                            </span>
                           </div>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+                    </div>
+                  );
+                })()}
+            </div>
 
-            {routeData && routeData.success && (
-              <div className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                {[
-                  { rd: (selectedRoute ? ({ ...routeData, ...selectedRoute } as RouteData) : routeData), leg: tripType === "ROUND_TRIP" ? "LEG 1 — OUTBOUND" : "ROUTE CALCULATED", from: pickupLocation, to: deliveryLocation },
-                  ...(tripType === "ROUND_TRIP" && returnRouteData?.success
-                    ? [{ rd: returnRouteData, leg: "LEG 2 — RETURN", from: deliveryLocation, to: returnLocation }]
-                    : []),
-                ].map(({ rd, leg, from, to }) => (
-                  <div
-                    key={leg}
-                    style={{
-                      padding: "14px 16px",
-                      background: "var(--bg-surface-hover)",
-                      borderRadius: 2,
-                      border: `1px solid ${rd.source === "tomtom" ? "var(--accent-primary)" : "var(--status-warning)"}`,
-                    }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.08em" }}>
-                        {leg}
-                      </div>
-                      <span style={{
-                        padding: "2px 8px",
-                        background: rd.source === "tomtom" ? "var(--accent-glow)" : "var(--bg-surface-hover)",
-                        border: `1px solid ${rd.source === "tomtom" ? "var(--accent-primary)" : "var(--status-warning)"}`,
-                        borderRadius: 2, fontSize: 9, fontWeight: 600, fontFamily: "var(--font-mono)",
-                        color: rd.source === "tomtom" ? "var(--accent-primary)" : "var(--status-warning)",
+            {/* RIGHT PANEL: visible when pickup + delivery selected and routes/results available */}
+            {(routeOptions.length > 0 || (routeData && routeData.success)) && (
+              <div className="step1-right">
+                {routeOptions.length > 0 && (
+                  <div className="card" style={{ padding: 16 }}>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontFamily: "var(--font-mono)",
+                        color: "var(--text-tertiary)",
+                        letterSpacing: "0.08em",
+                        marginBottom: 8,
                       }}>
-                        {rd.source === "tomtom" ? "LIVE" : "ESTIMATED"}
-                      </span>
+                      ROUTE OPTIONS
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", marginBottom: 10 }}>
-                      {from} → {to}
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 10, fontSize: 11, fontFamily: "var(--font-mono)" }}>
-                      <div>
-                        <div style={{ color: "var(--text-tertiary)", fontSize: 9, marginBottom: 3 }}>DISTANCE</div>
-                        <div style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: 16 }}>{Math.round(rd.distance_km)} km</div>
-                      </div>
-                      <div>
-                        <div style={{ color: "var(--text-tertiary)", fontSize: 9, marginBottom: 3 }}>DURATION</div>
-                        <div style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: 16 }}>
-                          {Math.floor(rd.duration_minutes / 60)}h {rd.duration_minutes % 60}m
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ color: "var(--text-tertiary)", fontSize: 9, marginBottom: 3 }}>FUEL</div>
-                        <div style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: 16 }}>{Math.round(rd.fuel_usage_litres)} L</div>
-                      </div>
-                    </div>
-                    {(() => {
-                      const fiasaPrice = fuelPriceData?.diesel_inland ?? 21.7;
-                      const effectivePrice = customFuelPricePerL && !isNaN(parseFloat(customFuelPricePerL))
-                        ? parseFloat(customFuelPricePerL)
-                        : fiasaPrice;
-                      const displayedFuelCost = rd.fuel_usage_litres * effectivePrice;
-                      const weightTons = parseFloat(weight || "0");
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}>
+                      {routeOptions.map((r) => {
+                        const ROUTE_COLORS = [
+                          "#16a34a",
+                          "#2563eb",
+                          "#ea580c",
+                          "#7c3aed",
+                        ];
+                        const color =
+                          ROUTE_COLORS[r.index % ROUTE_COLORS.length];
+                        const isSel = r.index === selectedRouteIndex;
+                        const isExp = r.index === expandedRouteIndex;
 
-                      // Weight impact hint
-                      const weightHint = weightTons <= 0 ? null
-                        : weightTons < 5  ? { label: `${weightTons}t load`, note: "Light — ~25–30 L/100km", color: "var(--status-success)" }
-                        : weightTons < 10 ? { label: `${weightTons}t load`, note: "Medium — ~32–38 L/100km", color: "#a3a300" }
-                        : weightTons < 20 ? { label: `${weightTons}t load`, note: "Heavy — ~38–45 L/100km", color: "var(--status-warning)" }
-                        :                  { label: `${weightTons}t load`, note: "Very heavy — ~45–55 L/100km", color: "var(--status-danger)" };
+                        const severityColor =
+                          r.max_traffic_severity == null
+                            ? "var(--text-tertiary)"
+                            : r.max_traffic_severity === 0
+                              ? "var(--status-success)"
+                              : r.max_traffic_severity === 1
+                                ? "#a3a300"
+                                : r.max_traffic_severity === 2
+                                  ? "var(--status-warning)"
+                                  : "var(--status-danger)";
 
-                      // Terrain impact hints
-                      const terrain = selectedRoute?.terrain ?? [];
-                      const terrainHints: { label: string; note: string }[] = [];
-                      if (terrain.includes('Mountain Passes')) terrainHints.push({ label: "⛰️ Mountain Passes", note: "+12–18% fuel" });
-                      if (terrain.includes('Escarpment'))      terrainHints.push({ label: "🗻 Escarpment",      note: "+8–12% fuel" });
-                      if (terrain.includes('Karoo'))           terrainHints.push({ label: "🏜️ Karoo",           note: "Flat — avg fuel" });
-                      if (terrain.includes('Coastal'))         terrainHints.push({ label: "🌊 Coastal",         note: "+5% (wind)" });
-                      if (terrain.includes('Highveld / Flat')) terrainHints.push({ label: "🟫 Highveld",        note: "Flat — avg fuel" });
+                        const terrainIcons: Record<string, string> = {
+                          Coastal: "🌊",
+                          "Mountain Passes": "⛰️",
+                          Karoo: "🏜️",
+                          Escarpment: "🗻",
+                          Bushveld: "🌿",
+                          "Highveld / Flat": "🟫",
+                        };
 
-                      const motorwayPct = selectedRoute?.motorway_pct ?? 0;
-                      const roadNote = motorwayPct >= 70 ? "Mostly highway — efficient"
-                        : motorwayPct >= 40 ? "Mixed roads — moderate"
-                        : "Mostly city/arterial — higher idle consumption";
-
-                      const totalCost = displayedFuelCost + rd.toll_cost_zar;
-
-                      return (
-                        <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 12 }}>
-
-                          {/* Live market fuel price banner */}
-                          <div style={{ background: "var(--bg-elevated)", borderRadius: 2, padding: "10px 12px", border: "1px solid var(--border-subtle)" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                              <span style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em" }}>
-                                LIVE DIESEL PRICE · FIASA
+                        return (
+                          <div
+                            key={r.index}
+                            style={{
+                              borderRadius: 2,
+                              background: isSel
+                                ? `${color}12`
+                                : "var(--bg-surface)",
+                              border: `1px solid ${isSel ? color : "var(--border-subtle)"}`,
+                              overflow: "hidden",
+                            }}>
+                            {/* Summary row — always visible, click to expand */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedRouteIndex(isExp ? null : r.index)
+                              }
+                              aria-expanded={isExp}
+                              style={{
+                                width: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                padding: "11px 14px",
+                                cursor: "pointer",
+                                textAlign: "left",
+                                background: "transparent",
+                                border: "none",
+                                gap: 10,
+                              }}>
+                              <span
+                                style={{
+                                  width: 22,
+                                  height: 22,
+                                  borderRadius: "50%",
+                                  background: color,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color: "#fff",
+                                  flexShrink: 0,
+                                  opacity: isSel ? 1 : 0.65,
+                                }}>
+                                {r.index + 1}
                               </span>
-                              <span style={{ fontSize: 9, padding: "1px 6px", background: "var(--accent-glow)", border: "1px solid var(--accent-primary)", borderRadius: 2, color: "var(--accent-primary)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>
-                                MARKET RATE
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  color: "var(--text-primary)",
+                                  flex: 1,
+                                }}>
+                                {r.is_best ? "Best Route" : r.label}
                               </span>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                              <span style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
-                                R {fiasaPrice.toFixed(2)}
-                              </span>
-                              <span style={{ fontSize: 12, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>per litre (inland diesel)</span>
-                            </div>
-                            <div style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", marginTop: 4 }}>
-                              {Math.round(rd.fuel_usage_litres)} L × R {fiasaPrice.toFixed(2)}/L = R {Math.round(rd.fuel_usage_litres * fiasaPrice).toLocaleString()}
-                            </div>
-                          </div>
-
-                          {/* Factor hints */}
-                          <div>
-                            <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>
-                              FACTORS AFFECTING YOUR FUEL COST
-                            </div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                              {weightHint && (
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontFamily: "var(--font-sans)" }}>
-                                  <span style={{ color: "var(--text-secondary)" }}>⚖️ {weightHint.label}</span>
-                                  <span style={{ color: weightHint.color, fontFamily: "var(--font-mono)", fontSize: 10 }}>{weightHint.note}</span>
-                                </div>
-                              )}
-                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontFamily: "var(--font-sans)" }}>
-                                <span style={{ color: "var(--text-secondary)" }}>🛣️ Road mix ({motorwayPct}% highway)</span>
-                                <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 10 }}>{roadNote}</span>
-                              </div>
-                              {terrainHints.map(th => (
-                                <div key={th.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontFamily: "var(--font-sans)" }}>
-                                  <span style={{ color: "var(--text-secondary)" }}>{th.label}</span>
-                                  <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 10 }}>{th.note}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Adjustable price input */}
-                          <div>
-                            <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>
-                              ADJUST FUEL PRICE / LITRE (OPTIONAL)
-                            </div>
-                            <div style={{ fontSize: 10, color: "var(--text-secondary)", fontFamily: "var(--font-sans)", marginBottom: 8 }}>
-                              Use your fleet card rate, depot price, or contract rate if different from the market price.
-                            </div>
-                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                              <div style={{ position: "relative", flex: 1 }}>
-                                <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", pointerEvents: "none" }}>R</span>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  placeholder={fiasaPrice.toFixed(2)}
-                                  value={customFuelPricePerL}
-                                  onChange={e => setCustomFuelPricePerL(e.target.value)}
-                                  style={{ ...inputStyle, paddingLeft: 24 }}
-                                />
-                              </div>
-                              <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", flexShrink: 0 }}>/L</span>
-                              {customFuelPricePerL && (
-                                <button type="button" onClick={() => setCustomFuelPricePerL("")}
-                                  style={{ fontSize: 10, color: "var(--accent-primary)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-mono)", flexShrink: 0 }}>
-                                  USE FIASA
-                                </button>
-                              )}
-                            </div>
-                            {customFuelPricePerL && effectivePrice !== fiasaPrice && (
-                              <div style={{ fontSize: 10, color: effectivePrice < fiasaPrice ? "var(--status-success)" : "var(--status-warning)", fontFamily: "var(--font-mono)", marginTop: 5 }}>
-                                {effectivePrice < fiasaPrice
-                                  ? `R ${(fiasaPrice - effectivePrice).toFixed(2)}/L below market — saving R ${Math.round((fiasaPrice - effectivePrice) * rd.fuel_usage_litres).toLocaleString()} on this trip`
-                                  : `R ${(effectivePrice - fiasaPrice).toFixed(2)}/L above market`}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Cost summary */}
-                          <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                              <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Fuel Cost:</span>
-                              <div style={{ textAlign: "right" }}>
-                                <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-success)", fontWeight: 600 }}>
-                                  R {Math.round(displayedFuelCost).toLocaleString()}
+                              {r.road_type && (
+                                <span
+                                  style={{
+                                    fontSize: 9,
+                                    fontFamily: "var(--font-mono)",
+                                    padding: "2px 6px",
+                                    background: "var(--bg-elevated)",
+                                    border: "1px solid var(--border-subtle)",
+                                    borderRadius: 2,
+                                    color: "var(--text-tertiary)",
+                                    letterSpacing: "0.04em",
+                                  }}>
+                                  {r.road_type.toUpperCase()}
                                 </span>
-                                <div style={{ fontSize: 9, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                                  {Math.round(rd.fuel_usage_litres)}L × R{effectivePrice.toFixed(2)}/L
-                                </div>
+                              )}
+                              {/* inline traffic dot */}
+                              <span
+                                style={{
+                                  width: 7,
+                                  height: 7,
+                                  borderRadius: "50%",
+                                  background: severityColor,
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  fontFamily: "var(--font-mono)",
+                                  color: "var(--text-secondary)",
+                                  display: "flex",
+                                  gap: 8,
+                                  flexShrink: 0,
+                                }}>
+                                <span style={{ fontWeight: 700 }}>
+                                  {Math.floor(r.duration_minutes / 60)}h{" "}
+                                  {r.duration_minutes % 60}m
+                                </span>
+                                <span>{Math.round(r.distance_km)} km</span>
                               </div>
-                            </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                              <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Toll Cost:</span>
-                              <span style={{ fontFamily: "var(--font-mono)", color: "var(--status-success)", fontWeight: 600 }}>
-                                R {Math.round(rd.toll_cost_zar).toLocaleString()}
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: "var(--text-tertiary)",
+                                  marginLeft: 2,
+                                }}>
+                                {isExp ? "▲" : "▼"}
                               </span>
-                            </div>
-                            {selectedVehicleTypeBaseRate != null && (
-                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10 }}>
-                                <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-sans)" }}>Base Rate ({vehicleType}):</span>
-                                <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-tertiary)" }}>R {selectedVehicleTypeBaseRate.toFixed(2)}/km</span>
+                            </button>
+
+                            {/* Expanded details */}
+                            {isExp && (
+                              <div
+                                style={{
+                                  padding: "0 14px 14px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 12,
+                                }}>
+                                {/* Row 1: Traffic + Tolls + Congestion */}
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(3, 1fr)",
+                                    gap: 8,
+                                  }}>
+                                  {/* Traffic */}
+                                  <div
+                                    style={{
+                                      background: "var(--bg-elevated)",
+                                      borderRadius: 2,
+                                      padding: "10px 11px",
+                                    }}>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        fontFamily: "var(--font-mono)",
+                                        color: "var(--text-tertiary)",
+                                        marginBottom: 6,
+                                        letterSpacing: "0.07em",
+                                      }}>
+                                      TRAFFIC
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        color: severityColor,
+                                        fontFamily: "var(--font-mono)",
+                                        marginBottom: 4,
+                                      }}>
+                                      {r.traffic_status || "Unknown"}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 10,
+                                        color: "var(--text-secondary)",
+                                        fontFamily: "var(--font-sans)",
+                                        marginBottom: 2,
+                                      }}>
+                                      {r.traffic_delay_minutes != null &&
+                                      r.traffic_delay_minutes > 0 ? (
+                                        <span style={{ color: severityColor }}>
+                                          +{Math.round(r.traffic_delay_minutes)}{" "}
+                                          min delay
+                                        </span>
+                                      ) : (
+                                        <span
+                                          style={{
+                                            color: "var(--status-success)",
+                                          }}>
+                                          No delay
+                                        </span>
+                                      )}
+                                    </div>
+                                    {r.traffic_vs_historic != null && (
+                                      <div
+                                        style={{
+                                          fontSize: 9,
+                                          fontFamily: "var(--font-mono)",
+                                          color:
+                                            r.traffic_vs_historic > 0
+                                              ? "var(--status-warning)"
+                                              : "var(--status-success)",
+                                        }}>
+                                        {r.traffic_vs_historic > 0
+                                          ? `+${r.traffic_vs_historic}m`
+                                          : `${r.traffic_vs_historic}m`}{" "}
+                                        vs avg
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Tolls */}
+                                  <div
+                                    style={{
+                                      background: "var(--bg-elevated)",
+                                      borderRadius: 2,
+                                      padding: "10px 11px",
+                                    }}>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        fontFamily: "var(--font-mono)",
+                                        color: "var(--text-tertiary)",
+                                        marginBottom: 6,
+                                        letterSpacing: "0.07em",
+                                      }}>
+                                      TOLL PLAZAS
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 18,
+                                        fontWeight: 700,
+                                        color: "var(--text-primary)",
+                                        fontFamily: "var(--font-mono)",
+                                        lineHeight: 1,
+                                        marginBottom: 4,
+                                      }}>
+                                      {r.toll_count != null
+                                        ? r.toll_count
+                                        : "—"}
+                                      <span
+                                        style={{
+                                          fontSize: 10,
+                                          fontWeight: 400,
+                                          color: "var(--text-tertiary)",
+                                          marginLeft: 4,
+                                        }}>
+                                        {r.toll_count === 1
+                                          ? "plaza"
+                                          : "plazas"}
+                                      </span>
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        color: "var(--text-primary)",
+                                        fontFamily: "var(--font-mono)",
+                                        marginBottom: 2,
+                                      }}>
+                                      R{" "}
+                                      {Math.round(
+                                        r.toll_cost_zar,
+                                      ).toLocaleString()}
+                                    </div>
+                                    {r.toll_count != null &&
+                                      r.toll_count > 1 &&
+                                      r.toll_cost_zar > 0 && (
+                                        <div
+                                          style={{
+                                            fontSize: 9,
+                                            color: "var(--text-tertiary)",
+                                            fontFamily: "var(--font-mono)",
+                                          }}>
+                                          ~R{" "}
+                                          {Math.round(
+                                            r.toll_cost_zar / r.toll_count,
+                                          ).toLocaleString()}{" "}
+                                          avg
+                                        </div>
+                                      )}
+                                  </div>
+
+                                  {/* Congestion */}
+                                  <div
+                                    style={{
+                                      background: "var(--bg-elevated)",
+                                      borderRadius: 2,
+                                      padding: "10px 11px",
+                                    }}>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        fontFamily: "var(--font-mono)",
+                                        color: "var(--text-tertiary)",
+                                        marginBottom: 6,
+                                        letterSpacing: "0.07em",
+                                      }}>
+                                      CONGESTION
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 18,
+                                        fontWeight: 700,
+                                        lineHeight: 1,
+                                        marginBottom: 4,
+                                        color:
+                                          r.congested_km != null &&
+                                          r.congested_km > 0
+                                            ? "var(--status-warning)"
+                                            : "var(--status-success)",
+                                        fontFamily: "var(--font-mono)",
+                                      }}>
+                                      {r.congested_km != null &&
+                                      r.congested_km > 0
+                                        ? `${r.congested_km}`
+                                        : "0"}
+                                      <span
+                                        style={{
+                                          fontSize: 10,
+                                          fontWeight: 400,
+                                          marginLeft: 3,
+                                        }}>
+                                        km
+                                      </span>
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 10,
+                                        color: "var(--text-secondary)",
+                                        fontFamily: "var(--font-sans)",
+                                        marginBottom: 2,
+                                      }}>
+                                      {r.congested_km != null &&
+                                      r.congested_km > 0
+                                        ? "congested sections"
+                                        : "free-flowing"}
+                                    </div>
+                                    {r.traffic_vs_historic != null && (
+                                      <div
+                                        style={{
+                                          fontSize: 9,
+                                          fontFamily: "var(--font-mono)",
+                                          color:
+                                            r.traffic_vs_historic > 0
+                                              ? "var(--status-warning)"
+                                              : "var(--status-success)",
+                                        }}>
+                                        {r.traffic_vs_historic > 0
+                                          ? `+${r.traffic_vs_historic}m`
+                                          : `${r.traffic_vs_historic}m`}{" "}
+                                        vs typical
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Row 2: Road + Journey time + Highway% */}
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(3, 1fr)",
+                                    gap: 8,
+                                  }}>
+                                  {/* Road type */}
+                                  <div
+                                    style={{
+                                      background: "var(--bg-elevated)",
+                                      borderRadius: 2,
+                                      padding: "10px 11px",
+                                    }}>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        fontFamily: "var(--font-mono)",
+                                        color: "var(--text-tertiary)",
+                                        marginBottom: 6,
+                                        letterSpacing: "0.07em",
+                                      }}>
+                                      ROAD TYPE
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        color: "var(--text-primary)",
+                                        fontFamily: "var(--font-sans)",
+                                        marginBottom: 4,
+                                      }}>
+                                      {r.road_type || "—"}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        color: "var(--text-tertiary)",
+                                        fontFamily: "var(--font-mono)",
+                                      }}>
+                                      {r.motorway_pct != null
+                                        ? `${r.motorway_pct}% motorway`
+                                        : ""}
+                                    </div>
+                                    {r.has_tunnel && (
+                                      <div
+                                        style={{
+                                          fontSize: 9,
+                                          color: "var(--text-secondary)",
+                                          fontFamily: "var(--font-sans)",
+                                          marginTop: 2,
+                                        }}>
+                                        🚇 includes tunnel
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Without traffic */}
+                                  <div
+                                    style={{
+                                      background: "var(--bg-elevated)",
+                                      borderRadius: 2,
+                                      padding: "10px 11px",
+                                    }}>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        fontFamily: "var(--font-mono)",
+                                        color: "var(--text-tertiary)",
+                                        marginBottom: 6,
+                                        letterSpacing: "0.07em",
+                                      }}>
+                                      WITHOUT TRAFFIC
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 14,
+                                        fontWeight: 700,
+                                        color: "var(--text-primary)",
+                                        fontFamily: "var(--font-mono)",
+                                        lineHeight: 1,
+                                        marginBottom: 4,
+                                      }}>
+                                      {r.no_traffic_minutes != null
+                                        ? `${Math.floor(r.no_traffic_minutes / 60)}h ${(r.no_traffic_minutes % 60).toFixed(2)}m`
+                                        : "—"}
+                                    </div>
+                                    {r.no_traffic_minutes != null &&
+                                      r.duration_minutes >
+                                        r.no_traffic_minutes && (
+                                        <div
+                                          style={{
+                                            fontSize: 9,
+                                            color: "var(--status-warning)",
+                                            fontFamily: "var(--font-mono)",
+                                          }}>
+                                          +
+                                          {(
+                                            r.duration_minutes -
+                                            r.no_traffic_minutes
+                                          ).toFixed(2)}
+                                          m with traffic
+                                        </div>
+                                      )}
+                                  </div>
+
+                                  {/* Countries */}
+                                  <div
+                                    style={{
+                                      background: "var(--bg-elevated)",
+                                      borderRadius: 2,
+                                      padding: "10px 11px",
+                                    }}>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        fontFamily: "var(--font-mono)",
+                                        color: "var(--text-tertiary)",
+                                        marginBottom: 6,
+                                        letterSpacing: "0.07em",
+                                      }}>
+                                      COUNTRIES
+                                    </div>
+                                    {r.country_codes &&
+                                    r.country_codes.length > 0 ? (
+                                      <>
+                                        <div
+                                          style={{
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            color: "var(--status-warning)",
+                                            fontFamily: "var(--font-mono)",
+                                            marginBottom: 4,
+                                          }}>
+                                          🌍 {r.country_codes.join(" → ")}
+                                        </div>
+                                        <div
+                                          style={{
+                                            fontSize: 9,
+                                            color: "var(--text-tertiary)",
+                                            fontFamily: "var(--font-sans)",
+                                          }}>
+                                          cross-border route
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <div
+                                          style={{
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            color: "var(--status-success)",
+                                            fontFamily: "var(--font-mono)",
+                                            marginBottom: 4,
+                                          }}>
+                                          ZA only
+                                        </div>
+                                        <div
+                                          style={{
+                                            fontSize: 9,
+                                            color: "var(--text-tertiary)",
+                                            fontFamily: "var(--font-sans)",
+                                          }}>
+                                          domestic route
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Terrain tags */}
+                                {((r.terrain && r.terrain.length > 0) ||
+                                  r.has_tunnel) && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        fontFamily: "var(--font-mono)",
+                                        color: "var(--text-tertiary)",
+                                        letterSpacing: "0.07em",
+                                        marginBottom: 6,
+                                      }}>
+                                      TERRAIN
+                                    </div>
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        gap: 5,
+                                      }}>
+                                      {r.terrain?.map((t) => (
+                                        <span
+                                          key={t}
+                                          style={{
+                                            fontSize: 10,
+                                            padding: "3px 9px",
+                                            borderRadius: 10,
+                                            background: "var(--bg-elevated)",
+                                            border:
+                                              "1px solid var(--border-subtle)",
+                                            color: "var(--text-secondary)",
+                                            fontFamily: "var(--font-sans)",
+                                          }}>
+                                          {terrainIcons[t] ?? "📍"} {t}
+                                        </span>
+                                      ))}
+                                      {r.has_tunnel && (
+                                        <span
+                                          style={{
+                                            fontSize: 10,
+                                            padding: "3px 9px",
+                                            borderRadius: 10,
+                                            background: "var(--bg-elevated)",
+                                            border:
+                                              "1px solid var(--border-subtle)",
+                                            color: "var(--text-secondary)",
+                                            fontFamily: "var(--font-sans)",
+                                          }}>
+                                          🚇 Tunnel
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Select button */}
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedRouteIndex(r.index)}
+                                  style={{
+                                    padding: "10px 0",
+                                    borderRadius: 2,
+                                    cursor: isSel ? "default" : "pointer",
+                                    fontWeight: 700,
+                                    fontSize: 11,
+                                    fontFamily: "var(--font-mono)",
+                                    letterSpacing: "0.07em",
+                                    background: isSel ? color : "transparent",
+                                    color: isSel ? "#fff" : color,
+                                    border: `1.5px solid ${color}`,
+                                    transition: "all 0.15s",
+                                  }}>
+                                  {isSel
+                                    ? `✓ ROUTE ${r.index + 1} SELECTED`
+                                    : `SELECT ROUTE ${r.index + 1}`}
+                                </button>
                               </div>
                             )}
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 700, borderTop: "1px solid var(--border-subtle)", paddingTop: 8, marginTop: 2 }}>
-                              <span style={{ color: "var(--text-primary)", fontFamily: "var(--font-sans)" }}>Estimated Trip Cost:</span>
-                              <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
-                                R {Math.round(totalCost).toLocaleString()}
-                              </span>
-                            </div>
                           </div>
-
-                        </div>
-                      );
-                    })()}
-                  </div>
-                ))}
-
-                {tripType === "ROUND_TRIP" && returnRouteData?.success && (
-                  <div style={{ padding: "12px 14px", background: "var(--bg-surface)", borderRadius: 2, border: "1px solid var(--border-subtle)" }}>
-                    <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                      RETURN LEG RATE (AUTO-CALCULATED, EDITABLE)
+                        );
+                      })}
                     </div>
-                    <input
-                      type="number"
-                      value={returnBaseRate}
-                      onChange={(e) => setReturnBaseRate(e.target.value)}
-                      style={inputStyle}
-                    />
                   </div>
                 )}
+
+                {routeData && routeData.success && (
+                  <div
+                    className="card"
+                    style={{
+                      padding: 16,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10,
+                    }}>
+                    {[
+                      {
+                        rd: selectedRoute
+                          ? ({ ...routeData, ...selectedRoute } as RouteData)
+                          : routeData,
+                        leg:
+                          tripType === "ROUND_TRIP"
+                            ? "LEG 1 — OUTBOUND"
+                            : "ROUTE CALCULATED",
+                        from: pickupLocation,
+                        to: deliveryLocation,
+                      },
+                      ...(tripType === "ROUND_TRIP" && returnRouteData?.success
+                        ? [
+                            {
+                              rd: returnRouteData,
+                              leg: "LEG 2 — RETURN",
+                              from: deliveryLocation,
+                              to: returnLocation,
+                            },
+                          ]
+                        : []),
+                    ].map(({ rd, leg, from, to }) => (
+                      <div
+                        key={leg}
+                        style={{
+                          padding: "14px 16px",
+                          background: "var(--bg-surface-hover)",
+                          borderRadius: 2,
+                          border: `1px solid ${rd.source === "tomtom" ? "var(--accent-primary)" : "var(--status-warning)"}`,
+                        }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: 10,
+                          }}>
+                          <div
+                            style={{
+                              fontSize: 10,
+                              fontFamily: "var(--font-mono)",
+                              color: "var(--text-tertiary)",
+                              letterSpacing: "0.08em",
+                            }}>
+                            {leg}
+                          </div>
+                          <span
+                            style={{
+                              padding: "2px 8px",
+                              background:
+                                rd.source === "tomtom"
+                                  ? "var(--accent-glow)"
+                                  : "var(--bg-surface-hover)",
+                              border: `1px solid ${rd.source === "tomtom" ? "var(--accent-primary)" : "var(--status-warning)"}`,
+                              borderRadius: 2,
+                              fontSize: 9,
+                              fontWeight: 600,
+                              fontFamily: "var(--font-mono)",
+                              color:
+                                rd.source === "tomtom"
+                                  ? "var(--accent-primary)"
+                                  : "var(--status-warning)",
+                            }}>
+                            {rd.source === "tomtom" ? "LIVE" : "ESTIMATED"}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-tertiary)",
+                            fontFamily: "var(--font-mono)",
+                            marginBottom: 10,
+                          }}>
+                          {from} → {to}
+                        </div>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(3, 1fr)",
+                            gap: 12,
+                            marginBottom: 10,
+                            fontSize: 11,
+                            fontFamily: "var(--font-mono)",
+                          }}>
+                          <div>
+                            <div
+                              style={{
+                                color: "var(--text-tertiary)",
+                                fontSize: 9,
+                                marginBottom: 3,
+                              }}>
+                              DISTANCE
+                            </div>
+                            <div
+                              style={{
+                                color: "var(--text-primary)",
+                                fontWeight: 700,
+                                fontSize: 16,
+                              }}>
+                              {Math.round(rd.distance_km)} km
+                            </div>
+                          </div>
+                          <div>
+                            <div
+                              style={{
+                                color: "var(--text-tertiary)",
+                                fontSize: 9,
+                                marginBottom: 3,
+                              }}>
+                              DURATION
+                            </div>
+                            <div
+                              style={{
+                                color: "var(--text-primary)",
+                                fontWeight: 700,
+                                fontSize: 16,
+                              }}>
+                              {Math.floor(rd.duration_minutes / 60)}h{" "}
+                              {rd.duration_minutes % 60}m
+                            </div>
+                          </div>
+                          <div>
+                            <div
+                              style={{
+                                color: "var(--text-tertiary)",
+                                fontSize: 9,
+                                marginBottom: 3,
+                              }}>
+                              FUEL
+                            </div>
+                            <div
+                              style={{
+                                color: "var(--text-primary)",
+                                fontWeight: 700,
+                                fontSize: 16,
+                              }}>
+                              {Math.round(rd.fuel_usage_litres)} L
+                            </div>
+                          </div>
+                        </div>
+                        {(() => {
+                          const fiasaPrice =
+                            fuelPriceData?.diesel_inland ?? 21.7;
+                          const effectivePrice =
+                            customFuelPricePerL &&
+                            !isNaN(parseFloat(customFuelPricePerL))
+                              ? parseFloat(customFuelPricePerL)
+                              : fiasaPrice;
+                          const displayedFuelCost =
+                            rd.fuel_usage_litres * effectivePrice;
+                          const weightTons = parseFloat(weight || "0");
+
+                          // Weight impact hint
+                          const weightHint =
+                            weightTons <= 0
+                              ? null
+                              : weightTons < 5
+                                ? {
+                                    label: `${weightTons}t load`,
+                                    note: "Light — ~25–30 L/100km",
+                                    color: "var(--status-success)",
+                                  }
+                                : weightTons < 10
+                                  ? {
+                                      label: `${weightTons}t load`,
+                                      note: "Medium — ~32–38 L/100km",
+                                      color: "#a3a300",
+                                    }
+                                  : weightTons < 20
+                                    ? {
+                                        label: `${weightTons}t load`,
+                                        note: "Heavy — ~38–45 L/100km",
+                                        color: "var(--status-warning)",
+                                      }
+                                    : {
+                                        label: `${weightTons}t load`,
+                                        note: "Very heavy — ~45–55 L/100km",
+                                        color: "var(--status-danger)",
+                                      };
+
+                          // Terrain impact hints
+                          const terrain = selectedRoute?.terrain ?? [];
+                          const terrainHints: {
+                            label: string;
+                            note: string;
+                          }[] = [];
+                          if (terrain.includes("Mountain Passes"))
+                            terrainHints.push({
+                              label: "⛰️ Mountain Passes",
+                              note: "+12–18% fuel",
+                            });
+                          if (terrain.includes("Escarpment"))
+                            terrainHints.push({
+                              label: "🗻 Escarpment",
+                              note: "+8–12% fuel",
+                            });
+                          if (terrain.includes("Karoo"))
+                            terrainHints.push({
+                              label: "🏜️ Karoo",
+                              note: "Flat — avg fuel",
+                            });
+                          if (terrain.includes("Coastal"))
+                            terrainHints.push({
+                              label: "🌊 Coastal",
+                              note: "+5% (wind)",
+                            });
+                          if (terrain.includes("Highveld / Flat"))
+                            terrainHints.push({
+                              label: "🟫 Highveld",
+                              note: "Flat — avg fuel",
+                            });
+
+                          const motorwayPct = selectedRoute?.motorway_pct ?? 0;
+                          const roadNote =
+                            motorwayPct >= 70
+                              ? "Mostly highway — efficient"
+                              : motorwayPct >= 40
+                                ? "Mixed roads — moderate"
+                                : "Mostly city/arterial — higher idle consumption";
+
+                          const baseRateCost =
+                            rd.distance_km *
+                            (selectedVehicleTypeBaseRate ??
+                              parseFloat(baseRatePerKm || "0"));
+                          const driverAllowanceAmt =
+                            parseFloat(driverAllowanceInput || "0") || 0;
+                          const fuelBasedTotal =
+                            displayedFuelCost +
+                            rd.toll_cost_zar +
+                            driverAllowanceAmt;
+                          const baseRateTotal =
+                            baseRateCost +
+                            rd.toll_cost_zar +
+                            driverAllowanceAmt;
+                          const computedTotal =
+                            costMode === "base_rate"
+                              ? baseRateTotal
+                              : fuelBasedTotal;
+                          const totalCost =
+                            editableTotalCostStr !== ""
+                              ? parseFloat(editableTotalCostStr) || 0
+                              : computedTotal;
+
+                          return (
+                            <div
+                              style={{
+                                borderTop: "1px solid var(--border-subtle)",
+                                paddingTop: 12,
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 12,
+                              }}>
+                              {/* Live market fuel price banner */}
+                              <div
+                                style={{
+                                  background: "var(--bg-elevated)",
+                                  borderRadius: 2,
+                                  padding: "10px 12px",
+                                  border: "1px solid var(--border-subtle)",
+                                }}>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    marginBottom: 6,
+                                  }}>
+                                  <span
+                                    style={{
+                                      fontSize: 9,
+                                      fontFamily: "var(--font-mono)",
+                                      color: "var(--text-tertiary)",
+                                      letterSpacing: "0.07em",
+                                    }}>
+                                    LIVE DIESEL PRICE · FIASA
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: 9,
+                                      padding: "1px 6px",
+                                      background: "var(--accent-glow)",
+                                      border: "1px solid var(--accent-primary)",
+                                      borderRadius: 2,
+                                      color: "var(--accent-primary)",
+                                      fontFamily: "var(--font-mono)",
+                                      fontWeight: 600,
+                                    }}>
+                                    MARKET RATE
+                                  </span>
+                                </div>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "baseline",
+                                    gap: 6,
+                                  }}>
+                                  <span
+                                    style={{
+                                      fontSize: 22,
+                                      fontWeight: 700,
+                                      fontFamily: "var(--font-mono)",
+                                      color: "var(--text-primary)",
+                                    }}>
+                                    R {fiasaPrice.toFixed(2)}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: 12,
+                                      color: "var(--text-tertiary)",
+                                      fontFamily: "var(--font-sans)",
+                                    }}>
+                                    per litre (inland diesel)
+                                  </span>
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: 10,
+                                    color: "var(--text-tertiary)",
+                                    fontFamily: "var(--font-mono)",
+                                    marginTop: 4,
+                                  }}>
+                                  {Math.round(rd.fuel_usage_litres)} L × R{" "}
+                                  {fiasaPrice.toFixed(2)}/L = R{" "}
+                                  {Math.round(
+                                    rd.fuel_usage_litres * fiasaPrice,
+                                  ).toLocaleString()}
+                                </div>
+                              </div>
+
+                              {/* Factor hints */}
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: 9,
+                                    fontFamily: "var(--font-mono)",
+                                    color: "var(--text-tertiary)",
+                                    letterSpacing: "0.07em",
+                                    marginBottom: 6,
+                                  }}>
+                                  FACTORS AFFECTING YOUR FUEL COST
+                                </div>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 5,
+                                  }}>
+                                  {weightHint && (
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        fontSize: 11,
+                                        fontFamily: "var(--font-sans)",
+                                      }}>
+                                      <span
+                                        style={{
+                                          color: "var(--text-secondary)",
+                                        }}>
+                                        ⚖️ {weightHint.label}
+                                      </span>
+                                      <span
+                                        style={{
+                                          color: weightHint.color,
+                                          fontFamily: "var(--font-mono)",
+                                          fontSize: 10,
+                                        }}>
+                                        {weightHint.note}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      fontSize: 11,
+                                      fontFamily: "var(--font-sans)",
+                                    }}>
+                                    <span
+                                      style={{
+                                        color: "var(--text-secondary)",
+                                      }}>
+                                      🛣️ Road mix ({motorwayPct}% highway)
+                                    </span>
+                                    <span
+                                      style={{
+                                        color: "var(--text-tertiary)",
+                                        fontFamily: "var(--font-mono)",
+                                        fontSize: 10,
+                                      }}>
+                                      {roadNote}
+                                    </span>
+                                  </div>
+                                  {terrainHints.map((th) => (
+                                    <div
+                                      key={th.label}
+                                      style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        fontSize: 11,
+                                        fontFamily: "var(--font-sans)",
+                                      }}>
+                                      <span
+                                        style={{
+                                          color: "var(--text-secondary)",
+                                        }}>
+                                        {th.label}
+                                      </span>
+                                      <span
+                                        style={{
+                                          color: "var(--text-tertiary)",
+                                          fontFamily: "var(--font-mono)",
+                                          fontSize: 10,
+                                        }}>
+                                        {th.note}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Cost mode selector — compact */}
+                              <div
+                                style={{
+                                  borderTop: "1px solid var(--border-subtle)",
+                                  paddingTop: 10,
+                                }}>
+                                <div
+                                  style={{
+                                    fontSize: 9,
+                                    fontFamily: "var(--font-mono)",
+                                    color: "var(--text-tertiary)",
+                                    letterSpacing: "0.07em",
+                                    marginBottom: 6,
+                                  }}>
+                                  PRICING METHOD
+                                </div>
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr 1fr",
+                                    gap: 6,
+                                    marginBottom: 10,
+                                  }}>
+                                  <div
+                                    onClick={() => setCostMode("fuel")}
+                                    style={{
+                                      border: `2px solid ${costMode === "fuel" ? "var(--accent-primary)" : "var(--border-subtle)"}`,
+                                      borderRadius: 4,
+                                      padding: "7px 10px",
+                                      cursor: "pointer",
+                                      background:
+                                        costMode === "fuel"
+                                          ? "var(--accent-glow)"
+                                          : "var(--bg-elevated)",
+                                      transition: "all 0.15s",
+                                    }}>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        fontFamily: "var(--font-mono)",
+                                        color:
+                                          costMode === "fuel"
+                                            ? "var(--accent-primary)"
+                                            : "var(--text-tertiary)",
+                                        letterSpacing: "0.05em",
+                                        marginBottom: 2,
+                                      }}>
+                                      FUEL COST
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 13,
+                                        fontFamily: "var(--font-mono)",
+                                        fontWeight: 700,
+                                        color:
+                                          costMode === "fuel"
+                                            ? "var(--accent-primary)"
+                                            : "var(--text-primary)",
+                                      }}>
+                                      R{" "}
+                                      {Math.round(
+                                        fuelBasedTotal,
+                                      ).toLocaleString()}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        color: "var(--text-tertiary)",
+                                        fontFamily: "var(--font-mono)",
+                                        marginTop: 2,
+                                      }}>
+                                      {Math.round(rd.fuel_usage_litres)}L × R
+                                      {effectivePrice.toFixed(2)}
+                                    </div>
+                                  </div>
+                                  <div
+                                    onClick={() => setCostMode("base_rate")}
+                                    style={{
+                                      border: `2px solid ${costMode === "base_rate" ? "var(--accent-primary)" : "var(--border-subtle)"}`,
+                                      borderRadius: 4,
+                                      padding: "7px 10px",
+                                      cursor: "pointer",
+                                      background:
+                                        costMode === "base_rate"
+                                          ? "var(--accent-glow)"
+                                          : "var(--bg-elevated)",
+                                      transition: "all 0.15s",
+                                    }}>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        fontFamily: "var(--font-mono)",
+                                        color:
+                                          costMode === "base_rate"
+                                            ? "var(--accent-primary)"
+                                            : "var(--text-tertiary)",
+                                        letterSpacing: "0.05em",
+                                        marginBottom: 2,
+                                      }}>
+                                      BASE RATE
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 13,
+                                        fontFamily: "var(--font-mono)",
+                                        fontWeight: 700,
+                                        color:
+                                          costMode === "base_rate"
+                                            ? "var(--accent-primary)"
+                                            : "var(--text-primary)",
+                                      }}>
+                                      R{" "}
+                                      {Math.round(
+                                        baseRateTotal,
+                                      ).toLocaleString()}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        color: "var(--text-tertiary)",
+                                        fontFamily: "var(--font-mono)",
+                                        marginTop: 2,
+                                      }}>
+                                      {Math.round(rd.distance_km)}km × R
+                                      {(
+                                        selectedVehicleTypeBaseRate ??
+                                        parseFloat(baseRatePerKm || "0")
+                                      ).toFixed(2)}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Editable toll + total */}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 6,
+                                  }}>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      fontSize: 12,
+                                    }}>
+                                    <span
+                                      style={{
+                                        color: "var(--text-secondary)",
+                                      }}>
+                                      Toll Cost:
+                                    </span>
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                      }}>
+                                      <span
+                                        style={{
+                                          fontSize: 11,
+                                          color: "var(--text-tertiary)",
+                                          fontFamily: "var(--font-mono)",
+                                        }}>
+                                        R
+                                      </span>
+                                      <input
+                                        type="number"
+                                        value={
+                                          editableTollCost !== null
+                                            ? editableTollCost
+                                            : Math.round(rd.toll_cost_zar)
+                                        }
+                                        onChange={(e) => {
+                                          setEditableTollCost(
+                                            parseFloat(e.target.value) || 0,
+                                          );
+                                          setEditableTotalCostStr("");
+                                        }}
+                                        style={{
+                                          ...inputStyle,
+                                          width: 110,
+                                          padding: "5px 8px",
+                                          fontSize: 12,
+                                          textAlign: "right",
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      fontSize: 12,
+                                    }}>
+                                    <span
+                                      style={{
+                                        color: "var(--text-secondary)",
+                                      }}>
+                                      Driver Allowance:
+                                    </span>
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                      }}>
+                                      <span
+                                        style={{
+                                          fontSize: 11,
+                                          color: "var(--text-tertiary)",
+                                          fontFamily: "var(--font-mono)",
+                                        }}>
+                                        R
+                                      </span>
+                                      <input
+                                        type="number"
+                                        value={driverAllowanceInput}
+                                        onChange={(e) => {
+                                          setDriverAllowanceInput(
+                                            e.target.value,
+                                          );
+                                          setEditableTotalCostStr("");
+                                        }}
+                                        placeholder="0"
+                                        style={{
+                                          ...inputStyle,
+                                          width: 110,
+                                          padding: "5px 8px",
+                                          fontSize: 12,
+                                          textAlign: "right",
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      fontSize: 13,
+                                      fontWeight: 700,
+                                      borderTop:
+                                        "1px solid var(--border-subtle)",
+                                      paddingTop: 8,
+                                      marginTop: 2,
+                                    }}>
+                                    <span
+                                      style={{ color: "var(--text-primary)" }}>
+                                      Estimated Trip Cost:
+                                    </span>
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                      }}>
+                                      <span
+                                        style={{
+                                          fontSize: 12,
+                                          color: "var(--text-tertiary)",
+                                          fontFamily: "var(--font-mono)",
+                                        }}>
+                                        R
+                                      </span>
+                                      <input
+                                        type="number"
+                                        value={
+                                          editableTotalCostStr !== ""
+                                            ? editableTotalCostStr
+                                            : String(Math.round(computedTotal))
+                                        }
+                                        onChange={(e) =>
+                                          setEditableTotalCostStr(
+                                            e.target.value,
+                                          )
+                                        }
+                                        style={{
+                                          ...inputStyle,
+                                          width: 130,
+                                          padding: "5px 8px",
+                                          fontSize: 13,
+                                          fontWeight: 700,
+                                          textAlign: "right",
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ))}
+
+                    {tripType === "ROUND_TRIP" && returnRouteData?.success && (
+                      <div
+                        style={{
+                          padding: "12px 14px",
+                          background: "var(--bg-surface)",
+                          borderRadius: 2,
+                          border: "1px solid var(--border-subtle)",
+                        }}>
+                        <div
+                          style={{
+                            fontSize: 10,
+                            fontFamily: "var(--font-mono)",
+                            color: "var(--text-tertiary)",
+                            letterSpacing: "0.08em",
+                            marginBottom: 8,
+                          }}>
+                          RETURN LEG RATE (AUTO-CALCULATED, EDITABLE)
+                        </div>
+                        <input
+                          type="number"
+                          value={returnBaseRate}
+                          onChange={(e) => setReturnBaseRate(e.target.value)}
+                          style={inputStyle}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setCurrentStep(2)}
+                  disabled={!canGoToStep2}
+                  className="btn-action"
+                  style={{
+                    width: "100%",
+                    opacity: canGoToStep2 ? 1 : 0.4,
+                    cursor: canGoToStep2 ? "pointer" : "not-allowed",
+                    marginTop: 8,
+                  }}>
+                  NEXT →
+                </button>
               </div>
             )}
-
-            <button
-              onClick={() => setCurrentStep(2)}
-              disabled={!canGoToStep2}
-              className="btn-action"
-              style={{
-                width: "100%",
-                opacity: canGoToStep2 ? 1 : 0.4,
-                cursor: canGoToStep2 ? "pointer" : "not-allowed",
-                marginTop: 8,
-              }}>
-              NEXT →
-            </button>
           </div>
-        )}
-        </div>
         </div>
       )}
 
@@ -2219,7 +3839,13 @@ export default function NewQuote() {
             </div>
           )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 16 }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+              marginBottom: 16,
+            }}>
             <div>
               {label("Driver")}
               <Select
@@ -2255,228 +3881,6 @@ export default function NewQuote() {
             </div>
           </div>
 
-          {/* Live cost breakdown */}
-          <div
-            style={{
-              padding: "16px",
-              background: "var(--bg-surface-hover)",
-              borderRadius: 2,
-              marginBottom: 16,
-            }}>
-            <div
-              style={{
-                fontSize: 10,
-                fontFamily: "var(--font-mono)",
-                color: "var(--text-tertiary)",
-                letterSpacing: "0.08em",
-                marginBottom: 10,
-              }}>
-              {tripType === "ROUND_TRIP" ? "OUTBOUND COST BREAKDOWN — LEG 1 (EDITABLE)" : "COST BREAKDOWN (EDITABLE)"}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-                fontSize: 12,
-              }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span
-                  style={{
-                    color: "var(--text-secondary)",
-                    fontFamily: "var(--font-sans)",
-                  }}>
-                  {tripType === "ROUND_TRIP" ? "Leg 1 Base Cost" : "Base Cost"} ({Math.round(distanceKm)} km × R{baseRatePerKm}/km):
-                </span>
-                <span
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    color: "var(--text-primary)",
-                  }}>
-                  R {Math.round(baseCost).toLocaleString()}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 8,
-                }}>
-                <span
-                  style={{
-                    color: "var(--text-secondary)",
-                    fontFamily: "var(--font-sans)",
-                  }}>
-                  Fuel Surcharge ({fuelConsumption}L/100km @ R
-                  {fuelPrice.toFixed(2)}/L):
-                </span>
-                <input
-                  type="number"
-                  value={
-                    editableFuelCost !== null
-                      ? editableFuelCost
-                      : Math.round(fuelCost)
-                  }
-                  onChange={(e) =>
-                    setEditableFuelCost(parseFloat(e.target.value) || 0)
-                  }
-                  style={{
-                    ...inputStyle,
-                    width: 100,
-                    padding: "4px 8px",
-                    fontSize: 12,
-                  }}
-                />
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 8,
-                }}>
-                <span
-                  style={{
-                    color: "var(--text-secondary)",
-                    fontFamily: "var(--font-sans)",
-                  }}>
-                  Toll Charges:
-                </span>
-                <input
-                  type="number"
-                  value={
-                    editableTollCost !== null
-                      ? editableTollCost
-                      : Math.round(tollCost)
-                  }
-                  onChange={(e) =>
-                    setEditableTollCost(parseFloat(e.target.value) || 0)
-                  }
-                  style={{
-                    ...inputStyle,
-                    width: 100,
-                    padding: "4px 8px",
-                    fontSize: 12,
-                  }}
-                />
-              </div>
-              {_weightSurcharge > 0 && (
-                <div
-                  style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span
-                    style={{
-                      color: "var(--text-secondary)",
-                      fontFamily: "var(--font-sans)",
-                    }}>
-                    Weight Surcharge ({Math.round(weightSurchargePct * 100)}%
-                    over{" "}
-                    {weightThreshold >= 1000
-                      ? `${weightThreshold / 1000}T`
-                      : `${weightThreshold}kg`}
-                    ):
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      color: "var(--status-warning)",
-                    }}>
-                    R {Math.round(_weightSurcharge).toLocaleString()}
-                  </span>
-                </div>
-              )}
-              {_additionalCosts > 0 && (
-                <div
-                  style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span
-                    style={{
-                      color: "var(--text-secondary)",
-                      fontFamily: "var(--font-sans)",
-                    }}>
-                    Cross-Border Fees:
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      color: "var(--status-warning)",
-                    }}>
-                    R {Math.round(_additionalCosts).toLocaleString()}
-                  </span>
-                </div>
-              )}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 8,
-                }}>
-                <span
-                  style={{
-                    color: "var(--text-secondary)",
-                    fontFamily: "var(--font-sans)",
-                  }}>
-                  Driver Allowance:
-                </span>
-                <input
-                  type="number"
-                  value={driverAllowanceInput}
-                  onChange={(e) => setDriverAllowanceInput(e.target.value)}
-                  placeholder="0"
-                  style={{
-                    ...inputStyle,
-                    width: 100,
-                    padding: "4px 8px",
-                    fontSize: 12,
-                  }}
-                />
-              </div>
-              {tripType === "ROUND_TRIP" && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 8,
-                    paddingTop: 8,
-                    borderTop: "1px dashed var(--border-subtle)",
-                  }}>
-                  <span style={{ color: "var(--accent-primary)", fontFamily: "var(--font-sans)", fontSize: 11 }}>
-                    Return Leg ({returnLocation ? `→ ${returnLocation}` : "no destination set"}
-                    {returnCargo ? "" : " · empty return"}):
-                  </span>
-                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-primary)", fontWeight: 600 }}>
-                    R {Math.round(_returnRate).toLocaleString()}
-                  </span>
-                </div>
-              )}
-              <div
-                style={{
-                  borderTop: "1px solid var(--border-subtle)",
-                  paddingTop: 8,
-                  display: "flex",
-                  justifyContent: "space-between",
-                }}>
-                <span
-                  style={{
-                    fontWeight: 600,
-                    color: "var(--text-primary)",
-                    fontFamily: "var(--font-sans)",
-                  }}>
-                  Total{tripType === "ROUND_TRIP" ? " (both legs)" : ""}:
-                </span>
-                <span
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 16,
-                    fontWeight: 700,
-                    color: "var(--accent-primary)",
-                  }}>
-                  R {Math.round(total).toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </div>
           <div
             style={{
               display: "flex",
@@ -2485,13 +3889,44 @@ export default function NewQuote() {
               marginBottom: 16,
             }}>
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.08em" }}>CUSTOMER</div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 6,
+                }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--text-tertiary)",
+                    letterSpacing: "0.08em",
+                  }}>
+                  CUSTOMER
+                </div>
                 <button
                   type="button"
-                  onClick={() => { setNewCustomerForm({ name: "", email: "", phone: "", city: "" }); setShowNewCustomer(true); }}
-                  style={{ background: "none", border: "none", color: "var(--accent-primary)", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", cursor: "pointer", padding: 0, textTransform: "uppercase" }}
-                >
+                  onClick={() => {
+                    setNewCustomerForm({
+                      name: "",
+                      email: "",
+                      phone: "",
+                      city: "",
+                    });
+                    setShowNewCustomer(true);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--accent-primary)",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.06em",
+                    cursor: "pointer",
+                    padding: 0,
+                    textTransform: "uppercase",
+                  }}>
                   + New Customer
                 </button>
               </div>
@@ -2500,9 +3935,16 @@ export default function NewQuote() {
                   <SelectValue placeholder="Select customer..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {(customers as { id: number; name: string; company_name?: string }[]).map((c) => (
+                  {(
+                    customers as {
+                      id: number;
+                      name: string;
+                      company_name?: string;
+                    }[]
+                  ).map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}{c.company_name ? ` — ${c.company_name}` : ""}
+                      {c.name}
+                      {c.company_name ? ` — ${c.company_name}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -2923,33 +4365,103 @@ export default function NewQuote() {
           </div>
 
           {/* Quote details recap (read-only — entered in Step 2) */}
-          <div style={{ padding: "16px", background: "var(--bg-surface-hover)", borderRadius: 2, marginBottom: 16 }}>
-            <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.08em", marginBottom: 10 }}>
+          <div
+            style={{
+              padding: "16px",
+              background: "var(--bg-surface-hover)",
+              borderRadius: 2,
+              marginBottom: 16,
+            }}>
+            <div
+              style={{
+                fontSize: 10,
+                fontFamily: "var(--font-mono)",
+                color: "var(--text-tertiary)",
+                letterSpacing: "0.08em",
+                marginBottom: 10,
+              }}>
               QUOTE DETAILS
             </div>
             {(() => {
-              const cust = (customers as { id: number; name: string; company_name?: string }[]).find(
-                (c) => String(c.id) === String(customerId),
-              );
+              const cust = (
+                customers as {
+                  id: number;
+                  name: string;
+                  company_name?: string;
+                }[]
+              ).find((c) => String(c.id) === String(customerId));
               const rows: [string, string][] = [
-                ["Customer", cust ? (cust.company_name ? `${cust.name} — ${cust.company_name}` : cust.name) : "—"],
+                [
+                  "Customer",
+                  cust
+                    ? cust.company_name
+                      ? `${cust.name} — ${cust.company_name}`
+                      : cust.name
+                    : "—",
+                ],
                 ["Status", status === "SENT" ? "Send to customer" : "Draft"],
-                ["Confidence", confidence ? confidence.charAt(0) + confidence.slice(1).toLowerCase() : "—"],
+                [
+                  "Confidence",
+                  confidence
+                    ? confidence.charAt(0) + confidence.slice(1).toLowerCase()
+                    : "—",
+                ],
                 ["SLA", `${slaHours || 48} hours`],
                 ["Valid until", validUntil ? String(validUntil) : "—"],
               ];
               return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {rows.map(([k, v]) => (
-                    <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, gap: 12 }}>
-                      <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>{k}:</span>
-                      <span style={{ color: "var(--text-primary)", fontWeight: 600, textAlign: "right" }}>{v}</span>
+                    <div
+                      key={k}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: 12,
+                        gap: 12,
+                      }}>
+                      <span
+                        style={{
+                          color: "var(--text-secondary)",
+                          fontFamily: "var(--font-sans)",
+                        }}>
+                        {k}:
+                      </span>
+                      <span
+                        style={{
+                          color: "var(--text-primary)",
+                          fontWeight: 600,
+                          textAlign: "right",
+                        }}>
+                        {v}
+                      </span>
                     </div>
                   ))}
                   {notes && notes.trim() && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
-                      <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)", fontSize: 12 }}>Notes:</span>
-                      <span style={{ color: "var(--text-primary)", fontSize: 12, whiteSpace: "pre-wrap" }}>{notes}</span>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                        marginTop: 4,
+                      }}>
+                      <span
+                        style={{
+                          color: "var(--text-secondary)",
+                          fontFamily: "var(--font-sans)",
+                          fontSize: 12,
+                        }}>
+                        Notes:
+                      </span>
+                      <span
+                        style={{
+                          color: "var(--text-primary)",
+                          fontSize: 12,
+                          whiteSpace: "pre-wrap",
+                        }}>
+                        {notes}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -2985,9 +4497,26 @@ export default function NewQuote() {
               }}>
               {/* Trip type badge */}
               {tripType === "ROUND_TRIP" && (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Trip Type:</span>
-                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-primary)", fontWeight: 700, fontSize: 11 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}>
+                  <span
+                    style={{
+                      color: "var(--text-secondary)",
+                      fontFamily: "var(--font-sans)",
+                    }}>
+                    Trip Type:
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--accent-primary)",
+                      fontWeight: 700,
+                      fontSize: 11,
+                    }}>
                     ROUND TRIP
                   </span>
                 </div>
@@ -3002,16 +4531,27 @@ export default function NewQuote() {
                 </span>
                 <span
                   style={{
-                    fontFamily: "var(--font-mono)",
+                    fontWeight: 600,
                     color: "var(--text-primary)",
                   }}>
                   {pickupLocation} → {deliveryLocation}
                 </span>
               </div>
               {tripType === "ROUND_TRIP" && returnLocation && (
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>Leg 2 Route:</span>
-                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-primary)" }}>
+                <div
+                  style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span
+                    style={{
+                      color: "var(--text-secondary)",
+                      fontFamily: "var(--font-sans)",
+                    }}>
+                    Leg 2 Route:
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--accent-primary)",
+                    }}>
                     {deliveryLocation} → {returnLocation}
                   </span>
                 </div>
@@ -3026,7 +4566,7 @@ export default function NewQuote() {
                 </span>
                 <span
                   style={{
-                    fontFamily: "var(--font-mono)",
+                    fontWeight: 600,
                     color: "var(--text-primary)",
                   }}>
                   {Math.round(distanceKm)} km
@@ -3042,7 +4582,7 @@ export default function NewQuote() {
                 </span>
                 <span
                   style={{
-                    fontFamily: "var(--font-mono)",
+                    fontWeight: 600,
                     color: "var(--text-primary)",
                   }}>
                   {weight}t {vehicleType}
@@ -3064,27 +4604,11 @@ export default function NewQuote() {
                     color: "var(--text-secondary)",
                     fontFamily: "var(--font-sans)",
                   }}>
-                  Base Cost:
-                </span>
-                <span
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    color: "var(--text-primary)",
-                  }}>
-                  R {Math.round(baseCost).toLocaleString()}
-                </span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span
-                  style={{
-                    color: "var(--text-secondary)",
-                    fontFamily: "var(--font-sans)",
-                  }}>
                   Fuel Surcharge:
                 </span>
                 <span
                   style={{
-                    fontFamily: "var(--font-mono)",
+                    fontWeight: 600,
                     color: "var(--text-primary)",
                   }}>
                   R {Math.round(fuelCost).toLocaleString()}
@@ -3100,7 +4624,7 @@ export default function NewQuote() {
                 </span>
                 <span
                   style={{
-                    fontFamily: "var(--font-mono)",
+                    fontWeight: 600,
                     color: "var(--text-primary)",
                   }}>
                   R {Math.round(tollCost).toLocaleString()}
@@ -3123,7 +4647,7 @@ export default function NewQuote() {
                   </span>
                   <span
                     style={{
-                      fontFamily: "var(--font-mono)",
+                      fontWeight: 600,
                       color: "var(--status-warning)",
                     }}>
                     R {Math.round(_weightSurcharge).toLocaleString()}
@@ -3142,7 +4666,7 @@ export default function NewQuote() {
                   </span>
                   <span
                     style={{
-                      fontFamily: "var(--font-mono)",
+                      fontWeight: 600,
                       color: "var(--status-warning)",
                     }}>
                     R {Math.round(_additionalCosts).toLocaleString()}
@@ -3159,18 +4683,43 @@ export default function NewQuote() {
                 </span>
                 <span
                   style={{
-                    fontFamily: "var(--font-mono)",
+                    fontWeight: 600,
                     color: "var(--text-primary)",
                   }}>
                   R {driverAllowance.toLocaleString()}
                 </span>
               </div>
+              {serviceCharge > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>
+                    Service Charge:
+                  </span>
+                  <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                    R {Math.round(serviceCharge).toLocaleString()}
+                  </span>
+                </div>
+              )}
               {tripType === "ROUND_TRIP" && _returnRate > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 8, borderTop: "1px dashed var(--border-subtle)" }}>
-                  <span style={{ color: "var(--accent-primary)", fontFamily: "var(--font-sans)" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    paddingTop: 8,
+                    borderTop: "1px dashed var(--border-subtle)",
+                  }}>
+                  <span
+                    style={{
+                      color: "var(--accent-primary)",
+                      fontFamily: "var(--font-sans)",
+                    }}>
                     Return Leg ({returnCargo ? "with cargo" : "empty return"}):
                   </span>
-                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-primary)", fontWeight: 600 }}>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--accent-primary)",
+                      fontWeight: 600,
+                    }}>
                     R {Math.round(_returnRate).toLocaleString()}
                   </span>
                 </div>
@@ -3189,7 +4738,9 @@ export default function NewQuote() {
                     fontSize: 14,
                     fontFamily: "var(--font-sans)",
                   }}>
-                  {tripType === "ROUND_TRIP" ? "Total (both legs):" : "Quote Total:"}
+                  {tripType === "ROUND_TRIP"
+                    ? "Total (both legs):"
+                    : "Quote Total:"}
                 </span>
                 <span
                   style={{
@@ -3725,299 +5276,300 @@ export default function NewQuote() {
 
           {/* Expected-profit-maximising price. Shown only once all mandatory data is filled. */}
           {canSave && (
-          <div style={{ marginBottom: 16 }}>
-            <button
-              onClick={fetchOptimal}
-              disabled={optimizing}
-              className="btn-action"
-              style={{
-                width: "100%",
-                background: "var(--accent-primary)",
-                border: "none",
-                color: "var(--bg-deep)",
-                cursor: optimizing ? "wait" : "pointer",
-                fontWeight: 600,
-              }}>
-              {optimizing ? "OPTIMISING…" : "✦ FIND OPTIMAL PRICE"}
-            </button>
-
-            {optimal && (
-              <div
+            <div style={{ marginBottom: 16 }}>
+              <button
+                onClick={fetchOptimal}
+                disabled={optimizing}
+                className="btn-action"
                 style={{
-                  marginTop: 12,
-                  padding: 16,
-                  background: "var(--bg-surface-hover)",
-                  borderRadius: 2,
-                  border: "1px solid var(--accent-primary)",
+                  width: "100%",
+                  background: "var(--accent-primary)",
+                  border: "none",
+                  color: "var(--bg-deep)",
+                  cursor: optimizing ? "wait" : "pointer",
+                  fontWeight: 600,
                 }}>
+                {optimizing ? "OPTIMISING…" : "✦ FIND OPTIMAL PRICE"}
+              </button>
+
+              {optimal && (
                 <div
                   style={{
-                    fontSize: 10,
-                    fontFamily: "var(--font-mono)",
-                    color: "var(--text-tertiary)",
-                    letterSpacing: "0.08em",
-                    marginBottom: 12,
-                  }}>
-                  AI OPTIMAL PRICE · maximises price × win-probability
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                    fontSize: 12,
-                    marginBottom: 12,
+                    marginTop: 12,
+                    padding: 16,
+                    background: "var(--bg-surface-hover)",
+                    borderRadius: 2,
+                    border: "1px solid var(--accent-primary)",
                   }}>
                   <div
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
+                      fontSize: 10,
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--text-tertiary)",
+                      letterSpacing: "0.08em",
+                      marginBottom: 12,
                     }}>
-                    <span style={{ color: "var(--text-secondary)" }}>
-                      Optimal price:
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 16,
-                        fontWeight: 700,
-                        color: "var(--accent-primary)",
-                      }}>
-                      R {Math.round(optimal.optimal_price).toLocaleString()}
-                    </span>
+                    AI OPTIMAL PRICE · maximises price × win-probability
                   </div>
                   <div
                     style={{
                       display: "flex",
-                      justifyContent: "space-between",
+                      flexDirection: "column",
+                      gap: 8,
+                      fontSize: 12,
+                      marginBottom: 12,
                     }}>
-                    <span style={{ color: "var(--text-secondary)" }}>
-                      Margin:
-                    </span>
-                    <span
+                    <div
                       style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-primary)",
-                        fontWeight: 600,
+                        display: "flex",
+                        justifyContent: "space-between",
                       }}>
-                      {optimal.optimal_margin_pct?.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}>
-                    <span style={{ color: "var(--text-secondary)" }}>
-                      Win probability:
-                    </span>
-                    <span
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        Optimal price:
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 16,
+                          fontWeight: 700,
+                          color: "var(--accent-primary)",
+                        }}>
+                        R {Math.round(optimal.optimal_price).toLocaleString()}
+                      </span>
+                    </div>
+                    <div
                       style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-primary)",
-                        fontWeight: 600,
+                        display: "flex",
+                        justifyContent: "space-between",
                       }}>
-                      {Math.round(
-                        (optimal.win_probability_at_optimal || 0) * 100,
-                      )}
-                      %
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}>
-                    <span style={{ color: "var(--text-secondary)" }}>
-                      Expected profit:
-                    </span>
-                    <span
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        Margin:
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          color: "var(--text-primary)",
+                          fontWeight: 600,
+                        }}>
+                        {optimal.optimal_margin_pct?.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div
                       style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--status-success)",
-                        fontWeight: 600,
+                        display: "flex",
+                        justifyContent: "space-between",
                       }}>
-                      R{" "}
-                      {Math.round(
-                        optimal.expected_profit || 0,
-                      ).toLocaleString()}
-                    </span>
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        Win probability:
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          color: "var(--text-primary)",
+                          fontWeight: 600,
+                        }}>
+                        {Math.round(
+                          (optimal.win_probability_at_optimal || 0) * 100,
+                        )}
+                        %
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                      }}>
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        Expected profit:
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          color: "var(--status-success)",
+                          fontWeight: 600,
+                        }}>
+                        R{" "}
+                        {Math.round(
+                          optimal.expected_profit || 0,
+                        ).toLocaleString()}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                {Array.isArray(optimal.curve) &&
-                  optimal.curve.length > 1 &&
-                  (() => {
-                    const data = optimal.curve.map((c: any) => ({
-                      margin: c.margin_pct,
-                      win: Math.round((c.win_probability || 0) * 100),
-                      profit: Math.round(c.expected_profit || 0),
-                    }));
-                    return (
-                      <div style={{ marginBottom: 12 }}>
-                        <div
-                          style={{
-                            fontSize: 10,
-                            fontFamily: "var(--font-mono)",
-                            color: "var(--text-tertiary)",
-                            letterSpacing: "0.08em",
-                            marginBottom: 6,
-                          }}>
-                          PROFIT SWEET-SPOT · expected profit (area) vs win-rate
-                          (line) across margin
-                        </div>
-                        {modelStats?.win_model && (
+                  {Array.isArray(optimal.curve) &&
+                    optimal.curve.length > 1 &&
+                    (() => {
+                      const data = optimal.curve.map((c: any) => ({
+                        margin: c.margin_pct,
+                        win: Math.round((c.win_probability || 0) * 100),
+                        profit: Math.round(c.expected_profit || 0),
+                      }));
+                      return (
+                        <div style={{ marginBottom: 12 }}>
                           <div
                             style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
                               fontSize: 10,
                               fontFamily: "var(--font-mono)",
-                              padding: "2px 8px",
-                              borderRadius: 2,
-                              marginBottom: 8,
-                              background: "var(--bg-surface)",
-                              border: "1px solid var(--border-subtle)",
-                              color: "var(--text-secondary)",
+                              color: "var(--text-tertiary)",
+                              letterSpacing: "0.08em",
+                              marginBottom: 6,
                             }}>
-                            <span
-                              style={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: 6,
-                                background:
-                                  modelStats.win_model.mode === "learned"
-                                    ? "var(--status-success)"
-                                    : "var(--status-warning)",
-                              }}
-                            />
-                            {modelStats.win_model.mode === "learned"
-                              ? `Win model: learned${modelStats.win_model.auc != null ? ` · AUC ${modelStats.win_model.auc.toFixed(2)}` : ""} · ${modelStats.win_model.outcomes_collected} outcomes`
-                              : `Win model: heuristic · ${modelStats.win_model.outcomes_collected}/${modelStats.win_model.outcomes_needed} outcomes to learn`}
+                            PROFIT SWEET-SPOT · expected profit (area) vs
+                            win-rate (line) across margin
                           </div>
-                        )}
-                        <ResponsiveContainer width="100%" height={150}>
-                          <ComposedChart
-                            data={data}
-                            margin={{ top: 8, right: 6, left: 0, bottom: 0 }}>
-                            <defs>
-                              <linearGradient
-                                id="evGrad"
-                                x1="0"
-                                y1="0"
-                                x2="0"
-                                y2="1">
-                                <stop
-                                  offset="5%"
-                                  stopColor="var(--status-success)"
-                                  stopOpacity={0.35}
-                                />
-                                <stop
-                                  offset="95%"
-                                  stopColor="var(--status-success)"
-                                  stopOpacity={0}
-                                />
-                              </linearGradient>
-                            </defs>
-                            <XAxis
-                              dataKey="margin"
-                              stroke="var(--text-tertiary)"
-                              tickFormatter={(v: number) => `${v}%`}
+                          {modelStats?.win_model && (
+                            <div
                               style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
                                 fontSize: 10,
                                 fontFamily: "var(--font-mono)",
-                              }}
-                            />
-                            <YAxis yAxisId="p" hide />
-                            <YAxis
-                              yAxisId="w"
-                              orientation="right"
-                              domain={[0, 100]}
-                              tickFormatter={(v: number) => `${v}%`}
-                              stroke="var(--text-tertiary)"
-                              style={{
-                                fontSize: 10,
-                                fontFamily: "var(--font-mono)",
-                              }}
-                              width={32}
-                            />
-                            <Tooltip
-                              contentStyle={{
-                                background: "var(--bg-deep)",
-                                border: "1px solid var(--border-subtle)",
+                                padding: "2px 8px",
                                 borderRadius: 2,
-                                fontSize: 11,
-                                fontFamily: "var(--font-mono)",
-                              }}
-                              labelFormatter={(v: any) => `Margin ${v}%`}
-                              formatter={(val: any, name: any) =>
-                                name === "profit"
-                                  ? [
-                                      `R ${Number(val).toLocaleString()}`,
-                                      "Exp. profit",
-                                    ]
-                                  : [`${val}%`, "Win rate"]
-                              }
-                            />
-                            <Area
-                              yAxisId="p"
-                              type="monotone"
-                              dataKey="profit"
-                              stroke="var(--status-success)"
-                              strokeWidth={2}
-                              fill="url(#evGrad)"
-                            />
-                            <Line
-                              yAxisId="w"
-                              type="monotone"
-                              dataKey="win"
-                              stroke="var(--accent-primary)"
-                              strokeWidth={2}
-                              dot={false}
-                            />
-                            {optimal.optimal_margin_pct != null && (
-                              <ReferenceLine
-                                yAxisId="p"
-                                x={
-                                  Math.round(optimal.optimal_margin_pct * 10) /
-                                  10
-                                }
-                                stroke="var(--accent-primary)"
-                                strokeDasharray="3 3"
+                                marginBottom: 8,
+                                background: "var(--bg-surface)",
+                                border: "1px solid var(--border-subtle)",
+                                color: "var(--text-secondary)",
+                              }}>
+                              <span
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: 6,
+                                  background:
+                                    modelStats.win_model.mode === "learned"
+                                      ? "var(--status-success)"
+                                      : "var(--status-warning)",
+                                }}
                               />
-                            )}
-                          </ComposedChart>
-                        </ResponsiveContainer>
-                      </div>
-                    );
-                  })()}
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    className="btn-action"
-                    onClick={applyOptimal}
-                    style={{
-                      flex: 1,
-                      background: "var(--accent-primary)",
-                      border: "none",
-                      color: "var(--bg-deep)",
-                      fontWeight: 600,
-                    }}>
-                    APPLY THIS PRICE
-                  </button>
-                  <button
-                    className="btn-action"
-                    onClick={() => setOptimal(null)}
-                    style={{
-                      background: "none",
-                      border: "1px solid var(--border-subtle)",
-                      color: "var(--text-secondary)",
-                    }}>
-                    DISMISS
-                  </button>
+                              {modelStats.win_model.mode === "learned"
+                                ? `Win model: learned${modelStats.win_model.auc != null ? ` · AUC ${modelStats.win_model.auc.toFixed(2)}` : ""} · ${modelStats.win_model.outcomes_collected} outcomes`
+                                : `Win model: heuristic · ${modelStats.win_model.outcomes_collected}/${modelStats.win_model.outcomes_needed} outcomes to learn`}
+                            </div>
+                          )}
+                          <ResponsiveContainer width="100%" height={150}>
+                            <ComposedChart
+                              data={data}
+                              margin={{ top: 8, right: 6, left: 0, bottom: 0 }}>
+                              <defs>
+                                <linearGradient
+                                  id="evGrad"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1">
+                                  <stop
+                                    offset="5%"
+                                    stopColor="var(--status-success)"
+                                    stopOpacity={0.35}
+                                  />
+                                  <stop
+                                    offset="95%"
+                                    stopColor="var(--status-success)"
+                                    stopOpacity={0}
+                                  />
+                                </linearGradient>
+                              </defs>
+                              <XAxis
+                                dataKey="margin"
+                                stroke="var(--text-tertiary)"
+                                tickFormatter={(v: number) => `${v}%`}
+                                style={{
+                                  fontSize: 10,
+                                  fontFamily: "var(--font-mono)",
+                                }}
+                              />
+                              <YAxis yAxisId="p" hide />
+                              <YAxis
+                                yAxisId="w"
+                                orientation="right"
+                                domain={[0, 100]}
+                                tickFormatter={(v: number) => `${v}%`}
+                                stroke="var(--text-tertiary)"
+                                style={{
+                                  fontSize: 10,
+                                  fontFamily: "var(--font-mono)",
+                                }}
+                                width={32}
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  background: "var(--bg-deep)",
+                                  border: "1px solid var(--border-subtle)",
+                                  borderRadius: 2,
+                                  fontSize: 11,
+                                  fontFamily: "var(--font-mono)",
+                                }}
+                                labelFormatter={(v: any) => `Margin ${v}%`}
+                                formatter={(val: any, name: any) =>
+                                  name === "profit"
+                                    ? [
+                                        `R ${Number(val).toLocaleString()}`,
+                                        "Exp. profit",
+                                      ]
+                                    : [`${val}%`, "Win rate"]
+                                }
+                              />
+                              <Area
+                                yAxisId="p"
+                                type="monotone"
+                                dataKey="profit"
+                                stroke="var(--status-success)"
+                                strokeWidth={2}
+                                fill="url(#evGrad)"
+                              />
+                              <Line
+                                yAxisId="w"
+                                type="monotone"
+                                dataKey="win"
+                                stroke="var(--accent-primary)"
+                                strokeWidth={2}
+                                dot={false}
+                              />
+                              {optimal.optimal_margin_pct != null && (
+                                <ReferenceLine
+                                  yAxisId="p"
+                                  x={
+                                    Math.round(
+                                      optimal.optimal_margin_pct * 10,
+                                    ) / 10
+                                  }
+                                  stroke="var(--accent-primary)"
+                                  strokeDasharray="3 3"
+                                />
+                              )}
+                            </ComposedChart>
+                          </ResponsiveContainer>
+                        </div>
+                      );
+                    })()}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      className="btn-action"
+                      onClick={applyOptimal}
+                      style={{
+                        flex: 1,
+                        background: "var(--accent-primary)",
+                        border: "none",
+                        color: "var(--bg-deep)",
+                        fontWeight: 600,
+                      }}>
+                      APPLY THIS PRICE
+                    </button>
+                    <button
+                      className="btn-action"
+                      onClick={() => setOptimal(null)}
+                      style={{
+                        background: "none",
+                        border: "1px solid var(--border-subtle)",
+                        color: "var(--text-secondary)",
+                      }}>
+                      DISMISS
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
           )}
 
           <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -4048,29 +5600,132 @@ export default function NewQuote() {
       )}
       {/* Quick-create customer slide-out */}
       {showNewCustomer && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 1100, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ position: "absolute", inset: 0, background: "var(--modal-backdrop)" }} onClick={() => setShowNewCustomer(false)} />
-          <div style={{ position: "relative", width: 440, background: "var(--bg-deep)", borderLeft: "1px solid var(--border-subtle)", padding: 28, overflowY: "auto" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>New Customer</div>
-              <button onClick={() => setShowNewCustomer(false)} style={{ background: "none", border: "none", color: "var(--text-tertiary)", cursor: "pointer", fontSize: 18 }}>✕</button>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1100,
+            display: "flex",
+            justifyContent: "flex-end",
+          }}>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "var(--modal-backdrop)",
+            }}
+            onClick={() => setShowNewCustomer(false)}
+          />
+          <div
+            style={{
+              position: "relative",
+              width: 440,
+              background: "var(--bg-deep)",
+              borderLeft: "1px solid var(--border-subtle)",
+              padding: 28,
+              overflowY: "auto",
+            }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 6,
+              }}>
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 500,
+                  color: "var(--text-primary)",
+                }}>
+                New Customer
+              </div>
+              <button
+                onClick={() => setShowNewCustomer(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-tertiary)",
+                  cursor: "pointer",
+                  fontSize: 18,
+                }}>
+                ✕
+              </button>
             </div>
-            {([
-              { key: "name", label: "Full Name", placeholder: "e.g. John Doe", required: true },
-              { key: "email", label: "Email", placeholder: "e.g. john@company.com", required: true, type: "email" },
-              { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000", required: true },
-              { key: "city", label: "City", placeholder: "e.g. Johannesburg", required: true },
-            ] as { key: "name" | "email" | "phone" | "city"; label: string; placeholder: string; required: boolean; type?: string }[]).map(f => (
+            {(
+              [
+                {
+                  key: "name",
+                  label: "Full Name",
+                  placeholder: "e.g. John Doe",
+                  required: true,
+                },
+                {
+                  key: "email",
+                  label: "Email",
+                  placeholder: "e.g. john@company.com",
+                  required: true,
+                  type: "email",
+                },
+                {
+                  key: "phone",
+                  label: "Phone",
+                  placeholder: "e.g. +27 11 000 0000",
+                  required: true,
+                },
+                {
+                  key: "city",
+                  label: "City",
+                  placeholder: "e.g. Johannesburg",
+                  required: true,
+                },
+              ] as {
+                key: "name" | "email" | "phone" | "city";
+                label: string;
+                placeholder: string;
+                required: boolean;
+                type?: string;
+              }[]
+            ).map((f) => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: "block", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.06em", marginBottom: 6, textTransform: "uppercase" }}>
-                  {f.label}<span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 11,
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--text-tertiary)",
+                    letterSpacing: "0.06em",
+                    marginBottom: 6,
+                    textTransform: "uppercase",
+                  }}>
+                  {f.label}
+                  <span
+                    style={{ color: "var(--status-danger)", marginLeft: 2 }}>
+                    *
+                  </span>
                 </label>
                 <input
                   type={(f as any).type || "text"}
                   placeholder={f.placeholder}
                   value={newCustomerForm[f.key]}
-                  onChange={e => setNewCustomerForm(p => ({ ...p, [f.key]: e.target.value }))}
-                  style={{ width: "100%", background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", padding: "10px 12px", borderRadius: 2, fontSize: 12, fontFamily: "var(--font-mono)", outline: "none", boxSizing: "border-box" }}
+                  onChange={(e) =>
+                    setNewCustomerForm((p) => ({
+                      ...p,
+                      [f.key]: e.target.value,
+                    }))
+                  }
+                  style={{
+                    width: "100%",
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border-subtle)",
+                    color: "var(--text-primary)",
+                    padding: "10px 12px",
+                    borderRadius: 2,
+                    fontSize: 12,
+                    fontFamily: "var(--font-mono)",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
                 />
               </div>
             ))}
@@ -4079,31 +5734,67 @@ export default function NewQuote() {
               <button
                 disabled={savingCustomer}
                 onClick={async () => {
-                  if (!newCustomerForm.name.trim() || !newCustomerForm.email.trim() || !newCustomerForm.phone.trim() || !newCustomerForm.city.trim()) {
+                  if (
+                    !newCustomerForm.name.trim() ||
+                    !newCustomerForm.email.trim() ||
+                    !newCustomerForm.phone.trim() ||
+                    !newCustomerForm.city.trim()
+                  ) {
                     toast.warning("All fields are required");
                     return;
                   }
                   setSavingCustomer(true);
                   try {
-                    const created = await postData({ url: "api/v1/customers/", data: { ...newCustomerForm, status: "ACTIVE" } });
-                    await queryClient.invalidateQueries({ queryKey: ["customers"] });
+                    const created = await postData({
+                      url: "api/v1/customers/",
+                      data: { ...newCustomerForm, status: "ACTIVE" },
+                    });
+                    await queryClient.invalidateQueries({
+                      queryKey: ["customers"],
+                    });
                     setCustomerId(String(created.id));
                     setShowNewCustomer(false);
-                    setNewCustomerForm({ name: "", email: "", phone: "", city: "" });
+                    setNewCustomerForm({
+                      name: "",
+                      email: "",
+                      phone: "",
+                      city: "",
+                    });
                     toast.success(`"${created.name}" added and selected`);
                   } catch (e) {
-                    toast.error((e as Error)?.message || "Failed to create customer");
+                    toast.error(
+                      (e as Error)?.message || "Failed to create customer",
+                    );
                   }
                   setSavingCustomer(false);
                 }}
-                style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.06em", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: savingCustomer ? "wait" : "pointer", fontWeight: 600 }}
-              >
+                style={{
+                  flex: 1,
+                  padding: "10px 0",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  letterSpacing: "0.06em",
+                  background: "var(--accent-primary)",
+                  color: "var(--bg-deep)",
+                  border: "none",
+                  borderRadius: 2,
+                  cursor: savingCustomer ? "wait" : "pointer",
+                  fontWeight: 600,
+                }}>
                 {savingCustomer ? "SAVING..." : "CREATE & SELECT"}
               </button>
               <button
                 onClick={() => setShowNewCustomer(false)}
-                style={{ padding: "10px 20px", fontFamily: "var(--font-mono)", fontSize: 11, background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
-              >
+                style={{
+                  padding: "10px 20px",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  background: "none",
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--text-secondary)",
+                  borderRadius: 2,
+                  cursor: "pointer",
+                }}>
                 CANCEL
               </button>
             </div>

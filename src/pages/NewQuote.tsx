@@ -97,23 +97,6 @@ interface FuelPriceData {
   last_updated?: string;
 }
 
-interface AISuggestion {
-  suggested_price: number;
-  margin_pct: number;
-  confidence: number;
-  margin_range: {
-    lower: number;
-    upper: number;
-  };
-  win_probability?: number;
-  win_probability_at_lower_price?: number;
-  win_probability_at_higher_price?: number;
-  rationale?: string;
-  source?: string;
-  market_rate?: number;
-  market_rate_source?: string;
-}
-
 interface RevenueGuard {
   risk_level: "SAFE" | "CAUTION" | "AT_RISK";
   color: string;
@@ -232,20 +215,12 @@ export default function NewQuote() {
   const [fuelPriceData, setFuelPriceData] = useState<FuelPriceData | null>(
     null,
   );
-  const [aiSuggestion, setAiSuggestion] = useState<AISuggestion | null>(null);
-  const [loadingAI, setLoadingAI] = useState(false);
-  const [showAISuggestion, setShowAISuggestion] = useState(false);
   const [revenueGuard, setRevenueGuard] = useState<RevenueGuard | null>(null);
 
   // Sprint 1 features
   const [modelStats, setModelStats] = useState<ModelStats | null>(null);
   const [marketBenchmark, setMarketBenchmark] =
     useState<MarketBenchmark | null>(null);
-  const [adjustedPrice, setAdjustedPrice] = useState<number | null>(null);
-  const [loadingWinProb, setLoadingWinProb] = useState(false);
-  const [winProbAtAdjusted, setWinProbAtAdjusted] = useState<number | null>(
-    null,
-  );
   const [showBenchmarkModal, setShowBenchmarkModal] = useState(false);
   const [guardExpanded, setGuardExpanded] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
@@ -354,7 +329,7 @@ export default function NewQuote() {
     ? parseFloat(companyProfile.default_toll_rate_per_km)
     : 0.5;
   const calculatedTollCost =
-    routeData?.toll_cost_zar || distance * tollRatePerKm;
+    (selectedRoute?.toll_cost_zar ?? routeData?.toll_cost_zar) || distance * tollRatePerKm;
   const _tollCost =
     editableTollCost !== null ? editableTollCost : calculatedTollCost;
 
@@ -429,47 +404,6 @@ export default function NewQuote() {
         // Silently fail — not critical
       });
   }, []);
-
-  // Fetch AI quote suggestion
-  const fetchAISuggestion = async () => {
-    if (!routeData) return;
-
-    setError("");
-    setLoadingAI(true);
-    try {
-      const data = await postData({
-        url: "/api/v1/quotes/suggest/",
-        data: {
-          distance_km: routeData.distance_km,
-          truck_type: 0,
-          load_type: 0,
-          load_weight: parseFloat(weight || "0"),
-          fuel_price: fuelPriceData?.diesel_inland || 22.0,
-          fuel_cost: _fuelCost,
-          toll_cost: _tollCost,
-          driver_cost: _driverAllowance,
-          actual_cost: _total - _returnRate,
-        },
-      });
-
-      if (data.success) {
-        setAiSuggestion(data);
-        setShowAISuggestion(true);
-      } else {
-        setError(data.error || "AI suggestion failed");
-      }
-    } catch (err: any) {
-      if (err?.status === 503) {
-        setError(
-          "AI model not yet trained — using rule-based suggestion not available. Try again later.",
-        );
-      } else {
-        setError(err?.message || "Failed to get AI suggestion");
-      }
-    } finally {
-      setLoadingAI(false);
-    }
-  };
 
   // AI price optimizer — maximise expected profit = price × P(win). Always
   // available (heuristic win-prob), unlike the ML suggest endpoint.
@@ -546,9 +480,10 @@ export default function NewQuote() {
     }
   };
 
-  // Update revenue guard when costs change
+  // Update revenue guard when costs change (Revenue Guard now lives in Step 2,
+  // alongside the editable cost breakdown, so it reflects margin health live).
   useEffect(() => {
-    if (currentStep === 3 && _total > 0) {
+    if (currentStep === 2 && _total > 0) {
       fetchRevenueGuard();
     }
   }, [currentStep, _total, _fuelCost, _tollCost]);
@@ -989,8 +924,10 @@ export default function NewQuote() {
     weight && parseFloat(weight) > 0 &&
     !weightExceedsCap &&
     (tripType === "ONE_WAY" || (returnRouteData && returnRouteData.success));
-  const canGoToStep3 = canGoToStep2;
-  const canSave = !!(canGoToStep3 && customerId && validUntil);
+  // Step 3 (summary) is reachable only once ALL mandatory data is in — route +
+  // weight (canGoToStep2) plus the customer and validity now entered in Step 2.
+  const canGoToStep3 = !!(canGoToStep2 && customerId && validUntil);
+  const canSave = canGoToStep3;
 
   const inputStyle: React.CSSProperties = {
     background: "var(--bg-surface)",
@@ -1218,8 +1155,6 @@ export default function NewQuote() {
                   setPickupCoords(coords ?? null);
                   setRouteData(null);
                   setRouteOptions([]);
-                  setAiSuggestion(null);
-                  setShowAISuggestion(false);
                 }}
                 resolvedText={routeData?.origin_resolved}
                 style={inputStyle}
@@ -1236,8 +1171,6 @@ export default function NewQuote() {
                   setDeliveryCoords(coords ?? null);
                   setRouteData(null);
                   setRouteOptions([]);
-                  setAiSuggestion(null);
-                  setShowAISuggestion(false);
                 }}
                 resolvedText={routeData?.dest_resolved}
                 style={inputStyle}
@@ -1269,8 +1202,6 @@ export default function NewQuote() {
                 setReturnRouteData(null);
               }
               setRouteData(null);
-              setAiSuggestion(null);
-              setShowAISuggestion(false);
             }}
           />
 
@@ -1313,8 +1244,6 @@ export default function NewQuote() {
                       setReturnRouteData(null);
                     }
                     setRouteData(null);
-                    setAiSuggestion(null);
-                    setShowAISuggestion(false);
                   }}
                 />
               </div>
@@ -1418,8 +1347,6 @@ export default function NewQuote() {
                   setVehicleType(val);
                   setSelectedVehicleId("");
                   setSelectedDriverId("");
-                  setAiSuggestion(null);
-                  setShowAISuggestion(false);
                 }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select vehicle type..." />
@@ -1483,8 +1410,6 @@ export default function NewQuote() {
                 disabled={!vehicleType}
                 onChange={(e) => {
                   setWeight(e.target.value);
-                  setAiSuggestion(null);
-                  setShowAISuggestion(false);
                 }}
                 style={{ ...inputStyle, opacity: vehicleType ? 1 : 0.5, cursor: vehicleType ? "auto" : "not-allowed" }}
               />
@@ -2531,789 +2456,6 @@ export default function NewQuote() {
               </div>
             </div>
           </div>
-
-          {/* AI Price Optimizer — maximise expected profit (always available) */}
-          <div style={{ marginBottom: 16 }}>
-            <button
-              onClick={fetchOptimal}
-              disabled={optimizing || !canGoToStep3}
-              className="btn-action"
-              style={{
-                width: "100%",
-                background: "var(--accent-primary)",
-                border: "none",
-                color: "var(--bg-deep)",
-                cursor: optimizing ? "wait" : "pointer",
-                fontWeight: 600,
-              }}>
-              {optimizing ? "OPTIMISING…" : "✦ FIND OPTIMAL PRICE"}
-            </button>
-
-            {optimal && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: 16,
-                  background: "var(--bg-surface-hover)",
-                  borderRadius: 2,
-                  border: "1px solid var(--accent-primary)",
-                }}>
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontFamily: "var(--font-mono)",
-                    color: "var(--text-tertiary)",
-                    letterSpacing: "0.08em",
-                    marginBottom: 12,
-                  }}>
-                  AI OPTIMAL PRICE · maximises price × win-probability
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                    fontSize: 12,
-                    marginBottom: 12,
-                  }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}>
-                    <span style={{ color: "var(--text-secondary)" }}>
-                      Optimal price:
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 16,
-                        fontWeight: 700,
-                        color: "var(--accent-primary)",
-                      }}>
-                      R {Math.round(optimal.optimal_price).toLocaleString()}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}>
-                    <span style={{ color: "var(--text-secondary)" }}>
-                      Margin:
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-primary)",
-                        fontWeight: 600,
-                      }}>
-                      {optimal.optimal_margin_pct?.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}>
-                    <span style={{ color: "var(--text-secondary)" }}>
-                      Win probability:
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-primary)",
-                        fontWeight: 600,
-                      }}>
-                      {Math.round(
-                        (optimal.win_probability_at_optimal || 0) * 100,
-                      )}
-                      %
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}>
-                    <span style={{ color: "var(--text-secondary)" }}>
-                      Expected profit:
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--status-success)",
-                        fontWeight: 600,
-                      }}>
-                      R{" "}
-                      {Math.round(
-                        optimal.expected_profit || 0,
-                      ).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-                {Array.isArray(optimal.curve) &&
-                  optimal.curve.length > 1 &&
-                  (() => {
-                    const data = optimal.curve.map((c: any) => ({
-                      margin: c.margin_pct,
-                      win: Math.round((c.win_probability || 0) * 100),
-                      profit: Math.round(c.expected_profit || 0),
-                    }));
-                    return (
-                      <div style={{ marginBottom: 12 }}>
-                        <div
-                          style={{
-                            fontSize: 10,
-                            fontFamily: "var(--font-mono)",
-                            color: "var(--text-tertiary)",
-                            letterSpacing: "0.08em",
-                            marginBottom: 6,
-                          }}>
-                          PROFIT SWEET-SPOT · expected profit (area) vs win-rate
-                          (line) across margin
-                        </div>
-                        {modelStats?.win_model && (
-                          <div
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                              fontSize: 10,
-                              fontFamily: "var(--font-mono)",
-                              padding: "2px 8px",
-                              borderRadius: 2,
-                              marginBottom: 8,
-                              background: "var(--bg-surface)",
-                              border: "1px solid var(--border-subtle)",
-                              color: "var(--text-secondary)",
-                            }}>
-                            <span
-                              style={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: 6,
-                                background:
-                                  modelStats.win_model.mode === "learned"
-                                    ? "var(--status-success)"
-                                    : "var(--status-warning)",
-                              }}
-                            />
-                            {modelStats.win_model.mode === "learned"
-                              ? `Win model: learned${modelStats.win_model.auc != null ? ` · AUC ${modelStats.win_model.auc.toFixed(2)}` : ""} · ${modelStats.win_model.outcomes_collected} outcomes`
-                              : `Win model: heuristic · ${modelStats.win_model.outcomes_collected}/${modelStats.win_model.outcomes_needed} outcomes to learn`}
-                          </div>
-                        )}
-                        <ResponsiveContainer width="100%" height={150}>
-                          <ComposedChart
-                            data={data}
-                            margin={{ top: 8, right: 6, left: 0, bottom: 0 }}>
-                            <defs>
-                              <linearGradient
-                                id="evGrad"
-                                x1="0"
-                                y1="0"
-                                x2="0"
-                                y2="1">
-                                <stop
-                                  offset="5%"
-                                  stopColor="var(--status-success)"
-                                  stopOpacity={0.35}
-                                />
-                                <stop
-                                  offset="95%"
-                                  stopColor="var(--status-success)"
-                                  stopOpacity={0}
-                                />
-                              </linearGradient>
-                            </defs>
-                            <XAxis
-                              dataKey="margin"
-                              stroke="var(--text-tertiary)"
-                              tickFormatter={(v: number) => `${v}%`}
-                              style={{
-                                fontSize: 10,
-                                fontFamily: "var(--font-mono)",
-                              }}
-                            />
-                            <YAxis yAxisId="p" hide />
-                            <YAxis
-                              yAxisId="w"
-                              orientation="right"
-                              domain={[0, 100]}
-                              tickFormatter={(v: number) => `${v}%`}
-                              stroke="var(--text-tertiary)"
-                              style={{
-                                fontSize: 10,
-                                fontFamily: "var(--font-mono)",
-                              }}
-                              width={32}
-                            />
-                            <Tooltip
-                              contentStyle={{
-                                background: "var(--bg-deep)",
-                                border: "1px solid var(--border-subtle)",
-                                borderRadius: 2,
-                                fontSize: 11,
-                                fontFamily: "var(--font-mono)",
-                              }}
-                              labelFormatter={(v: any) => `Margin ${v}%`}
-                              formatter={(val: any, name: any) =>
-                                name === "profit"
-                                  ? [
-                                      `R ${Number(val).toLocaleString()}`,
-                                      "Exp. profit",
-                                    ]
-                                  : [`${val}%`, "Win rate"]
-                              }
-                            />
-                            <Area
-                              yAxisId="p"
-                              type="monotone"
-                              dataKey="profit"
-                              stroke="var(--status-success)"
-                              strokeWidth={2}
-                              fill="url(#evGrad)"
-                            />
-                            <Line
-                              yAxisId="w"
-                              type="monotone"
-                              dataKey="win"
-                              stroke="var(--accent-primary)"
-                              strokeWidth={2}
-                              dot={false}
-                            />
-                            {optimal.optimal_margin_pct != null && (
-                              <ReferenceLine
-                                yAxisId="p"
-                                x={
-                                  Math.round(optimal.optimal_margin_pct * 10) /
-                                  10
-                                }
-                                stroke="var(--accent-primary)"
-                                strokeDasharray="3 3"
-                              />
-                            )}
-                          </ComposedChart>
-                        </ResponsiveContainer>
-                      </div>
-                    );
-                  })()}
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    className="btn-action"
-                    onClick={applyOptimal}
-                    style={{
-                      flex: 1,
-                      background: "var(--accent-primary)",
-                      border: "none",
-                      color: "var(--bg-deep)",
-                      fontWeight: 600,
-                    }}>
-                    APPLY THIS PRICE
-                  </button>
-                  <button
-                    className="btn-action"
-                    onClick={() => setOptimal(null)}
-                    style={{
-                      background: "none",
-                      border: "1px solid var(--border-subtle)",
-                      color: "var(--text-secondary)",
-                    }}>
-                    DISMISS
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* AI Quote Suggestion Panel */}
-          <div style={{ marginBottom: 16 }}>
-            <button
-              onClick={fetchAISuggestion}
-              disabled={loadingAI || !canGoToStep3}
-              className="btn-action"
-              style={{
-                width: "100%",
-                background: "var(--bg-surface)",
-                border: "1px solid var(--accent-primary)",
-                color: "var(--accent-primary)",
-                cursor: loadingAI || !canGoToStep3 ? "not-allowed" : "pointer",
-              }}>
-              {loadingAI
-                ? "GETTING AI SUGGESTION..."
-                : showAISuggestion
-                  ? "REFRESH SUGGESTION"
-                  : "GET AI SUGGESTION"}
-            </button>
-
-            {showAISuggestion && aiSuggestion && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: "16px",
-                  background: "var(--bg-surface-hover)",
-                  borderRadius: 2,
-                  border: "1px solid var(--accent-primary)",
-                }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 12,
-                  }}>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      fontFamily: "var(--font-mono)",
-                      color: "var(--text-tertiary)",
-                      letterSpacing: "0.08em",
-                    }}>
-                    AI SUGGESTION
-                  </div>
-                  <div
-                    style={{
-                      padding: "2px 8px",
-                      background: "var(--accent-dim)",
-                      border: "1px solid var(--accent-primary)",
-                      borderRadius: 2,
-                      fontSize: 9,
-                      color: "var(--accent-primary)",
-                      fontWeight: 600,
-                      fontFamily: "var(--font-mono)",
-                    }}>
-                    {Math.round(aiSuggestion.confidence * 100)}% CONFIDENCE
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                    fontSize: 12,
-                    marginBottom: 12,
-                  }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}>
-                    <span
-                      style={{
-                        color: "var(--text-secondary)",
-                        fontFamily: "var(--font-sans)",
-                      }}>
-                      Suggested Price:
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 16,
-                        fontWeight: 700,
-                        color: "var(--accent-primary)",
-                      }}>
-                      R{" "}
-                      {Math.round(
-                        aiSuggestion.suggested_price,
-                      ).toLocaleString()}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}>
-                    <span
-                      style={{
-                        color: "var(--text-secondary)",
-                        fontFamily: "var(--font-sans)",
-                      }}>
-                      Predicted Margin:
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-primary)",
-                        fontWeight: 600,
-                      }}>
-                      {aiSuggestion.margin_pct.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: 10,
-                    }}>
-                    <span
-                      style={{
-                        color: "var(--text-tertiary)",
-                        fontFamily: "var(--font-sans)",
-                      }}>
-                      Margin Range:
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-tertiary)",
-                      }}>
-                      {aiSuggestion.margin_range.lower.toFixed(1)}% -{" "}
-                      {aiSuggestion.margin_range.upper.toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* AI rationale + provenance — transparent basis for the number */}
-                {aiSuggestion.rationale && (
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "var(--text-secondary)",
-                      fontFamily: "var(--font-sans)",
-                      lineHeight: 1.5,
-                      marginBottom: 10,
-                      padding: "8px 10px",
-                      background: "var(--bg-surface)",
-                      borderRadius: 2,
-                      borderLeft: "2px solid var(--accent-primary)",
-                    }}>
-                    {aiSuggestion.rationale}
-                  </div>
-                )}
-                {(aiSuggestion.source || aiSuggestion.market_rate) && (
-                  <div
-                    style={{
-                      fontSize: 9.5,
-                      color: "var(--text-tertiary)",
-                      fontFamily: "var(--font-mono)",
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                      marginBottom: 12,
-                    }}>
-                    {aiSuggestion.source === "openai"
-                      ? "OpenAI"
-                      : aiSuggestion.source === "optimizer"
-                        ? "Optimizer"
-                        : "Rule-based"}
-                    {aiSuggestion.market_rate
-                      ? ` · market R${Math.round(aiSuggestion.market_rate).toLocaleString()} (${aiSuggestion.market_rate_source})`
-                      : ""}
-                  </div>
-                )}
-
-                {/* UPGRADE 1: Model stats */}
-                {modelStats && (
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: "var(--text-tertiary)",
-                      fontFamily: "var(--font-mono)",
-                      marginBottom: 12,
-                      padding: "8px",
-                      background: "var(--bg-surface)",
-                      borderRadius: 2,
-                    }}>
-                    Model trained on{" "}
-                    {(modelStats.synthetic_count ?? modelStats.real_quotes_count ?? 0).toLocaleString()} quotes +{" "}
-                    <span
-                      style={{
-                        color: "var(--accent-primary)",
-                        fontWeight: 600,
-                      }}>
-                      {modelStats.real_quotes_count}
-                    </span>{" "}
-                    real quotes
-                  </div>
-                )}
-
-                {/* UPGRADE 3: Win Probability Gauge */}
-                {aiSuggestion.win_probability !== undefined && (
-                  <div
-                    style={{
-                      marginBottom: 12,
-                      padding: "12px",
-                      background: "var(--bg-surface)",
-                      borderRadius: 2,
-                    }}>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-tertiary)",
-                        letterSpacing: "0.08em",
-                        marginBottom: 8,
-                      }}>
-                      WIN PROBABILITY
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        marginBottom: 8,
-                      }}>
-                      <div
-                        style={{
-                          flex: 1,
-                          height: 8,
-                          background: "var(--bg-deep)",
-                          borderRadius: 4,
-                          overflow: "hidden",
-                        }}>
-                        <div
-                          style={{
-                            width: `${(winProbAtAdjusted !== null ? winProbAtAdjusted : aiSuggestion.win_probability) * 100}%`,
-                            height: "100%",
-                            background:
-                              (winProbAtAdjusted !== null
-                                ? winProbAtAdjusted
-                                : aiSuggestion.win_probability) >= 0.7
-                                ? "var(--status-success)"
-                                : (winProbAtAdjusted !== null
-                                      ? winProbAtAdjusted
-                                      : aiSuggestion.win_probability) >= 0.4
-                                  ? "var(--status-warning)"
-                                  : "var(--status-danger)",
-                            transition: "all 0.3s ease",
-                          }}
-                        />
-                      </div>
-                      <span
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: "var(--text-primary)",
-                          minWidth: 45,
-                        }}>
-                        {Math.round(
-                          (winProbAtAdjusted !== null
-                            ? winProbAtAdjusted
-                            : aiSuggestion.win_probability) * 100,
-                        )}
-                        %
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: "var(--text-secondary)",
-                        marginBottom: 10,
-                      }}>
-                      At R{" "}
-                      {adjustedPrice !== null
-                        ? Math.round(adjustedPrice).toLocaleString()
-                        : Math.round(
-                            aiSuggestion.suggested_price,
-                          ).toLocaleString()}{" "}
-                      →{" "}
-                      {Math.round(
-                        (winProbAtAdjusted !== null
-                          ? winProbAtAdjusted
-                          : aiSuggestion.win_probability) * 100,
-                      )}
-                      % chance of winning
-                    </div>
-
-                    {/* UPGRADE 3: Price Sensitivity */}
-                    {aiSuggestion.win_probability_at_lower_price !==
-                      undefined &&
-                      aiSuggestion.win_probability_at_higher_price !==
-                        undefined && (
-                        <div
-                          style={{
-                            fontSize: 10,
-                            color: "var(--text-tertiary)",
-                            fontFamily: "var(--font-sans)",
-                            marginBottom: 10,
-                            lineHeight: 1.5,
-                          }}>
-                          <div style={{ marginBottom: 2 }}>
-                            Drop R
-                            {Math.round(
-                              aiSuggestion.suggested_price * 0.05,
-                            ).toLocaleString()}{" "}
-                            (5%) →{" "}
-                            {Math.round(
-                              aiSuggestion.win_probability_at_lower_price * 100,
-                            )}
-                            % chance
-                          </div>
-                          <div>
-                            Raise R
-                            {Math.round(
-                              aiSuggestion.suggested_price * 0.05,
-                            ).toLocaleString()}{" "}
-                            (5%) →{" "}
-                            {Math.round(
-                              aiSuggestion.win_probability_at_higher_price *
-                                100,
-                            )}
-                            % chance
-                          </div>
-                        </div>
-                      )}
-
-                    {/* UPGRADE 3: Price Adjustment Slider */}
-                    <div>
-                      <div
-                        style={{
-                          fontSize: 9,
-                          fontFamily: "var(--font-mono)",
-                          color: "var(--text-tertiary)",
-                          letterSpacing: "0.08em",
-                          marginBottom: 6,
-                        }}>
-                        ADJUST PROPOSED PRICE (±15%)
-                      </div>
-                      <input
-                        type="range"
-                        min={Math.round(aiSuggestion.suggested_price * 0.85)}
-                        max={Math.round(aiSuggestion.suggested_price * 1.15)}
-                        step={100}
-                        value={
-                          adjustedPrice !== null
-                            ? adjustedPrice
-                            : aiSuggestion.suggested_price
-                        }
-                        onChange={(e) => {
-                          const newPrice = parseFloat(e.target.value);
-                          setAdjustedPrice(newPrice);
-
-                          // Debounced win probability update
-                          setLoadingWinProb(true);
-                          setTimeout(() => {
-                            if (!customerId || !routeData) return;
-                            postData({
-                              url: "/api/v1/quotes/win-probability/",
-                              data: {
-                                price: newPrice,
-                                distance: routeData.distance_km,
-                                vehicle_type: vehicleType,
-                                client_id: parseInt(customerId),
-                                origin: extractCode(pickupLocation),
-                                destination: extractCode(deliveryLocation),
-                                days_until_departure: Math.ceil(
-                                  parseInt(slaHours) / 24,
-                                ),
-                              },
-                            })
-                              .then((data) => {
-                                setWinProbAtAdjusted(data.win_probability);
-                                setLoadingWinProb(false);
-                              })
-                              .catch(() => setLoadingWinProb(false));
-                          }, 500);
-                        }}
-                        style={{
-                          width: "100%",
-                          height: 6,
-                          background: "var(--bg-deep)",
-                          borderRadius: 3,
-                          outline: "none",
-                          cursor: "pointer",
-                        }}
-                      />
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: 9,
-                          color: "var(--text-tertiary)",
-                          fontFamily: "var(--font-mono)",
-                          marginTop: 4,
-                        }}>
-                        <span>
-                          R{" "}
-                          {Math.round(
-                            aiSuggestion.suggested_price * 0.85,
-                          ).toLocaleString()}
-                        </span>
-                        <span>
-                          R{" "}
-                          {Math.round(
-                            aiSuggestion.suggested_price * 1.15,
-                          ).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  onClick={() => {
-                    const priceToUse =
-                      adjustedPrice !== null
-                        ? adjustedPrice
-                        : aiSuggestion.suggested_price;
-                    if (!priceToUse || distanceKm <= 0) {
-                      toast.error("Set a valid route first, then apply the price.");
-                      return;
-                    }
-                    // Back-solve base rate/km so the quote TOTAL lands exactly on the
-                    // suggested price — accounting for the weight surcharge + additional
-                    // costs (same maths as APPLY THIS PRICE / applyOptimal), so the
-                    // breakdown actually reconciles.
-                    const fixed =
-                      _fuelCost + _tollCost + _driverAllowance + _additionalCosts;
-                    const threshold = weightThreshold || 5000;
-                    const ws = weightKg > threshold ? weightSurchargePct : 0;
-                    const perKm = (priceToUse - fixed) / (1 + ws) / distanceKm;
-                    if (perKm > 0 && isFinite(perKm)) {
-                      setBaseRatePerKm((Math.round(perKm * 100) / 100).toString());
-                      setShowAISuggestion(false);
-                      setAdjustedPrice(null);
-                      toast.success(
-                        `Price applied — R${Math.round(priceToUse).toLocaleString()}.`,
-                      );
-                      // Move forward to finalise (Customer & Summary).
-                      if (canGoToStep3) setCurrentStep(3);
-                    } else {
-                      toast.error("Couldn't apply that price to the current route.");
-                    }
-                  }}
-                  className="btn-action"
-                  style={{ width: "100%", fontSize: 11 }}>
-                  USE THIS SUGGESTION
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <button
-              onClick={() => setCurrentStep(1)}
-              className="btn-action"
-              style={{
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-                minWidth: 120,
-              }}>
-              ← BACK
-            </button>
-            <button
-              onClick={() => setCurrentStep(3)}
-              disabled={!canGoToStep3}
-              className="btn-action"
-              style={{ minWidth: 120 }}>
-              NEXT →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 3: Customer & Summary */}
-      {currentStep === 3 && (
-        <div
-          className="card"
-          style={{ padding: 20, maxWidth: 600, margin: "0 auto" }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>
-            Step 3: Quote Summary
-          </div>
-
           <div
             style={{
               display: "flex",
@@ -3726,6 +2868,73 @@ export default function NewQuote() {
                 )}
             </div>
           )}
+
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <button
+              onClick={() => setCurrentStep(1)}
+              className="btn-action"
+              style={{
+                background: "transparent",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-secondary)",
+                minWidth: 120,
+              }}>
+              ← BACK
+            </button>
+            <button
+              onClick={() => setCurrentStep(3)}
+              disabled={!canGoToStep3}
+              className="btn-action"
+              style={{ minWidth: 120 }}>
+              NEXT →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3: Customer & Summary */}
+      {currentStep === 3 && (
+        <div
+          className="card"
+          style={{ padding: 20, maxWidth: 600, margin: "0 auto" }}>
+          <div className="card-title" style={{ marginBottom: 16 }}>
+            Step 3: Quote Summary
+          </div>
+
+          {/* Quote details recap (read-only — entered in Step 2) */}
+          <div style={{ padding: "16px", background: "var(--bg-surface-hover)", borderRadius: 2, marginBottom: 16 }}>
+            <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.08em", marginBottom: 10 }}>
+              QUOTE DETAILS
+            </div>
+            {(() => {
+              const cust = (customers as { id: number; name: string; company_name?: string }[]).find(
+                (c) => String(c.id) === String(customerId),
+              );
+              const rows: [string, string][] = [
+                ["Customer", cust ? (cust.company_name ? `${cust.name} — ${cust.company_name}` : cust.name) : "—"],
+                ["Status", status === "SENT" ? "Send to customer" : "Draft"],
+                ["Confidence", confidence ? confidence.charAt(0) + confidence.slice(1).toLowerCase() : "—"],
+                ["SLA", `${slaHours || 48} hours`],
+                ["Valid until", validUntil ? String(validUntil) : "—"],
+              ];
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {rows.map(([k, v]) => (
+                    <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, gap: 12 }}>
+                      <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}>{k}:</span>
+                      <span style={{ color: "var(--text-primary)", fontWeight: 600, textAlign: "right" }}>{v}</span>
+                    </div>
+                  ))}
+                  {notes && notes.trim() && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
+                      <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-sans)", fontSize: 12 }}>Notes:</span>
+                      <span style={{ color: "var(--text-primary)", fontSize: 12, whiteSpace: "pre-wrap" }}>{notes}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
 
           {/* Full cost breakdown */}
           <div
@@ -4491,6 +3700,303 @@ export default function NewQuote() {
               }}>
               {error}
             </div>
+          )}
+
+          {/* Expected-profit-maximising price. Shown only once all mandatory data is filled. */}
+          {canSave && (
+          <div style={{ marginBottom: 16 }}>
+            <button
+              onClick={fetchOptimal}
+              disabled={optimizing}
+              className="btn-action"
+              style={{
+                width: "100%",
+                background: "var(--accent-primary)",
+                border: "none",
+                color: "var(--bg-deep)",
+                cursor: optimizing ? "wait" : "pointer",
+                fontWeight: 600,
+              }}>
+              {optimizing ? "OPTIMISING…" : "✦ FIND OPTIMAL PRICE"}
+            </button>
+
+            {optimal && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 16,
+                  background: "var(--bg-surface-hover)",
+                  borderRadius: 2,
+                  border: "1px solid var(--accent-primary)",
+                }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--text-tertiary)",
+                    letterSpacing: "0.08em",
+                    marginBottom: 12,
+                  }}>
+                  AI OPTIMAL PRICE · maximises price × win-probability
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    fontSize: 12,
+                    marginBottom: 12,
+                  }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}>
+                    <span style={{ color: "var(--text-secondary)" }}>
+                      Optimal price:
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 16,
+                        fontWeight: 700,
+                        color: "var(--accent-primary)",
+                      }}>
+                      R {Math.round(optimal.optimal_price).toLocaleString()}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}>
+                    <span style={{ color: "var(--text-secondary)" }}>
+                      Margin:
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        color: "var(--text-primary)",
+                        fontWeight: 600,
+                      }}>
+                      {optimal.optimal_margin_pct?.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}>
+                    <span style={{ color: "var(--text-secondary)" }}>
+                      Win probability:
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        color: "var(--text-primary)",
+                        fontWeight: 600,
+                      }}>
+                      {Math.round(
+                        (optimal.win_probability_at_optimal || 0) * 100,
+                      )}
+                      %
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}>
+                    <span style={{ color: "var(--text-secondary)" }}>
+                      Expected profit:
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono)",
+                        color: "var(--status-success)",
+                        fontWeight: 600,
+                      }}>
+                      R{" "}
+                      {Math.round(
+                        optimal.expected_profit || 0,
+                      ).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                {Array.isArray(optimal.curve) &&
+                  optimal.curve.length > 1 &&
+                  (() => {
+                    const data = optimal.curve.map((c: any) => ({
+                      margin: c.margin_pct,
+                      win: Math.round((c.win_probability || 0) * 100),
+                      profit: Math.round(c.expected_profit || 0),
+                    }));
+                    return (
+                      <div style={{ marginBottom: 12 }}>
+                        <div
+                          style={{
+                            fontSize: 10,
+                            fontFamily: "var(--font-mono)",
+                            color: "var(--text-tertiary)",
+                            letterSpacing: "0.08em",
+                            marginBottom: 6,
+                          }}>
+                          PROFIT SWEET-SPOT · expected profit (area) vs win-rate
+                          (line) across margin
+                        </div>
+                        {modelStats?.win_model && (
+                          <div
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              fontSize: 10,
+                              fontFamily: "var(--font-mono)",
+                              padding: "2px 8px",
+                              borderRadius: 2,
+                              marginBottom: 8,
+                              background: "var(--bg-surface)",
+                              border: "1px solid var(--border-subtle)",
+                              color: "var(--text-secondary)",
+                            }}>
+                            <span
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: 6,
+                                background:
+                                  modelStats.win_model.mode === "learned"
+                                    ? "var(--status-success)"
+                                    : "var(--status-warning)",
+                              }}
+                            />
+                            {modelStats.win_model.mode === "learned"
+                              ? `Win model: learned${modelStats.win_model.auc != null ? ` · AUC ${modelStats.win_model.auc.toFixed(2)}` : ""} · ${modelStats.win_model.outcomes_collected} outcomes`
+                              : `Win model: heuristic · ${modelStats.win_model.outcomes_collected}/${modelStats.win_model.outcomes_needed} outcomes to learn`}
+                          </div>
+                        )}
+                        <ResponsiveContainer width="100%" height={150}>
+                          <ComposedChart
+                            data={data}
+                            margin={{ top: 8, right: 6, left: 0, bottom: 0 }}>
+                            <defs>
+                              <linearGradient
+                                id="evGrad"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1">
+                                <stop
+                                  offset="5%"
+                                  stopColor="var(--status-success)"
+                                  stopOpacity={0.35}
+                                />
+                                <stop
+                                  offset="95%"
+                                  stopColor="var(--status-success)"
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                            </defs>
+                            <XAxis
+                              dataKey="margin"
+                              stroke="var(--text-tertiary)"
+                              tickFormatter={(v: number) => `${v}%`}
+                              style={{
+                                fontSize: 10,
+                                fontFamily: "var(--font-mono)",
+                              }}
+                            />
+                            <YAxis yAxisId="p" hide />
+                            <YAxis
+                              yAxisId="w"
+                              orientation="right"
+                              domain={[0, 100]}
+                              tickFormatter={(v: number) => `${v}%`}
+                              stroke="var(--text-tertiary)"
+                              style={{
+                                fontSize: 10,
+                                fontFamily: "var(--font-mono)",
+                              }}
+                              width={32}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                background: "var(--bg-deep)",
+                                border: "1px solid var(--border-subtle)",
+                                borderRadius: 2,
+                                fontSize: 11,
+                                fontFamily: "var(--font-mono)",
+                              }}
+                              labelFormatter={(v: any) => `Margin ${v}%`}
+                              formatter={(val: any, name: any) =>
+                                name === "profit"
+                                  ? [
+                                      `R ${Number(val).toLocaleString()}`,
+                                      "Exp. profit",
+                                    ]
+                                  : [`${val}%`, "Win rate"]
+                              }
+                            />
+                            <Area
+                              yAxisId="p"
+                              type="monotone"
+                              dataKey="profit"
+                              stroke="var(--status-success)"
+                              strokeWidth={2}
+                              fill="url(#evGrad)"
+                            />
+                            <Line
+                              yAxisId="w"
+                              type="monotone"
+                              dataKey="win"
+                              stroke="var(--accent-primary)"
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                            {optimal.optimal_margin_pct != null && (
+                              <ReferenceLine
+                                yAxisId="p"
+                                x={
+                                  Math.round(optimal.optimal_margin_pct * 10) /
+                                  10
+                                }
+                                stroke="var(--accent-primary)"
+                                strokeDasharray="3 3"
+                              />
+                            )}
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
+                    );
+                  })()}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    className="btn-action"
+                    onClick={applyOptimal}
+                    style={{
+                      flex: 1,
+                      background: "var(--accent-primary)",
+                      border: "none",
+                      color: "var(--bg-deep)",
+                      fontWeight: 600,
+                    }}>
+                    APPLY THIS PRICE
+                  </button>
+                  <button
+                    className="btn-action"
+                    onClick={() => setOptimal(null)}
+                    style={{
+                      background: "none",
+                      border: "1px solid var(--border-subtle)",
+                      color: "var(--text-secondary)",
+                    }}>
+                    DISMISS
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           )}
 
           <div style={{ display: "flex", justifyContent: "space-between" }}>

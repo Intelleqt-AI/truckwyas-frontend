@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
-import type { Map as LeafletMap, Marker, Polyline, LeafletMouseEvent } from 'leaflet';
+import type { Map as LeafletMap, Marker, Polyline, TileLayer, LeafletMouseEvent } from 'leaflet';
 import type { LocationCoords } from './LocationInput';
 
 type LeafletModule = typeof import('leaflet');
@@ -8,6 +8,12 @@ type MapField = 'pickup' | 'delivery' | 'return';
 
 const TOMTOM_KEY = import.meta.env.VITE_TOMTOM_API_KEY as string | undefined;
 const SA_CENTER: [number, number] = [-28.4793, 24.6727];
+
+interface RouteOptionGeo {
+  index: number;
+  is_best: boolean;
+  geometry: { lat: number; lon: number }[];
+}
 
 interface MapLocationPickerProps {
   pickupCoords: LocationCoords | null;
@@ -17,6 +23,14 @@ interface MapLocationPickerProps {
   activeField: MapField;
   onActiveFieldChange: (field: MapField) => void;
   onLocationSelect: (field: MapField, label: string, coords: LocationCoords) => void;
+  onExpand?: () => void;
+  onClose?: () => void;
+  mapHeight?: number;
+  // Outbound TomTom routes (best + alternatives). When provided, the map draws all of
+  // them — selected/best in green, the rest grey & clickable — instead of one preview line.
+  routeOptions?: RouteOptionGeo[];
+  selectedRouteIndex?: number;
+  onSelectRoute?: (index: number) => void;
 }
 
 async function fetchRoute(
@@ -99,6 +113,12 @@ export function MapLocationPicker({
   activeField,
   onActiveFieldChange,
   onLocationSelect,
+  onExpand,
+  onClose,
+  mapHeight = 270,
+  routeOptions,
+  selectedRouteIndex = 0,
+  onSelectRoute,
 }: MapLocationPickerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const instanceRef = useRef<{ map: LeafletMap; L: LeafletModule } | null>(null);
@@ -107,12 +127,15 @@ export function MapLocationPicker({
   const returnMarkerRef = useRef<Marker | null>(null);
   const lineRef = useRef<Polyline | null>(null);
   const returnLineRef = useRef<Polyline | null>(null);
+  const routeLinesRef = useRef<Polyline[]>([]);
+  const trafficLayerRef = useRef<TileLayer | null>(null);
   const activeFieldRef = useRef<MapField>(activeField);
   const onActiveFieldChangeRef = useRef(onActiveFieldChange);
   const onLocationSelectRef = useRef(onLocationSelect);
   const showReturnRef = useRef(showReturn);
   const [geocoding, setGeocoding] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  const [showTraffic, setShowTraffic] = useState(true);
 
   useEffect(() => { activeFieldRef.current = activeField; }, [activeField]);
   useEffect(() => { onActiveFieldChangeRef.current = onActiveFieldChange; }, [onActiveFieldChange]);
@@ -135,7 +158,8 @@ export function MapLocationPicker({
         shadowUrl: new URL('leaflet/dist/images/marker-shadow.png', import.meta.url).href,
       });
 
-      const map = L.map(mapRef.current, { center: SA_CENTER, zoom: 5, zoomControl: true });
+      // doubleClickZoom off: a double-tap selects the point (see 'dblclick' below) instead of zooming.
+      const map = L.map(mapRef.current, { center: SA_CENTER, zoom: 5, zoomControl: true, doubleClickZoom: false });
 
       const tileUrl = TOMTOM_KEY
         ? `https://api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=${TOMTOM_KEY}&tileSize=256`
@@ -146,7 +170,16 @@ export function MapLocationPicker({
         maxZoom: 19,
       }).addTo(map);
 
-      map.on('click', async (e: LeafletMouseEvent) => {
+      // Live traffic flow overlay (relative0 = Google-Maps-style green→red congestion colours).
+      // Created here; the toggle effect adds/removes it based on `showTraffic`.
+      if (TOMTOM_KEY) {
+        trafficLayerRef.current = L.tileLayer(
+          `https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_KEY}`,
+          { opacity: 0.75, maxZoom: 22, zIndex: 5 }
+        );
+      }
+
+      map.on('dblclick', async (e: LeafletMouseEvent) => {
         const { lat, lng } = e.latlng;
         const field = activeFieldRef.current;
         setGeocoding(true);
@@ -177,17 +210,28 @@ export function MapLocationPicker({
     };
   }, []);
 
+  // Show/hide the live traffic flow overlay
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (!inst || !mapReady || !trafficLayerRef.current) return;
+    if (showTraffic) trafficLayerRef.current.addTo(inst.map);
+    else inst.map.removeLayer(trafficLayerRef.current);
+  }, [showTraffic, mapReady]);
+
   // Update markers + lines whenever coords change (mapReady ensures this re-runs after remount)
   useEffect(() => {
     const inst = instanceRef.current;
     if (!inst || !mapReady) return;
     const { map, L } = inst;
+    let cancelled = false;
 
     if (pickupMarkerRef.current) { map.removeLayer(pickupMarkerRef.current); pickupMarkerRef.current = null; }
     if (deliveryMarkerRef.current) { map.removeLayer(deliveryMarkerRef.current); deliveryMarkerRef.current = null; }
     if (returnMarkerRef.current) { map.removeLayer(returnMarkerRef.current); returnMarkerRef.current = null; }
     if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
     if (returnLineRef.current) { map.removeLayer(returnLineRef.current); returnLineRef.current = null; }
+    routeLinesRef.current.forEach((ln) => map.removeLayer(ln));
+    routeLinesRef.current = [];
 
     if (pickupCoords) {
       pickupMarkerRef.current = L.marker([pickupCoords.lat, pickupCoords.lon], {
@@ -228,14 +272,45 @@ export function MapLocationPicker({
         [[pickupCoords.lat, pickupCoords.lon], [deliveryCoords.lat, deliveryCoords.lon]],
         { padding: [40, 40], maxZoom: 12 }
       );
-      fetchRoute(pickupCoords, deliveryCoords).then((pts) => {
-        if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
-        lineRef.current = L.polyline(pts, { color: '#0057FF', weight: 4, opacity: 0.85 }).addTo(map);
-        // Fit to include return marker too if present
-        const bounds = lineRef.current.getBounds();
-        if (returnCoords) bounds.extend([returnCoords.lat, returnCoords.lon]);
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
-      });
+      if (routeOptions && routeOptions.length > 0) {
+        // Draw all TomTom routes from backend geometry: selected/best = green, rest = grey & clickable.
+        const allPts: [number, number][] = [];
+        // Draw non-selected first so the selected (green) route ends up on top.
+        const ordered = [...routeOptions].sort(
+          (a, b) => Number(a.index === selectedRouteIndex) - Number(b.index === selectedRouteIndex)
+        );
+        ordered.forEach((r) => {
+          const pts = (r.geometry || []).map((p) => [p.lat, p.lon] as [number, number]);
+          if (pts.length < 2) return;
+          const isSel = r.index === selectedRouteIndex;
+          const line = L.polyline(
+            pts,
+            isSel
+              ? { color: '#16a34a', weight: 6, opacity: 0.95 }
+              : { color: '#334155', weight: 5, opacity: 0.85 }
+          ).addTo(map);
+          if (onSelectRoute) line.on('click', () => onSelectRoute(r.index));
+          if (isSel) line.bringToFront();
+          routeLinesRef.current.push(line);
+          pts.forEach((pt) => allPts.push(pt));
+        });
+        if (allPts.length) {
+          const bounds = L.latLngBounds(allPts);
+          if (returnCoords) bounds.extend([returnCoords.lat, returnCoords.lon]);
+          map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+        }
+      } else {
+        // No backend routes yet — lightweight single-line preview (pre-calculation).
+        fetchRoute(pickupCoords, deliveryCoords).then((pts) => {
+          if (cancelled) return;
+          if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
+          lineRef.current = L.polyline(pts, { color: '#0057FF', weight: 4, opacity: 0.85 }).addTo(map);
+          // Fit to include return marker too if present
+          const bounds = lineRef.current.getBounds();
+          if (returnCoords) bounds.extend([returnCoords.lat, returnCoords.lon]);
+          map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+        });
+      }
     } else if (pickupCoords) {
       map.setView([pickupCoords.lat, pickupCoords.lon], 12);
     } else if (deliveryCoords) {
@@ -245,11 +320,14 @@ export function MapLocationPicker({
     // Return leg: D → R
     if (deliveryCoords && returnCoords) {
       fetchRoute(deliveryCoords, returnCoords).then((pts) => {
+        if (cancelled) return;
         if (returnLineRef.current) { map.removeLayer(returnLineRef.current); returnLineRef.current = null; }
         returnLineRef.current = L.polyline(pts, { color: '#16a34a', weight: 4, opacity: 0.8, dashArray: '8 5' }).addTo(map);
       });
     }
-  }, [pickupCoords, deliveryCoords, returnCoords, mapReady]);
+
+    return () => { cancelled = true; };
+  }, [pickupCoords, deliveryCoords, returnCoords, mapReady, routeOptions, selectedRouteIndex]);
 
   const FIELD_CONFIG: { key: MapField; label: string; color: string; visible: boolean }[] = [
     { key: 'pickup', label: '● PICKUP', color: '#0057FF', visible: true },
@@ -290,7 +368,7 @@ export function MapLocationPicker({
       </div>
 
       <div style={{ position: 'relative', border: '1px solid var(--border-subtle)', borderRadius: 3, overflow: 'hidden' }}>
-        <div ref={mapRef} style={{ height: 270, width: '100%' }} />
+        <div ref={mapRef} style={{ height: mapHeight, width: '100%' }} />
 
         <div style={{
           position: 'absolute', bottom: 8, left: 8, zIndex: 500,
@@ -299,7 +377,7 @@ export function MapLocationPicker({
           fontSize: 9, color: '#fff', fontFamily: 'var(--font-mono)',
           letterSpacing: '0.07em', pointerEvents: 'none',
         }}>
-          CLICK MAP TO SET {activeField.toUpperCase()}
+          DOUBLE-TAP MAP TO SET {activeField.toUpperCase()}
         </div>
 
         {geocoding && (
@@ -310,6 +388,75 @@ export function MapLocationPicker({
             fontSize: 9, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)',
           }}>
             LOCATING…
+          </div>
+        )}
+
+        {onExpand && (
+          <button
+            type="button"
+            onClick={onExpand}
+            title="Expand map"
+            style={{
+              position: 'absolute', top: 8, right: 8, zIndex: 500,
+              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+              border: 'none', borderRadius: 3, width: 28, height: 28,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: '#fff', fontSize: 14,
+            }}
+          >
+            ⛶
+          </button>
+        )}
+
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            title="Close fullscreen"
+            style={{
+              position: 'absolute', top: 8, right: 8, zIndex: 500,
+              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+              border: 'none', borderRadius: 3, width: 32, height: 32,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: '#fff', fontSize: 18, lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        )}
+
+        {TOMTOM_KEY && (
+          <div style={{
+            position: 'absolute', bottom: 8, right: 8, zIndex: 500,
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4,
+          }}>
+            <button
+              type="button"
+              onClick={() => setShowTraffic((v) => !v)}
+              title="Toggle live traffic"
+              style={{
+                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+                border: `1px solid ${showTraffic ? '#2EAB30' : 'transparent'}`,
+                borderRadius: 3, padding: '4px 8px', cursor: 'pointer',
+                fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.07em',
+                color: showTraffic ? '#7CF07E' : '#cbd5e1', fontWeight: 600,
+              }}
+            >
+              {showTraffic ? '● TRAFFIC ON' : '○ TRAFFIC OFF'}
+            </button>
+            {showTraffic && (
+              <div style={{
+                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+                borderRadius: 3, padding: '3px 8px',
+                fontSize: 8, fontFamily: 'var(--font-mono)', color: '#fff',
+                display: 'flex', gap: 8, alignItems: 'center', letterSpacing: '0.05em',
+              }}>
+                <span style={{ color: '#2EAB30' }}>● clear</span>
+                <span style={{ color: '#F1BF40' }}>● light</span>
+                <span style={{ color: '#F18237' }}>● mod</span>
+                <span style={{ color: '#E70704' }}>● heavy</span>
+              </div>
+            )}
           </div>
         )}
       </div>

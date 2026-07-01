@@ -113,11 +113,16 @@ export default function Invoices() {
   const { data: capitalData } = useQuery({
     queryKey: ["capital-eligible"],
     queryFn: () => fetchData("api/v1/capital/eligible/").catch(() => null),
-    staleTime: 60_000,
   });
   const eligibleInvoices: any[] = capitalData?.invoices || [];
   const eligibleById = new Map(
     eligibleInvoices.map((e: any) => [String(e.id), e]),
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ineligibleInvoices: any[] = capitalData?.ineligible_invoices || [];
+  const ineligibleById = new Map(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ineligibleInvoices.map((e: any) => [String(e.id), e]),
   );
 
   // Expenses + vehicles, cached across navigations. Only fetched once the
@@ -331,6 +336,7 @@ export default function Invoices() {
       setToast("Invoice sent!");
       setTimeout(() => setToast(null), 3000);
       refetchInvoices();
+      queryClient.invalidateQueries({ queryKey: ['capital-eligible'] });
     } catch (error) {
       console.error("Failed to send invoice:", error);
       setToast("Failed to send invoice");
@@ -1743,6 +1749,7 @@ export default function Invoices() {
                         : `${ageDays}d overdue`;
 
                     const capitalEntry = eligibleById.get(String(inv.id));
+                    const ineligibleEntry = !capitalEntry ? ineligibleById.get(String(inv.id)) : null;
                     const tier = capitalEntry
                       ? String(
                           capitalEntry.risk_tier ||
@@ -1902,6 +1909,26 @@ export default function Invoices() {
                                   ? "REQUESTING..."
                                   : "REQUEST CAPITAL"}
                               </button>
+                            )}
+                            {ineligibleEntry && (
+                              <span
+                                title={ineligibleEntry.reason}
+                                style={{
+                                  fontSize: 9,
+                                  fontFamily: "var(--font-mono)",
+                                  color: "var(--text-tertiary)",
+                                  border: "1px solid var(--border-subtle)",
+                                  borderRadius: 2,
+                                  padding: "3px 6px",
+                                  whiteSpace: "nowrap",
+                                  maxWidth: 160,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  display: "inline-block",
+                                  cursor: "default",
+                                }}>
+                                ✕ {ineligibleEntry.reason}
+                              </span>
                             )}
                           </div>
                         </td>

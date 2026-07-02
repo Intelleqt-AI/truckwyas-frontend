@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { postData } from '@/lib/Api';
+import { useAuth } from '@/lib/AuthContext';
 
 export const EmailVerification = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { setUser } = useAuth();
   const email = searchParams.get('email') || '';
 
   const [code, setCode] = useState('');
@@ -21,6 +23,7 @@ export const EmailVerification = () => {
       const data: any = await postData({ url: 'api/v1/auth/verify-email/', data: { email, code } });
       localStorage.setItem('access', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      setUser(data.user);
       navigate('/onboarding');
     } catch (err: any) {
       setError(err?.data?.detail || 'Invalid or expired code. Please try again.');

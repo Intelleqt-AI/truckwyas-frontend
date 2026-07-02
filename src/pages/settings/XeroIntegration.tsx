@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import useFetch from "@/hooks/useFetch";
 import { usePost } from "@/hooks/usePost";
+import { fetchData } from "@/lib/Api";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -64,26 +65,9 @@ export default function XeroIntegration() {
     window.history.replaceState({}, "", window.location.pathname);
   }, [queryClient]);
 
-  // Connect to Xero — redirect the whole tab into the OAuth flow, then Xero
-  // bounces back to this page via the backend callback.
-  const { mutate: connectXero } = usePost({
-    onSuccess: (data: any) => {
-      if (data?.auth_url) {
-        window.location.href = data.auth_url;
-      } else {
-        toast.error("Could not start Xero connection.");
-      }
-    },
-    onError: (error: any) => {
-      if (error?.response?.status === 503) {
-        toast.error(
-          "Xero isn't configured on the server yet. Add the Xero app credentials to enable it."
-        );
-      } else {
-        toast.error("Failed to initiate Xero connection");
-      }
-    },
-  });
+  // Connect to Xero — fetch the OAuth authorization URL (authenticated GET), then
+  // redirect the whole tab into the flow. Xero bounces back via the backend callback.
+  // (The connect endpoint is a GET, so we use fetchData, not a POST mutation.)
 
   // Disconnect from Xero
   const { mutate: disconnectXero } = usePost({
@@ -134,8 +118,23 @@ export default function XeroIntegration() {
     },
   });
 
-  const handleConnect = () => {
-    connectXero({ url: "/api/integrations/xero/connect/", data: {} });
+  const handleConnect = async () => {
+    try {
+      const data: any = await fetchData("api/v1/integrations/xero/connect/");
+      if (data?.auth_url) {
+        window.location.href = data.auth_url;
+      } else {
+        toast.error("Could not start Xero connection.");
+      }
+    } catch (error: any) {
+      if (error?.status === 503) {
+        toast.error(
+          "Xero isn't configured on the server yet. Add the Xero app credentials to enable it."
+        );
+      } else {
+        toast.error("Failed to initiate Xero connection");
+      }
+    }
   };
 
   const handleDisconnect = () => {

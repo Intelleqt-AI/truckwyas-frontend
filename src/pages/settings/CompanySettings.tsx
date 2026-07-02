@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchData, patchData } from "@/lib/Api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/lib/toast';
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -44,14 +46,13 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 };
 
-const selectStyle: React.CSSProperties = { ...inputStyle, cursor: 'pointer' };
 const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 };
 const grid3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 };
 
 export function CompanySettings() {
   const [form, setForm] = useState({
     company_name: '', registration_number: '', vat_number: '',
-    industry: 'logistics', website: '', description: '',
+    industry: '', website: '', description: '',
     street: '', city: '', province: '', postal_code: '', country: 'South Africa',
     phone: '', email: '', support_email: '',
   });
@@ -64,7 +65,7 @@ export function CompanySettings() {
         company_name: d.company_name || '',
         registration_number: d.registration_number || '',
         vat_number: d.vat_number || '',
-        industry: d.industry || 'logistics',
+        industry: d.industry || '',
         website: d.website || '',
         description: d.description || '',
         street: d.address?.street || '',
@@ -76,7 +77,7 @@ export function CompanySettings() {
         email: d.contact?.email || '',
         support_email: d.contact?.support_email || '',
       });
-    }).catch(() => {});
+    }).catch(() => { toast.error('Failed to load company details'); });
   }, []);
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
@@ -94,13 +95,17 @@ export function CompanySettings() {
         address: { street: form.street, city: form.city, province: form.province, postal_code: form.postal_code, country: form.country },
         contact: { phone: form.phone, email: form.email, support_email: form.support_email },
       } });
-      setSaved(true); setTimeout(() => setSaved(false), 2000);
-    } catch {}
+      setSaved(true);
+      toast.success('Company details saved');
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to save company details');
+    }
     setSaving(false);
   };
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Company Details</div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Your business information and branding</div>
@@ -117,12 +122,19 @@ export function CompanySettings() {
             </div>
             <div>
               <label style={labelStyle}>Industry</label>
-              <select style={selectStyle} value={form.industry} onChange={e => set('industry', e.target.value)}>
-                <option value="logistics">Logistics</option>
-                <option value="road_freight">Road Freight</option>
-                <option value="courier">Courier</option>
-                <option value="warehousing">Warehousing</option>
-              </select>
+              <Select value={form.industry} onValueChange={val => set('industry', val)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general_freight">General Freight</SelectItem>
+                  <SelectItem value="refrigerated">Refrigerated Transport</SelectItem>
+                  <SelectItem value="hazmat">Hazmat / Dangerous Goods</SelectItem>
+                  <SelectItem value="construction">Construction Materials</SelectItem>
+                  <SelectItem value="agriculture">Agriculture</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div style={{ ...grid2, marginBottom: 16 }}>
@@ -165,18 +177,22 @@ export function CompanySettings() {
             </div>
             <div>
               <label style={labelStyle}>Province</label>
-              <select style={selectStyle} value={form.province} onChange={e => set('province', e.target.value)}>
-                <option value="">Select province</option>
-                <option value="GP">Gauteng</option>
-                <option value="WC">Western Cape</option>
-                <option value="KZN">KwaZulu-Natal</option>
-                <option value="EC">Eastern Cape</option>
-                <option value="LP">Limpopo</option>
-                <option value="MP">Mpumalanga</option>
-                <option value="NW">North West</option>
-                <option value="FS">Free State</option>
-                <option value="NC">Northern Cape</option>
-              </select>
+              <Select value={form.province} onValueChange={val => set('province', val)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select province" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GP">Gauteng</SelectItem>
+                  <SelectItem value="WC">Western Cape</SelectItem>
+                  <SelectItem value="KZN">KwaZulu-Natal</SelectItem>
+                  <SelectItem value="EC">Eastern Cape</SelectItem>
+                  <SelectItem value="LP">Limpopo</SelectItem>
+                  <SelectItem value="MP">Mpumalanga</SelectItem>
+                  <SelectItem value="NW">North West</SelectItem>
+                  <SelectItem value="FS">Free State</SelectItem>
+                  <SelectItem value="NC">Northern Cape</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label style={labelStyle}>Postal Code</label>

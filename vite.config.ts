@@ -10,7 +10,7 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3700',
+        target: 'http://localhost:8001',
         changeOrigin: true,
       },
     },
@@ -26,10 +26,18 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: (id: string) => {
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) return 'vendor';
-          if (id.includes('node_modules/lucide-react')) return 'ui';
-        }
+        // Function form — the rolldown-based bundler (Vite 8) requires a
+        // function here; the legacy object form throws "manualChunks is not a function".
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (/[\\/]node_modules[\\/](react|react-dom|react-router-dom|react-router)[\\/]/.test(id)) {
+              return 'vendor';
+            }
+            if (id.includes('lucide-react')) {
+              return 'ui';
+            }
+          }
+        },
       }
     },
     chunkSizeWarningLimit: 600,

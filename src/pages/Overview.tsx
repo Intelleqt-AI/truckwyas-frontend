@@ -1,25 +1,150 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
 
+// Fetches + derives all dashboard data. Lives in the queryFn so the result is
+// cached by TanStack Query (keyed below) and survives navigation — revisiting
+// the page no longer refires these 8 requests until the cache goes stale.
+async function loadOverview() {
+  const [
+    finance,
+    insightsData,
+    advancesData,
+    quotesData,
+    loadsData,
+    activityData,
+    vehiclesData,
+    fleetData,
+  ] = await Promise.all([
+    fetchData("api/v1/dashboard/finance/").catch(() => null),
+    fetchData("api/v1/dashboard/signals/").catch(() =>
+      fetchData("api/v1/dashboard/insights/").catch(() => []),
+    ),
+    fetchData("api/v1/advances/").catch(() => []),
+    fetchData("api/v1/quotes/?limit=5").catch(() => []),
+    fetchData("api/v1/loads/").catch(() => []),
+    fetchData("api/v1/activity/").catch(() => []),
+    fetchData("api/v1/vehicles/").catch(() => []),
+    fetchData("api/v1/fleet/overview/").catch(() => null),
+  ]);
+
+  const insightsArr = Array.isArray(insightsData)
+    ? insightsData
+    : insightsData?.signals || [];
+  const insights = insightsArr.map((s: any) => ({
+    category: s.category || s.type || "Update",
+    title: s.title || "",
+    body: s.body || s.message || "",
+    action: s.action || "VIEW",
+    severity: s.severity || "low",
+    type: s.type || "INFO",
+  }));
+
+  const advances = Array.isArray(advancesData)
+    ? advancesData
+    : advancesData?.results || [];
+
+  const quotes = quotesData?.results || quotesData || [];
+  const recentQuotes = quotes.slice(0, 5);
+
+  const loads = loadsData?.results || loadsData || [];
+  const activeLoadsCount = loads.filter(
+    (l: any) => l.status === "IN_TRANSIT" || l.status === "LOADING",
+  ).length;
+  const recentLoads = loads.slice(0, 5);
+
+  const vehicles = vehiclesData?.results || vehiclesData || [];
+  const totalVehicles = vehicles.length;
+  const activeVehicles =
+    fleetData?.active_vehicles ||
+    vehicles.filter(
+      (v: any) => v.status === "AVAILABLE" || v.status === "IN_USE",
+    ).length ||
+    0;
+
+  // Generate heatmap data from last 28 days of load activity
+  const heatmapData = new Array(28).fill(0);
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  loads.forEach((load: any) => {
+    const createdAt = load.created_at || load.pickup_date;
+    if (createdAt) {
+      const loadTime = new Date(createdAt).getTime();
+      const daysAgo = Math.floor((now - loadTime) / dayMs);
+      if (daysAgo >= 0 && daysAgo < 28) {
+        heatmapData[27 - daysAgo]++;
+      }
+    }
+  });
+
+  const activity = Array.isArray(activityData)
+    ? activityData
+    : activityData?.results || [];
+
+  return {
+    financeData: finance,
+    insights,
+    advances,
+    recentQuotes,
+    recentLoads,
+    activeLoadsCount,
+    totalVehicles,
+    activeVehicles,
+    activity,
+    heatmapData,
+  };
+}
+
+const CARD_MENUS: Record<string, { label: string; route: string }[]> = {
+  revenue: [
+    { label: "View Revenue Report", route: "/finance/reports" },
+    { label: "View All Invoices",   route: "/finance/invoices" },
+    { label: "New Invoice",         route: "/finance/invoices/new" },
+  ],
+  margin: [
+    { label: "View Finance Reports", route: "/finance/reports" },
+    { label: "View Expenses",        route: "/finance/expenses" },
+  ],
+  outstanding: [
+    { label: "View Outstanding Invoices", route: "/finance/invoices?status=OVERDUE" },
+    { label: "View All Invoices",         route: "/finance/invoices" },
+    { label: "Request Capital Advance",   route: "/capital" },
+  ],
+};
+
 export default function Overview() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [financeData, setFinanceData] = useState<any>(null);
-  const [insights, setInsights] = useState<any[]>([]);
-  const [advances, setAdvances] = useState<any[]>([]);
-  const [recentQuotes, setRecentQuotes] = useState<any[]>([]);
-  const [recentLoads, setRecentLoads] = useState<any[]>([]);
-  const [activeLoadsCount, setActiveLoadsCount] = useState(0);
-  const [totalVehicles, setTotalVehicles] = useState(0);
-  const [activeVehicles, setActiveVehicles] = useState(0);
-  const [activity, setActivity] = useState<any[]>([]);
-  const [activityLoading, setActivityLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [heatmapData, setHeatmapData] = useState<number[]>([]);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    const close = () => setOpenMenu(null);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [openMenu]);
+
+  const { data, isLoading: loading, refetch } = useQuery({
+    queryKey: ["overview-dashboard"],
+    queryFn: loadOverview,
+  });
+
+  // Cached data drives the view; defaults keep the first render safe.
+  const financeData = data?.financeData ?? null;
+  const insights = data?.insights ?? [];
+  const advances = data?.advances ?? [];
+  const recentQuotes = data?.recentQuotes ?? [];
+  const recentLoads = data?.recentLoads ?? [];
+  const activeLoadsCount = data?.activeLoadsCount ?? 0;
+  const totalVehicles = data?.totalVehicles ?? 0;
+  const activeVehicles = data?.activeVehicles ?? 0;
+  const activity = data?.activity ?? [];
+  const heatmapData = data?.heatmapData ?? [];
+  const activityLoading = loading;
 
   useEffect(() => {
     document.title = "Overview - TruckWys";
@@ -32,106 +157,7 @@ export default function Overview() {
     return () => clearInterval(clockInterval);
   }, []);
 
-  const load = useCallback(async () => {
-    try {
-      const [
-        finance,
-        insightsData,
-        advancesData,
-        quotesData,
-        loadsData,
-        activityData,
-        vehiclesData,
-        fleetData,
-      ] = await Promise.all([
-        fetchData("api/v1/dashboard/finance/").catch(() => null),
-        fetchData("api/v1/dashboard/signals/").catch(() =>
-          fetchData("api/v1/dashboard/insights/").catch(() => []),
-        ),
-        fetchData("api/v1/advances/").catch(() => []),
-        fetchData("api/v1/quotes/?limit=5").catch(() => []),
-        fetchData("api/v1/loads/").catch(() => []),
-        fetchData("api/v1/activity/").catch(() => []),
-        fetchData("api/v1/vehicles/").catch(() => []),
-        fetchData("api/v1/fleet/overview/").catch(() => null),
-      ]);
-      setFinanceData(finance);
-      const insightsArr = Array.isArray(insightsData)
-        ? insightsData
-        : insightsData?.signals || [];
-      setInsights(
-        insightsArr.map((s: any) => ({
-          category: s.category || s.type || "Update",
-          title: s.title || "",
-          body: s.body || s.message || "",
-          action: s.action || "VIEW",
-          severity: s.severity || "low",
-          type: s.type || "INFO",
-        })),
-      );
-
-      setAdvances(
-        Array.isArray(advancesData)
-          ? advancesData
-          : advancesData?.results || [],
-      );
-
-      const quotes = quotesData?.results || quotesData || [];
-      setRecentQuotes(quotes.slice(0, 5));
-
-      const loads = loadsData?.results || loadsData || [];
-      const activeLoads = loads.filter(
-        (l: any) => l.status === "IN_TRANSIT" || l.status === "LOADING",
-      );
-      setActiveLoadsCount(activeLoads.length);
-      setRecentLoads(loads.slice(0, 5));
-      const vehicles = vehiclesData?.results || vehiclesData || [];
-      setTotalVehicles(vehicles.length);
-
-      const activeVehicleCount =
-        fleetData?.active_vehicles ||
-        vehicles.filter(
-          (v: any) => v.status === "AVAILABLE" || v.status === "IN_USE",
-        ).length ||
-        0;
-      setActiveVehicles(activeVehicleCount);
-
-      // Generate heatmap data from last 28 days of load activity
-      const heatmap = new Array(28).fill(0);
-      const now = Date.now();
-      const dayMs = 24 * 60 * 60 * 1000;
-
-      loads.forEach((load: any) => {
-        const createdAt = load.created_at || load.pickup_date;
-        if (createdAt) {
-          const loadTime = new Date(createdAt).getTime();
-          const daysAgo = Math.floor((now - loadTime) / dayMs);
-          if (daysAgo >= 0 && daysAgo < 28) {
-            heatmap[27 - daysAgo]++;
-          }
-        }
-      });
-
-      setHeatmapData(heatmap);
-
-      setActivity(
-        Array.isArray(activityData)
-          ? activityData
-          : activityData?.results || [],
-      );
-      setActivityLoading(false);
-    } catch (error) {
-      console.error("Failed to load overview data:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  useAutoRefresh(load);
+  useAutoRefresh(refetch);
 
   const timeAgo = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -303,17 +329,25 @@ export default function Overview() {
             <span className="card-title">
               {loading ? "Loading..." : "Total Revenue"}
             </span>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              className="card-action">
-              <circle cx="12" cy="12" r="1" />
-              <circle cx="19" cy="12" r="1" />
-              <circle cx="5" cy="12" r="1" />
-            </svg>
+            <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                className="card-action"
+                onClick={() => setOpenMenu(openMenu === "revenue" ? null : "revenue")}>
+                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+              </svg>
+              {openMenu === "revenue" && (
+                <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 200, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
+                  {CARD_MENUS.revenue.map(item => (
+                    <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
+                      style={{ padding: "9px 14px", fontSize: 12, fontFamily: "var(--font-mono)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
+                      onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="metric-value">
             {loading ? "..." : formatCurrency(financeData?.total_revenue || 0)}
@@ -353,17 +387,25 @@ export default function Overview() {
             <span className="card-title">
               {loading ? "Loading..." : "Net Margin"}
             </span>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              className="card-action">
-              <circle cx="12" cy="12" r="1" />
-              <circle cx="19" cy="12" r="1" />
-              <circle cx="5" cy="12" r="1" />
-            </svg>
+            <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                className="card-action"
+                onClick={() => setOpenMenu(openMenu === "margin" ? null : "margin")}>
+                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+              </svg>
+              {openMenu === "margin" && (
+                <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 200, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
+                  {CARD_MENUS.margin.map(item => (
+                    <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
+                      style={{ padding: "9px 14px", fontSize: 12, fontFamily: "var(--font-mono)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
+                      onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div
             className="metric-value"
@@ -407,17 +449,25 @@ export default function Overview() {
             <span className="card-title">
               {loading ? "Loading..." : "Outstanding"}
             </span>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              className="card-action">
-              <circle cx="12" cy="12" r="1" />
-              <circle cx="19" cy="12" r="1" />
-              <circle cx="5" cy="12" r="1" />
-            </svg>
+            <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                className="card-action"
+                onClick={() => setOpenMenu(openMenu === "outstanding" ? null : "outstanding")}>
+                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+              </svg>
+              {openMenu === "outstanding" && (
+                <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 220, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
+                  {CARD_MENUS.outstanding.map(item => (
+                    <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
+                      style={{ padding: "9px 14px", fontSize: 12, fontFamily: "var(--font-mono)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
+                      onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div
             className="metric-value"

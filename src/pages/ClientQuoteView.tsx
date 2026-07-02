@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { RouteMapView } from '@/components/RouteMapView';
 
 // Hardcoded light-theme tokens — this is a public page outside the app shell
 const C = {
@@ -88,12 +89,20 @@ export default function ClientQuoteView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       });
-      if (!res.ok) throw new Error('Failed to respond to quote');
-      return res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw Object.assign(new Error(data.error || 'Failed to respond to quote'), { status: res.status, data });
+      return data;
     },
     onSuccess: (data) => {
       setResponded(true);
       setResponseMessage(data.message);
+    },
+    onError: (err: any) => {
+      if (err.status === 409) {
+        setResponded(true);
+        const alreadyAccepted = err.data?.status === 'ACCEPTED';
+        setResponseMessage(alreadyAccepted ? 'Quote accepted — your operator will be in touch' : 'Quote declined');
+      }
     },
   });
 
@@ -138,7 +147,7 @@ export default function ClientQuoteView() {
             <div style={{ fontSize: 18, fontWeight: 600, color: accepted ? C.success : C.text, marginBottom: 8 }}>
               {responseMessage}
             </div>
-            <div style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>
               {accepted ? 'The freight company will be in touch to confirm arrangements.' : 'Thank you for letting us know.'}
             </div>
           </div>
@@ -147,6 +156,7 @@ export default function ClientQuoteView() {
     );
   }
 
+  const alreadyActioned = quote.status === 'ACCEPTED' || quote.status === 'DECLINED';
   const validUntilDate = new Date(quote.valid_until);
   const isExpiringSoon = validUntilDate.getTime() - Date.now() < 48 * 60 * 60 * 1000;
   const isExpired = validUntilDate.getTime() < Date.now();
@@ -199,8 +209,17 @@ export default function ClientQuoteView() {
 
         {/* Route */}
         <Card>
-          <div style={{ fontSize: 11, fontFamily: C.mono, color: C.faint, letterSpacing: '0.1em', marginBottom: 20 }}>ROUTE</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontFamily: C.mono, color: C.faint, letterSpacing: '0.1em' }}>
+              {quote.trip_type === 'ROUND_TRIP' ? 'LEG 1 — OUTBOUND' : 'ROUTE'}
+            </div>
+            {quote.trip_type === 'ROUND_TRIP' && (
+              <span style={{ fontFamily: C.mono, fontSize: 10, color: C.accent, padding: '2px 8px', border: `1px solid ${C.accent}`, borderRadius: 4, fontWeight: 700 }}>
+                ROUND TRIP
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginBottom: 20 }}>
             <div>
               <Label>Pickup</Label>
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
@@ -215,7 +234,49 @@ export default function ClientQuoteView() {
               </div>
             </div>
           </div>
+          {(quote.pickup_location || quote.origin) && (quote.delivery_location || quote.destination) && (
+            <RouteMapView
+              pickup={quote.pickup_location || quote.origin}
+              delivery={quote.delivery_location || quote.destination}
+            />
+          )}
         </Card>
+
+        {/* Return Leg — visible only for ROUND_TRIP quotes */}
+        {quote.trip_type === 'ROUND_TRIP' && (
+          <Card>
+            <div style={{ fontSize: 11, fontFamily: C.mono, color: C.accent, letterSpacing: '0.1em', marginBottom: 20 }}>LEG 2 — RETURN</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+              <div>
+                <Label>Departs From</Label>
+                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{quote.delivery_location || '—'}</div>
+              </div>
+              <div style={{ fontSize: 20, color: C.faint }}>→</div>
+              <div>
+                <Label>Return Destination</Label>
+                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{quote.return_location || '—'}</div>
+              </div>
+            </div>
+            {(quote.return_cargo || quote.return_date) && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+                <div>
+                  <Label>Return Cargo</Label>
+                  <div style={{ fontSize: 13, color: quote.return_cargo ? C.text : C.faint }}>
+                    {quote.return_cargo || 'Empty return'}
+                  </div>
+                </div>
+                {quote.return_date && (
+                  <div>
+                    <Label>Return Date</Label>
+                    <div style={{ fontSize: 13, color: C.text, fontFamily: C.mono }}>
+                      {new Date(quote.return_date).toLocaleDateString('en-ZA')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Cargo details */}
         <Card>
@@ -278,16 +339,51 @@ export default function ClientQuoteView() {
               </span>
             </div>
           ))}
+          {quote.trip_type === 'ROUND_TRIP' && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px dashed ${C.accent}` }}>
+              <span style={{ fontSize: 13, color: C.accent }}>Return Leg ({quote.return_cargo ? 'with cargo' : 'empty return'})</span>
+              <span style={{ fontSize: 13, color: C.accent, fontFamily: C.mono, fontWeight: 600 }}>
+                {formatCurrencyLocal(parseFloat(quote.return_base_rate))}
+              </span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 16, marginTop: 4 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Total Amount</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
+              {quote.trip_type === 'ROUND_TRIP' ? 'Total (both legs)' : 'Total Amount'}
+            </span>
             <span style={{ fontSize: 26, fontWeight: 700, color: C.accent, fontFamily: C.mono }}>
               {formatCurrencyLocal(parseFloat(quote.total_amount || '0'))}
             </span>
           </div>
         </Card>
 
-        {/* Accept / Decline */}
-        {!isExpired && (
+        {/* Accept / Decline / Already responded / Expired */}
+        {alreadyActioned ? (
+          <div style={{
+            marginTop: 8,
+            padding: '20px 24px',
+            borderRadius: 6,
+            background: quote.status === 'ACCEPTED' ? C.successBg : C.dangerBg,
+            border: `1px solid ${quote.status === 'ACCEPTED' ? C.success : C.danger}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}>
+            <span style={{ fontSize: 20 }}>{quote.status === 'ACCEPTED' ? '✓' : '✗'}</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: quote.status === 'ACCEPTED' ? C.success : C.danger }}>
+                {quote.status === 'ACCEPTED' ? 'Quote Accepted' : 'Quote Declined'}
+              </div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                This quote has already been responded to and no further actions are available.
+              </div>
+            </div>
+          </div>
+        ) : isExpired ? (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: C.danger, fontSize: 13 }}>
+            This quote has expired and can no longer be accepted.
+          </div>
+        ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, marginTop: 8 }}>
             <button
               onClick={() => respondMutation.mutate('accept')}
@@ -325,12 +421,6 @@ export default function ClientQuoteView() {
             >
               DECLINE
             </button>
-          </div>
-        )}
-
-        {isExpired && (
-          <div style={{ textAlign: 'center', padding: '20px 0', color: C.danger, fontSize: 13 }}>
-            This quote has expired and can no longer be accepted.
           </div>
         )}
 

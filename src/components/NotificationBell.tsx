@@ -45,14 +45,12 @@ export function NotificationBell() {
       .catch(() => {});
   }, []);
 
+  // Load on mount, and re-load whenever a live WS event arrives.
   useEffect(() => { load(); }, [load]);
-
-  // Live: refresh the instant a real-time event arrives, plus a slow safety poll.
   useEffect(() => {
-    const onEvent = () => load();
-    window.addEventListener('tw:live-event', onEvent as EventListener);
-    const t = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 60000);
-    return () => { window.removeEventListener('tw:live-event', onEvent as EventListener); clearInterval(t); };
+    const handler = () => load();
+    window.addEventListener('tw:live-event', handler);
+    return () => window.removeEventListener('tw:live-event', handler);
   }, [load]);
 
   // Close on outside click

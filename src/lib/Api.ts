@@ -20,7 +20,9 @@ api.interceptors.response.use(
   res => res,
   error => {
     const reqUrl: string = error.config?.url || '';
-    const isAuthEndpoint = reqUrl.includes('auth/login') || reqUrl.includes('auth/register');
+    // A 401 on login/register means "wrong credentials"; on logout it means the
+    // session is already gone — none of these are an expired-session-mid-use event.
+    const isAuthEndpoint = reqUrl.includes('auth/login') || reqUrl.includes('auth/register') || reqUrl.includes('auth/logout');
 
     if (error.response?.status === 401 && !isAuthEndpoint) {
       toast.error('Session expired');
@@ -37,7 +39,8 @@ api.interceptors.response.use(
     const data = error.response?.data;
     let serverMsg: string | undefined;
     if (typeof data === 'string') {
-      serverMsg = data;
+      // Never surface raw HTML (Django debug pages, nginx error pages, etc.)
+      serverMsg = data.trim().startsWith('<') ? undefined : data;
     } else if (data && typeof data === 'object') {
       const obj = data as Record<string, any>;
       const firstField = obj.error ?? obj.detail ?? obj[Object.keys(obj)[0]];
@@ -79,9 +82,9 @@ export const putData = async ({ url, data }: { url: string; data: any }) => {
   return response.data;
 };
 
-export const patchData = async ({ url, data }: { url: string; data: any }) => {
+export const patchData = async ({ url, data, config = {} }: { url: string; data: any; config?: any }) => {
   if (!url) throw new Error('No patch URL provided');
-  const response = await api.patch(url, data);
+  const response = await api.patch(url, data, config);
   return response.data;
 };
 

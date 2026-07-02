@@ -3,6 +3,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import { fetchData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
 
+const TIER_META: Record<string, { color: string; label: string; feeRange: string; desc: string }> = {
+  PRIME:    { color: 'var(--accent-primary)',   label: 'Prime',    feeRange: '1.5%–2.0%', desc: 'Low-risk customer with strong payment history.' },
+  STANDARD: { color: 'var(--status-success)',   label: 'Standard', feeRange: '2.0%–2.75%', desc: 'Normal risk — reliable customer, acceptable DSO.' },
+  ELEVATED: { color: 'var(--status-warning)',   label: 'Elevated', feeRange: '2.75%–3.5%', desc: 'Moderate risk — slower payer or older invoice.' },
+  HIGH:     { color: 'var(--status-danger)',    label: 'High',     feeRange: '3.5%–4.5%', desc: 'Higher risk — late payment history or high DSO.' },
+};
+
 const STATUS_COLOR: Record<string, string> = {
   REQUESTED: 'var(--accent-primary)',
   APPROVED: 'var(--status-success)',
@@ -89,6 +96,12 @@ export default function AdvanceDetail() {
   const disbursedAt = advance.disbursed_at || advance.disbursedAt || null;
   const settledAt = advance.settled_at || advance.settledAt || null;
   const repaymentDate = advance.repayment_date || advance.due_date || advance.dueDate || null;
+
+  const riskDetail = advance.risk_score_detail || null;
+  const riskTier = (riskDetail?.tier || advance.risk_tier || '').toUpperCase();
+  const riskScore = riskDetail?.total_score ?? advance.risk_score ?? null;
+  const tierMeta = TIER_META[riskTier] || null;
+  const factorsBreakdown: Record<string, number> = riskDetail?.factors_breakdown || {};
 
   // Timeline steps
   const timelineSteps = [
@@ -237,11 +250,15 @@ export default function AdvanceDetail() {
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>Advanced to your account</div>
           </div>
 
+          {/* Fee Breakdown */}
           <div className="card" style={{ padding: 20 }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>Fee Breakdown</div>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Fee Breakdown</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 12 }}>
+              This is TruckWys's invoice factoring fee — the cost of receiving cash upfront before your customer pays.
+            </div>
             <div style={{ display: 'grid', gap: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Base Fee</span>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Factoring Fee</span>
                 <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{feePercent.toFixed(1)}%</span>
               </div>
               <div style={{ height: 1, background: 'var(--border-subtle)' }} />
@@ -251,6 +268,44 @@ export default function AdvanceDetail() {
               </div>
             </div>
           </div>
+
+          {/* Risk Assessment */}
+          {tierMeta && (
+            <div className="card" style={{ padding: 20, borderLeft: `3px solid ${tierMeta.color}` }}>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 12, textTransform: 'uppercase' }}>Risk Assessment</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: tierMeta.color }}>{tierMeta.label}</span>
+                {riskScore !== null && (
+                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', background: 'var(--bg-surface-hover)', padding: '2px 8px', borderRadius: 2 }}>
+                    Score: {Number(riskScore).toFixed(0)}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12 }}>{tierMeta.desc}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Fee range for this tier</span>
+                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: tierMeta.color }}>{tierMeta.feeRange}</span>
+              </div>
+              {Object.keys(factorsBreakdown).length > 0 && (
+                <>
+                  <div style={{ height: 1, background: 'var(--border-subtle)', marginBottom: 10 }} />
+                  <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>Score Factors</div>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {Object.entries(factorsBreakdown)
+                      .filter(([, val]) => typeof val === 'number' && !isNaN(val))
+                      .map(([key, val]) => (
+                        <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                            {key.replace(/_/g, ' ')}
+                          </span>
+                          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{(val as number).toFixed(1)}</span>
+                        </div>
+                      ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {disbursedAt && (
             <div className="card" style={{ padding: 20, background: 'var(--bg-surface-hover)', borderLeft: '4px solid var(--status-success)' }}>

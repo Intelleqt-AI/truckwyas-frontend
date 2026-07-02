@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
+import { DatePicker } from '@/components/ui/date-picker';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 
 // ========== TYPES ==========
@@ -184,31 +186,19 @@ export default function Insights() {
   const [period, setPeriod] = useState<PeriodType>('THIS_MONTH');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  // Data states
-  const [kpiData, setKpiData] = useState<KPIData | null>(null);
-  const [insightsData, setInsightsData] = useState<InsightsData | null>(null);
-  const [financeData, setFinanceData] = useState<FinanceData | null>(null);
-  const [cashflowData, setCashflowData] = useState<CashFlowData | null>(null);
-  const [loads, setLoads] = useState<Load[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [briefing, setBriefing] = useState<{ narrative?: string; ai_available?: boolean } | null>(null);
-
-  // AI executive briefing (Claude when configured, deterministic summary otherwise)
-  useEffect(() => {
-    fetchData('api/v1/dashboard/briefing/')
-      .then(setBriefing)
-      .catch(() => setBriefing(null));
-  }, []);
+  // AI executive briefing (LLM when configured, deterministic summary otherwise),
+  // grounded in the company's DB via RAG. Period-aware: re-fetches when the filter
+  // changes so the narrative matches the selected window. getPeriodParams() is only
+  // called inside queryFn (it's declared below), never synchronously in the key.
+  const { data: briefing = null } = useQuery<{ narrative?: string; ai_available?: boolean } | null>({
+    queryKey: ['insights-briefing', period, customFrom, customTo],
+    queryFn: () => fetchData(`api/v1/dashboard/briefing/?${getPeriodParams()}`).catch(() => null),
+  });
 
   // Build period params
   const getPeriodParams = (): string => {
     if (period === 'CUSTOM' && customFrom && customTo) {
-      return `date_from=${customFrom}&date_to=${customTo}`;
+      return `from=${customFrom}&to=${customTo}`;
     }
     const now = new Date();
     let from = '';
@@ -233,85 +223,82 @@ export default function Insights() {
         from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString().slice(0, 10);
         break;
     }
-    return `date_from=${from}&date_to=${to}`;
+    return `from=${from}&to=${to}`;
   };
 
-  // Load data for current tab
-  useEffect(() => {
-    const loadTabData = async () => {
-      setLoading(true);
+  // Per-tab data, cached per (tab, period, range) combination — revisiting a tab
+  // with the same filters serves cache instead of refetching every navigation.
+  const { data: tabData, isLoading: loading } = useQuery({
+    queryKey: ['insights-tab', tab, period, customFrom, customTo],
+    queryFn: async () => {
       const params = getPeriodParams();
-
-      try {
-        switch (tab) {
-          case 'briefing':
-            const [kpi, insights, loadsResp] = await Promise.all([
-              fetchData('api/v1/dashboard/kpi/').catch(() => null),
-              fetchData('api/v1/dashboard/insights/').catch(() => ({ recommendations: [] })),
-              fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
-            ]);
-            setKpiData(kpi);
-            setInsightsData(insights);
-            setLoads(loadsResp?.results || []);
-            break;
-
-          case 'margin':
-            const [finance, loadsData, expensesData] = await Promise.all([
-              fetchData(`api/v1/dashboard/finance/?${params}`).catch(() => null),
-              fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
-              fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
-            ]);
-            setFinanceData(finance);
-            setLoads(loadsData?.results || []);
-            setExpenses(expensesData?.results || []);
-            break;
-
-          case 'cash':
-            const [cf, finData, invData] = await Promise.all([
-              fetchData('api/v1/dashboard/cashflow/').catch(() => ({ forecast: [] })),
-              fetchData(`api/v1/dashboard/finance/?${params}`).catch(() => null),
-              fetchData('api/v1/invoices/?page_size=100').catch(() => ({ results: [] })),
-            ]);
-            setCashflowData(cf);
-            setFinanceData(finData);
-            setInvoices(invData?.results || []);
-            break;
-
-          case 'fleet':
-            const [veh, drv, exp] = await Promise.all([
-              fetchData('api/v1/vehicles/?page_size=50').catch(() => ({ results: [] })),
-              fetchData('api/v1/drivers/?page_size=50').catch(() => ({ results: [] })),
-              fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
-            ]);
-            setVehicles((veh?.results || []).map((v: any) => ({
+      switch (tab) {
+        case 'briefing': {
+          const [kpi, insights, loadsResp] = await Promise.all([
+            fetchData(`api/v1/dashboard/kpi/?${params}`).catch(() => null),
+            fetchData('api/v1/dashboard/insights/').catch(() => ({ recommendations: [] })),
+            fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
+          ]);
+          return { kpiData: kpi, insightsData: insights, loads: loadsResp?.results || [] };
+        }
+        case 'margin': {
+          const [finance, loadsData, expensesData] = await Promise.all([
+            fetchData(`api/v1/dashboard/finance/?${params}`).catch(() => null),
+            fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
+            fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
+          ]);
+          return { financeData: finance, loads: loadsData?.results || [], expenses: expensesData?.results || [] };
+        }
+        case 'cash': {
+          const [cf, finData, invData] = await Promise.all([
+            fetchData('api/v1/dashboard/cashflow/').catch(() => ({ forecast: [] })),
+            fetchData(`api/v1/dashboard/finance/?${params}`).catch(() => null),
+            fetchData('api/v1/invoices/?page_size=100').catch(() => ({ results: [] })),
+          ]);
+          return { cashflowData: cf, financeData: finData, invoices: invData?.results || [] };
+        }
+        case 'fleet': {
+          const [veh, drv, exp] = await Promise.all([
+            fetchData('api/v1/vehicles/?page_size=50').catch(() => ({ results: [] })),
+            fetchData('api/v1/drivers/?page_size=50').catch(() => ({ results: [] })),
+            fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
+          ]);
+          return {
+            vehicles: (veh?.results || []).map((v: any) => ({
               ...v,
               uptime_percentage: parseFloat(v.uptime_percentage || '0'),
               cost_per_km: parseFloat(v.cost_per_km || '0'),
               margin_per_trip: parseFloat(v.margin_per_trip || '0'),
               mileage: parseFloat(v.mileage || '0'),
-            })));
-            setDrivers(drv?.results || []);
-            setExpenses(exp?.results || []);
-            break;
-
-          case 'lanes':
-            const [lds, exps] = await Promise.all([
-              fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
-              fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
-            ]);
-            setLoads(lds?.results || []);
-            setExpenses(exps?.results || []);
-            break;
+            })),
+            drivers: drv?.results || [],
+            expenses: exp?.results || [],
+          };
         }
-      } catch (err) {
-        console.error('Failed to load insights data:', err);
-      } finally {
-        setLoading(false);
+        case 'lanes': {
+          const [lds, exps] = await Promise.all([
+            fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
+            fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
+          ]);
+          return { loads: lds?.results || [], expenses: exps?.results || [] };
+        }
+        default:
+          return {};
       }
-    };
+    },
+  });
 
-    loadTabData();
-  }, [tab, period, customFrom, customTo]);
+  // Cached data drives the view; defaults keep each tab's first render safe.
+  const td = tabData as any;
+  const kpiData = (td?.kpiData ?? null) as KPIData | null;
+  const insightsData = (td?.insightsData ?? null) as InsightsData | null;
+  const financeData = (td?.financeData ?? null) as FinanceData | null;
+  const cashflowData = (td?.cashflowData ?? null) as CashFlowData | null;
+  const loads = (td?.loads ?? []) as Load[];
+  const invoices = (td?.invoices ?? []) as Invoice[];
+  const expenses = (td?.expenses ?? []) as Expense[];
+  const drivers = (td?.drivers ?? []) as Driver[];
+  const vehicles = (td?.vehicles ?? []) as Vehicle[];
 
   // Helper functions
   const getMarginColor = (pct: number) => {
@@ -402,34 +389,18 @@ export default function Insights() {
         ))}
         {period === 'CUSTOM' && (
           <>
-            <input
-              type="date"
+            <DatePicker
               value={customFrom}
-              onChange={e => setCustomFrom(e.target.value)}
-              style={{
-                background: 'var(--input-bg)',
-                border: '1px solid var(--border-subtle)',
-                color: 'var(--text-primary)',
-                padding: '6px 10px',
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
-                borderRadius: 2,
-              }}
+              onChange={setCustomFrom}
+              placeholder="From"
+              style={{ width: 130, padding: '6px 10px', fontSize: 11 }}
             />
             <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>to</span>
-            <input
-              type="date"
+            <DatePicker
               value={customTo}
-              onChange={e => setCustomTo(e.target.value)}
-              style={{
-                background: 'var(--input-bg)',
-                border: '1px solid var(--border-subtle)',
-                color: 'var(--text-primary)',
-                padding: '6px 10px',
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
-                borderRadius: 2,
-              }}
+              onChange={setCustomTo}
+              placeholder="To"
+              style={{ width: 130, padding: '6px 10px', fontSize: 11 }}
             />
           </>
         )}

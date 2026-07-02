@@ -1,10 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Driver {
   id: number;
@@ -65,12 +68,8 @@ const getDriverName = (d: Driver) => {
 export default function Drivers() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [vehicles, setVehicles] = useState<{ id: number; plate: string; make?: string; model?: string; driver_id?: number | null }[]>([]);
-  const [overview, setOverview] = useState<DriverOverview | null>(null);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('All');
+  const [search, setSearch] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -86,21 +85,39 @@ export default function Drivers() {
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
 
-  const load = useCallback(() => {
-    return Promise.all([
-      fetchData('api/v1/drivers/'),
-      fetchData('api/v1/drivers/overview/').catch(() => null),
-      fetchData('api/v1/drivers/leaderboard/').catch(() => null),
-      fetchData('api/v1/vehicles/').catch(() => null),
-    ]).then(([driversData, overviewData, leaderboardData, vehicleData]) => {
+  // Debounce search into the queryKey so typing doesn't refire on every keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const didMountDrivers = useRef(false);
+  useEffect(() => {
+    if (!didMountDrivers.current) { didMountDrivers.current = true; setDebouncedSearch(search); return; }
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(searchTimer.current);
+  }, [search]);
+
+  const { data, isLoading: loading, refetch } = useQuery({
+    queryKey: ['drivers-page', debouncedSearch],
+    queryFn: async () => {
+      const q = debouncedSearch;
+      const driversUrl = q
+        ? `api/v1/drivers/?search=${encodeURIComponent(q)}`
+        : 'api/v1/drivers/';
+      const [driversData, overviewData, leaderboardData, vehicleData] = await Promise.all([
+        fetchData(driversUrl),
+        fetchData('api/v1/drivers/overview/').catch(() => null),
+        fetchData('api/v1/drivers/leaderboard/').catch(() => null),
+        fetchData('api/v1/vehicles/').catch(() => null),
+      ]);
+
       const vehicleList = Array.isArray(vehicleData) ? vehicleData : (vehicleData?.results || []);
-      setVehicles(vehicleList.map((v: any) => ({
+      const vehicles = vehicleList.map((v: any) => ({
         id: v.id,
         plate: v.plate || v.registration || `Vehicle ${v.id}`,
         make: v.make,
         model: v.model,
         driver_id: v.driver ?? null,
-      })));
+      }));
       const driverList = Array.isArray(driversData) ? driversData : (driversData?.results || []);
 
       // Parse leaderboard data
@@ -115,7 +132,7 @@ export default function Drivers() {
       }));
 
       // Flatten user_details into driver and merge leaderboard data
-      const driversWithPerformance = driverList.map((driver: any) => {
+      const drivers = driverList.map((driver: any) => {
         const ud = driver.user_details || {};
         const flattened: Driver = {
           ...driver,
@@ -131,36 +148,37 @@ export default function Drivers() {
         return flattened;
       });
 
-      setDrivers(driversWithPerformance);
-      setLeaderboard(leaderboardEntries);
-
+      let overview: DriverOverview;
       if (overviewData?.kpi_cards) {
         const cards = overviewData.kpi_cards as any[];
         const findVal = (kw: string) => {
           const c = cards.find((c: any) => (c.key || c.label || '').toString().toLowerCase().includes(kw));
           return parseFloat(c?.value) || 0;
         };
-        setOverview({
+        overview = {
           total_drivers: findVal('total') || driversData?.count || driverList.length,
           active_drivers: findVal('active') || driverList.filter((d: any) => d.status === 'ACTIVE').length,
           avg_revenue_per_driver: findVal('revenue') || findVal('avg') || 0,
-        });
+        };
       } else if (overviewData) {
-        setOverview(overviewData);
+        overview = overviewData;
       } else {
-        setOverview({
+        overview = {
           total_drivers: driverList.length,
           active_drivers: driverList.filter((d: any) => d.status === 'ACTIVE').length,
           avg_revenue_per_driver: 0,
-        });
+        };
       }
-    }).catch(() => {
-      setDrivers([]);
-    }).finally(() => setLoading(false));
-  }, []);
 
-  useEffect(() => { load(); }, [load]);
-  useAutoRefresh(load);
+      return { drivers, vehicles, overview, leaderboard: leaderboardEntries };
+    },
+  });
+
+  const drivers: Driver[] = data?.drivers ?? [];
+  const vehicles: { id: number; plate: string; make?: string; model?: string; driver_id?: number | null }[] = data?.vehicles ?? [];
+  const overview: DriverOverview | null = data?.overview ?? null;
+
+  useAutoRefresh(refetch);
 
   const filtered = drivers.filter(d => statusFilter === 'All' || d.status === statusFilter);
 
@@ -218,33 +236,52 @@ export default function Drivers() {
         ))}
       </div>
 
-      {/* Status Filter Tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {['All', 'ACTIVE', 'INACTIVE', 'ON_LEAVE'].map(status => {
-          const isActive = statusFilter === status;
-          return (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              style={{
-                background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                padding: '6px 12px',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                borderRadius: 2,
-                cursor: 'pointer',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                fontWeight: isActive ? 600 : 400,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {status === 'All' ? 'ALL' : status.replace('_', ' ')}
-            </button>
-          );
-        })}
+      {/* Search + Status Filter Toolbar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <input
+          type="text"
+          placeholder="Search name, license, username..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{
+            width: 280,
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-subtle)',
+            color: 'var(--text-primary)',
+            padding: '8px 12px',
+            borderRadius: 2,
+            fontSize: 12,
+            fontFamily: 'var(--font-mono)',
+            outline: 'none',
+          }}
+        />
+        <div style={{ display: 'flex', gap: 8 }}>
+          {['All', 'ACTIVE', 'INACTIVE', 'ON_LEAVE'].map(status => {
+            const isActive = statusFilter === status;
+            return (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                style={{
+                  background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                  padding: '6px 12px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  fontWeight: isActive ? 600 : 400,
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Table */}
@@ -383,18 +420,7 @@ export default function Drivers() {
                               try {
                                 await deleteData({ url: `api/v1/drivers/${d.id}/` });
                                 toast.success('Driver deleted');
-                                const res = await fetchData('api/v1/drivers/');
-                                const driverList = Array.isArray(res) ? res : (res?.results || []);
-                                setDrivers(driverList.map((driver: any) => {
-                                  const ud = driver.user_details || {};
-                                  return {
-                                    ...driver,
-                                    first_name: driver.first_name || ud.first_name || '',
-                                    last_name: driver.last_name || ud.last_name || '',
-                                    name: driver.name || ud.name || (ud.first_name ? `${ud.first_name} ${ud.last_name || ''}`.trim() : ''),
-                                    phone: driver.phone || ud.phone || '',
-                                  };
-                                }));
+                                refetch();
                               } catch (err: any) {
                                 toast.error(err?.message || 'Failed to delete driver');
                               }
@@ -435,13 +461,20 @@ export default function Drivers() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <input
-                  type={f.type || 'text'}
-                  placeholder={f.placeholder}
-                  value={(addForm as any)[f.key]}
-                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
-                />
+                {f.type === 'date' ? (
+                  <DatePicker
+                    value={(addForm as any)[f.key]}
+                    onChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}
+                  />
+                ) : (
+                  <input
+                    type={f.type || 'text'}
+                    placeholder={f.placeholder}
+                    value={(addForm as any)[f.key]}
+                    onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                )}
               </div>
             ))}
             {[
@@ -450,29 +483,30 @@ export default function Drivers() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <select
-                  value={(addForm as any)[f.key]}
-                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
-                >
-                  {f.options.map(o => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}
-                </select>
+                <Select value={(addForm as any)[f.key]} onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {f.options.map(o => <SelectItem key={o} value={o}>{o.replace('_', ' ')}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Vehicle</label>
-              <select
-                value={addForm.vehicle}
-                onChange={e => setAddForm(prev => ({ ...prev, vehicle: e.target.value }))}
-                style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
-              >
-                <option value="">— No vehicle assigned —</option>
-                {vehicles.map(v => (
-                  <option key={v.id} value={v.id}>
-                    {v.plate}{v.make || v.model ? ` — ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
-                  </option>
-                ))}
-              </select>
+              <Select value={addForm.vehicle} onValueChange={val => setAddForm(prev => ({ ...prev, vehicle: val }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="— No vehicle assigned —" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicles.map(v => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      {v.plate}{v.make || v.model ? ` — ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
@@ -511,20 +545,8 @@ export default function Drivers() {
                     }
                     setShowAddForm(false);
                     setAddForm({ first_name: '', last_name: '', email: '', phone: '', address: '', license_number: '', license_expiry: '', medical_card_expiry: '', license_state: 'GP', hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE', emergency_contact: '', vehicle: '' });
-                    // Refresh with user_details flattening
-                    const d = await fetchData('api/v1/drivers/');
-                    const driverList = Array.isArray(d) ? d : (d?.results || []);
-                    const driversWithNames = driverList.map((driver: any) => {
-                      const ud = driver.user_details || {};
-                      return {
-                        ...driver,
-                        first_name: driver.first_name || ud.first_name || '',
-                        last_name: driver.last_name || ud.last_name || '',
-                        name: driver.name || ud.name || (ud.first_name ? `${ud.first_name} ${ud.last_name || ''}`.trim() : ''),
-                        phone: driver.phone || ud.phone || '',
-                      };
-                    });
-                    setDrivers(driversWithNames);
+                    // Refresh
+                    refetch();
                   } catch (e: any) { toast.error(e?.message || 'Failed to create driver'); }
                   setSaving(false);
                 }}
@@ -571,13 +593,20 @@ export default function Drivers() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <input
-                  type={f.type || 'text'}
-                  placeholder={f.placeholder}
-                  value={(editForm as any)[f.key] ?? ''}
-                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
-                />
+                {f.type === 'date' ? (
+                  <DatePicker
+                    value={(editForm as any)[f.key] ?? ''}
+                    onChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}
+                  />
+                ) : (
+                  <input
+                    type={f.type || 'text'}
+                    placeholder={f.placeholder}
+                    value={(editForm as any)[f.key] ?? ''}
+                    onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                )}
               </div>
             ))}
             {[
@@ -586,29 +615,30 @@ export default function Drivers() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <select
-                  value={(editForm as any)[f.key]}
-                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
-                >
-                  {f.options.map(o => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}
-                </select>
+                <Select value={(editForm as any)[f.key]} onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {f.options.map(o => <SelectItem key={o} value={o}>{o.replace('_', ' ')}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Vehicle</label>
-              <select
-                value={editForm.vehicle ?? ''}
-                onChange={e => setEditForm((prev: any) => ({ ...prev, vehicle: e.target.value }))}
-                style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
-              >
-                <option value="">— No vehicle assigned —</option>
-                {vehicles.map(v => (
-                  <option key={v.id} value={v.id}>
-                    {v.plate}{v.make || v.model ? ` — ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
-                  </option>
-                ))}
-              </select>
+              <Select value={editForm.vehicle ?? ''} onValueChange={val => setEditForm((prev: any) => ({ ...prev, vehicle: val }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="— No vehicle assigned —" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicles.map(v => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      {v.plate}{v.make || v.model ? ` — ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
@@ -639,20 +669,8 @@ export default function Drivers() {
                     setEditDriver(null);
                     setEditForm({});
 
-                    // Re-fetch with user_details flattening
-                    const d = await fetchData('api/v1/drivers/');
-                    const driverList = Array.isArray(d) ? d : (d?.results || []);
-                    const driversWithNames = driverList.map((driver: any) => {
-                      const ud = driver.user_details || {};
-                      return {
-                        ...driver,
-                        first_name: driver.first_name || ud.first_name || '',
-                        last_name: driver.last_name || ud.last_name || '',
-                        name: driver.name || ud.name || (ud.first_name ? `${ud.first_name} ${ud.last_name || ''}`.trim() : ''),
-                        phone: driver.phone || ud.phone || '',
-                      };
-                    });
-                    setDrivers(driversWithNames);
+                    // Refresh
+                    refetch();
                   } catch (e: any) {
                     setError(e?.message || 'Failed to update driver');
                   }

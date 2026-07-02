@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
@@ -43,9 +44,19 @@ const TAB_SUBTITLES: Record<BookingTab, string> = {
 };
 
 export default function LoadsList() {
-  const [loads, setLoads] = useState<Load[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading: loading, isError, isFetching, refetch } = useQuery({
+    queryKey: ["loads-list"],
+    queryFn: () => fetchData('/api/v1/loads/'),
+    // Give the backend enough time to wake from a cold start (Render free tier ~20-30s).
+    // Retry up to 4 times with increasing delays: 3s, 6s, 9s, 12s.
+    retry: (failureCount, error: any) => {
+      if (error?.status === 401 || error?.status === 403) return false;
+      return failureCount < 4;
+    },
+    retryDelay: (attempt) => Math.min(3000 * (attempt + 1), 12000),
+  });
+  const loads = (data?.results || data || []) as Load[];
+  const error = isError ? 'Failed to load bookings' : null;
   const [convertingIds, setConvertingIds] = useState<Set<number>>(new Set());
   const [orderFilter, setOrderFilter] = useState('All');
   const [historyFilter, setHistoryFilter] = useState('All');
@@ -82,22 +93,7 @@ export default function LoadsList() {
     }
   };
 
-  const load = () => {
-    return fetchData('/api/v1/loads/')
-      .then((data: any) => {
-        const loadsData = data?.results || data || [];
-        setLoads(loadsData);
-        setError(null);
-      })
-      .catch(() => {
-        setError('Failed to load bookings');
-        setLoads([]);
-      })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, []);
-  useAutoRefresh(load);
+  useAutoRefresh(refetch);
 
   const activeLoads = loads.filter(l => ACTIVE_STATUSES.includes(l.status));
   const historyLoads = loads.filter(l => HISTORY_STATUSES.includes(l.status));
@@ -224,8 +220,20 @@ export default function LoadsList() {
   if (error) {
     return (
       <div style={{ padding: 40 }}>
-        <div style={{ fontSize: 13, color: 'var(--status-error)', marginBottom: 12 }}>{error}</div>
-        <button className="btn-action" onClick={() => window.location.reload()}>Retry</button>
+        <div style={{ fontSize: 13, color: 'var(--status-danger)', marginBottom: 4 }}>
+          Unable to reach the server.
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 16 }}>
+          The server may be starting up — this usually resolves in 20–30 seconds.
+        </div>
+        <button
+          className="btn-action"
+          disabled={isFetching}
+          onClick={() => refetch()}
+          style={{ opacity: isFetching ? 0.6 : 1 }}
+        >
+          {isFetching ? 'Connecting…' : 'Retry'}
+        </button>
       </div>
     );
   }

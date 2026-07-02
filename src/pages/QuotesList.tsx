@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
@@ -179,6 +179,18 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
   const loads: any[] = loadsData?.results || loadsData || [];
   const quotes: any[] = quotesData?.results || quotesData || [];
 
+  // Live update: refetch when backend pushes any quote event over WebSocket
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { detail } = (e as CustomEvent);
+      if (typeof detail?.event === 'string' && detail.event.startsWith('quote.')) {
+        queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      }
+    };
+    window.addEventListener('tw:live-event', handler);
+    return () => window.removeEventListener('tw:live-event', handler);
+  }, [queryClient]);
+
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       patchData({ url: `api/v1/quotes/${id}/`, data: { status } }),
@@ -194,7 +206,9 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
         data: {},
       }),
     onSuccess: (_data, quote) => {
+      // Invalidate both keys — QuotesList uses 'loads', LoadsList uses 'loads-list'
       queryClient.invalidateQueries({ queryKey: ['loads'] });
+      queryClient.invalidateQueries({ queryKey: ['loads-list'] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       toast.success(`Quote ${quote.quote_number} converted to load`);
     },
@@ -264,8 +278,12 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
     const quote = quotes.find(q => String(q.id) === quoteId);
     if (!quote || quote.status === newStatus) return;
 
-    // Optimistically update UI and call API
-    statusMutation.mutate({ id: quoteId, status: newStatus });
+    // Dragging to In-Transit must create a load record, not just patch status
+    if (newStatus === 'IT') {
+      convertToLoadMutation.mutate(quote);
+    } else {
+      statusMutation.mutate({ id: quoteId, status: newStatus });
+    }
   };
 
   const activeQuote = activeQuoteId ? quotes.find(q => String(q.id) === activeQuoteId) : null;

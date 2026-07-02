@@ -1,21 +1,38 @@
 import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
-import type { Map as LeafletMap, Marker, Polyline, LeafletMouseEvent } from 'leaflet';
+import type { Map as LeafletMap, Marker, Polyline, TileLayer, LeafletMouseEvent } from 'leaflet';
 import type { LocationCoords } from './LocationInput';
 
 type LeafletModule = typeof import('leaflet');
+type MapField = 'pickup' | 'delivery' | 'return';
 
 const TOMTOM_KEY = import.meta.env.VITE_TOMTOM_API_KEY as string | undefined;
 const SA_CENTER: [number, number] = [-28.4793, 24.6727];
 
+interface RouteOptionGeo {
+  index: number;
+  is_best: boolean;
+  geometry: { lat: number; lon: number }[];
+}
+
 interface MapLocationPickerProps {
   pickupCoords: LocationCoords | null;
   deliveryCoords: LocationCoords | null;
-  onLocationSelect: (field: 'pickup' | 'delivery', label: string, coords: LocationCoords) => void;
+  returnCoords?: LocationCoords | null;
+  showReturn?: boolean;
+  activeField: MapField;
+  onActiveFieldChange: (field: MapField) => void;
+  onLocationSelect: (field: MapField, label: string, coords: LocationCoords) => void;
+  onExpand?: () => void;
+  onClose?: () => void;
+  mapHeight?: number;
+  // Outbound TomTom routes (best + alternatives). When provided, the map draws all of
+  // them — selected/best in green, the rest grey & clickable — instead of one preview line.
+  routeOptions?: RouteOptionGeo[];
+  selectedRouteIndex?: number;
+  onSelectRoute?: (index: number) => void;
 }
 
-/** Fetch a road-following route between two points.
- *  Tries TomTom Routing API first, falls back to OSRM (free, no key). */
 async function fetchRoute(
   from: { lat: number; lon: number },
   to: { lat: number; lon: number },
@@ -36,7 +53,6 @@ async function fetchRoute(
     }
   }
 
-  // OSRM fallback — free, no key
   try {
     const res = await fetch(
       `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson`
@@ -44,18 +60,16 @@ async function fetchRoute(
     const data = await res.json();
     const coords: [number, number][] = data?.routes?.[0]?.geometry?.coordinates ?? [];
     if (coords.length > 1) {
-      return coords.map(([lng, lat]) => [lat, lng]); // GeoJSON is [lng,lat], Leaflet wants [lat,lng]
+      return coords.map(([lng, lat]) => [lat, lng]);
     }
   } catch {
-    // fall through to straight line
+    // fall through
   }
 
-  // Final fallback: straight line
   return [[from.lat, from.lon], [to.lat, to.lon]];
 }
 
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  // Try TomTom first if key is available
   if (TOMTOM_KEY) {
     try {
       const res = await fetch(
@@ -69,7 +83,6 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
     }
   }
 
-  // Nominatim fallback (free, no key needed)
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
@@ -77,7 +90,6 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
     );
     const data = await res.json();
     if (data?.display_name) {
-      // Trim to most useful parts: road/suburb, city, country
       const a = data.address || {};
       const parts = [
         a.road || a.suburb || a.neighbourhood,
@@ -93,19 +105,43 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
-export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSelect }: MapLocationPickerProps) {
+export function MapLocationPicker({
+  pickupCoords,
+  deliveryCoords,
+  returnCoords,
+  showReturn = false,
+  activeField,
+  onActiveFieldChange,
+  onLocationSelect,
+  onExpand,
+  onClose,
+  mapHeight = 270,
+  routeOptions,
+  selectedRouteIndex = 0,
+  onSelectRoute,
+}: MapLocationPickerProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const instanceRef = useRef<{ map: LeafletMap; L: LeafletModule } | null>(null);
   const pickupMarkerRef = useRef<Marker | null>(null);
   const deliveryMarkerRef = useRef<Marker | null>(null);
+  const returnMarkerRef = useRef<Marker | null>(null);
   const lineRef = useRef<Polyline | null>(null);
-  const activeFieldRef = useRef<'pickup' | 'delivery'>('pickup');
+  const returnLineRef = useRef<Polyline | null>(null);
+  const routeLinesRef = useRef<Polyline[]>([]);
+  const routeLabelsRef = useRef<Marker[]>([]);
+  const trafficLayerRef = useRef<TileLayer | null>(null);
+  const activeFieldRef = useRef<MapField>(activeField);
+  const onActiveFieldChangeRef = useRef(onActiveFieldChange);
   const onLocationSelectRef = useRef(onLocationSelect);
-  const [activeField, setActiveField] = useState<'pickup' | 'delivery'>('pickup');
+  const showReturnRef = useRef(showReturn);
   const [geocoding, setGeocoding] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [showTraffic, setShowTraffic] = useState(true);
 
   useEffect(() => { activeFieldRef.current = activeField; }, [activeField]);
+  useEffect(() => { onActiveFieldChangeRef.current = onActiveFieldChange; }, [onActiveFieldChange]);
   useEffect(() => { onLocationSelectRef.current = onLocationSelect; }, [onLocationSelect]);
+  useEffect(() => { showReturnRef.current = showReturn; }, [showReturn]);
 
   // Init map once
   useEffect(() => {
@@ -123,7 +159,8 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
         shadowUrl: new URL('leaflet/dist/images/marker-shadow.png', import.meta.url).href,
       });
 
-      const map = L.map(mapRef.current, { center: SA_CENTER, zoom: 5, zoomControl: true });
+      // doubleClickZoom off: a double-tap selects the point (see 'dblclick' below) instead of zooming.
+      const map = L.map(mapRef.current, { center: SA_CENTER, zoom: 5, zoomControl: true, doubleClickZoom: false });
 
       const tileUrl = TOMTOM_KEY
         ? `https://api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=${TOMTOM_KEY}&tileSize=256`
@@ -134,16 +171,26 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
         maxZoom: 19,
       }).addTo(map);
 
-      map.on('click', async (e: LeafletMouseEvent) => {
+      // Live traffic flow overlay (relative0 = Google-Maps-style green→red congestion colours).
+      // Created here; the toggle effect adds/removes it based on `showTraffic`.
+      if (TOMTOM_KEY) {
+        trafficLayerRef.current = L.tileLayer(
+          `https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${TOMTOM_KEY}`,
+          { opacity: 0.75, maxZoom: 22, zIndex: 5 }
+        );
+      }
+
+      map.on('dblclick', async (e: LeafletMouseEvent) => {
         const { lat, lng } = e.latlng;
         const field = activeFieldRef.current;
         setGeocoding(true);
         try {
           const label = await reverseGeocode(lat, lng);
           onLocationSelectRef.current(field, label, { lat, lon: lng });
-          // After setting pickup, auto-switch to delivery so the next click sets it
           if (field === 'pickup') {
-            setActiveField('delivery');
+            onActiveFieldChangeRef.current('delivery');
+          } else if (field === 'delivery' && showReturnRef.current) {
+            onActiveFieldChangeRef.current('return');
           }
         } finally {
           setGeocoding(false);
@@ -151,6 +198,7 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
       });
 
       instanceRef.current = { map, L };
+      setMapReady(true);
     })();
 
     return () => {
@@ -159,19 +207,34 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
         instanceRef.current.map.remove();
         instanceRef.current = null;
       }
+      setMapReady(false);
     };
   }, []);
 
-  // Update markers + line whenever coords change
+  // Show/hide the live traffic flow overlay
   useEffect(() => {
     const inst = instanceRef.current;
-    if (!inst) return;
-    const { map, L } = inst;
+    if (!inst || !mapReady || !trafficLayerRef.current) return;
+    if (showTraffic) trafficLayerRef.current.addTo(inst.map);
+    else inst.map.removeLayer(trafficLayerRef.current);
+  }, [showTraffic, mapReady]);
 
-    // Remove old markers and line
+  // Update markers + lines whenever coords change (mapReady ensures this re-runs after remount)
+  useEffect(() => {
+    const inst = instanceRef.current;
+    if (!inst || !mapReady) return;
+    const { map, L } = inst;
+    let cancelled = false;
+
     if (pickupMarkerRef.current) { map.removeLayer(pickupMarkerRef.current); pickupMarkerRef.current = null; }
     if (deliveryMarkerRef.current) { map.removeLayer(deliveryMarkerRef.current); deliveryMarkerRef.current = null; }
+    if (returnMarkerRef.current) { map.removeLayer(returnMarkerRef.current); returnMarkerRef.current = null; }
     if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
+    if (returnLineRef.current) { map.removeLayer(returnLineRef.current); returnLineRef.current = null; }
+    routeLinesRef.current.forEach((ln) => map.removeLayer(ln));
+    routeLinesRef.current = [];
+    routeLabelsRef.current.forEach((m) => map.removeLayer(m));
+    routeLabelsRef.current = [];
 
     if (pickupCoords) {
       pickupMarkerRef.current = L.marker([pickupCoords.lat, pickupCoords.lon], {
@@ -195,29 +258,100 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
       }).addTo(map);
     }
 
-    // Draw road-following route between P and D when both are set
+    if (returnCoords) {
+      returnMarkerRef.current = L.marker([returnCoords.lat, returnCoords.lon], {
+        icon: L.divIcon({
+          html: '<div style="background:#16a34a;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">R</div>',
+          className: '',
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        }),
+      }).addTo(map);
+    }
+
+    // Outbound leg: P → D
     if (pickupCoords && deliveryCoords) {
-      // Fit bounds immediately using straight-line corners while route loads
       map.fitBounds(
         [[pickupCoords.lat, pickupCoords.lon], [deliveryCoords.lat, deliveryCoords.lon]],
         { padding: [40, 40], maxZoom: 12 }
       );
+      if (routeOptions && routeOptions.length > 0) {
+        // Distinct color per route so users can match map lines to the option list.
+        const ROUTE_COLORS = ['#16a34a', '#2563eb', '#ea580c', '#7c3aed'];
+        const allPts: [number, number][] = [];
+        // Draw non-selected first so the selected route ends up on top.
+        const ordered = [...routeOptions].sort(
+          (a, b) => Number(a.index === selectedRouteIndex) - Number(b.index === selectedRouteIndex)
+        );
+        ordered.forEach((r) => {
+          const pts = (r.geometry || []).map((p) => [p.lat, p.lon] as [number, number]);
+          if (pts.length < 2) return;
+          const isSel = r.index === selectedRouteIndex;
+          const color = ROUTE_COLORS[r.index % ROUTE_COLORS.length];
+          const line = L.polyline(
+            pts,
+            isSel
+              ? { color, weight: 6, opacity: 0.95 }
+              : { color, weight: 4, opacity: 0.45 }
+          ).addTo(map);
+          if (onSelectRoute) line.on('click', () => onSelectRoute(r.index));
+          if (isSel) line.bringToFront();
+          routeLinesRef.current.push(line);
+          pts.forEach((pt) => allPts.push(pt));
 
-      fetchRoute(pickupCoords, deliveryCoords).then((routePoints) => {
-        if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
-        lineRef.current = L.polyline(routePoints, {
-          color: '#0057FF',
-          weight: 4,
-          opacity: 0.85,
-        }).addTo(map);
-        map.fitBounds(lineRef.current.getBounds(), { padding: [40, 40], maxZoom: 12 });
-      });
+          // Numbered badge at the midpoint of each route
+          const mid = pts[Math.floor(pts.length / 2)];
+          const label = L.marker(mid, {
+            icon: L.divIcon({
+              html: `<div style="background:${color};color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);opacity:${isSel ? 1 : 0.65}">${r.index + 1}</div>`,
+              className: '',
+              iconSize: [20, 20],
+              iconAnchor: [10, 10],
+            }),
+            interactive: false,
+          }).addTo(map);
+          routeLabelsRef.current.push(label);
+        });
+        if (allPts.length) {
+          const bounds = L.latLngBounds(allPts);
+          if (returnCoords) bounds.extend([returnCoords.lat, returnCoords.lon]);
+          map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+        }
+      } else {
+        // No backend routes yet — lightweight single-line preview (pre-calculation).
+        fetchRoute(pickupCoords, deliveryCoords).then((pts) => {
+          if (cancelled) return;
+          if (lineRef.current) { map.removeLayer(lineRef.current); lineRef.current = null; }
+          lineRef.current = L.polyline(pts, { color: '#0057FF', weight: 4, opacity: 0.85 }).addTo(map);
+          // Fit to include return marker too if present
+          const bounds = lineRef.current.getBounds();
+          if (returnCoords) bounds.extend([returnCoords.lat, returnCoords.lon]);
+          map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+        });
+      }
     } else if (pickupCoords) {
       map.setView([pickupCoords.lat, pickupCoords.lon], 12);
     } else if (deliveryCoords) {
       map.setView([deliveryCoords.lat, deliveryCoords.lon], 12);
     }
-  }, [pickupCoords, deliveryCoords]);
+
+    // Return leg: D → R
+    if (deliveryCoords && returnCoords) {
+      fetchRoute(deliveryCoords, returnCoords).then((pts) => {
+        if (cancelled) return;
+        if (returnLineRef.current) { map.removeLayer(returnLineRef.current); returnLineRef.current = null; }
+        returnLineRef.current = L.polyline(pts, { color: '#16a34a', weight: 4, opacity: 0.8, dashArray: '8 5' }).addTo(map);
+      });
+    }
+
+    return () => { cancelled = true; };
+  }, [pickupCoords, deliveryCoords, returnCoords, mapReady, routeOptions, selectedRouteIndex]);
+
+  const FIELD_CONFIG: { key: MapField; label: string; color: string; visible: boolean }[] = [
+    { key: 'pickup', label: '● PICKUP', color: '#0057FF', visible: true },
+    { key: 'delivery', label: '● DELIVERY', color: '#e85d04', visible: true },
+    { key: 'return', label: '● RETURN', color: '#16a34a', visible: showReturn },
+  ];
 
   const btnBase: React.CSSProperties = {
     flex: 1,
@@ -234,34 +368,25 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
   return (
     <div style={{ marginBottom: 4 }}>
       <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-        <button
-          type="button"
-          onClick={() => setActiveField('pickup')}
-          style={{
-            ...btnBase,
-            background: activeField === 'pickup' ? '#0057FF' : 'var(--bg-surface)',
-            border: `1px solid ${activeField === 'pickup' ? '#0057FF' : 'var(--border-subtle)'}`,
-            color: activeField === 'pickup' ? '#fff' : 'var(--text-tertiary)',
-          }}
-        >
-          ● PICKUP
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveField('delivery')}
-          style={{
-            ...btnBase,
-            background: activeField === 'delivery' ? '#e85d04' : 'var(--bg-surface)',
-            border: `1px solid ${activeField === 'delivery' ? '#e85d04' : 'var(--border-subtle)'}`,
-            color: activeField === 'delivery' ? '#fff' : 'var(--text-tertiary)',
-          }}
-        >
-          ● DELIVERY
-        </button>
+        {FIELD_CONFIG.filter((f) => f.visible).map(({ key, label, color }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onActiveFieldChange(key)}
+            style={{
+              ...btnBase,
+              background: activeField === key ? color : 'var(--bg-surface)',
+              border: `1px solid ${activeField === key ? color : 'var(--border-subtle)'}`,
+              color: activeField === key ? '#fff' : 'var(--text-tertiary)',
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       <div style={{ position: 'relative', border: '1px solid var(--border-subtle)', borderRadius: 3, overflow: 'hidden' }}>
-        <div ref={mapRef} style={{ height: 270, width: '100%' }} />
+        <div ref={mapRef} style={{ height: mapHeight, width: '100%' }} />
 
         <div style={{
           position: 'absolute', bottom: 8, left: 8, zIndex: 500,
@@ -270,7 +395,7 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
           fontSize: 9, color: '#fff', fontFamily: 'var(--font-mono)',
           letterSpacing: '0.07em', pointerEvents: 'none',
         }}>
-          CLICK MAP TO SET {activeField.toUpperCase()}
+          DOUBLE-TAP MAP TO SET {activeField.toUpperCase()}
         </div>
 
         {geocoding && (
@@ -281,6 +406,75 @@ export function MapLocationPicker({ pickupCoords, deliveryCoords, onLocationSele
             fontSize: 9, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)',
           }}>
             LOCATING…
+          </div>
+        )}
+
+        {onExpand && (
+          <button
+            type="button"
+            onClick={onExpand}
+            title="Expand map"
+            style={{
+              position: 'absolute', top: 8, right: 8, zIndex: 500,
+              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+              border: 'none', borderRadius: 3, width: 28, height: 28,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: '#fff', fontSize: 14,
+            }}
+          >
+            ⛶
+          </button>
+        )}
+
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            title="Close fullscreen"
+            style={{
+              position: 'absolute', top: 8, right: 8, zIndex: 500,
+              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+              border: 'none', borderRadius: 3, width: 32, height: 32,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: '#fff', fontSize: 18, lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        )}
+
+        {TOMTOM_KEY && (
+          <div style={{
+            position: 'absolute', bottom: 8, right: 8, zIndex: 500,
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4,
+          }}>
+            <button
+              type="button"
+              onClick={() => setShowTraffic((v) => !v)}
+              title="Toggle live traffic"
+              style={{
+                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+                border: `1px solid ${showTraffic ? '#2EAB30' : 'transparent'}`,
+                borderRadius: 3, padding: '4px 8px', cursor: 'pointer',
+                fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.07em',
+                color: showTraffic ? '#7CF07E' : '#cbd5e1', fontWeight: 600,
+              }}
+            >
+              {showTraffic ? '● TRAFFIC ON' : '○ TRAFFIC OFF'}
+            </button>
+            {showTraffic && (
+              <div style={{
+                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+                borderRadius: 3, padding: '3px 8px',
+                fontSize: 8, fontFamily: 'var(--font-mono)', color: '#fff',
+                display: 'flex', gap: 8, alignItems: 'center', letterSpacing: '0.05em',
+              }}>
+                <span style={{ color: '#2EAB30' }}>● clear</span>
+                <span style={{ color: '#F1BF40' }}>● light</span>
+                <span style={{ color: '#F18237' }}>● mod</span>
+                <span style={{ color: '#E70704' }}>● heavy</span>
+              </div>
+            )}
           </div>
         )}
       </div>

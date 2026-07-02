@@ -5,6 +5,7 @@ import { fetchData, patchData, deleteData, postData, downloadBlob } from '@/lib/
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',
@@ -25,6 +26,7 @@ export default function QuoteDetail() {
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
   const [outcomeType, setOutcomeType] = useState<'accepted' | 'rejected' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [customRejectionReason, setCustomRejectionReason] = useState('');
   const [finalPrice, setFinalPrice] = useState('');
   const [fuelAlert, setFuelAlert] = useState<any>(null);
   const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void; danger?: boolean } | null>(null);
@@ -34,6 +36,21 @@ export default function QuoteDetail() {
     queryFn: () => fetchData(`api/v1/quotes/${id}/`),
     retry: 1,
   });
+
+  // Live update: refetch when backend pushes a quote status event over WebSocket
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { detail } = e as CustomEvent;
+      if (typeof detail?.event === 'string' && detail.event.startsWith('quote.')) {
+        if (!detail?.data?.id || String(detail.data.id) === String(id)) {
+          queryClient.invalidateQueries({ queryKey: ['quote', id] });
+          queryClient.invalidateQueries({ queryKey: ['quotes'] });
+        }
+      }
+    };
+    window.addEventListener('tw:live-event', handler);
+    return () => window.removeEventListener('tw:live-event', handler);
+  }, [id, queryClient]);
 
   // Fetch fuel alert for sent/pending quotes
   useEffect(() => {
@@ -52,9 +69,14 @@ export default function QuoteDetail() {
 
   const statusMutation = useMutation({
     mutationFn: (newStatus: string) => patchData({ url: `api/v1/quotes/${id}/`, data: { status: newStatus } }),
-    onSuccess: () => {
+    onSuccess: (_data, newStatus) => {
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.setQueryData(['quotes'], (old: any) => {
+        if (!old) return old;
+        const items: any[] = old?.results || old;
+        const updated = items.map((q: any) => String(q.id) === String(id) ? { ...q, status: newStatus } : q);
+        return old?.results ? { ...old, results: updated } : updated;
+      });
     },
   });
 
@@ -71,6 +93,15 @@ export default function QuoteDetail() {
       }
       toast.success('Share link ready — copy and send to your customer');
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
+      queryClient.setQueryData(['quotes'], (old: unknown) => {
+        if (!old || typeof old !== 'object') return old;
+        const o = old as Record<string, unknown>;
+        const items = (o.results as unknown[] | undefined) || (old as unknown[]);
+        const updated = (items as Record<string, unknown>[]).map((q) =>
+          String(q.id) === String(id) ? { ...q, status: 'SENT' } : q
+        );
+        return o.results ? { ...o, results: updated } : updated;
+      });
     },
     onError: (error: any) => {
       toast.error(error?.message || 'Failed to generate share link');
@@ -111,7 +142,11 @@ export default function QuoteDetail() {
       setShowOutcomeModal(false);
       setOutcomeType(null);
       setRejectionReason('');
+      setCustomRejectionReason('');
       setFinalPrice('');
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'Failed to save outcome');
     },
   });
 
@@ -244,13 +279,51 @@ export default function QuoteDetail() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Customer */}
           <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 16 }}>Customer</div>
-            <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)' }}>{quote.customer_name}</div>
+            <div className="card-title" style={{ marginBottom: 14 }}>Customer</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>NAME</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{quote.customer_name || '—'}</div>
+              </div>
+              {quote.customer_company && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>COMPANY</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_company}</div>
+                </div>
+              )}
+              {quote.customer_email && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>EMAIL</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_email}</div>
+                </div>
+              )}
+              {quote.customer_phone && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>PHONE</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_phone}</div>
+                </div>
+              )}
+              {quote.customer_city && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>CITY</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_city}</div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Route */}
           <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 16 }}>Route</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div className="card-title" style={{ marginBottom: 0 }}>
+                {quote.trip_type === 'ROUND_TRIP' ? 'Leg 1 — Outbound Route' : 'Route'}
+              </div>
+              {quote.trip_type === 'ROUND_TRIP' && (
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 2, fontWeight: 700 }}>
+                  ROUND TRIP
+                </span>
+              )}
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 {label('Pickup Location')}
@@ -260,16 +333,55 @@ export default function QuoteDetail() {
                 {label('Delivery Location')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
               </div>
-              <div>
-                {label('Origin')}
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.origin || '—'}</div>
-              </div>
-              <div>
-                {label('Destination')}
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.destination || '—'}</div>
-              </div>
             </div>
           </div>
+
+          {/* Return Leg — visible only for ROUND_TRIP quotes */}
+          {quote.trip_type === 'ROUND_TRIP' && (
+            <div className="card" style={{ padding: 20, border: '1px solid var(--accent-primary)', borderLeft: '3px solid var(--accent-primary)' }}>
+              <div className="card-title" style={{ marginBottom: 16, color: 'var(--accent-primary)' }}>
+                Leg 2 — Return Route
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  {label('Returns From')}
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
+                </div>
+                <div>
+                  {label('Return Destination')}
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.return_location || '—'}</div>
+                </div>
+                <div>
+                  {label('Return Cargo')}
+                  <div style={{ fontSize: 13, color: quote.return_cargo ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
+                    {quote.return_cargo || 'Empty return'}
+                  </div>
+                </div>
+                {quote.return_date && (
+                  <div>
+                    {label('Return Date')}
+                    <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      {new Date(quote.return_date).toLocaleDateString('en-ZA')}
+                    </div>
+                  </div>
+                )}
+                {quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
+                  <div>
+                    {label('Return Rate')}
+                    <div style={{ fontSize: 13, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                      {formatCurrency(parseFloat(quote.return_base_rate))}
+                    </div>
+                  </div>
+                )}
+                {quote.return_notes && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    {label('Return Notes')}
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{quote.return_notes}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Cargo Details */}
           <div className="card" style={{ padding: 20 }}>
@@ -324,8 +436,20 @@ export default function QuoteDetail() {
                   </span>
                 </div>
               ))}
+              {quote.trip_type === 'ROUND_TRIP' && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed var(--accent-primary)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--accent-primary)' }}>
+                    Return Leg ({quote.return_cargo ? 'with cargo' : 'empty return'})
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--accent-primary)', fontWeight: 600 }}>
+                    {formatCurrency(parseFloat(quote.return_base_rate))}
+                  </span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 12, marginTop: 4 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Total Amount</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {quote.trip_type === 'ROUND_TRIP' ? 'Total (both legs)' : 'Total Amount'}
+                </span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--accent-primary)' }}>
                   {formatCurrency(parseFloat(quote.total_amount || '0'))}
                 </span>
@@ -354,19 +478,19 @@ export default function QuoteDetail() {
               </div>
               <div>
                 {label('Status')}
-                <select
-                  value={quote.status}
-                  onChange={(e) => statusMutation.mutate(e.target.value)}
-                  disabled={statusMutation.isPending}
-                  style={inputStyle}
-                >
-                  <option value="DRAFT">Draft</option>
-                  <option value="SENT">Sent</option>
-                  <option value="ACCEPTED">Accepted</option>
-                  <option value="DECLINED">Declined</option>
-                  <option value="IT">In-Transit</option>
-                  <option value="COMPLETED">Completed</option>
-                </select>
+                <Select value={quote.status} onValueChange={(val) => statusMutation.mutate(val)} disabled={statusMutation.isPending}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DRAFT">Draft</SelectItem>
+                    <SelectItem value="SENT">Sent</SelectItem>
+                    <SelectItem value="ACCEPTED">Accepted</SelectItem>
+                    <SelectItem value="DECLINED">Declined</SelectItem>
+                    <SelectItem value="IT">In-Transit</SelectItem>
+                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 {label('Confidence')}
@@ -633,23 +757,23 @@ export default function QuoteDetail() {
             {outcomeType === 'rejected' && (
               <div style={{ marginBottom: 16 }}>
                 {label('Rejection Reason')}
-                <select
-                  value={rejectionReason}
-                  onChange={e => setRejectionReason(e.target.value)}
-                  style={inputStyle}
-                >
-                  <option value="">Select reason...</option>
-                  <option value="Price too high">Price too high</option>
-                  <option value="Went with competitor">Went with competitor</option>
-                  <option value="Job cancelled">Job cancelled</option>
-                  <option value="Other">Other (please specify)</option>
-                </select>
+                <Select value={rejectionReason} onValueChange={setRejectionReason}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select reason..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Price too high">Price too high</SelectItem>
+                    <SelectItem value="Went with competitor">Went with competitor</SelectItem>
+                    <SelectItem value="Job cancelled">Job cancelled</SelectItem>
+                    <SelectItem value="Other">Other (please specify)</SelectItem>
+                  </SelectContent>
+                </Select>
                 {rejectionReason === 'Other' && (
                   <input
                     type="text"
                     placeholder="Please specify reason"
-                    value={rejectionReason}
-                    onChange={e => setRejectionReason(e.target.value)}
+                    value={customRejectionReason}
+                    onChange={e => setCustomRejectionReason(e.target.value)}
                     style={{ ...inputStyle, marginTop: 10 }}
                   />
                 )}
@@ -662,6 +786,7 @@ export default function QuoteDetail() {
                   setShowOutcomeModal(false);
                   setOutcomeType(null);
                   setRejectionReason('');
+                  setCustomRejectionReason('');
                   setFinalPrice('');
                 }}
                 className="btn-action"
@@ -673,14 +798,14 @@ export default function QuoteDetail() {
                 onClick={() => {
                   const data: any = { outcome: outcomeType };
                   if (outcomeType === 'rejected' && rejectionReason) {
-                    data.rejection_reason = rejectionReason;
+                    data.rejection_reason = rejectionReason === 'Other' ? customRejectionReason : rejectionReason;
                   }
                   if (outcomeType === 'accepted' && finalPrice) {
                     data.final_price = parseFloat(finalPrice);
                   }
                   outcomeMutation.mutate(data);
                 }}
-                disabled={outcomeType === 'rejected' && !rejectionReason}
+                disabled={outcomeType === 'rejected' && (!rejectionReason || (rejectionReason === 'Other' && !customRejectionReason))}
                 className="btn-action"
                 style={{
                   flex: 1,

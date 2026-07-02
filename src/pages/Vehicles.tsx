@@ -1,10 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { fetchData, postData, patchData, deleteData } from '../lib/Api';
+import { useQuery } from '@tanstack/react-query';
+import { fetchData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AddVehicleDrawer } from '@/components/AddVehicleDrawer';
 
 interface Vehicle {
   id: number;
@@ -31,6 +35,8 @@ interface Vehicle {
   type?: string;
   last_maintenance_date?: string;
   next_maintenance_due?: string;
+  service_interval_km?: number | null;
+  last_service_mileage?: number | string | null;
 }
 
 interface FleetOverview {
@@ -79,74 +85,79 @@ const STATUS_COLOR: Record<string, string> = {
 const formatZAR = (v: number) =>
   'R ' + v.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
+// Fetches all fleet data + derives lists. Lives in the queryFn so the result is
+// cached by TanStack Query (keyed by search below) and survives navigation —
+// revisiting the page no longer refires these requests until the cache goes stale.
+async function loadFleet(q: string) {
+  const vehiclesUrl = q
+    ? `api/v1/vehicles/?search=${encodeURIComponent(q)}`
+    : 'api/v1/vehicles/';
+  const [vehData, overviewData, insightsData, vtData, driverData] = await Promise.all([
+    fetchData(vehiclesUrl),
+    fetchData('api/v1/fleet/overview/'),
+    fetchData('api/v1/fleet/intelligence/'),
+    fetchData('api/v1/vehicle-types/'),
+    fetchData('api/v1/drivers/'),
+  ]);
+
+  const vehicles: Vehicle[] = Array.isArray(vehData) ? vehData : (vehData?.results || []);
+
+  const overview: FleetOverview | null = overviewData;
+
+  const insights: FleetInsight[] = Array.isArray(insightsData) ? insightsData : (insightsData?.opportunities || []);
+
+  const vtList = Array.isArray(vtData) ? vtData : (vtData?.results || []);
+  const vehicleTypes = vtList.map((vt: any) => ({ id: vt.id, name: vt.name }));
+
+  const driverList = Array.isArray(driverData) ? driverData : (driverData?.results || []);
+  const drivers = driverList.map((d: any) => {
+    const ud = d.user_details || {};
+    const fn = d.first_name || ud.first_name || '';
+    const ln = d.last_name || ud.last_name || '';
+    const name = fn && ln ? `${fn} ${ln}` : fn || ln || d.name || `Driver ${d.id}`;
+    return { id: d.id, name };
+  });
+
+  return { vehicles, overview, insights, vehicleTypes, drivers };
+}
+
 export default function Vehicles() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [vehicleTypes, setVehicleTypes] = useState<{ id: number; name: string }[]>([]);
-  const [drivers, setDrivers] = useState<{ id: number; name: string }[]>([]);
-  const [overview, setOverview] = useState<FleetOverview | null>(null);
-  const [insights, setInsights] = useState<FleetInsight[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('All');
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
   const [sortBy, setSortBy] = useState('revenue');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [addForm, setAddForm] = useState({
-    vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '',
-    type: 'Rigid Truck', capacity: '', mileage: '', fuel_type: 'Diesel', status: 'AVAILABLE',
-    insurance_expiry: '', registration_expiry: '', last_maintenance_date: '', next_maintenance_due: '',
-    driver: '',
-  });
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
   const [editForm, setEditForm] = useState<any>({});
+  const [saving, setSaving] = useState(false);
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
 
-  const load = useCallback(() => {
-    return Promise.all([
-      fetchData('api/v1/vehicles/'),
-      fetchData('api/v1/fleet/overview/'),
-      fetchData('api/v1/fleet/intelligence/'),
-      fetchData('api/v1/vehicle-types/'),
-      fetchData('api/v1/drivers/'),
-    ])
-      .then(([vehData, overviewData, insightsData, vtData, driverData]) => {
-        const vehiclesArray = Array.isArray(vehData) ? vehData : (vehData?.results || []);
-        setVehicles(vehiclesArray);
+  const { data, isLoading: loading, refetch } = useQuery({
+    // search drives the vehicles fetch URL (server-side search), so it must be
+    // part of the key — statusFilter / sortBy are applied client-side in render.
+    queryKey: ['vehicles-page', debouncedSearch],
+    queryFn: () => loadFleet(debouncedSearch),
+  });
 
-        setOverview(overviewData);
+  // Cached data drives the view; defaults keep the first render safe.
+  const vehicles = data?.vehicles ?? [];
+  const vehicleTypes = data?.vehicleTypes ?? [];
+  const drivers = data?.drivers ?? [];
 
-        const insightsArray = Array.isArray(insightsData) ? insightsData : (insightsData?.opportunities || []);
-        setInsights(insightsArray);
+  // Mirror the typed-search value into the debounced value (300ms) used by the query key.
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(val), 300);
+  };
 
-        const vtList = Array.isArray(vtData) ? vtData : (vtData?.results || []);
-        setVehicleTypes(vtList.map((vt: any) => ({ id: vt.id, name: vt.name })));
-
-        const driverList = Array.isArray(driverData) ? driverData : (driverData?.results || []);
-        setDrivers(driverList.map((d: any) => {
-          const ud = d.user_details || {};
-          const fn = d.first_name || ud.first_name || '';
-          const ln = d.last_name || ud.last_name || '';
-          const name = fn && ln ? `${fn} ${ln}` : fn || ln || d.name || `Driver ${d.id}`;
-          return { id: d.id, name };
-        }));
-
-        setError(null);
-      })
-      .catch(() => {
-        setError('Failed to load fleet data');
-        setVehicles([]);
-        setOverview(null);
-        setInsights([]);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-  useAutoRefresh(load);
+  useAutoRefresh(refetch);
 
   // Filter vehicles
   const filtered = vehicles.filter(v => {
@@ -262,33 +273,52 @@ export default function Vehicles() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
         {/* Vehicle Table */}
         <div>
-          {/* Status Filter Tabs */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            {['All', 'AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE'].map(status => {
-              const isActive = statusFilter === status;
-              return (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  style={{
-                    background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                    padding: '6px 12px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    fontWeight: isActive ? 600 : 400,
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {status === 'All' ? 'ALL' : status.replace('_', ' ')}
-                </button>
-              );
-            })}
+          {/* Search + Status Filter Toolbar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <input
+              type="text"
+              placeholder="Search VIN, plate, make, model..."
+              value={search}
+              onChange={e => handleSearchChange(e.target.value)}
+              style={{
+                width: 280,
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)',
+                color: 'var(--text-primary)',
+                padding: '8px 12px',
+                borderRadius: 2,
+                fontSize: 12,
+                fontFamily: 'var(--font-mono)',
+                outline: 'none',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              {['All', 'AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE'].map(status => {
+                const isActive = statusFilter === status;
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    style={{
+                      background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                      border: '1px solid var(--border-subtle)',
+                      color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                      padding: '6px 12px',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      borderRadius: 2,
+                      cursor: 'pointer',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      fontWeight: isActive ? 600 : 400,
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Table */}
@@ -385,14 +415,14 @@ export default function Vehicles() {
                                 year: v.year || new Date().getFullYear(),
                                 plate: v.plate || v.registration || '',
                                 type: v.vehicle_type_name || '',
-                                capacity: v.capacity || '',
+                                capacity: v.capacity ? String(Number(v.capacity) / 1000) : '',
                                 fuel_type: v.fuel_type || 'Diesel',
                                 status: v.status || 'AVAILABLE',
                                 mileage: v.mileage || '',
-                                insurance_expiry: v.insurance_expiry || '',
                                 registration_expiry: v.registration_expiry || '',
                                 last_maintenance_date: v.last_maintenance_date || '',
-                                next_maintenance_due: v.next_maintenance_due || '',
+                                service_interval_km: v.service_interval_km ?? '',
+                                last_service_mileage: v.last_service_mileage ?? '',
                                 driver: v.driver ?? '',
                               });
                             }}
@@ -410,8 +440,7 @@ export default function Vehicles() {
                                   try {
                                     await deleteData({ url: `api/v1/vehicles/${v.id}/` });
                                     toast.success('Vehicle deleted');
-                                    const d = await fetchData('api/v1/vehicles/');
-                                    setVehicles(Array.isArray(d) ? d : d?.results || []);
+                                    refetch();
                                   } catch (err: any) {
                                     toast.error(err?.message || 'Failed to delete vehicle');
                                   }
@@ -432,107 +461,11 @@ export default function Vehicles() {
 
       </div>
 
-      {/* Add Vehicle Slide-out */}
-      {showAddForm && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setShowAddForm(false)} />
-          <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Add Vehicle</div>
-              <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
-            </div>
-            {[
-              { key: 'vin', label: 'VIN Number', placeholder: 'e.g. WDB9634031L123456' },
-              { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz' },
-              { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
-              { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
-              { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
-              { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
-              { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
-              { key: 'insurance_expiry', label: 'Insurance Expiry', type: 'date' },
-              { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
-              { key: 'last_maintenance_date', label: 'Last Maintenance', type: 'date' },
-              { key: 'next_maintenance_due', label: 'Next Maintenance Due', type: 'date' },
-            ].map(f => (
-              <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <input
-                  type={f.type || 'text'}
-                  placeholder={f.placeholder}
-                  value={(addForm as any)[f.key]}
-                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: f.type === 'number' ? e.target.value : e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
-            ))}
-            {[
-              { key: 'type', label: 'Vehicle Type', options: vehicleTypes.length > 0 ? vehicleTypes.map(vt => vt.name) : ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck', 'Tautliner', 'Box Truck'] },
-              { key: 'fuel_type', label: 'Fuel Type', options: ['Diesel', 'Petrol', 'Electric', 'Hybrid'] },
-              { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE', 'OUT_OF_SERVICE'] },
-            ].map(f => (
-              <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <select
-                  value={(addForm as any)[f.key]}
-                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
-                >
-                  {f.options.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
-            ))}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Driver</label>
-              <select
-                value={addForm.driver}
-                onChange={e => setAddForm(prev => ({ ...prev, driver: e.target.value }))}
-                style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
-              >
-                <option value="">— No driver assigned —</option>
-                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
-              <button
-                disabled={saving}
-                onClick={async () => {
-                  setSaving(true);
-                  try {
-                    const vehicleTypeId = vehicleTypes.find(vt => vt.name === addForm.type)?.id;
-                    const { type: _t, ...addFormWithoutType } = addForm;
-                    await postData({
-                      url: 'api/v1/vehicles/',
-                      data: {
-                        ...addFormWithoutType,
-                        year: Number(addForm.year),
-                        capacity: Number(addForm.capacity) || 0,
-                        mileage: addForm.mileage ? Number(addForm.mileage) : undefined,
-                        driver: addForm.driver ? Number(addForm.driver) : null,
-                        ...(vehicleTypeId ? { vehicle_type: vehicleTypeId } : {}),
-                      },
-                    });
-                    setShowAddForm(false);
-                    setAddForm({ vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '', type: 'Rigid Truck', capacity: '', mileage: '', fuel_type: 'Diesel', status: 'AVAILABLE', insurance_expiry: '', registration_expiry: '', last_maintenance_date: '', next_maintenance_due: '', driver: '' });
-                    // Refresh
-                    const d = await fetchData('api/v1/vehicles/');
-                    setVehicles(Array.isArray(d) ? d : d?.results || []);
-                  } catch (e: any) { toast.error(e?.message || 'Failed to create vehicle'); }
-                  setSaving(false);
-                }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
-              >
-                {saving ? 'SAVING...' : 'CREATE VEHICLE'}
-              </button>
-              <button
-                onClick={() => setShowAddForm(false)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
-              >
-                CANCEL
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddVehicleDrawer
+        open={showAddForm}
+        onClose={() => setShowAddForm(false)}
+        onCreated={refetch}
+      />
 
       {/* Edit Vehicle Slide-out */}
       {editVehicle && (
@@ -554,22 +487,29 @@ export default function Vehicles() {
               { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
               { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
               { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
-              { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
+              { key: 'capacity', label: 'Capacity (ton)', placeholder: 'e.g. 30', type: 'number' },
               { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
-              { key: 'insurance_expiry', label: 'Insurance Expiry', type: 'date' },
               { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
-              { key: 'last_maintenance_date', label: 'Last Maintenance', type: 'date' },
-              { key: 'next_maintenance_due', label: 'Next Maintenance Due', type: 'date' },
+              { key: 'last_maintenance_date', label: 'Last Maintenance Date', type: 'date' },
+              { key: 'service_interval_km', label: 'Service Interval (km)', placeholder: 'e.g. 10000', type: 'number' },
+              { key: 'last_service_mileage', label: 'Last Service Odometer (km)', placeholder: 'e.g. 145000', type: 'number' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <input
-                  type={f.type || 'text'}
-                  placeholder={f.placeholder}
-                  value={(editForm as any)[f.key]}
-                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
-                />
+                {f.type === 'date' ? (
+                  <DatePicker
+                    value={(editForm as any)[f.key]}
+                    onChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}
+                  />
+                ) : (
+                  <input
+                    type={f.type || 'text'}
+                    placeholder={f.placeholder}
+                    value={(editForm as any)[f.key]}
+                    onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                )}
               </div>
             ))}
             {[
@@ -579,25 +519,32 @@ export default function Vehicles() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
-                <select
+                <Select
                   value={(editForm as any)[f.key]}
-                  onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                  onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}
                 >
-                  {f.options.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {f.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Driver</label>
-              <select
-                value={editForm.driver ?? ''}
-                onChange={e => setEditForm((prev: any) => ({ ...prev, driver: e.target.value }))}
-                style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+              <Select
+                value={editForm.driver != null && editForm.driver !== '' ? String(editForm.driver) : ''}
+                onValueChange={val => setEditForm((prev: any) => ({ ...prev, driver: val }))}
               >
-                <option value="">— No driver assigned —</option>
-                {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="— No driver assigned —" />
+                </SelectTrigger>
+                <SelectContent>
+                  {drivers.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
@@ -611,16 +558,17 @@ export default function Vehicles() {
                     const payload = {
                       ...formWithoutType,
                       year: editForm.year ? Number(editForm.year) : undefined,
-                      capacity: editForm.capacity ? Number(editForm.capacity) : undefined,
+                      capacity: editForm.capacity ? Number(editForm.capacity) * 1000 : undefined,
                       mileage: editForm.mileage ? Number(editForm.mileage) : undefined,
+                      service_interval_km: editForm.service_interval_km ? Number(editForm.service_interval_km) : null,
+                      last_service_mileage: editForm.last_service_mileage ? Number(editForm.last_service_mileage) : null,
                       driver: editForm.driver !== '' && editForm.driver != null ? Number(editForm.driver) : null,
                       ...(vehicleTypeId ? { vehicle_type: vehicleTypeId } : {}),
                     };
                     await patchData({ url: `api/v1/vehicles/${editVehicle.id}/`, data: payload });
                     setEditVehicle(null);
                     setEditForm({});
-                    const d = await fetchData('api/v1/vehicles/');
-                    setVehicles(Array.isArray(d) ? d : d?.results || []);
+                    refetch();
                   } catch (e: any) {
                     setError(e?.message || 'Failed to update vehicle');
                   }

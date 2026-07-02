@@ -352,7 +352,7 @@ export default function Drivers() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditDriver(d);
-                          const dUd = d.user_details || {};
+                          const dUd: any = d.user_details || {};
                           setEditForm({
                             first_name: d.first_name || '',
                             last_name: d.last_name || '',

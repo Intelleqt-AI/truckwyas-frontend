@@ -256,7 +256,7 @@ export default function NewQuote() {
         v.name === vehicleType,
     );
     return vt?.fuel_consumption_l_per_100km
-      ? parseFloat(vt.fuel_consumption_l_per_100km)
+      ? parseFloat(String(vt.fuel_consumption_l_per_100km))
       : (FUEL_CONSUMPTION_FALLBACK[vehicleType] ?? 36);
   })();
   const fuelPrice =

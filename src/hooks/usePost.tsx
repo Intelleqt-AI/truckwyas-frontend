@@ -6,8 +6,8 @@ export const usePost = (options: any = {}) => {
   const { invalidate, onSuccess, ...rest } = options;
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({ url, data, config }: { url: string; data: any; config?: any }) => postData({ url, data, config }),
+  return useMutation<any, Error, { url: string; data?: any; config?: any }>({
+    mutationFn: ({ url, data, config }) => postData({ url, data, config }),
     onSuccess: (...args) => {
       if (invalidate) {
         const keys = Array.isArray(invalidate) ? invalidate : [invalidate];

@@ -147,6 +147,42 @@ interface MarketBenchmark {
   recommendation: string;
 }
 
+interface AnalysisOptimization {
+  optimal_price: number;
+  optimal_margin_pct?: number;
+  win_probability_at_optimal?: number;
+  expected_profit?: number;
+  curve?: { price: number; margin: number; win_probability?: number }[];
+}
+
+interface QuoteAnalysis {
+  success: boolean;
+  narrative?: string;
+  narrative_source?: string;
+  suggested_price?: number;
+  suggested_price_rationale?: string;
+  price_optimization?: AnalysisOptimization;
+  cost_analysis?: {
+    success: boolean;
+    color?: string;
+    risk_level?: string;
+    margin_pct?: number;
+    cost_per_km: number;
+    explanations?: string[];
+  };
+  fuel_analysis?: {
+    current_price: number;
+    is_stale: boolean;
+    fuel_pct_of_total: number;
+    stale_warning?: string;
+    price_note?: string;
+  };
+  market_analysis?: {
+    market_rate: number;
+    your_vs_market_pct: number;
+  };
+}
+
 const DRAFT_KEY = "truckwyas_newquote_draft";
 
 export default function NewQuote() {

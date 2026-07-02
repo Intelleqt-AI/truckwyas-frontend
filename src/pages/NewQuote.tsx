@@ -246,7 +246,8 @@ export default function NewQuote() {
     useState<MarketBenchmark | null>(null);
   const [showBenchmarkModal, setShowBenchmarkModal] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
-  const [optimal, setOptimal] = useState<any>(null);
+  const [optimal, setOptimal] = useState<AnalysisOptimization | null>(null);
+  const [analysis, setAnalysis] = useState<QuoteAnalysis | null>(null);
 
   const { data: companyProfile } = useQuery({
     queryKey: ["company-profile"],
@@ -517,37 +518,53 @@ export default function NewQuote() {
     setError("");
     setOptimizing(true);
     setOptimal(null);
+    setAnalysis(null);
     try {
       const outboundTotal = _total - _returnRate;
-      const marketRate =
-        marketBenchmark?.market_avg_rate || outboundTotal * 1.15;
-      const data = await postData({
-        url: "api/v1/quotes/optimize/",
+      const directCost =
+        _fuelCost + _tollCost + _weightSurcharge + _additionalCosts + _driverAllowance;
+      const data: QuoteAnalysis = await postData({
+        url: "api/v1/quotes/analyze/",
         data: {
-          total_cost: Math.round(outboundTotal * 100) / 100,
-          market_rate: Math.round(marketRate),
-          client_tier: "standard",
+          quote_total: Math.round(outboundTotal * 100) / 100,
+          direct_cost: Math.round(directCost * 100) / 100,
+          distance_km: distanceKm,
           origin: extractCode(pickupLocation),
           destination: extractCode(deliveryLocation),
           vehicle_type: vehicleType,
+          weight: parseFloat(weight || "0"),
+          fuel_cost: Math.round(_fuelCost * 100) / 100,
+          toll_cost: Math.round(_tollCost * 100) / 100,
+          driver_cost: Math.round(_driverAllowance * 100) / 100,
+          fuel_usage_litres:
+            selectedRoute?.fuel_usage_litres ?? routeData?.fuel_usage_litres ?? null,
+          fuel_price_used: fuelPrice,
+          market_rate: Math.round(marketBenchmark?.market_avg_rate || 0),
+          client_tier: "standard",
         },
       });
-      if (data?.optimal_price) setOptimal(data);
-      else setError("Could not compute an optimal price");
+      if (data?.success) {
+        setAnalysis(data);
+        setOptimal(data.price_optimization ?? null);
+      } else {
+        setError("Could not analyse this quote");
+      }
     } catch (err) {
-      setError((err as Error)?.message || "Failed to optimise price");
+      setError((err as Error)?.message || "Failed to analyse quote");
     } finally {
       setOptimizing(false);
     }
   };
 
-  // Apply the optimal price by setting a service charge to bridge the gap.
+  // Apply the AI-suggested price by setting a service charge to bridge the gap.
   const applyOptimal = () => {
-    if (!optimal?.optimal_price) return;
+    const suggested = analysis?.suggested_price ?? optimal?.optimal_price;
+    if (!suggested) return;
     const currentCosts = _fuelCost + _tollCost + _weightSurcharge + _additionalCosts + _driverAllowance;
-    const diff = optimal.optimal_price - _returnRate - currentCosts;
+    const diff = suggested - _returnRate - currentCosts;
     setServiceCharge(Math.max(0, Math.round(diff)));
     setOptimal(null);
+    setAnalysis(null);
   };
 
   // Fetch revenue guard assessment
@@ -5131,7 +5148,7 @@ export default function NewQuote() {
                 {optimizing ? "OPTIMISING…" : "✦ FIND OPTIMAL PRICE"}
               </button>
 
-              {optimal && (
+              {analysis && (
                 <div
                   style={{
                     marginTop: 12,
@@ -5148,8 +5165,82 @@ export default function NewQuote() {
                       letterSpacing: "0.08em",
                       marginBottom: 12,
                     }}>
-                    AI OPTIMAL PRICE · maximises price × win-probability
+                    AI QUOTE ANALYSIS
                   </div>
+
+                  {analysis.narrative && (
+                    <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 2, padding: "10px 12px", marginBottom: 12 }}>
+                      <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>
+                        {analysis.narrative_source === "llm" ? "✦ AI SUMMARY" : "SUMMARY"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text-primary)", lineHeight: 1.55 }}>{analysis.narrative}</div>
+                    </div>
+                  )}
+
+                  {analysis.cost_analysis?.success && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, marginBottom: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: "var(--text-secondary)" }}>Cost vs route:</span>
+                        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 2, color: "#fff", background: `var(--status-${analysis.cost_analysis.color || "success"})` }}>
+                          {(analysis.cost_analysis.risk_level || "").replace("_", " ")} · {analysis.cost_analysis.margin_pct?.toFixed(1)}%
+                        </span>
+                      </div>
+                      {analysis.cost_analysis.cost_per_km != null && (
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ color: "var(--text-secondary)" }}>Cost per km:</span>
+                          <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>R {analysis.cost_analysis.cost_per_km.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {(analysis.cost_analysis.explanations || []).slice(0, 2).map((e) => (
+                        <div key={e} style={{ fontSize: 11, color: "var(--text-tertiary)" }}>• {e}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  {analysis.fuel_analysis && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, marginBottom: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: "var(--text-secondary)" }}>Fuel price:</span>
+                        <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          {analysis.fuel_analysis.current_price != null && (
+                            <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>R {analysis.fuel_analysis.current_price.toFixed(2)}/L</span>
+                          )}
+                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 2, color: "#fff", background: analysis.fuel_analysis.is_stale ? "var(--status-warning)" : "var(--status-success)" }}>
+                            {analysis.fuel_analysis.is_stale ? "STALE" : "LIVE"}
+                          </span>
+                        </span>
+                      </div>
+                      {analysis.fuel_analysis.fuel_pct_of_total != null && (
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ color: "var(--text-secondary)" }}>Fuel share of total:</span>
+                          <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>{analysis.fuel_analysis.fuel_pct_of_total}%</span>
+                        </div>
+                      )}
+                      {(analysis.fuel_analysis.stale_warning || analysis.fuel_analysis.price_note) && (
+                        <div style={{ fontSize: 11, color: "var(--status-warning)" }}>{analysis.fuel_analysis.stale_warning || analysis.fuel_analysis.price_note}</div>
+                      )}
+                    </div>
+                  )}
+
+                  {analysis.market_analysis?.market_rate != null && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, marginBottom: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ color: "var(--text-secondary)" }}>Market rate:</span>
+                        <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>R {Math.round(analysis.market_analysis.market_rate).toLocaleString()}</span>
+                      </div>
+                      {analysis.market_analysis.your_vs_market_pct != null && (
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ color: "var(--text-secondary)" }}>Your quote vs market:</span>
+                          <span style={{ fontFamily: "var(--font-mono)", color: analysis.market_analysis.your_vs_market_pct >= 0 ? "var(--status-success)" : "var(--status-warning)" }}>
+                            {analysis.market_analysis.your_vs_market_pct >= 0 ? "+" : ""}{analysis.market_analysis.your_vs_market_pct}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {optimal && (
+                  <>
                   <div
                     style={{
                       display: "flex",
@@ -5382,6 +5473,13 @@ export default function NewQuote() {
                         </div>
                       );
                     })()}
+                  </>
+                  )}
+                  {analysis.suggested_price_rationale && (
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 10 }}>
+                      {analysis.suggested_price_rationale}
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       className="btn-action"
@@ -5393,11 +5491,11 @@ export default function NewQuote() {
                         color: "var(--bg-deep)",
                         fontWeight: 600,
                       }}>
-                      APPLY THIS PRICE
+                      APPLY SUGGESTED PRICE
                     </button>
                     <button
                       className="btn-action"
-                      onClick={() => setOptimal(null)}
+                      onClick={() => { setOptimal(null); setAnalysis(null); }}
                       style={{
                         background: "none",
                         border: "1px solid var(--border-subtle)",

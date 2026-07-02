@@ -37,6 +37,21 @@ export default function QuoteDetail() {
     retry: 1,
   });
 
+  // Live update: refetch when backend pushes a quote status event over WebSocket
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { detail } = e as CustomEvent;
+      if (typeof detail?.event === 'string' && detail.event.startsWith('quote.')) {
+        if (!detail?.data?.id || String(detail.data.id) === String(id)) {
+          queryClient.invalidateQueries({ queryKey: ['quote', id] });
+          queryClient.invalidateQueries({ queryKey: ['quotes'] });
+        }
+      }
+    };
+    window.addEventListener('tw:live-event', handler);
+    return () => window.removeEventListener('tw:live-event', handler);
+  }, [id, queryClient]);
+
   // Fetch fuel alert for sent/pending quotes
   useEffect(() => {
     if (quote && (quote.status === 'SENT' || quote.status === 'DRAFT')) {
@@ -54,9 +69,14 @@ export default function QuoteDetail() {
 
   const statusMutation = useMutation({
     mutationFn: (newStatus: string) => patchData({ url: `api/v1/quotes/${id}/`, data: { status: newStatus } }),
-    onSuccess: () => {
+    onSuccess: (_data, newStatus) => {
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.setQueryData(['quotes'], (old: any) => {
+        if (!old) return old;
+        const items: any[] = old?.results || old;
+        const updated = items.map((q: any) => String(q.id) === String(id) ? { ...q, status: newStatus } : q);
+        return old?.results ? { ...old, results: updated } : updated;
+      });
     },
   });
 
@@ -77,6 +97,15 @@ export default function QuoteDetail() {
         toast.success('Share link ready — copy and send to your customer');
       }
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
+      queryClient.setQueryData(['quotes'], (old: unknown) => {
+        if (!old || typeof old !== 'object') return old;
+        const o = old as Record<string, unknown>;
+        const items = (o.results as unknown[] | undefined) || (old as unknown[]);
+        const updated = (items as Record<string, unknown>[]).map((q) =>
+          String(q.id) === String(id) ? { ...q, status: 'SENT' } : q
+        );
+        return o.results ? { ...o, results: updated } : updated;
+      });
     },
     onError: (error: any) => {
       toast.error(error?.message || 'Failed to generate share link');

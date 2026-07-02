@@ -40,6 +40,9 @@ export function VehicleTypesDirectory() {
   const [addErr, setAddErr] = useState('');
   const [form, setForm] = useState({ name: '', description: '', capacity: '', base_rate: '' });
 
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [editType, setEditType] = useState<VehicleType | null>(null);
   const [editForm, setEditForm] = useState({ name: '', description: '', capacity: '', base_rate: '', active: 'true' });
@@ -68,6 +71,24 @@ export function VehicleTypesDirectory() {
     await deleteData({ url: `api/v1/vehicle-types/${id}/` }).catch(() => {});
     load();
   };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    await Promise.all([...selected].map(id => deleteData({ url: `api/v1/vehicle-types/${id}/` }).catch(() => {})));
+    setSelected(new Set());
+    setShowBulkConfirm(false);
+    setBulkDeleting(false);
+    load();
+  };
+
+  const toggleSelect = (id: number) => setSelected(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const allSelected = filtered.length > 0 && filtered.every(t => selected.has(t.id));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(filtered.map(t => t.id)));
 
   const handleAdd = async () => {
     if (!form.name.trim()) { setAddErr('Name is required'); return; }
@@ -142,7 +163,19 @@ export function VehicleTypesDirectory() {
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-secondary)', fontWeight: 600 }}>
             ⚙ Vehicle Types ({types.length})
           </span>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {selected.size > 0 && (
+              <button
+                onClick={() => setShowBulkConfirm(true)}
+                style={{
+                  background: 'var(--status-danger)', border: 'none', color: '#fff',
+                  padding: '6px 12px', fontFamily: 'var(--font-mono)', fontSize: 10,
+                  borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em',
+                }}
+              >
+                DELETE ({selected.size})
+              </button>
+            )}
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -198,6 +231,9 @@ export function VehicleTypesDirectory() {
           <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
             <thead>
               <tr>
+                <th style={{ padding: '10px 20px', borderBottom: '1px solid var(--border-subtle)', width: 36 }}>
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ cursor: 'pointer' }} />
+                </th>
                 {['Name', 'Description', 'Capacity', 'Base Rate', 'Status', ''].map(h => (
                   <th key={h} style={{
                     padding: '10px 20px', textAlign: 'left' as const,
@@ -210,9 +246,12 @@ export function VehicleTypesDirectory() {
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No vehicle types found</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No vehicle types found</td></tr>
               ) : filtered.map((t, i) => (
-                <tr key={t.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
+                <tr key={t.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-row)' : 'none', background: selected.has(t.id) ? 'var(--bg-elevated)' : 'transparent' }}>
+                  <td style={{ padding: '12px 20px' }}>
+                    <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleSelect(t.id)} style={{ cursor: 'pointer' }} />
+                  </td>
                   <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
                     {t.name}
                   </td>
@@ -269,6 +308,17 @@ export function VehicleTypesDirectory() {
           danger
           onConfirm={() => handleDelete(deleteTarget.id)}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {showBulkConfirm && (
+        <ConfirmModal
+          title={`Delete ${selected.size} Vehicle Type${selected.size > 1 ? 's' : ''}`}
+          message={`Are you sure you want to delete ${selected.size} vehicle type${selected.size > 1 ? 's' : ''}? This cannot be undone.`}
+          confirmLabel={bulkDeleting ? 'Deleting...' : 'Delete All'}
+          danger
+          onConfirm={handleBulkDelete}
+          onCancel={() => setShowBulkConfirm(false)}
         />
       )}
 

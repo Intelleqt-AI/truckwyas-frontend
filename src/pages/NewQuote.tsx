@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { AlertTriangle, Info, Clock, Check, Landmark, Route, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, patchData, fetchData } from "@/lib/Api";
@@ -146,53 +147,7 @@ interface MarketBenchmark {
   recommendation: string;
 }
 
-// Response shape of POST /api/v1/quotes/analyze/ (comprehensive AI quote analysis)
-interface AnalysisCost {
-  success?: boolean;
-  risk_level?: string;
-  color?: string;
-  margin_pct?: number;
-  cost_per_km?: number | null;
-  explanations?: string[];
-  suggestions?: string[];
-  margin_floor_display?: string;
-}
-interface AnalysisFuel {
-  current_price?: number | null;
-  is_stale?: boolean;
-  last_updated?: string | null;
-  stale_warning?: string | null;
-  price_note?: string | null;
-  fuel_cost_zar?: number;
-  fuel_usage_litres?: number | null;
-  fuel_pct_of_total?: number | null;
-  fuel_price_used?: number | null;
-}
-interface AnalysisMarket {
-  market_rate?: number | null;
-  source?: string;
-  your_vs_market_pct?: number | null;
-}
-interface AnalysisOptimization {
-  optimal_price?: number;
-  optimal_margin_pct?: number;
-  win_probability_at_optimal?: number | null;
-  expected_profit?: number;
-  curve?: Array<{ margin_pct: number; win_probability: number; expected_profit: number }>;
-}
-interface QuoteAnalysis {
-  success: boolean;
-  route?: string | null;
-  quote_total?: number;
-  cost_analysis?: AnalysisCost;
-  fuel_analysis?: AnalysisFuel;
-  price_optimization?: AnalysisOptimization;
-  market_analysis?: AnalysisMarket;
-  suggested_price?: number;
-  suggested_price_rationale?: string | null;
-  narrative?: string;
-  narrative_source?: string;
-}
+const DRAFT_KEY = "truckwyas_newquote_draft";
 
 export default function NewQuote() {
   const navigate = useNavigate();
@@ -283,13 +238,13 @@ export default function NewQuote() {
     null,
   );
   const [revenueGuard, setRevenueGuard] = useState<RevenueGuard | null>(null);
+  const [guardExpanded, setGuardExpanded] = useState(false);
 
   // Sprint 1 features
   const [modelStats, setModelStats] = useState<ModelStats | null>(null);
   const [marketBenchmark, setMarketBenchmark] =
     useState<MarketBenchmark | null>(null);
   const [showBenchmarkModal, setShowBenchmarkModal] = useState(false);
-  const [guardExpanded, setGuardExpanded] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
   const [optimal, setOptimal] = useState<AnalysisOptimization | null>(null);
   const [analysis, setAnalysis] = useState<QuoteAnalysis | null>(null);
@@ -443,6 +398,78 @@ export default function NewQuote() {
     queryFn: () => fetchData("api/v1/customers/"),
   });
   const customers = customersData?.results || customersData || [];
+
+  // ── Draft restore (new quotes only) ─────────────────────────────────────
+  useEffect(() => {
+    if (isEditing) return;
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    try {
+      const d = JSON.parse(raw);
+      if (d.pickupLocation) setPickupLocation(d.pickupLocation);
+      if (d.deliveryLocation) setDeliveryLocation(d.deliveryLocation);
+      if (d.pickupCoords) setPickupCoords(d.pickupCoords);
+      if (d.deliveryCoords) setDeliveryCoords(d.deliveryCoords);
+      if (d.tripType) setTripType(d.tripType);
+      if (d.returnLocation) setReturnLocation(d.returnLocation);
+      if (d.returnCoords) setReturnCoords(d.returnCoords);
+      if (d.returnCargo) setReturnCargo(d.returnCargo);
+      if (d.returnDate) setReturnDate(d.returnDate);
+      if (d.returnBaseRate) setReturnBaseRate(d.returnBaseRate);
+      if (d.returnNotes) setReturnNotes(d.returnNotes);
+      if (d.weight) setWeight(d.weight);
+      if (d.vehicleType) setVehicleType(d.vehicleType);
+      if (d.selectedVehicleId) setSelectedVehicleId(d.selectedVehicleId);
+      if (d.selectedDriverId) setSelectedDriverId(d.selectedDriverId);
+      if (d.baseRatePerKm) setBaseRatePerKm(d.baseRatePerKm);
+      if (d.cargoDescription) setCargoDescription(d.cargoDescription);
+      if (d.driverAllowanceInput) setDriverAllowanceInput(d.driverAllowanceInput);
+      if (d.editableTollCost != null) setEditableTollCost(d.editableTollCost);
+      if (d.costMode) setCostMode(d.costMode);
+      if (d.customFuelPricePerL) setCustomFuelPricePerL(d.customFuelPricePerL);
+      if (d.customerId) setCustomerId(d.customerId);
+      if (d.notes) setNotes(d.notes);
+      if (d.status) setStatus(d.status);
+      if (d.confidence) setConfidence(d.confidence);
+      if (d.slaHours) setSlaHours(d.slaHours);
+      if (d.validUntil) setValidUntil(d.validUntil);
+      if (d.routeData) setRouteData(d.routeData);
+      if (d.routeOptions) setRouteOptions(d.routeOptions);
+      if (d.selectedRouteIndex != null) setSelectedRouteIndex(d.selectedRouteIndex);
+      if (d.returnRouteData) setReturnRouteData(d.returnRouteData);
+      if (d.currentStep) setCurrentStep(d.currentStep);
+      toast.info("Draft restored — continue where you left off");
+    } catch {
+      localStorage.removeItem(DRAFT_KEY);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Draft auto-save (debounced 1s) ──────────────────────────────────────
+  useEffect(() => {
+    if (isEditing) return;
+    if (!pickupLocation && !deliveryLocation && !weight && !customerId) return;
+    const timer = setTimeout(() => {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        pickupLocation, deliveryLocation, pickupCoords, deliveryCoords,
+        tripType, returnLocation, returnCoords, returnCargo, returnDate, returnBaseRate, returnNotes,
+        weight, vehicleType, selectedVehicleId, selectedDriverId,
+        baseRatePerKm, cargoDescription, driverAllowanceInput,
+        editableTollCost, costMode, customFuelPricePerL,
+        customerId, notes, status, confidence, slaHours, validUntil, currentStep,
+        routeData, routeOptions, selectedRouteIndex, returnRouteData,
+      }));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [
+    isEditing, pickupLocation, deliveryLocation, pickupCoords, deliveryCoords,
+    tripType, returnLocation, returnCoords, returnCargo, returnDate, returnBaseRate, returnNotes,
+    weight, vehicleType, selectedVehicleId, selectedDriverId,
+    baseRatePerKm, cargoDescription, driverAllowanceInput,
+    editableTollCost, costMode, customFuelPricePerL,
+    customerId, notes, status, confidence, slaHours, validUntil, currentStep,
+    routeData, routeOptions, selectedRouteIndex, returnRouteData,
+  ]);
 
   // Fetch current fuel prices on mount
   useEffect(() => {
@@ -952,8 +979,21 @@ export default function NewQuote() {
       isEditing
         ? patchData({ url: `api/v1/quotes/${editId}/`, data })
         : postData({ url: "api/v1/quotes/", data }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      localStorage.removeItem(DRAFT_KEY);
+      if (editId && variables?.status) {
+        queryClient.setQueryData(['quotes'], (old: unknown) => {
+          if (!old || typeof old !== 'object') return old;
+          const o = old as Record<string, unknown>;
+          const items = (o.results as unknown[] | undefined) || (old as unknown[]);
+          const updated = (items as Record<string, unknown>[]).map((q) =>
+            String(q.id) === String(editId) ? { ...q, status: variables.status } : q
+          );
+          return o.results ? { ...o, results: updated } : updated;
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      if (editId) queryClient.invalidateQueries({ queryKey: ["quote", editId] });
       toast.success(isEditing ? "Quote updated" : "Quote saved");
       navigate(isEditing ? `/bookings/quotes/${editId}` : "/bookings/quotes");
     },
@@ -1586,13 +1626,20 @@ export default function NewQuote() {
                     </SelectTrigger>
                     <SelectContent>
                       {vehicleTypes.length > 0
-                        ? vehicleTypes.map((vt) => (
-                            <SelectItem key={vt.id} value={vt.name}>
-                              {vt.name
-                                .replace(/\s*\([\d\s\-–.]+\s*tonn?e?s?\)/gi, "")
-                                .trim()}
-                            </SelectItem>
-                          ))
+                        ? vehicleTypes
+                            .filter((vt, idx, arr) => arr.findIndex(x => x.name === vt.name) === idx)
+                            .map((vt) => {
+                              const displayName = vt.name.replace(/\s*\([\d\s\-–.]+\s*tonn?e?s?\)/gi, "").trim();
+                              const cap = vt.capacity != null && Number(vt.capacity) > 0 ? `${Number(vt.capacity)} ton` : null;
+                              const rate = vt.base_rate != null && Number(vt.base_rate) > 0 ? `R${Number(vt.base_rate)}/km` : null;
+                              const meta = [cap, rate].filter(Boolean).join(' · ');
+                              return (
+                                <SelectItem key={vt.id} value={vt.name}>
+                                  <span>{displayName}</span>
+                                  {meta && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{meta}</span>}
+                                </SelectItem>
+                              );
+                            })
                         : [
                             "Semi-Trailer Truck",
                             "Rigid Truck",
@@ -1637,14 +1684,17 @@ export default function NewQuote() {
                           No available vehicles for this type
                         </SelectItem>
                       ) : (
-                        vehicles.map((v) => (
-                          <SelectItem key={v.id} value={String(v.id)}>
-                            {v.make} {v.model} · {v.plate}
-                            {v.capacity != null
-                              ? ` · ${kgToTon(parseFloat(String(v.capacity)))} ton`
-                              : ""}
-                          </SelectItem>
-                        ))
+                        vehicles.map((v) => {
+                          const cap = v.capacity != null && Number(v.capacity) > 0
+                            ? `${kgToTon(parseFloat(String(v.capacity)))} ton` : null;
+                          const meta = [v.plate, cap].filter(Boolean).join(' · ');
+                          return (
+                            <SelectItem key={v.id} value={String(v.id)}>
+                              <span>{v.make} {v.model}</span>
+                              {meta && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{meta}</span>}
+                            </SelectItem>
+                          );
+                        })
                       )}
                     </SelectContent>
                   </Select>
@@ -1702,7 +1752,7 @@ export default function NewQuote() {
                               ? "var(--status-warning)"
                               : "var(--text-tertiary)",
                         }}>
-                        {overLimit ? "⚠️" : nearLimit ? "⚠️" : "ℹ️"}
+                        {overLimit ? <AlertTriangle size={12} /> : nearLimit ? <AlertTriangle size={12} /> : <Info size={12} />}
                         {overLimit
                           ? `${w} ton exceeds ${capLabel} capacity of ${cap} ton`
                           : nearLimit
@@ -2142,7 +2192,7 @@ export default function NewQuote() {
                                                     "var(--status-success)",
                                                   fontWeight: 600,
                                                 }}>
-                                                ⏰ {post.hours}
+                                                <Clock size={9} style={{ display: 'inline', marginRight: 3 }} />{post.hours}
                                               </span>
                                             </div>
                                             <div
@@ -2151,7 +2201,7 @@ export default function NewQuote() {
                                                 color: "var(--text-tertiary)",
                                                 fontFamily: "var(--font-sans)",
                                               }}>
-                                              ℹ️ {post.note}
+                                              <Info size={9} style={{ display: 'inline', marginRight: 3, flexShrink: 0 }} />{post.note}
                                             </div>
                                           </div>
                                         );
@@ -2266,7 +2316,7 @@ export default function NewQuote() {
                                                       "var(--status-success)",
                                                     flexShrink: 0,
                                                   }}>
-                                                  ✓
+                                                  <Check size={10} />
                                                 </span>
                                                 <span>{doc}</span>
                                               </div>
@@ -2313,7 +2363,7 @@ export default function NewQuote() {
                                               color: "var(--status-warning)",
                                             }}>
                                             <span style={{ flexShrink: 0 }}>
-                                              ⚠️
+                                              <AlertTriangle size={12} />
                                             </span>
                                             <span>{w}</span>
                                           </div>
@@ -2507,15 +2557,6 @@ export default function NewQuote() {
                                   ? "var(--status-warning)"
                                   : "var(--status-danger)";
 
-                        const terrainIcons: Record<string, string> = {
-                          Coastal: "🌊",
-                          "Mountain Passes": "⛰️",
-                          Karoo: "🏜️",
-                          Escarpment: "🗻",
-                          Bushveld: "🌿",
-                          "Highveld / Flat": "🟫",
-                        };
-
                         return (
                           <div
                             key={r.index}
@@ -2611,13 +2652,8 @@ export default function NewQuote() {
                                 </span>
                                 <span>{Math.round(r.distance_km)} km</span>
                               </div>
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  color: "var(--text-tertiary)",
-                                  marginLeft: 2,
-                                }}>
-                                {isExp ? "▲" : "▼"}
+                              <span style={{ display: "flex", alignItems: "center", marginLeft: 2 }}>
+                                {isExp ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                               </span>
                             </button>
 
@@ -2902,7 +2938,7 @@ export default function NewQuote() {
                                           fontFamily: "var(--font-sans)",
                                           marginTop: 2,
                                         }}>
-                                        🚇 includes tunnel
+                                        <Landmark size={9} style={{ display: 'inline', marginRight: 3 }} />includes tunnel
                                       </div>
                                     )}
                                   </div>
@@ -3053,7 +3089,7 @@ export default function NewQuote() {
                                             color: "var(--text-secondary)",
                                             fontFamily: "var(--font-sans)",
                                           }}>
-                                          {terrainIcons[t] ?? "📍"} {t}
+                                          {t}
                                         </span>
                                       ))}
                                       {r.has_tunnel && (
@@ -3068,7 +3104,7 @@ export default function NewQuote() {
                                             color: "var(--text-secondary)",
                                             fontFamily: "var(--font-sans)",
                                           }}>
-                                          🚇 Tunnel
+                                          <Landmark size={10} style={{ display: 'inline', marginRight: 3 }} />Tunnel
                                         </span>
                                       )}
                                     </div>
@@ -3303,27 +3339,27 @@ export default function NewQuote() {
                           }[] = [];
                           if (terrain.includes("Mountain Passes"))
                             terrainHints.push({
-                              label: "⛰️ Mountain Passes",
+                              label: "Mountain Passes",
                               note: "+12–18% fuel",
                             });
                           if (terrain.includes("Escarpment"))
                             terrainHints.push({
-                              label: "🗻 Escarpment",
+                              label: "Escarpment",
                               note: "+8–12% fuel",
                             });
                           if (terrain.includes("Karoo"))
                             terrainHints.push({
-                              label: "🏜️ Karoo",
+                              label: "Karoo",
                               note: "Flat — avg fuel",
                             });
                           if (terrain.includes("Coastal"))
                             terrainHints.push({
-                              label: "🌊 Coastal",
+                              label: "Coastal",
                               note: "+5% (wind)",
                             });
                           if (terrain.includes("Highveld / Flat"))
                             terrainHints.push({
-                              label: "🟫 Highveld",
+                              label: "Highveld",
                               note: "Flat — avg fuel",
                             });
 
@@ -3497,7 +3533,7 @@ export default function NewQuote() {
                                       style={{
                                         color: "var(--text-secondary)",
                                       }}>
-                                      🛣️ Road mix ({motorwayPct}% highway)
+                                      <Route size={11} style={{ display: 'inline', marginRight: 4 }} />Road mix ({motorwayPct}% highway)
                                     </span>
                                     <span
                                       style={{
@@ -3607,8 +3643,7 @@ export default function NewQuote() {
                                         fontFamily: "var(--font-mono)",
                                         marginTop: 2,
                                       }}>
-                                      {Math.round(rd.fuel_usage_litres)}L × R
-                                      {effectivePrice.toFixed(2)}
+                                      {Math.round(rd.fuel_usage_litres)}L × R{effectivePrice.toFixed(2)} + R{Math.round(rd.toll_cost_zar)} toll
                                     </div>
                                   </div>
                                   <div
@@ -3659,11 +3694,7 @@ export default function NewQuote() {
                                         fontFamily: "var(--font-mono)",
                                         marginTop: 2,
                                       }}>
-                                      {Math.round(rd.distance_km)}km × R
-                                      {(
-                                        selectedVehicleTypeBaseRate ??
-                                        parseFloat(baseRatePerKm || "0")
-                                      ).toFixed(2)}
+                                      {Math.round(rd.distance_km)}km × R{(selectedVehicleTypeBaseRate ?? parseFloat(baseRatePerKm || "0")).toFixed(2)} + R{Math.round(rd.toll_cost_zar)} toll
                                     </div>
                                   </div>
                                 </div>
@@ -4086,316 +4117,8 @@ export default function NewQuote() {
             </div>
           </div>
 
-          {/* UPGRADE 4: Enhanced Revenue Guard Badge */}
-          {revenueGuard && (
-            <div
-              style={{
-                padding: "16px",
-                background:
-                  revenueGuard.risk_level === "AT_RISK"
-                    ? "rgba(239, 68, 68, 0.05)"
-                    : revenueGuard.risk_level === "CAUTION"
-                      ? "rgba(251, 191, 36, 0.05)"
-                      : "rgba(34, 197, 94, 0.05)",
-                borderRadius: 2,
-                border: `1px solid var(--status-${revenueGuard.color})`,
-                marginBottom: 16,
-              }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 12,
-                }}>
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontFamily: "var(--font-mono)",
-                    color: "var(--text-tertiary)",
-                    letterSpacing: "0.08em",
-                  }}>
-                  REVENUE GUARD
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 12,
-                      color: "var(--text-secondary)",
-                    }}>
-                    Margin: {(revenueGuard.margin_pct ?? 0).toFixed(1)}%
-                  </span>
-                  <span
-                    style={{
-                      padding: "4px 10px",
-                      background: `var(--status-${revenueGuard.color})`,
-                      borderRadius: 2,
-                      fontSize: 10,
-                      color: "#fff",
-                      fontWeight: 700,
-                      fontFamily: "var(--font-mono)",
-                    }}>
-                    {revenueGuard.risk_level === "SAFE" && (
-                      <>
-                        <svg
-                          width="10"
-                          height="10"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>{" "}
-                        SAFE
-                      </>
-                    )}
-                    {revenueGuard.risk_level === "CAUTION" && (
-                      <>
-                        <svg
-                          width="10"
-                          height="10"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2">
-                          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                          <line x1="12" y1="9" x2="12" y2="13" />
-                          <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>{" "}
-                        CAUTION
-                      </>
-                    )}
-                    {revenueGuard.risk_level === "AT_RISK" && (
-                      <>
-                        <svg
-                          width="10"
-                          height="10"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2">
-                          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                          <line x1="12" y1="9" x2="12" y2="13" />
-                          <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>{" "}
-                        AT RISK
-                      </>
-                    )}
-                  </span>
-                </div>
-              </div>
 
-              {/* Margin Floor Display */}
-              {revenueGuard.margin_floor && (
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "var(--text-tertiary)",
-                    fontFamily: "var(--font-mono)",
-                    marginBottom: 12,
-                  }}>
-                  Minimum viable price (0% margin):{" "}
-                  <span
-                    style={{ color: "var(--status-danger)", fontWeight: 600 }}>
-                    {revenueGuard.margin_floor_display ||
-                      `R${Math.round(revenueGuard.margin_floor).toLocaleString()}`}
-                  </span>
-                </div>
-              )}
 
-              {/* Explanations Section (expandable for CAUTION/SAFE, pre-expanded for AT_RISK) */}
-              {revenueGuard.explanations &&
-                revenueGuard.explanations.length > 0 && (
-                  <div style={{ marginBottom: 12 }}>
-                    <button
-                      onClick={() => setGuardExpanded(!guardExpanded)}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "var(--text-primary)",
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
-                        cursor: "pointer",
-                        padding: "4px 0",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        marginBottom: 8,
-                      }}>
-                      <span>
-                        {guardExpanded || revenueGuard.risk_level === "AT_RISK"
-                          ? "▼"
-                          : "▶"}
-                      </span>
-                      <span>
-                        Why is this {revenueGuard.risk_level.replace("_", " ")}?
-                      </span>
-                    </button>
-                    {(guardExpanded ||
-                      revenueGuard.risk_level === "AT_RISK") && (
-                      <div
-                        style={{
-                          padding: "10px",
-                          background: "var(--bg-surface)",
-                          borderRadius: 2,
-                          marginBottom: 8,
-                        }}>
-                        {revenueGuard.explanations.map((explanation, idx) => (
-                          <div
-                            key={idx}
-                            style={{
-                              fontSize: 11,
-                              color: "var(--text-secondary)",
-                              marginBottom:
-                                idx < revenueGuard.explanations!.length - 1
-                                  ? 6
-                                  : 0,
-                              fontFamily: "var(--font-sans)",
-                              lineHeight: 1.5,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 4,
-                            }}>
-                            <svg
-                              width="12"
-                              height="12"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>{" "}
-                            {explanation}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-              {/* Suggestions Section (expandable for CAUTION/SAFE, pre-expanded for AT_RISK) */}
-              {revenueGuard.suggestions &&
-                revenueGuard.suggestions.length > 0 && (
-                  <div style={{ marginBottom: 12 }}>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-primary)",
-                        marginBottom: 8,
-                        fontWeight: 600,
-                      }}>
-                      How to fix it:
-                    </div>
-                    <div
-                      style={{
-                        padding: "10px",
-                        background: "var(--bg-surface)",
-                        borderRadius: 2,
-                      }}>
-                      {revenueGuard.suggestions.map((suggestion, idx) => (
-                        <div
-                          key={idx}
-                          style={{
-                            fontSize: 11,
-                            color: "var(--text-secondary)",
-                            marginBottom:
-                              idx < revenueGuard.suggestions!.length - 1
-                                ? 6
-                                : 0,
-                            fontFamily: "var(--font-sans)",
-                            lineHeight: 1.5,
-                          }}>
-                          → {suggestion}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              {/* Action Buttons */}
-              {revenueGuard.risk_level === "AT_RISK" && (
-                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                  {revenueGuard.recommended_surcharge_zar && (
-                    <button
-                      onClick={() => {
-                        const surcharge =
-                          revenueGuard.recommended_surcharge_zar!;
-                        const newAdditionalCharges =
-                          _weightSurcharge + _additionalCosts + surcharge;
-                        setDriverAllowanceInput(
-                          String(parseFloat(driverAllowanceInput) + surcharge),
-                        );
-                        setNotes(
-                          (prev) =>
-                            prev +
-                            (prev ? "\n" : "") +
-                            `Fuel surcharge added: +R${Math.round(surcharge).toLocaleString()} due to diesel price increase`,
-                        );
-                      }}
-                      className="btn-action"
-                      style={{
-                        fontSize: 10,
-                        padding: "8px 12px",
-                        background: "var(--status-warning)",
-                        border: "none",
-                        color: "#000",
-                        flex: 1,
-                      }}>
-                      ADD SURCHARGE
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setNotes(
-                        (prev) =>
-                          prev +
-                          (prev ? "\n\n" : "") +
-                          "**PAYMENT TERM:** 50% deposit required before dispatch. 50% balance due on delivery.",
-                      );
-                    }}
-                    className="btn-action"
-                    style={{
-                      fontSize: 10,
-                      padding: "8px 12px",
-                      background: "var(--accent-primary)",
-                      border: "none",
-                      color: "#fff",
-                      flex: 1,
-                    }}>
-                    REQUIRE DEPOSIT
-                  </button>
-                </div>
-              )}
-
-              {/* Old warnings (fallback) */}
-              {(!revenueGuard.explanations ||
-                revenueGuard.explanations.length === 0) &&
-                revenueGuard.warnings.length > 0 && (
-                  <div
-                    style={{
-                      padding: "8px",
-                      background: "var(--bg-surface)",
-                      borderRadius: 2,
-                    }}>
-                    {revenueGuard.warnings.map((warning, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          fontSize: 10,
-                          color: "var(--text-secondary)",
-                          marginBottom:
-                            idx < revenueGuard.warnings.length - 1 ? 4 : 0,
-                          fontFamily: "var(--font-sans)",
-                        }}>
-                        • {warning}
-                      </div>
-                    ))}
-                  </div>
-                )}
-            </div>
-          )}
 
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <button
@@ -4428,6 +4151,74 @@ export default function NewQuote() {
           <div className="card-title" style={{ marginBottom: 16 }}>
             Step 3: Quote Summary
           </div>
+
+          {/* Compact Revenue Guard — expandable summary warning */}
+          {revenueGuard && revenueGuard.risk_level !== "SAFE" && (
+            <div style={{
+              background: revenueGuard.risk_level === "AT_RISK" ? "rgba(239,68,68,0.07)" : "rgba(251,191,36,0.07)",
+              border: `1px solid var(--status-${revenueGuard.color})`,
+              borderRadius: 4,
+              marginBottom: 16,
+              overflow: "hidden",
+            }}>
+              {/* Header row — always visible, click to expand */}
+              <div
+                onClick={() => setGuardExpanded(x => !x)}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "10px 14px", cursor: "pointer",
+                }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: `var(--status-${revenueGuard.color})`, fontFamily: "var(--font-mono)", fontWeight: 700, letterSpacing: "0.06em" }}>
+                    {revenueGuard.risk_level === "AT_RISK" ? "⚠ AT RISK" : "⚠ CAUTION"}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                    {revenueGuard.explanations?.[0] || `Margin is ${(revenueGuard.margin_pct ?? 0).toFixed(1)}%`}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {revenueGuard.margin_floor && (
+                    <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: `var(--status-${revenueGuard.color})`, whiteSpace: "nowrap" }}>
+                      Min: {revenueGuard.margin_floor_display || `R${Math.round(revenueGuard.margin_floor).toLocaleString()}`}
+                    </span>
+                  )}
+                  {guardExpanded ? <ChevronUp size={13} color="var(--text-tertiary)" /> : <ChevronDown size={13} color="var(--text-tertiary)" />}
+                </div>
+              </div>
+
+              {/* Expanded details */}
+              {guardExpanded && (
+                <div style={{ borderTop: `1px solid var(--status-${revenueGuard.color})`, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-secondary)" }}>
+                    <span>Current margin</span>
+                    <span style={{ fontFamily: "var(--font-mono)", color: `var(--status-${revenueGuard.color})`, fontWeight: 600 }}>{(revenueGuard.margin_pct ?? 0).toFixed(1)}%</span>
+                  </div>
+                  {revenueGuard.explanations && revenueGuard.explanations.length > 1 && revenueGuard.explanations.slice(1).map((exp, i) => (
+                    <div key={i} style={{ fontSize: 12, color: "var(--text-secondary)" }}>✓ {exp}</div>
+                  ))}
+                  {revenueGuard.suggestions && revenueGuard.suggestions.length > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.06em", marginBottom: 6 }}>HOW TO FIX</div>
+                      {revenueGuard.suggestions.map((s, i) => {
+                        // Fix backend bug: negative Rand increase values (e.g. "R-9789") are wrong.
+                        // Recompute: cost = margin_floor, target at 10% = cost / 0.9
+                        let display = s;
+                        if (/R-\d/.test(s) && revenueGuard.margin_floor) {
+                          const cost = revenueGuard.margin_floor;
+                          const increase = Math.round(cost / 0.9 - cost);
+                          display = `Current margin is ${(revenueGuard.margin_pct ?? 0).toFixed(1)}%. Consider increasing price by R${increase.toLocaleString()} to reach 10% margin`;
+                        }
+                        return <div key={i} style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>→ {display}</div>;
+                      })}
+                    </div>
+                  )}
+                  {revenueGuard.warnings && revenueGuard.warnings.length > 0 && revenueGuard.warnings.map((w, i) => (
+                    <div key={i} style={{ fontSize: 12, color: `var(--status-${revenueGuard.color})` }}>• {w}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Quote details recap (read-only — entered in Step 2) */}
           <div

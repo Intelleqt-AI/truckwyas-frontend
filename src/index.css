@@ -81,6 +81,10 @@ body {
   border-color: var(--accent-primary) !important;
 }
 
+.tw-select-trigger[data-state="open"] .tw-select-chevron {
+  transform: rotate(180deg);
+}
+
 .tw-select-item:hover,
 .tw-select-item[data-highlighted] {
   background: var(--accent-glow) !important;

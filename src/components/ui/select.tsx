@@ -35,9 +35,7 @@ const SelectTrigger = React.forwardRef<
     {...props}
   >
     {children}
-    <SelectPrimitive.Icon asChild>
-      <ChevronDown size={13} style={{ opacity: 0.5, flexShrink: 0 }} />
-    </SelectPrimitive.Icon>
+    <ChevronDown size={13} className="tw-select-chevron" style={{ opacity: 0.5, flexShrink: 0, transition: "transform 0.15s" }} />
   </SelectPrimitive.Trigger>
 ))
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
@@ -178,6 +178,18 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
 
   const loads: any[] = loadsData?.results || loadsData || [];
   const quotes: any[] = quotesData?.results || quotesData || [];
+
+  // Live update: refetch when backend pushes any quote event over WebSocket
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { detail } = (e as CustomEvent);
+      if (typeof detail?.event === 'string' && detail.event.startsWith('quote.')) {
+        queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      }
+    };
+    window.addEventListener('tw:live-event', handler);
+    return () => window.removeEventListener('tw:live-event', handler);
+  }, [queryClient]);
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>

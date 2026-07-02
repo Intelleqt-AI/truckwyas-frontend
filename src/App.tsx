@@ -81,7 +81,6 @@ const LoginOtp = lazy(() => import('./pages/LoginOtp').then(m => ({ default: m.L
 const Signup = lazy(() => import('./pages/Signup'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const PasswordReset = lazy(() => import('./pages/PasswordReset'));
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword').then(m => ({ default: m.ForgotPassword })));
 const InviteAccept = lazy(() => import('./pages/InviteAccept').then(m => ({ default: m.InviteAccept })));
 const EmailVerification = lazy(() =>
   import('./pages/EmailVerification').then(m => ({
@@ -172,14 +171,7 @@ const App = () => (
                 }
               />
               <Route path="/password-reset" element={<PasswordReset />} />
-              <Route
-                path="/forgot-password"
-                element={
-                  <PublicOnly>
-                    <ForgotPassword />
-                  </PublicOnly>
-                }
-              />
+              <Route path="/forgot-password" element={<Navigate to="/password-reset" replace />} />
               <Route path="/reset-password" element={<Navigate to="/password-reset" replace />} />
               <Route
                 path="/invite/:token"

@@ -179,7 +179,7 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
           border: '1px solid var(--border-subtle)',
           borderTop: 'none',
           borderRadius: '0 0 4px 4px',
-          zIndex: 200, maxHeight: 220, overflowY: 'auto',
+          zIndex: 1100, maxHeight: 220, overflowY: 'auto',
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         }}>
           {suggestions.map((s, i) => (

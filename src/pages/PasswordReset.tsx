@@ -155,6 +155,9 @@ export default function PasswordReset() {
                   <input type="text" required value={code} onChange={e => setCode(e.target.value)}
                     placeholder="6-digit code from email" maxLength={6}
                     style={{ ...inputStyle, letterSpacing: '0.2em', fontSize: 16, fontFamily: 'var(--font-mono)' }} />
+                  <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 4 }}>
+                    The code is valid for 1 hour.
+                  </span>
                 </div>
 
                 {/* New password */}

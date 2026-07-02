@@ -91,7 +91,11 @@ export default function QuoteDetail() {
       } catch {
         setShareUrl(data.share_url);
       }
-      toast.success('Share link ready — copy and send to your customer');
+      if (data.email_sent) {
+        toast.success(`Quote emailed to ${data.customer_email} — share link also below`);
+      } else {
+        toast.success('Share link ready — copy and send to your customer');
+      }
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
       queryClient.setQueryData(['quotes'], (old: unknown) => {
         if (!old || typeof old !== 'object') return old;

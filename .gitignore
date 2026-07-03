@@ -23,6 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+test
 
 # Local env & config (keep local dev versions out of future commits)
 .env

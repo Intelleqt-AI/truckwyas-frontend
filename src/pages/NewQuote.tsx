@@ -77,6 +77,7 @@ interface RouteData {
   distance_km: number;
   duration_minutes: number;
   fuel_usage_litres: number;
+  fuel_rate_l_per_100km?: number;
   fuel_cost_zar: number;
   toll_cost_zar: number;
   total_cost_zar: number;
@@ -1213,7 +1214,7 @@ export default function NewQuote() {
         {/* Left — standard header block */}
         <div>
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => { localStorage.removeItem(DRAFT_KEY); navigate(-1); }}
             style={{
               background: "none",
               border: "none",
@@ -2734,7 +2735,7 @@ export default function NewQuote() {
                                         fontFamily: "var(--font-mono)",
                                         marginBottom: 4,
                                       }}>
-                                      {r.traffic_status || "Unknown"}
+                                      {Math.round(r.distance_km / (r.duration_minutes / 60))} km/h avg
                                     </div>
                                     <div
                                       style={{
@@ -2757,6 +2758,9 @@ export default function NewQuote() {
                                           No delay
                                         </span>
                                       )}
+                                    </div>
+                                    <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)" }}>
+                                      {Math.max(1, Math.floor(r.duration_minutes / 60 / 4.5))} stop{Math.max(1, Math.floor(r.duration_minutes / 60 / 4.5)) !== 1 ? "s" : ""} recommended
                                     </div>
                                     {r.traffic_vs_historic != null && (
                                       <div
@@ -3325,6 +3329,11 @@ export default function NewQuote() {
                               }}>
                               {Math.round(rd.fuel_usage_litres)} L
                             </div>
+                            {rd.fuel_rate_l_per_100km != null && (
+                              <div style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", marginTop: 2 }}>
+                                {rd.fuel_rate_l_per_100km.toFixed(1)} L/100km
+                              </div>
+                            )}
                           </div>
                         </div>
                         {(() => {
@@ -3339,31 +3348,32 @@ export default function NewQuote() {
                             rd.fuel_usage_litres * effectivePrice;
                           const weightTons = parseFloat(weight || "0");
 
-                          // Weight impact hint
+                          // Weight impact hint — uses actual calculated rate, not a static range
+                          const actualRate = rd.fuel_rate_l_per_100km;
                           const weightHint =
                             weightTons <= 0
                               ? null
                               : weightTons < 5
                                 ? {
                                     label: `${weightTons}t load`,
-                                    note: "Light — ~25–30 L/100km",
+                                    note: actualRate != null ? `${actualRate.toFixed(1)} L/100km` : "Light — ~25–30 L/100km",
                                     color: "var(--status-success)",
                                   }
                                 : weightTons < 10
                                   ? {
                                       label: `${weightTons}t load`,
-                                      note: "Medium — ~32–38 L/100km",
+                                      note: actualRate != null ? `${actualRate.toFixed(1)} L/100km` : "Medium — ~32–38 L/100km",
                                       color: "#a3a300",
                                     }
                                   : weightTons < 20
                                     ? {
                                         label: `${weightTons}t load`,
-                                        note: "Heavy — ~38–45 L/100km",
+                                        note: actualRate != null ? `${actualRate.toFixed(1)} L/100km` : "Heavy — ~38–45 L/100km",
                                         color: "var(--status-warning)",
                                       }
                                     : {
                                         label: `${weightTons}t load`,
-                                        note: "Very heavy — ~45–55 L/100km",
+                                        note: actualRate != null ? `${actualRate.toFixed(1)} L/100km` : "Very heavy — ~45–55 L/100km",
                                         color: "var(--status-danger)",
                                       };
 
@@ -3461,20 +3471,20 @@ export default function NewQuote() {
                                       color: "var(--text-tertiary)",
                                       letterSpacing: "0.07em",
                                     }}>
-                                    LIVE DIESEL PRICE · FIASA
+                                    {fuelPriceData && !fuelPriceData.is_stale ? "LIVE DIESEL PRICE · FIASA" : "ESTIMATED DIESEL PRICE"}
                                   </span>
                                   <span
                                     style={{
                                       fontSize: 9,
                                       padding: "1px 6px",
-                                      background: "var(--accent-glow)",
-                                      border: "1px solid var(--accent-primary)",
+                                      background: fuelPriceData && !fuelPriceData.is_stale ? "var(--accent-glow)" : "var(--bg-surface-hover)",
+                                      border: `1px solid ${fuelPriceData && !fuelPriceData.is_stale ? "var(--accent-primary)" : "var(--status-warning)"}`,
                                       borderRadius: 2,
-                                      color: "var(--accent-primary)",
+                                      color: fuelPriceData && !fuelPriceData.is_stale ? "var(--accent-primary)" : "var(--status-warning)",
                                       fontFamily: "var(--font-mono)",
                                       fontWeight: 600,
                                     }}>
-                                    MARKET RATE
+                                    {fuelPriceData && !fuelPriceData.is_stale ? "MARKET RATE" : "ESTIMATED"}
                                   </span>
                                 </div>
                                 <div

@@ -87,6 +87,13 @@ export default function VehicleFinancialProfile() {
 
   const healthScore = vehicle.ai_health_score ?? 0;
 
+  const nextServiceKm = (vehicle.service_interval_km && vehicle.last_service_mileage)
+    ? parseFloat(vehicle.last_service_mileage) + Number(vehicle.service_interval_km)
+    : null;
+  const kmUntilService = (nextServiceKm !== null && vehicle.mileage)
+    ? nextServiceKm - parseFloat(vehicle.mileage)
+    : null;
+
   const tabStyle = (active: boolean): React.CSSProperties => ({
     background: 'transparent', border: 'none',
     borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
@@ -126,15 +133,15 @@ export default function VehicleFinancialProfile() {
                   make: vehicle.make || '',
                   model: vehicle.model || '',
                   year: vehicle.year || '',
-                  capacity: vehicle.capacity || '',
+                  capacity: vehicle.capacity ? String(Number(vehicle.capacity) / 1000) : '',
                   mileage: vehicle.mileage || '',
                   type: vehicle.vehicle_type_name || '',
                   fuel_type: vehicle.fuel_type || 'Diesel',
                   status: vehicle.status || 'AVAILABLE',
-                  insurance_expiry: vehicle.insurance_expiry?.slice(0, 10) || '',
                   registration_expiry: vehicle.registration_expiry?.slice(0, 10) || '',
                   last_maintenance_date: vehicle.last_maintenance_date?.slice(0, 10) || '',
-                  next_maintenance_due: vehicle.next_maintenance_due?.slice(0, 10) || '',
+                  service_interval_km: vehicle.service_interval_km || '',
+                  last_service_mileage: vehicle.last_service_mileage || '',
                   driver: vehicle.driver ?? '',
                 });
               }}
@@ -224,7 +231,7 @@ export default function VehicleFinancialProfile() {
                 { label: 'VIN', value: vehicle.vin },
                 { label: 'PLATE', value: vehicle.plate },
                 { label: 'TYPE', value: vehicle.vehicle_type_name || '—' },
-                { label: 'CAPACITY', value: vehicle.capacity ? `${parseFloat(vehicle.capacity).toFixed(0)} kg` : '—' },
+                { label: 'CAPACITY', value: vehicle.capacity ? `${(parseFloat(vehicle.capacity) / 1000).toFixed(1)} ton` : '—' },
                 { label: 'FUEL TYPE', value: vehicle.fuel_type },
                 { label: 'YEAR', value: vehicle.year },
                 { label: 'DRIVER', value: vehicle.driver_name || '—' },
@@ -257,8 +264,9 @@ export default function VehicleFinancialProfile() {
                 <div className="card-title" style={{ marginBottom: 16 }}>MAINTENANCE</div>
                 {[
                   { label: 'LAST MAINTENANCE', value: vehicle.last_maintenance_date?.slice(0, 10) || '—' },
-                  { label: 'NEXT DUE', value: vehicle.next_maintenance_due?.slice(0, 10) || '—' },
-                  { label: 'INSURANCE EXPIRY', value: vehicle.insurance_expiry?.slice(0, 10) || '—' },
+                  { label: 'SERVICE INTERVAL', value: vehicle.service_interval_km ? `${Number(vehicle.service_interval_km).toLocaleString('en-ZA')} km` : '—' },
+                  { label: 'NEXT SERVICE AT', value: nextServiceKm ? `${nextServiceKm.toLocaleString('en-ZA')} km` : '—' },
+                  { label: 'KM UNTIL SERVICE', value: kmUntilService !== null ? (kmUntilService > 0 ? `${Math.round(kmUntilService).toLocaleString('en-ZA')} km` : 'OVERDUE') : '—' },
                   { label: 'REGISTRATION EXPIRY', value: vehicle.registration_expiry?.slice(0, 10) || '—' },
                 ].map(r => (
                   <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
@@ -330,7 +338,7 @@ export default function VehicleFinancialProfile() {
                 { label: 'COST PER KM', value: vehicle.cost_per_km ? `R ${parseFloat(vehicle.cost_per_km).toFixed(2)}` : '—' },
                 { label: 'MARGIN PER TRIP', value: vehicle.margin_per_trip ? formatCurrency(parseFloat(vehicle.margin_per_trip)) : '—' },
                 { label: 'FUEL CONSUMPTION', value: vehicle.fuel_consumption_per_km ? `${vehicle.fuel_consumption_per_km} L/km` : '—' },
-                { label: 'CAPACITY', value: vehicle.capacity ? `${parseFloat(vehicle.capacity).toFixed(0)} kg` : '—' },
+                { label: 'CAPACITY', value: vehicle.capacity ? `${(parseFloat(vehicle.capacity) / 1000).toFixed(1)} ton` : '—' },
                 { label: 'FUEL TYPE', value: vehicle.fuel_type || '—' },
                 { label: 'MILEAGE', value: vehicle.mileage ? `${parseFloat(vehicle.mileage).toLocaleString('en-ZA')} km` : '—' },
               ].map(r => (
@@ -345,10 +353,11 @@ export default function VehicleFinancialProfile() {
             <div className="card" style={{ padding: 20 }}>
               <div className="card-title" style={{ marginBottom: 16 }}>COMPLIANCE & MAINTENANCE</div>
               {[
-                { label: 'LAST MAINTENANCE', value: vehicle.last_maintenance_date || '—', alert: false },
-                { label: 'NEXT DUE', value: vehicle.next_maintenance_due || '—', alert: vehicle.next_maintenance_due && new Date(vehicle.next_maintenance_due) < new Date() },
-                { label: 'INSURANCE EXPIRY', value: vehicle.insurance_expiry || '—', alert: vehicle.insurance_expiry && new Date(vehicle.insurance_expiry) < new Date() },
-                { label: 'REGISTRATION EXPIRY', value: vehicle.registration_expiry || '—', alert: vehicle.registration_expiry && new Date(vehicle.registration_expiry) < new Date() },
+                { label: 'LAST MAINTENANCE', value: vehicle.last_maintenance_date?.slice(0, 10) || '—', alert: false },
+                { label: 'SERVICE INTERVAL', value: vehicle.service_interval_km ? `${Number(vehicle.service_interval_km).toLocaleString('en-ZA')} km` : '—', alert: false },
+                { label: 'NEXT SERVICE AT', value: nextServiceKm ? `${nextServiceKm.toLocaleString('en-ZA')} km` : '—', alert: false },
+                { label: 'KM UNTIL SERVICE', value: kmUntilService !== null ? (kmUntilService > 0 ? `${Math.round(kmUntilService).toLocaleString('en-ZA')} km` : 'OVERDUE') : '—', alert: kmUntilService !== null && kmUntilService <= 0 },
+                { label: 'REGISTRATION EXPIRY', value: vehicle.registration_expiry?.slice(0, 10) || '—', alert: !!(vehicle.registration_expiry && new Date(vehicle.registration_expiry) < new Date()) },
                 { label: 'VIN', value: vehicle.vin || '—', alert: false },
               ].map(r => (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
@@ -406,12 +415,12 @@ export default function VehicleFinancialProfile() {
               { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
               { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
               { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
-              { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
+              { key: 'capacity', label: 'Capacity (ton)', placeholder: 'e.g. 30', type: 'number' },
               { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
-              { key: 'insurance_expiry', label: 'Insurance Expiry', type: 'date' },
               { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
-              { key: 'last_maintenance_date', label: 'Last Maintenance', type: 'date' },
-              { key: 'next_maintenance_due', label: 'Next Maintenance Due', type: 'date' },
+              { key: 'last_maintenance_date', label: 'Last Maintenance Date', type: 'date' },
+              { key: 'service_interval_km', label: 'Service Interval (km)', placeholder: 'e.g. 10000', type: 'number' },
+              { key: 'last_service_mileage', label: 'Last Service Odometer (km)', placeholder: 'e.g. 145000', type: 'number' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
@@ -470,8 +479,10 @@ export default function VehicleFinancialProfile() {
                     const payload = {
                       ...formWithoutType,
                       year: editForm.year ? Number(editForm.year) : undefined,
-                      capacity: editForm.capacity ? Number(editForm.capacity) : undefined,
+                      capacity: editForm.capacity ? Number(editForm.capacity) * 1000 : undefined,
                       mileage: editForm.mileage ? Number(editForm.mileage) : undefined,
+                      service_interval_km: editForm.service_interval_km ? Number(editForm.service_interval_km) : null,
+                      last_service_mileage: editForm.last_service_mileage ? Number(editForm.last_service_mileage) : null,
                       driver: editForm.driver !== '' && editForm.driver != null ? Number(editForm.driver) : null,
                       ...(vehicleTypeId ? { vehicle_type: vehicleTypeId } : {}),
                     };

@@ -209,7 +209,16 @@ export default function ClientQuoteView() {
 
         {/* Route */}
         <Card>
-          <div style={{ fontSize: 11, fontFamily: C.mono, color: C.faint, letterSpacing: '0.1em', marginBottom: 20 }}>ROUTE</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontFamily: C.mono, color: C.faint, letterSpacing: '0.1em' }}>
+              {quote.trip_type === 'ROUND_TRIP' ? 'LEG 1 — OUTBOUND' : 'ROUTE'}
+            </div>
+            {quote.trip_type === 'ROUND_TRIP' && (
+              <span style={{ fontFamily: C.mono, fontSize: 10, color: C.accent, padding: '2px 8px', border: `1px solid ${C.accent}`, borderRadius: 4, fontWeight: 700 }}>
+                ROUND TRIP
+              </span>
+            )}
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginBottom: 20 }}>
             <div>
               <Label>Pickup</Label>
@@ -232,6 +241,42 @@ export default function ClientQuoteView() {
             />
           )}
         </Card>
+
+        {/* Return Leg — visible only for ROUND_TRIP quotes */}
+        {quote.trip_type === 'ROUND_TRIP' && (
+          <Card>
+            <div style={{ fontSize: 11, fontFamily: C.mono, color: C.accent, letterSpacing: '0.1em', marginBottom: 20 }}>LEG 2 — RETURN</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+              <div>
+                <Label>Departs From</Label>
+                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{quote.delivery_location || '—'}</div>
+              </div>
+              <div style={{ fontSize: 20, color: C.faint }}>→</div>
+              <div>
+                <Label>Return Destination</Label>
+                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{quote.return_location || '—'}</div>
+              </div>
+            </div>
+            {(quote.return_cargo || quote.return_date) && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+                <div>
+                  <Label>Return Cargo</Label>
+                  <div style={{ fontSize: 13, color: quote.return_cargo ? C.text : C.faint }}>
+                    {quote.return_cargo || 'Empty return'}
+                  </div>
+                </div>
+                {quote.return_date && (
+                  <div>
+                    <Label>Return Date</Label>
+                    <div style={{ fontSize: 13, color: C.text, fontFamily: C.mono }}>
+                      {new Date(quote.return_date).toLocaleDateString('en-ZA')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Cargo details */}
         <Card>
@@ -294,8 +339,18 @@ export default function ClientQuoteView() {
               </span>
             </div>
           ))}
+          {quote.trip_type === 'ROUND_TRIP' && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px dashed ${C.accent}` }}>
+              <span style={{ fontSize: 13, color: C.accent }}>Return Leg ({quote.return_cargo ? 'with cargo' : 'empty return'})</span>
+              <span style={{ fontSize: 13, color: C.accent, fontFamily: C.mono, fontWeight: 600 }}>
+                {formatCurrencyLocal(parseFloat(quote.return_base_rate))}
+              </span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 16, marginTop: 4 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Total Amount</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
+              {quote.trip_type === 'ROUND_TRIP' ? 'Total (both legs)' : 'Total Amount'}
+            </span>
             <span style={{ fontSize: 26, fontWeight: 700, color: C.accent, fontFamily: C.mono }}>
               {formatCurrencyLocal(parseFloat(quote.total_amount || '0'))}
             </span>

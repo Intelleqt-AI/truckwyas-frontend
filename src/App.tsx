@@ -77,6 +77,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const XeroIntegration = lazy(() => import('./pages/settings/XeroIntegration'));
 const FleetImport = lazy(() => import('./pages/settings/FleetImport'));
 const Login = lazy(() => import('./pages/Login'));
+const LoginOtp = lazy(() => import('./pages/LoginOtp').then(m => ({ default: m.LoginOtp })));
 const Signup = lazy(() => import('./pages/Signup'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const PasswordReset = lazy(() => import('./pages/PasswordReset'));
@@ -92,15 +93,22 @@ const VehicleFinancialProfile = lazy(() => import('./pages/VehicleFinancialProfi
 const RiskScoreView = lazy(() => import('./pages/RiskScoreView'));
 const FleetHeatmap = lazy(() => import('./pages/FleetHeatmap'));
 const ClientQuoteView = lazy(() => import('./pages/ClientQuoteView'));
+const PublicInvoice = lazy(() => import('./pages/PublicInvoice'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
+      // Don't retry auth errors — retry everything else up to 4×.
+      // Delays: 3s, 6s, 9s, 12s — enough for a Render free-tier cold start (~20-30s).
+      retry: (failureCount, error: unknown) => {
+        const status = (error as { status?: number })?.status;
+        if (status === 401 || status === 403) return false;
+        return failureCount < 4;
+      },
+      retryDelay: (attempt) => Math.min(3000 * (attempt + 1), 12000),
       throwOnError: false,
-      staleTime: 5 * 60 * 1000, // 5 min — avoids refetch on every page revisit
+      staleTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
-      // refetchOnReconnect: true,
     },
   },
 });
@@ -148,6 +156,14 @@ const App = () => (
                 }
               />
               <Route
+                path="/login/verify-otp"
+                element={
+                  <PublicOnly>
+                    <LoginOtp />
+                  </PublicOnly>
+                }
+              />
+              <Route
                 path="/signup"
                 element={
                   <PublicOnly>
@@ -182,6 +198,8 @@ const App = () => (
                 }
               />
               <Route path="/quotes/view/:quoteId/:token" element={<ClientQuoteView />} />
+              <Route path="/invoice/view/:id/:token" element={<PublicInvoice />} />
+              <Route path="/invoice/view/:id" element={<PublicInvoice />} />
               <Route
                 path="/onboarding"
                 element={

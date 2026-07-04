@@ -1,18 +1,28 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { postData } from '@/lib/Api';
 import { useAuth } from '@/lib/AuthContext';
+import { postLoginNavigate } from '@/lib/postLogin';
 
-export const EmailVerification = () => {
+export const LoginOtp = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { setUser } = useAuth();
-  const email = searchParams.get('email') || '';
+
+  const state = (location.state || {}) as { pendingToken?: string; email?: string };
+  const pendingToken = state.pendingToken;
+  const email = state.email;
 
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resentMsg, setResentMsg] = useState('');
+
+  // Guard against refresh / direct navigation: without a pending token there's
+  // no in-flight challenge, so restart the login.
+  if (!pendingToken) {
+    return <Navigate to="/login" replace />;
+  }
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,13 +30,16 @@ export const EmailVerification = () => {
     if (code.length !== 6) { setError('Please enter the 6-digit code.'); return; }
     setLoading(true);
     try {
-      const data: any = await postData({ url: 'api/v1/auth/verify-email/', data: { email, code } });
+      const data: any = await postData({
+        url: 'api/v1/auth/login/verify-otp/',
+        data: { pending_token: pendingToken, code },
+      });
       localStorage.setItem('access', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setUser(data.user);
-      navigate('/onboarding');
+      await postLoginNavigate(navigate);
     } catch (err: any) {
-      setError(err?.data?.detail || 'Invalid or expired code. Please try again.');
+      setError(err?.data?.detail || err?.message || 'Invalid or expired code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -35,10 +48,10 @@ export const EmailVerification = () => {
   const handleResend = async () => {
     setError(''); setResentMsg('');
     try {
-      await postData({ url: 'api/v1/auth/resend-verification/', data: { email } });
+      await postData({ url: 'api/v1/auth/login/resend-otp/', data: { pending_token: pendingToken } });
       setResentMsg('A new code has been sent to your email.');
-    } catch {
-      setError('Failed to resend. Please try again.');
+    } catch (err: any) {
+      setError(err?.data?.detail || 'Failed to resend. Please try again.');
     }
   };
 
@@ -52,11 +65,11 @@ export const EmailVerification = () => {
         </div>
 
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Verify your email</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Enter your sign-in code</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            We sent a 6-digit verification code to{' '}
+            Two-factor authentication is on. We sent a 6-digit code to{' '}
             <strong style={{ color: 'var(--text-primary)' }}>{email || 'your email'}</strong>.
-            Enter it below to activate your account.
+            Enter it below to finish signing in.
           </div>
         </div>
 
@@ -74,7 +87,7 @@ export const EmailVerification = () => {
         <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, letterSpacing: '0.08em' }}>
-              VERIFICATION CODE
+              SIGN-IN CODE
             </label>
             <input
               type="text"
@@ -97,7 +110,7 @@ export const EmailVerification = () => {
           </div>
 
           <button type="submit" className="btn-action" style={{ width: '100%' }} disabled={loading || code.length !== 6}>
-            {loading ? 'VERIFYING...' : 'VERIFY EMAIL'}
+            {loading ? 'VERIFYING...' : 'VERIFY & SIGN IN'}
           </button>
         </form>
 
@@ -118,4 +131,4 @@ export const EmailVerification = () => {
   );
 };
 
-export default EmailVerification;
+export default LoginOtp;

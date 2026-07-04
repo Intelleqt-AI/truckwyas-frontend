@@ -447,7 +447,7 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   transition: border-color 0.2s, box-shadow 0.2s;
   box-shadow: var(--shadow-card);
 }
@@ -593,14 +593,15 @@ body {
   text-transform: uppercase;
   color: var(--text-secondary);
   font-weight: 600;
-  padding-bottom: 12px;
+  padding: 0 16px 12px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .data-table td {
-  padding: 12px 0;
+  padding: 12px 16px 12px 0;
   border-bottom: 1px solid var(--border-row);
   color: var(--text-tertiary);
+  text-align: left;
 }
 
 .data-table tr:last-child td {
@@ -775,6 +776,12 @@ body {
 
 .btn-action:hover {
   opacity: 0.9;
+}
+
+.btn-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .btn-ghost {

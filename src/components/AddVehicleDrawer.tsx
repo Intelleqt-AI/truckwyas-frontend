@@ -13,7 +13,8 @@ interface Props {
 const EMPTY_FORM = {
   vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '',
   type: 'Rigid Truck', capacity: '', mileage: '', fuel_type: 'Diesel', status: 'AVAILABLE',
-  insurance_expiry: '', registration_expiry: '', last_maintenance_date: '', next_maintenance_due: '',
+  registration_expiry: '', last_maintenance_date: '',
+  service_interval_km: '', last_service_mileage: '',
   driver: '',
 };
 
@@ -23,12 +24,12 @@ const TEXT_FIELDS = [
   { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
   { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
   { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
-  { key: 'capacity', label: 'Capacity (kg)', placeholder: 'e.g. 30000', type: 'number' },
+  { key: 'capacity', label: 'Capacity (ton)', placeholder: 'e.g. 30', type: 'number' },
   { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
-  { key: 'insurance_expiry', label: 'Insurance Expiry', type: 'date' },
   { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
-  { key: 'last_maintenance_date', label: 'Last Maintenance', type: 'date' },
-  { key: 'next_maintenance_due', label: 'Next Maintenance Due', type: 'date' },
+  { key: 'last_maintenance_date', label: 'Last Maintenance Date', type: 'date' },
+  { key: 'service_interval_km', label: 'Service Interval (km)', placeholder: 'e.g. 10000', type: 'number' },
+  { key: 'last_service_mileage', label: 'Last Service Odometer (km)', placeholder: 'e.g. 145000', type: 'number' },
 ];
 
 const labelStyle: React.CSSProperties = {
@@ -46,11 +47,12 @@ const inputStyle: React.CSSProperties = {
 export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [vehicleTypes, setVehicleTypes] = useState<{ id: number; name: string }[]>([]);
   const [drivers, setDrivers] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { setSubmitError(null); return; }
     fetchData('api/v1/vehicle-types/').then((d: any) => {
       const arr = Array.isArray(d) ? d : (d?.results || []);
       setVehicleTypes(arr.map((vt: any) => ({ id: vt.id, name: vt.name })));
@@ -68,6 +70,7 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
 
   const handleCreate = async () => {
     setSaving(true);
+    setSubmitError(null);
     try {
       const vehicleTypeId = vehicleTypes.find(vt => vt.name === form.type)?.id;
       const { type: _t, ...rest } = form;
@@ -76,17 +79,22 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
         data: {
           ...rest,
           year: Number(form.year),
-          capacity: Number(form.capacity) || 0,
+          capacity: (Number(form.capacity) || 0) * 1000,
           mileage: form.mileage ? Number(form.mileage) : undefined,
+          service_interval_km: form.service_interval_km ? Number(form.service_interval_km) : null,
+          last_service_mileage: form.last_service_mileage ? Number(form.last_service_mileage) : null,
           driver: form.driver ? Number(form.driver) : null,
           ...(vehicleTypeId ? { vehicle_type: vehicleTypeId } : {}),
         },
       });
       setForm(EMPTY_FORM);
+      setSubmitError(null);
       onCreated();
       onClose();
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to create vehicle');
+      const msg = e?.message || 'Failed to create vehicle';
+      setSubmitError(msg);
+      toast.error(msg);
     }
     setSaving(false);
   };
@@ -105,6 +113,29 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
           <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Add Vehicle</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
         </div>
+
+        {submitError && (
+          <div style={{
+            marginBottom: 20,
+            padding: '12px 14px',
+            background: 'var(--status-danger-bg, #fef2f2)',
+            border: '1px solid var(--status-danger, #dc2626)',
+            borderRadius: 4,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+          }}>
+            <span style={{ color: 'var(--status-danger, #dc2626)', fontWeight: 700, fontSize: 15, lineHeight: 1 }}>!</span>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-danger, #dc2626)', marginBottom: 2 }}>
+                Failed to create vehicle
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--status-danger, #dc2626)', opacity: 0.85 }}>
+                {submitError}
+              </div>
+            </div>
+          </div>
+        )}
 
         {TEXT_FIELDS.map(f => (
           <div key={f.key} style={{ marginBottom: 16 }}>

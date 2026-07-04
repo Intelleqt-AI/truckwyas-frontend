@@ -99,9 +99,34 @@ async function loadOverview() {
   };
 }
 
+const CARD_MENUS: Record<string, { label: string; route: string }[]> = {
+  revenue: [
+    { label: "View Revenue Report", route: "/finance/reports" },
+    { label: "View All Invoices",   route: "/finance/invoices" },
+    { label: "New Invoice",         route: "/finance/invoices/new" },
+  ],
+  margin: [
+    { label: "View Finance Reports", route: "/finance/reports" },
+    { label: "View Expenses",        route: "/finance/expenses" },
+  ],
+  outstanding: [
+    { label: "View Outstanding Invoices", route: "/finance/invoices?status=OVERDUE" },
+    { label: "View All Invoices",         route: "/finance/invoices" },
+    { label: "Request Capital Advance",   route: "/capital" },
+  ],
+};
+
 export default function Overview() {
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    const close = () => setOpenMenu(null);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [openMenu]);
 
   const { data, isLoading: loading, refetch } = useQuery({
     queryKey: ["overview-dashboard"],
@@ -304,17 +329,25 @@ export default function Overview() {
             <span className="card-title">
               {loading ? "Loading..." : "Total Revenue"}
             </span>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              className="card-action">
-              <circle cx="12" cy="12" r="1" />
-              <circle cx="19" cy="12" r="1" />
-              <circle cx="5" cy="12" r="1" />
-            </svg>
+            <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                className="card-action"
+                onClick={() => setOpenMenu(openMenu === "revenue" ? null : "revenue")}>
+                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+              </svg>
+              {openMenu === "revenue" && (
+                <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 200, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
+                  {CARD_MENUS.revenue.map(item => (
+                    <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
+                      style={{ padding: "9px 14px", fontSize: 12, fontFamily: "var(--font-mono)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
+                      onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="metric-value">
             {loading ? "..." : formatCurrency(financeData?.total_revenue || 0)}
@@ -354,17 +387,25 @@ export default function Overview() {
             <span className="card-title">
               {loading ? "Loading..." : "Net Margin"}
             </span>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              className="card-action">
-              <circle cx="12" cy="12" r="1" />
-              <circle cx="19" cy="12" r="1" />
-              <circle cx="5" cy="12" r="1" />
-            </svg>
+            <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                className="card-action"
+                onClick={() => setOpenMenu(openMenu === "margin" ? null : "margin")}>
+                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+              </svg>
+              {openMenu === "margin" && (
+                <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 200, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
+                  {CARD_MENUS.margin.map(item => (
+                    <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
+                      style={{ padding: "9px 14px", fontSize: 12, fontFamily: "var(--font-mono)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
+                      onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div
             className="metric-value"
@@ -408,17 +449,25 @@ export default function Overview() {
             <span className="card-title">
               {loading ? "Loading..." : "Outstanding"}
             </span>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              className="card-action">
-              <circle cx="12" cy="12" r="1" />
-              <circle cx="19" cy="12" r="1" />
-              <circle cx="5" cy="12" r="1" />
-            </svg>
+            <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                className="card-action"
+                onClick={() => setOpenMenu(openMenu === "outstanding" ? null : "outstanding")}>
+                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+              </svg>
+              {openMenu === "outstanding" && (
+                <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 220, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
+                  {CARD_MENUS.outstanding.map(item => (
+                    <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
+                      style={{ padding: "9px 14px", fontSize: 12, fontFamily: "var(--font-mono)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
+                      onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div
             className="metric-value"

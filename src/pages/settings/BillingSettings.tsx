@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { fetchData, postData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -24,18 +25,20 @@ const sectionTitleStyle: React.CSSProperties = {
   fontWeight: 600,
 };
 
-interface CompanyProfile {
+interface BillingStatus {
   subscription_plan?: string | null;
   subscription_status?: string | null;
-  company_name?: string;
+  subscription_start?: string | null;
 }
 
 interface BillingTransaction {
   id: string;
-  pf_payment_id: string;
+  payfast_payment_id?: string;
+  payment_id?: string;
   created_at: string;
   amount: number;
   status: string;
+  plan?: string;
 }
 
 const PRO_PLAN = {
@@ -55,25 +58,79 @@ const PRO_PLAN = {
 };
 
 export function BillingSettings() {
-  const [profile, setProfile] = useState<CompanyProfile | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [billingHistory, setBillingHistory] = useState<BillingTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirming, setConfirming] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
 
-  useEffect(() => {
-    fetchData('api/v1/company/profile/')
-      .then((data) => setProfile(data))
-      .catch(() => setProfile(null))
-      .finally(() => setLoading(false));
-
-    fetchData('api/v1/billing/history/')
-      .then((data) => setBillingHistory(data.results || data || []))
-      .catch(() => setBillingHistory([]));
+  const loadStatus = useCallback(async () => {
+    try {
+      const data = await fetchData('api/v1/billing/status/');
+      setBillingStatus(data);
+      return data;
+    } catch {
+      return null;
+    }
   }, []);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const data = await fetchData('api/v1/billing/history/');
+      setBillingHistory(data.results || data || []);
+    } catch {
+      setBillingHistory([]);
+    }
+  }, []);
+
+  // On mount: load billing data, then handle PayFast return URL params
+  useEffect(() => {
+    const returnSuccess = searchParams.get('success') === '1';
+    const returnCancelled = searchParams.get('cancelled') === '1';
+
+    // Clear URL params immediately so refresh doesn't re-trigger
+    if (returnSuccess || returnCancelled) {
+      setSearchParams({}, { replace: true });
+    }
+
+    const init = async () => {
+      if (returnCancelled) {
+        toast.info('Payment cancelled. Your subscription was not changed.');
+        await Promise.all([loadStatus(), loadHistory()]);
+        setLoading(false);
+        return;
+      }
+
+      if (returnSuccess) {
+        // Call confirm endpoint — activates subscription even if ITN hasn't
+        // arrived yet (important for localhost where ITN can't reach the server)
+        setConfirming(true);
+        try {
+          const confirmed = await postData({ url: 'api/v1/billing/confirm/', data: {} });
+          setBillingStatus(confirmed);
+          toast.success('Subscription activated! Welcome to TruckWys Pro.');
+        } catch {
+          // ITN may have already processed it — just re-fetch status
+          await loadStatus();
+        } finally {
+          setConfirming(false);
+        }
+        await loadHistory();
+        setLoading(false);
+        return;
+      }
+
+      await Promise.all([loadStatus(), loadHistory()]);
+      setLoading(false);
+    };
+
+    init();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubscribe = async () => {
     setSubscribing(true);
@@ -82,17 +139,12 @@ export function BillingSettings() {
         plan: 'pro',
         return_url: `${window.location.origin}/settings/billing?success=1`,
         cancel_url: `${window.location.origin}/settings/billing?cancelled=1`,
-        notify_url: `${import.meta.env.VITE_API_URL}api/v1/billing/itn/`,
       }});
       if ((data.payfast_url || data.payment_url) && data.form_data) {
-        // PayFast requires a form POST — build and auto-submit a hidden form
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = data.payfast_url || data.payment_url;
         Object.entries(data.form_data).forEach(([key, value]) => {
-          // Skip empty values — PayFast signs only non-empty fields, so the
-          // submitted set must match (posting an empty field PayFast didn't
-          // sign triggers a generic "could not process" 400).
           if (value === '' || value === null || value === undefined) return;
           const input = document.createElement('input');
           input.type = 'hidden';
@@ -123,28 +175,38 @@ export function BillingSettings() {
         try {
           await postData({ url: 'api/v1/billing/cancel/', data: {} });
           toast.success('Subscription cancelled.');
-          setProfile(prev => prev ? { ...prev, subscription_status: 'cancelled' } : prev);
+          setBillingStatus(prev => prev ? { ...prev, subscription_status: 'cancelled' } : prev);
         } catch {
           toast.error('Failed to cancel subscription. Please contact support.');
         } finally {
           setCancelling(false);
+          setConfirmOpts(null);
         }
       },
     });
   };
 
-  const planKey = profile?.subscription_plan?.toLowerCase() || 'free';
-  const isActive = profile?.subscription_status === 'active';
-  const isPro = ['pro', 'growth', 'enterprise'].includes(planKey) && isActive;
+  const planKey = billingStatus?.subscription_plan?.toLowerCase() || 'free';
+  const subStatus = billingStatus?.subscription_status?.toLowerCase() || 'none';
+  const isPro = ['pro', 'growth', 'enterprise'].includes(planKey) && subStatus === 'active';
+
+  const showLoading = loading || confirming;
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Billing</div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Manage your subscription and payment history</div>
       </div>
 
-      {loading && (
+      {confirming && (
+        <div style={{ ...sectionStyle, padding: 16, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 16, height: 16, border: '2px solid var(--accent-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Activating your subscription...</span>
+        </div>
+      )}
+
+      {showLoading && !confirming && (
         <div style={sectionStyle}>
           <div style={{ padding: 20 }}>
             <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
@@ -153,7 +215,7 @@ export function BillingSettings() {
         </div>
       )}
 
-      {!loading && (
+      {!showLoading && (
         <div style={sectionStyle}>
           <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Plan</span></div>
           <div style={{ padding: 20 }}>
@@ -170,9 +232,18 @@ export function BillingSettings() {
                       borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
                     }}>Active</span>
                   )}
+                  {subStatus === 'cancelled' && (
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 7px',
+                      background: 'var(--status-danger-bg)', color: 'var(--status-danger)',
+                      borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
+                    }}>Cancelled</span>
+                  )}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
-                  {isPro ? `R ${PRO_PLAN.price.toLocaleString()} / month` : 'No active subscription'}
+                  {isPro
+                    ? `R ${PRO_PLAN.price.toLocaleString()} / month${billingStatus?.subscription_start ? ` · since ${new Date(billingStatus.subscription_start).toLocaleDateString('en-ZA')}` : ''}`
+                    : 'No active subscription'}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -202,7 +273,7 @@ export function BillingSettings() {
               ))}
             </div>
 
-            {!isPro && (
+            {!isPro && subStatus !== 'cancelled' && (
               <div style={{
                 marginTop: 16, padding: 12,
                 background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
@@ -217,7 +288,7 @@ export function BillingSettings() {
         </div>
       )}
 
-      {!loading && (
+      {!showLoading && (
         <div style={sectionStyle}>
           <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Billing History</span></div>
           {billingHistory.length === 0 ? (
@@ -230,7 +301,7 @@ export function BillingSettings() {
             <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
               <thead>
                 <tr>
-                  {['Payment ID', 'Date', 'Amount', 'Status'].map(h => (
+                  {['Payment ID', 'Plan', 'Date', 'Amount', 'Status'].map(h => (
                     <th key={h} style={{
                       padding: '10px 20px', textAlign: 'left' as const,
                       fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
@@ -244,7 +315,10 @@ export function BillingSettings() {
                 {billingHistory.map((tx, i) => (
                   <tr key={tx.id} style={{ borderBottom: i < billingHistory.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
                     <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>
-                      {tx.pf_payment_id || tx.id}
+                      {tx.payfast_payment_id || tx.payment_id || tx.id}
+                    </td>
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                      {tx.plan || '—'}
                     </td>
                     <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
                       {new Date(tx.created_at).toLocaleDateString('en-ZA')}
@@ -255,7 +329,7 @@ export function BillingSettings() {
                     <td style={{ padding: '12px 20px' }}>
                       <span style={{
                         fontFamily: 'var(--font-mono)', fontSize: 10,
-                        color: tx.status === 'complete' ? 'var(--accent-primary)' : 'var(--status-warning)',
+                        color: tx.status === 'complete' ? 'var(--accent-primary)' : tx.status === 'pending' ? 'var(--status-warning)' : 'var(--status-danger)',
                         textTransform: 'uppercase' as const,
                       }}>{tx.status}</span>
                     </td>
@@ -266,16 +340,17 @@ export function BillingSettings() {
           )}
         </div>
       )}
-    {confirmOpts && (
-      <ConfirmModal
-        title={confirmOpts.title}
-        message={confirmOpts.message}
-        confirmLabel={confirmOpts.confirmLabel}
-        danger={confirmOpts.danger}
-        onConfirm={confirmOpts.onConfirm}
-        onCancel={() => setConfirmOpts(null)}
-      />
-    )}
+
+      {confirmOpts && (
+        <ConfirmModal
+          title={confirmOpts.title}
+          message={confirmOpts.message}
+          confirmLabel={confirmOpts.confirmLabel}
+          danger={confirmOpts.danger}
+          onConfirm={confirmOpts.onConfirm}
+          onCancel={() => setConfirmOpts(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,31 +1,36 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+
 const STATUS_COLOR: Record<string, string> = {
   PAID: 'var(--accent-primary)',
   SENT: 'var(--status-warning)',
+  VIEWED: 'var(--status-info, #6366f1)',
   OVERDUE: 'var(--status-danger)',
+  PARTIALLY_PAID: 'var(--status-warning)',
   DRAFT: 'var(--text-tertiary)',
 };
 
 export default function InvoiceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [sending, setSending] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; isError?: boolean } | null>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('EFT');
   const [paymentReference, setPaymentReference] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
+  const [requestingCapital, setRequestingCapital] = useState(false);
 
   const { data: invoice, isLoading, isError, refetch } = useQuery({
     queryKey: ['invoice', id],
@@ -33,6 +38,36 @@ export default function InvoiceDetail() {
     enabled: !!id,
     retry: 2,
   });
+
+  // Capital eligibility — shared cache with invoices list
+  const { data: capitalData } = useQuery({
+    queryKey: ['capital-eligible'],
+    queryFn: () => fetchData('api/v1/capital/eligible/').catch(() => null),
+  });
+  const eligibleInvoices: any[] = capitalData?.invoices || [];
+  const capitalEntry = eligibleInvoices.find((e: any) => String(e.id) === String(id));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ineligibleInvoices: any[] = capitalData?.ineligible_invoices || [];
+  const ineligibleEntry = !capitalEntry
+    ? ineligibleInvoices.find((e: any) => String(e.id) === String(id))
+    : null;
+
+  const handleRequestCapital = async () => {
+    if (!id) return;
+    setRequestingCapital(true);
+    try {
+      await postData({ url: 'api/v1/advances/', data: { invoice_id: id } });
+      setToast({ msg: 'Capital requested successfully!' });
+      queryClient.invalidateQueries({ queryKey: ['capital-eligible'] });
+      queryClient.invalidateQueries({ queryKey: ['capital-page'] });
+    } catch (err: any) {
+      const reason = err?.data?.reason || err?.data?.error || err?.message || 'Failed to request capital';
+      setToast({ msg: `Capital request failed: ${reason}`, isError: true });
+    } finally {
+      setRequestingCapital(false);
+      setTimeout(() => setToast(null), 5000);
+    }
+  };
 
   // Payments aren't embedded on the invoice serializer — fetch them.
   const { data: paymentsResp } = useQuery({
@@ -47,12 +82,13 @@ export default function InvoiceDetail() {
     setSending(true);
     try {
       await postData({ url: `api/v1/invoices/${id}/send_invoice/` });
-      setToast('Invoice sent!');
+      setToast({ msg: 'Invoice sent!' });
       setTimeout(() => setToast(null), 3000);
       refetch();
+      queryClient.invalidateQueries({ queryKey: ['capital-eligible'] });
     } catch (error) {
       console.error('Failed to send invoice:', error);
-      setToast('Failed to send invoice');
+      setToast({ msg: error instanceof Error ? error.message : 'Failed to send invoice', isError: true });
       setTimeout(() => setToast(null), 3000);
     } finally {
       setSending(false);
@@ -63,16 +99,42 @@ export default function InvoiceDetail() {
     if (!id) return;
     setDownloading(true);
     try {
-      const result: any = await postData({ url: `api/v1/invoices/${id}/generate_pdf/`, data: {} });
-      const pdfUrl = result?.pdf_url;
-      if (pdfUrl) {
-        window.open(pdfUrl, '_blank');
-        setToast('PDF opened in new tab');
+      let pdfUrl: string | null = null;
+
+      if (invoice?.pdf_file) {
+        const file: string = invoice.pdf_file;
+        if (file.startsWith('http://') || file.startsWith('https://')) {
+          pdfUrl = file;
+        } else {
+          const base = (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:8000';
+          pdfUrl = `${base}/media/${file}`;
+        }
       } else {
-        setToast('PDF generated — check downloads');
+        const result: any = await postData({ url: `api/v1/invoices/${id}/generate_pdf/`, data: {} });
+        pdfUrl = result?.pdf_url ?? null;
+        if (pdfUrl) refetch();
+      }
+
+      if (pdfUrl) {
+        // Fetch as blob so the `download` attribute works cross-origin
+        // (browsers ignore `download` on cross-origin hrefs).
+        const resp = await fetch(pdfUrl);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const blob = await resp.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = `Invoice_${invoice?.invoice_number || id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
+        setToast({ msg: 'PDF downloaded' });
+      } else {
+        setToast({ msg: 'Failed to get PDF URL', isError: true });
       }
     } catch {
-      setToast('Failed to generate PDF');
+      setToast({ msg: 'Failed to generate PDF', isError: true });
     } finally {
       setTimeout(() => {
         setToast(null);
@@ -86,13 +148,14 @@ export default function InvoiceDetail() {
     setSendingReminder(true);
     try {
       await postData({ url: `api/v1/invoices/${id}/send_reminder/`, data: {} });
-      setToast('Reminder sent successfully!');
+      setToast({ msg: 'Reminder sent successfully!' });
       setTimeout(() => setToast(null), 3000);
+      refetch();
     } catch (error: any) {
       if (error?.response?.status === 404) {
-        setToast('Reminder recorded — customer will be contacted');
+        setToast({ msg: 'Reminder recorded — customer will be contacted' });
       } else {
-        setToast('Failed to send reminder');
+        setToast({ msg: error instanceof Error ? error.message : 'Failed to send reminder', isError: true });
       }
       setTimeout(() => setToast(null), 3000);
     } finally {
@@ -102,7 +165,7 @@ export default function InvoiceDetail() {
 
   const handleRecordPayment = async () => {
     if (!id || !paymentAmount || !paymentDate) {
-      setToast('Please fill in all required fields');
+      setToast({ msg: 'Please fill in all required fields', isError: true });
       setTimeout(() => setToast(null), 3000);
       return;
     }
@@ -119,17 +182,18 @@ export default function InvoiceDetail() {
           reference: paymentReference
         }
       });
-      setToast('Payment recorded!');
+      setToast({ msg: 'Payment recorded!' });
       setShowPaymentForm(false);
       setPaymentAmount('');
       setPaymentDate('');
       setPaymentReference('');
       setTimeout(() => setToast(null), 3000);
       refetch();
+      queryClient.invalidateQueries({ queryKey: ['invoice-payments', id] });
     } catch (error) {
-      console.error('Failed to record payment:', error);
-      setToast('Failed to record payment');
-      setTimeout(() => setToast(null), 3000);
+      const msg = error instanceof Error ? error.message : 'Failed to record payment';
+      setToast({ msg, isError: true });
+      setTimeout(() => setToast(null), 5000);
     } finally {
       setRecordingPayment(false);
     }
@@ -141,8 +205,15 @@ export default function InvoiceDetail() {
   return (
     <div>
       {toast && (
-        <div style={{ position: 'fixed', top: 80, right: 24, zIndex: 1000, background: 'var(--accent-primary)', color: 'black', padding: '12px 20px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-          {toast}
+        <div style={{
+          position: 'fixed', top: 80, right: 24, zIndex: 1000,
+          background: toast.isError ? 'var(--status-danger, #e53935)' : 'var(--accent-primary)',
+          color: toast.isError ? '#fff' : 'black',
+          padding: '12px 20px', borderRadius: 2, fontSize: 12,
+          fontFamily: 'var(--font-mono)', fontWeight: 600,
+          maxWidth: 360,
+        }}>
+          {toast.msg}
         </div>
       )}
       <div style={{ marginBottom: 24 }}>
@@ -279,6 +350,12 @@ export default function InvoiceDetail() {
             { label: 'Amount', value: formatCurrency(parseFloat(invoice.total_amount || invoice.amount || '0')) },
             { label: 'Due Date', value: invoice.due_date?.slice(0, 10) || '—' },
             { label: 'Created', value: invoice.created_at?.slice(0, 10) || '—' },
+            {
+              label: 'Reminders Sent',
+              value: invoice.reminder_count
+                ? `${invoice.reminder_count} — last ${new Date(invoice.last_reminder_at).toLocaleDateString('en-ZA')}`
+                : 'None sent',
+            },
           ].map(r => (
             <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
               <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.label}</span>
@@ -290,21 +367,32 @@ export default function InvoiceDetail() {
         <div className="card" style={{ padding: 20 }}>
           <div className="card-title" style={{ marginBottom: 16 }}>Actions</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {invoice.status === 'DRAFT' && (
+            {(invoice.status === 'DRAFT' || invoice.status === 'SENT' || invoice.status === 'VIEWED') && (
               <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }} onClick={handleSendInvoice} disabled={sending}>
-                {sending ? 'SENDING...' : 'SEND TO CUSTOMER'}
+                {sending ? 'SENDING...' : invoice.status === 'VIEWED' ? 'RESEND TO CUSTOMER' : 'SEND TO CUSTOMER'}
               </button>
             )}
             <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={handleDownloadPDF} disabled={downloading}>
               {downloading ? 'DOWNLOADING...' : 'DOWNLOAD PDF'}
             </button>
-            {(invoice.status === 'SENT' || invoice.status === 'OVERDUE') && (
+            {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE') && (
               <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={handleSendReminder} disabled={sendingReminder}>
                 {sendingReminder ? 'SENDING...' : 'SEND REMINDER'}
               </button>
             )}
-            {(invoice.status === 'SENT' || invoice.status === 'OVERDUE' || invoice.status === 'PARTIALLY_PAID') && !showPaymentForm && (
+            {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE' || invoice.status === 'PARTIALLY_PAID') && !showPaymentForm && (
               <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>RECORD PAYMENT</button>
+            )}
+            {capitalEntry && (
+              <button className="btn-action" onClick={handleRequestCapital} disabled={requestingCapital} style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}>
+                {requestingCapital ? 'REQUESTING...' : 'REQUEST CAPITAL'}
+              </button>
+            )}
+            {ineligibleEntry && (
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: 2, padding: '8px 10px', lineHeight: 1.4 }}>
+                <div style={{ color: 'var(--text-secondary)', marginBottom: 3, fontSize: 10, letterSpacing: '0.05em' }}>NOT ELIGIBLE FOR CAPITAL</div>
+                {ineligibleEntry.reason}
+              </div>
             )}
           </div>
 
@@ -312,18 +400,28 @@ export default function InvoiceDetail() {
             <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--border-subtle)' }}>
               <div className="card-title" style={{ marginBottom: 12, fontSize: 12 }}>Record Payment</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Amount"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                  style={{ padding: '8px', fontSize: 12, border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
-                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={`Amount (balance: ${formatCurrency(invoice.balance)})`}
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                    style={{ flex: 1, padding: '8px', fontSize: 12, border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPaymentAmount(String(invoice.balance))}
+                    style={{ padding: '8px 10px', fontSize: 11, fontFamily: 'var(--font-mono)', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 2, color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    FULL
+                  </button>
+                </div>
                 <DatePicker
                   value={paymentDate}
                   onChange={setPaymentDate}
                   style={{ padding: '8px', fontSize: 12 }}
+                  maxDate={new Date()}
                 />
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                   <SelectTrigger>
@@ -348,7 +446,7 @@ export default function InvoiceDetail() {
                     onClick={handleRecordPayment}
                     disabled={recordingPayment}
                     className="btn-action"
-                    style={{ flex: 1, padding: '10px', fontSize: 12, background: 'var(--accent-primary)', border: 'none', color: 'black' }}
+                    style={{ flex: 1, padding: '10px', fontSize: 12, background: 'var(--accent-primary)', border: 'none', color: 'white' }}
                   >
                     {recordingPayment ? 'RECORDING...' : 'SAVE'}
                   </button>

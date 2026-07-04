@@ -41,6 +41,14 @@ interface RouteGeoPoint {
   lon: number;
 }
 
+// One SANRAL plaza charged on a route (from backend geofence matcher).
+interface TollBreakdownItem {
+  plaza: string;
+  route: string;        // N-road, e.g. "N3"
+  location_km?: number; // km marker along the route
+  tariff: number;       // ZAR for the selected vehicle class
+}
+
 // One route option returned by TomTom (best + alternatives). No custom ranking.
 interface RouteOption {
   index: number;
@@ -57,6 +65,7 @@ interface RouteOption {
   fuel_usage_litres: number;
   fuel_cost_zar: number;
   toll_cost_zar: number;
+  toll_breakdown?: TollBreakdownItem[];
   total_cost_zar: number;
   // Rich metadata
   toll_count?: number;
@@ -82,6 +91,9 @@ interface RouteData {
   total_cost_zar: number;
   success: boolean;
   source: "tomtom" | "estimated";
+  toll_source?: "geofence" | "estimated" | "sanral";
+  toll_routes?: string[];
+  toll_breakdown?: TollBreakdownItem[];
   origin_resolved?: string;
   dest_resolved?: string;
   cross_border?: boolean;
@@ -392,12 +404,16 @@ export default function NewQuote() {
   const _fuelCost =
     editableFuelCost !== null ? editableFuelCost : calculatedFuelCost;
 
-  // Toll cost: TomTom value OR company default toll rate/km fallback
+  // Toll cost: use the calculated toll when a route exists (0 is a VALID result —
+  // a route with no SANRAL plaza, e.g. Pretoria→Joburg). Only fall back to the
+  // per-km estimate when there's no route data yet. `??` (not `||`) so a real R0
+  // isn't treated as missing — that mismatch showed R0 but saved a fallback toll.
   const tollRatePerKm = companyProfile?.default_toll_rate_per_km
     ? parseFloat(companyProfile.default_toll_rate_per_km)
     : 0.5;
   const calculatedTollCost =
-    (selectedRoute?.toll_cost_zar ?? routeData?.toll_cost_zar) ||
+    selectedRoute?.toll_cost_zar ??
+    routeData?.toll_cost_zar ??
     distance * tollRatePerKm;
   const _tollCost =
     editableTollCost !== null ? editableTollCost : calculatedTollCost;
@@ -724,10 +740,12 @@ export default function NewQuote() {
           ...(oCoords && {
             origin_lat: oCoords.lat,
             origin_lon: oCoords.lon,
+            origin_country: oCoords.country_code,
           }),
           ...(dCoords && {
             dest_lat: dCoords.lat,
             dest_lon: dCoords.lon,
+            dest_country: dCoords.country_code,
           }),
           vehicle_type: vehicleType,
           cross_border_enabled: crossBorderEnabled,
@@ -2802,9 +2820,9 @@ export default function NewQuote() {
                                         lineHeight: 1,
                                         marginBottom: 4,
                                       }}>
-                                      {r.toll_count != null
-                                        ? r.toll_count
-                                        : "—"}
+                                      {r.toll_breakdown != null
+                                        ? r.toll_breakdown.length
+                                        : (r.toll_count ?? "—")}
                                       <span
                                         style={{
                                           fontSize: 10,
@@ -2812,7 +2830,8 @@ export default function NewQuote() {
                                           color: "var(--text-tertiary)",
                                           marginLeft: 4,
                                         }}>
-                                        {r.toll_count === 1
+                                        {(r.toll_breakdown?.length ??
+                                          r.toll_count) === 1
                                           ? "plaza"
                                           : "plazas"}
                                       </span>
@@ -2830,20 +2849,20 @@ export default function NewQuote() {
                                         r.toll_cost_zar,
                                       ).toLocaleString()}
                                     </div>
-                                    {r.toll_count != null &&
-                                      r.toll_count > 1 &&
-                                      r.toll_cost_zar > 0 && (
+                                    {r.toll_breakdown &&
+                                      r.toll_breakdown.length > 0 && (
                                         <div
                                           style={{
                                             fontSize: 9,
                                             color: "var(--text-tertiary)",
                                             fontFamily: "var(--font-mono)",
+                                            lineHeight: 1.5,
                                           }}>
-                                          ~R{" "}
-                                          {Math.round(
-                                            r.toll_cost_zar / r.toll_count,
-                                          ).toLocaleString()}{" "}
-                                          avg
+                                          {[...new Set(
+                                            r.toll_breakdown.map(
+                                              (t) => t.route,
+                                            ),
+                                          )].join(" · ")}
                                         </div>
                                       )}
                                   </div>
@@ -3046,7 +3065,9 @@ export default function NewQuote() {
                                       COUNTRIES
                                     </div>
                                     {r.country_codes &&
-                                    r.country_codes.length > 0 ? (
+                                    r.country_codes.some(
+                                      (c) => c !== "ZAF" && c !== "ZA",
+                                    ) ? (
                                       <>
                                         <div
                                           style={{
@@ -3056,7 +3077,7 @@ export default function NewQuote() {
                                             fontFamily: "var(--font-mono)",
                                             marginBottom: 4,
                                           }}>
-                                          🌍 {r.country_codes.join(" → ")}
+                                          {r.country_codes.join(" → ")}
                                         </div>
                                         <div
                                           style={{
@@ -3792,6 +3813,159 @@ export default function NewQuote() {
                                       />
                                     </div>
                                   </div>
+
+                                  {/* Per-plaza toll breakdown — which plazas, where, how much */}
+                                  {(() => {
+                                    const bd =
+                                      selectedRoute?.toll_breakdown ??
+                                      rd.toll_breakdown ??
+                                      [];
+                                    const ac = rd.additional_costs;
+                                    if (bd.length === 0 && !ac) return null;
+                                    return (
+                                      <div
+                                        style={{
+                                          background: "var(--bg-elevated)",
+                                          border: "1px solid var(--border-subtle)",
+                                          borderRadius: 2,
+                                          padding: "8px 10px",
+                                          fontFamily: "var(--font-mono)",
+                                          fontSize: 10,
+                                        }}>
+                                        <div
+                                          style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            color: "var(--text-tertiary)",
+                                            letterSpacing: "0.07em",
+                                            marginBottom: 6,
+                                          }}>
+                                          <span>TOLL BREAKDOWN</span>
+                                          <span>
+                                            {rd.toll_source === "geofence"
+                                              ? "LIVE ROUTE MATCH"
+                                              : "ESTIMATED"}
+                                          </span>
+                                        </div>
+                                        {bd.map((t, i) => (
+                                          <div
+                                            key={`${t.plaza}-${i}`}
+                                            style={{
+                                              display: "flex",
+                                              justifyContent: "space-between",
+                                              padding: "3px 0",
+                                              borderBottom:
+                                                "1px solid var(--border-row)",
+                                              color: "var(--text-secondary)",
+                                            }}>
+                                            <span>
+                                              {t.plaza}{" "}
+                                              <span
+                                                style={{
+                                                  color: "var(--text-tertiary)",
+                                                }}>
+                                                · {t.route}
+                                                {t.location_km != null
+                                                  ? ` km ${Math.round(t.location_km)}`
+                                                  : ""}
+                                              </span>
+                                            </span>
+                                            <span
+                                              style={{
+                                                color: "var(--text-primary)",
+                                              }}>
+                                              R {t.tariff.toLocaleString()}
+                                            </span>
+                                          </div>
+                                        ))}
+                                        {bd.length === 0 && (
+                                          <div
+                                            style={{
+                                              color: "var(--text-tertiary)",
+                                              padding: "2px 0",
+                                            }}>
+                                            No SANRAL plazas on this route — R 0
+                                          </div>
+                                        )}
+                                        {bd.length > 0 && (
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              justifyContent: "space-between",
+                                              paddingTop: 5,
+                                              fontWeight: 700,
+                                              color: "var(--text-primary)",
+                                            }}>
+                                            <span>
+                                              {bd.length} plaza
+                                              {bd.length === 1 ? "" : "s"} total
+                                            </span>
+                                            <span>
+                                              R{" "}
+                                              {Math.round(
+                                                bd.reduce(
+                                                  (s, t) => s + t.tariff,
+                                                  0,
+                                                ),
+                                              ).toLocaleString()}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {ac && (
+                                          <div style={{ marginTop: 8 }}>
+                                            <div
+                                              style={{
+                                                color: "var(--text-tertiary)",
+                                                letterSpacing: "0.07em",
+                                                marginBottom: 4,
+                                              }}>
+                                              CROSS-BORDER COSTS
+                                            </div>
+                                            {[
+                                              ["Border fees", ac.border_fees],
+                                              [
+                                                "Weighbridge",
+                                                ac.weighbridge_fees,
+                                              ],
+                                              [
+                                                "Foreign tolls",
+                                                ac.non_sa_tolls,
+                                              ],
+                                            ]
+                                              .filter(
+                                                ([, v]) =>
+                                                  typeof v === "number" &&
+                                                  v > 0,
+                                              )
+                                              .map(([label, v]) => (
+                                                <div
+                                                  key={label as string}
+                                                  style={{
+                                                    display: "flex",
+                                                    justifyContent:
+                                                      "space-between",
+                                                    padding: "2px 0",
+                                                    color:
+                                                      "var(--text-secondary)",
+                                                  }}>
+                                                  <span>{label}</span>
+                                                  <span
+                                                    style={{
+                                                      color:
+                                                        "var(--text-primary)",
+                                                    }}>
+                                                    R{" "}
+                                                    {Math.round(
+                                                      v as number,
+                                                    ).toLocaleString()}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                   <div
                                     style={{
                                       display: "flex",

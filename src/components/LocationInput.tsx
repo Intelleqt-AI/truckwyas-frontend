@@ -5,11 +5,15 @@ interface Suggestion {
   label: string;
   lat: number;
   lon: number;
+  country?: string;
+  country_code?: string;
+  cross_border?: boolean;
 }
 
 export interface LocationCoords {
   lat: number;
   lon: number;
+  country_code?: string;  // ISO from the picked suggestion; drives cross-border detection
 }
 
 interface LocationInputProps {
@@ -62,7 +66,7 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
   };
 
   const handleSelect = (s: Suggestion) => {
-    onChange(s.label, { lat: s.lat, lon: s.lon });
+    onChange(s.label, { lat: s.lat, lon: s.lon, country_code: s.country_code });
     setSuggestions([]);
     setOpen(false);
   };
@@ -187,6 +191,7 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
               key={i}
               onMouseDown={() => handleSelect(s)}
               style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                 padding: '9px 12px', fontSize: 12, cursor: 'pointer',
                 color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
                 borderBottom: i < suggestions.length - 1 ? '1px solid var(--border-subtle)' : 'none',
@@ -195,7 +200,23 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
-              {s.label}
+              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {s.label}
+              </span>
+              {s.cross_border && (
+                <span
+                  title={`Cross-border — ${s.country || 'outside South Africa'}`}
+                  style={{
+                    flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
+                    padding: '2px 6px', borderRadius: 3,
+                    color: 'var(--status-warning)',
+                    background: 'color-mix(in srgb, var(--status-warning) 15%, transparent)',
+                    border: '1px solid var(--status-warning)',
+                  }}
+                >
+                  {(s.country_code || 'INTL').replace('ZAF', '')} · CROSS-BORDER
+                </span>
+              )}
             </div>
           ))}
         </div>

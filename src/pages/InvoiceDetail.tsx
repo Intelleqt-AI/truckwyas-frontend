@@ -2,7 +2,26 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData } from "@/lib/Api";
+
 import { formatCurrency } from "@/lib/formatters";
+
+const MC_URL =
+  "https://getstarted.merchantcapital.co.za?actiontype=C_C&channel=Part_Trad&who=IA_SP";
+const MC_STORAGE_KEY = "mc_applied_invoice_ids";
+
+function loadAppliedIds(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(MC_STORAGE_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveAppliedId(id: string, current: Set<string>): Set<string> {
+  const next = new Set(current).add(id);
+  localStorage.setItem(MC_STORAGE_KEY, JSON.stringify([...next]));
+  return next;
+}
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -20,6 +39,7 @@ export default function InvoiceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
   const [sending, setSending] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
@@ -30,7 +50,6 @@ export default function InvoiceDetail() {
   const [paymentMethod, setPaymentMethod] = useState('EFT');
   const [paymentReference, setPaymentReference] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
-  const [requestingCapital, setRequestingCapital] = useState(false);
 
   const { data: invoice, isLoading, isError, refetch } = useQuery({
     queryKey: ['invoice', id],
@@ -51,23 +70,6 @@ export default function InvoiceDetail() {
   const ineligibleEntry = !capitalEntry
     ? ineligibleInvoices.find((e: any) => String(e.id) === String(id))
     : null;
-
-  const handleRequestCapital = async () => {
-    if (!id) return;
-    setRequestingCapital(true);
-    try {
-      await postData({ url: 'api/v1/advances/', data: { invoice_id: id } });
-      setToast({ msg: 'Capital requested successfully!' });
-      queryClient.invalidateQueries({ queryKey: ['capital-eligible'] });
-      queryClient.invalidateQueries({ queryKey: ['capital-page'] });
-    } catch (err: any) {
-      const reason = err?.data?.reason || err?.data?.error || err?.message || 'Failed to request capital';
-      setToast({ msg: `Capital request failed: ${reason}`, isError: true });
-    } finally {
-      setRequestingCapital(false);
-      setTimeout(() => setToast(null), 5000);
-    }
-  };
 
   // Payments aren't embedded on the invoice serializer — fetch them.
   const { data: paymentsResp } = useQuery({
@@ -384,9 +386,22 @@ export default function InvoiceDetail() {
               <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>RECORD PAYMENT</button>
             )}
             {capitalEntry && (
-              <button className="btn-action" onClick={handleRequestCapital} disabled={requestingCapital} style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }}>
-                {requestingCapital ? 'REQUESTING...' : 'REQUEST CAPITAL'}
-              </button>
+              <a
+                href={MC_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-action"
+                onClick={() => setAppliedIds((prev) => saveAppliedId(String(id), prev))}
+                style={{
+                  width: '100%', padding: '10px', fontSize: 12,
+                  background: 'transparent',
+                  border: `1px solid ${appliedIds.has(String(id)) ? 'var(--status-success)' : 'var(--accent-primary)'}`,
+                  color: appliedIds.has(String(id)) ? 'var(--status-success)' : 'var(--accent-primary)',
+                  textDecoration: 'none', textAlign: 'center', display: 'block', boxSizing: 'border-box',
+                  fontFamily: 'var(--font-mono)', fontWeight: 600,
+                }}>
+                {appliedIds.has(String(id)) ? 'Applied ✓' : 'APPLY FOR CAPITAL →'}
+              </a>
             )}
             {ineligibleEntry && (
               <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: 2, padding: '8px 10px', lineHeight: 1.4 }}>

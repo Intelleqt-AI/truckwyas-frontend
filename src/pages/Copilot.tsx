@@ -1,6 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { postData, fetchData, deleteData } from '@/lib/Api';
+import { useAuth } from '@/lib/AuthContext';
+import Markdown from '@/components/copilot/Markdown';
+import ProposalCard, { Proposal } from '@/components/copilot/ProposalCard';
 
 function relTime(iso: string): string {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -20,7 +23,18 @@ interface Message {
   actions?: Action[];
   proposedAction?: ProposedAction | null;
   actionState?: 'pending' | 'done' | 'dismissed' | 'error';
+  proposal?: Proposal | null;
   animate?: boolean;
+}
+
+// The Typewriter streams raw text, which would flash unrendered markdown syntax.
+// Replies containing markdown (tables, fences, headings, lists, bold, links,
+// inline code) skip the animation and render through <Markdown> immediately;
+// plain replies animate and then hand off to <Markdown> when done (onDone).
+function looksLikeMarkdown(s: string): boolean {
+  return s.includes('|') || s.includes('```') || s.includes('**') || s.includes('`')
+    || /\[[^\]]+\]\([^)]+\)/.test(s) || /^#{1,6}\s/m.test(s)
+    || /^\s*[-*]\s/m.test(s) || /^\s*\d+\.\s/m.test(s);
 }
 
 const STARTERS: { title: string; prompt: string; hint: string }[] = [
@@ -30,19 +44,39 @@ const STARTERS: { title: string; prompt: string; hint: string }[] = [
   { title: 'Fleet status', prompt: 'Fleet status', hint: 'Active, idle & maintenance' },
 ];
 
-const INTRO: Message = {
-  role: 'assistant',
-  content: "I'm your TruckWys copilot. Ask me about your cash position, overdue invoices, quotes pipeline, fleet status or fast-pay capacity — I answer from your live data.",
-};
+// Extra starters for roles that can write — the agent drafts the record, the
+// user confirms via the proposal card. Hidden for VIEWER/DRIVER.
+const WRITE_STARTERS: { title: string; prompt: string; hint: string }[] = [
+  { title: 'Add a customer', prompt: 'Add a new customer', hint: 'Draft a record — you confirm before it saves' },
+  { title: 'Draft a quote', prompt: 'Create a new quote', hint: 'Propose a quote for your confirmation' },
+];
+
+const GENERIC_INTRO_TEXT = "I'm your TruckWys copilot. Ask me about your cash position, overdue invoices, quotes pipeline, fleet status or fast-pay capacity — I answer from your live data.";
+
+function buildIntro(firstName?: string): Message {
+  return {
+    role: 'assistant',
+    content: firstName ? `Hi ${firstName} — ${GENERIC_INTRO_TEXT}` : GENERIC_INTRO_TEXT,
+  };
+}
 
 // Lightweight typewriter for the streaming feel (used on freshly-arrived replies).
-function Typewriter({ text }: { text: string }) {
+// Calls onDone when finished so the message can re-render through <Markdown>.
+function Typewriter({ text, onDone }: { text: string; onDone?: () => void }) {
   const [n, setN] = useState(0);
   useEffect(() => {
     setN(0);
     let i = 0;
-    const id = setInterval(() => { i += 2; setN(Math.min(text.length, i)); if (i >= text.length) clearInterval(id); }, 12);
+    const id = setInterval(() => {
+      i += 2;
+      setN(Math.min(text.length, i));
+      if (i >= text.length) {
+        clearInterval(id);
+        onDone?.();
+      }
+    }, 12);
     return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text]);
   return <>{text.slice(0, n)}</>;
 }
@@ -54,17 +88,22 @@ const labelStyle: React.CSSProperties = {
 
 export default function Copilot() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const introMsg = useMemo(() => buildIntro((user?.name || '').split(' ')[0] || undefined), [user?.name]);
   const [params, setParams] = useSearchParams();
-  const [messages, setMessages] = useState<Message[]>([INTRO]);
+  const [messages, setMessages] = useState<Message[]>([introMsg]);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [proposalBusy, setProposalBusy] = useState(false);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
+  const canWrite = !['VIEWER', 'DRIVER'].includes(user?.role || '');
+  const starters = canWrite ? [...STARTERS, ...WRITE_STARTERS] : STARTERS;
   const isEmpty = messages.length <= 1;
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
@@ -80,12 +119,17 @@ export default function Copilot() {
     setShowHistory(false);
     fetchData(`api/v1/agent/conversations/${id}/`)
       .then((d: any) => {
-        const hist = (d?.messages || []).map((m: any) => ({ role: m.role, content: m.content }));
+        // Proposals persist server-side; rehydrate their cards with live status
+        // (pending/executed/dismissed/failed/expired) so history stays truthful.
+        const hist = (d?.messages || []).map((m: any) => ({
+          role: m.role, content: m.content, proposal: m.proposal || null,
+          actions: m.actions || [],
+        }));
         setConversationId(id);
-        setMessages(hist.length ? [INTRO, ...hist] : [INTRO]);
+        setMessages(hist.length ? [introMsg, ...hist] : [introMsg]);
       })
       .catch(() => {});
-  }, []);
+  }, [introMsg]);
 
   // On mount (e.g. clicking "Copilot" in the sidebar): always start a fresh
   // chat. We only load the conversation list so past chats stay browsable in
@@ -125,7 +169,8 @@ export default function Copilot() {
       setMessages(prev => [...prev, {
         role: 'assistant', content: res?.reply || 'Sorry, I could not produce a response.',
         actions: res?.actions || [], proposedAction: res?.proposed_action || null,
-        actionState: res?.proposed_action ? 'pending' : undefined, animate: true,
+        actionState: res?.proposed_action ? 'pending' : undefined,
+        proposal: res?.proposal || null, animate: true,
       }]);
       refreshConversations();
     } catch (e: any) {
@@ -169,19 +214,76 @@ export default function Copilot() {
   };
   const dismissAction = (i: number) => setMessages(prev => prev.map((m, j) => j === i ? { ...m, actionState: 'dismissed' } : m));
 
+  // --- Server-side proposals (AI-drafted CREATE/UPDATE/DELETE, user-confirmed) ---
+
+  const patchProposal = (msgIndex: number, patch: Partial<Proposal>) =>
+    setMessages(prev => prev.map((m, i) =>
+      i === msgIndex && m.proposal ? { ...m, proposal: { ...m.proposal, ...patch } } : m));
+
+  const executeProposal = async (msgIndex: number, id: number) => {
+    if (proposalBusy) return;
+    setProposalBusy(true);
+    try {
+      const res: any = await postData({ url: `api/v1/agent/proposals/${id}/execute/`, data: {} });
+      if (res?.status === 'executed') {
+        setMessages(prev => {
+          const next = prev.map((m, i) =>
+            i === msgIndex && m.proposal ? { ...m, proposal: { ...m.proposal, status: 'executed' as const, result: res?.result || null } } : m);
+          return [...next, {
+            role: 'assistant' as const, content: res?.message || 'Done.',
+            actions: res?.action ? [res.action] : [], animate: true,
+          }];
+        });
+        refreshConversations();
+      } else {
+        // Defensive: a 200 that isn't "executed" is treated as a failure.
+        patchProposal(msgIndex, { status: 'failed', result: { error: res?.error || 'The action could not be completed.' } });
+      }
+    } catch (e: any) {
+      // The server includes the proposal's authoritative state on errors
+      // (proposal_status): a 409 from a card that already executed in another
+      // tab must show "Saved", not "Failed". Fall back to failed otherwise.
+      const serverStatus = e?.data?.proposal_status as Proposal['status'] | undefined;
+      if (serverStatus === 'executed' || serverStatus === 'dismissed') {
+        patchProposal(msgIndex, { status: serverStatus });
+      } else {
+        patchProposal(msgIndex, {
+          status: serverStatus === 'expired' ? 'expired' : 'failed',
+          result: { error: e?.message || 'The action could not be completed.' },
+        });
+      }
+    } finally {
+      setProposalBusy(false);
+    }
+  };
+
+  const dismissProposal = async (msgIndex: number, id: number) => {
+    if (proposalBusy) return;
+    setProposalBusy(true);
+    try {
+      await postData({ url: `api/v1/agent/proposals/${id}/dismiss/`, data: {} });
+    } catch {
+      // Dismiss is non-destructive; mark it locally either way — reopening the
+      // conversation rehydrates the authoritative status from the server.
+    } finally {
+      patchProposal(msgIndex, { status: 'dismissed' });
+      setProposalBusy(false);
+    }
+  };
+
   // New chat — resets to an empty thread WITHOUT touching the server. The
   // conversation row is created lazily on the first message (see send()), so an
   // unused "New chat" never gets saved to history. The previous thread is KEPT.
   const newChat = () => {
     setShowHistory(false); setInput(''); setAiAvailable(null);
-    setMessages([INTRO]); setConversationId(null);
+    setMessages([introMsg]); setConversationId(null);
   };
 
   const deleteConversation = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Delete this conversation?')) return;
     await deleteData({ url: `api/v1/agent/conversations/${id}/` }).catch(() => {});
-    if (id === conversationId) { setMessages([INTRO]); setConversationId(null); }
+    if (id === conversationId) { setMessages([introMsg]); setConversationId(null); }
     refreshConversations();
   };
 
@@ -207,6 +309,7 @@ export default function Copilot() {
         .cp-conv:hover { background: var(--bg-surface-hover); }
         .cp-conv:hover .cp-del { opacity: 1; }
         .cp-del:hover { color: var(--status-danger) !important; }
+        .cp-md > :last-child { margin-bottom: 0 !important; }
       `}</style>
 
       {/* Header — eyebrow + title + status pill */}
@@ -222,7 +325,7 @@ export default function Copilot() {
           color: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)',
         }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)' }} />
-          {aiAvailable === null ? 'Ready' : aiAvailable ? 'Claude · Live' : 'Rules engine'}
+          {aiAvailable === null ? 'Ready' : aiAvailable ? 'AI · Live' : 'Rules engine'}
         </span>
       </div>
 
@@ -263,9 +366,9 @@ export default function Copilot() {
           {isEmpty ? (
             <div>
               <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>How can I help you run the business today?</div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 620, marginBottom: 22, lineHeight: 1.55 }}>{INTRO.content}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 620, marginBottom: 22, lineHeight: 1.55 }}>{introMsg.content}</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 10 }}>
-                {STARTERS.map(s => (
+                {starters.map(s => (
                   <button key={s.title} className="cp-card" onClick={() => send(s.prompt)}
                     style={{ textAlign: 'left', cursor: 'pointer', padding: 14, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, transition: 'border-color .15s ease' }}>
                     <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{s.title}</div>
@@ -288,8 +391,25 @@ export default function Copilot() {
                         color: m.role === 'user' ? 'var(--bg-deep)' : 'var(--text-primary)',
                         border: m.role === 'user' ? 'none' : '1px solid var(--border-subtle)',
                       }}>
-                        {m.role === 'assistant' && m.animate ? <Typewriter text={m.content} /> : m.content}
+                        {m.role === 'user'
+                          ? m.content
+                          : m.animate && !looksLikeMarkdown(m.content)
+                            ? <Typewriter
+                                text={m.content}
+                                onDone={() => setMessages(prev => prev.map((mm, j) =>
+                                  j === realIndex ? { ...mm, animate: false } : mm))}
+                              />
+                            : <Markdown>{m.content}</Markdown>}
                       </div>
+
+                      {m.proposal && (
+                        <ProposalCard
+                          proposal={m.proposal}
+                          onConfirm={() => executeProposal(realIndex, m.proposal!.id)}
+                          onDismiss={() => dismissProposal(realIndex, m.proposal!.id)}
+                          busy={proposalBusy || loading}
+                        />
+                      )}
 
                       {m.proposedAction && m.actionState === 'pending' && (
                         <div style={{ marginTop: 10, padding: 13, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', borderRadius: 2 }}>

@@ -255,9 +255,11 @@ export default function NewQuote() {
   const [serviceCharge, setServiceCharge] = useState<number>(0);
   const [editableTotalCostStr, setEditableTotalCostStr] = useState<string>("");
 
-  // Step 3: Customer & Summary
+  // Customer, dates, notes
   const [customerId, setCustomerId] = useState("");
   const [notes, setNotes] = useState("");
+  const [pickupDate, setPickupDate] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
 
   // Quick-create customer
   const [showNewCustomer, setShowNewCustomer] = useState(false);
@@ -482,15 +484,15 @@ export default function NewQuote() {
       if (d.customFuelPricePerL) setCustomFuelPricePerL(d.customFuelPricePerL);
       if (d.customerId) setCustomerId(d.customerId);
       if (d.notes) setNotes(d.notes);
-      if (d.status) setStatus(d.status);
-      if (d.confidence) setConfidence(d.confidence);
-      if (d.slaHours) setSlaHours(d.slaHours);
       if (d.validUntil) setValidUntil(d.validUntil);
+      if (d.pickupDate) setPickupDate(d.pickupDate);
+      if (d.deliveryDate) setDeliveryDate(d.deliveryDate);
       if (d.routeData) setRouteData(d.routeData);
       if (d.routeOptions) setRouteOptions(d.routeOptions);
       if (d.selectedRouteIndex != null) setSelectedRouteIndex(d.selectedRouteIndex);
       if (d.returnRouteData) setReturnRouteData(d.returnRouteData);
-      if (d.currentStep) setCurrentStep(d.currentStep);
+      if (d.currentStep === 3 || d.currentStep === 2) setCurrentStep(2);
+      else if (d.currentStep === 1) setCurrentStep(1);
       toast.info("Draft restored — continue where you left off");
     } catch {
       localStorage.removeItem(DRAFT_KEY);
@@ -509,7 +511,7 @@ export default function NewQuote() {
         weight, vehicleType, selectedVehicleId, selectedDriverId,
         baseRatePerKm, cargoDescription, driverAllowanceInput,
         editableTollCost, costMode, customFuelPricePerL,
-        customerId, notes, status, confidence, slaHours, validUntil, currentStep,
+        customerId, notes, validUntil, pickupDate, deliveryDate, currentStep,
         routeData, routeOptions, selectedRouteIndex, returnRouteData,
       }));
     }, 1000);
@@ -520,7 +522,7 @@ export default function NewQuote() {
     weight, vehicleType, selectedVehicleId, selectedDriverId,
     baseRatePerKm, cargoDescription, driverAllowanceInput,
     editableTollCost, costMode, customFuelPricePerL,
-    customerId, notes, status, confidence, slaHours, validUntil, currentStep,
+    customerId, notes, validUntil, pickupDate, deliveryDate, currentStep,
     routeData, routeOptions, selectedRouteIndex, returnRouteData,
   ]);
 
@@ -662,10 +664,10 @@ export default function NewQuote() {
     }
   }, [currentStep, _total, _fuelCost, _tollCost]);
 
-  // Fetch market benchmark when Step 3 is reached
+  // Fetch market benchmark when Summary step is reached
   useEffect(() => {
     if (
-      currentStep === 3 &&
+      currentStep === 2 &&
       pickupLocation &&
       deliveryLocation &&
       vehicleType
@@ -698,6 +700,14 @@ export default function NewQuote() {
     _total,
     _returnRate,
   ]);
+
+  // Auto-run optimal price analysis when Summary step is entered
+  useEffect(() => {
+    if (currentStep === 2 && _total > 0) {
+      fetchOptimal();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
 
   // Calculate route(s) — both legs when ROUND_TRIP. Accepts optional overrides
   // so callers (e.g. the AI-chat prefill) can pass freshly-resolved values
@@ -891,6 +901,8 @@ export default function NewQuote() {
         if (q.confidence) setConfidence(q.confidence);
         if (q.sla_hours != null) setSlaHours(String(q.sla_hours));
         if (q.valid_until) setValidUntil(String(q.valid_until).split("T")[0]);
+        if (q.pickup_date) setPickupDate(String(q.pickup_date).split("T")[0]);
+        if (q.delivery_date) setDeliveryDate(String(q.delivery_date).split("T")[0]);
         // Reconstruct cost state from the saved quote so totals render without re-running route calc
         const dist = parseFloat(q.distance || "0");
         if (dist > 0) {
@@ -924,7 +936,7 @@ export default function NewQuote() {
         if (q.return_base_rate != null)
           setReturnBaseRate(String(q.return_base_rate));
         if (q.return_notes) setReturnNotes(q.return_notes);
-        setCurrentStep(3);
+        setCurrentStep(2);
       })
       .catch(() => {
         if (!cancelled) setError("Failed to load quote for editing");
@@ -1073,6 +1085,8 @@ export default function NewQuote() {
       customer: parseInt(customerId),
       pickup_location: pickupLocation,
       delivery_location: deliveryLocation,
+      pickup_date: pickupDate || null,
+      delivery_date: deliveryDate || null,
       origin: extractCode(pickupLocation),
       destination: extractCode(deliveryLocation),
       ...(pickupCoords
@@ -1158,18 +1172,18 @@ export default function NewQuote() {
   const weightExceedsCap =
     effectiveCap != null && parseFloat(weight || "0") > effectiveCap;
 
-  // Step validation
-  const canGoToStep2 =
+  // Step validation — all required fields now live in Step 1
+  const canGoToStep2 = !!(
     routeData &&
     routeData.success &&
     weight &&
     parseFloat(weight) > 0 &&
     !weightExceedsCap &&
-    (tripType === "ONE_WAY" || (returnRouteData && returnRouteData.success));
-  // Step 3 (summary) is reachable only once ALL mandatory data is in — route +
-  // weight (canGoToStep2) plus the customer and validity now entered in Step 2.
-  const canGoToStep3 = !!(canGoToStep2 && customerId && validUntil);
-  const canSave = canGoToStep3;
+    customerId &&
+    validUntil &&
+    (tripType === "ONE_WAY" || (returnRouteData && returnRouteData.success))
+  );
+  const canSave = canGoToStep2;
 
   const inputStyle: React.CSSProperties = {
     background: "var(--bg-surface)",
@@ -1213,8 +1227,7 @@ export default function NewQuote() {
 
   const STEPS = [
     { n: 1, label: "Route" },
-    { n: 2, label: "Freight" },
-    { n: 3, label: "Summary" },
+    { n: 2, label: "Summary" },
   ];
 
   return (
@@ -1358,6 +1371,33 @@ export default function NewQuote() {
                 Step 1: Route Details
               </div>
 
+              {/* Customer */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.08em" }}>
+                    CUSTOMER
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setNewCustomerForm({ name: "", email: "", phone: "", city: "" }); setShowNewCustomer(true); }}
+                    style={{ background: "none", border: "none", color: "var(--accent-primary)", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", cursor: "pointer", padding: 0, textTransform: "uppercase" }}>
+                    + New Customer
+                  </button>
+                </div>
+                <Select value={customerId} onValueChange={setCustomerId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select customer..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(customers as { id: number; name: string; company_name?: string }[]).map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}{c.company_name ? ` — ${c.company_name}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Trip Type Toggle — top of form */}
               <div style={{ marginBottom: 16 }}>
                 {label("Trip Type")}
@@ -1446,88 +1486,21 @@ export default function NewQuote() {
                 </div>
               </div>
 
-              <MapLocationPicker
-                pickupCoords={pickupCoords}
-                deliveryCoords={deliveryCoords}
-                returnCoords={tripType === "ROUND_TRIP" ? returnCoords : null}
-                showReturn={tripType === "ROUND_TRIP"}
-                activeField={activeMapField}
-                onActiveFieldChange={setActiveMapField}
-                onExpand={() => setMapExpanded(true)}
-                routeOptions={routeOptions}
-                selectedRouteIndex={selectedRouteIndex}
-                onSelectRoute={setSelectedRouteIndex}
-                onLocationSelect={(field, label, coords) => {
-                  if (field === "pickup") {
-                    setPickupLocation(label);
-                    setPickupCoords(coords);
-                  } else if (field === "delivery") {
-                    setDeliveryLocation(label);
-                    setDeliveryCoords(coords);
-                  } else {
-                    setReturnLocation(label);
-                    setReturnCoords(coords);
-                    setReturnRouteData(null);
-                  }
-                  setRouteData(null);
-                }}
-              />
-
-              {/* Fullscreen map modal */}
-              {mapExpanded && (
-                <div
-                  style={{
-                    position: "fixed",
-                    inset: 0,
-                    zIndex: 1000,
-                    background: "rgba(0,0,0,0.85)",
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
-                  onKeyDown={(e) =>
-                    e.key === "Escape" && setMapExpanded(false)
-                  }>
-                  <div
-                    style={{
-                      flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      padding: 16,
-                      gap: 12,
-                      overflow: "hidden",
-                    }}>
-                    <MapLocationPicker
-                      pickupCoords={pickupCoords}
-                      deliveryCoords={deliveryCoords}
-                      returnCoords={
-                        tripType === "ROUND_TRIP" ? returnCoords : null
-                      }
-                      showReturn={tripType === "ROUND_TRIP"}
-                      activeField={activeMapField}
-                      onActiveFieldChange={setActiveMapField}
-                      onClose={() => setMapExpanded(false)}
-                      mapHeight={window.innerHeight - 120}
-                      routeOptions={routeOptions}
-                      selectedRouteIndex={selectedRouteIndex}
-                      onSelectRoute={setSelectedRouteIndex}
-                      onLocationSelect={(field, label, coords) => {
-                        if (field === "pickup") {
-                          setPickupLocation(label);
-                          setPickupCoords(coords);
-                        } else if (field === "delivery") {
-                          setDeliveryLocation(label);
-                          setDeliveryCoords(coords);
-                        } else {
-                          setReturnLocation(label);
-                          setReturnCoords(coords);
-                          setReturnRouteData(null);
-                        }
-                        setRouteData(null);
-                      }}
-                    />
-                  </div>
+              {/* Dates + Valid Until */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                <div>
+                  {label("Pickup Date")}
+                  <DatePicker value={pickupDate} onChange={setPickupDate} />
                 </div>
-              )}
+                <div>
+                  {label("Delivery Date")}
+                  <DatePicker value={deliveryDate} onChange={setDeliveryDate} />
+                </div>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                {label("Valid Until")}
+                <DatePicker value={validUntil} onChange={setValidUntil} />
+              </div>
 
               {/* Cross-border toggle */}
               <label
@@ -1818,6 +1791,101 @@ export default function NewQuote() {
                   })()}
                 </div>
               </div>
+
+              {/* Notes */}
+              <div style={{ marginBottom: 12 }}>
+                {label("Notes (Optional)")}
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Additional notes..."
+                  rows={2}
+                  style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
+                />
+              </div>
+
+              <MapLocationPicker
+                pickupCoords={pickupCoords}
+                deliveryCoords={deliveryCoords}
+                returnCoords={tripType === "ROUND_TRIP" ? returnCoords : null}
+                showReturn={tripType === "ROUND_TRIP"}
+                activeField={activeMapField}
+                onActiveFieldChange={setActiveMapField}
+                onExpand={() => setMapExpanded(true)}
+                routeOptions={routeOptions}
+                selectedRouteIndex={selectedRouteIndex}
+                onSelectRoute={setSelectedRouteIndex}
+                onLocationSelect={(field, label, coords) => {
+                  if (field === "pickup") {
+                    setPickupLocation(label);
+                    setPickupCoords(coords);
+                  } else if (field === "delivery") {
+                    setDeliveryLocation(label);
+                    setDeliveryCoords(coords);
+                  } else {
+                    setReturnLocation(label);
+                    setReturnCoords(coords);
+                    setReturnRouteData(null);
+                  }
+                  setRouteData(null);
+                }}
+              />
+
+              {/* Fullscreen map modal */}
+              {mapExpanded && (
+                <div
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: 1000,
+                    background: "rgba(0,0,0,0.85)",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                  onKeyDown={(e) =>
+                    e.key === "Escape" && setMapExpanded(false)
+                  }>
+                  <div
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      padding: 16,
+                      gap: 12,
+                      overflow: "hidden",
+                    }}>
+                    <MapLocationPicker
+                      pickupCoords={pickupCoords}
+                      deliveryCoords={deliveryCoords}
+                      returnCoords={
+                        tripType === "ROUND_TRIP" ? returnCoords : null
+                      }
+                      showReturn={tripType === "ROUND_TRIP"}
+                      activeField={activeMapField}
+                      onActiveFieldChange={setActiveMapField}
+                      onClose={() => setMapExpanded(false)}
+                      mapHeight={window.innerHeight - 120}
+                      routeOptions={routeOptions}
+                      selectedRouteIndex={selectedRouteIndex}
+                      onSelectRoute={setSelectedRouteIndex}
+                      onLocationSelect={(field, label, coords) => {
+                        if (field === "pickup") {
+                          setPickupLocation(label);
+                          setPickupCoords(coords);
+                        } else if (field === "delivery") {
+                          setDeliveryLocation(label);
+                          setDeliveryCoords(coords);
+                        } else {
+                          setReturnLocation(label);
+                          setReturnCoords(coords);
+                          setReturnRouteData(null);
+                        }
+                        setRouteData(null);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
 
               <button
                 onClick={() => calculateRoute()}
@@ -2572,7 +2640,7 @@ export default function NewQuote() {
             {(routeOptions.length > 0 || (routeData && routeData.success)) && (
               <div className="step1-right">
                 {routeOptions.length > 0 && (
-                  <div className="card" style={{ padding: 16 }}>
+                  <div className="card" style={{ padding: 16, order: 1 }}>
                     <div
                       style={{
                         fontSize: 10,
@@ -4131,245 +4199,13 @@ export default function NewQuote() {
         </div>
       )}
 
-      {/* STEP 2: Freight Details */}
+      {/* STEP 2: Summary */}
       {currentStep === 2 && (
         <div
           className="card"
           style={{ padding: 20, maxWidth: 600, margin: "0 auto" }}>
           <div className="card-title" style={{ marginBottom: 16 }}>
-            Step 2: Freight Details
-          </div>
-
-          {error && (
-            <div
-              style={{
-                padding: "10px 12px",
-                background: "var(--bg-surface)",
-                border: "1px solid var(--status-danger)",
-                borderRadius: 2,
-                color: "var(--status-danger)",
-                fontSize: 12,
-                marginBottom: 16,
-              }}>
-              {error}
-            </div>
-          )}
-
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
-              marginBottom: 16,
-            }}>
-            <div>
-              {label("Driver")}
-              <Select
-                value={selectedDriverId}
-                onValueChange={setSelectedDriverId}>
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      selectedVehicle?.driver != null
-                        ? "— No driver assigned to this vehicle —"
-                        : "— Select a driver (optional) —"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {drivers.map((d) => {
-                    const name =
-                      d.user_details?.name ||
-                      [d.user_details?.first_name, d.user_details?.last_name]
-                        .filter(Boolean)
-                        .join(" ") ||
-                      d.user_details?.username ||
-                      `Driver #${d.id}`;
-                    return (
-                      <SelectItem key={d.id} value={String(d.id)}>
-                        {name}
-                        {d.status !== "active" ? ` (${d.status})` : ""}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              marginBottom: 16,
-            }}>
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 6,
-                }}>
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontFamily: "var(--font-mono)",
-                    color: "var(--text-tertiary)",
-                    letterSpacing: "0.08em",
-                  }}>
-                  CUSTOMER
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewCustomerForm({
-                      name: "",
-                      email: "",
-                      phone: "",
-                      city: "",
-                    });
-                    setShowNewCustomer(true);
-                  }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--accent-primary)",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 10,
-                    letterSpacing: "0.06em",
-                    cursor: "pointer",
-                    padding: 0,
-                    textTransform: "uppercase",
-                  }}>
-                  + New Customer
-                </button>
-              </div>
-              <Select value={customerId} onValueChange={setCustomerId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select customer..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {(
-                    customers as {
-                      id: number;
-                      name: string;
-                      company_name?: string;
-                    }[]
-                  ).map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                      {c.company_name ? ` — ${c.company_name}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              {label("Notes (Optional)")}
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Additional notes..."
-                rows={3}
-                style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
-              />
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 12,
-              }}>
-              <div>
-                {label("Status")}
-                <Select
-                  value={status}
-                  onValueChange={(val) => setStatus(val as "DRAFT" | "SENT")}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DRAFT">Draft</SelectItem>
-                    <SelectItem value="SENT">Send to Customer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                {label("Confidence")}
-                <Select
-                  value={confidence}
-                  onValueChange={(val) =>
-                    setConfidence(val as "HIGH" | "MEDIUM" | "LOW")
-                  }>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="HIGH">High</SelectItem>
-                    <SelectItem value="MEDIUM">Medium</SelectItem>
-                    <SelectItem value="LOW">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 12,
-              }}>
-              <div>
-                {label("SLA (Hours)")}
-                <input
-                  type="number"
-                  value={slaHours}
-                  onChange={(e) => setSlaHours(e.target.value)}
-                  placeholder="48"
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                {label("Valid Until")}
-                <DatePicker value={validUntil} onChange={setValidUntil} />
-              </div>
-            </div>
-          </div>
-
-
-
-
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <button
-              onClick={() => setCurrentStep(1)}
-              className="btn-action"
-              style={{
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-                minWidth: 120,
-              }}>
-              ← BACK
-            </button>
-            <button
-              onClick={() => setCurrentStep(3)}
-              disabled={!canGoToStep3}
-              className="btn-action"
-              style={{ minWidth: 120 }}>
-              NEXT →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 3: Customer & Summary */}
-      {currentStep === 3 && (
-        <div
-          className="card"
-          style={{ padding: 20, maxWidth: 600, margin: "0 auto" }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>
-            Step 3: Quote Summary
+            Step 2: Quote Summary
           </div>
 
           {/* Compact Revenue Guard — expandable summary warning */}
@@ -4440,6 +4276,391 @@ export default function NewQuote() {
             </div>
           )}
 
+          {/* Expected-profit-maximising price — auto-runs on step entry */}
+          {canSave && (
+            <div style={{ marginBottom: 16 }}>
+              {optimizing && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 14px",
+                    background: "var(--bg-surface-hover)",
+                    borderRadius: 2,
+                    border: "1px solid var(--border-subtle)",
+                    marginBottom: 12,
+                  }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" style={{ animation: "spin 1s linear infinite", flexShrink: 0 }}>
+                    <circle cx="8" cy="8" r="6" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
+                  </svg>
+                  <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-secondary)", letterSpacing: "0.06em" }}>
+                    ANALYSING OPTIMAL PRICE…
+                  </span>
+                </div>
+              )}
+
+              {analysis && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: 16,
+                    background: "var(--bg-surface-hover)",
+                    borderRadius: 2,
+                    border: "1px solid var(--accent-primary)",
+                  }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--text-tertiary)",
+                      letterSpacing: "0.08em",
+                      marginBottom: 12,
+                    }}>
+                    AI QUOTE ANALYSIS
+                  </div>
+
+                  {analysis.narrative && (
+                    <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 2, padding: "10px 12px", marginBottom: 12 }}>
+                      <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>
+                        {analysis.narrative_source === "llm" ? "✦ AI SUMMARY" : "SUMMARY"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text-primary)", lineHeight: 1.55 }}>{analysis.narrative}</div>
+                    </div>
+                  )}
+
+                  {analysis.cost_analysis?.success && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, marginBottom: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: "var(--text-secondary)" }}>Cost vs route:</span>
+                        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 2, color: "#fff", background: `var(--status-${analysis.cost_analysis.color || "success"})` }}>
+                          {(analysis.cost_analysis.risk_level || "").replace("_", " ")} · {analysis.cost_analysis.margin_pct?.toFixed(1)}%
+                        </span>
+                      </div>
+                      {analysis.cost_analysis.cost_per_km != null && (
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ color: "var(--text-secondary)" }}>Cost per km:</span>
+                          <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>R {analysis.cost_analysis.cost_per_km.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {(analysis.cost_analysis.explanations || []).slice(0, 2).map((e) => (
+                        <div key={e} style={{ fontSize: 11, color: "var(--text-tertiary)" }}>• {e}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  {analysis.fuel_analysis && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, marginBottom: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: "var(--text-secondary)" }}>Fuel price:</span>
+                        <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          {analysis.fuel_analysis.current_price != null && (
+                            <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>R {analysis.fuel_analysis.current_price.toFixed(2)}/L</span>
+                          )}
+                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 2, color: "#fff", background: analysis.fuel_analysis.is_stale ? "var(--status-warning)" : "var(--status-success)" }}>
+                            {analysis.fuel_analysis.is_stale ? "STALE" : "LIVE"}
+                          </span>
+                        </span>
+                      </div>
+                      {analysis.fuel_analysis.fuel_pct_of_total != null && (
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ color: "var(--text-secondary)" }}>Fuel share of total:</span>
+                          <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>{analysis.fuel_analysis.fuel_pct_of_total}%</span>
+                        </div>
+                      )}
+                      {(analysis.fuel_analysis.stale_warning || analysis.fuel_analysis.price_note) && (
+                        <div style={{ fontSize: 11, color: "var(--status-warning)" }}>{analysis.fuel_analysis.stale_warning || analysis.fuel_analysis.price_note}</div>
+                      )}
+                    </div>
+                  )}
+
+                  {analysis.market_analysis?.market_rate != null && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, marginBottom: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ color: "var(--text-secondary)" }}>Market rate:</span>
+                        <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>R {Math.round(analysis.market_analysis.market_rate).toLocaleString()}</span>
+                      </div>
+                      {analysis.market_analysis.your_vs_market_pct != null && (
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ color: "var(--text-secondary)" }}>Your quote vs market:</span>
+                          <span style={{ fontFamily: "var(--font-mono)", color: analysis.market_analysis.your_vs_market_pct >= 0 ? "var(--status-success)" : "var(--status-warning)" }}>
+                            {analysis.market_analysis.your_vs_market_pct >= 0 ? "+" : ""}{analysis.market_analysis.your_vs_market_pct}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {optimal && (
+                  <>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      fontSize: 12,
+                      marginBottom: 12,
+                    }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                      }}>
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        Optimal price:
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 16,
+                          fontWeight: 700,
+                          color: "var(--accent-primary)",
+                        }}>
+                        R {Math.round(optimal.optimal_price).toLocaleString()}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                      }}>
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        Margin:
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          color: "var(--text-primary)",
+                          fontWeight: 600,
+                        }}>
+                        {optimal.optimal_margin_pct?.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                      }}>
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        Win probability:
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          color: "var(--text-primary)",
+                          fontWeight: 600,
+                        }}>
+                        {Math.round(
+                          (optimal.win_probability_at_optimal || 0) * 100,
+                        )}
+                        %
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                      }}>
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        Expected profit:
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          color: "var(--status-success)",
+                          fontWeight: 600,
+                        }}>
+                        R{" "}
+                        {Math.round(
+                          optimal.expected_profit || 0,
+                        ).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                  {Array.isArray(optimal.curve) &&
+                    optimal.curve.length > 1 &&
+                    (() => {
+                      const data = optimal.curve.map((c: any) => ({
+                        margin: c.margin_pct,
+                        win: Math.round((c.win_probability || 0) * 100),
+                        profit: Math.round(c.expected_profit || 0),
+                      }));
+                      return (
+                        <div style={{ marginBottom: 12 }}>
+                          <div
+                            style={{
+                              fontSize: 10,
+                              fontFamily: "var(--font-mono)",
+                              color: "var(--text-tertiary)",
+                              letterSpacing: "0.08em",
+                              marginBottom: 6,
+                            }}>
+                            PROFIT SWEET-SPOT · expected profit (area) vs
+                            win-rate (line) across margin
+                          </div>
+                          {modelStats?.win_model && (
+                            <div
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                fontSize: 10,
+                                fontFamily: "var(--font-mono)",
+                                padding: "2px 8px",
+                                borderRadius: 2,
+                                marginBottom: 8,
+                                background: "var(--bg-surface)",
+                                border: "1px solid var(--border-subtle)",
+                                color: "var(--text-secondary)",
+                              }}>
+                              <span
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: 6,
+                                  background:
+                                    modelStats.win_model.mode === "learned"
+                                      ? "var(--status-success)"
+                                      : "var(--status-warning)",
+                                }}
+                              />
+                              {modelStats.win_model.mode === "learned"
+                                ? `Win model: learned${modelStats.win_model.auc != null ? ` · AUC ${modelStats.win_model.auc.toFixed(2)}` : ""} · ${modelStats.win_model.outcomes_collected} outcomes`
+                                : `Win model: heuristic · ${modelStats.win_model.outcomes_collected}/${modelStats.win_model.outcomes_needed} outcomes to learn`}
+                            </div>
+                          )}
+                          <ResponsiveContainer width="100%" height={150}>
+                            <ComposedChart
+                              data={data}
+                              margin={{ top: 8, right: 6, left: 0, bottom: 0 }}>
+                              <defs>
+                                <linearGradient
+                                  id="evGrad"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1">
+                                  <stop
+                                    offset="5%"
+                                    stopColor="var(--status-success)"
+                                    stopOpacity={0.35}
+                                  />
+                                  <stop
+                                    offset="95%"
+                                    stopColor="var(--status-success)"
+                                    stopOpacity={0}
+                                  />
+                                </linearGradient>
+                              </defs>
+                              <XAxis
+                                dataKey="margin"
+                                stroke="var(--text-tertiary)"
+                                tickFormatter={(v: number) => `${v}%`}
+                                style={{
+                                  fontSize: 10,
+                                  fontFamily: "var(--font-mono)",
+                                }}
+                              />
+                              <YAxis yAxisId="p" hide />
+                              <YAxis
+                                yAxisId="w"
+                                orientation="right"
+                                domain={[0, 100]}
+                                tickFormatter={(v: number) => `${v}%`}
+                                stroke="var(--text-tertiary)"
+                                style={{
+                                  fontSize: 10,
+                                  fontFamily: "var(--font-mono)",
+                                }}
+                                width={32}
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  background: "var(--bg-deep)",
+                                  border: "1px solid var(--border-subtle)",
+                                  borderRadius: 2,
+                                  fontSize: 11,
+                                  fontFamily: "var(--font-mono)",
+                                }}
+                                labelFormatter={(v: any) => `Margin ${v}%`}
+                                formatter={(val: any, name: any) =>
+                                  name === "profit"
+                                    ? [
+                                        `R ${Number(val).toLocaleString()}`,
+                                        "Exp. profit",
+                                      ]
+                                    : [`${val}%`, "Win rate"]
+                                }
+                              />
+                              <Area
+                                yAxisId="p"
+                                type="monotone"
+                                dataKey="profit"
+                                stroke="var(--status-success)"
+                                strokeWidth={2}
+                                fill="url(#evGrad)"
+                              />
+                              <Line
+                                yAxisId="w"
+                                type="monotone"
+                                dataKey="win"
+                                stroke="var(--accent-primary)"
+                                strokeWidth={2}
+                                dot={false}
+                              />
+                              {optimal.optimal_margin_pct != null && (
+                                <ReferenceLine
+                                  yAxisId="p"
+                                  x={
+                                    Math.round(
+                                      optimal.optimal_margin_pct * 10,
+                                    ) / 10
+                                  }
+                                  stroke="var(--accent-primary)"
+                                  strokeDasharray="3 3"
+                                />
+                              )}
+                            </ComposedChart>
+                          </ResponsiveContainer>
+                        </div>
+                      );
+                    })()}
+                  </>
+                  )}
+                  {analysis.suggested_price_rationale && (
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 10 }}>
+                      {analysis.suggested_price_rationale}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      className="btn-action"
+                      onClick={applyOptimal}
+                      style={{
+                        flex: 1,
+                        background: "var(--accent-primary)",
+                        border: "none",
+                        color: "var(--bg-deep)",
+                        fontWeight: 600,
+                      }}>
+                      APPLY SUGGESTED PRICE
+                    </button>
+                    <button
+                      className="btn-action"
+                      onClick={() => { setOptimal(null); setAnalysis(null); }}
+                      style={{
+                        background: "none",
+                        border: "1px solid var(--border-subtle)",
+                        color: "var(--text-secondary)",
+                      }}>
+                      DISMISS
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Quote details recap (read-only — entered in Step 2) */}
           <div
             style={{
@@ -4475,14 +4696,7 @@ export default function NewQuote() {
                       : cust.name
                     : "—",
                 ],
-                ["Status", status === "SENT" ? "Send to customer" : "Draft"],
-                [
-                  "Confidence",
-                  confidence
-                    ? confidence.charAt(0) + confidence.slice(1).toLowerCase()
-                    : "—",
-                ],
-                ["SLA", `${slaHours || 48} hours`],
+                ["Status", "Draft"],
                 ["Valid until", validUntil ? String(validUntil) : "—"],
               ];
               return (
@@ -5350,388 +5564,9 @@ export default function NewQuote() {
             </div>
           )}
 
-          {/* Expected-profit-maximising price. Shown only once all mandatory data is filled. */}
-          {canSave && (
-            <div style={{ marginBottom: 16 }}>
-              <button
-                onClick={fetchOptimal}
-                disabled={optimizing}
-                className="btn-action"
-                style={{
-                  width: "100%",
-                  background: "var(--accent-primary)",
-                  border: "none",
-                  color: "var(--bg-deep)",
-                  cursor: optimizing ? "wait" : "pointer",
-                  fontWeight: 600,
-                }}>
-                {optimizing ? "OPTIMISING…" : "✦ FIND OPTIMAL PRICE"}
-              </button>
-
-              {analysis && (
-                <div
-                  style={{
-                    marginTop: 12,
-                    padding: 16,
-                    background: "var(--bg-surface-hover)",
-                    borderRadius: 2,
-                    border: "1px solid var(--accent-primary)",
-                  }}>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      fontFamily: "var(--font-mono)",
-                      color: "var(--text-tertiary)",
-                      letterSpacing: "0.08em",
-                      marginBottom: 12,
-                    }}>
-                    AI QUOTE ANALYSIS
-                  </div>
-
-                  {analysis.narrative && (
-                    <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 2, padding: "10px 12px", marginBottom: 12 }}>
-                      <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.07em", marginBottom: 6 }}>
-                        {analysis.narrative_source === "llm" ? "✦ AI SUMMARY" : "SUMMARY"}
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--text-primary)", lineHeight: 1.55 }}>{analysis.narrative}</div>
-                    </div>
-                  )}
-
-                  {analysis.cost_analysis?.success && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, marginBottom: 12 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ color: "var(--text-secondary)" }}>Cost vs route:</span>
-                        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 2, color: "#fff", background: `var(--status-${analysis.cost_analysis.color || "success"})` }}>
-                          {(analysis.cost_analysis.risk_level || "").replace("_", " ")} · {analysis.cost_analysis.margin_pct?.toFixed(1)}%
-                        </span>
-                      </div>
-                      {analysis.cost_analysis.cost_per_km != null && (
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: "var(--text-secondary)" }}>Cost per km:</span>
-                          <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>R {analysis.cost_analysis.cost_per_km.toFixed(2)}</span>
-                        </div>
-                      )}
-                      {(analysis.cost_analysis.explanations || []).slice(0, 2).map((e) => (
-                        <div key={e} style={{ fontSize: 11, color: "var(--text-tertiary)" }}>• {e}</div>
-                      ))}
-                    </div>
-                  )}
-
-                  {analysis.fuel_analysis && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, marginBottom: 12 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ color: "var(--text-secondary)" }}>Fuel price:</span>
-                        <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          {analysis.fuel_analysis.current_price != null && (
-                            <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>R {analysis.fuel_analysis.current_price.toFixed(2)}/L</span>
-                          )}
-                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 2, color: "#fff", background: analysis.fuel_analysis.is_stale ? "var(--status-warning)" : "var(--status-success)" }}>
-                            {analysis.fuel_analysis.is_stale ? "STALE" : "LIVE"}
-                          </span>
-                        </span>
-                      </div>
-                      {analysis.fuel_analysis.fuel_pct_of_total != null && (
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: "var(--text-secondary)" }}>Fuel share of total:</span>
-                          <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>{analysis.fuel_analysis.fuel_pct_of_total}%</span>
-                        </div>
-                      )}
-                      {(analysis.fuel_analysis.stale_warning || analysis.fuel_analysis.price_note) && (
-                        <div style={{ fontSize: 11, color: "var(--status-warning)" }}>{analysis.fuel_analysis.stale_warning || analysis.fuel_analysis.price_note}</div>
-                      )}
-                    </div>
-                  )}
-
-                  {analysis.market_analysis?.market_rate != null && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, marginBottom: 12 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ color: "var(--text-secondary)" }}>Market rate:</span>
-                        <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>R {Math.round(analysis.market_analysis.market_rate).toLocaleString()}</span>
-                      </div>
-                      {analysis.market_analysis.your_vs_market_pct != null && (
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: "var(--text-secondary)" }}>Your quote vs market:</span>
-                          <span style={{ fontFamily: "var(--font-mono)", color: analysis.market_analysis.your_vs_market_pct >= 0 ? "var(--status-success)" : "var(--status-warning)" }}>
-                            {analysis.market_analysis.your_vs_market_pct >= 0 ? "+" : ""}{analysis.market_analysis.your_vs_market_pct}%
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {optimal && (
-                  <>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 8,
-                      fontSize: 12,
-                      marginBottom: 12,
-                    }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}>
-                      <span style={{ color: "var(--text-secondary)" }}>
-                        Optimal price:
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 16,
-                          fontWeight: 700,
-                          color: "var(--accent-primary)",
-                        }}>
-                        R {Math.round(optimal.optimal_price).toLocaleString()}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}>
-                      <span style={{ color: "var(--text-secondary)" }}>
-                        Margin:
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          color: "var(--text-primary)",
-                          fontWeight: 600,
-                        }}>
-                        {optimal.optimal_margin_pct?.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}>
-                      <span style={{ color: "var(--text-secondary)" }}>
-                        Win probability:
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          color: "var(--text-primary)",
-                          fontWeight: 600,
-                        }}>
-                        {Math.round(
-                          (optimal.win_probability_at_optimal || 0) * 100,
-                        )}
-                        %
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}>
-                      <span style={{ color: "var(--text-secondary)" }}>
-                        Expected profit:
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          color: "var(--status-success)",
-                          fontWeight: 600,
-                        }}>
-                        R{" "}
-                        {Math.round(
-                          optimal.expected_profit || 0,
-                        ).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                  {Array.isArray(optimal.curve) &&
-                    optimal.curve.length > 1 &&
-                    (() => {
-                      const data = optimal.curve.map((c: any) => ({
-                        margin: c.margin_pct,
-                        win: Math.round((c.win_probability || 0) * 100),
-                        profit: Math.round(c.expected_profit || 0),
-                      }));
-                      return (
-                        <div style={{ marginBottom: 12 }}>
-                          <div
-                            style={{
-                              fontSize: 10,
-                              fontFamily: "var(--font-mono)",
-                              color: "var(--text-tertiary)",
-                              letterSpacing: "0.08em",
-                              marginBottom: 6,
-                            }}>
-                            PROFIT SWEET-SPOT · expected profit (area) vs
-                            win-rate (line) across margin
-                          </div>
-                          {modelStats?.win_model && (
-                            <div
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 6,
-                                fontSize: 10,
-                                fontFamily: "var(--font-mono)",
-                                padding: "2px 8px",
-                                borderRadius: 2,
-                                marginBottom: 8,
-                                background: "var(--bg-surface)",
-                                border: "1px solid var(--border-subtle)",
-                                color: "var(--text-secondary)",
-                              }}>
-                              <span
-                                style={{
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: 6,
-                                  background:
-                                    modelStats.win_model.mode === "learned"
-                                      ? "var(--status-success)"
-                                      : "var(--status-warning)",
-                                }}
-                              />
-                              {modelStats.win_model.mode === "learned"
-                                ? `Win model: learned${modelStats.win_model.auc != null ? ` · AUC ${modelStats.win_model.auc.toFixed(2)}` : ""} · ${modelStats.win_model.outcomes_collected} outcomes`
-                                : `Win model: heuristic · ${modelStats.win_model.outcomes_collected}/${modelStats.win_model.outcomes_needed} outcomes to learn`}
-                            </div>
-                          )}
-                          <ResponsiveContainer width="100%" height={150}>
-                            <ComposedChart
-                              data={data}
-                              margin={{ top: 8, right: 6, left: 0, bottom: 0 }}>
-                              <defs>
-                                <linearGradient
-                                  id="evGrad"
-                                  x1="0"
-                                  y1="0"
-                                  x2="0"
-                                  y2="1">
-                                  <stop
-                                    offset="5%"
-                                    stopColor="var(--status-success)"
-                                    stopOpacity={0.35}
-                                  />
-                                  <stop
-                                    offset="95%"
-                                    stopColor="var(--status-success)"
-                                    stopOpacity={0}
-                                  />
-                                </linearGradient>
-                              </defs>
-                              <XAxis
-                                dataKey="margin"
-                                stroke="var(--text-tertiary)"
-                                tickFormatter={(v: number) => `${v}%`}
-                                style={{
-                                  fontSize: 10,
-                                  fontFamily: "var(--font-mono)",
-                                }}
-                              />
-                              <YAxis yAxisId="p" hide />
-                              <YAxis
-                                yAxisId="w"
-                                orientation="right"
-                                domain={[0, 100]}
-                                tickFormatter={(v: number) => `${v}%`}
-                                stroke="var(--text-tertiary)"
-                                style={{
-                                  fontSize: 10,
-                                  fontFamily: "var(--font-mono)",
-                                }}
-                                width={32}
-                              />
-                              <Tooltip
-                                contentStyle={{
-                                  background: "var(--bg-deep)",
-                                  border: "1px solid var(--border-subtle)",
-                                  borderRadius: 2,
-                                  fontSize: 11,
-                                  fontFamily: "var(--font-mono)",
-                                }}
-                                labelFormatter={(v: any) => `Margin ${v}%`}
-                                formatter={(val: any, name: any) =>
-                                  name === "profit"
-                                    ? [
-                                        `R ${Number(val).toLocaleString()}`,
-                                        "Exp. profit",
-                                      ]
-                                    : [`${val}%`, "Win rate"]
-                                }
-                              />
-                              <Area
-                                yAxisId="p"
-                                type="monotone"
-                                dataKey="profit"
-                                stroke="var(--status-success)"
-                                strokeWidth={2}
-                                fill="url(#evGrad)"
-                              />
-                              <Line
-                                yAxisId="w"
-                                type="monotone"
-                                dataKey="win"
-                                stroke="var(--accent-primary)"
-                                strokeWidth={2}
-                                dot={false}
-                              />
-                              {optimal.optimal_margin_pct != null && (
-                                <ReferenceLine
-                                  yAxisId="p"
-                                  x={
-                                    Math.round(
-                                      optimal.optimal_margin_pct * 10,
-                                    ) / 10
-                                  }
-                                  stroke="var(--accent-primary)"
-                                  strokeDasharray="3 3"
-                                />
-                              )}
-                            </ComposedChart>
-                          </ResponsiveContainer>
-                        </div>
-                      );
-                    })()}
-                  </>
-                  )}
-                  {analysis.suggested_price_rationale && (
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 10 }}>
-                      {analysis.suggested_price_rationale}
-                    </div>
-                  )}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      className="btn-action"
-                      onClick={applyOptimal}
-                      style={{
-                        flex: 1,
-                        background: "var(--accent-primary)",
-                        border: "none",
-                        color: "var(--bg-deep)",
-                        fontWeight: 600,
-                      }}>
-                      APPLY SUGGESTED PRICE
-                    </button>
-                    <button
-                      className="btn-action"
-                      onClick={() => { setOptimal(null); setAnalysis(null); }}
-                      style={{
-                        background: "none",
-                        border: "1px solid var(--border-subtle)",
-                        color: "var(--text-secondary)",
-                      }}>
-                      DISMISS
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <button
-              onClick={() => setCurrentStep(2)}
+              onClick={() => setCurrentStep(1)}
               className="btn-action"
               style={{
                 background: "transparent",

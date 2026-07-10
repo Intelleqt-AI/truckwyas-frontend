@@ -271,6 +271,8 @@ export default function NewQuote() {
   });
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [status, setStatus] = useState<"DRAFT" | "SENT">("DRAFT");
+  // Set when the user clicks "Save & Send" so onSuccess also emails the customer
+  const sendAfterSaveRef = useRef(false);
   const [confidence, setConfidence] = useState<"HIGH" | "MEDIUM" | "LOW">(
     "MEDIUM",
   );
@@ -317,7 +319,22 @@ export default function NewQuote() {
     capacity?: string | number;
     fuel_consumption_l_per_100km?: string | number;
     base_rate?: string | number;
+    available_vehicle_count?: number;
   }[] = vehicleTypesRaw?.results || vehicleTypesRaw || [];
+
+  // Only offer vehicle types the company can actually fulfil (≥1 available
+  // vehicle). Availability is aggregated by name because the vehicles query
+  // matches on vehicle_type name, and duplicate type names exist in the data.
+  const fulfillableTypeNames = new Set(
+    vehicleTypes
+      .filter((vt) => Number(vt.available_vehicle_count ?? 0) > 0)
+      .map((vt) => vt.name),
+  );
+  const selectableVehicleTypes = vehicleTypes
+    .filter((vt, idx, arr) => arr.findIndex((x) => x.name === vt.name) === idx)
+    .filter(
+      (vt) => fulfillableTypeNames.has(vt.name) || vt.name === vehicleType,
+    );
 
   type VehicleOption = {
     id: number;
@@ -1046,9 +1063,31 @@ export default function NewQuote() {
       isEditing
         ? patchData({ url: `api/v1/quotes/${editId}/`, data })
         : postData({ url: "api/v1/quotes/", data }),
-    onSuccess: (_data, variables) => {
+    onSuccess: async (data, variables) => {
       localStorage.removeItem(DRAFT_KEY);
-      if (editId && variables?.status) {
+      const shouldSend = sendAfterSaveRef.current;
+      sendAfterSaveRef.current = false;
+      const quoteId = editId || (data as any)?.id;
+
+      // "Save & Send" — email the customer the shareable quote link
+      if (shouldSend && quoteId) {
+        try {
+          const res: any = await postData({
+            url: `api/v1/quotes/${quoteId}/send_to_customer/`,
+          });
+          if (res?.email_sent) {
+            toast.success("Quote saved & sent to customer");
+          } else {
+            toast.warning(
+              "Quote saved & marked sent, but no customer email is on file",
+            );
+          }
+        } catch (e: any) {
+          toast.error(
+            e?.message || "Quote saved, but failed to send to customer",
+          );
+        }
+      } else if (editId && variables?.status) {
         queryClient.setQueryData(['quotes'], (old: unknown) => {
           if (!old || typeof old !== 'object') return old;
           const o = old as Record<string, unknown>;
@@ -1059,12 +1098,14 @@ export default function NewQuote() {
           return o.results ? { ...o, results: updated } : updated;
         });
       }
+
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
-      if (editId) queryClient.invalidateQueries({ queryKey: ["quote", editId] });
-      toast.success(isEditing ? "Quote updated" : "Quote saved");
-      navigate(isEditing ? `/bookings/quotes/${editId}` : "/bookings/quotes");
+      if (quoteId) queryClient.invalidateQueries({ queryKey: ["quote", quoteId] });
+      if (!shouldSend) toast.success(isEditing ? "Quote updated" : "Quote saved");
+      navigate(quoteId ? `/bookings/quotes/${quoteId}` : "/bookings/quotes");
     },
     onError: (e: any) => {
+      sendAfterSaveRef.current = false;
       const msg =
         e?.message ||
         (isEditing ? "Failed to update quote" : "Failed to create quote");
@@ -1073,7 +1114,7 @@ export default function NewQuote() {
     },
   });
 
-  const handleSave = () => {
+  const handleSave = (send = false) => {
     if (!customerId) {
       const msg = "Please select a customer";
       setError(msg);
@@ -1081,6 +1122,7 @@ export default function NewQuote() {
       return;
     }
     setError("");
+    sendAfterSaveRef.current = send;
     mutation.mutate({
       customer: parseInt(customerId),
       pickup_location: pickupLocation,
@@ -1654,9 +1696,8 @@ export default function NewQuote() {
                     </SelectTrigger>
                     <SelectContent>
                       {vehicleTypes.length > 0
-                        ? vehicleTypes
-                            .filter((vt, idx, arr) => arr.findIndex(x => x.name === vt.name) === idx)
-                            .map((vt) => {
+                        ? selectableVehicleTypes.length > 0
+                          ? selectableVehicleTypes.map((vt) => {
                               const displayName = vt.name.replace(/\s*\([\d\s\-–.]+\s*tonn?e?s?\)/gi, "").trim();
                               const cap = vt.capacity != null && Number(vt.capacity) > 0 ? `${Number(vt.capacity)} ton` : null;
                               const rate = vt.base_rate != null && Number(vt.base_rate) > 0 ? `R${Number(vt.base_rate)}/km` : null;
@@ -1668,6 +1709,11 @@ export default function NewQuote() {
                                 </SelectItem>
                               );
                             })
+                          : (
+                            <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
+                              No available vehicles. Add vehicles in Settings → Vehicles to quote.
+                            </div>
+                          )
                         : [
                             "Semi-Trailer Truck",
                             "Rigid Truck",
@@ -5576,17 +5622,31 @@ export default function NewQuote() {
               }}>
               ← BACK
             </button>
-            <button
-              onClick={handleSave}
-              disabled={mutation.isPending || !canSave}
-              className="btn-action"
-              style={{ minWidth: 140 }}>
-              {mutation.isPending
-                ? "SAVING..."
-                : isEditing
-                  ? "UPDATE QUOTE"
-                  : "SAVE QUOTE"}
-            </button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => handleSave(false)}
+                disabled={mutation.isPending || !canSave}
+                className="btn-action"
+                style={{
+                  minWidth: 130,
+                  background: "transparent",
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--text-primary)",
+                }}>
+                {mutation.isPending
+                  ? "SAVING..."
+                  : isEditing
+                    ? "UPDATE QUOTE"
+                    : "SAVE QUOTE"}
+              </button>
+              <button
+                onClick={() => handleSave(true)}
+                disabled={mutation.isPending || !canSave}
+                className="btn-action"
+                style={{ minWidth: 150 }}>
+                {mutation.isPending ? "WORKING..." : "SAVE & SEND"}
+              </button>
+            </div>
           </div>
         </div>
       )}

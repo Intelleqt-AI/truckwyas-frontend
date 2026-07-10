@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/').replace(/\/$/, '');
+const BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/').replace(/\/$/, '');
 
 const C = {
   bg:        '#f1f5f9',
@@ -67,21 +67,29 @@ export default function PublicInvoice() {
         }}>
           <div>
             <div style={{ fontSize: 11, fontFamily: C.mono, color: '#93c5fd', letterSpacing: '0.12em', marginBottom: 4 }}>
-              TRUCKWYS · INVOICE
+              {data?.company_name ? `${data.company_name} · INVOICE` : 'INVOICE'}
             </div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>
               {isLoading ? 'Loading…' : data ? data.invoice_number : 'Invoice'}
             </div>
           </div>
-          <div style={{ width: 48, height: 48, background: 'rgba(255,255,255,0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="24" height="24" fill="none" stroke="#93c5fd" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-              <polyline points="10 9 9 9 8 9"/>
-            </svg>
-          </div>
+          {data?.company_logo_url ? (
+            <img
+              src={data.company_logo_url}
+              alt={data.company_name || 'Company logo'}
+              style={{ maxHeight: 48, maxWidth: 160, objectFit: 'contain' }}
+            />
+          ) : (
+            <div style={{ width: 48, height: 48, background: 'rgba(255,255,255,0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" fill="none" stroke="#93c5fd" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+            </div>
+          )}
         </div>
 
         {/* Body */}
@@ -243,10 +251,10 @@ export default function PublicInvoice() {
               )}
             </div>
 
-            {/* Footer */}
+            {/* Footer — platform attribution */}
             <div style={{ borderTop: `1px solid ${C.border}`, padding: '16px 32px', textAlign: 'center' }}>
               <div style={{ fontSize: 11, color: C.faint, fontFamily: C.mono, letterSpacing: '0.06em' }}>
-                TRUCKWYS · SA ROAD FREIGHT INTELLIGENCE
+                Powered by TruckWys
               </div>
             </div>
           </div>

@@ -422,20 +422,31 @@ export default function QuoteDetail() {
           <div className="card" style={{ padding: 20 }}>
             <div className="card-title" style={{ marginBottom: 16 }}>Cost Breakdown</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[
-                { label: 'Base Rate', value: quote.base_rate },
-                { label: 'Fuel Surcharge', value: quote.fuel_surcharge },
-                { label: 'Toll Charges', value: quote.toll_charges },
-                { label: 'Driver Allowance', value: quote.driver_allowance },
-                { label: 'Additional Charges', value: quote.additional_charges },
-              ].map((item) => (
-                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{item.label}</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)' }}>
-                    {formatCurrency(parseFloat(item.value || '0'))}
-                  </span>
-                </div>
-              ))}
+              {(() => {
+                const total = parseFloat(quote.total_amount || '0');
+                const fuel = parseFloat(quote.fuel_surcharge || '0');
+                const toll = parseFloat(quote.toll_charges || '0');
+                const driver = parseFloat(quote.driver_allowance || '0');
+                const additional = parseFloat(quote.additional_charges || '0');
+                const serviceCharge = Math.round((total - fuel - toll - driver - additional) * 100) / 100;
+
+                const rows = [
+                  { label: 'Fuel Surcharge', value: fuel },
+                  { label: 'Toll Charges', value: toll },
+                  { label: 'Driver Allowance', value: driver },
+                  ...(additional > 0 ? [{ label: 'Additional Charges', value: additional }] : []),
+                  ...(serviceCharge > 0 ? [{ label: 'Service Charge', value: serviceCharge }] : []),
+                ];
+
+                return rows.map((item) => (
+                  <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{item.label}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)' }}>
+                      {formatCurrency(item.value)}
+                    </span>
+                  </div>
+                ));
+              })()}
               {quote.trip_type === 'ROUND_TRIP' && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed var(--accent-primary)' }}>
                   <span style={{ fontSize: 12, color: 'var(--accent-primary)' }}>

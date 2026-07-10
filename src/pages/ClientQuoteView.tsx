@@ -165,13 +165,17 @@ export default function ClientQuoteView() {
     <PublicShell>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '40px 24px 64px' }}>
 
-        {/* Branding header */}
+        {/* Branding header — the freight company's own logo & name */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: C.accent, letterSpacing: '-0.02em', marginBottom: 4 }}>
-            TRUCKWYS
-          </div>
-          <div style={{ fontSize: 11, color: C.faint, fontFamily: C.mono, letterSpacing: '0.12em' }}>
-            ROAD FREIGHT INTELLIGENCE
+          {quote.company_logo_url && (
+            <img
+              src={quote.company_logo_url}
+              alt={quote.company_name || 'Company logo'}
+              style={{ maxHeight: 64, maxWidth: 220, objectFit: 'contain', marginBottom: 12 }}
+            />
+          )}
+          <div style={{ fontSize: 22, fontWeight: 700, color: C.text, letterSpacing: '-0.02em' }}>
+            {quote.company_name || 'Freight Quote'}
           </div>
         </div>
 
@@ -278,9 +282,9 @@ export default function ClientQuoteView() {
           </Card>
         )}
 
-        {/* Cargo details */}
+        {/* Cargo & schedule details */}
         <Card>
-          <div style={{ fontSize: 11, fontFamily: C.mono, color: C.faint, letterSpacing: '0.1em', marginBottom: 20 }}>CARGO</div>
+          <div style={{ fontSize: 11, fontFamily: C.mono, color: C.faint, letterSpacing: '0.1em', marginBottom: 20 }}>CARGO &amp; SCHEDULE</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
             <div>
               <Label>Description</Label>
@@ -302,58 +306,33 @@ export default function ClientQuoteView() {
                 {quote.distance ? `${Math.round(parseFloat(quote.distance)).toLocaleString('en-ZA')} km` : '—'}
               </div>
             </div>
-            {quote.vehicle_display && (
-              <div>
-                <Label>Vehicle</Label>
-                <div style={{ fontSize: 13, color: C.text }}>{quote.vehicle_display}</div>
+            <div>
+              <Label>Collection date</Label>
+              <div style={{ fontSize: 13, color: C.text, fontFamily: C.mono }}>
+                {quote.pickup_date ? new Date(quote.pickup_date).toLocaleDateString('en-ZA') : 'To be confirmed'}
               </div>
-            )}
-            {quote.driver_display && (
-              <div>
-                <Label>Driver</Label>
-                <div style={{ fontSize: 13, color: C.text }}>{quote.driver_display}</div>
+            </div>
+            <div>
+              <Label>Delivery date</Label>
+              <div style={{ fontSize: 13, color: C.text, fontFamily: C.mono }}>
+                {quote.delivery_date ? new Date(quote.delivery_date).toLocaleDateString('en-ZA') : 'To be confirmed'}
               </div>
-            )}
+            </div>
           </div>
         </Card>
 
-        {/* Cost breakdown */}
-        <Card>
-          <div style={{ fontSize: 11, fontFamily: C.mono, color: C.faint, letterSpacing: '0.1em', marginBottom: 20 }}>COST BREAKDOWN</div>
-          {[
-            { label: 'Base Rate', value: quote.base_rate },
-            { label: 'Fuel Surcharge', value: quote.fuel_surcharge },
-            { label: 'Toll Charges', value: quote.toll_charges },
-            { label: 'Driver Allowance', value: quote.driver_allowance },
-            { label: 'Additional Charges', value: quote.additional_charges },
-          ].map(item => (
-            <div key={item.label} style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              padding: '10px 0',
-              borderBottom: `1px solid ${C.border}`,
-            }}>
-              <span style={{ fontSize: 13, color: C.muted }}>{item.label}</span>
-              <span style={{ fontSize: 13, color: C.text, fontFamily: C.mono }}>
-                {formatCurrencyLocal(parseFloat(item.value || '0'))}
-              </span>
-            </div>
-          ))}
-          {quote.trip_type === 'ROUND_TRIP' && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px dashed ${C.accent}` }}>
-              <span style={{ fontSize: 13, color: C.accent }}>Return Leg ({quote.return_cargo ? 'with cargo' : 'empty return'})</span>
-              <span style={{ fontSize: 13, color: C.accent, fontFamily: C.mono, fontWeight: 600 }}>
-                {formatCurrencyLocal(parseFloat(quote.return_base_rate))}
-              </span>
-            </div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 16, marginTop: 4 }}>
+        {/* Total price — the single all-in amount (no internal cost breakdown) */}
+        <Card style={{ borderTop: `4px solid ${C.accent}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
-              {quote.trip_type === 'ROUND_TRIP' ? 'Total (both legs)' : 'Total Amount'}
+              {quote.trip_type === 'ROUND_TRIP' ? 'Total (round trip)' : 'Total Amount'}
             </span>
-            <span style={{ fontSize: 26, fontWeight: 700, color: C.accent, fontFamily: C.mono }}>
+            <span style={{ fontSize: 28, fontWeight: 700, color: C.accent, fontFamily: C.mono }}>
               {formatCurrencyLocal(parseFloat(quote.total_amount || '0'))}
             </span>
+          </div>
+          <div style={{ fontSize: 11, color: C.faint, marginTop: 6, textAlign: 'right' }}>
+            Excl. VAT
           </div>
         </Card>
 
@@ -424,9 +403,9 @@ export default function ClientQuoteView() {
           </div>
         )}
 
-        {/* Footer */}
+        {/* Footer — platform attribution */}
         <div style={{ textAlign: 'center', marginTop: 48, fontSize: 11, color: C.faint }}>
-          Powered by TruckWys — Road Freight Intelligence Platform
+          Powered by TruckWys
         </div>
       </div>
     </PublicShell>

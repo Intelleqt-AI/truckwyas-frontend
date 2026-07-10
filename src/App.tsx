@@ -68,6 +68,7 @@ const CreateInvoice = lazy(() => import('./pages/CreateInvoice'));
 const Expenses = lazy(() => import('./pages/Expenses'));
 const FinanceReports = lazy(() => import('./pages/FinanceReports'));
 const Capital = lazy(() => import('./pages/Capital'));
+const CustomerRisk = lazy(() => import('./pages/CustomerRisk'));
 const AdvanceRequest = lazy(() => import('./pages/AdvanceRequest'));
 const AdvanceDetail = lazy(() => import('./pages/AdvanceDetail'));
 const Insights = lazy(() => import('./pages/Insights'));
@@ -264,6 +265,7 @@ const App = () => (
                 {/* Finance-role gated */}
                 <Route element={<RoleRoute roles={FINANCE_ROLES} />}>
                   <Route path="/capital" element={<Capital />} />
+                  <Route path="/customers/:id/risk" element={<CustomerRisk />} />
                   <Route path="/capital/request" element={<AdvanceRequest />} />
                   <Route path="/capital/advances/:id" element={<AdvanceDetail />} />
                   <Route path="/capital/risk-scores" element={<RiskScoreView />} />

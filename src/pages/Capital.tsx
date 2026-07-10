@@ -1,9 +1,18 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/formatters";
 import { fetchData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
+
+const RISK_BAND_COLOR: Record<string, string> = {
+  LOW: "var(--status-success)",
+  MEDIUM: "var(--status-warning)",
+  HIGH: "var(--status-danger)",
+  CRITICAL: "var(--status-danger)",
+  NEW: "var(--text-tertiary)",
+};
 
 const MC_URL =
   "https://getstarted.merchantcapital.co.za?actiontype=C_C&channel=Part_Trad&who=IA_SP";
@@ -26,6 +35,7 @@ function saveAppliedId(id: string, current: Set<string>): Set<string> {
 }
 
 export default function Capital() {
+  const navigate = useNavigate();
   const [showIneligible, setShowIneligible] = useState(false);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
 
@@ -59,10 +69,13 @@ export default function Capital() {
     (sum, inv) => sum + (inv.total_amount || inv.amount || 0),
     0,
   );
-  const outstanding = facility?.outstanding_advances || 0;
-  const facilityLimit = facility?.facility_limit || 1000000;
-  const available = facilityLimit - outstanding;
-  const utilization = Math.round((outstanding / facilityLimit) * 100);
+  // FacilitySerializer exposes limit/outstanding/available/utilization_percent
+  const outstanding = Number(facility?.outstanding ?? 0);
+  const facilityLimit = Number(facility?.limit ?? 1000000);
+  const available = Number(facility?.available ?? facilityLimit - outstanding);
+  const utilization = Math.round(
+    Number(facility?.utilization_percent ?? (outstanding / facilityLimit) * 100),
+  );
 
   useEffect(() => {
     document.title = "Capital - TruckWys";
@@ -361,7 +374,9 @@ export default function Capital() {
               <tr>
                 <th>Invoice #</th>
                 <th>Customer</th>
+                <th>AI Risk</th>
                 <th>Amount</th>
+                <th>Fundable</th>
                 <th className="text-right">Action</th>
               </tr>
             </thead>
@@ -370,6 +385,11 @@ export default function Capital() {
                 const amount = Number(
                   inv.total_amount || inv.amount || inv.invoice_amount || 0,
                 );
+                const riskPct = inv.customer_risk_pct;
+                const riskBand: string = inv.customer_risk_band || "NEW";
+                const blocked = !!inv.risk_blocked;
+                const fundable = Number(inv.fundable_amount_zar ?? amount);
+                const riskColor = RISK_BAND_COLOR[riskBand] || "var(--text-tertiary)";
                 return (
                   <tr key={inv.id}>
                     <td className="mono">
@@ -378,35 +398,81 @@ export default function Capital() {
                     <td>
                       {inv.customer || inv.customer_name || inv.customerName}
                     </td>
+                    <td>
+                      {riskPct === null || riskPct === undefined ? (
+                        <span style={{ color: "var(--text-tertiary)", fontSize: 11 }}>—</span>
+                      ) : (
+                        <button
+                          onClick={() => inv.customer_id && navigate(`/customers/${inv.customer_id}/risk`)}
+                          title="Open AI risk profile"
+                          style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: riskColor,
+                            background: "none",
+                            border: `1px solid ${riskColor}`,
+                            borderRadius: 999,
+                            padding: "2px 10px",
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                          }}>
+                          {riskPct}%{riskBand === "NEW" ? " · NEW" : ""}
+                        </button>
+                      )}
+                    </td>
                     <td className="mono">{formatCurrency(amount)}</td>
+                    <td className="mono" style={{ color: fundable < amount ? "var(--status-warning)" : undefined }}>
+                      {formatCurrency(fundable)}
+                    </td>
                     <td className="text-left">
-                      <a
-                        href={MC_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-action"
-                        onClick={() =>
-                          setAppliedIds((prev) =>
-                            saveAppliedId(String(inv.id), prev),
-                          )
-                        }
-                        style={{
-                          fontSize: 10,
-                          padding: "4px 12px",
-                          background: appliedIds.has(String(inv.id))
-                            ? "var(--status-success)"
-                            : "var(--accent-primary)",
-                          color: "var(--btn-action-color)",
-                          border: "none",
-                          borderRadius: 2,
-                          fontFamily: "var(--font-mono)",
-                          fontWeight: 600,
-                          textDecoration: "none",
-                          display: "inline-block",
-                          whiteSpace: "nowrap",
-                        }}>
-                        {appliedIds.has(String(inv.id)) ? "Applied ✓" : "APPLY"}
-                      </a>
+                      {blocked ? (
+                        <span
+                          title={`Customer risk ${riskPct}% — above the 70% fast-pay limit`}
+                          style={{
+                            fontSize: 10,
+                            padding: "4px 12px",
+                            background: "none",
+                            color: "var(--status-danger)",
+                            border: "1px solid var(--status-danger)",
+                            borderRadius: 2,
+                            fontFamily: "var(--font-mono)",
+                            fontWeight: 600,
+                            display: "inline-block",
+                            whiteSpace: "nowrap",
+                            opacity: 0.85,
+                          }}>
+                          HIGH RISK
+                        </span>
+                      ) : (
+                        <a
+                          href={MC_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-action"
+                          onClick={() =>
+                            setAppliedIds((prev) =>
+                              saveAppliedId(String(inv.id), prev),
+                            )
+                          }
+                          style={{
+                            fontSize: 10,
+                            padding: "4px 12px",
+                            background: appliedIds.has(String(inv.id))
+                              ? "var(--status-success)"
+                              : "var(--accent-primary)",
+                            color: "var(--btn-action-color)",
+                            border: "none",
+                            borderRadius: 2,
+                            fontFamily: "var(--font-mono)",
+                            fontWeight: 600,
+                            textDecoration: "none",
+                            display: "inline-block",
+                            whiteSpace: "nowrap",
+                          }}>
+                          {appliedIds.has(String(inv.id)) ? "Applied ✓" : "APPLY"}
+                        </a>
+                      )}
                     </td>
                   </tr>
                 );

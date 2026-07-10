@@ -146,7 +146,7 @@ export default function CustomerRisk() {
         <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.1em", marginBottom: 8 }}>
           REAL-TIME AI SUMMARY
         </div>
-        <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.65, maxWidth: 860 }}>
+        <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.65, textAlign: "justify" }}>
           {data.ai_summary}
         </div>
       </div>

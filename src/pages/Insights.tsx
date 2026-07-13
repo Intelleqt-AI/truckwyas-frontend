@@ -165,20 +165,24 @@ type PeriodType = 'THIS_MONTH' | 'LAST_MONTH' | 'LAST_3M' | 'LAST_6M' | 'LAST_12
 
 const TABS = [
   { id: 'briefing' as TabType, label: 'Briefing' },
-  { id: 'margin' as TabType, label: 'Margin Engine' },
-  { id: 'cash' as TabType, label: 'Cash Flow' },
+  { id: 'margin' as TabType, label: 'Margin engine' },
+  { id: 'cash' as TabType, label: 'Cash flow' },
   { id: 'fleet' as TabType, label: 'Fleet' },
   { id: 'lanes' as TabType, label: 'Lanes' },
 ];
 
 const PERIOD_OPTIONS: { id: PeriodType; label: string }[] = [
-  { id: 'THIS_MONTH', label: 'This Month' },
-  { id: 'LAST_MONTH', label: 'Last Month' },
+  { id: 'THIS_MONTH', label: 'This month' },
+  { id: 'LAST_MONTH', label: 'Last month' },
   { id: 'LAST_3M', label: 'Last 3M' },
   { id: 'LAST_6M', label: 'Last 6M' },
   { id: 'LAST_12M', label: 'Last 12M' },
   { id: 'CUSTOM', label: 'Custom' },
 ];
+
+// Sentence-case a raw token for display: "IN_TRANSIT" → "In transit".
+const titleCase = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
 
 export default function Insights() {
   const navigate = useNavigate();
@@ -336,14 +340,14 @@ export default function Insights() {
     <div style={{
       fontSize: 10,
       fontFamily: 'var(--font-mono)',
-      textTransform: 'uppercase',
       padding: '2px 8px',
-      borderRadius: 2,
+      borderRadius: 4,
       background: 'var(--bg-surface-hover)',
       color: 'var(--text-secondary)',
       display: 'inline-block',
+      whiteSpace: 'nowrap',
     }}>
-      {children}
+      {titleCase(children)}
     </div>
   );
 
@@ -377,7 +381,6 @@ export default function Insights() {
               fontFamily: 'var(--font-mono)',
               fontSize: 10,
               letterSpacing: '0.05em',
-              textTransform: 'uppercase',
               padding: '6px 12px',
               cursor: 'pointer',
               borderRadius: 2,
@@ -420,8 +423,7 @@ export default function Insights() {
               fontFamily: 'var(--font-mono)',
               fontSize: 13,
               letterSpacing: '0.05em',
-              fontWeight: tab === t.id ? 600 : 400,
-              textTransform: 'uppercase',
+              fontWeight: tab === t.id ? 500 : 400,
               padding: '12px 0',
               marginRight: 24,
               cursor: 'pointer',
@@ -593,13 +595,14 @@ export default function Insights() {
                             <div style={{
                               fontSize: 10,
                               fontFamily: 'var(--font-mono)',
-                              textTransform: 'uppercase',
                               padding: '2px 8px',
-                              borderRadius: 2,
+                              borderRadius: 4,
                               background: 'var(--bg-surface-hover)',
                               color: 'var(--text-secondary)',
+                              display: 'inline-block',
+                              whiteSpace: 'nowrap',
                             }}>
-                              {rec.type.replace(/_/g, ' ')}
+                              {titleCase(rec.type)}
                             </div>
                             <div style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
                               {rec.message}
@@ -1074,11 +1077,10 @@ export default function Insights() {
                               <div style={{
                                 minWidth: 120,
                                 fontSize: 12,
-                                textTransform: 'uppercase',
                                 fontFamily: 'var(--font-mono)',
                                 color: 'var(--text-secondary)',
                               }}>
-                                {cat.category}
+                                {titleCase(cat.category)}
                               </div>
                               <div style={{
                                 flex: 1,
@@ -1250,7 +1252,7 @@ export default function Insights() {
                     return customers.length > 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {customers.map((c, idx) => {
-                          const risk = c.oldest_invoice_days > 60 ? 'HIGH RISK' : c.oldest_invoice_days > 30 ? 'MEDIUM' : 'CURRENT';
+                          const risk = c.oldest_invoice_days > 60 ? 'High risk' : c.oldest_invoice_days > 30 ? 'Medium' : 'Current';
                           const riskColor = c.oldest_invoice_days > 60 ? 'var(--status-danger)' : c.oldest_invoice_days > 30 ? 'var(--status-warning)' : 'var(--status-success)';
 
                           return (
@@ -1293,11 +1295,12 @@ export default function Insights() {
                               <div style={{
                                 fontSize: 10,
                                 fontFamily: 'var(--font-mono)',
-                                textTransform: 'uppercase',
                                 padding: '2px 8px',
-                                borderRadius: 2,
+                                borderRadius: 4,
                                 background: riskColor,
                                 color: 'white',
+                                display: 'inline-block',
+                                whiteSpace: 'nowrap',
                               }}>
                                 {risk}
                               </div>

@@ -259,18 +259,18 @@ export default function LoadsList() {
             onClick={() => navigate('/bookings/quotes/ai-chat')}
             style={{
               background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)',
-              padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono)',
-              fontWeight: 600, letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer',
+              padding: '8px 16px', fontSize: 13,
+              fontWeight: 500, borderRadius: 4, cursor: 'pointer',
             }}
-          >AI QUOTE</button>
+          >AI quote</button>
           <button
             onClick={() => navigate('/bookings/quotes/new')}
             style={{
-              background: 'var(--accent-primary)', border: 'none', color: 'var(--bg-deep)',
-              padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono)',
-              fontWeight: 600, letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer',
+              background: 'var(--accent-primary)', border: 'none', color: 'var(--btn-action-color, #fff)',
+              padding: '8px 16px', fontSize: 13,
+              fontWeight: 500, borderRadius: 4, cursor: 'pointer',
             }}
-          >+ NEW QUOTE</button>
+          >+ New quote</button>
         </div>
       </div>
 
@@ -290,13 +290,10 @@ export default function LoadsList() {
               borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
               color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
               padding: '12px 0',
-              fontSize: 13,
-              fontWeight: activeTab === tab.id ? 600 : 400,
+              fontSize: 14,
+              fontWeight: activeTab === tab.id ? 500 : 400,
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              fontFamily: 'var(--font-mono)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
             }}
             onMouseEnter={(e) => {
               if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--text-primary)';

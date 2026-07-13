@@ -320,7 +320,7 @@ export default function Copilot() {
         </div>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 10,
-          padding: '4px 9px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: '0.07em',
+          padding: '4px 9px', borderRadius: 2, letterSpacing: '0.07em',
           background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
           color: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)',
         }}>
@@ -334,7 +334,7 @@ export default function Copilot() {
         {/* Sidebar */}
         <div style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, overflow: 'hidden' }}>
           <div style={{ padding: 10, borderBottom: '1px solid var(--border-subtle)' }}>
-            <button onClick={newChat} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, padding: '9px 12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            <button onClick={newChat} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, padding: '9px 12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em' }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               New chat
             </button>
@@ -464,7 +464,7 @@ export default function Copilot() {
               style={{ flex: 1, resize: 'none', maxHeight: 140, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 2, color: 'var(--text-primary)', fontSize: 13.5, lineHeight: 1.5, outline: 'none', fontFamily: 'var(--font-sans)', padding: '10px 12px' }} />
             <button className="btn-action" onClick={() => send()} disabled={loading || !input.trim()}
               style={{ background: input.trim() && !loading ? 'var(--accent-primary)' : 'var(--bg-surface-hover)', color: input.trim() && !loading ? 'var(--bg-deep)' : 'var(--text-tertiary)', border: 'none', padding: '10px 18px' }}>
-              {loading ? '…' : 'SEND'}
+              {loading ? '…' : 'Send'}
             </button>
           </div>
         </div>

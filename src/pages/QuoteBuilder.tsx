@@ -412,7 +412,7 @@ export default function QuoteBuilder() {
   };
 
   // ---- styles ----
-  const cardS: React.CSSProperties = { background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4 };
+  const cardS: React.CSSProperties = { background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, boxShadow: "var(--shadow-card)" };
   const labelS: React.CSSProperties = { fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.04em", textTransform: "uppercase" };
   const inputS: React.CSSProperties = { background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: "9px 11px", color: "var(--text-primary)", fontSize: 14, width: "100%", outline: "none" };
   const dot = (c: string): React.CSSProperties => ({ width: 7, height: 7, borderRadius: 2, background: c, flexShrink: 0 });
@@ -436,7 +436,7 @@ export default function QuoteBuilder() {
             <span style={dot(saving ? "var(--status-warning)" : lastSavedAt ? "var(--status-success)" : "var(--text-tertiary)")} />
           </div>
           <button onClick={startNew} title="Start a fresh quote (this one stays saved)"
-            style={{ ...labelS, background: "transparent", color: "var(--accent-primary)", border: "1px solid var(--accent-primary)", borderRadius: 4, padding: "6px 12px", cursor: "pointer" }}>
+            style={{ fontSize: 13, fontWeight: 500, background: "transparent", color: "var(--accent-primary)", border: "1px solid var(--accent-primary)", borderRadius: 4, padding: "6px 12px", cursor: "pointer" }}>
             + New quote
           </button>
         </div>
@@ -449,8 +449,8 @@ export default function QuoteBuilder() {
             You have an unsaved quote from earlier{resumable.pickup ? ` (${resumable.pickup}${resumable.delivery ? ` → ${resumable.delivery}` : ""})` : ""}.
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={applyResumable} style={{ ...labelS, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 4, padding: "6px 12px", cursor: "pointer" }}>Resume</button>
-            <button onClick={discardResumable} style={{ ...labelS, background: "transparent", color: "var(--text-tertiary)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: "6px 12px", cursor: "pointer" }}>Discard</button>
+            <button onClick={applyResumable} style={{ fontSize: 13, fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 4, padding: "6px 12px", cursor: "pointer" }}>Resume</button>
+            <button onClick={discardResumable} style={{ fontSize: 13, fontWeight: 500, background: "transparent", color: "var(--text-tertiary)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: "6px 12px", cursor: "pointer" }}>Discard</button>
           </div>
         </div>
       )}
@@ -460,7 +460,7 @@ export default function QuoteBuilder() {
         <span style={{ fontSize: 15 }}>💬</span>
         <input value={nlText} onChange={e => setNlText(e.target.value)} onKeyDown={e => e.key === "Enter" && submitNL()}
           placeholder="Describe it — “20t steel, JHB to Cape Town, flatbed, Tuesday”" style={{ ...inputS, border: "none", background: "transparent" }} />
-        <button onClick={submitNL} disabled={nlBusy || !nlText.trim()} style={{ ...labelS, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 4, padding: "7px 12px", cursor: "pointer", opacity: nlText.trim() ? 1 : 0.5 }}>{nlBusy ? "Reading…" : "Fill"}</button>
+        <button onClick={submitNL} disabled={nlBusy || !nlText.trim()} style={{ fontSize: 13, fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 4, padding: "7px 14px", cursor: "pointer", opacity: nlText.trim() ? 1 : 0.5 }}>{nlBusy ? "Reading…" : "Fill"}</button>
       </div>
 
       {/* 1 — inputs */}
@@ -623,7 +623,7 @@ export default function QuoteBuilder() {
 
           {/* actions */}
           <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "14px 18px", borderTop: "1px solid var(--border-row)" }}>
-            {opt && (opt.optimal_price || analysis?.suggested_price) && <button onClick={applyOptimal} style={{ ...labelS, background: "transparent", border: "1px solid var(--accent-primary)", color: "var(--accent-primary)", borderRadius: 4, padding: "9px 14px", cursor: "pointer" }}>Apply recommended</button>}
+            {opt && (opt.optimal_price || analysis?.suggested_price) && <button onClick={applyOptimal} style={{ fontSize: 14, fontWeight: 500, background: "transparent", border: "1px solid var(--accent-primary)", color: "var(--accent-primary)", borderRadius: 4, padding: "9px 14px", cursor: "pointer" }}>Apply recommended</button>}
             <button onClick={() => save(true)} disabled={saving} style={{ fontSize: 14, fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 4, padding: "10px 16px", cursor: "pointer" }}>Send quote to client</button>
             <button onClick={() => save(false)} disabled={saving} style={{ fontSize: 14, background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 4, padding: "10px 16px", cursor: "pointer" }}>Save as draft</button>
             {benchmark?.market_avg_rate ? <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--text-tertiary)" }}>Benchmark: {formatCurrency(benchmark.market_avg_rate)} avg · {benchmark.recommendation || ""}</span> : null}

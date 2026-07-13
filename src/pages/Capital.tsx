@@ -209,7 +209,7 @@ export default function Capital() {
             letterSpacing: "0.06em",
             display: "inline-block",
           }}>
-          APPLY FOR CAPITAL →
+          Apply for capital →
         </a>
       </div>
 
@@ -323,19 +323,19 @@ export default function Capital() {
             color: "var(--text-tertiary)",
           }}>
           <div>
-            <div style={{ color: "var(--status-danger)", fontWeight: 600 }}>
+            <div style={{ color: "var(--status-danger)", fontWeight: 500 }}>
               OUTSTANDING
             </div>
             <div>{formatCurrency(outstanding)}</div>
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+            <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>
               LIMIT
             </div>
             <div>{formatCurrency(facilityLimit)}</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ color: "var(--status-success)", fontWeight: 600 }}>
+            <div style={{ color: "var(--status-success)", fontWeight: 500 }}>
               AVAILABLE
             </div>
             <div>{formatCurrency(available)}</div>
@@ -417,7 +417,7 @@ export default function Capital() {
                             cursor: "pointer",
                             whiteSpace: "nowrap",
                           }}>
-                          {riskPct}%{riskBand === "NEW" ? " · NEW" : ""}
+                          {riskPct}%{riskBand === "NEW" ? " · New" : ""}
                         </button>
                       )}
                     </td>
@@ -435,14 +435,14 @@ export default function Capital() {
                             background: "none",
                             color: "var(--status-danger)",
                             border: "1px solid var(--status-danger)",
-                            borderRadius: 2,
+                            borderRadius: 4,
                             fontFamily: "var(--font-mono)",
-                            fontWeight: 600,
+                            fontWeight: 500,
                             display: "inline-block",
                             whiteSpace: "nowrap",
                             opacity: 0.85,
                           }}>
-                          HIGH RISK
+                          High risk
                         </span>
                       ) : (
                         <a
@@ -470,7 +470,7 @@ export default function Capital() {
                             display: "inline-block",
                             whiteSpace: "nowrap",
                           }}>
-                          {appliedIds.has(String(inv.id)) ? "Applied ✓" : "APPLY"}
+                          {appliedIds.has(String(inv.id)) ? "Applied ✓" : "Apply"}
                         </a>
                       )}
                     </td>
@@ -501,7 +501,7 @@ export default function Capital() {
                 fontFamily: "var(--font-mono)",
                 userSelect: "none",
               }}>
-              {showIneligible ? "▲ HIDE" : "▼ SHOW REASONS"}
+              {showIneligible ? "▲ Hide" : "▼ Show reasons"}
             </span>
           </div>
           {showIneligible && (

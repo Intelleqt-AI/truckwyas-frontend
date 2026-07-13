@@ -53,7 +53,7 @@ export function ForgotPassword() {
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>📧</div>
               <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-                Check Your Email
+                Check your email
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 If an account exists for <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>,
@@ -62,7 +62,7 @@ export function ForgotPassword() {
             </div>
             <Link to="/login" style={{ textDecoration: 'none' }}>
               <button className="btn-action" style={{ width: '100%' }}>
-                BACK TO LOGIN
+                Back to login
               </button>
             </Link>
           </>
@@ -70,7 +70,7 @@ export function ForgotPassword() {
           <>
             <div style={{ marginBottom: 32 }}>
               <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-                Reset Password
+                Reset password
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
                 Enter your email and we'll send you a reset link
@@ -115,7 +115,7 @@ export function ForgotPassword() {
                 className="btn-action"
                 style={{ width: '100%', marginBottom: 16 }}
               >
-                {submitting ? 'SENDING...' : 'SEND RESET LINK'}
+                {submitting ? 'Sending...' : 'Send reset link'}
               </button>
             </form>
 

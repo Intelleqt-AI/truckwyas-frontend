@@ -116,6 +116,10 @@ const CARD_MENUS: Record<string, { label: string; route: string }[]> = {
   ],
 };
 
+// Sentence-case a raw status token for display: "IN_TRANSIT" → "In transit".
+const titleCase = (s?: string) =>
+  s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : "—";
+
 export default function Overview() {
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -518,7 +522,7 @@ export default function Overview() {
                     borderRadius: 1,
                   }}
                 />
-                Fuel Cost
+                Fuel cost
               </span>
             </div>
           </div>
@@ -716,7 +720,7 @@ export default function Overview() {
                 borderRadius: 2,
                 cursor: "pointer",
               }}>
-              VIEW ALL
+              View all
             </button>
           </div>
           {loading ? (
@@ -776,9 +780,11 @@ export default function Overview() {
                                 : "var(--text-tertiary)",
                           padding: "2px 6px",
                           background: "var(--bg-surface-hover)",
-                          borderRadius: 2,
+                          borderRadius: 4,
+                          display: "inline-block",
+                          whiteSpace: "nowrap",
                         }}>
-                        {quote.status}
+                        {titleCase(quote.status)}
                       </span>
                     </td>
                   </tr>
@@ -812,7 +818,7 @@ export default function Overview() {
                 borderRadius: 2,
                 cursor: "pointer",
               }}>
-              VIEW ALL
+              View all
             </button>
           </div>
           {loading ? (
@@ -871,9 +877,11 @@ export default function Overview() {
                                 : "var(--text-tertiary)",
                           padding: "2px 6px",
                           background: "var(--bg-surface-hover)",
-                          borderRadius: 2,
+                          borderRadius: 4,
+                          display: "inline-block",
+                          whiteSpace: "nowrap",
                         }}>
-                        {load.status?.replace("_", " ")}
+                        {titleCase(load.status)}
                       </span>
                     </td>
                   </tr>

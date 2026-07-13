@@ -35,6 +35,10 @@ const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',
 };
 
+// Sentence-case a status/token for display: "PARTIALLY_PAID" → "Partially paid".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
 export default function InvoiceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -201,8 +205,8 @@ export default function InvoiceDetail() {
     }
   };
 
-  if (isLoading) return <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>;
-  if (isError || !invoice) return <div style={{ padding: 40 }}><div style={{ color: 'var(--text-tertiary)' }}>Invoice not found.</div><button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/finance/invoices')}>← BACK</button></div>;
+  if (isLoading) return <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading...</div>;
+  if (isError || !invoice) return <div style={{ padding: 40 }}><div style={{ color: 'var(--text-tertiary)' }}>Invoice not found.</div><button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/finance/invoices')}>← Back</button></div>;
 
   return (
     <div>
@@ -212,22 +216,22 @@ export default function InvoiceDetail() {
           background: toast.isError ? 'var(--status-danger, #e53935)' : 'var(--accent-primary)',
           color: toast.isError ? '#fff' : 'black',
           padding: '12px 20px', borderRadius: 2, fontSize: 12,
-          fontFamily: 'var(--font-mono)', fontWeight: 600,
+          fontFamily: 'var(--font-mono)', fontWeight: 500,
           maxWidth: 360,
         }}>
           {toast.msg}
         </div>
       )}
       <div style={{ marginBottom: 24 }}>
-        <button onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← BACK TO INVOICES</button>
+        <button onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← Back to invoices</button>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Invoice</div>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{invoice.invoice_number}</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{invoice.customer_name}</div>
           </div>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: STATUS_COLOR[invoice.status] || 'var(--text-secondary)', padding: '6px 12px', border: `1px solid ${STATUS_COLOR[invoice.status] || 'var(--border-subtle)'}`, borderRadius: 2 }}>
-            {invoice.status}
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: STATUS_COLOR[invoice.status] || 'var(--text-secondary)', padding: '6px 12px', border: `1px solid ${STATUS_COLOR[invoice.status] || 'var(--border-subtle)'}`, borderRadius: 4, display: 'inline-block', whiteSpace: 'nowrap' }}>
+            {formatStatus(invoice.status)}
           </span>
         </div>
       </div>
@@ -266,7 +270,7 @@ export default function InvoiceDetail() {
             <tbody>
               {invoice.line_items.map((item: any, idx: number) => (
                 <tr key={idx}>
-                  <td>{item.description || item.item_description || '—'}</td>
+                  <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.description || item.item_description || ''}>{item.description || item.item_description || '—'}</td>
                   <td className="mono text-right">{item.quantity || 1}</td>
                   <td className="mono text-right">{formatCurrency(item.unit_price || item.price || 0)}</td>
                   <td className="mono text-right" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
@@ -348,7 +352,7 @@ export default function InvoiceDetail() {
           {[
             { label: 'Invoice Number', value: invoice.invoice_number },
             { label: 'Customer', value: invoice.customer_name },
-            { label: 'Status', value: invoice.status },
+            { label: 'Status', value: formatStatus(invoice.status) },
             { label: 'Amount', value: formatCurrency(parseFloat(invoice.total_amount || invoice.amount || '0')) },
             { label: 'Due Date', value: invoice.due_date?.slice(0, 10) || '—' },
             { label: 'Created', value: invoice.created_at?.slice(0, 10) || '—' },
@@ -371,19 +375,19 @@ export default function InvoiceDetail() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {(invoice.status === 'DRAFT' || invoice.status === 'SENT' || invoice.status === 'VIEWED') && (
               <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }} onClick={handleSendInvoice} disabled={sending}>
-                {sending ? 'SENDING...' : invoice.status === 'VIEWED' ? 'RESEND TO CUSTOMER' : 'SEND TO CUSTOMER'}
+                {sending ? 'Sending...' : invoice.status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
               </button>
             )}
             <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={handleDownloadPDF} disabled={downloading}>
-              {downloading ? 'DOWNLOADING...' : 'DOWNLOAD PDF'}
+              {downloading ? 'Downloading...' : 'Download PDF'}
             </button>
             {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE') && (
-              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={handleSendReminder} disabled={sendingReminder}>
-                {sendingReminder ? 'SENDING...' : 'SEND REMINDER'}
+              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={handleSendReminder} disabled={sendingReminder}>
+                {sendingReminder ? 'Sending...' : 'Send reminder'}
               </button>
             )}
             {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE' || invoice.status === 'PARTIALLY_PAID') && !showPaymentForm && (
-              <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>RECORD PAYMENT</button>
+              <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>Record payment</button>
             )}
             {capitalEntry && (
               <a
@@ -398,14 +402,14 @@ export default function InvoiceDetail() {
                   border: `1px solid ${appliedIds.has(String(id)) ? 'var(--status-success)' : 'var(--accent-primary)'}`,
                   color: appliedIds.has(String(id)) ? 'var(--status-success)' : 'var(--accent-primary)',
                   textDecoration: 'none', textAlign: 'center', display: 'block', boxSizing: 'border-box',
-                  fontFamily: 'var(--font-mono)', fontWeight: 600,
+                  fontFamily: 'var(--font-mono)', fontWeight: 500,
                 }}>
-                {appliedIds.has(String(id)) ? 'Applied ✓' : 'APPLY FOR CAPITAL →'}
+                {appliedIds.has(String(id)) ? 'Applied ✓' : 'Apply for capital →'}
               </a>
             )}
             {ineligibleEntry && (
               <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: 2, padding: '8px 10px', lineHeight: 1.4 }}>
-                <div style={{ color: 'var(--text-secondary)', marginBottom: 3, fontSize: 10, letterSpacing: '0.05em' }}>NOT ELIGIBLE FOR CAPITAL</div>
+                <div style={{ color: 'var(--text-secondary)', marginBottom: 3, fontSize: 10, letterSpacing: '0.05em' }}>Not eligible for capital</div>
                 {ineligibleEntry.reason}
               </div>
             )}
@@ -429,7 +433,7 @@ export default function InvoiceDetail() {
                     onClick={() => setPaymentAmount(String(invoice.balance))}
                     style={{ padding: '8px 10px', fontSize: 11, fontFamily: 'var(--font-mono)', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 2, color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}
                   >
-                    FULL
+                    Full
                   </button>
                 </div>
                 <DatePicker
@@ -463,14 +467,14 @@ export default function InvoiceDetail() {
                     className="btn-action"
                     style={{ flex: 1, padding: '10px', fontSize: 12, background: 'var(--accent-primary)', border: 'none', color: 'white' }}
                   >
-                    {recordingPayment ? 'RECORDING...' : 'SAVE'}
+                    {recordingPayment ? 'Recording...' : 'Save'}
                   </button>
                   <button
                     onClick={() => setShowPaymentForm(false)}
                     className="btn-action"
                     style={{ flex: 1, padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
                   >
-                    CANCEL
+                    Cancel
                   </button>
                 </div>
               </div>

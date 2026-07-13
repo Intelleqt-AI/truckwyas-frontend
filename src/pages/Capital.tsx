@@ -278,7 +278,7 @@ export default function Capital() {
             fontSize: 11,
             fontFamily: "var(--font-mono)",
           }}>
-          <span style={{ color: "var(--text-tertiary)" }}>FACILITY METER</span>
+          <span style={{ color: "var(--text-tertiary)" }}>Facility meter</span>
           <span
             style={{
               color:

@@ -257,7 +257,7 @@ export default function LoadsList() {
               padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono)',
               fontWeight: 600, letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer',
             }}
-          >AI QUOTE</button>
+          >AI quote</button>
           <button
             onClick={() => navigate('/bookings/quotes/new')}
             style={{
@@ -265,7 +265,7 @@ export default function LoadsList() {
               padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono)',
               fontWeight: 600, letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer',
             }}
-          >+ NEW QUOTE</button>
+          >+ New quote</button>
         </div>
       </div>
 

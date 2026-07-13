@@ -3964,7 +3964,7 @@ export default function NewQuote() {
                                             letterSpacing: "0.07em",
                                             marginBottom: 6,
                                           }}>
-                                          <span>TOLL BREAKDOWN</span>
+                                          <span>Toll breakdown</span>
                                           <span>
                                             {rd.toll_source === "geofence"
                                               ? "LIVE ROUTE MATCH"
@@ -4300,7 +4300,7 @@ export default function NewQuote() {
                   ))}
                   {revenueGuard.suggestions && revenueGuard.suggestions.length > 0 && (
                     <div style={{ marginTop: 4 }}>
-                      <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.06em", marginBottom: 6 }}>HOW TO FIX</div>
+                      <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.06em", marginBottom: 6 }}>How to fix</div>
                       {revenueGuard.suggestions.map((s, i) => {
                         // Fix backend bug: negative Rand increase values (e.g. "R-9789") are wrong.
                         // Recompute: cost = margin_floor, target at 10% = cost / 0.9

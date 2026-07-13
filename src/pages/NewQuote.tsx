@@ -1300,7 +1300,7 @@ export default function NewQuote() {
             }}>
             ← BACK
           </button>
-          {/* <div style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
+          {/* <div style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.1em", marginBottom: 4 }}>
             Quotes
           </div> */}
           <div
@@ -1422,7 +1422,7 @@ export default function NewQuote() {
                   <button
                     type="button"
                     onClick={() => { setNewCustomerForm({ name: "", email: "", phone: "", city: "" }); setShowNewCustomer(true); }}
-                    style={{ background: "none", border: "none", color: "var(--accent-primary)", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", cursor: "pointer", padding: 0, textTransform: "uppercase" }}>
+                    style={{ background: "none", border: "none", color: "var(--accent-primary)", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", cursor: "pointer", padding: 0, }}>
                     + New Customer
                   </button>
                 </div>
@@ -5748,7 +5748,6 @@ export default function NewQuote() {
                     color: "var(--text-tertiary)",
                     letterSpacing: "0.06em",
                     marginBottom: 6,
-                    textTransform: "uppercase",
                   }}>
                   {f.label}
                   <span

@@ -9,7 +9,7 @@ export function LiveBadge({ label = 'Live' }: { label?: string }) {
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
         fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em',
-        textTransform: 'uppercase', color: 'var(--status-success)',
+        color: 'var(--status-success)',
         padding: '3px 8px', borderRadius: 999,
         background: 'var(--status-success-bg, var(--bg-surface))',
         border: '1px solid var(--border-subtle)',

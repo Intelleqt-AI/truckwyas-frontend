@@ -35,8 +35,7 @@ const TEXT_FIELDS = [
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)',
   color: 'var(--text-tertiary)', letterSpacing: '0.06em',
-  marginBottom: 6, textTransform: 'uppercase',
-};
+  marginBottom: 6, };
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',

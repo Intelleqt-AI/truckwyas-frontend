@@ -325,7 +325,6 @@ export default function Insights() {
       fontFamily: 'var(--font-mono)',
       color: 'var(--text-tertiary)',
       letterSpacing: '0.08em',
-      textTransform: 'uppercase',
       marginBottom: 16,
     }}>
       {children}
@@ -336,7 +335,6 @@ export default function Insights() {
     <div style={{
       fontSize: 10,
       fontFamily: 'var(--font-mono)',
-      textTransform: 'uppercase',
       padding: '2px 8px',
       borderRadius: 2,
       background: 'var(--bg-surface-hover)',
@@ -356,7 +354,6 @@ export default function Insights() {
           fontFamily: 'var(--font-mono)',
           color: 'var(--text-tertiary)',
           letterSpacing: '0.1em',
-          textTransform: 'uppercase',
           marginBottom: 4
         }}>
           Intelligence
@@ -377,7 +374,6 @@ export default function Insights() {
               fontFamily: 'var(--font-mono)',
               fontSize: 10,
               letterSpacing: '0.05em',
-              textTransform: 'uppercase',
               padding: '6px 12px',
               cursor: 'pointer',
               borderRadius: 2,
@@ -421,7 +417,6 @@ export default function Insights() {
               fontSize: 13,
               letterSpacing: '0.05em',
               fontWeight: tab === t.id ? 600 : 400,
-              textTransform: 'uppercase',
               padding: '12px 0',
               marginRight: 24,
               cursor: 'pointer',
@@ -452,7 +447,7 @@ export default function Insights() {
                 }}>
                   <div style={{
                     fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
-                    textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 10,
+                    color: 'var(--text-tertiary)', marginBottom: 10,
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   }}>
                     <span>AI Executive Briefing</span>
@@ -485,7 +480,7 @@ export default function Insights() {
                         {kpiData.revenue_change_pct >= 0 ? '+' : ''}{kpiData.revenue_change_pct.toFixed(1)}%
                       </div>
                     )}
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       Revenue MTD
                     </div>
                   </div>
@@ -501,7 +496,7 @@ export default function Insights() {
                     }}>
                       {(kpiData?.net_margin_pct || 0).toFixed(1)}%
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       Net Margin
                     </div>
                   </div>
@@ -520,7 +515,7 @@ export default function Insights() {
                     <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 8 }}>
                       avg days to collect
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       DSO
                     </div>
                   </div>
@@ -539,7 +534,7 @@ export default function Insights() {
                     <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 8 }}>
                       of fleet active
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       Fleet Utilisation
                     </div>
                   </div>
@@ -555,7 +550,7 @@ export default function Insights() {
                     }}>
                       {formatCurrency(kpiData?.total_advance_amount || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       Cash Available
                     </div>
                   </div>
@@ -593,7 +588,6 @@ export default function Insights() {
                             <div style={{
                               fontSize: 10,
                               fontFamily: 'var(--font-mono)',
-                              textTransform: 'uppercase',
                               padding: '2px 8px',
                               borderRadius: 2,
                               background: 'var(--bg-surface-hover)',
@@ -768,7 +762,7 @@ export default function Insights() {
                     }}>
                       {formatCurrency(financeData?.revenue_period || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       Revenue Period
                     </div>
                   </div>
@@ -783,7 +777,7 @@ export default function Insights() {
                     }}>
                       {formatCurrency(financeData?.expenses_period || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       Total Costs
                     </div>
                   </div>
@@ -798,7 +792,7 @@ export default function Insights() {
                     }}>
                       {formatCurrency(financeData?.net_margin_period || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       Net Margin R
                     </div>
                   </div>
@@ -813,7 +807,7 @@ export default function Insights() {
                     }}>
                       {(financeData?.net_margin_percent_period || 0).toFixed(1)}%
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       Net Margin %
                     </div>
                   </div>
@@ -980,7 +974,6 @@ export default function Insights() {
                                   fontSize: 11,
                                   fontFamily: 'var(--font-mono)',
                                   color: 'var(--text-tertiary)',
-                                  textTransform: 'uppercase',
                                 }}>
                                   {new Date(m.month + '-01').toLocaleString('en-ZA', { month: 'short' }).toUpperCase()}
                                 </div>
@@ -1074,7 +1067,6 @@ export default function Insights() {
                               <div style={{
                                 minWidth: 120,
                                 fontSize: 12,
-                                textTransform: 'uppercase',
                                 fontFamily: 'var(--font-mono)',
                                 color: 'var(--text-secondary)',
                               }}>
@@ -1158,7 +1150,7 @@ export default function Insights() {
                     }}>
                       {formatCurrency(financeData?.cash_flow_forecast?.next_30_days || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>
                       Next 30 Days
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
@@ -1176,7 +1168,7 @@ export default function Insights() {
                     }}>
                       {formatCurrency(financeData?.cash_flow_forecast?.next_60_days || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>
                       Next 60 Days
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
@@ -1194,7 +1186,7 @@ export default function Insights() {
                     }}>
                       {formatCurrency(financeData?.cash_flow_forecast?.next_90_days || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>
                       Next 90 Days
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
@@ -1293,7 +1285,6 @@ export default function Insights() {
                               <div style={{
                                 fontSize: 10,
                                 fontFamily: 'var(--font-mono)',
-                                textTransform: 'uppercase',
                                 padding: '2px 8px',
                                 borderRadius: 2,
                                 background: riskColor,
@@ -1362,15 +1353,15 @@ export default function Insights() {
                         </ResponsiveContainer>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
                           <div>
-                            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>8-Week Net</div>
+                            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6 }}>8-Week Net</div>
                             <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600, color: runningBalance >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>{formatCurrency(runningBalance)}</div>
                           </div>
                           <div>
-                            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Positive Weeks</div>
+                            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6 }}>Positive Weeks</div>
                             <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--status-success)' }}>{data.filter(d => d.net >= 0).length} of {data.length}</div>
                           </div>
                           <div>
-                            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Peak Week</div>
+                            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6 }}>Peak Week</div>
                             <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent-primary)' }}>{formatCurrency(Math.max(...data.map(d => d.net)))}</div>
                           </div>
                         </div>
@@ -1400,7 +1391,7 @@ export default function Insights() {
                     }}>
                       {vehicles.filter(v => ['IN_USE', 'AVAILABLE'].includes(v.status.toUpperCase())).length}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       Active Vehicles
                     </div>
                   </div>
@@ -1415,7 +1406,7 @@ export default function Insights() {
                     }}>
                       {vehicles.length > 0 ? (vehicles.reduce((sum, v) => sum + (v.ai_health_score || 0), 0) / vehicles.length).toFixed(0) : 0}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       Avg Health Score
                     </div>
                   </div>
@@ -1430,7 +1421,7 @@ export default function Insights() {
                     }}>
                       {vehicles.filter(v => (v.ai_health_score || 100) < 60).length}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       Vehicles at Risk
                     </div>
                   </div>
@@ -1445,7 +1436,7 @@ export default function Insights() {
                     }}>
                       {vehicles.length > 0 ? formatCurrency(vehicles.reduce((sum, v) => sum + (v.cost_per_km || 0), 0) / vehicles.length) : formatCurrency(0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                       Avg Cost/km
                     </div>
                   </div>
@@ -1762,7 +1753,7 @@ export default function Insights() {
                         {/* Header row */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 80px 80px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>
                           {['Route', 'Trips', 'Revenue', 'Rev/km', 'Margin'].map(h => (
-                            <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+                            <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em' }}>{h}</div>
                           ))}
                         </div>
                         {routes.map((r, idx) => (
@@ -1808,7 +1799,7 @@ export default function Insights() {
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 60px 100px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>
                           {['Cargo Type', 'Avg/Trip', 'Trips', 'Total'].map(h => (
-                            <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
+                            <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em' }}>{h}</div>
                           ))}
                         </div>
                         {types.map((c, idx) => (
@@ -1842,7 +1833,7 @@ export default function Insights() {
                       { label: 'Completed', count: completed.length, rev: cRev, sub: 'revenue realised', color: 'var(--status-success)' },
                     ].map((item, idx) => (
                       <div key={idx} className="card" style={{ padding: 20 }}>
-                        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 12 }}>{item.label}</div>
+                        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 12 }}>{item.label}</div>
                         <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 600, color: item.color, marginBottom: 6 }}>{item.count}</div>
                         <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginBottom: 4 }}>{formatCurrency(item.rev)}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.sub}</div>
@@ -1870,7 +1861,7 @@ export default function Insights() {
                     const maxAvg = Math.max(...bins.map(b => b.avg), 1);
                     return bins.map((b, idx) => (
                       <div key={idx} className="card" style={{ padding: 20, borderLeft: b.avg === maxAvg && b.avg > 0 ? '3px solid var(--accent-primary)' : '3px solid transparent' }}>
-                        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 12 }}>{b.label}</div>
+                        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 12 }}>{b.label}</div>
                         <div style={{ fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 600, color: b.avg === maxAvg && b.avg > 0 ? 'var(--accent-primary)' : 'var(--text-primary)', marginBottom: 6 }}>{b.avg > 0 ? formatCurrency(b.avg) : '—'}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>avg/trip · {b.count} loads</div>
                       </div>

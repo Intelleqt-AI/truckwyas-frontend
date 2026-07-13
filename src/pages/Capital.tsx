@@ -93,7 +93,6 @@ export default function Capital() {
               fontFamily: "var(--font-mono)",
               color: "var(--text-tertiary)",
               letterSpacing: "0.1em",
-              textTransform: "uppercase",
               marginBottom: 4,
             }}>
             Capital
@@ -149,7 +148,6 @@ export default function Capital() {
             fontFamily: "var(--font-mono)",
             color: "var(--text-tertiary)",
             letterSpacing: "0.1em",
-            textTransform: "uppercase",
             marginBottom: 4,
           }}>
           Capital

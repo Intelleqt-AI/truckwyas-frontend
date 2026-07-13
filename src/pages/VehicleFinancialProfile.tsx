@@ -10,7 +10,7 @@ const VEHICLE_STATUSES = ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'OUT_OF_SERVICE'
 const ScoreBar = ({ label, value, max = 100, color = 'var(--accent-primary)' }: any) => (
   <div style={{ marginBottom: 14 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{label}</span>
+      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>{label}</span>
       <span style={{ fontSize: 13, color, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{value ?? '—'}</span>
     </div>
     <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
@@ -100,7 +100,7 @@ export default function VehicleFinancialProfile() {
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
     fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
     fontWeight: active ? 600 : 400,
-    textTransform: 'uppercase', padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
+    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
     transition: 'all 0.2s ease',
   });
 
@@ -115,7 +115,7 @@ export default function VehicleFinancialProfile() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>VEHICLE</div>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>VEHICLE</div>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
               {vehicle.plate}
             </div>
@@ -153,7 +153,6 @@ export default function VehicleFinancialProfile() {
                 border: `1px solid var(--border-subtle)`, borderRadius: 2,
                 cursor: 'pointer',
                 letterSpacing: '0.08em',
-                textTransform: 'uppercase',
                 transition: 'all 0.15s ease',
               }}
             >
@@ -184,7 +183,6 @@ export default function VehicleFinancialProfile() {
                     cursor: isCurrentStatus || updating ? 'default' : 'pointer',
                     opacity: updating && !isCurrentStatus ? 0.5 : 1,
                     letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
                     transition: 'all 0.15s ease',
                   }}
                 >
@@ -237,7 +235,7 @@ export default function VehicleFinancialProfile() {
                 { label: 'DRIVER', value: vehicle.driver_name || '—' },
               ].map(r => (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>{r.label}</span>
                   <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value ?? '—'}</span>
                 </div>
               ))}
@@ -253,7 +251,7 @@ export default function VehicleFinancialProfile() {
                   { label: 'FUEL CONSUMPTION', value: `${parseFloat(vehicle.fuel_consumption_per_km || '0').toFixed(2)} L/km` },
                 ].map(r => (
                   <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
+                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>{r.label}</span>
                     <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
                   </div>
                 ))}
@@ -270,7 +268,7 @@ export default function VehicleFinancialProfile() {
                   { label: 'REGISTRATION EXPIRY', value: vehicle.registration_expiry?.slice(0, 10) || '—' },
                 ].map(r => (
                   <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
+                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>{r.label}</span>
                     <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
                   </div>
                 ))}
@@ -324,7 +322,7 @@ export default function VehicleFinancialProfile() {
               <ScoreBar label="FUEL EFFICIENCY" value={vehicle.fuel_efficiency_score ?? 0} />
               <ScoreBar label="MAINTENANCE SCORE" value={vehicle.maintenance_score ?? 0} color="var(--status-success)" />
               <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>UPTIME</span>
+                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>UPTIME</span>
                 <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
                   {parseFloat(vehicle.uptime_percentage || '0').toFixed(1)}%
                 </span>
@@ -343,7 +341,7 @@ export default function VehicleFinancialProfile() {
                 { label: 'MILEAGE', value: vehicle.mileage ? `${parseFloat(vehicle.mileage).toLocaleString('en-ZA')} km` : '—' },
               ].map(r => (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>{r.label}</span>
                   <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
                 </div>
               ))}
@@ -361,7 +359,7 @@ export default function VehicleFinancialProfile() {
                 { label: 'VIN', value: vehicle.vin || '—', alert: false },
               ].map(r => (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>{r.label}</span>
                   <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: r.alert ? 'var(--status-danger)' : 'var(--text-primary)' }}>{r.value}</span>
                 </div>
               ))}
@@ -423,7 +421,7 @@ export default function VehicleFinancialProfile() {
               { key: 'last_service_mileage', label: 'Last Service Odometer (km)', placeholder: 'e.g. 145000', type: 'number' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, }}>{f.label}</label>
                 <input
                   type={f.type || 'text'}
                   placeholder={f.placeholder}
@@ -439,7 +437,7 @@ export default function VehicleFinancialProfile() {
               { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE', 'OUT_OF_SERVICE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, }}>{f.label}</label>
                 <Select
                   value={editForm[f.key] ?? ''}
                   onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}
@@ -454,7 +452,7 @@ export default function VehicleFinancialProfile() {
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Driver</label>
+              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, }}>Assigned Driver</label>
               <Select
                 value={String(editForm.driver ?? '')}
                 onValueChange={val => setEditForm((prev: any) => ({ ...prev, driver: val }))}
@@ -495,13 +493,13 @@ export default function VehicleFinancialProfile() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase' }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600, }}
               >
                 {saving ? 'SAVING...' : 'UPDATE VEHICLE'}
               </button>
               <button
                 onClick={() => setShowEditForm(false)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase' }}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', }}
               >
                 CANCEL
               </button>

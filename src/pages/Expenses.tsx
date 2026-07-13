@@ -217,7 +217,7 @@ export default function Expenses() {
       {/* Header */}
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Finance</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Finance</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Expenses</div>
           {categoryBreakdown.length > 0 && (
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -617,7 +617,7 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
     color: 'var(--text-primary)', padding: '8px 12px',
     fontFamily: 'var(--font-mono)', fontSize: 12, borderRadius: 2, width: '100%', boxSizing: 'border-box' as const,
   };
-  const labelStyle = { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' as const, display: 'block', marginBottom: 6 };
+  const labelStyle = { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', display: 'block', marginBottom: 6 };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

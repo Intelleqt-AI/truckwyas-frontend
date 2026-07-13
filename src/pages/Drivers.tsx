@@ -194,7 +194,7 @@ export default function Drivers() {
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
     fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
     fontWeight: active ? 600 : 400,
-    textTransform: 'uppercase', padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
+    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
     transition: 'all 0.2s ease',
   });
 
@@ -207,7 +207,7 @@ export default function Drivers() {
       {/* Page header */}
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Fleet</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
             <LiveBadge />
@@ -271,7 +271,6 @@ export default function Drivers() {
                   fontSize: 11,
                   borderRadius: 2,
                   cursor: 'pointer',
-                  textTransform: 'uppercase',
                   letterSpacing: '0.06em',
                   fontWeight: isActive ? 600 : 400,
                   transition: 'all 0.2s ease'
@@ -292,8 +291,7 @@ export default function Drivers() {
               {['Name', 'License', 'Status', 'Trips MTD', 'Revenue Generated', 'Performance', ''].map(h => (
                 <th key={h} style={{
                   padding: '12px 20px 12px 32px', textAlign: 'left',
-                  fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
-                  letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                  fontFamily: 'var(--font-mono)', fontSize: 10,                   letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                   borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
                 }}>{h}</th>
               ))}
@@ -352,7 +350,6 @@ export default function Drivers() {
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 10,
                       color: STATUS_COLOR[d.status] || 'var(--text-secondary)',
-                      textTransform: 'uppercase',
                     }}>
                       {d.status?.replace('_', ' ')}
                     </span>
@@ -460,7 +457,7 @@ export default function Drivers() {
               { key: 'emergency_contact', label: 'Emergency Contact', placeholder: 'e.g. Jane Doe or 082 123 4567' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, }}>{f.label}</label>
                 {f.type === 'date' ? (
                   <DatePicker
                     value={(addForm as any)[f.key]}
@@ -482,7 +479,7 @@ export default function Drivers() {
               { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, }}>{f.label}</label>
                 <Select value={(addForm as any)[f.key]} onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}>
                   <SelectTrigger>
                     <SelectValue />
@@ -494,7 +491,7 @@ export default function Drivers() {
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Vehicle</label>
+              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, }}>Assigned Vehicle</label>
               <Select value={addForm.vehicle} onValueChange={val => setAddForm(prev => ({ ...prev, vehicle: val }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="— No vehicle assigned —" />
@@ -592,7 +589,7 @@ export default function Drivers() {
               { key: 'emergency_contact', label: 'Emergency Contact', placeholder: 'e.g. Jane Doe or 082 123 4567' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, }}>{f.label}</label>
                 {f.type === 'date' ? (
                   <DatePicker
                     value={(editForm as any)[f.key] ?? ''}
@@ -614,7 +611,7 @@ export default function Drivers() {
               { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, }}>{f.label}</label>
                 <Select value={(editForm as any)[f.key]} onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}>
                   <SelectTrigger>
                     <SelectValue />
@@ -626,7 +623,7 @@ export default function Drivers() {
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Vehicle</label>
+              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, }}>Assigned Vehicle</label>
               <Select value={editForm.vehicle ?? ''} onValueChange={val => setEditForm((prev: any) => ({ ...prev, vehicle: val }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="— No vehicle assigned —" />

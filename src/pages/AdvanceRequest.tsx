@@ -82,7 +82,7 @@ export default function AdvanceRequest() {
     return (
       <div>
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Capital</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Request Advance</div>
         </div>
         <div className="card" style={{ padding: 40, textAlign: 'center' }}>
@@ -97,7 +97,7 @@ export default function AdvanceRequest() {
     return (
       <div>
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Capital</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Request Submitted</div>
         </div>
         <div className="card" style={{ padding: 40, textAlign: 'center' }}>
@@ -124,7 +124,7 @@ export default function AdvanceRequest() {
     <div>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Capital</div>
         <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Request Advance</div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Fast payment on eligible invoices — 3 steps.</div>
       </div>
@@ -143,7 +143,7 @@ export default function AdvanceRequest() {
             }}>
               {s}
             </div>
-            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: step >= s ? 'var(--text-primary)' : 'var(--text-tertiary)', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: step >= s ? 'var(--text-primary)' : 'var(--text-tertiary)', }}>
               {s === 1 ? 'Select' : s === 2 ? 'Review' : 'Confirm'}
             </span>
             {s < 3 && <div style={{ width: 40, height: 2, background: step > s ? 'var(--accent-primary)' : 'var(--border-subtle)' }} />}
@@ -199,8 +199,7 @@ export default function AdvanceRequest() {
                         <span style={{
                           fontFamily: 'var(--font-mono)', fontSize: 10,
                           color: TIER_COLOR[inv.risk_tier || inv.tier || 'standard'],
-                          background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase'
-                        }}>
+                          background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2,                         }}>
                           {inv.risk_tier || inv.tier || 'standard'}
                         </span>
                       </td>
@@ -259,7 +258,7 @@ export default function AdvanceRequest() {
               <span style={{
                 fontFamily: 'var(--font-mono)', fontSize: 11,
                 color: TIER_COLOR[tier],
-                background: 'var(--bg-surface-hover)', padding: '4px 8px', borderRadius: 2, textTransform: 'uppercase', fontWeight: 600
+                background: 'var(--bg-surface-hover)', padding: '4px 8px', borderRadius: 2, fontWeight: 600
               }}>
                 {tier}
               </span>

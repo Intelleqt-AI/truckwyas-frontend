@@ -226,7 +226,7 @@ export default function QuoteDetail() {
         >
           ← BACK TO QUOTES
         </button>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>
           Quote Detail
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -711,7 +711,6 @@ export default function QuoteDetail() {
                   fontSize: 11,
                   fontFamily: 'var(--font-mono)',
                   letterSpacing: '0.08em',
-                  textTransform: 'uppercase' as const,
                   cursor: 'pointer',
                   width: '100%',
                   marginTop: 8,

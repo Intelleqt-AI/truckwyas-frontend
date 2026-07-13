@@ -43,6 +43,10 @@ const TAB_SUBTITLES: Record<BookingTab, string> = {
   history: 'Completed & Archived',
 };
 
+// Display a status enum in clean sentence case (IN_TRANSIT -> "In transit").
+const prettyStatus = (s: string) =>
+  (s || '').replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase());
+
 export default function LoadsList() {
   const { data, isLoading: loading, isError, isFetching, refetch } = useQuery({
     queryKey: ["loads-list"],
@@ -114,12 +118,12 @@ export default function LoadsList() {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)' }}>
-            {['LOAD #', 'CUSTOMER', 'ROUTE', 'DRIVER', 'VEHICLE', 'STATUS', 'AMOUNT', 'ACTION'].map(h => (
+            {['Load', 'Customer', 'Route', 'Driver', 'Vehicle', 'Status', 'Amount', 'Action'].map(h => (
               <th key={h} style={{
                 padding: '12px 16px',
-                textAlign: h === 'AMOUNT' ? 'right' : h === 'ACTION' ? 'center' : 'left',
-                fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-                fontWeight: 600, letterSpacing: '0.1em'
+                textAlign: h === 'Amount' ? 'right' : h === 'Action' ? 'center' : 'left',
+                fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
+                fontWeight: 500, letterSpacing: '0.01em'
               }}>{h}</th>
             ))}
           </tr>
@@ -152,7 +156,7 @@ export default function LoadsList() {
                   border: `1px solid ${STATUS_COLOR[load.status] || 'var(--border-subtle)'}`,
                   borderRadius: 2,
                 }}>
-                  {load.status?.replace('_', ' ')}
+                  {prettyStatus(load.status)}
                 </span>
               </td>
               <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600 }}>
@@ -208,7 +212,7 @@ export default function LoadsList() {
   if (loading) {
     return (
       <div style={{ padding: 40 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 20 }}>Bookings</div>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 20 }}>Bookings</div>
         <div className="card" style={{ padding: 20 }}>
           <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
           <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
@@ -243,7 +247,7 @@ export default function LoadsList() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Bookings</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Bookings</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{TAB_SUBTITLES[activeTab]}</div>
             <LiveBadge />
@@ -290,7 +294,6 @@ export default function LoadsList() {
               cursor: 'pointer',
               transition: 'all 0.2s ease',
               fontFamily: 'var(--font-mono)',
-              textTransform: 'uppercase',
               letterSpacing: '0.05em',
             }}
             onMouseEnter={(e) => {
@@ -341,12 +344,11 @@ export default function LoadsList() {
                     border: '1px solid var(--border-subtle)',
                     color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
                     padding: '6px 12px', fontFamily: 'var(--font-mono)', fontSize: 11,
-                    borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase',
-                    letterSpacing: '0.06em', fontWeight: isActive ? 600 : 400,
+                    borderRadius: 2, cursor: 'pointer',                     letterSpacing: '0.06em', fontWeight: isActive ? 600 : 400,
                     transition: 'all 0.2s ease'
                   }}
                 >
-                  {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+                  {prettyStatus(status)}
                 </button>
               );
             })}
@@ -397,12 +399,11 @@ export default function LoadsList() {
                       border: '1px solid var(--border-subtle)',
                       color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
                       padding: '6px 12px', fontFamily: 'var(--font-mono)', fontSize: 11,
-                      borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase',
-                      letterSpacing: '0.06em', fontWeight: isActive ? 600 : 400,
+                      borderRadius: 2, cursor: 'pointer',                       letterSpacing: '0.06em', fontWeight: isActive ? 600 : 400,
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    {status === 'All' ? 'ALL' : status}
+                    {prettyStatus(status)}
                   </button>
                 );
               })}

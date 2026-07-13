@@ -60,8 +60,7 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
       {/* Header: operation badge + label */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-          letterSpacing: '0.08em', color: opColor, border: `1px solid ${opColor}`,
+          fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,           letterSpacing: '0.08em', color: opColor, border: `1px solid ${opColor}`,
           padding: '2px 7px', borderRadius: 8,
         }}>{proposal.operation}</span>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{proposal.label}</span>
@@ -85,8 +84,7 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
           border: '1px solid var(--border-subtle)',
         }}>
           <div style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
-            letterSpacing: '0.06em', color: 'var(--text-tertiary)', marginBottom: 4,
+            fontFamily: 'var(--font-mono)', fontSize: 10,             letterSpacing: '0.06em', color: 'var(--text-tertiary)', marginBottom: 4,
           }}>AI analysis</div>
           {proposal.analysis_summary}
         </div>
@@ -100,7 +98,7 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
               <tr key={i}>
                 <td style={{
                   fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)',
-                  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
+                  letterSpacing: '0.05em', whiteSpace: 'nowrap',
                   padding: '4px 14px 4px 0', verticalAlign: 'top',
                 }}>{f.label}</td>
                 <td style={{ fontSize: 13, color: 'var(--text-primary)', padding: '4px 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>

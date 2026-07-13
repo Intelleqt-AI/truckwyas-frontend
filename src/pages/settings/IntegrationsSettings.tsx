@@ -13,7 +13,6 @@ const cardStyle: React.CSSProperties = {
 const sectionTitleStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 11,
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
   color: 'var(--text-secondary)',
   fontWeight: 600,
@@ -326,7 +325,7 @@ export function IntegrationsSettings() {
           <span style={{
             fontFamily: 'var(--font-mono)', fontSize: 9, padding: '3px 8px',
             background: 'var(--bg-surface-hover)', color: 'var(--status-warning)',
-            borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
+            borderRadius: 2, letterSpacing: '0.08em',
           }}>
             In Development
           </span>

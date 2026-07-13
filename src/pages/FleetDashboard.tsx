@@ -22,7 +22,6 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   fontFamily: 'var(--font-mono)',
   fontSize: 11,
   letterSpacing: '0.08em',
-  textTransform: 'uppercase',
   padding: '12px 0',
   marginRight: 24,
   cursor: 'pointer',

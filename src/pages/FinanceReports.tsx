@@ -177,7 +177,7 @@ export default function FinanceReports() {
     <div>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Finance</div>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Finance</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Reports</div>
@@ -203,7 +203,6 @@ export default function FinanceReports() {
               fontFamily: 'var(--font-mono)',
               fontSize: 11,
               letterSpacing: '0.08em',
-              textTransform: 'uppercase',
               padding: '12px 0',
               marginRight: 24,
               cursor: 'pointer',

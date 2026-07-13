@@ -42,7 +42,6 @@ const labelStyle: React.CSSProperties = {
   color: "var(--text-tertiary)",
   letterSpacing: "0.06em",
   marginBottom: 6,
-  textTransform: "uppercase",
 };
 
 const PAYMENT_TERMS = [
@@ -150,7 +149,7 @@ export default function CustomerDetail() {
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>CUSTOMER</div>
+            <div style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.1em", marginBottom: 4 }}>CUSTOMER</div>
             <div style={{ fontSize: 22, fontWeight: 500, color: "var(--text-primary)" }}>{customer.name}</div>
             {customer.company_name && (
               <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4 }}>{customer.company_name}</div>
@@ -160,11 +159,11 @@ export default function CustomerDetail() {
             <button
               onClick={() => navigate(`/customers/${id}/risk`)}
               title="Open the AI risk profile for this customer"
-              style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--accent-primary)", background: "transparent", padding: "6px 12px", border: "1px solid var(--accent-primary)", borderRadius: 2, cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" }}
+              style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--accent-primary)", background: "transparent", padding: "6px 12px", border: "1px solid var(--accent-primary)", borderRadius: 2, cursor: "pointer", letterSpacing: "0.08em", }}
             >AI ANALYSIS</button>
             <button
               onClick={openEdit}
-              style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-secondary)", background: "transparent", padding: "6px 12px", border: "1px solid var(--border-subtle)", borderRadius: 2, cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" }}
+              style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-secondary)", background: "transparent", padding: "6px 12px", border: "1px solid var(--border-subtle)", borderRadius: 2, cursor: "pointer", letterSpacing: "0.08em", }}
             >EDIT</button>
             <button
               disabled={updating}
@@ -179,7 +178,6 @@ export default function CustomerDetail() {
                 cursor: updating ? "default" : "pointer",
                 opacity: updating ? 0.5 : 1,
                 letterSpacing: "0.08em",
-                textTransform: "uppercase",
                 transition: "all 0.15s ease",
               }}
             >{isActive ? "ACTIVE" : "INACTIVE"}</button>
@@ -223,7 +221,7 @@ export default function CustomerDetail() {
             { label: "BILLING ADDRESS", value: customer.billing_address || customer.address },
           ].map(r => (
             <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border-row)" }}>
-              <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", textTransform: "uppercase" }}>{r.label}</span>
+              <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", }}>{r.label}</span>
               <span style={{ fontSize: 13, color: "var(--text-primary)", maxWidth: 260, textAlign: "right" }}>{r.value || "—"}</span>
             </div>
           ))}
@@ -239,7 +237,7 @@ export default function CustomerDetail() {
             { label: "MEMBER SINCE", value: customer.created_at?.slice(0, 10) || "—", mono: true },
           ].map(r => (
             <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border-row)" }}>
-              <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", textTransform: "uppercase" }}>{r.label}</span>
+              <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", }}>{r.label}</span>
               <span style={{ fontSize: 13, color: "var(--text-primary)", fontFamily: r.mono ? "var(--font-mono)" : undefined }}>{r.value}</span>
             </div>
           ))}
@@ -258,8 +256,7 @@ export default function CustomerDetail() {
                 {["Quote #", "Route", "Amount", "Status", "Date"].map(h => (
                   <th key={h} style={{
                     padding: "8px 16px", textAlign: "left",
-                    fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase",
-                    letterSpacing: "0.08em", color: "var(--text-tertiary)",
+                    fontFamily: "var(--font-mono)", fontSize: 10,                     letterSpacing: "0.08em", color: "var(--text-tertiary)",
                     borderBottom: "1px solid var(--border-subtle)", fontWeight: 600,
                   }}>{h}</th>
                 ))}
@@ -285,8 +282,7 @@ export default function CustomerDetail() {
                   </td>
                   <td style={{ padding: "10px 16px" }}>
                     <span style={{
-                      fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase",
-                      color: QUOTE_STATUS_COLOR[q.status] || "var(--text-tertiary)",
+                      fontFamily: "var(--font-mono)", fontSize: 10,                       color: QUOTE_STATUS_COLOR[q.status] || "var(--text-tertiary)",
                     }}>{q.status?.replace("_", " ") || "—"}</span>
                   </td>
                   <td style={{ padding: "10px 16px", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-tertiary)" }}>

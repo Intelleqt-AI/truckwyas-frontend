@@ -28,7 +28,7 @@ function formatCurrencyLocal(n: number) {
 
 function Label({ children }: { children: string }) {
   return (
-    <div style={{ fontSize: 10, fontFamily: C.mono, color: C.faint, letterSpacing: '0.08em', marginBottom: 6, textTransform: 'uppercase' as const }}>
+    <div style={{ fontSize: 10, fontFamily: C.mono, color: C.faint, letterSpacing: '0.08em', marginBottom: 6, }}>
       {children}
     </div>
   );

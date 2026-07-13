@@ -9,7 +9,7 @@ const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] as const;
 const ScoreBar = ({ label, value, max = 100, color = 'var(--accent-primary)' }: any) => (
   <div style={{ marginBottom: 14 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{label}</span>
+      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>{label}</span>
       <span style={{ fontSize: 13, color, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{value ?? '—'}</span>
     </div>
     <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
@@ -91,7 +91,7 @@ export default function DriverProfile() {
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
     fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
     fontWeight: active ? 600 : 400,
-    textTransform: 'uppercase', padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
+    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
     transition: 'all 0.2s ease',
   });
 
@@ -106,7 +106,7 @@ export default function DriverProfile() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>DRIVER</div>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>DRIVER</div>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)' }}>{name}</div>
             {phone && (
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
@@ -139,7 +139,6 @@ export default function DriverProfile() {
                     cursor: isCurrentStatus || updating ? 'default' : 'pointer',
                     opacity: updating && !isCurrentStatus ? 0.5 : 1,
                     letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
                     transition: 'all 0.15s ease',
                   }}
                 >
@@ -203,7 +202,7 @@ export default function DriverProfile() {
             { label: 'VEHICLE', value: driver.assigned_vehicle },
           ].map(r => (
             <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
+              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>{r.label}</span>
               <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: r.label === 'LICENSE NUMBER' || r.label === 'ID NUMBER' || r.label === 'VEHICLE' ? 'var(--font-mono)' : 'var(--font-sans)', maxWidth: 260, textAlign: 'right' }}>
                 {r.value ?? '—'}
               </span>
@@ -224,7 +223,7 @@ export default function DriverProfile() {
             { label: 'LICENSE EXPIRY', value: driver.license_expiry?.slice(0, 10) || '—', alert: driver.license_expiry && new Date(driver.license_expiry) < new Date() },
           ].map(r => (
             <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
+              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>{r.label}</span>
               <span style={{ fontSize: 13, color: r.alert ? 'var(--status-danger)' : 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
                 {r.value}
               </span>
@@ -245,8 +244,7 @@ export default function DriverProfile() {
                 {['Load #', 'Route', 'Distance', 'Revenue', 'Status', 'Date'].map(h => (
                   <th key={h} style={{
                     padding: '8px 16px', textAlign: 'left',
-                    fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
-                    letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                    fontFamily: 'var(--font-mono)', fontSize: 10,                     letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                     borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
                   }}>{h}</th>
                 ))}
@@ -275,8 +273,7 @@ export default function DriverProfile() {
                   </td>
                   <td style={{ padding: '10px 16px' }}>
                     <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
-                      color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : load.status === 'IN_TRANSIT' ? 'var(--status-warning)' : 'var(--text-tertiary)',
+                      fontFamily: 'var(--font-mono)', fontSize: 10,                       color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : load.status === 'IN_TRANSIT' ? 'var(--status-warning)' : 'var(--text-tertiary)',
                     }}>{load.status?.replace('_', ' ')}</span>
                   </td>
                   <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
@@ -348,7 +345,7 @@ export default function DriverProfile() {
                 { label: 'ACCIDENTS', value: (driver.accident_history ?? 0).toString() },
               ].map(r => (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>{r.label}</span>
                   <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
                 </div>
               ))}
@@ -377,7 +374,7 @@ export default function DriverProfile() {
                   return (
                     <div key={key} style={{ marginBottom: 14 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{label}</span>
+                        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>{label}</span>
                         <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>R {val.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                       </div>
                       <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>

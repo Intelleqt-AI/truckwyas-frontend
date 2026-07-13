@@ -53,7 +53,6 @@ const labelStyle: React.CSSProperties = {
   color: "var(--text-tertiary)",
   letterSpacing: "0.06em",
   marginBottom: 6,
-  textTransform: "uppercase",
 };
 
 const EMPTY_FORM = {
@@ -188,7 +187,7 @@ export default function Customers() {
             style={{ ...fieldStyle, width: 280 }}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Sort</span>
+            <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.06em" }}>Sort</span>
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger>
                 <SelectValue />
@@ -209,8 +208,7 @@ export default function Customers() {
               {["Name", "Company", "Email", "Phone", "City", "Payment Terms", ""].map(h => (
                 <th key={h} style={{
                   padding: "12px 20px 12px 32px", textAlign: "left",
-                  fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase",
-                  letterSpacing: "0.08em", color: "var(--text-tertiary)",
+                  fontFamily: "var(--font-mono)", fontSize: 10,                   letterSpacing: "0.08em", color: "var(--text-tertiary)",
                   borderBottom: "1px solid var(--border-subtle)", fontWeight: 600,
                 }}>{h}</th>
               ))}

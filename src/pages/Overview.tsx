@@ -236,7 +236,6 @@ export default function Overview() {
                     fontFamily: "var(--font-mono)",
                     color: "var(--text-tertiary)",
                     letterSpacing: "0.08em",
-                    textTransform: "uppercase",
                   }}>
                   {formatDate(currentTime)}
                 </div>
@@ -300,7 +299,6 @@ export default function Overview() {
                       fontSize: 9,
                       fontFamily: "var(--font-mono)",
                       color: "var(--text-tertiary)",
-                      textTransform: "uppercase",
                       letterSpacing: "0.08em",
                       marginBottom: 2,
                     }}>

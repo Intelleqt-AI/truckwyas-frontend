@@ -28,7 +28,7 @@ function formatCurrencyLocal(n: number) {
 
 function Label({ children }: { children: string }) {
   return (
-    <div style={{ fontSize: 10, fontFamily: C.mono, color: C.faint, letterSpacing: '0.08em', marginBottom: 6, textTransform: 'uppercase' as const }}>
+    <div style={{ fontSize: 10, fontFamily: C.mono, color: C.faint, letterSpacing: '0.08em', marginBottom: 6, }}>
       {children}
     </div>
   );
@@ -181,7 +181,7 @@ export default function ClientQuoteView() {
 
         {/* Quote number + status banner */}
         <Card style={{ textAlign: 'center', borderTop: `4px solid ${C.accent}` }}>
-          <div style={{ fontSize: 11, fontFamily: C.mono, color: C.faint, letterSpacing: '0.1em', marginBottom: 8 }}>QUOTE</div>
+          <div style={{ fontSize: 11, fontFamily: C.mono, color: C.faint, letterSpacing: '0.1em', marginBottom: 8 }}>Quote</div>
           <div style={{ fontSize: 26, fontWeight: 700, color: C.text, fontFamily: C.mono, marginBottom: 12 }}>
             {quote.quote_number}
           </div>

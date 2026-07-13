@@ -93,7 +93,6 @@ export default function Capital() {
               fontFamily: "var(--font-mono)",
               color: "var(--text-tertiary)",
               letterSpacing: "0.1em",
-              textTransform: "uppercase",
               marginBottom: 4,
             }}>
             Capital
@@ -149,7 +148,6 @@ export default function Capital() {
             fontFamily: "var(--font-mono)",
             color: "var(--text-tertiary)",
             letterSpacing: "0.1em",
-            textTransform: "uppercase",
             marginBottom: 4,
           }}>
           Capital
@@ -278,7 +276,7 @@ export default function Capital() {
             fontSize: 11,
             fontFamily: "var(--font-mono)",
           }}>
-          <span style={{ color: "var(--text-tertiary)" }}>FACILITY METER</span>
+          <span style={{ color: "var(--text-tertiary)" }}>Facility meter</span>
           <span
             style={{
               color:

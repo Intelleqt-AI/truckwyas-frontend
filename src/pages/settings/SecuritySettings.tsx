@@ -18,7 +18,6 @@ const sectionHeaderStyle: React.CSSProperties = {
 const sectionTitleStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 11,
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
   color: 'var(--text-secondary)',
   fontWeight: 600,
@@ -28,7 +27,6 @@ const labelStyle: React.CSSProperties = {
   display: 'block',
   fontFamily: 'var(--font-mono)',
   fontSize: 10,
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
   color: 'var(--text-tertiary)',
   marginBottom: 6,
@@ -69,7 +67,7 @@ function ToggleRow({ label, description, checked, onChange, badge, badgeColor }:
               fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 6px',
               borderRadius: 2, background: badgeColor || 'var(--status-success-bg)',
               color: badgeColor ? 'var(--bg-deep)' : 'var(--accent-primary)',
-              textTransform: 'uppercase', letterSpacing: '0.08em',
+              letterSpacing: '0.08em',
             }}>{badge}</span>
           )}
         </div>
@@ -254,8 +252,7 @@ export function SecuritySettings() {
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 6px',
                       borderRadius: 2, background: 'var(--status-success-bg)',
-                      color: 'var(--accent-primary)', textTransform: 'uppercase',
-                    }}>Current</span>
+                      color: 'var(--accent-primary)',                     }}>Current</span>
                   )}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{s.location} · {formatRelativeTime(s.time)}</div>

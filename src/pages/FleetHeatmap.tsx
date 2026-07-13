@@ -107,7 +107,7 @@ export default function FleetHeatmap() {
     <div>
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>FLEET INTELLIGENCE</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Fleet intelligence</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Utilisation Heatmap</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Live fleet activity and route performance</div>
         </div>
@@ -132,7 +132,7 @@ export default function FleetHeatmap() {
 
       {/* Utilisation gauge */}
       <div className="card" style={{ padding: 20, marginBottom: 20 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>FLEET UTILISATION RATE</div>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>Fleet utilisation rate</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ flex: 1, height: 12, background: 'var(--border-subtle)', borderRadius: 6 }}>
             <div style={{ height: 12, width: `${utilRate}%`, background: utilRate >= 70 ? 'var(--status-success)' : utilRate >= 40 ? 'var(--accent-primary)' : 'var(--status-warning)', borderRadius: 6, transition: 'width 0.6s ease' }} />
@@ -190,7 +190,7 @@ export default function FleetHeatmap() {
 
         {/* Top routes */}
         <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>TOP ROUTES BY VOLUME</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>Top routes by volume</div>
           {topRoutes.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--text-tertiary)', textAlign: 'center', padding: '20px 0' }}>No route data yet</div>
           ) : topRoutes.map(([route, data]) => (

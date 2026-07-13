@@ -36,8 +36,7 @@ const sectionHeader: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
 };
 const sectionTitle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase',
-  letterSpacing: '0.08em', color: 'var(--text-secondary)', fontWeight: 600,
+  fontFamily: 'var(--font-mono)', fontSize: 11,   letterSpacing: '0.08em', color: 'var(--text-secondary)', fontWeight: 600,
 };
 const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 12 };
 const inputStyle: React.CSSProperties = {
@@ -47,7 +46,7 @@ const inputStyle: React.CSSProperties = {
 };
 const labelStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)',
-  marginBottom: 5, textTransform: 'uppercase' as const, display: 'block',
+  marginBottom: 5, display: 'block',
 };
 
 const SAMPLE = {
@@ -261,7 +260,7 @@ export function DeveloperApi() {
         <div style={sectionHeader}><span style={sectionTitle}>Endpoint</span></div>
         <div style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <span style={{ ...mono, fontWeight: 700, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 2 }}>POST</span>
+            <span style={{ ...mono, fontWeight: 700, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 2 }}>Post</span>
             <span style={{ ...mono, color: 'var(--text-primary)' }}>/api/v1/risk/underwrite/</span>
           </div>
           <div style={{ ...mono, color: 'var(--text-tertiary)', marginBottom: 4 }}>
@@ -287,7 +286,7 @@ export function DeveloperApi() {
             <thead>
               <tr style={{ background: 'var(--bg-deep)' }}>
                 {['Object', 'Field', 'Type', 'Required', 'Description'].map(h => (
-                  <th key={h} style={{ position: 'sticky', top: 0, zIndex: 1, padding: '8px 14px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid var(--border-subtle)', whiteSpace: 'nowrap', background: 'var(--bg-deep)' }}>{h}</th>
+                  <th key={h} style={{ position: 'sticky', top: 0, zIndex: 1, padding: '8px 14px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', letterSpacing: '0.07em', borderBottom: '1px solid var(--border-subtle)', whiteSpace: 'nowrap', background: 'var(--bg-deep)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -417,8 +416,8 @@ export function DeveloperApi() {
                     <button onClick={() => toggleLogs(k)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>
                       {logsOpen ? 'HIDE LOGS' : 'LOGS'}
                     </button>
-                    <button onClick={() => openEdit(k)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>EDIT</button>
-                    <button onClick={() => setRevokeTarget(k)} style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>REVOKE</button>
+                    <button onClick={() => openEdit(k)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>Edit</button>
+                    <button onClick={() => setRevokeTarget(k)} style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>Revoke</button>
                   </div>
                 </div>
               </div>
@@ -426,7 +425,7 @@ export function DeveloperApi() {
               {/* Call history panel */}
               {logsOpen && (
                 <div style={{ background: 'var(--bg-deep)', borderTop: '1px solid var(--border-subtle)', padding: '10px 20px 14px' }}>
-                  <div style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Call History (last 100)</div>
+                  <div style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 8, letterSpacing: '0.08em' }}>Call History (last 100)</div>
                   {logsLoading[k.id] ? (
                     <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Loading…</div>
                   ) : !logs[k.id] || logs[k.id].length === 0 ? (
@@ -436,7 +435,7 @@ export function DeveloperApi() {
                       <thead>
                         <tr>
                           {['Time', 'Invoice Amt', 'Tier', 'Score', 'Eligible', 'IP'].map(h => (
-                            <th key={h} style={{ padding: '4px 10px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
+                            <th key={h} style={{ padding: '4px 10px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-tertiary)', letterSpacing: '0.07em', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -493,12 +492,12 @@ export function DeveloperApi() {
         </div>
         <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div>
-            <div style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6, textTransform: 'uppercase' }}>Request body</div>
+            <div style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6, }}>Request body</div>
             <textarea value={body} onChange={e => setBody(e.target.value)} spellCheck={false}
               style={{ ...inputStyle, ...mono, height: 300, resize: 'vertical', lineHeight: 1.5, whiteSpace: 'pre' }} />
           </div>
           <div>
-            <div style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6, textTransform: 'uppercase' }}>Response</div>
+            <div style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6, }}>Response</div>
             {tryErr ? (
               <div style={{ ...mono, color: 'var(--status-danger)', fontSize: 12 }}>{tryErr}</div>
             ) : result ? (
@@ -567,7 +566,7 @@ export function DeveloperApi() {
               <button className="btn-action" style={{ flex: 1 }} onClick={handleEditSave} disabled={editSaving || !editForm.name.trim()}>
                 {editSaving ? 'SAVING…' : 'SAVE CHANGES'}
               </button>
-              <button onClick={() => setEditKey(null)} style={{ flex: 1, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer' }}>CANCEL</button>
+              <button onClick={() => setEditKey(null)} style={{ flex: 1, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -590,7 +589,7 @@ export function DeveloperApi() {
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 3 }}>{label}</div>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: color || 'var(--text-primary)' }}>{value}</div>
     </div>
   );

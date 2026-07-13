@@ -54,7 +54,7 @@ const components = {
     </div>
   ),
   th: ({ children }: any) => (
-    <th style={{ ...cellStyle, fontFamily: 'var(--font-mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)', background: 'var(--bg-base)', fontWeight: 600 }}>
+    <th style={{ ...cellStyle, fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.05em', color: 'var(--text-tertiary)', background: 'var(--bg-base)', fontWeight: 600 }}>
       {children}
     </th>
   ),

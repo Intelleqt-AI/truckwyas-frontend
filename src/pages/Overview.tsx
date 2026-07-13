@@ -236,7 +236,6 @@ export default function Overview() {
                     fontFamily: "var(--font-mono)",
                     color: "var(--text-tertiary)",
                     letterSpacing: "0.08em",
-                    textTransform: "uppercase",
                   }}>
                   {formatDate(currentTime)}
                 </div>
@@ -300,7 +299,6 @@ export default function Overview() {
                       fontSize: 9,
                       fontFamily: "var(--font-mono)",
                       color: "var(--text-tertiary)",
-                      textTransform: "uppercase",
                       letterSpacing: "0.08em",
                       marginBottom: 2,
                     }}>
@@ -1035,7 +1033,7 @@ export default function Overview() {
           {loading ? (
             <div className="feed-item">
               <div className="feed-meta">
-                <span>LOADING</span>
+                <span>Loading</span>
                 <span>...</span>
               </div>
               <div className="feed-content">Loading insights...</div>
@@ -1103,7 +1101,7 @@ export default function Overview() {
               </div>
               <div className="feed-item">
                 <div className="feed-meta">
-                  <span>INVOICE COLLECTOR</span>
+                  <span>Invoice collector</span>
                   <span>2m AGO</span>
                 </div>
                 <div className="feed-content">
@@ -1115,7 +1113,7 @@ export default function Overview() {
               </div>
               <div className="feed-item">
                 <div className="feed-meta">
-                  <span>QUOTE GENERATOR</span>
+                  <span>Quote generator</span>
                   <span>14m AGO</span>
                 </div>
                 <div className="feed-content">
@@ -1126,7 +1124,7 @@ export default function Overview() {
               </div>
               <div className="feed-item">
                 <div className="feed-meta">
-                  <span>FLEET MONITOR</span>
+                  <span>Fleet monitor</span>
                   <span>1h AGO</span>
                 </div>
                 <div className="feed-content">

@@ -19,7 +19,6 @@ const sectionHeaderStyle: React.CSSProperties = {
 const sectionTitleStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 11,
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
   color: 'var(--text-secondary)',
   fontWeight: 600,
@@ -229,14 +228,14 @@ export function BillingSettings() {
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 7px',
                       background: 'var(--status-success-bg)', color: 'var(--accent-primary)',
-                      borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
+                      borderRadius: 2, letterSpacing: '0.08em',
                     }}>Active</span>
                   )}
                   {subStatus === 'cancelled' && (
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 7px',
                       background: 'var(--status-danger-bg)', color: 'var(--status-danger)',
-                      borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
+                      borderRadius: 2, letterSpacing: '0.08em',
                     }}>Cancelled</span>
                   )}
                 </div>
@@ -304,8 +303,7 @@ export function BillingSettings() {
                   {['Payment ID', 'Plan', 'Date', 'Amount', 'Status'].map(h => (
                     <th key={h} style={{
                       padding: '10px 20px', textAlign: 'left' as const,
-                      fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                      letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                      fontFamily: 'var(--font-mono)', fontSize: 10,                       letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                       borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
                     }}>{h}</th>
                   ))}
@@ -330,7 +328,6 @@ export function BillingSettings() {
                       <span style={{
                         fontFamily: 'var(--font-mono)', fontSize: 10,
                         color: tx.status === 'complete' ? 'var(--accent-primary)' : tx.status === 'pending' ? 'var(--status-warning)' : 'var(--status-danger)',
-                        textTransform: 'uppercase' as const,
                       }}>{tx.status}</span>
                     </td>
                   </tr>

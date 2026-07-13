@@ -213,6 +213,40 @@
   --font-mono: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ---- Design system tokens (single source of truth) ----
+     Type scale — six steps. Everything maps to one of these; no one-off sizes.
+     Capitalisation rule: UPPERCASE only at --text-micro (the .ui-label). Nothing
+     --text-small (13px) or larger is ever uppercase. */
+  --text-display: 28px;   /* page titles */
+  --text-title: 20px;     /* section / group titles */
+  --text-subhead: 16px;   /* card headers */
+  --text-body: 14px;      /* default body text */
+  --text-small: 13px;     /* table cells, secondary text */
+  --text-micro: 11px;     /* the only uppercase — eyebrows, table headers, stat labels */
+
+  /* Weight — three stops. Body is regular; 600 is for real headings only. */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Spacing — 4px grid. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+}
+
+/* The ONE uppercase role: micro eyebrow / label / table header / stat-card label. */
+.ui-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
 }
 
 /* ===========================
@@ -466,11 +500,10 @@ body {
 
 .card-title {
   font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 12px;
+  letter-spacing: 0.01em;
   color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: var(--weight-medium);
 }
 
 .card-action {
@@ -589,10 +622,10 @@ body {
 .data-table th {
   text-align: left;
   font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  color: var(--text-tertiary);
+  font-weight: var(--weight-medium);
   padding: 0 16px 12px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -665,11 +698,10 @@ body {
   padding: 20px;
   border-bottom: 1px solid var(--border-subtle);
   font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 12px;
+  letter-spacing: 0.01em;
   color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: var(--weight-medium);
   display: flex;
   align-items: center;
   gap: 8px;

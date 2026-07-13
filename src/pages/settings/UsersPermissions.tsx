@@ -22,7 +22,6 @@ const sectionHeaderStyle: React.CSSProperties = {
 const sectionTitleStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 11,
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
   color: 'var(--text-secondary)',
   fontWeight: 600,
@@ -230,8 +229,7 @@ export function UsersPermissions() {
           }}>
             <div style={{ flex: 1 }}>
               <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: 6,
+                fontFamily: 'var(--font-mono)', fontSize: 10,                 letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: 6,
               }}>Email</div>
               <input
                 style={{
@@ -246,8 +244,7 @@ export function UsersPermissions() {
             </div>
             <div>
               <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: 6,
+                fontFamily: 'var(--font-mono)', fontSize: 10,                 letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: 6,
               }}>Role</div>
               <Select value={inviteRole} onValueChange={setInviteRole}>
                 <SelectTrigger>
@@ -283,8 +280,7 @@ export function UsersPermissions() {
                 {['User', 'Role', 'Status', 'Last Active', ''].map(h => (
                   <th key={h} style={{
                     padding: '10px 20px', textAlign: 'left' as const,
-                    fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                    fontFamily: 'var(--font-mono)', fontSize: 10,                     letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                     borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
                   }}>{h}</th>
                 ))}
@@ -318,12 +314,12 @@ export function UsersPermissions() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="admin">ADMIN</SelectItem>
-                        <SelectItem value="manager">MANAGER</SelectItem>
-                        <SelectItem value="operator">OPERATOR</SelectItem>
-                        <SelectItem value="dispatcher">DISPATCHER</SelectItem>
-                        <SelectItem value="viewer">VIEWER</SelectItem>
-                        <SelectItem value="driver">DRIVER</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="operator">Operator</SelectItem>
+                        <SelectItem value="dispatcher">Dispatcher</SelectItem>
+                        <SelectItem value="viewer">Viewer</SelectItem>
+                        <SelectItem value="driver">Driver</SelectItem>
                       </SelectContent>
                     </Select>
                   ) : (
@@ -331,7 +327,7 @@ export function UsersPermissions() {
                       fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 7px',
                       border: `1px solid ${roleColor(u.role)}`,
                       color: roleColor(u.role), borderRadius: 2,
-                      textTransform: 'uppercase' as const, letterSpacing: '0.06em',
+                      letterSpacing: '0.06em',
                     }}>{u.role}</span>
                   )}
                 </td>
@@ -339,7 +335,6 @@ export function UsersPermissions() {
                   <span style={{
                     fontFamily: 'var(--font-mono)', fontSize: 10,
                     color: u.status?.toLowerCase() === 'active' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                    textTransform: 'uppercase' as const,
                   }}>{u.status}</span>
                 </td>
                 <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-tertiary)' }}>
@@ -354,7 +349,7 @@ export function UsersPermissions() {
                         color: 'var(--status-danger)', padding: '4px 10px',
                         fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
                       }}
-                    >REMOVE</button>
+                    >Remove</button>
                   )}
                 </td>
               </tr>
@@ -376,8 +371,7 @@ export function UsersPermissions() {
                 {['Email', 'Role', 'Invited', 'Expires', ''].map(h => (
                   <th key={h} style={{
                     padding: '10px 20px', textAlign: 'left' as const,
-                    fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                    fontFamily: 'var(--font-mono)', fontSize: 10,                     letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                     borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
                   }}>{h}</th>
                 ))}
@@ -392,7 +386,7 @@ export function UsersPermissions() {
                       fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 7px',
                       border: `1px solid ${roleColor(inv.role)}`,
                       color: roleColor(inv.role), borderRadius: 2,
-                      textTransform: 'uppercase' as const, letterSpacing: '0.06em',
+                      letterSpacing: '0.06em',
                     }}>{inv.role}</span>
                   </td>
                   <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-tertiary)' }}>
@@ -410,7 +404,7 @@ export function UsersPermissions() {
                           color: 'var(--text-tertiary)', padding: '4px 10px',
                           fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
                         }}
-                      >RESEND</button>
+                      >Resend</button>
                       {isAdmin && (
                         <button
                           onClick={() => handleRevokeInvite(inv.token)}
@@ -419,7 +413,7 @@ export function UsersPermissions() {
                             color: 'var(--status-danger)', padding: '4px 10px',
                             fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
                           }}
-                        >REVOKE</button>
+                        >Revoke</button>
                       )}
                     </div>
                   </td>
@@ -451,7 +445,7 @@ export function UsersPermissions() {
               <span style={{
                 fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 8px',
                 border: `1px solid ${r.color}`, color: r.color,
-                borderRadius: 2, textTransform: 'uppercase' as const, width: 80, textAlign: 'center' as const,
+                borderRadius: 2, width: 80, textAlign: 'center' as const,
               }}>{r.role}</span>
               <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.desc}</span>
             </div>
@@ -484,12 +478,12 @@ export function UsersPermissions() {
                 background: 'none', border: '1px solid var(--border-subtle)',
                 color: 'var(--text-secondary)', padding: '7px 14px',
                 fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-              }}>CANCEL</button>
+              }}>Cancel</button>
               <button onClick={() => handleDeleteUser(deleteConfirm)} style={{
                 background: 'var(--status-danger)', border: 'none',
                 color: 'white', padding: '7px 14px',
                 fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-              }}>REMOVE</button>
+              }}>Remove</button>
             </div>
           </div>
         </div>

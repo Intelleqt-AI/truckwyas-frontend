@@ -51,7 +51,7 @@ export default function AdvanceDetail() {
     return (
       <div>
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Capital</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Advance Detail</div>
         </div>
         <div className="card" style={{ padding: 40, textAlign: 'center' }}>
@@ -65,7 +65,7 @@ export default function AdvanceDetail() {
     return (
       <div>
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Capital</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Advance Detail</div>
         </div>
         <div className="card" style={{ padding: 40, textAlign: 'center' }}>
@@ -122,7 +122,7 @@ export default function AdvanceDetail() {
         >
           ← Back to Capital
         </button>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital / Advance</div>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Capital / Advance</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Advance #{advance.id}</div>
           <span style={{
@@ -132,7 +132,6 @@ export default function AdvanceDetail() {
             background: 'var(--bg-surface-hover)',
             padding: '4px 10px',
             borderRadius: 2,
-            textTransform: 'uppercase',
             fontWeight: 600
           }}>
             {status}
@@ -175,23 +174,23 @@ export default function AdvanceDetail() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
-                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Invoice Number</div>
+                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, }}>Invoice Number</div>
                 <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 500 }}>{invoiceNumber}</div>
               </div>
               <div>
-                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Customer</div>
+                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, }}>Customer</div>
                 <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>{customerName}</div>
               </div>
               {repaymentDate && (
                 <>
                   <div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Repayment Due</div>
+                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, }}>Repayment Due</div>
                     <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{new Date(repaymentDate).toLocaleDateString()}</div>
                   </div>
                 </>
               )}
               <div>
-                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Invoice Link</div>
+                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, }}>Invoice Link</div>
                 <button
                   style={{ fontSize: 12, color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'var(--font-mono)' }}
                   onClick={() => navigate(`/finance/invoices/${advance.invoice || advance.invoice_id}`)}
@@ -245,14 +244,14 @@ export default function AdvanceDetail() {
         {/* Right column - Key metrics */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="card" style={{ padding: 20, background: 'var(--bg-surface-hover)' }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>Net Payout</div>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, }}>Net Payout</div>
             <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-primary)' }}>{formatCurrency(netAmount)}</div>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>Advanced to your account</div>
           </div>
 
           {/* Fee Breakdown */}
           <div className="card" style={{ padding: 20 }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Fee Breakdown</div>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, }}>Fee Breakdown</div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 12 }}>
               This is TruckWys's invoice factoring fee — the cost of receiving cash upfront before your customer pays.
             </div>
@@ -272,7 +271,7 @@ export default function AdvanceDetail() {
           {/* Risk Assessment */}
           {tierMeta && (
             <div className="card" style={{ padding: 20, borderLeft: `3px solid ${tierMeta.color}` }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 12, textTransform: 'uppercase' }}>Risk Assessment</div>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 12, }}>Risk Assessment</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: tierMeta.color }}>{tierMeta.label}</span>
                 {riskScore !== null && (
@@ -289,7 +288,7 @@ export default function AdvanceDetail() {
               {Object.keys(factorsBreakdown).length > 0 && (
                 <>
                   <div style={{ height: 1, background: 'var(--border-subtle)', marginBottom: 10 }} />
-                  <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>Score Factors</div>
+                  <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, }}>Score Factors</div>
                   <div style={{ display: 'grid', gap: 6 }}>
                     {Object.entries(factorsBreakdown)
                       .filter(([, val]) => typeof val === 'number' && !isNaN(val))
@@ -309,7 +308,7 @@ export default function AdvanceDetail() {
 
           {disbursedAt && (
             <div className="card" style={{ padding: 20, background: 'var(--bg-surface-hover)', borderLeft: '4px solid var(--status-success)' }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>Disbursed</div>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, }}>Disbursed</div>
               <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
                 {new Date(disbursedAt).toLocaleDateString()}
               </div>
@@ -319,7 +318,7 @@ export default function AdvanceDetail() {
 
           {repaymentDate && !settledAt && (
             <div className="card" style={{ padding: 20, background: 'var(--bg-surface-hover)', borderLeft: '4px solid var(--status-warning)' }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>Repayment Due</div>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, }}>Repayment Due</div>
               <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
                 {new Date(repaymentDate).toLocaleDateString()}
               </div>
@@ -329,7 +328,7 @@ export default function AdvanceDetail() {
 
           {settledAt && (
             <div className="card" style={{ padding: 20, background: 'var(--bg-surface-hover)', borderLeft: '4px solid var(--text-tertiary)' }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>Settled</div>
+              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, }}>Settled</div>
               <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
                 {new Date(settledAt).toLocaleDateString()}
               </div>

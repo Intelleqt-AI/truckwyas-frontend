@@ -141,7 +141,7 @@ export default function Bookings() {
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <button onClick={() => navigate('/bookings')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← BACK TO LOADS</button>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Load Detail</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Load Detail</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{load.load_number}</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{load.customer_name}</div>
         </div>
@@ -218,7 +218,7 @@ export default function Bookings() {
           <div className="card-title" style={{ marginBottom: 16 }}>Route</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
-              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>PICKUP</div>
+              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Pickup</div>
               <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{load.pickup_location}</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{load.pickup_city}, {load.pickup_state}</div>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>{fmt(load.pickup_date)}</div>
@@ -227,7 +227,7 @@ export default function Bookings() {
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{load.cargo_description}</div>
             </div>
             <div>
-              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>DELIVERY</div>
+              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Delivery</div>
               <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{load.delivery_location}</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{load.delivery_city}, {load.delivery_state}</div>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>{fmt(load.delivery_date)}</div>
@@ -274,7 +274,7 @@ export default function Bookings() {
                 >
                   <span>✓ INVOICE CREATED</span>
                   <span style={{ opacity: 0.7, fontSize: 10 }}>—</span>
-                  <span>SEE INVOICE →</span>
+                  <span>See invoice →</span>
                 </button>
               )}
 
@@ -296,7 +296,6 @@ export default function Bookings() {
                   fontFamily: 'var(--font-mono)',
                   fontSize: 11,
                   letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
                   cursor: 'pointer',
                   borderRadius: 2,
                 }}

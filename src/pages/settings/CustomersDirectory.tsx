@@ -31,8 +31,7 @@ const sectionStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)',
   color: 'var(--text-tertiary)', letterSpacing: '0.06em',
-  marginBottom: 6, textTransform: 'uppercase',
-};
+  marginBottom: 6, };
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
@@ -147,7 +146,7 @@ export function CustomersDirectory() {
           padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-secondary)', fontWeight: 600 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', color: 'var(--text-secondary)', fontWeight: 600 }}>
             Customers ({customers.length})
           </span>
           <div style={{ display: 'flex', gap: 10 }}>
@@ -209,8 +208,7 @@ export function CustomersDirectory() {
                 {['Customer', 'Contact', 'City', 'Payment Terms', 'Status', ''].map(h => (
                   <th key={h} style={{
                     padding: '10px 20px', textAlign: 'left' as const,
-                    fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                    fontFamily: 'var(--font-mono)', fontSize: 10,                     letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                     borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
                   }}>{h}</th>
                 ))}
@@ -237,7 +235,6 @@ export function CustomersDirectory() {
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 10,
                       color: STATUS_COLOR[c.status] || 'var(--text-tertiary)',
-                      textTransform: 'uppercase' as const,
                     }}>{c.status}</span>
                   </td>
                   <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
@@ -250,7 +247,7 @@ export function CustomersDirectory() {
                           fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
                           letterSpacing: '0.06em',
                         }}
-                      >EDIT</button>
+                      >Edit</button>
                       <button
                         onClick={() => setDeleteTarget({ id: c.id, name: c.name })}
                         style={{
@@ -259,7 +256,7 @@ export function CustomersDirectory() {
                           fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
                           letterSpacing: '0.06em',
                         }}
-                      >DELETE</button>
+                      >Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -322,13 +319,13 @@ export function CustomersDirectory() {
               <button
                 disabled={editSaving}
                 onClick={handleEditSave}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: editSaving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase' }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: editSaving ? 'wait' : 'pointer', fontWeight: 600, }}
               >
                 {editSaving ? 'SAVING...' : 'SAVE CHANGES'}
               </button>
               <button
                 onClick={() => setEditCustomer(null)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase' }}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', }}
               >
                 CANCEL
               </button>

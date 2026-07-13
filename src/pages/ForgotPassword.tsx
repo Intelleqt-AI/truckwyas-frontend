@@ -83,7 +83,6 @@ export function ForgotPassword() {
                   display: 'block',
                   fontSize: 11,
                   fontFamily: 'var(--font-mono)',
-                  textTransform: 'uppercase' as const,
                   letterSpacing: '0.08em',
                   color: 'var(--text-tertiary)',
                   marginBottom: 6,

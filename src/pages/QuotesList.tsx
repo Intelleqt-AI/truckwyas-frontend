@@ -293,7 +293,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
       {/* Header — hidden when embedded in Bookings tabs */}
       {!embedded && (
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Operations</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Loads & Quotes</div>
@@ -332,7 +332,6 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
               fontSize: 11,
               fontFamily: 'var(--font-mono)',
               cursor: 'pointer',
-              textTransform: 'uppercase' as const,
               letterSpacing: '0.06em',
               fontWeight: view === v ? 600 : 400,
               transition: 'all 0.2s ease',
@@ -362,7 +361,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
               <div key={col}>
                 <div style={{ borderTop: `2px solid ${STATUS_COLOR[col] || 'var(--border-subtle)'}`, paddingTop: 8, marginBottom: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[col] || 'var(--text-secondary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{COLUMN_LABELS[col]}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[col] || 'var(--text-secondary)', letterSpacing: '0.08em', }}>{COLUMN_LABELS[col]}</span>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-secondary)', background: 'var(--bg-surface-hover)', padding: '2px 7px', borderRadius: 10 }}>{colItems.length}</span>
                   </div>
                   {colTotal > 0 && (
@@ -427,13 +426,12 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                   fontSize: 11,
                   fontFamily: 'var(--font-mono)',
                   cursor: 'pointer',
-                  textTransform: 'uppercase' as const,
                   letterSpacing: '0.06em',
                   fontWeight: statusFilter === status ? 600 : 400,
                   transition: 'all 0.2s ease',
                 }}
               >
-                {status === 'ALL' ? 'ALL' : COLUMN_LABELS[status]} ({status === 'ALL' ? quotes.length : quotesByStatus[status]?.length || 0})
+                {status === 'ALL' ? 'All' : COLUMN_LABELS[status]} ({status === 'ALL' ? quotes.length : quotesByStatus[status]?.length || 0})
               </button>
             ))}
           </div>
@@ -442,12 +440,12 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)' }}>
-                  {['QUOTE #', 'CUSTOMER', 'ROUTE', 'STATUS', 'OUTCOME', 'CREATED', 'AMOUNT', 'ACTION'].map(h => (
+                  {['Quote', 'Customer', 'Route', 'Status', 'Outcome', 'Created', 'Amount', 'Action'].map(h => (
                     <th key={h} style={{
                       padding: '12px 16px',
-                      textAlign: h === 'AMOUNT' ? 'right' : h === 'ACTION' ? 'center' : 'left',
-                      fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-                      fontWeight: 600, letterSpacing: '0.1em',
+                      textAlign: h === 'Amount' ? 'right' : h === 'Action' ? 'center' : 'left',
+                      fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
+                      fontWeight: 500, letterSpacing: '0.01em',
                     }}>{h}</th>
                   ))}
                 </tr>

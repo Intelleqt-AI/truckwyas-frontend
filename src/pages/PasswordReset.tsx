@@ -92,8 +92,8 @@ export default function PasswordReset() {
       <div style={{ width: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
         {/* Logo */}
         <div style={{ marginBottom: 32, textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>TRUCKWYS</div>
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>ROAD FREIGHT INTELLIGENCE</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Truckwys</div>
+          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>Road freight intelligence</div>
         </div>
 
         {step === 'done' ? (
@@ -101,7 +101,7 @@ export default function PasswordReset() {
             <div style={{ fontSize: 40, marginBottom: 16 }}>✓</div>
             <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Password Updated</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24 }}>Your password has been reset. You can now log in.</div>
-            <button className="btn-action" style={{ width: '100%' }} onClick={() => navigate('/login')}>BACK TO LOGIN</button>
+            <button className="btn-action" style={{ width: '100%' }} onClick={() => navigate('/login')}>Back to login</button>
           </div>
         ) : (
           <>
@@ -128,7 +128,7 @@ export default function PasswordReset() {
             {step === 'request' ? (
               <form onSubmit={requestReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
-                  <label style={labelStyle}>EMAIL ADDRESS</label>
+                  <label style={labelStyle}>Email address</label>
                   <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
                     style={inputStyle} placeholder="your@email.com" />
                 </div>
@@ -151,7 +151,7 @@ export default function PasswordReset() {
 
                 {/* Reset code */}
                 <div>
-                  <label style={labelStyle}>RESET CODE</label>
+                  <label style={labelStyle}>Reset code</label>
                   <input type="text" required value={code} onChange={e => setCode(e.target.value)}
                     placeholder="6-digit code from email" maxLength={6}
                     style={{ ...inputStyle, letterSpacing: '0.2em', fontSize: 16, fontFamily: 'var(--font-mono)' }} />
@@ -159,7 +159,7 @@ export default function PasswordReset() {
 
                 {/* New password */}
                 <div>
-                  <label style={labelStyle}>NEW PASSWORD</label>
+                  <label style={labelStyle}>New password</label>
                   <div style={{ position: 'relative' }}>
                     <input type={showNew ? 'text' : 'password'} required value={newPassword} onChange={e => setNewPassword(e.target.value)}
                       placeholder="Min 8 characters" style={{ ...inputStyle, paddingRight: 40 }} />
@@ -172,7 +172,7 @@ export default function PasswordReset() {
 
                 {/* Confirm password */}
                 <div>
-                  <label style={labelStyle}>CONFIRM PASSWORD</label>
+                  <label style={labelStyle}>Confirm password</label>
                   <div style={{ position: 'relative' }}>
                     <input type={showConfirm ? 'text' : 'password'} required value={confirm} onChange={e => setConfirm(e.target.value)}
                       placeholder="Repeat new password" style={{ ...inputStyle, paddingRight: 40 }} />

@@ -131,7 +131,7 @@ export default function PublicInvoice() {
               {/* From / To */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 28 }}>
                 <div>
-                  <div style={{ fontSize: 10, fontFamily: C.mono, color: C.faint, letterSpacing: '0.08em', marginBottom: 6 }}>FROM</div>
+                  <div style={{ fontSize: 10, fontFamily: C.mono, color: C.faint, letterSpacing: '0.08em', marginBottom: 6 }}>From</div>
                   <div style={{ fontWeight: 600, fontSize: 15 }}>{data.company_name}</div>
                   {data.company_phone && <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{data.company_phone}</div>}
                   {data.company_email && <div style={{ color: C.muted, fontSize: 13 }}>{data.company_email}</div>}
@@ -184,7 +184,7 @@ export default function PublicInvoice() {
                 </div>
               ) : data.description ? (
                 <div style={{ marginBottom: 24, background: C.bg, borderRadius: 6, padding: '12px 16px' }}>
-                  <div style={{ fontSize: 10, fontFamily: C.mono, color: C.faint, letterSpacing: '0.08em', marginBottom: 6 }}>DESCRIPTION</div>
+                  <div style={{ fontSize: 10, fontFamily: C.mono, color: C.faint, letterSpacing: '0.08em', marginBottom: 6 }}>Description</div>
                   <div style={{ fontSize: 14, color: C.muted }}>{data.description}</div>
                 </div>
               ) : null}
@@ -203,7 +203,7 @@ export default function PublicInvoice() {
                     </div>
                   ))}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0 6px', borderTop: `2px solid ${C.navy}`, marginTop: 2 }}>
-                    <span style={{ fontWeight: 700, fontSize: 15 }}>TOTAL</span>
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>Total</span>
                     <span style={{ fontFamily: C.mono, fontWeight: 700, fontSize: 18, color: C.navy }}>{fmt(data.total_amount)}</span>
                   </div>
                   {Number(data.paid_amount) > 0 && (
@@ -224,7 +224,7 @@ export default function PublicInvoice() {
               {/* Notes */}
               {data.notes && (
                 <div style={{ marginBottom: 24, background: C.navyLight, borderRadius: 6, padding: '14px 16px', borderLeft: `3px solid ${C.navy}` }}>
-                  <div style={{ fontSize: 10, fontFamily: C.mono, color: C.navy, letterSpacing: '0.08em', marginBottom: 6 }}>NOTES</div>
+                  <div style={{ fontSize: 10, fontFamily: C.mono, color: C.navy, letterSpacing: '0.08em', marginBottom: 6 }}>Notes</div>
                   <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{data.notes}</div>
                 </div>
               )}

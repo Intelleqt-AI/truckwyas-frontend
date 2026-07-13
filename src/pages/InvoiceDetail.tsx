@@ -222,7 +222,7 @@ export default function InvoiceDetail() {
         <button onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← BACK TO INVOICES</button>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Invoice</div>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Invoice</div>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{invoice.invoice_number}</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{invoice.customer_name}</div>
           </div>
@@ -378,12 +378,12 @@ export default function InvoiceDetail() {
               {downloading ? 'DOWNLOADING...' : 'DOWNLOAD PDF'}
             </button>
             {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE') && (
-              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={handleSendReminder} disabled={sendingReminder}>
+              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={handleSendReminder} disabled={sendingReminder}>
                 {sendingReminder ? 'SENDING...' : 'SEND REMINDER'}
               </button>
             )}
             {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE' || invoice.status === 'PARTIALLY_PAID') && !showPaymentForm && (
-              <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>RECORD PAYMENT</button>
+              <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>Record payment</button>
             )}
             {capitalEntry && (
               <a
@@ -405,7 +405,7 @@ export default function InvoiceDetail() {
             )}
             {ineligibleEntry && (
               <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: 2, padding: '8px 10px', lineHeight: 1.4 }}>
-                <div style={{ color: 'var(--text-secondary)', marginBottom: 3, fontSize: 10, letterSpacing: '0.05em' }}>NOT ELIGIBLE FOR CAPITAL</div>
+                <div style={{ color: 'var(--text-secondary)', marginBottom: 3, fontSize: 10, letterSpacing: '0.05em' }}>Not eligible for capital</div>
                 {ineligibleEntry.reason}
               </div>
             )}

@@ -20,7 +20,6 @@ const sectionHeaderStyle: React.CSSProperties = {
 const sectionTitleStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 11,
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
   color: 'var(--text-secondary)',
   fontWeight: 600,
@@ -34,7 +33,6 @@ const labelStyle: React.CSSProperties = {
   display: 'block',
   fontFamily: 'var(--font-mono)',
   fontSize: 10,
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
   color: 'var(--text-tertiary)',
   marginBottom: 6,

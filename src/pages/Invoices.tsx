@@ -462,7 +462,6 @@ export default function Invoices() {
             fontFamily: "var(--font-mono)",
             color: "var(--text-tertiary)",
             letterSpacing: "0.1em",
-            textTransform: "uppercase",
             marginBottom: 4,
           }}>
           Finance
@@ -539,7 +538,6 @@ export default function Invoices() {
               cursor: "pointer",
               transition: "all 0.2s ease",
               fontFamily: "var(--font-mono)",
-              textTransform: "uppercase",
               letterSpacing: "0.05em",
             }}
             onMouseEnter={(e) => {
@@ -569,7 +567,6 @@ export default function Invoices() {
             cursor: "pointer",
             transition: "all 0.2s ease",
             fontFamily: "var(--font-mono)",
-            textTransform: "uppercase",
             letterSpacing: "0.05em",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
@@ -649,7 +646,6 @@ export default function Invoices() {
                         fontFamily: "var(--font-mono)",
                         color: "var(--text-secondary)",
                         marginBottom: 6,
-                        textTransform: "uppercase",
                         letterSpacing: "0.05em",
                       }}>
                       Category *
@@ -682,7 +678,6 @@ export default function Invoices() {
                         fontFamily: "var(--font-mono)",
                         color: "var(--text-secondary)",
                         marginBottom: 6,
-                        textTransform: "uppercase",
                         letterSpacing: "0.05em",
                       }}>
                       Description *
@@ -723,7 +718,6 @@ export default function Invoices() {
                               fontFamily: "var(--font-mono)",
                               color: "var(--text-secondary)",
                               marginBottom: 6,
-                              textTransform: "uppercase",
                               letterSpacing: "0.05em",
                             }}>
                             Litres
@@ -756,7 +750,6 @@ export default function Invoices() {
                               fontFamily: "var(--font-mono)",
                               color: "var(--text-secondary)",
                               marginBottom: 6,
-                              textTransform: "uppercase",
                               letterSpacing: "0.05em",
                             }}>
                             Price/Litre
@@ -796,7 +789,6 @@ export default function Invoices() {
                         fontFamily: "var(--font-mono)",
                         color: "var(--text-secondary)",
                         marginBottom: 6,
-                        textTransform: "uppercase",
                         letterSpacing: "0.05em",
                       }}>
                       Amount (ZAR) *
@@ -841,7 +833,6 @@ export default function Invoices() {
                           fontFamily: "var(--font-mono)",
                           color: "var(--text-secondary)",
                           marginBottom: 6,
-                          textTransform: "uppercase",
                           letterSpacing: "0.05em",
                         }}>
                         Date *
@@ -861,7 +852,6 @@ export default function Invoices() {
                           fontFamily: "var(--font-mono)",
                           color: "var(--text-secondary)",
                           marginBottom: 6,
-                          textTransform: "uppercase",
                           letterSpacing: "0.05em",
                         }}>
                         Vehicle
@@ -899,7 +889,6 @@ export default function Invoices() {
                           fontFamily: "var(--font-mono)",
                           color: "var(--text-secondary)",
                           marginBottom: 6,
-                          textTransform: "uppercase",
                           letterSpacing: "0.05em",
                         }}>
                         Vendor
@@ -931,7 +920,6 @@ export default function Invoices() {
                           fontFamily: "var(--font-mono)",
                           color: "var(--text-secondary)",
                           marginBottom: 6,
-                          textTransform: "uppercase",
                           letterSpacing: "0.05em",
                         }}>
                         Receipt #
@@ -968,7 +956,6 @@ export default function Invoices() {
                         fontFamily: "var(--font-mono)",
                         color: "var(--text-secondary)",
                         marginBottom: 6,
-                        textTransform: "uppercase",
                         letterSpacing: "0.05em",
                       }}>
                       Notes
@@ -1237,7 +1224,6 @@ export default function Invoices() {
                   fontSize: 11,
                   borderRadius: 2,
                   cursor: "pointer",
-                  textTransform: "uppercase",
                   letterSpacing: "0.06em",
                   fontWeight: expenseStatusFilter === s ? 600 : 400,
                   whiteSpace: "nowrap",
@@ -1634,7 +1620,6 @@ export default function Invoices() {
                     fontSize: 11,
                     borderRadius: 2,
                     cursor: "pointer",
-                    textTransform: "uppercase",
                     letterSpacing: "0.06em",
                     fontWeight: statusFilter === s ? 600 : 400,
                     transition: "all 0.2s ease",
@@ -1804,7 +1789,6 @@ export default function Invoices() {
                                   padding: "1px 5px",
                                   border: `1px solid ${TIER_COLOR[tier] || "var(--border-subtle)"}`,
                                   borderRadius: 2,
-                                  textTransform: "uppercase",
                                 }}>
                                 {tier}
                               </span>

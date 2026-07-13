@@ -83,7 +83,7 @@ function Typewriter({ text, onDone }: { text: string; onDone?: () => void }) {
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4,
+  letterSpacing: '0.1em', marginBottom: 4,
 };
 
 export default function Copilot() {
@@ -320,7 +320,7 @@ export default function Copilot() {
         </div>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 10,
-          padding: '4px 9px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: '0.07em',
+          padding: '4px 9px', borderRadius: 2, letterSpacing: '0.07em',
           background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
           color: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)',
         }}>
@@ -334,12 +334,12 @@ export default function Copilot() {
         {/* Sidebar */}
         <div style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, overflow: 'hidden' }}>
           <div style={{ padding: 10, borderBottom: '1px solid var(--border-subtle)' }}>
-            <button onClick={newChat} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, padding: '9px 12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            <button onClick={newChat} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, padding: '9px 12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               New chat
             </button>
           </div>
-          <div style={{ padding: '10px 12px 4px', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Conversations</div>
+          <div style={{ padding: '10px 12px 4px', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-tertiary)', letterSpacing: '0.08em', }}>Conversations</div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {conversations.length === 0 ? (
               <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 11 }}>No conversations yet</div>
@@ -431,7 +431,7 @@ export default function Copilot() {
                         <div style={{ display: 'flex', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
                           {m.actions.map((a, j) => (
                             <button key={j} className="cp-chip" onClick={() => navigate(a.route)}
-                              style={{ background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', padding: '6px 11px', fontFamily: 'var(--font-mono)', fontSize: 10.5, borderRadius: 2, cursor: 'pointer', letterSpacing: '0.04em', transition: 'all .12s ease', textTransform: 'uppercase' }}>
+                              style={{ background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', padding: '6px 11px', fontFamily: 'var(--font-mono)', fontSize: 10.5, borderRadius: 2, cursor: 'pointer', letterSpacing: '0.04em', transition: 'all .12s ease', }}>
                               {a.label} →
                             </button>
                           ))}

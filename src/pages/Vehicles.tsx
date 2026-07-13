@@ -183,7 +183,6 @@ export default function Vehicles() {
         padding: '2px 6px',
         background: 'var(--bg-surface-hover)',
         borderRadius: 2,
-        textTransform: 'uppercase'
       }}>
         {status.replace('_', ' ')}
       </span>
@@ -215,21 +214,21 @@ export default function Vehicles() {
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
     fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
     fontWeight: active ? 600 : 400,
-    textTransform: 'uppercase', padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
+    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
     transition: 'all 0.2s ease',
   });
 
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Fleet</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
             <LiveBadge />
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>HEATMAP</button>
+            <button onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>Heatmap</button>
             <button className="btn-action" onClick={() => setShowAddForm(true)}>+ ADD VEHICLE</button>
           </div>
         </div>
@@ -308,7 +307,6 @@ export default function Vehicles() {
                       fontSize: 11,
                       borderRadius: 2,
                       cursor: 'pointer',
-                      textTransform: 'uppercase',
                       letterSpacing: '0.06em',
                       fontWeight: isActive ? 600 : 400,
                       transition: 'all 0.2s ease'
@@ -329,8 +327,7 @@ export default function Vehicles() {
                   {['Registration', 'Make / Model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency', ''].map(h => (
                     <th key={h} style={{
                       padding: '12px 20px 12px 32px', textAlign: 'left',
-                      fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
-                      letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+                      fontFamily: 'var(--font-mono)', fontSize: 10,                       letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                       borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
                     }}>{h}</th>
                   ))}
@@ -427,7 +424,7 @@ export default function Vehicles() {
                               });
                             }}
                             style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
-                          >EDIT</button>
+                          >Edit</button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -495,7 +492,7 @@ export default function Vehicles() {
               { key: 'last_service_mileage', label: 'Last Service Odometer (km)', placeholder: 'e.g. 145000', type: 'number' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, }}>{f.label}</label>
                 {f.type === 'date' ? (
                   <DatePicker
                     value={(editForm as any)[f.key]}
@@ -518,7 +515,7 @@ export default function Vehicles() {
               { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE', 'OUT_OF_SERVICE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, }}>{f.label}</label>
                 <Select
                   value={(editForm as any)[f.key]}
                   onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}
@@ -533,7 +530,7 @@ export default function Vehicles() {
               </div>
             ))}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Driver</label>
+              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, }}>Assigned Driver</label>
               <Select
                 value={editForm.driver != null && editForm.driver !== '' ? String(editForm.driver) : ''}
                 onValueChange={val => setEditForm((prev: any) => ({ ...prev, driver: val }))}

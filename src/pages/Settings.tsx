@@ -91,7 +91,6 @@ export default function Settings() {
               fontFamily: 'var(--font-mono)',
               color: 'var(--text-tertiary)',
               letterSpacing: '0.1em',
-              textTransform: 'uppercase',
               padding: '12px 20px 6px',
             }}>
               {s.group}

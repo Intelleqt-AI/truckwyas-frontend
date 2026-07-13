@@ -260,7 +260,7 @@ export function DeveloperApi() {
         <div style={sectionHeader}><span style={sectionTitle}>Endpoint</span></div>
         <div style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <span style={{ ...mono, fontWeight: 700, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 2 }}>POST</span>
+            <span style={{ ...mono, fontWeight: 700, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 2 }}>Post</span>
             <span style={{ ...mono, color: 'var(--text-primary)' }}>/api/v1/risk/underwrite/</span>
           </div>
           <div style={{ ...mono, color: 'var(--text-tertiary)', marginBottom: 4 }}>
@@ -416,8 +416,8 @@ export function DeveloperApi() {
                     <button onClick={() => toggleLogs(k)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>
                       {logsOpen ? 'HIDE LOGS' : 'LOGS'}
                     </button>
-                    <button onClick={() => openEdit(k)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>EDIT</button>
-                    <button onClick={() => setRevokeTarget(k)} style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>REVOKE</button>
+                    <button onClick={() => openEdit(k)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>Edit</button>
+                    <button onClick={() => setRevokeTarget(k)} style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>Revoke</button>
                   </div>
                 </div>
               </div>
@@ -566,7 +566,7 @@ export function DeveloperApi() {
               <button className="btn-action" style={{ flex: 1 }} onClick={handleEditSave} disabled={editSaving || !editForm.name.trim()}>
                 {editSaving ? 'SAVING…' : 'SAVE CHANGES'}
               </button>
-              <button onClick={() => setEditKey(null)} style={{ flex: 1, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer' }}>CANCEL</button>
+              <button onClick={() => setEditKey(null)} style={{ flex: 1, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>
         </div>

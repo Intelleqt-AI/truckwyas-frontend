@@ -106,7 +106,7 @@ export default function DriverProfile() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>DRIVER</div>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Driver</div>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)' }}>{name}</div>
             {phone && (
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
@@ -190,7 +190,7 @@ export default function DriverProfile() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         {/* Details */}
         <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>DETAILS</div>
+          <div className="card-title" style={{ marginBottom: 16 }}>Details</div>
           {[
             { label: 'LICENSE NUMBER', value: driver.license_number },
             { label: 'LICENSE STATE', value: driver.license_state },
@@ -212,7 +212,7 @@ export default function DriverProfile() {
 
         {/* Performance */}
         <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>PERFORMANCE</div>
+          <div className="card-title" style={{ marginBottom: 16 }}>Performance</div>
           {[
             { label: 'EFFICIENCY SCORE', value: driver.efficiency_score ?? '—' },
             { label: 'ON-TIME RATE', value: driver.on_time_rate ? `${driver.on_time_rate}%` : '—' },
@@ -325,7 +325,7 @@ export default function DriverProfile() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
             {/* Performance Scores */}
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 20 }}>PERFORMANCE SCORES</div>
+              <div className="card-title" style={{ marginBottom: 20 }}>Performance scores</div>
               <ScoreBar label="ON-TIME RATE" value={onTimeRate} color="var(--accent-primary)" />
               <ScoreBar label="SAFETY SCORE" value={safetyScore} color={safetyScore >= 80 ? 'var(--status-success)' : safetyScore >= 60 ? 'var(--status-warning)' : 'var(--status-danger)'} />
               <ScoreBar label="EXPERIENCE SCORE" value={experienceScore} />
@@ -334,7 +334,7 @@ export default function DriverProfile() {
 
             {/* Earnings Breakdown */}
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>EARNINGS BREAKDOWN</div>
+              <div className="card-title" style={{ marginBottom: 16 }}>Earnings breakdown</div>
               {[
                 { label: 'TOTAL REVENUE', value: formatCurrency(driver.revenue_generated ?? totalRevenue) },
                 { label: 'TOTAL TRIPS', value: (driver.total_trips ?? totalTrips).toString() },
@@ -353,7 +353,7 @@ export default function DriverProfile() {
 
             {/* Monthly Earnings */}
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>MONTHLY EARNINGS</div>
+              <div className="card-title" style={{ marginBottom: 16 }}>Monthly earnings</div>
               {(() => {
                 const monthMap: Record<string, number> = {};
                 loads.forEach((l: any) => {

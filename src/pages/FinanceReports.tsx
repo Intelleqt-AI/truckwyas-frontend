@@ -163,7 +163,7 @@ export default function FinanceReports() {
   const ErrorState = () => (
     <div className="card" style={{ padding: 40, textAlign: 'center' }}>
       <div style={{ color: 'var(--status-danger)', marginBottom: 16, fontSize: 14 }}>Failed to load data</div>
-      <button className="btn-action" onClick={() => window.location.reload()}>RETRY</button>
+      <button className="btn-action" onClick={() => window.location.reload()}>Retry</button>
     </div>
   );
 

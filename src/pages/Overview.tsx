@@ -1033,7 +1033,7 @@ export default function Overview() {
           {loading ? (
             <div className="feed-item">
               <div className="feed-meta">
-                <span>LOADING</span>
+                <span>Loading</span>
                 <span>...</span>
               </div>
               <div className="feed-content">Loading insights...</div>

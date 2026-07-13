@@ -225,7 +225,7 @@ export default function Customers() {
                       <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
                         Add your first customer to get started
                       </div>
-                      <button onClick={() => setShowAddForm(true)} className="btn-action">ADD CUSTOMER</button>
+                      <button onClick={() => setShowAddForm(true)} className="btn-action">Add customer</button>
                     </div>
                   </td>
                 </tr>
@@ -273,7 +273,7 @@ export default function Customers() {
                       <button
                         onClick={e => { e.stopPropagation(); openEdit(c); }}
                         style={{ background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", padding: "4px 10px", borderRadius: 2, cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em" }}
-                      >EDIT</button>
+                      >Edit</button>
                       <button
                         onClick={e => {
                           e.stopPropagation();
@@ -461,8 +461,8 @@ export default function Customers() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                  <SelectItem value="INACTIVE">INACTIVE</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </div>

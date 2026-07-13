@@ -314,12 +314,12 @@ export function UsersPermissions() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="admin">ADMIN</SelectItem>
-                        <SelectItem value="manager">MANAGER</SelectItem>
-                        <SelectItem value="operator">OPERATOR</SelectItem>
-                        <SelectItem value="dispatcher">DISPATCHER</SelectItem>
-                        <SelectItem value="viewer">VIEWER</SelectItem>
-                        <SelectItem value="driver">DRIVER</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="operator">Operator</SelectItem>
+                        <SelectItem value="dispatcher">Dispatcher</SelectItem>
+                        <SelectItem value="viewer">Viewer</SelectItem>
+                        <SelectItem value="driver">Driver</SelectItem>
                       </SelectContent>
                     </Select>
                   ) : (
@@ -349,7 +349,7 @@ export function UsersPermissions() {
                         color: 'var(--status-danger)', padding: '4px 10px',
                         fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
                       }}
-                    >REMOVE</button>
+                    >Remove</button>
                   )}
                 </td>
               </tr>
@@ -404,7 +404,7 @@ export function UsersPermissions() {
                           color: 'var(--text-tertiary)', padding: '4px 10px',
                           fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
                         }}
-                      >RESEND</button>
+                      >Resend</button>
                       {isAdmin && (
                         <button
                           onClick={() => handleRevokeInvite(inv.token)}
@@ -413,7 +413,7 @@ export function UsersPermissions() {
                             color: 'var(--status-danger)', padding: '4px 10px',
                             fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
                           }}
-                        >REVOKE</button>
+                        >Revoke</button>
                       )}
                     </div>
                   </td>
@@ -478,12 +478,12 @@ export function UsersPermissions() {
                 background: 'none', border: '1px solid var(--border-subtle)',
                 color: 'var(--text-secondary)', padding: '7px 14px',
                 fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-              }}>CANCEL</button>
+              }}>Cancel</button>
               <button onClick={() => handleDeleteUser(deleteConfirm)} style={{
                 background: 'var(--status-danger)', border: 'none',
                 color: 'white', padding: '7px 14px',
                 fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-              }}>REMOVE</button>
+              }}>Remove</button>
             </div>
           </div>
         </div>

@@ -149,7 +149,7 @@ export default function CustomerDetail() {
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.1em", marginBottom: 4 }}>CUSTOMER</div>
+            <div style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.1em", marginBottom: 4 }}>Customer</div>
             <div style={{ fontSize: 22, fontWeight: 500, color: "var(--text-primary)" }}>{customer.name}</div>
             {customer.company_name && (
               <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4 }}>{customer.company_name}</div>
@@ -160,11 +160,11 @@ export default function CustomerDetail() {
               onClick={() => navigate(`/customers/${id}/risk`)}
               title="Open the AI risk profile for this customer"
               style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--accent-primary)", background: "transparent", padding: "6px 12px", border: "1px solid var(--accent-primary)", borderRadius: 2, cursor: "pointer", letterSpacing: "0.08em", }}
-            >AI ANALYSIS</button>
+            >AI analysis</button>
             <button
               onClick={openEdit}
               style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-secondary)", background: "transparent", padding: "6px 12px", border: "1px solid var(--border-subtle)", borderRadius: 2, cursor: "pointer", letterSpacing: "0.08em", }}
-            >EDIT</button>
+            >Edit</button>
             <button
               disabled={updating}
               onClick={handleStatusToggle}
@@ -210,7 +210,7 @@ export default function CustomerDetail() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         {/* Contact Details */}
         <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>CONTACT DETAILS</div>
+          <div className="card-title" style={{ marginBottom: 16 }}>Contact details</div>
           {[
             { label: "EMAIL", value: customer.email },
             { label: "PHONE", value: customer.phone },
@@ -229,7 +229,7 @@ export default function CustomerDetail() {
 
         {/* Account Details */}
         <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>ACCOUNT DETAILS</div>
+          <div className="card-title" style={{ marginBottom: 16 }}>Account details</div>
           {[
             { label: "PAYMENT TERMS", value: PAYMENT_TERMS_LABEL[customer.payment_terms_default] || customer.payment_terms_default || "NET30", mono: true },
             { label: "CREDIT LIMIT", value: customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "—", mono: true },
@@ -352,8 +352,8 @@ export default function CustomerDetail() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                  <SelectItem value="INACTIVE">INACTIVE</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </div>

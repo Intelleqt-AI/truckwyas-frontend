@@ -247,7 +247,7 @@ export function CustomersDirectory() {
                           fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
                           letterSpacing: '0.06em',
                         }}
-                      >EDIT</button>
+                      >Edit</button>
                       <button
                         onClick={() => setDeleteTarget({ id: c.id, name: c.name })}
                         style={{
@@ -256,7 +256,7 @@ export function CustomersDirectory() {
                           fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
                           letterSpacing: '0.06em',
                         }}
-                      >DELETE</button>
+                      >Delete</button>
                     </div>
                   </td>
                 </tr>

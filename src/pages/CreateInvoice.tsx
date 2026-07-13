@@ -91,7 +91,7 @@ export default function CreateInvoice() {
                   </div>
                 ))}
                 <div>
-                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>CUSTOMER</div>
+                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>Customer</div>
                   <Select value={form.customer} onValueChange={val => setForm(f => ({ ...f, customer: val }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select customer..." />
@@ -107,12 +107,12 @@ export default function CreateInvoice() {
                     <input type="number" placeholder="0.00" value={form.amount} onChange={set('amount')} style={inputStyle} />
                   </div>
                   <div>
-                    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>DUE DATE</div>
+                    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>Due date</div>
                     <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} maxDate={today} />
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>DESCRIPTION</div>
+                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>Description</div>
                   <textarea value={form.description} onChange={set('description')} rows={3} placeholder="Invoice description..." style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
                 </div>
               </div>

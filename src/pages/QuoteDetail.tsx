@@ -282,30 +282,30 @@ export default function QuoteDetail() {
             <div className="card-title" style={{ marginBottom: 14 }}>Customer</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>NAME</div>
+                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>Name</div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{quote.customer_name || '—'}</div>
               </div>
               {quote.customer_company && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>COMPANY</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>Company</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_company}</div>
                 </div>
               )}
               {quote.customer_email && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>EMAIL</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>Email</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_email}</div>
                 </div>
               )}
               {quote.customer_phone && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>PHONE</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>Phone</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_phone}</div>
                 </div>
               )}
               {quote.customer_city && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>CITY</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>City</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_city}</div>
                 </div>
               )}

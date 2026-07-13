@@ -463,7 +463,7 @@ export default function Insights() {
 
               {/* SECTION 1: BUSINESS PULSE */}
               <div>
-                <SectionHeader>BUSINESS PULSE</SectionHeader>
+                <SectionHeader>Business pulse</SectionHeader>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
                   {/* Revenue MTD */}
                   <div className="card" style={{ padding: 20 }}>
@@ -559,7 +559,7 @@ export default function Insights() {
 
               {/* SECTION 2: ACTION REQUIRED */}
               <div>
-                <SectionHeader>ACTION REQUIRED</SectionHeader>
+                <SectionHeader>Action required</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
                   {insightsData?.recommendations && insightsData.recommendations.length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -655,7 +655,7 @@ export default function Insights() {
 
               {/* SECTION 3: LIVE OPERATIONS */}
               <div>
-                <SectionHeader>LIVE OPERATIONS</SectionHeader>
+                <SectionHeader>Live operations</SectionHeader>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                   {(() => {
                     const inTransit = loads.filter(l => ['IN_TRANSIT', 'ASSIGNED'].includes(l.status.toUpperCase().replace(' ', '_')));
@@ -954,7 +954,7 @@ export default function Insights() {
               {/* SECTION 3: MONTHLY P&L TREND */}
               {financeData?.monthly_trend && financeData.monthly_trend.length > 0 && (
                 <div>
-                  <SectionHeader>MONTHLY P&L TREND</SectionHeader>
+                  <SectionHeader>Monthly P&L trend</SectionHeader>
                   <div className="card" style={{ padding: 20 }}>
                     {(() => {
                       const trend = [...financeData.monthly_trend].sort((a, b) => a.month.localeCompare(b.month)).slice(-6);
@@ -1039,7 +1039,7 @@ export default function Insights() {
 
               {/* SECTION 4: COST BREAKDOWN */}
               <div>
-                <SectionHeader>COST BREAKDOWN</SectionHeader>
+                <SectionHeader>Cost breakdown</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
                   {(() => {
                     const categoryMap = new Map<string, number>();
@@ -1138,7 +1138,7 @@ export default function Insights() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* SECTION 1: CASH POSITION */}
               <div>
-                <SectionHeader>CASH POSITION</SectionHeader>
+                <SectionHeader>Cash position</SectionHeader>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                   <div className="card" style={{ padding: 20 }}>
                     <div style={{
@@ -1198,7 +1198,7 @@ export default function Insights() {
 
               {/* SECTION 2: CUSTOMER PAYMENT INTELLIGENCE */}
               <div>
-                <SectionHeader>WHO OWES YOU AND HOW LONG</SectionHeader>
+                <SectionHeader>Who owes you and how long</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
                   {(() => {
                     const customerMap = new Map<string, {
@@ -1379,7 +1379,7 @@ export default function Insights() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* SECTION 1: FLEET HEALTH SUMMARY */}
               <div>
-                <SectionHeader>FLEET HEALTH SUMMARY</SectionHeader>
+                <SectionHeader>Fleet health summary</SectionHeader>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
                   <div className="card" style={{ padding: 20 }}>
                     <div style={{
@@ -1648,7 +1648,7 @@ export default function Insights() {
 
               {/* SECTION 4: MAINTENANCE RISK ALERT */}
               <div>
-                <SectionHeader>MAINTENANCE RISK ALERT</SectionHeader>
+                <SectionHeader>Maintenance risk alert</SectionHeader>
                 <div className="card" style={{ padding: 20 }}>
                   {(() => {
                     const atRisk = vehicles.filter(v => (v.ai_health_score || 100) < 70).sort((a, b) => a.ai_health_score - b.ai_health_score);
@@ -1818,7 +1818,7 @@ export default function Insights() {
 
               {/* SECTION 3: LOAD STATUS */}
               <div>
-                <SectionHeader>LOAD PIPELINE STATUS</SectionHeader>
+                <SectionHeader>Load pipeline status</SectionHeader>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
                   {(() => {
                     const pending = loads.filter(l => ['PENDING', 'ASSIGNED'].includes((l.status || '').toUpperCase()));

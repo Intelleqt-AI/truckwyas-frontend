@@ -107,7 +107,7 @@ export default function RiskScoreView() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>FAST PAY</div>
+        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Fast pay</div>
         <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Customer Risk Scores</div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>AI-computed creditworthiness for fast pay eligibility</div>
       </div>
@@ -126,7 +126,7 @@ export default function RiskScoreView() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24, marginBottom: 24 }}>
         {/* Portfolio score card */}
         <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>PORTFOLIO OVERVIEW</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>Portfolio overview</div>
           <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
             <ScoreRing score={avgScore} tier={avgScore >= 85 ? 'PRIME' : avgScore >= 70 ? 'STANDARD' : avgScore >= 55 ? 'ELEVATED' : avgScore >= 40 ? 'HIGH' : 'INELIGIBLE'} />
             <div>
@@ -139,7 +139,7 @@ export default function RiskScoreView() {
 
         {/* Score factors legend */}
         <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>SCORE FACTORS</div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>Score factors</div>
           {[
             { label: 'Payment History', weight: 35 },
             { label: 'Invoice Age', weight: 20 },

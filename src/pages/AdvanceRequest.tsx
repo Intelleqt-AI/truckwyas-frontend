@@ -243,7 +243,7 @@ export default function AdvanceRequest() {
             <span className="card-title">Step 2: Fee Breakdown</span>
           </div>
           <div style={{ marginBottom: 24, padding: 16, background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>SELECTED INVOICE</div>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Selected invoice</div>
             <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedInvoice.invoice_number}</div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{selectedInvoice.customer_name}</div>
           </div>

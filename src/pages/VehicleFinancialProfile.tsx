@@ -115,7 +115,7 @@ export default function VehicleFinancialProfile() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>VEHICLE</div>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>Vehicle</div>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
               {vehicle.plate}
             </div>
@@ -224,7 +224,7 @@ export default function VehicleFinancialProfile() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
             {/* Specs */}
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>SPECIFICATIONS</div>
+              <div className="card-title" style={{ marginBottom: 16 }}>Specifications</div>
               {[
                 { label: 'VIN', value: vehicle.vin },
                 { label: 'PLATE', value: vehicle.plate },
@@ -244,7 +244,7 @@ export default function VehicleFinancialProfile() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* Economics */}
               <div className="card" style={{ padding: 20 }}>
-                <div className="card-title" style={{ marginBottom: 16 }}>ECONOMICS</div>
+                <div className="card-title" style={{ marginBottom: 16 }}>Economics</div>
                 {[
                   { label: 'COST PER KM', value: `R ${parseFloat(vehicle.cost_per_km || '0').toFixed(2)}` },
                   { label: 'MARGIN PER TRIP', value: formatCurrency(parseFloat(vehicle.margin_per_trip || '0')) },
@@ -259,7 +259,7 @@ export default function VehicleFinancialProfile() {
 
               {/* Maintenance */}
               <div className="card" style={{ padding: 20 }}>
-                <div className="card-title" style={{ marginBottom: 16 }}>MAINTENANCE</div>
+                <div className="card-title" style={{ marginBottom: 16 }}>Maintenance</div>
                 {[
                   { label: 'LAST MAINTENANCE', value: vehicle.last_maintenance_date?.slice(0, 10) || '—' },
                   { label: 'SERVICE INTERVAL', value: vehicle.service_interval_km ? `${Number(vehicle.service_interval_km).toLocaleString('en-ZA')} km` : '—' },
@@ -316,13 +316,13 @@ export default function VehicleFinancialProfile() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
             {/* Performance Scores */}
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 20 }}>PERFORMANCE SCORES</div>
+              <div className="card-title" style={{ marginBottom: 20 }}>Performance scores</div>
               <ScoreBar label="AI HEALTH SCORE" value={healthScore} color={healthScore >= 80 ? 'var(--status-success)' : 'var(--status-warning)'} />
               <ScoreBar label="UPTIME SCORE" value={vehicle.uptime_score ?? 0} color="var(--accent-primary)" />
               <ScoreBar label="FUEL EFFICIENCY" value={vehicle.fuel_efficiency_score ?? 0} />
               <ScoreBar label="MAINTENANCE SCORE" value={vehicle.maintenance_score ?? 0} color="var(--status-success)" />
               <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>UPTIME</span>
+                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', }}>Uptime</span>
                 <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
                   {parseFloat(vehicle.uptime_percentage || '0').toFixed(1)}%
                 </span>
@@ -331,7 +331,7 @@ export default function VehicleFinancialProfile() {
 
             {/* Cost Analysis */}
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>COST ANALYSIS</div>
+              <div className="card-title" style={{ marginBottom: 16 }}>Cost analysis</div>
               {[
                 { label: 'COST PER KM', value: vehicle.cost_per_km ? `R ${parseFloat(vehicle.cost_per_km).toFixed(2)}` : '—' },
                 { label: 'MARGIN PER TRIP', value: vehicle.margin_per_trip ? formatCurrency(parseFloat(vehicle.margin_per_trip)) : '—' },
@@ -349,7 +349,7 @@ export default function VehicleFinancialProfile() {
 
             {/* Compliance */}
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>COMPLIANCE & MAINTENANCE</div>
+              <div className="card-title" style={{ marginBottom: 16 }}>Compliance & maintenance</div>
               {[
                 { label: 'LAST MAINTENANCE', value: vehicle.last_maintenance_date?.slice(0, 10) || '—', alert: false },
                 { label: 'SERVICE INTERVAL', value: vehicle.service_interval_km ? `${Number(vehicle.service_interval_km).toLocaleString('en-ZA')} km` : '—', alert: false },

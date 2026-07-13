@@ -85,6 +85,13 @@ export default function QuoteBuilder() {
   const [saving, setSaving] = useState(false);
   const [savedQuoteId, setSavedQuoteId] = useState<number | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  // An unsaved localStorage draft found on mount — offered via a banner, never
+  // force-loaded (force-loading hijacked every "New quote" with the last one).
+  const [resumable, setResumable] = useState<any>(null);
+  // True once THIS session created the DB draft. Lets us bind the URL to the new
+  // quote's id without the edit-loader clobbering in-progress fields, and keeps
+  // autosave running after that URL flip.
+  const createdRef = useRef(false);
 
   // ---- reference data ----
   const { data: companyProfile } = useQuery({ queryKey: ["company-profile"], queryFn: () => fetchData("api/v1/company/profile/") });
@@ -228,6 +235,9 @@ export default function QuoteBuilder() {
   // ---- edit mode: load existing quote ----
   useEffect(() => {
     if (!editId) return;
+    // We just created this draft and navigated to its URL — fields are already
+    // in state; don't refetch and overwrite them.
+    if (createdRef.current) return;
     fetchData(`api/v1/quotes/${editId}/`).then((q: any) => {
       setCustomerId(String(q.customer || ""));
       setPickup(q.pickup_location || ""); setDelivery(q.delivery_location || "");
@@ -248,27 +258,58 @@ export default function QuoteBuilder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId]);
 
-  // ---- localStorage draft (new quotes): restore on mount, autosave on change ----
+  // ---- localStorage draft (crash-recovery for a not-yet-saved quote) ----
+  // On mount we only OFFER to resume (via a banner); we never auto-load it, so a
+  // fresh "New quote" always starts blank. Once the DB draft exists the slot is
+  // cleared — the quotes list is then the source of truth for parked drafts.
   useEffect(() => {
     if (isEditing) return;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
         const d = JSON.parse(raw);
-        setCustomerId(d.customerId || ""); setVehicleType(d.vehicleType || "");
-        setPickup(d.pickup || ""); setDelivery(d.delivery || "");
-        setPickupCoords(d.pickupCoords || null); setDeliveryCoords(d.deliveryCoords || null);
-        setWeight(d.weight || ""); setCargo(d.cargo || ""); setNotes(d.notes || "");
-        setTripType(d.tripType || "ONE_WAY");
-        if (d.customerId || d.pickup) toast.info("Restored your unsaved quote");
+        if (d && (d.customerId || d.pickup || d.delivery)) setResumable(d);
       }
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const applyResumable = () => {
+    const d = resumable; if (!d) return;
+    setCustomerId(d.customerId || ""); setVehicleType(d.vehicleType || "");
+    setPickup(d.pickup || ""); setDelivery(d.delivery || "");
+    setPickupCoords(d.pickupCoords || null); setDeliveryCoords(d.deliveryCoords || null);
+    setWeight(d.weight || ""); setCargo(d.cargo || ""); setNotes(d.notes || "");
+    setTripType(d.tripType || "ONE_WAY");
+    setResumable(null);
+  };
+  const discardResumable = () => { localStorage.removeItem(DRAFT_KEY); setResumable(null); };
+
+  // Blank the form for a brand-new quote. React Router reuses this component
+  // across /edit/:id ↔ /new (only the param changes, no remount), so we reset
+  // every field explicitly rather than relying on a remount. The quote being
+  // left is already saved (DB draft in the quotes list), so nothing is lost.
+  const startNew = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    createdRef.current = false;
+    setSavedQuoteId(null); setLastSavedAt(null); setResumable(null);
+    setCustomerId(""); setVehicleType(""); setPickup(""); setDelivery("");
+    setPickupCoords(null); setDeliveryCoords(null);
+    setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
+    setPickupDate(""); setDeliveryDate(""); setShowDetails(false); setNlText("");
+    setEditableTollCost(null); setDriverAllowanceInput("0"); setServiceCharge(0);
+    setRouteData(null); setSelectedRouteIndex(0);
+    setAnalysis(null); setGuard(null); setBenchmark(null);
+    if (isEditing) navigate("/bookings/quotes/new", { replace: true });
+    toast.success("Started a new quote");
+  };
+
   const draftRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (isEditing) return;
+    // Don't persist an empty form — otherwise a blank "New quote" mount would
+    // overwrite (and destroy) the unsaved draft the Resume banner is offering.
+    if (!(customerId || pickup || delivery)) return;
     if (draftRef.current) clearTimeout(draftRef.current);
     draftRef.current = setTimeout(() => {
       try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType })); } catch { /* ignore */ }
@@ -295,7 +336,9 @@ export default function QuoteBuilder() {
   const dbRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const substantive = ready && total > 0;
   useEffect(() => {
-    if (isEditing) return; // edit mode saves explicitly
+    // Autosave a brand-new quote, or one we created this session (createdRef).
+    // A pre-existing quote opened for editing saves explicitly, not on every keystroke.
+    if (isEditing && !createdRef.current) return;
     if (!substantive) return;
     if (dbRef.current) clearTimeout(dbRef.current);
     dbRef.current = setTimeout(async () => {
@@ -304,7 +347,16 @@ export default function QuoteBuilder() {
           await patchData({ url: `api/v1/quotes/${savedQuoteId}/`, data: buildPayload("DRAFT") });
         } else {
           const res = await postData({ url: "api/v1/quotes/", data: buildPayload("DRAFT") });
-          if (res?.id) { setSavedQuoteId(res.id); queryClient.invalidateQueries({ queryKey: ["quotes"] }); }
+          if (res?.id) {
+            setSavedQuoteId(res.id);
+            createdRef.current = true;
+            // The DB now owns this draft — drop the local crash-recovery copy and
+            // bind the URL to the new quote so a refresh resumes it (no duplicate).
+            localStorage.removeItem(DRAFT_KEY);
+            setResumable(null);
+            queryClient.invalidateQueries({ queryKey: ["quotes"] });
+            navigate(`/bookings/quotes/${res.id}/edit`, { replace: true });
+          }
         }
         setLastSavedAt(new Date());
       } catch { /* silent — localStorage still holds it */ }
@@ -350,13 +402,32 @@ export default function QuoteBuilder() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
         <div>
           <div style={labelS}>Operations</div>
-          <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)", marginTop: 4 }}>{isEditing ? "Edit quote" : "New quote"}</div>
+          <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)", marginTop: 4 }}>{isEditing && !createdRef.current ? "Edit quote" : "New quote"}</div>
         </div>
-        <div style={{ fontSize: 12, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", display: "flex", alignItems: "center", gap: 6 }}>
-          {saving ? "Saving…" : lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Auto-saves as you work"}
-          <span style={dot(saving ? "var(--status-warning)" : lastSavedAt ? "var(--status-success)" : "var(--text-tertiary)")} />
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ fontSize: 12, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", display: "flex", alignItems: "center", gap: 6 }}>
+            {saving ? "Saving…" : lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Auto-saves as you work"}
+            <span style={dot(saving ? "var(--status-warning)" : lastSavedAt ? "var(--status-success)" : "var(--text-tertiary)")} />
+          </div>
+          <button onClick={startNew} title="Start a fresh quote (this one stays saved)"
+            style={{ ...labelS, background: "transparent", color: "var(--accent-primary)", border: "1px solid var(--accent-primary)", borderRadius: 4, padding: "6px 12px", cursor: "pointer" }}>
+            + New quote
+          </button>
         </div>
       </div>
+
+      {/* Resume-unsaved banner — opt-in, only before the first DB save */}
+      {resumable && !isEditing && (
+        <div style={{ ...cardS, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 14px", marginBottom: 12, borderColor: "var(--accent-primary)" }}>
+          <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+            You have an unsaved quote from earlier{resumable.pickup ? ` (${resumable.pickup}${resumable.delivery ? ` → ${resumable.delivery}` : ""})` : ""}.
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={applyResumable} style={{ ...labelS, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 4, padding: "6px 12px", cursor: "pointer" }}>Resume</button>
+            <button onClick={discardResumable} style={{ ...labelS, background: "transparent", color: "var(--text-tertiary)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: "6px 12px", cursor: "pointer" }}>Discard</button>
+          </div>
+        </div>
+      )}
 
       {/* NL input */}
       <div style={{ ...cardS, display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 14, background: "var(--bg-surface-hover)" }}>

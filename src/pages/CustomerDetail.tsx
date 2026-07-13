@@ -158,6 +158,11 @@ export default function CustomerDetail() {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
+              onClick={() => navigate(`/customers/${id}/risk`)}
+              title="Open the AI risk profile for this customer"
+              style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--accent-primary)", background: "transparent", padding: "6px 12px", border: "1px solid var(--accent-primary)", borderRadius: 2, cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" }}
+            >AI ANALYSIS</button>
+            <button
               onClick={openEdit}
               style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-secondary)", background: "transparent", padding: "6px 12px", border: "1px solid var(--border-subtle)", borderRadius: 2, cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" }}
             >EDIT</button>

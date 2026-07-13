@@ -1,7 +1,26 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ellipsis } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
+
+const MC_URL =
+  "https://getstarted.merchantcapital.co.za?actiontype=C_C&channel=Part_Trad&who=IA_SP";
+const MC_STORAGE_KEY = "mc_applied_invoice_ids";
+
+function loadAppliedIds(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(MC_STORAGE_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveAppliedId(id: string, current: Set<string>): Set<string> {
+  const next = new Set(current).add(id);
+  localStorage.setItem(MC_STORAGE_KEY, JSON.stringify([...next]));
+  return next;
+}
 import { fetchData, postData, putData, deleteData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -34,15 +53,6 @@ const EXPENSE_STATUS_COLOR: Record<string, string> = {
   REJECTED: "var(--status-danger)",
 };
 
-const CATEGORY_ICONS: Record<string, string> = {
-  FUEL: "",
-  TOLLS: "",
-  MAINTENANCE: "",
-  DRIVER_COST: "",
-  INSURANCE: "",
-  OVERHEAD: "",
-  OTHER: "",
-};
 
 const PAGE_SIZE = 10;
 
@@ -91,10 +101,9 @@ export default function Invoices() {
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(
     null,
   );
-  const [requestingCapitalId, setRequestingCapitalId] = useState<string | null>(
-    null,
-  );
   const [toast, setToast] = useState<string | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
   const statuses = ["All", "SENT", "OVERDUE", "PAID", "DRAFT"];
 
   // Invoices + stats, cached across navigations.
@@ -384,28 +393,6 @@ export default function Invoices() {
     }
   };
 
-  const handleRequestCapital = async (e: React.MouseEvent, inv: any) => {
-    e.stopPropagation();
-    setRequestingCapitalId(inv.id);
-    try {
-      await postData({ url: "api/v1/advances/", data: { invoice_id: inv.id } });
-      setToast(
-        `Capital requested for ${inv.invoice_number || inv.invoiceNumber}`,
-      );
-      queryClient.invalidateQueries({ queryKey: ["capital-eligible"] });
-      queryClient.invalidateQueries({ queryKey: ["capital-page"] });
-    } catch (err: any) {
-      const reason =
-        err?.data?.reason ||
-        err?.data?.error ||
-        err?.message ||
-        "Failed to request capital";
-      setToast(`Capital request failed: ${reason}`);
-    } finally {
-      setRequestingCapitalId(null);
-      setTimeout(() => setToast(null), 4000);
-    }
-  };
 
   // Never fall back to mock data — show empty state if API returns nothing
   const allInvoices = invoices;
@@ -1676,7 +1663,7 @@ export default function Invoices() {
                 <col style={{ width: "130px" }} />
                 <col style={{ width: "160px" }} />
                 <col style={{ width: "180px" }} />
-                <col style={{ width: "220px" }} />
+                <col style={{ width: "80px" }} />
               </colgroup>
               <thead>
                 <tr>
@@ -1685,7 +1672,7 @@ export default function Invoices() {
                   <th>Amount</th>
                   <th>Status</th>
                   <th>Due Date</th>
-                  <th>Actions</th>
+                  <th style={{ textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1858,100 +1845,203 @@ export default function Invoices() {
                             )}
                           </div>
                         </td>
-                        <td onClick={(e) => e.stopPropagation()}>
-                          <div
+                        <td
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ position: "relative", textAlign: "right" }}>
+                          {/* 3-dot menu button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDropdownId(
+                                openDropdownId === inv.id ? null : inv.id,
+                              );
+                            }}
                             style={{
-                              display: "flex",
-                              gap: 8,
-                              flexWrap: "wrap",
+                              background: "transparent",
+                              border: "1px solid var(--border-subtle)",
+                              color: "var(--text-secondary)",
+                              borderRadius: 2,
+                              cursor: "pointer",
+                              padding: "3px 8px",
+                              lineHeight: 0,
+                              display: "inline-flex",
+                              alignItems: "center",
                             }}>
-                            {invStatus === "DRAFT" && (
-                              <button
-                                className="btn-action"
-                                style={{ fontSize: 10, padding: "4px 12px" }}
-                                onClick={(e) => handleSendInvoice(e, inv.id)}
-                                disabled={sendingId === inv.id}>
-                                {sendingId === inv.id ? "SENDING..." : "SEND"}
-                              </button>
-                            )}
-                            {invStatus === "OVERDUE" && (
-                              <button
-                                className="btn-action"
+                            <Ellipsis size={14} />
+                          </button>
+
+                          {/* Dropdown */}
+                          {openDropdownId === inv.id && (
+                            <>
+                              {/* click-away overlay */}
+                              <div
                                 style={{
-                                  fontSize: 10,
-                                  padding: "4px 10px",
-                                  fontFamily: "var(--font-mono)",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.05em",
-                                  background: "transparent",
-                                  border: "1px solid var(--status-warning)",
-                                  color: "var(--status-warning)",
+                                  position: "fixed",
+                                  inset: 0,
+                                  zIndex: 99,
                                 }}
-                                onClick={(e) => handleSendReminder(e, inv.id)}
-                                disabled={sendingReminderId === inv.id}>
-                                {sendingReminderId === inv.id
-                                  ? "SENDING..."
-                                  : "REMIND"}
-                              </button>
-                            )}
-                            {invStatus !== "DRAFT" && (
-                              <button
-                                className="btn-action"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenDropdownId(null);
+                                }}
+                              />
+                              <div
                                 style={{
-                                  fontSize: 10,
-                                  padding: "4px 10px",
-                                  background: "transparent",
+                                  position: "absolute",
+                                  right: 0,
+                                  top: "calc(100% + 4px)",
+                                  zIndex: 100,
+                                  background: "#ffffff",
                                   border: "1px solid var(--border-subtle)",
-                                  color: "var(--text-secondary)",
-                                }}
-                                onClick={(e) => handleDownloadPDF(e, inv.id)}>
-                                PDF
-                              </button>
-                            )}
-                            {capitalEntry && (
-                              <button
-                                className="btn-action"
-                                style={{
-                                  fontSize: 10,
-                                  padding: "4px 10px",
-                                  background: "transparent",
-                                  border: `1px solid ${TIER_COLOR[tier || ""] || "var(--accent-primary)"}`,
-                                  color:
-                                    TIER_COLOR[tier || ""] ||
-                                    "var(--accent-primary)",
-                                  fontFamily: "var(--font-mono)",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.05em",
-                                  whiteSpace: "nowrap",
-                                }}
-                                onClick={(e) => handleRequestCapital(e, inv)}
-                                disabled={requestingCapitalId === inv.id}>
-                                {requestingCapitalId === inv.id
-                                  ? "REQUESTING..."
-                                  : "REQUEST CAPITAL"}
-                              </button>
-                            )}
-                            {ineligibleEntry && (
-                              <span
-                                title={ineligibleEntry.reason}
-                                style={{
-                                  fontSize: 9,
-                                  fontFamily: "var(--font-mono)",
-                                  color: "var(--text-tertiary)",
-                                  border: "1px solid var(--border-subtle)",
-                                  borderRadius: 2,
-                                  padding: "3px 6px",
-                                  whiteSpace: "nowrap",
-                                  maxWidth: 160,
+                                  borderRadius: 4,
+                                  minWidth: 200,
+                                  boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
                                   overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  display: "inline-block",
-                                  cursor: "default",
                                 }}>
-                                ✕ {ineligibleEntry.reason}
-                              </span>
-                            )}
-                          </div>
+                                {invStatus === "DRAFT" && (
+                                  <button
+                                    style={{
+                                      display: "block",
+                                      width: "100%",
+                                      textAlign: "left",
+                                      background: "transparent",
+                                      border: "none",
+                                      borderBottom:
+                                        "1px solid var(--border-subtle)",
+                                      color: "var(--accent-primary)",
+                                      fontFamily: "var(--font-mono)",
+                                      fontSize: 11,
+                                      letterSpacing: "0.05em",
+                                      padding: "10px 14px",
+                                      cursor: "pointer",
+                                      transition: "background 0.15s",
+                                    }}
+                                    disabled={sendingId === inv.id}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                                    onClick={(e) => {
+                                      setOpenDropdownId(null);
+                                      handleSendInvoice(e, inv.id);
+                                    }}>
+                                    {sendingId === inv.id
+                                      ? "SENDING..."
+                                      : "SEND TO CUSTOMER"}
+                                  </button>
+                                )}
+                                {invStatus === "OVERDUE" && (
+                                  <button
+                                    style={{
+                                      display: "block",
+                                      width: "100%",
+                                      textAlign: "left",
+                                      background: "transparent",
+                                      border: "none",
+                                      borderBottom:
+                                        "1px solid var(--border-subtle)",
+                                      color: "var(--status-warning)",
+                                      fontFamily: "var(--font-mono)",
+                                      fontSize: 11,
+                                      letterSpacing: "0.05em",
+                                      padding: "10px 14px",
+                                      cursor: "pointer",
+                                      transition: "background 0.15s",
+                                    }}
+                                    disabled={sendingReminderId === inv.id}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                                    onClick={(e) => {
+                                      setOpenDropdownId(null);
+                                      handleSendReminder(e, inv.id);
+                                    }}>
+                                    {sendingReminderId === inv.id
+                                      ? "SENDING..."
+                                      : "SEND REMINDER"}
+                                  </button>
+                                )}
+                                {invStatus !== "DRAFT" && (
+                                  <button
+                                    style={{
+                                      display: "block",
+                                      width: "100%",
+                                      textAlign: "left",
+                                      background: "transparent",
+                                      border: "none",
+                                      borderBottom:
+                                        "1px solid var(--border-subtle)",
+                                      color: "var(--text-secondary)",
+                                      fontFamily: "var(--font-mono)",
+                                      fontSize: 11,
+                                      letterSpacing: "0.05em",
+                                      padding: "10px 14px",
+                                      cursor: "pointer",
+                                      transition: "background 0.15s",
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                                    onClick={(e) => {
+                                      setOpenDropdownId(null);
+                                      handleDownloadPDF(e, inv.id);
+                                    }}>
+                                    DOWNLOAD PDF
+                                  </button>
+                                )}
+                                {capitalEntry && (
+                                  <a
+                                    href={MC_URL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => {
+                                      setOpenDropdownId(null);
+                                      setAppliedIds((prev) => saveAppliedId(String(inv.id), prev));
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                                    style={{
+                                      display: "block",
+                                      width: "100%",
+                                      textAlign: "left",
+                                      background: "transparent",
+                                      borderBottom: "1px solid var(--border-subtle)",
+                                      color: appliedIds.has(String(inv.id))
+                                        ? "var(--status-success)"
+                                        : TIER_COLOR[tier || ""] || "var(--accent-primary)",
+                                      fontFamily: "var(--font-mono)",
+                                      fontSize: 11,
+                                      letterSpacing: "0.05em",
+                                      padding: "10px 14px",
+                                      cursor: "pointer",
+                                      textDecoration: "none",
+                                      boxSizing: "border-box",
+                                      transition: "background 0.15s",
+                                    }}>
+                                    {appliedIds.has(String(inv.id)) ? "Applied ✓" : "REQUEST CAPITAL →"}
+                                  </a>
+                                )}
+                                {ineligibleEntry && (
+                                  <div
+                                    style={{
+                                      padding: "10px 14px",
+                                      fontFamily: "var(--font-mono)",
+                                      fontSize: 10,
+                                      color: "var(--text-tertiary)",
+                                      lineHeight: 1.4,
+                                    }}>
+                                    <div
+                                      style={{
+                                        color: "var(--status-danger)",
+                                        fontWeight: 600,
+                                        marginBottom: 2,
+                                        fontSize: 9,
+                                        letterSpacing: "0.05em",
+                                      }}>
+                                      NOT ELIGIBLE FOR CAPITAL
+                                    </div>
+                                    {ineligibleEntry.reason}
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </td>
                       </tr>
                     );

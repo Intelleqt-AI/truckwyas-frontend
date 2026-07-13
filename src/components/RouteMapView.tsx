@@ -83,6 +83,7 @@ export function RouteMapView({ pickup, delivery, height = 260, geometry }: Route
   const pickupMarkerRef = useRef<Marker | null>(null);
   const deliveryMarkerRef = useRef<Marker | null>(null);
   const routeLineRef = useRef<Polyline | null>(null);
+  const fittedKeyRef = useRef<string | null>(null);
 
   // Initialise the Leaflet map once.
   useEffect(() => {
@@ -145,7 +146,14 @@ export function RouteMapView({ pickup, delivery, height = 260, geometry }: Route
       deliveryMarkerRef.current = L.marker(end, { icon: dotIcon(L, '#dc2626') })
         .bindTooltip(`Delivery: ${delivery}`, { direction: 'top' }).addTo(map);
       routeLineRef.current = L.polyline(points, { color: '#1d4ed8', weight: 3, opacity: 0.85 }).addTo(map);
-      map.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
+      // Only re-fit the view when the endpoints change. Swapping to an alternate
+      // route keeps the same start/end, so we leave the viewport put — avoids the
+      // zoom "blink" on every route selection.
+      const fitKey = `${start.join()}|${end.join()}`;
+      if (fittedKeyRef.current !== fitKey) {
+        map.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
+        fittedKeyRef.current = fitKey;
+      }
     };
 
     clear();

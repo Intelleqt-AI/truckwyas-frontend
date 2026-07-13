@@ -58,13 +58,13 @@ export default function QuoteBuilder() {
   const [cargo, setCargo] = useState("");
   const [pickupDate, setPickupDate] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
-  const [tripType, setTripType] = useState<"ONE_WAY" | "ROUND_TRIP">("ONE_WAY");
+  const [tripType, setTripType] = useState<"ONE_WAY" | "ROUND_TRIP">("ROUND_TRIP");
   const [crossBorder, setCrossBorder] = useState(true);
   const [notes, setNotes] = useState("");
   const [validUntil, setValidUntil] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10);
   });
-  const [showDetails, setShowDetails] = useState(false);
+  const [showDetails, setShowDetails] = useState(true);
 
   // ---- pricing overrides ----
   const [editableTollCost, setEditableTollCost] = useState<number | null>(null);
@@ -92,6 +92,12 @@ export default function QuoteBuilder() {
   // quote's id without the edit-loader clobbering in-progress fields, and keeps
   // autosave running after that URL flip.
   const createdRef = useRef(false);
+  // The draft's DB id, mirrored in a ref so the debounced autosave closure always
+  // sees the latest value (React state is async — reading it from the closure
+  // caused a POST race that created duplicate drafts). creatingRef locks out a
+  // second POST while the first create is still in flight.
+  const savedIdRef = useRef<number | null>(null);
+  const creatingRef = useRef(false);
 
   // ---- reference data ----
   const { data: companyProfile } = useQuery({ queryKey: ["company-profile"], queryFn: () => fetchData("api/v1/company/profile/") });
@@ -127,17 +133,24 @@ export default function QuoteBuilder() {
 
   // ---- derived costs ----
   const route = routeData?.routes?.[selectedRouteIndex] || null;
+  // `distance` is always the ONE-WAY lane distance (what the map + route options
+  // show, and what we persist). A round trip drives it twice, so distance-based
+  // costs multiply by `legs`. Keeping `distance` one-way makes reload math simple:
+  // base_rate/(distance×legs) always recovers the per-km rate.
   const distance = route?.distance_km ?? routeData?.distance_km ?? 0;
-  const fuelCost = Math.round(distance * fuelConsumption * fuelPricePerL / 100);
+  const legs = tripType === "ROUND_TRIP" ? 2 : 1;
+  const chargeDistance = distance * legs;
+  const fuelCost = Math.round(chargeDistance * fuelConsumption * fuelPricePerL / 100);
   const tollRate = Number(companyProfile?.default_toll_rate_per_km) || 0.95;
-  const tollCost = editableTollCost !== null ? editableTollCost : Math.round(route?.toll_cost_zar ?? routeData?.toll_cost_zar ?? distance * tollRate);
-  const crossBorderCost = (routeData?.additional_costs?.border_fees || 0) + (routeData?.additional_costs?.weighbridge_fees || 0) + (routeData?.additional_costs?.non_sa_tolls || 0);
+  const autoToll = Math.round((route?.toll_cost_zar ?? routeData?.toll_cost_zar ?? distance * tollRate) * legs);
+  const tollCost = editableTollCost !== null ? editableTollCost : autoToll;
+  const crossBorderCost = ((routeData?.additional_costs?.border_fees || 0) + (routeData?.additional_costs?.weighbridge_fees || 0) + (routeData?.additional_costs?.non_sa_tolls || 0)) * legs;
   const driverAllowance = Number(driverAllowanceInput) || 0;
   const weightKg = (Number(weight) || 0) * 1000;
   const surchargeThreshold = Number(companyProfile?.weight_surcharge_threshold_kg) || 5000;
   const surchargePct = Number(companyProfile?.weight_surcharge_pct) || 15;
-  const weightSurcharge = weightKg > surchargeThreshold ? Math.round((distance * Number(baseRatePerKm)) * (surchargePct / 100)) : 0;
-  const baseCost = Math.round(distance * Number(baseRatePerKm));
+  const weightSurcharge = weightKg > surchargeThreshold ? Math.round((chargeDistance * Number(baseRatePerKm)) * (surchargePct / 100)) : 0;
+  const baseCost = Math.round(chargeDistance * Number(baseRatePerKm));
   const directCost = fuelCost + tollCost + crossBorderCost + driverAllowance;
   const total = baseCost + fuelCost + tollCost + crossBorderCost + driverAllowance + weightSurcharge + serviceCharge;
   const marginPct = total > 0 ? Math.round(((total - directCost) / total) * 100) : 0;
@@ -178,13 +191,13 @@ export default function QuoteBuilder() {
     try {
       const [an, gd] = await Promise.all([
         postData({ url: "api/v1/quotes/analyze/", data: {
-          quote_total: total, direct_cost: directCost, distance_km: distance, origin: extractCode(pickup), destination: extractCode(delivery),
+          quote_total: total, direct_cost: directCost, distance_km: chargeDistance, origin: extractCode(pickup), destination: extractCode(delivery),
           vehicle_type: vehicleType, weight: weightKg, fuel_cost: fuelCost, toll_cost: tollCost, driver_cost: driverAllowance,
-          fuel_usage_litres: Math.round(distance * fuelConsumption / 100), fuel_price_used: fuelPricePerL,
+          fuel_usage_litres: Math.round(chargeDistance * fuelConsumption / 100), fuel_price_used: fuelPricePerL,
           market_rate: benchmark?.market_avg_rate || 0, client_tier: "standard",
         }}).catch(() => null),
         postData({ url: "/api/v1/quotes/guard/", data: {
-          total_cost: directCost, quote_price: total, distance_km: distance, fuel_cost: fuelCost, toll_cost: tollCost,
+          total_cost: directCost, quote_price: total, distance_km: chargeDistance, fuel_cost: fuelCost, toll_cost: tollCost,
         }}).catch(() => null),
       ]);
       if (an) setAnalysis(an);
@@ -196,8 +209,10 @@ export default function QuoteBuilder() {
     if (analyzeRef.current) clearTimeout(analyzeRef.current);
     analyzeRef.current = setTimeout(() => { runAI(); }, 700);
     return () => { if (analyzeRef.current) clearTimeout(analyzeRef.current); };
+    // selectedRouteIndex/legs are folded into `total`, but list them so an
+    // alternate-route pick (or trip-type flip) always re-runs the AI explicitly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeData, total]);
+  }, [routeData, total, selectedRouteIndex, legs]);
 
   // benchmark on lane resolve
   useEffect(() => {
@@ -247,12 +262,18 @@ export default function QuoteBuilder() {
       setCargo(q.cargo_description || ""); setNotes(q.notes || "");
       setDriverAllowanceInput(String(q.driver_allowance || 0));
       if (q.toll_charges != null) setEditableTollCost(Number(q.toll_charges));
-      if (q.distance && q.base_rate) setBaseRatePerKm(String(Math.round((Number(q.base_rate) / Number(q.distance)) * 100) / 100));
+      if (q.trip_type) setTripType(q.trip_type);
+      // base_rate is the round-trip base (chargeDistance × rate); divide by
+      // distance × legs to recover the per-km rate the way the live math computes it.
+      if (q.distance && q.base_rate) {
+        const loadLegs = q.trip_type === "ROUND_TRIP" ? 2 : 1;
+        setBaseRatePerKm(String(Math.round((Number(q.base_rate) / (Number(q.distance) * loadLegs)) * 100) / 100));
+      }
       if (q.valid_until) setValidUntil(q.valid_until);
       if (q.pickup_date) setPickupDate(q.pickup_date);
       if (q.delivery_date) setDeliveryDate(q.delivery_date);
-      if (q.trip_type) setTripType(q.trip_type);
       setSavedQuoteId(Number(editId));
+      savedIdRef.current = Number(editId);
       if (q.distance) setRouteData({ distance_km: Number(q.distance), toll_cost_zar: Number(q.toll_charges) });
     }).catch(() => toast.error("Couldn't load that quote"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -291,11 +312,11 @@ export default function QuoteBuilder() {
   // left is already saved (DB draft in the quotes list), so nothing is lost.
   const startNew = () => {
     localStorage.removeItem(DRAFT_KEY);
-    createdRef.current = false;
+    createdRef.current = false; savedIdRef.current = null; creatingRef.current = false;
     setSavedQuoteId(null); setLastSavedAt(null); setResumable(null);
     setCustomerId(""); setVehicleType(""); setPickup(""); setDelivery("");
     setPickupCoords(null); setDeliveryCoords(null);
-    setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
+    setWeight(""); setCargo(""); setNotes(""); setTripType("ROUND_TRIP");
     setPickupDate(""); setDeliveryDate(""); setShowDetails(false); setNlText("");
     setEditableTollCost(null); setDriverAllowanceInput("0"); setServiceCharge(0);
     setRouteData(null); setSelectedRouteIndex(0);
@@ -342,12 +363,16 @@ export default function QuoteBuilder() {
     if (!substantive) return;
     if (dbRef.current) clearTimeout(dbRef.current);
     dbRef.current = setTimeout(async () => {
+      const existingId = savedIdRef.current ?? savedQuoteId;
       try {
-        if (savedQuoteId) {
-          await patchData({ url: `api/v1/quotes/${savedQuoteId}/`, data: buildPayload("DRAFT") });
+        if (existingId) {
+          await patchData({ url: `api/v1/quotes/${existingId}/`, data: buildPayload("DRAFT") });
         } else {
+          if (creatingRef.current) return;      // a create is already in flight
+          creatingRef.current = true;
           const res = await postData({ url: "api/v1/quotes/", data: buildPayload("DRAFT") });
           if (res?.id) {
+            savedIdRef.current = res.id;
             setSavedQuoteId(res.id);
             createdRef.current = true;
             // The DB now owns this draft — drop the local crash-recovery copy and
@@ -357,9 +382,10 @@ export default function QuoteBuilder() {
             queryClient.invalidateQueries({ queryKey: ["quotes"] });
             navigate(`/bookings/quotes/${res.id}/edit`, { replace: true });
           }
+          creatingRef.current = false;
         }
         setLastSavedAt(new Date());
-      } catch { /* silent — localStorage still holds it */ }
+      } catch { creatingRef.current = false; /* silent — localStorage still holds it */ }
     }, 1500);
     return () => { if (dbRef.current) clearTimeout(dbRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -533,7 +559,7 @@ export default function QuoteBuilder() {
                 <span style={labelS}>Quote total</span>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 22, fontWeight: 600, color: "var(--text-primary)" }}>{formatCurrency(total)}</span>
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>{Math.round(distance)} km · live diesel · your {vehicleType} settings{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>{Math.round(distance)} km {legs === 2 ? `one way · ${Math.round(chargeDistance)} km round trip` : "one way"} · live diesel · your {vehicleType} settings{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
               <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                 <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Tolls</div><input type="number" value={tollCost} onChange={e => setEditableTollCost(Number(e.target.value))} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
                 <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Driver</div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>

@@ -173,7 +173,7 @@ export default function RiskScoreView() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--bg-surface-hover)' }}>
-                {['CUSTOMER', 'SCORE', 'TIER', 'PAYMENT HIST', 'INVOICE AGE', 'POD', 'FAST PAY FEE', 'ELIGIBLE'].map(h => (
+                {['Customer', 'Score', 'Tier', 'Payment hist', 'Invoice age', 'POD', 'Fast-pay fee', 'Eligible'].map(h => (
                   <th key={h} style={{ padding: '12px 16px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textAlign: 'left', letterSpacing: '0.08em', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
                 ))}
               </tr>

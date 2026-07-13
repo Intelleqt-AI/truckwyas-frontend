@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import type { Map as LeafletMap, Marker, Polyline } from 'leaflet';
 
@@ -67,20 +67,29 @@ interface RouteMapViewProps {
   pickup: string;
   delivery: string;
   height?: number;
+  /**
+   * Polyline of the currently selected route, as [lat, lon] pairs. When present
+   * this is drawn verbatim — it's the exact route the backend priced — and the
+   * map redraws whenever it changes (i.e. when a different route option is
+   * selected). When absent the component falls back to geocoding the
+   * pickup/delivery text and fetching a route itself.
+   */
+  geometry?: [number, number][];
 }
 
-export function RouteMapView({ pickup, delivery, height = 260 }: RouteMapViewProps) {
+export function RouteMapView({ pickup, delivery, height = 260, geometry }: RouteMapViewProps) {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<{ map: LeafletMap; L: LeafletModule } | null>(null);
   const pickupMarkerRef = useRef<Marker | null>(null);
   const deliveryMarkerRef = useRef<Marker | null>(null);
   const routeLineRef = useRef<Polyline | null>(null);
 
+  // Initialise the Leaflet map once.
   useEffect(() => {
     if (!mapDivRef.current || mapInstanceRef.current) return;
 
-    import('leaflet').then(async (L) => {
-      if (!mapDivRef.current) return;
+    import('leaflet').then((L) => {
+      if (!mapDivRef.current || mapInstanceRef.current) return;
 
       const map = L.map(mapDivRef.current, {
         zoomControl: true,
@@ -97,41 +106,76 @@ export function RouteMapView({ pickup, delivery, height = 260 }: RouteMapViewPro
       L.control.attribution({ prefix: false, position: 'bottomright' }).addTo(map);
 
       mapInstanceRef.current = { map, L };
-
-      const [pickupCoords, deliveryCoords] = await Promise.all([
-        geocodeText(pickup),
-        geocodeText(delivery),
-      ]);
-
-      if (!mapInstanceRef.current) return;
-
-      if (pickupCoords) {
-        pickupMarkerRef.current = L.marker([pickupCoords.lat, pickupCoords.lon], { icon: dotIcon(L, '#16a34a') })
-          .bindTooltip(`Pickup: ${pickup}`, { direction: 'top' })
-          .addTo(map);
-      }
-      if (deliveryCoords) {
-        deliveryMarkerRef.current = L.marker([deliveryCoords.lat, deliveryCoords.lon], { icon: dotIcon(L, '#dc2626') })
-          .bindTooltip(`Delivery: ${delivery}`, { direction: 'top' })
-          .addTo(map);
-      }
-
-      if (pickupCoords && deliveryCoords) {
-        const points = await fetchRoute(pickupCoords, deliveryCoords);
-        routeLineRef.current = L.polyline(points, { color: '#1d4ed8', weight: 3, opacity: 0.85 }).addTo(map);
-        map.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
-      } else if (pickupCoords) {
-        map.setView([pickupCoords.lat, pickupCoords.lon], 9);
-      } else if (deliveryCoords) {
-        map.setView([deliveryCoords.lat, deliveryCoords.lon], 9);
-      }
+      // Force an initial draw now that the map exists.
+      setReady((n) => n + 1);
     });
 
     return () => {
       mapInstanceRef.current?.map.remove();
       mapInstanceRef.current = null;
     };
-  }, []); // pickup/delivery don't change on this static view
+  }, []);
+
+  // Bumped after map init so the draw effect below runs once the map is ready.
+  const [ready, setReady] = useState(0);
+  // Stable key for the geometry so the effect only re-runs on an actual change.
+  const geomKey = geometry && geometry.length > 1
+    ? `${geometry.length}:${geometry[0].join()}:${geometry[geometry.length - 1].join()}`
+    : '';
+
+  // Draw / redraw markers + route line whenever the selected route (geometry) or
+  // the pickup/delivery text changes.
+  useEffect(() => {
+    const inst = mapInstanceRef.current;
+    if (!inst) return;
+    const { map, L } = inst;
+    let cancelled = false;
+
+    const clear = () => {
+      pickupMarkerRef.current?.remove(); pickupMarkerRef.current = null;
+      deliveryMarkerRef.current?.remove(); deliveryMarkerRef.current = null;
+      routeLineRef.current?.remove(); routeLineRef.current = null;
+    };
+
+    const drawLine = (points: [number, number][]) => {
+      if (cancelled || points.length < 2) return;
+      const [start, end] = [points[0], points[points.length - 1]];
+      pickupMarkerRef.current = L.marker(start, { icon: dotIcon(L, '#16a34a') })
+        .bindTooltip(`Pickup: ${pickup}`, { direction: 'top' }).addTo(map);
+      deliveryMarkerRef.current = L.marker(end, { icon: dotIcon(L, '#dc2626') })
+        .bindTooltip(`Delivery: ${delivery}`, { direction: 'top' }).addTo(map);
+      routeLineRef.current = L.polyline(points, { color: '#1d4ed8', weight: 3, opacity: 0.85 }).addTo(map);
+      map.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
+    };
+
+    clear();
+
+    // Preferred path: draw the exact geometry of the selected route.
+    if (geometry && geometry.length > 1) {
+      drawLine(geometry);
+      return () => { cancelled = true; };
+    }
+
+    // Fallback: geocode the text and fetch a route ourselves.
+    (async () => {
+      const [pickupCoords, deliveryCoords] = await Promise.all([
+        geocodeText(pickup),
+        geocodeText(delivery),
+      ]);
+      if (cancelled || !mapInstanceRef.current) return;
+      if (pickupCoords && deliveryCoords) {
+        const points = await fetchRoute(pickupCoords, deliveryCoords);
+        if (!cancelled) drawLine(points);
+      } else if (pickupCoords) {
+        map.setView([pickupCoords.lat, pickupCoords.lon], 9);
+      } else if (deliveryCoords) {
+        map.setView([deliveryCoords.lat, deliveryCoords.lon], 9);
+      }
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, geomKey, pickup, delivery]);
 
   return (
     <div

@@ -29,7 +29,7 @@ const extractCode = (s: string) => {
   return (s || "").slice(0, 3).toUpperCase();
 };
 
-interface RouteOption { summary?: string; distance_km: number; duration_min?: number; toll_cost_zar?: number; label?: string; }
+interface RouteOption { summary?: string; distance_km: number; duration_min?: number; duration_minutes?: number; toll_cost_zar?: number; label?: string; geometry?: { lat: number; lon: number }[]; }
 interface RouteData {
   distance_km: number; duration_minutes?: number; fuel_cost_zar?: number; toll_cost_zar?: number;
   fuel_usage_litres?: number; fuel_price_used?: number; routes?: RouteOption[]; best_index?: number;
@@ -425,7 +425,10 @@ export default function QuoteBuilder() {
       {ready && (
         <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 14, marginBottom: 14 }}>
           <div style={{ ...cardS, overflow: "hidden" }}>
-            <RouteMapView pickup={pickup} delivery={delivery} height={300} />
+            <RouteMapView pickup={pickup} delivery={delivery} height={300}
+              geometry={route?.geometry && route.geometry.length > 1
+                ? route.geometry.map(p => [p.lat, p.lon] as [number, number])
+                : undefined} />
             {routeData?.routes && routeData.routes.length > 1 && (
               <div style={{ display: "flex", gap: 8, padding: 10, flexWrap: "wrap", borderTop: "1px solid var(--border-subtle)" }}>
                 {routeData.routes.map((r, i) => (

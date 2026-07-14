@@ -16,6 +16,19 @@ const STATUS_COLOR: Record<string, string> = {
   COMPLETED: 'var(--status-success)',
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Draft',
+  SENT: 'Sent',
+  ACCEPTED: 'Accepted',
+  DECLINED: 'Declined',
+  IT: 'In-Transit',
+  COMPLETED: 'Completed',
+};
+
+// Sentence-case a single-word token for display: "HIGH" → "High".
+const sentenceCase = (s?: string) =>
+  s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '';
+
 export default function QuoteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -184,7 +197,7 @@ export default function QuoteDetail() {
     return (
       <div style={{ padding: 40 }}>
         <div style={{ fontSize: 13, color: 'var(--status-danger)', marginBottom: 12 }}>Quote not found</div>
-        <button className="btn-action" onClick={() => navigate('/bookings/quotes')}>Back to Quotes</button>
+        <button className="btn-action" onClick={() => navigate('/bookings/quotes')}>Back to quotes</button>
       </div>
     );
   }
@@ -224,7 +237,7 @@ export default function QuoteDetail() {
             padding: 0,
           }}
         >
-          ← BACK TO QUOTES
+          ← Back to quotes
         </button>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
           Quote Detail
@@ -237,16 +250,18 @@ export default function QuoteDetail() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span
               style={{
+                display: 'inline-block',
+                whiteSpace: 'nowrap',
                 fontFamily: 'var(--font-mono)',
                 fontSize: 10,
                 color: STATUS_COLOR[quote.status] || 'var(--text-secondary)',
                 padding: '4px 10px',
                 border: `1px solid ${STATUS_COLOR[quote.status] || 'var(--border-subtle)'}`,
-                borderRadius: 2,
+                borderRadius: 4,
                 background: 'var(--bg-surface)',
               }}
             >
-              {quote.status}
+              {STATUS_LABEL[quote.status] || quote.status}
             </span>
           </div>
         </div>
@@ -319,8 +334,8 @@ export default function QuoteDetail() {
                 {quote.trip_type === 'ROUND_TRIP' ? 'Leg 1 — Outbound Route' : 'Route'}
               </div>
               {quote.trip_type === 'ROUND_TRIP' && (
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 2, fontWeight: 700 }}>
-                  ROUND TRIP
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 4, fontWeight: 500, whiteSpace: 'nowrap', display: 'inline-block' }}>
+                  Round trip
                 </span>
               )}
             </div>
@@ -506,7 +521,7 @@ export default function QuoteDetail() {
               <div>
                 {label('Confidence')}
                 <div style={{ fontSize: 12, color: quote.confidence === 'HIGH' ? 'var(--status-success)' : quote.confidence === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)' }}>
-                  {quote.confidence}
+                  {sentenceCase(quote.confidence)}
                 </div>
               </div>
               <div>
@@ -573,7 +588,7 @@ export default function QuoteDetail() {
                   className="btn-action"
                   style={{ flex: 1, fontSize: 11, padding: '10px 16px', background: 'var(--status-success)', border: 'none', color: '#000' }}
                 >
-                  ✓ MARK AS ACCEPTED
+                  ✓ Mark as accepted
                 </button>
                 <button
                   onClick={() => {
@@ -583,7 +598,7 @@ export default function QuoteDetail() {
                   className="btn-action"
                   style={{ flex: 1, fontSize: 11, padding: '10px 16px', background: 'var(--status-danger)', border: 'none', color: '#fff' }}
                 >
-                  ✗ MARK AS REJECTED
+                  ✗ Mark as rejected
                 </button>
               </div>
             </div>
@@ -598,7 +613,7 @@ export default function QuoteDetail() {
                 onClick={() => navigate(`/bookings/quotes/${id}/edit`)}
                 style={{ width: '100%', fontSize: 11, padding: '10px 16px' }}
               >
-                EDIT QUOTE
+                Edit quote
               </button>
 
               {/* Send to Customer */}
@@ -614,7 +629,7 @@ export default function QuoteDetail() {
                 }}
                 disabled={sendToCustomerMutation.isPending}
               >
-                {sendToCustomerMutation.isPending ? 'GENERATING...' : 'SEND TO CUSTOMER'}
+                {sendToCustomerMutation.isPending ? 'Generating…' : 'Send to customer'}
               </button>
 
               {shareUrl && (
@@ -627,7 +642,7 @@ export default function QuoteDetail() {
                   color: 'var(--text-primary)',
                   fontFamily: 'var(--font-mono)',
                 }}>
-                  <div style={{ color: 'var(--text-tertiary)', marginBottom: 6 }}>SHARE LINK:</div>
+                  <div style={{ color: 'var(--text-tertiary)', marginBottom: 6 }}>Share link</div>
                   <div style={{
                     wordBreak: 'break-all',
                     color: 'var(--accent-primary)',
@@ -653,7 +668,7 @@ export default function QuoteDetail() {
                       width: '100%',
                     }}
                   >
-                    COPY LINK
+                    Copy link
                   </button>
                 </div>
               )}
@@ -666,7 +681,7 @@ export default function QuoteDetail() {
                     style={{ width: '100%', fontSize: 11, padding: '10px 16px', background: 'var(--status-success)', border: 'none' }}
                     disabled={convertToLoadMutation.isPending}
                   >
-                    {convertToLoadMutation.isPending ? 'CONVERTING...' : '✓ CONVERT TO BOOKING'}
+                    {convertToLoadMutation.isPending ? 'Converting…' : '✓ Convert to booking'}
                   </button>
                 </>
               )}
@@ -686,7 +701,7 @@ export default function QuoteDetail() {
                 }}
                 disabled={deleteMutation.isPending}
               >
-                {deleteMutation.isPending ? 'DELETING...' : 'DELETE QUOTE'}
+                {deleteMutation.isPending ? 'Deleting…' : 'Delete quote'}
               </button>
 
               {/* PDF Download */}
@@ -711,13 +726,12 @@ export default function QuoteDetail() {
                   fontSize: 11,
                   fontFamily: 'var(--font-mono)',
                   letterSpacing: '0.08em',
-                  textTransform: 'uppercase' as const,
                   cursor: 'pointer',
                   width: '100%',
                   marginTop: 8,
                 }}
               >
-                ↓ DOWNLOAD PDF
+                ↓ Download PDF
               </button>
             </div>
           </div>
@@ -803,7 +817,7 @@ export default function QuoteDetail() {
                 className="btn-action"
                 style={{ flex: 1, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
               >
-                CANCEL
+                Cancel
               </button>
               <button
                 onClick={() => {
@@ -825,7 +839,7 @@ export default function QuoteDetail() {
                   color: outcomeType === 'accepted' ? '#000' : '#fff'
                 }}
               >
-                {outcomeMutation.isPending ? 'SAVING...' : outcomeType === 'accepted' ? 'MARK ACCEPTED' : 'MARK REJECTED'}
+                {outcomeMutation.isPending ? 'Saving…' : outcomeType === 'accepted' ? 'Mark accepted' : 'Mark rejected'}
               </button>
             </div>
           </div>

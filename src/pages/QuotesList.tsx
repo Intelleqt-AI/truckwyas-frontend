@@ -43,6 +43,10 @@ const confidenceColor = (c?: string) =>
 const routeOf = (q: any) =>
   `${q.origin || q.pickup_location || '—'} → ${q.destination || q.delivery_location || '—'}`;
 
+// Sentence-case a single-word token for display: "HIGH" → "High".
+const sentenceCase = (s?: string) =>
+  s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '';
+
 const COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'IT', 'COMPLETED'];
 const COLUMN_LABELS: Record<string, string> = {
   DRAFT: 'Draft',
@@ -96,10 +100,10 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
               <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 11 }}>⛽</span>
             )}
             {quote.outcome === 'accepted' && (
-              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>✓ WON</span>
+              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, fontFamily: 'var(--font-mono)', fontWeight: 500 }}>✓ Won</span>
             )}
             {quote.outcome === 'rejected' && (
-              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>✗ LOST</span>
+              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>✗ Lost</span>
             )}
           </div>
         </div>
@@ -110,15 +114,15 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: quote.status === 'ACCEPTED' ? 10 : 0 }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
           {quote.confidence && (
-            <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 2, color: confidenceColor(quote.confidence), border: `1px solid ${confidenceColor(quote.confidence)}` }}>{quote.confidence}</span>
+            <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', color: confidenceColor(quote.confidence), border: `1px solid ${confidenceColor(quote.confidence)}` }}>{sentenceCase(quote.confidence)}</span>
           )}
         </div>
         {quote.status === 'ACCEPTED' && onConvertToLoad && (
           <button
             onClick={(e) => onConvertToLoad(e, quote)}
-            style={{ width: '100%', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.05em', padding: '7px 8px', background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
+            style={{ width: '100%', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '0.05em', padding: '7px 8px', background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
           >
-            → CONVERT TO BOOKING
+            → Convert to booking
           </button>
         )}
       </div>
@@ -301,12 +305,12 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-action" style={{ background: 'var(--accent-primary)', color: 'var(--bg-deep)' }} onClick={() => navigate('/bookings/quotes/ai-chat')}>
-                AI QUOTE
+                AI quote
               </button>
               <button className="btn-action" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={() => navigate('/bookings/quotes/new')}>
-                + NEW QUOTE
+                + New quote
               </button>
-              <button className="btn-action" onClick={() => navigate('/bookings/quotes/new')}>+ NEW LOAD</button>
+              <button className="btn-action" onClick={() => navigate('/bookings/quotes/new')}>+ New load</button>
             </div>
           </div>
         </div>
@@ -332,11 +336,10 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
               fontSize: 11,
               fontFamily: 'var(--font-mono)',
               cursor: 'pointer',
-              textTransform: 'uppercase' as const,
               letterSpacing: '0.06em',
-              fontWeight: view === v ? 600 : 400,
+              fontWeight: view === v ? 500 : 400,
               transition: 'all 0.2s ease',
-            }}>{v}</button>
+            }}>{v === 'board' ? 'Board' : 'List'}</button>
           ))}
         </div>
         <div style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
@@ -402,7 +405,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(activeQuote.total_amount || '0'))}</span>
                   {activeQuote.confidence && (
-                    <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 600, padding: '2px 6px', borderRadius: 2, color: confidenceColor(activeQuote.confidence), border: `1px solid ${confidenceColor(activeQuote.confidence)}` }}>{activeQuote.confidence}</span>
+                    <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', color: confidenceColor(activeQuote.confidence), border: `1px solid ${confidenceColor(activeQuote.confidence)}` }}>{sentenceCase(activeQuote.confidence)}</span>
                   )}
                 </div>
               </div>
@@ -427,18 +430,17 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                   fontSize: 11,
                   fontFamily: 'var(--font-mono)',
                   cursor: 'pointer',
-                  textTransform: 'uppercase' as const,
                   letterSpacing: '0.06em',
-                  fontWeight: statusFilter === status ? 600 : 400,
+                  fontWeight: statusFilter === status ? 500 : 400,
                   transition: 'all 0.2s ease',
                 }}
               >
-                {status === 'ALL' ? 'ALL' : COLUMN_LABELS[status]} ({status === 'ALL' ? quotes.length : quotesByStatus[status]?.length || 0})
+                {status === 'ALL' ? 'All' : COLUMN_LABELS[status]} ({status === 'ALL' ? quotes.length : quotesByStatus[status]?.length || 0})
               </button>
             ))}
           </div>
 
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)' }}>
@@ -446,8 +448,8 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                     <th key={h} style={{
                       padding: '12px 16px',
                       textAlign: h === 'AMOUNT' ? 'right' : h === 'ACTION' ? 'center' : 'left',
-                      fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-                      fontWeight: 600, letterSpacing: '0.1em',
+                      fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
+                      fontWeight: 500, letterSpacing: '0.08em', whiteSpace: 'nowrap',
                     }}>{h}</th>
                   ))}
                 </tr>
@@ -464,49 +466,50 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                     onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
-                    <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                    <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
                       {quote.quote_number}
                       {quote.fuel_alert && (
                         <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 11, marginLeft: 6 }}>⛽</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-primary)' }}>{quote.customer_name || '—'}</td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>{routeOf(quote)}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{quote.customer_name || '—'}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }} title={routeOf(quote)}>{routeOf(quote)}</td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{
+                        display: 'inline-block', whiteSpace: 'nowrap',
                         fontFamily: 'var(--font-mono)', fontSize: 10,
                         color: STATUS_COLOR[quote.status] || 'var(--text-secondary)',
                         padding: '4px 8px',
                         border: `1px solid ${STATUS_COLOR[quote.status] || 'var(--border-subtle)'}`,
-                        borderRadius: 2,
+                        borderRadius: 4,
                       }}>
                         {COLUMN_LABELS[quote.status] || quote.status}
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       {quote.outcome === 'accepted' && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, borderRadius: 2, fontWeight: 600 }}>✓ Won</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', fontWeight: 500 }}>✓ Won</span>
                       )}
                       {quote.outcome === 'rejected' && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', borderRadius: 2, fontWeight: 600 }}>✗ Lost</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', fontWeight: 500 }}>✗ Lost</span>
                       )}
                       {(!quote.outcome || quote.outcome === 'pending') && (
                         <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                    <td style={{ padding: '12px 16px', fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                       {quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '—'}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600 }}>
+                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {formatCurrency(parseFloat(quote.total_amount || '0'))}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                       {quote.status === 'ACCEPTED' && (
                         <button
                           onClick={(e) => handleConvertToLoad(e, quote)}
-                          style={{ background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer' }}
+                          style={{ background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
-                          → BOOKING
+                          → Booking
                         </button>
                       )}
                     </td>

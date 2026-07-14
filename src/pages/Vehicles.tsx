@@ -85,6 +85,10 @@ const STATUS_COLOR: Record<string, string> = {
 const formatZAR = (v: number) =>
   'R ' + v.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
+// Sentence-case a status token for display: "IN_USE" → "In use".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
 // Fetches all fleet data + derives lists. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed by search below) and survives navigation —
 // revisiting the page no longer refires these requests until the cache goes stale.
@@ -177,15 +181,16 @@ export default function Vehicles() {
     const color = STATUS_COLOR[status] || 'var(--text-secondary)';
     return (
       <span style={{
+        display: 'inline-block',
+        whiteSpace: 'nowrap',
         fontFamily: 'var(--font-mono)',
         fontSize: 10,
         color,
         padding: '2px 6px',
         background: 'var(--bg-surface-hover)',
-        borderRadius: 2,
-        textTransform: 'uppercase'
+        borderRadius: 4,
       }}>
-        {status.replace('_', ' ')}
+        {formatStatus(status)}
       </span>
     );
   };
@@ -214,8 +219,8 @@ export default function Vehicles() {
     borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
     fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
-    fontWeight: active ? 600 : 400,
-    textTransform: 'uppercase', padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
+    fontWeight: active ? 500 : 400,
+    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
     transition: 'all 0.2s ease',
   });
 
@@ -229,8 +234,8 @@ export default function Vehicles() {
             <LiveBadge />
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>HEATMAP</button>
-            <button className="btn-action" onClick={() => setShowAddForm(true)}>+ ADD VEHICLE</button>
+            <button onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>Heatmap</button>
+            <button className="btn-action" onClick={() => setShowAddForm(true)}>+ Add vehicle</button>
           </div>
         </div>
       </div>
@@ -308,13 +313,12 @@ export default function Vehicles() {
                       fontSize: 11,
                       borderRadius: 2,
                       cursor: 'pointer',
-                      textTransform: 'uppercase',
                       letterSpacing: '0.06em',
-                      fontWeight: isActive ? 600 : 400,
+                      fontWeight: isActive ? 500 : 400,
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+                    {status === 'All' ? 'All' : formatStatus(status)}
                   </button>
                 );
               })}
@@ -322,7 +326,7 @@ export default function Vehicles() {
           </div>
 
           {/* Table */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
@@ -350,7 +354,7 @@ export default function Vehicles() {
                             Get started by adding your first vehicle to your fleet
                           </div>
                           <button onClick={() => setShowAddForm(true)} className="btn-action">
-                            ADD VEHICLE
+                            Add vehicle
                           </button>
                         </div>
                       </td>
@@ -370,13 +374,13 @@ export default function Vehicles() {
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
-                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                         {v.plate || v.registration || '—'}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={[v.make, v.model].filter(Boolean).join(' ')}>
                         {[v.make, v.model].filter(Boolean).join(' ') || '—'}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.vehicle_type_name || '—'}
                       </td>
                       <td style={{ padding: '12px 20px 12px 32px' }}>{getStatusBadge(v.status)}</td>
@@ -393,13 +397,13 @@ export default function Vehicles() {
                           {Math.min(utilizationPercent, 100).toFixed(0)}%
                         </span>
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.revenue_generated ? formatZAR(v.revenue_generated) : '—'}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.total_trips ?? 0}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.fuel_efficiency_score ? `${parseFloat(v.fuel_efficiency_score as any).toFixed(0)}/100` : '—'}
                       </td>
                       <td style={{ padding: '12px 20px', textAlign: 'right' }}>
@@ -574,15 +578,15 @@ export default function Vehicles() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
               >
-                {saving ? 'SAVING...' : 'UPDATE VEHICLE'}
+                {saving ? 'Saving…' : 'Update vehicle'}
               </button>
               <button
                 onClick={() => setEditVehicle(null)}
                 style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
               >
-                CANCEL
+                Cancel
               </button>
             </div>
           </div>

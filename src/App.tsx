@@ -51,7 +51,7 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 // Lazy load all other pages for code splitting
-const NewQuote = lazy(() => import('./pages/NewQuote'));
+const QuoteBuilder = lazy(() => import('./pages/QuoteBuilder'));
 const AIQuoteChat = lazy(() => import('./pages/AIQuoteChat'));
 const QuoteDetail = lazy(() => import('./pages/QuoteDetail'));
 const Bookings = lazy(() => import('./pages/Bookings'));
@@ -231,9 +231,9 @@ const App = () => (
                 <Route path="/bookings/orders" element={<LoadsList />} />
                 <Route path="/bookings/history" element={<LoadsList />} />
                 <Route path="/bookings/quotes" element={<LoadsList />} />
-                <Route path="/bookings/quotes/new" element={<NewQuote />} />
+                <Route path="/bookings/quotes/new" element={<QuoteBuilder />} />
                 <Route path="/bookings/quotes/ai-chat" element={<AIQuoteChat />} />
-                <Route path="/bookings/quotes/:id/edit" element={<NewQuote />} />
+                <Route path="/bookings/quotes/:id/edit" element={<QuoteBuilder />} />
                 <Route path="/bookings/quotes/:id" element={<QuoteDetail />} />
                 <Route path="/bookings/:id" element={<Bookings />} />
 

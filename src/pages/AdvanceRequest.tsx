@@ -11,6 +11,10 @@ const TIER_FEE: Record<string, number> = {
   prime: 0.02, standard: 0.025, elevated: 0.035, high: 0.045,
 };
 
+// Sentence-case a single token for display: "standard" → "Standard".
+const cap = (s?: string) =>
+  s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+
 export default function AdvanceRequest() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -113,7 +117,7 @@ export default function AdvanceRequest() {
             style={{ padding: '10px 24px', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12 }}
             onClick={() => navigate('/capital')}
           >
-            BACK TO CAPITAL
+            Back to Capital
           </button>
         </div>
       </div>
@@ -199,9 +203,10 @@ export default function AdvanceRequest() {
                         <span style={{
                           fontFamily: 'var(--font-mono)', fontSize: 10,
                           color: TIER_COLOR[inv.risk_tier || inv.tier || 'standard'],
-                          background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 2, textTransform: 'uppercase'
+                          background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 4,
+                          display: 'inline-block', whiteSpace: 'nowrap'
                         }}>
-                          {inv.risk_tier || inv.tier || 'standard'}
+                          {cap(inv.risk_tier || inv.tier || 'standard')}
                         </span>
                       </td>
                     </tr>
@@ -214,7 +219,7 @@ export default function AdvanceRequest() {
                   style={{ padding: '8px 16px', background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11 }}
                   onClick={() => navigate('/capital')}
                 >
-                  CANCEL
+                  Cancel
                 </button>
                 <button
                   className="btn-action"
@@ -229,7 +234,7 @@ export default function AdvanceRequest() {
                   }}
                   onClick={() => selectedInvoiceId && setStep(2)}
                 >
-                  CONTINUE →
+                  Continue →
                 </button>
               </div>
             </>
@@ -259,9 +264,10 @@ export default function AdvanceRequest() {
               <span style={{
                 fontFamily: 'var(--font-mono)', fontSize: 11,
                 color: TIER_COLOR[tier],
-                background: 'var(--bg-surface-hover)', padding: '4px 8px', borderRadius: 2, textTransform: 'uppercase', fontWeight: 600
+                background: 'var(--bg-surface-hover)', padding: '4px 8px', borderRadius: 4,
+                display: 'inline-block', whiteSpace: 'nowrap', fontWeight: 500
               }}>
-                {tier}
+                {cap(tier)}
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -291,14 +297,14 @@ export default function AdvanceRequest() {
               style={{ padding: '10px 20px', background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11 }}
               onClick={() => setStep(1)}
             >
-              ← BACK
+              ← Back
             </button>
             <button
               className="btn-action"
               style={{ padding: '10px 20px', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600 }}
               onClick={() => setStep(3)}
             >
-              CONTINUE →
+              Continue →
             </button>
           </div>
         </div>
@@ -338,7 +344,7 @@ export default function AdvanceRequest() {
               }}
               onClick={() => !submitting && setStep(2)}
             >
-              ← BACK
+              ← Back
             </button>
             <button
               className="btn-action"
@@ -353,7 +359,7 @@ export default function AdvanceRequest() {
               }}
               onClick={handleSubmit}
             >
-              {submitting ? 'SUBMITTING...' : 'CONFIRM REQUEST ✓'}
+              {submitting ? 'Submitting…' : 'Confirm request ✓'}
             </button>
           </div>
         </div>

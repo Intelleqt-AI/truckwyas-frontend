@@ -116,6 +116,10 @@ const CARD_MENUS: Record<string, { label: string; route: string }[]> = {
   ],
 };
 
+// Sentence-case a raw status token for display: "IN_TRANSIT" → "In transit".
+const titleCase = (s?: string) =>
+  s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : "—";
+
 export default function Overview() {
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -518,7 +522,7 @@ export default function Overview() {
                     borderRadius: 1,
                   }}
                 />
-                Fuel Cost
+                Fuel cost
               </span>
             </div>
           </div>
@@ -716,7 +720,7 @@ export default function Overview() {
                 borderRadius: 2,
                 cursor: "pointer",
               }}>
-              VIEW ALL
+              View all
             </button>
           </div>
           {loading ? (
@@ -776,9 +780,11 @@ export default function Overview() {
                                 : "var(--text-tertiary)",
                           padding: "2px 6px",
                           background: "var(--bg-surface-hover)",
-                          borderRadius: 2,
+                          borderRadius: 4,
+                          display: "inline-block",
+                          whiteSpace: "nowrap",
                         }}>
-                        {quote.status}
+                        {titleCase(quote.status)}
                       </span>
                     </td>
                   </tr>
@@ -812,7 +818,7 @@ export default function Overview() {
                 borderRadius: 2,
                 cursor: "pointer",
               }}>
-              VIEW ALL
+              View all
             </button>
           </div>
           {loading ? (
@@ -871,9 +877,11 @@ export default function Overview() {
                                 : "var(--text-tertiary)",
                           padding: "2px 6px",
                           background: "var(--bg-surface-hover)",
-                          borderRadius: 2,
+                          borderRadius: 4,
+                          display: "inline-block",
+                          whiteSpace: "nowrap",
                         }}>
-                        {load.status?.replace("_", " ")}
+                        {titleCase(load.status)}
                       </span>
                     </td>
                   </tr>
@@ -1064,77 +1072,26 @@ export default function Overview() {
               </div>
             ))
           ) : (
-            <>
-              <div className="feed-item">
-                <div className="feed-meta">
-                  <span style={{ color: "var(--accent-primary)" }}>
-                    ROUTE OPTIMIZER
-                  </span>
-                  <span>NOW</span>
-                </div>
-                <div className="feed-content">
-                  <span className="highlight-text">Margin Leak Detected</span>{" "}
-                  on JHB-CPT route. Fuel costs spiked 12% above baseline for
-                  Truck 42.
-                  <div className="alert-box">
-                    <div className="alert-title">
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="8" x2="12" y2="12" />
-                        <line x1="12" y1="16" x2="12.01" y2="16" />
-                      </svg>
-                      Recommendation
-                    </div>
-                    <div>
-                      Reroute via N1 Alternate or renegotiate return load.
-                    </div>
-                    <button
-                      className="btn-action"
-                      onClick={() => navigate("/copilot")}>
-                      ASK COPILOT
-                    </button>
-                  </div>
-                </div>
+            // Honest empty state — the old fallback rendered hardcoded FAKE
+            // activity (Truck 42, INV-2024-09, LogiCorp, TRK-892) that looked
+            // live but matched no real record, so clicking "Ask Copilot" about it
+            // returned "no such record". Show nothing invented instead.
+            <div className="feed-item">
+              <div className="feed-meta">
+                <span>AGENT</span>
+                <span>—</span>
               </div>
-              <div className="feed-item">
-                <div className="feed-meta">
-                  <span>INVOICE COLLECTOR</span>
-                  <span>2m AGO</span>
-                </div>
-                <div className="feed-content">
-                  Chasing invoice #INV-2024-09. Client opened email 3 times.{" "}
-                  <span className="highlight-text">
-                    Probability of payment today: 85%.
-                  </span>
-                </div>
+              <div className="feed-content">
+                No agent activity yet. As your quotes, invoices and fleet data grow,
+                insights will appear here.{" "}
+                <button
+                  className="btn-action"
+                  style={{ marginTop: 10 }}
+                  onClick={() => navigate("/copilot")}>
+                  ASK COPILOT
+                </button>
               </div>
-              <div className="feed-item">
-                <div className="feed-meta">
-                  <span>QUOTE GENERATOR</span>
-                  <span>14m AGO</span>
-                </div>
-                <div className="feed-content">
-                  Generated 3 quotes for{" "}
-                  <span className="highlight-text">LogiCorp</span>. Margin
-                  locked at 22%.
-                </div>
-              </div>
-              <div className="feed-item">
-                <div className="feed-meta">
-                  <span>FLEET MONITOR</span>
-                  <span>1h AGO</span>
-                </div>
-                <div className="feed-content">
-                  Tyre pressure warning on TRK-892. Maintenance ticket
-                  auto-created.
-                </div>
-              </div>
-            </>
+            </div>
           )}
         </div>
       </aside>

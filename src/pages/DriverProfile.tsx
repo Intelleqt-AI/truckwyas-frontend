@@ -27,6 +27,10 @@ const STATUS_COLOR: Record<string, string> = {
   ON_LEAVE: 'var(--status-warning)',
 };
 
+// Sentence-case a status token for display: "ON_LEAVE" → "On leave".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
 export default function DriverProfile() {
   const { driverId } = useParams();
   const navigate = useNavigate();
@@ -48,12 +52,12 @@ export default function DriverProfile() {
   });
 
   if (isLoading) return (
-    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>
+    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading…</div>
   );
   if (!driver) return (
     <div style={{ padding: 40 }}>
       <div style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Driver not found.</div>
-      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/fleet/drivers')}>← BACK</button>
+      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/fleet/drivers')}>← Back</button>
     </div>
   );
 
@@ -90,8 +94,8 @@ export default function DriverProfile() {
     borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
     fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
-    fontWeight: active ? 600 : 400,
-    textTransform: 'uppercase', padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
+    fontWeight: active ? 500 : 400,
+    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
     transition: 'all 0.2s ease',
   });
 
@@ -102,7 +106,7 @@ export default function DriverProfile() {
         <button
           onClick={() => navigate('/fleet/drivers')}
           style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}
-        >← BACK TO DRIVERS</button>
+        >← Back to drivers</button>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
@@ -131,19 +135,19 @@ export default function DriverProfile() {
                     setUpdating(false);
                   }}
                   style={{
+                    display: 'inline-block', whiteSpace: 'nowrap',
                     fontFamily: 'var(--font-mono)', fontSize: 11,
                     color: isCurrentStatus ? 'var(--bg-deep)' : btnColor,
                     background: isCurrentStatus ? btnColor : 'transparent',
                     padding: '6px 12px',
-                    border: `1px solid ${btnColor}`, borderRadius: 2,
+                    border: `1px solid ${btnColor}`, borderRadius: 4,
                     cursor: isCurrentStatus || updating ? 'default' : 'pointer',
                     opacity: updating && !isCurrentStatus ? 0.5 : 1,
                     letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  {s.replace('_', ' ')}
+                  {formatStatus(s)}
                 </button>
               );
             })}
@@ -247,7 +251,7 @@ export default function DriverProfile() {
                     padding: '8px 16px', textAlign: 'left',
                     fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
                     letterSpacing: '0.08em', color: 'var(--text-tertiary)',
-                    borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                    borderBottom: '1px solid var(--border-subtle)', fontWeight: 500,
                   }}>{h}</th>
                 ))}
               </tr>
@@ -261,25 +265,26 @@ export default function DriverProfile() {
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>
+                  <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                     {load.load_number}
                   </td>
-                  <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-secondary)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${load.pickup_city || '—'} → ${load.delivery_city || '—'}`}>
                     {load.pickup_city || '—'} → {load.delivery_city || '—'}
                   </td>
-                  <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                     {load.distance ? `${parseFloat(load.distance).toFixed(0)} km` : '—'}
                   </td>
-                  <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent-primary)' }}>
+                  <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent-primary)', whiteSpace: 'nowrap' }}>
                     {load.total_amount ? formatZAR(parseFloat(load.total_amount)) : '—'}
                   </td>
                   <td style={{ padding: '10px 16px' }}>
                     <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
+                      display: 'inline-block', whiteSpace: 'nowrap',
+                      fontFamily: 'var(--font-mono)', fontSize: 10,
                       color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : load.status === 'IN_TRANSIT' ? 'var(--status-warning)' : 'var(--text-tertiary)',
-                    }}>{load.status?.replace('_', ' ')}</span>
+                    }}>{formatStatus(load.status)}</span>
                   </td>
-                  <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
+                  <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
                     {load.created_at?.slice(0, 10) || '—'}
                   </td>
                 </tr>
@@ -408,7 +413,7 @@ export default function DriverProfile() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>{formatCurrency(parseFloat(load.total_amount || '0'))}</div>
-                    <div style={{ fontSize: 10, color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{load.status}</div>
+                    <div style={{ fontSize: 10, color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{formatStatus(load.status)}</div>
                   </div>
                 </div>
               ))}

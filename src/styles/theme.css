@@ -77,6 +77,32 @@
   /* Card */
   --card-radius: 2px;
 
+  /* ===========================
+     TYPE SCALE / WEIGHT / SPACING (theme-agnostic — same in light + dark)
+     Single source of truth for sizing. Six steps only; nothing off-scale.
+     Uppercase belongs ONLY to --text-micro (11px mono) micro-labels.
+     =========================== */
+  --text-display: 28px;   /* page hero numbers */
+  --text-title: 20px;     /* page title */
+  --text-subhead: 16px;   /* section / card heading */
+  --text-body: 14px;      /* default body + inputs */
+  --text-small: 13px;     /* secondary text, table cells */
+  --text-micro: 11px;     /* mono UPPERCASE micro-labels only (eyebrows, th, stat labels) */
+
+  --weight-regular: 400;  /* body */
+  --weight-medium: 500;   /* labels, table headers, active states */
+  --weight-semibold: 600; /* page/section headings + key figures only */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --pill-radius: 4px;
+
   /* Nav item hover */
   --nav-hover-bg: rgba(77, 158, 255, 0.05);
   --nav-hover-color: var(--accent-primary);
@@ -166,13 +192,14 @@
   --scrollbar-thumb: #E5E7EB;
   --scrollbar-thumb-hover: #D1D5DB;
 
-  /* Shadows */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.02);
-  --shadow-card-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  /* Shadows — give white cards/inputs a real lift off the grey page */
+  --shadow-card: 0 1px 3px rgba(17, 24, 39, 0.06), 0 1px 2px rgba(17, 24, 39, 0.04);
+  --shadow-card-hover: 0 4px 12px -2px rgba(17, 24, 39, 0.10);
 
-  /* Input specific */
-  --input-bg: var(--bg-deep);
-  --input-bg-focus: var(--bg-surface);
+  /* Input specific — white fill on the grey page so boxes read as distinct
+     surfaces, not the same colour as the container. */
+  --input-bg: #FFFFFF;
+  --input-bg-focus: #FFFFFF;
 
   /* Card */
   --card-radius: 2px;
@@ -470,7 +497,19 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: 500;
+}
+
+/* The one true micro-label: 11px mono uppercase. The ONLY place uppercase is
+   allowed (page eyebrows, table column headers, stat-card labels). Nothing at
+   13px+ should ever be uppercase. */
+.ui-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  font-weight: var(--weight-medium);
 }
 
 .card-action {

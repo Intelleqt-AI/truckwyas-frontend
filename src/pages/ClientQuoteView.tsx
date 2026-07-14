@@ -218,8 +218,8 @@ export default function ClientQuoteView() {
               {quote.trip_type === 'ROUND_TRIP' ? 'LEG 1 — OUTBOUND' : 'ROUTE'}
             </div>
             {quote.trip_type === 'ROUND_TRIP' && (
-              <span style={{ fontFamily: C.mono, fontSize: 10, color: C.accent, padding: '2px 8px', border: `1px solid ${C.accent}`, borderRadius: 4, fontWeight: 700 }}>
-                ROUND TRIP
+              <span style={{ fontFamily: C.mono, fontSize: 10, color: C.accent, padding: '2px 8px', border: `1px solid ${C.accent}`, borderRadius: 4, fontWeight: 500, whiteSpace: 'nowrap', display: 'inline-block' }}>
+                Round trip
               </span>
             )}
           </div>
@@ -381,7 +381,7 @@ export default function ClientQuoteView() {
                 opacity: respondMutation.isPending ? 0.7 : 1,
               }}
             >
-              {respondMutation.isPending ? 'SUBMITTING...' : '✓  ACCEPT QUOTE'}
+              {respondMutation.isPending ? 'Submitting…' : '✓  Accept quote'}
             </button>
             <button
               onClick={() => respondMutation.mutate('decline')}
@@ -398,7 +398,7 @@ export default function ClientQuoteView() {
                 cursor: respondMutation.isPending ? 'not-allowed' : 'pointer',
               }}
             >
-              DECLINE
+              Decline
             </button>
           </div>
         )}

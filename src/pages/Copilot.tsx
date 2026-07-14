@@ -25,6 +25,7 @@ interface Message {
   actionState?: 'pending' | 'done' | 'dismissed' | 'error';
   proposal?: Proposal | null;
   animate?: boolean;
+  degraded?: boolean; // reply came from the rules engine (AI unavailable), not the LLM
 }
 
 // The Typewriter streams raw text, which would flash unrendered markdown syntax.
@@ -101,6 +102,11 @@ export default function Copilot() {
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  // The conversation the user is currently looking at. A reply must only be
+  // applied if the user hasn't switched threads while it was in flight —
+  // otherwise it lands in the wrong conversation (and reverts the pointer).
+  const activeConvRef = useRef<number | null>(null);
+  useEffect(() => { activeConvRef.current = conversationId; }, [conversationId]);
 
   const canWrite = !['VIEWER', 'DRIVER'].includes(user?.role || '');
   const starters = canWrite ? [...STARTERS, ...WRITE_STARTERS] : STARTERS;
@@ -117,6 +123,7 @@ export default function Copilot() {
 
   const openConversation = useCallback((id: number) => {
     setShowHistory(false);
+    activeConvRef.current = id;  // switch the active thread now so any in-flight reply is dropped
     fetchData(`api/v1/agent/conversations/${id}/`)
       .then((d: any) => {
         // Proposals persist server-side; rehydrate their cards with live status
@@ -154,16 +161,22 @@ export default function Copilot() {
     setInput('');
     if (taRef.current) taRef.current.style.height = 'auto';
     setLoading(true);
+    // Visible outside the try so the catch guard can compare against it too.
+    let convId = conversationId;
     try {
       // Each conversation has its own chat endpoint; the server owns the history,
       // so we only send the new message. Create a conversation first if needed.
-      let convId = conversationId;
       if (!convId) {
         const created: any = await postData({ url: 'api/v1/agent/conversations/', data: {} });
         convId = created?.id ?? null;
-        if (convId) setConversationId(convId);
+        if (convId) { setConversationId(convId); activeConvRef.current = convId; }
       }
       const res: any = await postData({ url: `api/v1/agent/conversations/${convId}/chat/`, data: { message: content } });
+      // The user may have switched threads (or started a new chat) while this was
+      // in flight — if so, drop the reply here. It's already persisted server-side
+      // and will appear when they reopen this thread. Applying it now would render
+      // it into the wrong conversation.
+      if (activeConvRef.current !== convId) return;
       setAiAvailable(!!res?.ai_available);
       if (res?.conversation_id && res.conversation_id !== conversationId) setConversationId(res.conversation_id);
       setMessages(prev => [...prev, {
@@ -171,9 +184,11 @@ export default function Copilot() {
         actions: res?.actions || [], proposedAction: res?.proposed_action || null,
         actionState: res?.proposed_action ? 'pending' : undefined,
         proposal: res?.proposal || null, animate: true,
+        degraded: res?.ai_available === false,
       }]);
       refreshConversations();
     } catch (e: any) {
+      if (activeConvRef.current !== convId) return;
       setMessages(prev => [...prev, { role: 'assistant', content: e?.message || 'Something went wrong reaching the copilot.', animate: true }]);
     } finally {
       setLoading(false);
@@ -262,11 +277,13 @@ export default function Copilot() {
     setProposalBusy(true);
     try {
       await postData({ url: `api/v1/agent/proposals/${id}/dismiss/`, data: {} });
-    } catch {
-      // Dismiss is non-destructive; mark it locally either way — reopening the
-      // conversation rehydrates the authoritative status from the server.
-    } finally {
+      // Only mark dismissed once the SERVER confirms it. Marking it locally on a
+      // failed call would leave the card "Dismissed" here while it stays PENDING
+      // on the server, so reopening the thread resurrects a confirmable card.
       patchProposal(msgIndex, { status: 'dismissed' });
+    } catch (e: any) {
+      patchProposal(msgIndex, { result: { error: e?.message || 'Could not dismiss — please try again.' } });
+    } finally {
       setProposalBusy(false);
     }
   };
@@ -276,6 +293,7 @@ export default function Copilot() {
   // unused "New chat" never gets saved to history. The previous thread is KEPT.
   const newChat = () => {
     setShowHistory(false); setInput(''); setAiAvailable(null);
+    activeConvRef.current = null;  // any in-flight reply from the previous thread is dropped
     setMessages([introMsg]); setConversationId(null);
   };
 
@@ -320,7 +338,7 @@ export default function Copilot() {
         </div>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 10,
-          padding: '4px 9px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: '0.07em',
+          padding: '4px 9px', borderRadius: 2, letterSpacing: '0.07em',
           background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
           color: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)',
         }}>
@@ -334,7 +352,7 @@ export default function Copilot() {
         {/* Sidebar */}
         <div style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, overflow: 'hidden' }}>
           <div style={{ padding: 10, borderBottom: '1px solid var(--border-subtle)' }}>
-            <button onClick={newChat} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, padding: '9px 12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            <button onClick={newChat} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, padding: '9px 12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em' }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               New chat
             </button>
@@ -402,6 +420,12 @@ export default function Copilot() {
                             : <Markdown>{m.content}</Markdown>}
                       </div>
 
+                      {m.role === 'assistant' && m.degraded && (
+                        <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>
+                          ⚠ Rules engine — AI is unavailable, so this answer is basic. Try again shortly.
+                        </div>
+                      )}
+
                       {m.proposal && (
                         <ProposalCard
                           proposal={m.proposal}
@@ -464,7 +488,7 @@ export default function Copilot() {
               style={{ flex: 1, resize: 'none', maxHeight: 140, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 2, color: 'var(--text-primary)', fontSize: 13.5, lineHeight: 1.5, outline: 'none', fontFamily: 'var(--font-sans)', padding: '10px 12px' }} />
             <button className="btn-action" onClick={() => send()} disabled={loading || !input.trim()}
               style={{ background: input.trim() && !loading ? 'var(--accent-primary)' : 'var(--bg-surface-hover)', color: input.trim() && !loading ? 'var(--bg-deep)' : 'var(--text-tertiary)', border: 'none', padding: '10px 18px' }}>
-              {loading ? '…' : 'SEND'}
+              {loading ? '…' : 'Send'}
             </button>
           </div>
         </div>

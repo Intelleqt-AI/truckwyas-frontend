@@ -4,14 +4,18 @@ import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
+// Sentence-case a status/token for display: "FUNDED" → "Funded".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
 const TABS = [
   { id: 'pl', label: 'P&L' },
-  { id: 'cashflow', label: 'Cash Flow' },
+  { id: 'cashflow', label: 'Cash flow' },
   { id: 'customer', label: 'Customer' },
   { id: 'aging', label: 'Aging' },
   { id: 'lanes', label: 'Lanes' },
   { id: 'capital', label: 'Capital' },
-  { id: 'fastpay', label: 'Fast-Pay' },
+  { id: 'fastpay', label: 'Fast-pay' },
 ];
 
 export default function FinanceReports() {
@@ -163,7 +167,7 @@ export default function FinanceReports() {
   const ErrorState = () => (
     <div className="card" style={{ padding: 40, textAlign: 'center' }}>
       <div style={{ color: 'var(--status-danger)', marginBottom: 16, fontSize: 14 }}>Failed to load data</div>
-      <button className="btn-action" onClick={() => window.location.reload()}>RETRY</button>
+      <button className="btn-action" onClick={() => window.location.reload()}>Retry</button>
     </div>
   );
 
@@ -185,7 +189,7 @@ export default function FinanceReports() {
               Comprehensive financial analytics • Last updated: {new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
-          <button className="btn-action" onClick={exportToCSV}>↓ EXPORT CSV</button>
+          <button className="btn-action" onClick={exportToCSV}>↓ Export CSV</button>
         </div>
       </div>
 
@@ -203,7 +207,6 @@ export default function FinanceReports() {
               fontFamily: 'var(--font-mono)',
               fontSize: 11,
               letterSpacing: '0.08em',
-              textTransform: 'uppercase',
               padding: '12px 0',
               marginRight: 24,
               cursor: 'pointer',
@@ -417,9 +420,11 @@ export default function FinanceReports() {
                                       color: net >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
                                       padding: '2px 6px',
                                       background: 'var(--bg-surface-hover)',
-                                      borderRadius: 2
+                                      borderRadius: 4,
+                                      display: 'inline-block',
+                                      whiteSpace: 'nowrap'
                                     }}>
-                                      {net >= 0 ? 'POSITIVE' : 'NEGATIVE'}
+                                      {net >= 0 ? 'Positive' : 'Negative'}
                                     </span>
                                   </td>
                                 </tr>
@@ -547,7 +552,7 @@ export default function FinanceReports() {
                                   }}>
                                     #{idx + 1}
                                   </td>
-                                  <td style={{ fontWeight: idx < 3 ? 500 : 400 }}>{cust.customer_name}</td>
+                                  <td style={{ fontWeight: idx < 3 ? 500 : 400, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={cust.customer_name}>{cust.customer_name}</td>
                                   <td className="mono text-right" style={{
                                     color: 'var(--accent-primary)',
                                     fontWeight: 600
@@ -567,9 +572,11 @@ export default function FinanceReports() {
                                       color: dso <= 30 ? 'var(--status-success)' : dso <= 60 ? 'var(--status-warning)' : 'var(--status-danger)',
                                       padding: '2px 6px',
                                       background: 'var(--bg-surface-hover)',
-                                      borderRadius: 2
+                                      borderRadius: 4,
+                                      display: 'inline-block',
+                                      whiteSpace: 'nowrap'
                                     }}>
-                                      {dso <= 30 ? 'EXCELLENT' : dso <= 60 ? 'GOOD' : 'WATCH'}
+                                      {dso <= 30 ? 'Excellent' : dso <= 60 ? 'Good' : 'Watch'}
                                     </span>
                                   </td>
                                 </tr>
@@ -727,10 +734,10 @@ export default function FinanceReports() {
                     <tbody>
                       {agingData.overdue_invoices.map((inv: any) => (
                         <tr key={inv.id}>
-                          <td className="mono">{inv.invoice_number}</td>
-                          <td>{inv.customer_name}</td>
-                          <td className="mono text-right">{formatCurrency(inv.total_amount || 0)}</td>
-                          <td className="mono text-right">{inv.due_date}</td>
+                          <td className="mono" style={{ whiteSpace: 'nowrap' }}>{inv.invoice_number}</td>
+                          <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={inv.customer_name}>{inv.customer_name}</td>
+                          <td className="mono text-right" style={{ whiteSpace: 'nowrap' }}>{formatCurrency(inv.total_amount || 0)}</td>
+                          <td className="mono text-right" style={{ whiteSpace: 'nowrap' }}>{inv.due_date}</td>
                           <td className="mono text-right" style={{ color: 'var(--status-danger)' }}>
                             {inv.days_overdue || 0}
                           </td>
@@ -880,8 +887,8 @@ export default function FinanceReports() {
                     <tbody>
                       {advances.slice(0, 10).map((adv: any) => (
                         <tr key={adv.id}>
-                          <td className="mono">{adv.invoice_number}</td>
-                          <td>{adv.customer_name}</td>
+                          <td className="mono" style={{ whiteSpace: 'nowrap' }}>{adv.invoice_number}</td>
+                          <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={adv.customer_name}>{adv.customer_name}</td>
                           <td className="mono text-right" style={{ color: 'var(--accent-primary)' }}>
                             {formatCurrency(adv.advanced_amount || 0)}
                           </td>
@@ -894,9 +901,11 @@ export default function FinanceReports() {
                               color: adv.status === 'FUNDED' || adv.status === 'ACTIVE' ? 'var(--status-warning)' : 'var(--status-success)',
                               padding: '2px 6px',
                               background: 'var(--bg-surface-hover)',
-                              borderRadius: 2
+                              borderRadius: 4,
+                              display: 'inline-block',
+                              whiteSpace: 'nowrap'
                             }}>
-                              {adv.status || 'ACTIVE'}
+                              {formatStatus(adv.status || 'ACTIVE')}
                             </span>
                           </td>
                         </tr>
@@ -954,7 +963,7 @@ export default function FinanceReports() {
                           : 'var(--status-success)';
                         return (
                           <tr key={idx}>
-                            <td style={{ color: 'var(--text-primary)' }}>{l.lane}</td>
+                            <td style={{ color: 'var(--text-primary)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.lane}>{l.lane}</td>
                             <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{l.loads}</td>
                             <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{formatCurrency(l.revenue || 0)}</td>
                             <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{l.est_margin == null ? '—' : formatCurrency(l.est_margin)}</td>

@@ -32,6 +32,10 @@ const STATUS_COLOR: Record<string, string> = {
   CANCELLED: 'var(--status-error)',
 };
 
+// Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
 type BookingTab = 'quotes' | 'orders' | 'history';
 
 const ACTIVE_STATUSES = ['PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'];
@@ -110,7 +114,7 @@ export default function LoadsList() {
   });
 
   const renderTable = (data: Load[], showInvoiceAction: boolean) => (
-    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+    <div className="card" style={{ padding: 0, overflowX: 'auto', overflowY: 'hidden' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)' }}>
@@ -118,8 +122,8 @@ export default function LoadsList() {
               <th key={h} style={{
                 padding: '12px 16px',
                 textAlign: h === 'AMOUNT' ? 'right' : h === 'ACTION' ? 'center' : 'left',
-                fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-                fontWeight: 600, letterSpacing: '0.1em'
+                fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
+                fontWeight: 500, letterSpacing: '0.08em', whiteSpace: 'nowrap'
               }}>{h}</th>
             ))}
           </tr>
@@ -137,25 +141,26 @@ export default function LoadsList() {
               onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
-              <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 600 }}>{load.load_number}</td>
-              <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-primary)' }}>{load.customer_name || '—'}</td>
-              <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>
+              <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{load.load_number}</td>
+              <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{load.customer_name || '—'}</td>
+              <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${load.pickup_location} → ${load.delivery_location}`}>
                 {load.pickup_location} → {load.delivery_location}
               </td>
-              <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>{load.driver_name || '—'}</td>
-              <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{load.vehicle_info || '—'}</td>
+              <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{load.driver_name || '—'}</td>
+              <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={load.vehicle_info || ''}>{load.vehicle_info || '—'}</td>
               <td style={{ padding: '12px 16px' }}>
                 <span style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 10,
+                  display: 'inline-block', whiteSpace: 'nowrap',
+                  fontSize: 12,
                   color: STATUS_COLOR[load.status] || 'var(--text-secondary)',
-                  padding: '4px 8px',
+                  padding: '3px 9px',
                   border: `1px solid ${STATUS_COLOR[load.status] || 'var(--border-subtle)'}`,
-                  borderRadius: 2,
+                  borderRadius: 4,
                 }}>
-                  {load.status?.replace('_', ' ')}
+                  {formatStatus(load.status)}
                 </span>
               </td>
-              <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600 }}>
+              <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
                 {formatCurrency(parseFloat(load.total_amount || '0'))}
               </td>
               <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
@@ -167,14 +172,14 @@ export default function LoadsList() {
                       background: 'transparent',
                       border: '1px solid var(--accent-primary)',
                       color: 'var(--accent-primary)',
-                      padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)',
-                      letterSpacing: '0.05em', borderRadius: 2,
+                      padding: '5px 12px', fontSize: 13, whiteSpace: 'nowrap',
+                      borderRadius: 4,
                       cursor: convertingIds.has(load.id) ? 'not-allowed' : 'pointer',
                       opacity: convertingIds.has(load.id) ? 0.5 : 1,
                       transition: 'all 0.15s ease',
                     }}
                   >
-                    {convertingIds.has(load.id) ? 'CREATING...' : '→ INVOICE'}
+                    {convertingIds.has(load.id) ? 'Creating…' : '→ Invoice'}
                   </button>
                 )}
               </td>
@@ -254,18 +259,18 @@ export default function LoadsList() {
             onClick={() => navigate('/bookings/quotes/ai-chat')}
             style={{
               background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)',
-              padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono)',
-              fontWeight: 600, letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer',
+              padding: '8px 16px', fontSize: 13,
+              fontWeight: 500, borderRadius: 4, cursor: 'pointer',
             }}
-          >AI QUOTE</button>
+          >AI quote</button>
           <button
             onClick={() => navigate('/bookings/quotes/new')}
             style={{
-              background: 'var(--accent-primary)', border: 'none', color: 'var(--bg-deep)',
-              padding: '8px 16px', fontSize: 11, fontFamily: 'var(--font-mono)',
-              fontWeight: 600, letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer',
+              background: 'var(--accent-primary)', border: 'none', color: 'var(--btn-action-color, #fff)',
+              padding: '8px 16px', fontSize: 13,
+              fontWeight: 500, borderRadius: 4, cursor: 'pointer',
             }}
-          >+ NEW QUOTE</button>
+          >+ New quote</button>
         </div>
       </div>
 
@@ -285,13 +290,10 @@ export default function LoadsList() {
               borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
               color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
               padding: '12px 0',
-              fontSize: 13,
-              fontWeight: activeTab === tab.id ? 600 : 400,
+              fontSize: 14,
+              fontWeight: activeTab === tab.id ? 500 : 400,
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              fontFamily: 'var(--font-mono)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
             }}
             onMouseEnter={(e) => {
               if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--text-primary)';
@@ -338,15 +340,15 @@ export default function LoadsList() {
                   onClick={() => setOrderFilter(status)}
                   style={{
                     background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                    padding: '6px 12px', fontFamily: 'var(--font-mono)', fontSize: 11,
-                    borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase',
-                    letterSpacing: '0.06em', fontWeight: isActive ? 600 : 400,
+                    border: `1px solid ${isActive ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+                    color: isActive ? 'var(--btn-action-color, #fff)' : 'var(--text-secondary)',
+                    padding: '6px 12px', fontSize: 13, whiteSpace: 'nowrap',
+                    borderRadius: 4, cursor: 'pointer',
+                    fontWeight: isActive ? 500 : 400,
                     transition: 'all 0.2s ease'
                   }}
                 >
-                  {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+                  {status === 'All' ? 'All' : formatStatus(status)}
                 </button>
               );
             })}

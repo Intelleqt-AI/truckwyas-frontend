@@ -14,6 +14,10 @@ const STATUS_COLOR: Record<string, string> = {
   OFF: 'var(--text-tertiary)',
 };
 
+// Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
 const tabStyle = (active: boolean): React.CSSProperties => ({
   background: 'none',
   border: 'none',
@@ -22,7 +26,6 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   fontFamily: 'var(--font-mono)',
   fontSize: 11,
   letterSpacing: '0.08em',
-  textTransform: 'uppercase',
   padding: '12px 0',
   marginRight: 24,
   cursor: 'pointer',
@@ -103,7 +106,7 @@ export default function FleetDashboard() {
           </div>
         </div>
         <button className="btn-action" onClick={() => navigate(tab === 'vehicles' ? '/fleet/vehicles' : '/fleet/drivers')}>
-          + ADD {tab === 'vehicles' ? 'VEHICLE' : 'DRIVER'}
+          + Add {tab === 'vehicles' ? 'vehicle' : 'driver'}
         </button>
       </div>
 
@@ -145,8 +148,8 @@ export default function FleetDashboard() {
                   <td>{v.make || ''} {v.model || ''}</td>
                   <td>{v.driver || '—'}</td>
                   <td>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[v.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-                      {v.status ? v.status.replace('_', ' ') : '—'}
+                    <span style={{ display: 'inline-block', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[v.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 4 }}>
+                      {v.status ? formatStatus(v.status) : '—'}
                     </span>
                   </td>
                   <td style={{ color: 'var(--text-secondary)' }}>{v.route || '—'}</td>
@@ -184,8 +187,8 @@ export default function FleetDashboard() {
                     {d.rating !== undefined ? `★ ${d.rating}` : '—'}
                   </td>
                   <td className="text-right">
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[d.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-                      {d.status || '—'}
+                    <span style={{ display: 'inline-block', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[d.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 4 }}>
+                      {d.status ? formatStatus(d.status) : '—'}
                     </span>
                   </td>
                 </tr>

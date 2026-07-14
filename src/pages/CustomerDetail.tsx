@@ -14,6 +14,10 @@ const PAYMENT_TERMS_LABEL: Record<string, string> = {
   NET90: "Net 90 Days",
 };
 
+// Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, c => c.toUpperCase()) : "—";
+
 const QUOTE_STATUS_COLOR: Record<string, string> = {
   PENDING: "var(--status-warning)",
   ACCEPTED: "var(--status-success)",
@@ -73,13 +77,13 @@ export default function CustomerDetail() {
   });
 
   if (isLoading) return (
-    <div style={{ padding: 40, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 12 }}>LOADING...</div>
+    <div style={{ padding: 40, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 12 }}>Loading…</div>
   );
 
   if (!customer) return (
     <div style={{ padding: 40 }}>
       <div style={{ color: "var(--text-tertiary)", fontSize: 13 }}>Customer not found.</div>
-      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate("/customers")}>← BACK</button>
+      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate("/customers")}>← Back</button>
     </div>
   );
 
@@ -146,7 +150,7 @@ export default function CustomerDetail() {
         <button
           onClick={() => navigate("/customers")}
           style={{ background: "none", border: "none", color: "var(--text-tertiary)", cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: 11, marginBottom: 8, padding: 0 }}
-        >← BACK TO CUSTOMERS</button>
+        >← Back to customers</button>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
@@ -160,12 +164,12 @@ export default function CustomerDetail() {
             <button
               onClick={() => navigate(`/customers/${id}/risk`)}
               title="Open the AI risk profile for this customer"
-              style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--accent-primary)", background: "transparent", padding: "6px 12px", border: "1px solid var(--accent-primary)", borderRadius: 2, cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" }}
-            >AI ANALYSIS</button>
+              style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--accent-primary)", background: "transparent", padding: "6px 12px", border: "1px solid var(--accent-primary)", borderRadius: 2, cursor: "pointer", letterSpacing: "0.08em" }}
+            >AI analysis</button>
             <button
               onClick={openEdit}
-              style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-secondary)", background: "transparent", padding: "6px 12px", border: "1px solid var(--border-subtle)", borderRadius: 2, cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" }}
-            >EDIT</button>
+              style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-secondary)", background: "transparent", padding: "6px 12px", border: "1px solid var(--border-subtle)", borderRadius: 2, cursor: "pointer", letterSpacing: "0.08em" }}
+            >Edit</button>
             <button
               disabled={updating}
               onClick={handleStatusToggle}
@@ -179,10 +183,9 @@ export default function CustomerDetail() {
                 cursor: updating ? "default" : "pointer",
                 opacity: updating ? 0.5 : 1,
                 letterSpacing: "0.08em",
-                textTransform: "uppercase",
                 transition: "all 0.15s ease",
               }}
-            >{isActive ? "ACTIVE" : "INACTIVE"}</button>
+            >{isActive ? "Active" : "Inactive"}</button>
           </div>
         </div>
       </div>
@@ -235,7 +238,7 @@ export default function CustomerDetail() {
           {[
             { label: "PAYMENT TERMS", value: PAYMENT_TERMS_LABEL[customer.payment_terms_default] || customer.payment_terms_default || "NET30", mono: true },
             { label: "CREDIT LIMIT", value: customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "—", mono: true },
-            { label: "STATUS", value: isActive ? "ACTIVE" : "INACTIVE", mono: true },
+            { label: "STATUS", value: isActive ? "Active" : "Inactive", mono: true },
             { label: "MEMBER SINCE", value: customer.created_at?.slice(0, 10) || "—", mono: true },
           ].map(r => (
             <div key={r.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border-row)" }}>
@@ -260,7 +263,7 @@ export default function CustomerDetail() {
                     padding: "8px 16px", textAlign: "left",
                     fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase",
                     letterSpacing: "0.08em", color: "var(--text-tertiary)",
-                    borderBottom: "1px solid var(--border-subtle)", fontWeight: 600,
+                    borderBottom: "1px solid var(--border-subtle)", fontWeight: 500, whiteSpace: "nowrap",
                   }}>{h}</th>
                 ))}
               </tr>
@@ -274,22 +277,23 @@ export default function CustomerDetail() {
                   onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-surface-hover)")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
-                  <td style={{ padding: "10px 16px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-primary)" }}>
+                  <td style={{ padding: "10px 16px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
                     {q.quote_number || `#${q.id}`}
                   </td>
-                  <td style={{ padding: "10px 16px", fontSize: 12, color: "var(--text-secondary)" }}>
+                  <td style={{ padding: "10px 16px", fontSize: 12, color: "var(--text-secondary)", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={`${q.pickup_location || "—"} → ${q.delivery_location || "—"}`}>
                     {q.pickup_location || "—"} → {q.delivery_location || "—"}
                   </td>
-                  <td style={{ padding: "10px 16px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--accent-primary)" }}>
+                  <td style={{ padding: "10px 16px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--accent-primary)", whiteSpace: "nowrap" }}>
                     {q.total_amount || q.quote_price ? formatZAR(parseFloat(q.total_amount || q.quote_price)) : "—"}
                   </td>
                   <td style={{ padding: "10px 16px" }}>
                     <span style={{
-                      fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase",
+                      display: "inline-block", whiteSpace: "nowrap",
+                      fontFamily: "var(--font-mono)", fontSize: 10,
                       color: QUOTE_STATUS_COLOR[q.status] || "var(--text-tertiary)",
-                    }}>{q.status?.replace("_", " ") || "—"}</span>
+                    }}>{formatStatus(q.status)}</span>
                   </td>
-                  <td style={{ padding: "10px 16px", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-tertiary)" }}>
+                  <td style={{ padding: "10px 16px", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
                     {q.created_at?.slice(0, 10) || "—"}
                   </td>
                 </tr>
@@ -356,8 +360,8 @@ export default function CustomerDetail() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                  <SelectItem value="INACTIVE">INACTIVE</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -368,13 +372,13 @@ export default function CustomerDetail() {
                 onClick={handleSave}
                 style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.06em", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
               >
-                {saving ? "SAVING..." : "UPDATE CUSTOMER"}
+                {saving ? "Saving…" : "Update customer"}
               </button>
               <button
                 onClick={() => setShowEdit(false)}
                 style={{ padding: "10px 20px", fontFamily: "var(--font-mono)", fontSize: 11, background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
               >
-                CANCEL
+                Cancel
               </button>
             </div>
           </div>

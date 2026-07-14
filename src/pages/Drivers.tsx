@@ -58,6 +58,10 @@ const STATUS_COLOR: Record<string, string> = {
 const formatZAR = (v: number) =>
   'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
+// Sentence-case a status token for display: "ON_LEAVE" → "On leave".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
 const getDriverName = (d: Driver) => {
   if (d.first_name && d.last_name) return `${d.first_name} ${d.last_name}`;
   if (d.name) return d.name;
@@ -193,13 +197,13 @@ export default function Drivers() {
     borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
     fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
-    fontWeight: active ? 600 : 400,
-    textTransform: 'uppercase', padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
+    fontWeight: active ? 500 : 400,
+    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
     transition: 'all 0.2s ease',
   });
 
   if (loading) return (
-    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>
+    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading…</div>
   );
 
   return (
@@ -213,7 +217,7 @@ export default function Drivers() {
             <LiveBadge />
           </div>
         </div>
-        <button className="btn-action" onClick={() => setShowAddForm(true)}>+ ADD DRIVER</button>
+        <button className="btn-action" onClick={() => setShowAddForm(true)}>+ Add driver</button>
       </div>
 
       {/* Tabs */}
@@ -271,13 +275,12 @@ export default function Drivers() {
                   fontSize: 11,
                   borderRadius: 2,
                   cursor: 'pointer',
-                  textTransform: 'uppercase',
                   letterSpacing: '0.06em',
-                  fontWeight: isActive ? 600 : 400,
+                  fontWeight: isActive ? 500 : 400,
                   transition: 'all 0.2s ease'
                 }}
               >
-                {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+                {status === 'All' ? 'All' : formatStatus(status)}
               </button>
             );
           })}
@@ -285,7 +288,7 @@ export default function Drivers() {
       </div>
 
       {/* Table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
@@ -294,7 +297,7 @@ export default function Drivers() {
                   padding: '12px 20px 12px 32px', textAlign: 'left',
                   fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
                   letterSpacing: '0.08em', color: 'var(--text-tertiary)',
-                  borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                  borderBottom: '1px solid var(--border-subtle)', fontWeight: 500,
                 }}>{h}</th>
               ))}
             </tr>
@@ -313,7 +316,7 @@ export default function Drivers() {
                         Get started by adding your first driver to your team
                       </div>
                       <button onClick={() => setShowAddForm(true)} className="btn-action">
-                        ADD DRIVER
+                        Add driver
                       </button>
                     </div>
                   </td>
@@ -345,22 +348,22 @@ export default function Drivers() {
                       {getDriverName(d)}
                     </div>
                   </td>
-                  <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                     {d.license_number || '—'}
                   </td>
                   <td style={{ padding: '12px 20px 12px 32px' }}>
                     <span style={{
+                      display: 'inline-block', whiteSpace: 'nowrap',
                       fontFamily: 'var(--font-mono)', fontSize: 10,
                       color: STATUS_COLOR[d.status] || 'var(--text-secondary)',
-                      textTransform: 'uppercase',
                     }}>
-                      {d.status?.replace('_', ' ')}
+                      {formatStatus(d.status)}
                     </span>
                   </td>
-                  <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                     {d.total_trips ?? 0}
                   </td>
-                  <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                     {d.revenue_generated ? formatZAR(d.revenue_generated) : '—'}
                   </td>
                   <td style={{ padding: '12px 20px 12px 32px' }}>
@@ -407,7 +410,7 @@ export default function Drivers() {
                           });
                         }}
                         style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
-                      >EDIT</button>
+                      >Edit</button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -428,7 +431,7 @@ export default function Drivers() {
                           });
                         }}
                         style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
-                      >DEL</button>
+                      >Del</button>
                     </div>
                   </td>
                 </tr>
@@ -550,15 +553,15 @@ export default function Drivers() {
                   } catch (e: any) { toast.error(e?.message || 'Failed to create driver'); }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
               >
-                {saving ? 'SAVING...' : 'CREATE DRIVER'}
+                {saving ? 'Saving…' : 'Create driver'}
               </button>
               <button
                 onClick={() => setShowAddForm(false)}
                 style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
               >
-                CANCEL
+                Cancel
               </button>
             </div>
           </div>
@@ -676,15 +679,15 @@ export default function Drivers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
               >
-                {saving ? 'SAVING...' : 'UPDATE DRIVER'}
+                {saving ? 'Saving…' : 'Update driver'}
               </button>
               <button
                 onClick={() => setEditDriver(null)}
                 style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
               >
-                CANCEL
+                Cancel
               </button>
             </div>
           </div>

@@ -147,7 +147,7 @@ export default function Customers() {
   }
 
   if (loading) return (
-    <div style={{ padding: 40, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 12 }}>LOADING...</div>
+    <div style={{ padding: 40, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 12 }}>Loading…</div>
   );
 
   return (
@@ -158,7 +158,7 @@ export default function Customers() {
           <div style={{ fontSize: 22, fontWeight: 500, color: "var(--text-primary)" }}>Customers</div>
           <LiveBadge />
         </div>
-        <button className="btn-action" onClick={() => setShowAddForm(true)}>+ ADD CUSTOMER</button>
+        <button className="btn-action" onClick={() => setShowAddForm(true)}>+ Add customer</button>
       </div>
 
       {/* KPI strip */}
@@ -177,7 +177,7 @@ export default function Customers() {
       </div>
 
       {/* Table */}
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+      <div className="card" style={{ padding: 0, overflowX: "auto" }}>
         {/* Table toolbar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px 12px 32px", borderBottom: "1px solid var(--border-subtle)" }}>
           <input
@@ -211,7 +211,7 @@ export default function Customers() {
                   padding: "12px 20px 12px 32px", textAlign: "left",
                   fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase",
                   letterSpacing: "0.08em", color: "var(--text-tertiary)",
-                  borderBottom: "1px solid var(--border-subtle)", fontWeight: 600,
+                  borderBottom: "1px solid var(--border-subtle)", fontWeight: 500, whiteSpace: "nowrap",
                 }}>{h}</th>
               ))}
             </tr>
@@ -227,7 +227,7 @@ export default function Customers() {
                       <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
                         Add your first customer to get started
                       </div>
-                      <button onClick={() => setShowAddForm(true)} className="btn-action">ADD CUSTOMER</button>
+                      <button onClick={() => setShowAddForm(true)} className="btn-action">Add customer</button>
                     </div>
                   </td>
                 </tr>
@@ -249,25 +249,25 @@ export default function Customers() {
                   onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-surface-hover)")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
-                  <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
+                  <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
                       {c.name}
                     </div>
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, color: "var(--text-secondary)" }}>
+                  <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, color: "var(--text-secondary)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.company_name || ""}>
                     {c.company_name || "—"}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)" }}>
+                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.email}>
                     {c.email}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)" }}>
+                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                     {c.phone || "—"}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, color: "var(--text-secondary)" }}>
+                  <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                     {c.city || "—"}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-secondary)" }}>
+                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                     {c.payment_terms_default || "NET30"}
                   </td>
                   <td style={{ padding: "12px 20px", textAlign: "right" }}>
@@ -275,7 +275,7 @@ export default function Customers() {
                       <button
                         onClick={e => { e.stopPropagation(); openEdit(c); }}
                         style={{ background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", padding: "4px 10px", borderRadius: 2, cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em" }}
-                      >EDIT</button>
+                      >Edit</button>
                       <button
                         onClick={e => {
                           e.stopPropagation();
@@ -296,7 +296,7 @@ export default function Customers() {
                           });
                         }}
                         style={{ background: "none", border: "1px solid var(--status-danger)", color: "var(--status-danger)", padding: "4px 10px", borderRadius: 2, cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em" }}
-                      >DEL</button>
+                      >Del</button>
                     </div>
                   </td>
                 </tr>
@@ -387,13 +387,13 @@ export default function Customers() {
                 }}
                 style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.06em", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
               >
-                {saving ? "SAVING..." : "CREATE CUSTOMER"}
+                {saving ? "Saving…" : "Create customer"}
               </button>
               <button
                 onClick={() => setShowAddForm(false)}
                 style={{ padding: "10px 20px", fontFamily: "var(--font-mono)", fontSize: 11, background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
               >
-                CANCEL
+                Cancel
               </button>
             </div>
           </div>
@@ -463,8 +463,8 @@ export default function Customers() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                  <SelectItem value="INACTIVE">INACTIVE</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -490,13 +490,13 @@ export default function Customers() {
                 }}
                 style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.06em", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
               >
-                {saving ? "SAVING..." : "UPDATE CUSTOMER"}
+                {saving ? "Saving…" : "Update customer"}
               </button>
               <button
                 onClick={() => setEditCustomer(null)}
                 style={{ padding: "10px 20px", fontFamily: "var(--font-mono)", fontSize: 11, background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
               >
-                CANCEL
+                Cancel
               </button>
             </div>
           </div>

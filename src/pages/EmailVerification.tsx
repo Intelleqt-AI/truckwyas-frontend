@@ -97,7 +97,7 @@ export const EmailVerification = () => {
           </div>
 
           <button type="submit" className="btn-action" style={{ width: '100%' }} disabled={loading || code.length !== 6}>
-            {loading ? 'VERIFYING...' : 'VERIFY EMAIL'}
+            {loading ? 'Verifying...' : 'Verify email'}
           </button>
         </form>
 
@@ -110,7 +110,7 @@ export const EmailVerification = () => {
 
         <div style={{ marginTop: 16, textAlign: 'center' }}>
           <button onClick={() => navigate('/login')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>
-            ← BACK TO LOGIN
+            ← Back to login
           </button>
         </div>
       </div>

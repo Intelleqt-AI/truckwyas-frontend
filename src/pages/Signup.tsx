@@ -200,7 +200,7 @@ const Signup = () => {
           )}
 
           <button type="submit" className="btn-action"
-            style={{ width: '100%', padding: '12px 16px', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.6 : 1 }}
+            style={{ width: '100%', padding: '12px 16px', fontSize: 11, letterSpacing: '0.08em', cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.6 : 1 }}
             disabled={loading}>
             {loading ? "Creating account..." : "Sign up"}
           </button>

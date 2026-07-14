@@ -176,8 +176,13 @@ export default function QuoteBuilder() {
   const surchargePct = Number(companyProfile?.weight_surcharge_pct) || 15;
   const weightSurcharge = weightKg > surchargeThreshold ? Math.round((chargeDistance * Number(baseRatePerKm)) * (surchargePct / 100)) : 0;
   const baseCost = Math.round(chargeDistance * Number(baseRatePerKm));
-  const directCost = fuelCost + tollCost + crossBorderCost + driverAllowance;
   const total = baseCost + fuelCost + tollCost + crossBorderCost + driverAllowance + weightSurcharge + serviceCharge;
+  // Every real cost component the carrier must recover — base rate included.
+  // Excluding base rate here (as an earlier version did) let the AI optimiser
+  // treat it as pure profit already banked, so it could recommend a price
+  // *below* the carrier's own base rate alone. Only the discretionary service
+  // charge (the markup layered on top) is excluded from the cost floor.
+  const directCost = total - serviceCharge;
   const marginPct = total > 0 ? Math.round(((total - directCost) / total) * 100) : 0;
 
   // ---- route calculation (debounced auto-run) ----
@@ -256,7 +261,10 @@ export default function QuoteBuilder() {
   const opt = analysis?.price_optimization;
   const applyOptimal = () => {
     const target = opt?.optimal_price || analysis?.suggested_price;
-    if (target && target > 0) { setServiceCharge(prev => prev + (target - total)); toast.success("Applied AI-recommended price"); }
+    // Floored at 0: serviceCharge has no visible line item in the cost
+    // breakdown, so letting it go negative would silently apply a hidden
+    // discount below full cost with no on-screen explanation.
+    if (target && target > 0) { setServiceCharge(prev => Math.max(0, prev + (target - total))); toast.success("Applied AI-recommended price"); }
   };
 
   // ---- natural-language input ----

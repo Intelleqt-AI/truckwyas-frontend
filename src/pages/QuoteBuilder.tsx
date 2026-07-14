@@ -6,7 +6,10 @@ import { toast } from "@/lib/toast";
 import { formatCurrency } from "@/lib/formatters";
 import { LocationInput, type LocationCoords } from "@/components/LocationInput";
 import { RouteMapView } from "@/components/RouteMapView";
-import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { MessageCircle, Map, Info, Sparkles } from "lucide-react";
 
 /**
  * QuoteBuilder — the redesigned single-page quote flow.
@@ -29,13 +32,24 @@ const extractCode = (s: string) => {
   return (s || "").slice(0, 3).toUpperCase();
 };
 
-interface RouteOption { summary?: string; distance_km: number; duration_min?: number; duration_minutes?: number; toll_cost_zar?: number; label?: string; geometry?: { lat: number; lon: number }[]; }
+interface TollBreakdownItem { plaza: string; route: string; location_km: number; tariff: number; }
+interface RouteOption {
+  summary?: string; distance_km: number; duration_min?: number; duration_minutes?: number;
+  toll_cost_zar?: number; toll_breakdown?: TollBreakdownItem[]; fuel_cost_zar?: number; total_cost_zar?: number;
+  label?: string; geometry?: { lat: number; lon: number }[];
+  road_type?: string; motorway_pct?: number; traffic_status?: string; congested_km?: number; terrain?: string;
+}
+const formatDuration = (min?: number) => {
+  if (!min || min <= 0) return "—";
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+};
 interface RouteData {
   distance_km: number; duration_minutes?: number; fuel_cost_zar?: number; toll_cost_zar?: number;
   fuel_usage_litres?: number; fuel_price_used?: number; routes?: RouteOption[]; best_index?: number;
   cross_border?: boolean; countries?: string[];
   additional_costs?: { border_fees?: number; weighbridge_fees?: number; non_sa_tolls?: number };
-  toll_breakdown?: { name: string; cost: number }[]; warnings?: string[];
+  toll_breakdown?: TollBreakdownItem[]; warnings?: string[];
   origin_resolved?: string; dest_resolved?: string;
 }
 
@@ -68,6 +82,15 @@ export default function QuoteBuilder() {
 
   // ---- pricing overrides ----
   const [editableTollCost, setEditableTollCost] = useState<number | null>(null);
+  // True only once the user has actually typed in the Tolls field this session.
+  // A quote loaded for editing pre-fills editableTollCost from its last-saved
+  // toll_charges so there's no flash of R0 before the route recalculates, but
+  // that saved figure must not permanently pin the field once live route data
+  // (route.toll_cost_zar) arrives — otherwise a draft saved back when tolls
+  // were mis-priced (e.g. before plazas were seeded) stays stuck at the old
+  // wrong number forever, even though the toll breakdown popover shows the
+  // correct live total.
+  const [tollManuallyEdited, setTollManuallyEdited] = useState(false);
   const [driverAllowanceInput, setDriverAllowanceInput] = useState("0");
   const [baseRatePerKm, setBaseRatePerKm] = useState("10");
   const [serviceCharge, setServiceCharge] = useState(0);
@@ -143,7 +166,9 @@ export default function QuoteBuilder() {
   const fuelCost = Math.round(chargeDistance * fuelConsumption * fuelPricePerL / 100);
   const tollRate = Number(companyProfile?.default_toll_rate_per_km) || 0.95;
   const autoToll = Math.round((route?.toll_cost_zar ?? routeData?.toll_cost_zar ?? distance * tollRate) * legs);
-  const tollCost = editableTollCost !== null ? editableTollCost : autoToll;
+  const tollCost = tollManuallyEdited && editableTollCost !== null ? editableTollCost : autoToll;
+  const tollBreakdown = route?.toll_breakdown ?? routeData?.toll_breakdown ?? [];
+  const tollBreakdownOneWay = tollBreakdown.reduce((s, b) => s + Number(b.tariff), 0);
   const crossBorderCost = ((routeData?.additional_costs?.border_fees || 0) + (routeData?.additional_costs?.weighbridge_fees || 0) + (routeData?.additional_costs?.non_sa_tolls || 0)) * legs;
   const driverAllowance = Number(driverAllowanceInput) || 0;
   const weightKg = (Number(weight) || 0) * 1000;
@@ -185,8 +210,13 @@ export default function QuoteBuilder() {
 
   // ---- AI analyze + guard + benchmark once cost is ready ----
   const analyzeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards against out-of-order responses: if the user switches routes (or any
+  // other cost input changes) while a call is in flight, a slower earlier call
+  // must not overwrite the result of a newer one that resolves first.
+  const aiReqRef = useRef(0);
   const runAI = async () => {
     if (!routeData || total <= 0) return;
+    const reqId = ++aiReqRef.current;
     setOptimizing(true);
     try {
       const [an, gd] = await Promise.all([
@@ -200,9 +230,10 @@ export default function QuoteBuilder() {
           total_cost: directCost, quote_price: total, distance_km: chargeDistance, fuel_cost: fuelCost, toll_cost: tollCost,
         }}).catch(() => null),
       ]);
+      if (reqId !== aiReqRef.current) return; // a newer request has since started — this result is stale
       if (an) setAnalysis(an);
       if (gd?.success !== false) setGuard(gd);
-    } finally { setOptimizing(false); }
+    } finally { if (reqId === aiReqRef.current) setOptimizing(false); }
   };
   useEffect(() => {
     if (!routeData || total <= 0) return;
@@ -318,7 +349,7 @@ export default function QuoteBuilder() {
     setPickupCoords(null); setDeliveryCoords(null);
     setWeight(""); setCargo(""); setNotes(""); setTripType("ROUND_TRIP");
     setPickupDate(""); setDeliveryDate(""); setShowDetails(false); setNlText("");
-    setEditableTollCost(null); setDriverAllowanceInput("0"); setServiceCharge(0);
+    setEditableTollCost(null); setTollManuallyEdited(false); setDriverAllowanceInput("0"); setServiceCharge(0);
     setRouteData(null); setSelectedRouteIndex(0);
     setAnalysis(null); setGuard(null); setBenchmark(null);
     if (isEditing) navigate("/bookings/quotes/new", { replace: true });
@@ -457,7 +488,7 @@ export default function QuoteBuilder() {
 
       {/* NL input */}
       <div style={{ ...cardS, display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 14, background: "var(--bg-surface-hover)" }}>
-        <span style={{ fontSize: 15 }}>💬</span>
+        <MessageCircle size={16} color="var(--text-tertiary)" />
         <input value={nlText} onChange={e => setNlText(e.target.value)} onKeyDown={e => e.key === "Enter" && submitNL()}
           placeholder="Describe it — “20t steel, JHB to Cape Town, flatbed, Tuesday”" style={{ ...inputS, border: "none", background: "transparent" }} />
         <button onClick={submitNL} disabled={nlBusy || !nlText.trim()} style={{ fontSize: 13, fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 4, padding: "7px 14px", cursor: "pointer", opacity: nlText.trim() ? 1 : 0.5 }}>{nlBusy ? "Reading…" : "Fill"}</button>
@@ -512,7 +543,7 @@ export default function QuoteBuilder() {
       {/* empty state */}
       {!ready && (
         <div style={{ ...cardS, padding: 40, textAlign: "center", color: "var(--text-tertiary)" }}>
-          <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.4 }}>🗺️</div>
+          <div style={{ marginBottom: 10, opacity: 0.4, display: "flex", justifyContent: "center" }}><Map size={32} /></div>
           <div style={{ fontSize: 15, color: "var(--text-secondary)" }}>Add a client, vehicle type, collection and delivery</div>
           <div style={{ fontSize: 13, marginTop: 6 }}>The route, costs and AI quote appear here automatically.</div>
         </div>
@@ -529,11 +560,33 @@ export default function QuoteBuilder() {
             {routeData?.routes && routeData.routes.length > 1 && (
               <div style={{ display: "flex", gap: 8, padding: 10, flexWrap: "wrap", borderTop: "1px solid var(--border-subtle)" }}>
                 {routeData.routes.map((r, i) => (
-                  <button key={i} onClick={() => setSelectedRouteIndex(i)} style={{ fontFamily: "var(--font-mono)", fontSize: 11, padding: "5px 9px", borderRadius: 4, cursor: "pointer",
-                    border: `1px solid ${i === selectedRouteIndex ? "var(--accent-primary)" : "var(--border-subtle)"}`,
-                    background: i === selectedRouteIndex ? "var(--status-success-bg)" : "var(--bg-surface)", color: i === selectedRouteIndex ? "var(--accent-primary)" : "var(--text-secondary)" }}>
-                    {r.label || r.summary || `Route ${i + 1}`} · {Math.round(r.distance_km)} km
-                  </button>
+                  <Tooltip key={i}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => {
+                          setSelectedRouteIndex(i);
+                          // Clear stale AI numbers immediately so the summary never shows
+                          // a previous route's figures while the new analysis is in flight.
+                          setAnalysis(null); setGuard(null);
+                        }}
+                        style={{ fontFamily: "var(--font-mono)", fontSize: 11, padding: "5px 9px", borderRadius: 4, cursor: "pointer",
+                          border: `1px solid ${i === selectedRouteIndex ? "var(--accent-primary)" : "var(--border-subtle)"}`,
+                          background: i === selectedRouteIndex ? "var(--status-success-bg)" : "var(--bg-surface)", color: i === selectedRouteIndex ? "var(--accent-primary)" : "var(--text-secondary)" }}>
+                        {r.label || r.summary || `Route ${i + 1}`} · {Math.round(r.distance_km)} km
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" style={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", fontSize: 12, padding: "10px 12px", maxWidth: 220 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "3px 12px" }}>
+                        <span style={{ color: "var(--text-tertiary)" }}>Distance</span><span>{Math.round(r.distance_km)} km</span>
+                        <span style={{ color: "var(--text-tertiary)" }}>Duration</span><span>{formatDuration(r.duration_minutes ?? r.duration_min)}</span>
+                        <span style={{ color: "var(--text-tertiary)" }}>Fuel</span><span>{formatCurrency(r.fuel_cost_zar)}</span>
+                        <span style={{ color: "var(--text-tertiary)" }}>Tolls</span><span>{formatCurrency(r.toll_cost_zar)}</span>
+                        <span style={{ color: "var(--text-tertiary)" }}>Total</span><span>{formatCurrency(r.total_cost_zar)}</span>
+                        {r.road_type && (<><span style={{ color: "var(--text-tertiary)" }}>Road</span><span>{r.road_type}</span></>)}
+                        {r.terrain && (<><span style={{ color: "var(--text-tertiary)" }}>Terrain</span><span>{r.terrain}</span></>)}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 ))}
               </div>
             )}
@@ -543,15 +596,44 @@ export default function QuoteBuilder() {
             {calculatingRoute && <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Calculating route…</div>}
             {!calculatingRoute && (<>
               {[
-                { l: `Fuel — ${fuelConsumption} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },
-                { l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
-                ...(crossBorderCost > 0 ? [{ l: "Cross-border / weighbridge", v: crossBorderCost, c: "#2BB6A6" }] : []),
-                { l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },
-                ...(weightSurcharge > 0 ? [{ l: `Weight surcharge (${surchargePct}%)`, v: weightSurcharge, c: "var(--text-tertiary)" }] : []),
-                { l: `Base rate (${vehicleType || "—"} · R${baseRatePerKm}/km)`, v: baseCost, c: "var(--accent-primary)" },
+                { key: "fuel", l: `Fuel — ${fuelConsumption} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },
+                { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
+                ...(crossBorderCost > 0 ? [{ key: "cb", l: "Cross-border / weighbridge", v: crossBorderCost, c: "#2BB6A6" }] : []),
+                { key: "driver", l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },
+                ...(weightSurcharge > 0 ? [{ key: "surcharge", l: `Weight surcharge (${surchargePct}%)`, v: weightSurcharge, c: "var(--text-tertiary)" }] : []),
+                { key: "base", l: `Base rate (${vehicleType || "—"} · R${baseRatePerKm}/km)`, v: baseCost, c: "var(--accent-primary)" },
               ].map((r, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border-row)", fontSize: 13 }}>
-                  <span style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}><span style={dot(r.c)} />{r.l}</span>
+                  <span style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={dot(r.c)} />{r.l}
+                    {r.key === "tolls" && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button type="button" title="Toll breakdown"
+                            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1 }}>
+                            <Info size={11} />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                          <div style={{ ...labelS, marginBottom: 8 }}>Toll plazas on this route</div>
+                          {tollBreakdown.length === 0 ? (
+                            <div style={{ color: "var(--text-tertiary)" }}>No SANRAL plazas matched on this route.</div>
+                          ) : (<>
+                            {tollBreakdown.map((b, bi) => (
+                              <div key={bi} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "4px 0", borderBottom: "1px solid var(--border-row)" }}>
+                                <span>{b.plaza} <span style={{ color: "var(--text-tertiary)" }}>({b.route})</span></span>
+                                <span style={{ fontFamily: "var(--font-mono)", flexShrink: 0 }}>{formatCurrency(b.tariff)}</span>
+                              </div>
+                            ))}
+                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border-subtle)", fontWeight: 600 }}>
+                              <span>One way total</span><span style={{ fontFamily: "var(--font-mono)" }}>{formatCurrency(tollBreakdownOneWay)}</span>
+                            </div>
+                            {legs === 2 && <div style={{ color: "var(--text-tertiary)", marginTop: 4 }}>× 2 for round trip = {formatCurrency(tollBreakdownOneWay * 2)}</div>}
+                          </>)}
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </span>
                   <span style={{ fontFamily: "var(--font-mono)" }}>{formatCurrency(r.v)}</span>
                 </div>
               ))}
@@ -561,7 +643,7 @@ export default function QuoteBuilder() {
               </div>
               <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>{Math.round(distance)} km {legs === 2 ? `one way · ${Math.round(chargeDistance)} km round trip` : "one way"} · live diesel · your {vehicleType} settings{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
               <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Tolls</div><input type="number" value={tollCost} onChange={e => setEditableTollCost(Number(e.target.value))} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
+                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Tolls</div><input type="number" value={tollCost} onChange={e => { setEditableTollCost(Number(e.target.value)); setTollManuallyEdited(true); }} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
                 <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Driver</div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
                 <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>R/km</div><input type="number" value={baseRatePerKm} onChange={e => setBaseRatePerKm(e.target.value)} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
               </div>
@@ -596,7 +678,7 @@ export default function QuoteBuilder() {
                   <ComposedChart data={curveData} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
                     <defs><linearGradient id="qg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--status-success)" stopOpacity={0.35} /><stop offset="95%" stopColor="var(--status-success)" stopOpacity={0} /></linearGradient></defs>
                     <XAxis dataKey="margin" hide /><YAxis hide />
-                    <Tooltip contentStyle={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", borderRadius: 4, fontSize: 11 }} formatter={(v: any, n: any) => n === "profit" ? [formatCurrency(Number(v)), "Exp. profit"] : [`${v}%`, "Win"]} labelFormatter={(v: any) => `Margin ${v}%`} />
+                    <ChartTooltip contentStyle={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", borderRadius: 4, fontSize: 11 }} formatter={(v: any, n: any) => n === "profit" ? [formatCurrency(Number(v)), "Exp. profit"] : [`${v}%`, "Win"]} labelFormatter={(v: any) => `Margin ${v}%`} />
                     <Area type="monotone" dataKey="profit" stroke="var(--status-success)" strokeWidth={2} fill="url(#qg)" />
                     {opt?.optimal_margin_pct != null && <ReferenceLine x={Math.round(opt.optimal_margin_pct)} stroke="var(--accent-primary)" strokeDasharray="3 3" />}
                   </ComposedChart>
@@ -616,7 +698,7 @@ export default function QuoteBuilder() {
           {/* still learning */}
           {aiLearning && (
             <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border-row)", background: "var(--status-warning-bg)", display: "flex", gap: 10, fontSize: 13 }}>
-              <span style={{ color: "var(--status-warning)", fontSize: 15 }}>◐</span>
+              <Sparkles size={16} color="var(--status-warning)" style={{ flexShrink: 0 }} />
               <div><b>AI pricing is still learning your fleet.</b><span style={{ color: "var(--text-secondary)" }}> Priced on true cost + your {vehicleType} base rate for now — the optimiser needs ~{winModel.outcomes_needed} completed loads to learn what wins with your clients ({winModel.outcomes_collected}/{winModel.outcomes_needed} logged). Every quote you close sharpens it.</span></div>
             </div>
           )}

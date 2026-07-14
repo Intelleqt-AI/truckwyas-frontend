@@ -218,22 +218,27 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
             }}
           />
         </div>
-        <div className="agent-command">
-          <div className="agent-icon" />
-          <input
-            type="text"
-            className="agent-input"
-            placeholder="Ask Copilot anything..."
-            value={agentQuery}
-            onChange={e => setAgentQuery(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && agentQuery.trim()) {
-                navigate(`/copilot?q=${encodeURIComponent(agentQuery.trim())}`);
-                setAgentQuery('');
-              }
-            }}
-          />
-        </div>
+        {/* The Copilot page is gated to INSIGHTS_ROLES (App.tsx). Only show the
+            omnibox to roles that can actually reach it, so a DRIVER's query isn't
+            silently swallowed by the route guard on Enter. */}
+        {['ADMIN', 'MANAGER', 'OPERATOR', 'DISPATCHER', 'VIEWER'].includes(userRole) && (
+          <div className="agent-command">
+            <div className="agent-icon" />
+            <input
+              type="text"
+              className="agent-input"
+              placeholder="Ask Copilot anything..."
+              value={agentQuery}
+              onChange={e => setAgentQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && agentQuery.trim()) {
+                  navigate(`/copilot?q=${encodeURIComponent(agentQuery.trim())}`);
+                  setAgentQuery('');
+                }
+              }}
+            />
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <div className="status-badge active">
             <span style={{ width: 6, height: 6, background: 'currentColor', borderRadius: '50%', display: 'inline-block' }} />

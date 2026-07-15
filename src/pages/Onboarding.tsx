@@ -197,7 +197,7 @@ export function Onboarding() {
               background: 'none', border: 'none', color: 'var(--text-tertiary)',
               fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer',
             }}>
-              SKIP →
+              Skip →
             </button>
           </div>
           <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
@@ -323,7 +323,7 @@ export function Onboarding() {
                   className="btn-action"
                   style={{ width: '100%' }}
                 >
-                  {submitting ? 'SAVING...' : 'CONTINUE'}
+                  {submitting ? 'Saving...' : 'Continue'}
                 </button>
               </>
             )}
@@ -504,7 +504,7 @@ export function Onboarding() {
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>🚛</div>
             <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-              You're All Set!
+              You're all set!
             </div>
             <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 32, lineHeight: 1.6 }}>
               Your business is ready. Jump in and create your first quote — you can add
@@ -516,7 +516,7 @@ export function Onboarding() {
               className="btn-action"
               style={{ width: '100%', marginBottom: 16 }}
             >
-              GO TO DASHBOARD
+              Go to dashboard
             </button>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12 }}>

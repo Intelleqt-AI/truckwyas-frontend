@@ -10,6 +10,10 @@ const TIER_META: Record<string, { color: string; label: string; feeRange: string
   HIGH:     { color: 'var(--status-danger)',    label: 'High',     feeRange: '3.5%–4.5%', desc: 'Higher risk — late payment history or high DSO.' },
 };
 
+// Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
 const STATUS_COLOR: Record<string, string> = {
   REQUESTED: 'var(--accent-primary)',
   APPROVED: 'var(--status-success)',
@@ -75,7 +79,7 @@ export default function AdvanceDetail() {
             style={{ padding: '8px 16px', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, marginTop: 12 }}
             onClick={() => navigate('/capital')}
           >
-            BACK TO CAPITAL
+            Back to Capital
           </button>
         </div>
       </div>
@@ -131,11 +135,12 @@ export default function AdvanceDetail() {
             color: STATUS_COLOR[status] || 'var(--text-tertiary)',
             background: 'var(--bg-surface-hover)',
             padding: '4px 10px',
-            borderRadius: 2,
-            textTransform: 'uppercase',
-            fontWeight: 600
+            borderRadius: 4,
+            display: 'inline-block',
+            whiteSpace: 'nowrap',
+            fontWeight: 500
           }}>
-            {status}
+            {formatStatus(status)}
           </span>
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>

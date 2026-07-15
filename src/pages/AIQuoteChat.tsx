@@ -360,12 +360,12 @@ export default function AIQuoteChat() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 90px)' }}>
       <div style={{ marginBottom: 14 }}>
-        <button onClick={() => navigate('/bookings/quotes')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0, letterSpacing: '0.05em' }}>← BACK TO QUOTES</button>
+        <button onClick={() => navigate('/bookings/quotes')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0, letterSpacing: '0.05em' }}>← Back to quotes</button>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>AI Quote</div>
           {messages.length > 1 && (
-            <button onClick={startOver} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '6px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Start over</button>
+            <button onClick={startOver} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '6px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}>Start over</button>
           )}
         </div>
       </div>
@@ -519,12 +519,11 @@ export default function AIQuoteChat() {
               cursor: (!input.trim() || isLoading || isRecording) ? 'not-allowed' : 'pointer',
               fontFamily: 'var(--font-mono)',
               letterSpacing: '0.05em',
-              textTransform: 'uppercase',
               opacity: (!input.trim() || isLoading || isRecording) ? 0.5 : 1,
               transition: 'all 0.2s'
             }}
           >
-            SEND
+            Send
           </button>
         </div>
       </div>
@@ -629,11 +628,10 @@ export default function AIQuoteChat() {
               cursor: canCreateQuote && !isLoading ? 'pointer' : 'not-allowed',
               fontFamily: 'var(--font-mono)',
               letterSpacing: '0.05em',
-              textTransform: 'uppercase',
               transition: 'all 0.2s'
             }}
           >
-            {isLoading ? 'CREATING...' : 'CREATE QUOTE'}
+            {isLoading ? 'Creating…' : 'Create quote'}
           </button>
 
           {!canCreateQuote && (

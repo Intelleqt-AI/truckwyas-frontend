@@ -7,6 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const VEHICLE_STATUSES = ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'OUT_OF_SERVICE'] as const;
 
+// Sentence-case a status token for display: "IN_USE" → "In use".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
 const ScoreBar = ({ label, value, max = 100, color = 'var(--accent-primary)' }: any) => (
   <div style={{ marginBottom: 14 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
@@ -69,12 +73,12 @@ export default function VehicleFinancialProfile() {
   });
 
   if (isLoading) return (
-    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>
+    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading…</div>
   );
   if (!vehicle) return (
     <div style={{ padding: 40 }}>
       <div style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Vehicle not found.</div>
-      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/fleet')}>← BACK TO FLEET</button>
+      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/fleet')}>← Back to fleet</button>
     </div>
   );
 
@@ -99,8 +103,8 @@ export default function VehicleFinancialProfile() {
     borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
     fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
-    fontWeight: active ? 600 : 400,
-    textTransform: 'uppercase', padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
+    fontWeight: active ? 500 : 400,
+    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
     transition: 'all 0.2s ease',
   });
 
@@ -111,7 +115,7 @@ export default function VehicleFinancialProfile() {
         <button
           onClick={() => navigate('/fleet')}
           style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}
-        >← BACK TO FLEET</button>
+        >← Back to fleet</button>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
@@ -153,11 +157,10 @@ export default function VehicleFinancialProfile() {
                 border: `1px solid var(--border-subtle)`, borderRadius: 2,
                 cursor: 'pointer',
                 letterSpacing: '0.08em',
-                textTransform: 'uppercase',
                 transition: 'all 0.15s ease',
               }}
             >
-              EDIT
+              Edit
             </button>
             <div style={{ display: 'flex', gap: 6 }}>
             {VEHICLE_STATUSES.map(s => {
@@ -184,11 +187,10 @@ export default function VehicleFinancialProfile() {
                     cursor: isCurrentStatus || updating ? 'default' : 'pointer',
                     opacity: updating && !isCurrentStatus ? 0.5 : 1,
                     letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  {s.replace('_', ' ')}
+                  {formatStatus(s)}
                 </button>
               );
             })}
@@ -266,7 +268,7 @@ export default function VehicleFinancialProfile() {
                   { label: 'LAST MAINTENANCE', value: vehicle.last_maintenance_date?.slice(0, 10) || '—' },
                   { label: 'SERVICE INTERVAL', value: vehicle.service_interval_km ? `${Number(vehicle.service_interval_km).toLocaleString('en-ZA')} km` : '—' },
                   { label: 'NEXT SERVICE AT', value: nextServiceKm ? `${nextServiceKm.toLocaleString('en-ZA')} km` : '—' },
-                  { label: 'KM UNTIL SERVICE', value: kmUntilService !== null ? (kmUntilService > 0 ? `${Math.round(kmUntilService).toLocaleString('en-ZA')} km` : 'OVERDUE') : '—' },
+                  { label: 'KM UNTIL SERVICE', value: kmUntilService !== null ? (kmUntilService > 0 ? `${Math.round(kmUntilService).toLocaleString('en-ZA')} km` : 'Overdue') : '—' },
                   { label: 'REGISTRATION EXPIRY', value: vehicle.registration_expiry?.slice(0, 10) || '—' },
                 ].map(r => (
                   <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
@@ -356,7 +358,7 @@ export default function VehicleFinancialProfile() {
                 { label: 'LAST MAINTENANCE', value: vehicle.last_maintenance_date?.slice(0, 10) || '—', alert: false },
                 { label: 'SERVICE INTERVAL', value: vehicle.service_interval_km ? `${Number(vehicle.service_interval_km).toLocaleString('en-ZA')} km` : '—', alert: false },
                 { label: 'NEXT SERVICE AT', value: nextServiceKm ? `${nextServiceKm.toLocaleString('en-ZA')} km` : '—', alert: false },
-                { label: 'KM UNTIL SERVICE', value: kmUntilService !== null ? (kmUntilService > 0 ? `${Math.round(kmUntilService).toLocaleString('en-ZA')} km` : 'OVERDUE') : '—', alert: kmUntilService !== null && kmUntilService <= 0 },
+                { label: 'KM UNTIL SERVICE', value: kmUntilService !== null ? (kmUntilService > 0 ? `${Math.round(kmUntilService).toLocaleString('en-ZA')} km` : 'Overdue') : '—', alert: kmUntilService !== null && kmUntilService <= 0 },
                 { label: 'REGISTRATION EXPIRY', value: vehicle.registration_expiry?.slice(0, 10) || '—', alert: !!(vehicle.registration_expiry && new Date(vehicle.registration_expiry) < new Date()) },
                 { label: 'VIN', value: vehicle.vin || '—', alert: false },
               ].map(r => (
@@ -386,7 +388,7 @@ export default function VehicleFinancialProfile() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>{formatCurrency(parseFloat(load.total_amount || '0'))}</div>
-                    <div style={{ fontSize: 10, color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{load.status}</div>
+                    <div style={{ fontSize: 10, color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{formatStatus(load.status)}</div>
                   </div>
                 </div>
               ))}
@@ -495,15 +497,15 @@ export default function VehicleFinancialProfile() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase' }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
               >
-                {saving ? 'SAVING...' : 'UPDATE VEHICLE'}
+                {saving ? 'Saving…' : 'Update vehicle'}
               </button>
               <button
                 onClick={() => setShowEditForm(false)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase' }}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
               >
-                CANCEL
+                Cancel
               </button>
             </div>
           </div>

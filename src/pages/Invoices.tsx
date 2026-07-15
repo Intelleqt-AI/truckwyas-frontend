@@ -53,6 +53,9 @@ const EXPENSE_STATUS_COLOR: Record<string, string> = {
   REJECTED: "var(--status-danger)",
 };
 
+// Sentence-case a status/token for display: "PARTIALLY_PAID" → "Partially paid".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : "—";
 
 const PAGE_SIZE = 10;
 
@@ -450,7 +453,7 @@ export default function Invoices() {
             borderRadius: 2,
             fontSize: 12,
             fontFamily: "var(--font-mono)",
-            fontWeight: 600,
+            fontWeight: 500,
           }}>
           {toast}
         </div>
@@ -488,7 +491,7 @@ export default function Invoices() {
             <button
               className="btn-action"
               onClick={() => navigate("/finance/invoices/new")}>
-              + NEW INVOICE
+              + New invoice
             </button>
           )}
           {activeTab === "expenses" && (
@@ -498,7 +501,7 @@ export default function Invoices() {
                 setShowExpenseForm(true);
                 setEditingExpense(null);
               }}>
-              + ADD EXPENSE
+              + Add expense
             </button>
           )}
         </div>
@@ -535,11 +538,10 @@ export default function Invoices() {
               padding: "12px 0",
               marginBottom: -1,
               fontSize: 13,
-              fontWeight: activeTab === tab.id ? 600 : 400,
+              fontWeight: activeTab === tab.id ? 500 : 400,
               cursor: "pointer",
               transition: "all 0.2s ease",
               fontFamily: "var(--font-mono)",
-              textTransform: "uppercase",
               letterSpacing: "0.05em",
             }}
             onMouseEnter={(e) => {
@@ -569,7 +571,6 @@ export default function Invoices() {
             cursor: "pointer",
             transition: "all 0.2s ease",
             fontFamily: "var(--font-mono)",
-            textTransform: "uppercase",
             letterSpacing: "0.05em",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
@@ -616,10 +617,10 @@ export default function Invoices() {
                   <div
                     style={{
                       fontSize: 18,
-                      fontWeight: 600,
+                      fontWeight: 500,
                       color: "var(--text-primary)",
                     }}>
-                    {editingExpense ? "Edit Expense" : "Add Expense"}
+                    {editingExpense ? "Edit expense" : "Add expense"}
                   </div>
                   <button
                     onClick={() => {
@@ -1005,7 +1006,7 @@ export default function Invoices() {
                         !expenseForm.expense_date
                       }
                       style={{ flex: 1 }}>
-                      {editingExpense ? "UPDATE EXPENSE" : "ADD EXPENSE"}
+                      {editingExpense ? "Update expense" : "Add expense"}
                     </button>
                     <button
                       onClick={() => {
@@ -1022,10 +1023,10 @@ export default function Invoices() {
                         fontSize: 11,
                         fontFamily: "var(--font-mono)",
                         cursor: "pointer",
-                        fontWeight: 600,
+                        fontWeight: 500,
                         letterSpacing: "0.05em",
                       }}>
-                      CANCEL
+                      Cancel
                     </button>
                   </div>
                 </div>
@@ -1211,7 +1212,7 @@ export default function Invoices() {
               }}>
               {expenseCategories.map((c) => (
                 <option key={c} value={c}>
-                  {c === "All" ? "All Categories" : c.replace("_", " ")}
+                  {c === "All" ? "All categories" : formatStatus(c)}
                 </option>
               ))}
             </select>
@@ -1237,12 +1238,11 @@ export default function Invoices() {
                   fontSize: 11,
                   borderRadius: 2,
                   cursor: "pointer",
-                  textTransform: "uppercase",
                   letterSpacing: "0.06em",
-                  fontWeight: expenseStatusFilter === s ? 600 : 400,
+                  fontWeight: expenseStatusFilter === s ? 500 : 400,
                   whiteSpace: "nowrap",
                 }}>
-                {s}
+                {s === "All" ? "All" : formatStatus(s)}
               </button>
             ))}
             <span
@@ -1321,7 +1321,7 @@ export default function Invoices() {
                                 <button
                                   onClick={() => setShowExpenseForm(true)}
                                   className="btn-action">
-                                  ADD EXPENSE
+                                  Add expense
                                 </button>
                               </div>
                             </td>
@@ -1353,16 +1353,16 @@ export default function Invoices() {
 
                           return (
                             <tr key={exp.id}>
-                              <td className="mono" style={{ fontSize: 12 }}>
+                              <td className="mono" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
                                 {formatDate(exp.expense_date)}
                               </td>
-                              <td style={{ fontSize: 12 }}>
+                              <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>
                                 <span
                                   style={{ fontFamily: "var(--font-sans)" }}>
-                                  {exp.category.replace("_", " ")}
+                                  {formatStatus(exp.category)}
                                 </span>
                               </td>
-                              <td style={{ fontSize: 12 }}>
+                              <td style={{ fontSize: 12, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={exp.description}>
                                 {exp.description}
                               </td>
                               <td
@@ -1375,7 +1375,7 @@ export default function Invoices() {
                               </td>
                               <td
                                 className="mono"
-                                style={{ fontSize: 13, fontWeight: 500 }}>
+                                style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap" }}>
                                 {formatCurrency(exp.amount)}
                               </td>
                               <td>
@@ -1388,9 +1388,11 @@ export default function Invoices() {
                                       "var(--text-secondary)",
                                     padding: "2px 6px",
                                     background: "var(--bg-surface-hover)",
-                                    borderRadius: 2,
+                                    borderRadius: 4,
+                                    display: "inline-block",
+                                    whiteSpace: "nowrap",
                                   }}>
-                                  {exp.status}
+                                  {formatStatus(exp.status)}
                                 </span>
                               </td>
                               <td>
@@ -1408,7 +1410,7 @@ export default function Invoices() {
                                         onClick={() =>
                                           handleApproveExpense(exp.id)
                                         }>
-                                        APPROVE
+                                        Approve
                                       </button>
                                       <button
                                         className="btn-action"
@@ -1421,7 +1423,7 @@ export default function Invoices() {
                                         onClick={() =>
                                           handleRejectExpense(exp.id)
                                         }>
-                                        REJECT
+                                        Reject
                                       </button>
                                     </>
                                   )}
@@ -1435,7 +1437,7 @@ export default function Invoices() {
                                       color: "var(--text-secondary)",
                                     }}
                                     onClick={() => handleEditExpense(exp)}>
-                                    EDIT
+                                    Edit
                                   </button>
                                   <button
                                     className="btn-action"
@@ -1447,7 +1449,7 @@ export default function Invoices() {
                                       color: "var(--status-danger)",
                                     }}
                                     onClick={() => handleDeleteExpense(exp.id)}>
-                                    DEL
+                                    Del
                                   </button>
                                 </div>
                               </td>
@@ -1484,7 +1486,7 @@ export default function Invoices() {
                             setExpensePage((p) => Math.max(1, p - 1))
                           }
                           disabled={expensePage === 1}>
-                          ← PREV
+                          ← Prev
                         </button>
                         <button
                           className="btn-action"
@@ -1492,7 +1494,7 @@ export default function Invoices() {
                             setExpensePage((p) => Math.min(totalPages, p + 1))
                           }
                           disabled={expensePage === totalPages}>
-                          NEXT →
+                          Next →
                         </button>
                       </div>
                     </div>
@@ -1634,12 +1636,11 @@ export default function Invoices() {
                     fontSize: 11,
                     borderRadius: 2,
                     cursor: "pointer",
-                    textTransform: "uppercase",
                     letterSpacing: "0.06em",
-                    fontWeight: statusFilter === s ? 600 : 400,
+                    fontWeight: statusFilter === s ? 500 : 400,
                     transition: "all 0.2s ease",
                   }}>
-                  {s}
+                  {s === "All" ? "All" : formatStatus(s)}
                 </button>
               ))}
             </div>
@@ -1710,7 +1711,7 @@ export default function Invoices() {
                           <button
                             onClick={() => navigate("/bookings")}
                             className="btn-action">
-                            GO TO BOOKINGS
+                            Go to bookings
                           </button>
                         </div>
                       </td>
@@ -1771,9 +1772,9 @@ export default function Invoices() {
                         key={inv.id}
                         style={{ cursor: "pointer" }}
                         onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
-                        <td className="mono">{invNumber}</td>
-                        <td>{custName}</td>
-                        <td className="mono">{formatCurrency(amount)}</td>
+                        <td className="mono" style={{ whiteSpace: "nowrap" }}>{invNumber}</td>
+                        <td style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={custName}>{custName}</td>
+                        <td className="mono" style={{ whiteSpace: "nowrap" }}>{formatCurrency(amount)}</td>
                         <td>
                           <div
                             style={{
@@ -1790,9 +1791,11 @@ export default function Invoices() {
                                   "var(--text-secondary)",
                                 padding: "2px 6px",
                                 background: "var(--bg-surface-hover)",
-                                borderRadius: 2,
+                                borderRadius: 4,
+                                display: "inline-block",
+                                whiteSpace: "nowrap",
                               }}>
-                              {invStatus}
+                              {formatStatus(invStatus)}
                             </span>
                             {capitalEntry && tier && (
                               <span
@@ -1803,10 +1806,11 @@ export default function Invoices() {
                                     TIER_COLOR[tier] || "var(--text-tertiary)",
                                   padding: "1px 5px",
                                   border: `1px solid ${TIER_COLOR[tier] || "var(--border-subtle)"}`,
-                                  borderRadius: 2,
-                                  textTransform: "uppercase",
+                                  borderRadius: 4,
+                                  display: "inline-block",
+                                  whiteSpace: "nowrap",
                                 }}>
-                                {tier}
+                                {formatStatus(tier)}
                               </span>
                             )}
                           </div>
@@ -1924,8 +1928,8 @@ export default function Invoices() {
                                       handleSendInvoice(e, inv.id);
                                     }}>
                                     {sendingId === inv.id
-                                      ? "SENDING..."
-                                      : "SEND TO CUSTOMER"}
+                                      ? "Sending..."
+                                      : "Send to customer"}
                                   </button>
                                 )}
                                 {invStatus === "OVERDUE" && (
@@ -1954,8 +1958,8 @@ export default function Invoices() {
                                       handleSendReminder(e, inv.id);
                                     }}>
                                     {sendingReminderId === inv.id
-                                      ? "SENDING..."
-                                      : "SEND REMINDER"}
+                                      ? "Sending..."
+                                      : "Send reminder"}
                                   </button>
                                 )}
                                 {invStatus !== "DRAFT" && (
@@ -1982,7 +1986,7 @@ export default function Invoices() {
                                       setOpenDropdownId(null);
                                       handleDownloadPDF(e, inv.id);
                                     }}>
-                                    DOWNLOAD PDF
+                                    Download PDF
                                   </button>
                                 )}
                                 {capitalEntry && (
@@ -2014,7 +2018,7 @@ export default function Invoices() {
                                       boxSizing: "border-box",
                                       transition: "background 0.15s",
                                     }}>
-                                    {appliedIds.has(String(inv.id)) ? "Applied ✓" : "REQUEST CAPITAL →"}
+                                    {appliedIds.has(String(inv.id)) ? "Applied ✓" : "Request capital →"}
                                   </a>
                                 )}
                                 {ineligibleEntry && (
@@ -2029,12 +2033,12 @@ export default function Invoices() {
                                     <div
                                       style={{
                                         color: "var(--status-danger)",
-                                        fontWeight: 600,
+                                        fontWeight: 500,
                                         marginBottom: 2,
                                         fontSize: 9,
                                         letterSpacing: "0.05em",
                                       }}>
-                                      NOT ELIGIBLE FOR CAPITAL
+                                      Not eligible for capital
                                     </div>
                                     {ineligibleEntry.reason}
                                   </div>
@@ -2074,13 +2078,13 @@ export default function Invoices() {
                     className="btn-action"
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}>
-                    ← PREV
+                    ← Prev
                   </button>
                   <button
                     className="btn-action"
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}>
-                    NEXT →
+                    Next →
                   </button>
                 </div>
               </div>

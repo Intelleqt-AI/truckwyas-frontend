@@ -499,6 +499,7 @@ export default function NewQuote() {
       if (d.editableTollCost != null) setEditableTollCost(d.editableTollCost);
       if (d.costMode) setCostMode(d.costMode);
       if (d.customFuelPricePerL) setCustomFuelPricePerL(d.customFuelPricePerL);
+      if (d.serviceCharge != null) setServiceCharge(d.serviceCharge);
       if (d.customerId) setCustomerId(d.customerId);
       if (d.notes) setNotes(d.notes);
       if (d.validUntil) setValidUntil(d.validUntil);
@@ -527,7 +528,7 @@ export default function NewQuote() {
         tripType, returnLocation, returnCoords, returnCargo, returnDate, returnBaseRate, returnNotes,
         weight, vehicleType, selectedVehicleId, selectedDriverId,
         baseRatePerKm, cargoDescription, driverAllowanceInput,
-        editableTollCost, costMode, customFuelPricePerL,
+        editableTollCost, costMode, customFuelPricePerL, serviceCharge,
         customerId, notes, validUntil, pickupDate, deliveryDate, currentStep,
         routeData, routeOptions, selectedRouteIndex, returnRouteData,
       }));
@@ -538,7 +539,7 @@ export default function NewQuote() {
     tripType, returnLocation, returnCoords, returnCargo, returnDate, returnBaseRate, returnNotes,
     weight, vehicleType, selectedVehicleId, selectedDriverId,
     baseRatePerKm, cargoDescription, driverAllowanceInput,
-    editableTollCost, costMode, customFuelPricePerL,
+    editableTollCost, costMode, customFuelPricePerL, serviceCharge,
     customerId, notes, validUntil, pickupDate, deliveryDate, currentStep,
     routeData, routeOptions, selectedRouteIndex, returnRouteData,
   ]);
@@ -612,7 +613,9 @@ export default function NewQuote() {
             selectedRoute?.fuel_usage_litres ?? routeData?.fuel_usage_litres ?? null,
           fuel_price_used: fuelPrice,
           market_rate: Math.round(marketBenchmark?.market_avg_rate || 0),
-          client_tier: "standard",
+          // Backend derives client tier / acceptance rate / urgency from these.
+          customer_id: customerId ? parseInt(customerId) : null,
+          pickup_date: pickupDate || null,
         },
       });
       if (data?.success) {
@@ -629,11 +632,13 @@ export default function NewQuote() {
   };
 
   // Apply the AI-suggested price by setting a service charge to bridge the gap.
+  // The analysis prices the OUTBOUND leg (quote_total = _total - _returnRate),
+  // so the return rate must not be subtracted again here.
   const applyOptimal = () => {
     const suggested = analysis?.suggested_price ?? optimal?.optimal_price;
     if (!suggested) return;
     const currentCosts = _fuelCost + _tollCost + _weightSurcharge + _additionalCosts + _driverAllowance;
-    const diff = suggested - _returnRate - currentCosts;
+    const diff = suggested - currentCosts;
     setServiceCharge(Math.max(0, Math.round(diff)));
     setOptimal(null);
     setAnalysis(null);
@@ -940,6 +945,19 @@ export default function NewQuote() {
           setEditableFuelCost(parseFloat(q.fuel_surcharge));
         if (q.toll_charges != null)
           setEditableTollCost(parseFloat(q.toll_charges));
+        // Service charge isn't a persisted field — back-compute it as the
+        // residual of the saved total over the saved cost components so an
+        // applied AI price survives editing (otherwise resave drops it).
+        {
+          const known =
+            parseFloat(q.fuel_surcharge || "0") +
+            parseFloat(q.toll_charges || "0") +
+            parseFloat(q.driver_allowance || "0") +
+            parseFloat(q.additional_charges || "0") +
+            parseFloat(q.return_base_rate || "0");
+          const residual = parseFloat(q.total_amount || "0") - known;
+          if (residual > 0.5) setServiceCharge(Math.round(residual));
+        }
         // Round trip fields
         if (q.trip_type) setTripType(q.trip_type);
         if (q.return_location) setReturnLocation(q.return_location);
@@ -1047,7 +1065,8 @@ export default function NewQuote() {
     const upper = location.trim().toUpperCase();
     if (upper.includes("JHB") || upper.includes("JOHANNESBURG")) return "JHB";
     if (upper.includes("CPT") || upper.includes("CAPE TOWN")) return "CPT";
-    if (upper.includes("DUR") || upper.includes("DURBAN")) return "DUR";
+    // DBN is the canonical Durban code — the backend estimate tables key on it.
+    if (upper.includes("DBN") || upper.includes("DUR") || upper.includes("DURBAN")) return "DBN";
     if (upper.includes("PE") || upper.includes("PORT ELIZABETH")) return "PE";
     if (upper.includes("BFN") || upper.includes("BLOEMFONTEIN")) return "BFN";
     if (upper.includes("PTA") || upper.includes("PRETORIA")) return "PTA";
@@ -4420,7 +4439,7 @@ export default function NewQuote() {
                     </div>
                   )}
 
-                  {analysis.market_analysis?.market_rate != null && (
+                  {analysis.market_analysis?.market_rate != null ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, marginBottom: 12 }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
                         <span style={{ color: "var(--text-secondary)" }}>Market rate:</span>
@@ -4434,6 +4453,13 @@ export default function NewQuote() {
                           </span>
                         </div>
                       )}
+                    </div>
+                  ) : (
+                    // No real benchmark for this lane — say so, don't show a
+                    // fabricated number.
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 12 }}>
+                      <span style={{ color: "var(--text-secondary)" }}>Market rate:</span>
+                      <span style={{ color: "var(--text-tertiary)" }}>No market data for this lane yet</span>
                     </div>
                   )}
 
@@ -4689,7 +4715,13 @@ export default function NewQuote() {
                         color: "var(--bg-deep)",
                         fontWeight: 600,
                       }}>
-                      APPLY SUGGESTED PRICE
+                      {(() => {
+                        const suggested =
+                          analysis?.suggested_price ?? optimal?.optimal_price;
+                        return suggested
+                          ? `APPLY R ${Math.round(suggested).toLocaleString()}`
+                          : "APPLY SUGGESTED PRICE";
+                      })()}
                     </button>
                     <button
                       className="btn-action"

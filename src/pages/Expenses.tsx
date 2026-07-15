@@ -26,8 +26,12 @@ interface Vehicle {
   registration?: string;
 }
 
+// Sentence-case a status/token for display: "DRIVER_COST" → "Driver cost".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
 const CATS = [
-  { value: 'All', label: 'All Categories', icon: '📊' },
+  { value: 'All', label: 'All categories', icon: '📊' },
   { value: 'FUEL', label: 'Fuel', icon: '⛽' },
   { value: 'TOLLS', label: 'Tolls', icon: '🛣️' },
   { value: 'MAINTENANCE', label: 'Maintenance', icon: '🔧' },
@@ -38,9 +42,9 @@ const CATS = [
 ];
 
 const DATE_FILTERS = [
-  { value: 'this_month', label: 'This Month' },
-  { value: 'last_month', label: 'Last Month' },
-  { value: 'custom', label: 'Custom Range' },
+  { value: 'this_month', label: 'This month' },
+  { value: 'last_month', label: 'Last month' },
+  { value: 'custom', label: 'Custom range' },
 ];
 
 function getCategoryIcon(cat: string) {
@@ -132,7 +136,7 @@ export default function Expenses() {
 
   const handleDelete = (id: number) => {
     setConfirmOpts({
-      title: 'Delete Expense',
+      title: 'Delete expense',
       message: 'Delete this expense? This cannot be undone.',
       confirmLabel: 'Delete',
       danger: true,
@@ -238,9 +242,9 @@ export default function Expenses() {
               color: 'var(--text-secondary)',
             }}
           >
-            EXPORT CSV
+            Export CSV
           </button>
-          <button className="btn-action" onClick={() => setShowAdd(true)}>+ ADD EXPENSE</button>
+          <button className="btn-action" onClick={() => setShowAdd(true)}>+ Add expense</button>
         </div>
       </div>
 
@@ -269,8 +273,8 @@ export default function Expenses() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 24 }}>
         {/* Monthly Trend Chart */}
         <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-            Monthly Expense Trend (Last 6 Months)
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 16 }}>
+            Monthly expense trend (last 6 months)
           </div>
           {monthlyTrend.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 12 }}>
@@ -323,8 +327,8 @@ export default function Expenses() {
 
         {/* Category Breakdown Donut Chart */}
         <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-            Category Breakdown
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 16 }}>
+            Category breakdown
           </div>
           {categoryBreakdown.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 12 }}>
@@ -393,8 +397,8 @@ export default function Expenses() {
 
       {/* Budget vs Actual Section */}
       <div className="card" style={{ padding: 20, marginBottom: 24 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-          Budget vs Actual
+        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 16 }}>
+          Budget vs actual
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {budgetData.map((item, i) => {
@@ -483,7 +487,7 @@ export default function Expenses() {
             width: 150, cursor: 'pointer',
           }}
         >
-          <option value="All">All Vehicles</option>
+          <option value="All">All vehicles</option>
           {vehicles.map(v => <option key={v.id} value={String(v.id)}>{v.plate || v.registration}</option>)}
         </select>
         <select
@@ -505,13 +509,13 @@ export default function Expenses() {
             onClick={() => { setStatusFilter(s); setPage(1); }}
             style={{
               padding: '7px 12px', fontSize: 10, fontFamily: 'var(--font-mono)',
-              fontWeight: 600, borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap',
+              fontWeight: 500, borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap',
               border: statusFilter === s ? 'none' : '1px solid var(--border-subtle)',
               background: statusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
               color: statusFilter === s ? 'black' : 'var(--text-secondary)',
             }}
           >
-            {s}
+            {s === 'ALL' ? 'All' : formatStatus(s)}
           </button>
         ))}
       </div>
@@ -535,18 +539,19 @@ export default function Expenses() {
               <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No expenses found</td></tr>
             ) : rows.map(exp => (
               <tr key={exp.id}>
-                <td className="mono" style={{ fontSize: 12 }}>{formatDate(exp.expense_date || exp.date)}</td>
-                <td style={{ fontSize: 12 }}>{exp.category.replace('_', ' ')}</td>
-                <td style={{ fontSize: 12 }}>{exp.description}</td>
-                <td className="mono" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{exp.vehicle_info || exp.vehicle_registration || 'N/A'}</td>
-                <td className="mono" style={{ fontSize: 13, fontWeight: 500 }}>{formatCurrency(exp.amount)}</td>
+                <td className="mono" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{formatDate(exp.expense_date || exp.date)}</td>
+                <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{formatStatus(exp.category)}</td>
+                <td style={{ fontSize: 12, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={exp.description}>{exp.description}</td>
+                <td className="mono" style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{exp.vehicle_info || exp.vehicle_registration || 'N/A'}</td>
+                <td className="mono" style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' }}>{formatCurrency(exp.amount)}</td>
                 <td>
                   <span style={{
                     fontFamily: 'var(--font-mono)', fontSize: 10,
                     color: exp.status === 'APPROVED' ? 'var(--status-success)' : exp.status === 'REJECTED' ? 'var(--status-danger)' : 'var(--status-warning)',
-                    padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 2,
+                    padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 4,
+                    display: 'inline-block', whiteSpace: 'nowrap',
                   }}>
-                    {exp.status || 'PENDING'}
+                    {formatStatus(exp.status || 'PENDING')}
                   </span>
                 </td>
                 <td>
@@ -556,7 +561,7 @@ export default function Expenses() {
                       className="btn-action"
                       style={{ fontSize: 10, padding: '4px 10px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
                     >
-                      EDIT
+                      Edit
                     </button>
                     <button
                       onClick={() => handleDelete(exp.id)}
@@ -564,7 +569,7 @@ export default function Expenses() {
                       className="btn-action"
                       style={{ fontSize: 10, padding: '4px 10px', background: 'transparent', border: '1px solid var(--status-danger)', color: 'var(--status-danger)' }}
                     >
-                      {deletingId === exp.id ? '...' : 'DEL'}
+                      {deletingId === exp.id ? '...' : 'Del'}
                     </button>
                   </div>
                 </td>
@@ -579,8 +584,8 @@ export default function Expenses() {
               {(page - 1) * perPage + 1}–{Math.min(page * perPage, sorted.length)} of {sorted.length}
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-action" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← PREV</button>
-              <button className="btn-action" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>NEXT →</button>
+              <button className="btn-action" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← Prev</button>
+              <button className="btn-action" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next →</button>
             </div>
           </div>
         )}
@@ -653,7 +658,7 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
       <div className="card" style={{ padding: 20, width: 480, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>
-            {expense ? 'Edit Expense' : 'Add Expense'}
+            {expense ? 'Edit expense' : 'Add expense'}
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
@@ -696,9 +701,9 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
             <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Enter expense details..." rows={3} required style={{ ...inputStyle, resize: 'vertical' }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 8 }}>
-            <button type="button" onClick={onClose} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 16px', fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer', borderRadius: 2 }}>CANCEL</button>
+            <button type="button" onClick={onClose} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 16px', fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer', borderRadius: 2 }}>Cancel</button>
             <button type="submit" disabled={submitting} className="btn-action">
-              {submitting ? (expense ? 'UPDATING...' : 'ADDING...') : (expense ? 'UPDATE' : 'ADD EXPENSE')}
+              {submitting ? (expense ? 'Updating...' : 'Adding...') : (expense ? 'Update' : 'Add expense')}
             </button>
           </div>
         </form>

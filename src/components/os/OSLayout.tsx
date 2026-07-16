@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { LiveEvents } from '@/components/LiveEvents';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useAuth } from '@/lib/AuthContext';
@@ -20,6 +21,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   const profileRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   const { user: authUser } = useAuth();
   const userName = authUser?.name || authUser?.username || 'User';
@@ -50,6 +52,9 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('onboarding_done');
+    // Query keys carry no user id, so cached data would otherwise survive into
+    // the NEXT account's session (staleTime 5min) and show its numbers.
+    queryClient.clear();
     if (message) toast.info(message);
     navigate('/login');
   };

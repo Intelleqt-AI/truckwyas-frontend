@@ -230,6 +230,9 @@ export default function QuoteBuilder() {
           vehicle_type: vehicleType, weight: weightKg, fuel_cost: fuelCost, toll_cost: tollCost, driver_cost: driverAllowance,
           fuel_usage_litres: Math.round(chargeDistance * fuelConsumption / 100), fuel_price_used: fuelPricePerL,
           market_rate: benchmark?.market_avg_rate || 0, client_tier: "standard",
+          // This panel never renders the LLM narrative — skipping it server-side
+          // cuts the analyze round-trip from seconds to near-instant.
+          skip_narrative: true,
         }}).catch(() => null),
         postData({ url: "/api/v1/quotes/guard/", data: {
           total_cost: directCost, quote_price: total, distance_km: chargeDistance, fuel_cost: fuelCost, toll_cost: tollCost,
@@ -242,6 +245,10 @@ export default function QuoteBuilder() {
   };
   useEffect(() => {
     if (!routeData || total <= 0) return;
+    // Any total-affecting change (trip-type flip, toll/driver/rate edit, route
+    // switch) invalidates the numbers on screen: clear them and flag loading so
+    // all four AI fields show a spinner together until the fresh analysis lands.
+    setAnalysis(null); setGuard(null); setOptimizing(true);
     if (analyzeRef.current) clearTimeout(analyzeRef.current);
     analyzeRef.current = setTimeout(() => { runAI(); }, 700);
     return () => { if (analyzeRef.current) clearTimeout(analyzeRef.current); };
@@ -456,6 +463,16 @@ export default function QuoteBuilder() {
   const inputS: React.CSSProperties = { background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: "9px 11px", color: "var(--text-primary)", fontSize: 14, width: "100%", outline: "none" };
   const dot = (c: string): React.CSSProperties => ({ width: 7, height: 7, borderRadius: 2, background: c, flexShrink: 0 });
 
+  // All four AI fields (recommended price, margin, win probability, sweet-spot)
+  // come from the same analyze response — show them together only once it has
+  // landed; until then every field renders the same spinner.
+  const aiLoading = optimizing || !analysis;
+  const aiSpinner = (
+    <svg width="18" height="18" viewBox="0 0 16 16" style={{ animation: "spin 1s linear infinite", marginTop: 10, display: "block" }}>
+      <circle cx="8" cy="8" r="6" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
+    </svg>
+  );
+
   const curveData = (opt?.curve || []).map((c: any) => {
     const marginRaw = c.margin_pct != null ? c.margin_pct : (c.margin || 0) * 100;
     return { margin: Math.round(marginRaw), win: Math.round((c.win_probability || 0) * 100), profit: Math.round(c.expected_profit || 0) };
@@ -571,12 +588,7 @@ export default function QuoteBuilder() {
                   <Tooltip key={i}>
                     <TooltipTrigger asChild>
                       <button
-                        onClick={() => {
-                          setSelectedRouteIndex(i);
-                          // Clear stale AI numbers immediately so the summary never shows
-                          // a previous route's figures while the new analysis is in flight.
-                          setAnalysis(null); setGuard(null);
-                        }}
+                        onClick={() => setSelectedRouteIndex(i)}
                         style={{ fontFamily: "var(--font-mono)", fontSize: 11, padding: "5px 9px", borderRadius: 4, cursor: "pointer",
                           border: `1px solid ${i === selectedRouteIndex ? "var(--accent-primary)" : "var(--border-subtle)"}`,
                           background: i === selectedRouteIndex ? "var(--status-success-bg)" : "var(--bg-surface)", color: i === selectedRouteIndex ? "var(--accent-primary)" : "var(--text-secondary)" }}>
@@ -666,22 +678,28 @@ export default function QuoteBuilder() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.4fr" }}>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={labelS}>Recommended price</div>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, color: "var(--accent-primary)", marginTop: 4 }}>{opt?.optimal_price ? formatCurrency(opt.optimal_price) : formatCurrency(total)}</div>
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>to this client</div>
+              {aiLoading ? aiSpinner : (<>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, color: "var(--accent-primary)", marginTop: 4 }}>{opt?.optimal_price ? formatCurrency(opt.optimal_price) : formatCurrency(total)}</div>
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>to this client</div>
+              </>)}
             </div>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={labelS}>Margin</div>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{opt?.optimal_margin_pct ? `${Math.round(opt.optimal_margin_pct)}%` : `${marginPct}%`}</div>
-              <div style={{ fontSize: 12, color: "var(--status-success)", marginTop: 2 }}>{formatCurrency(opt?.expected_profit ?? ((opt?.optimal_price || total) - directCost))} profit</div>
+              {aiLoading ? aiSpinner : (<>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{opt?.optimal_margin_pct ? `${Math.round(opt.optimal_margin_pct)}%` : `${marginPct}%`}</div>
+                <div style={{ fontSize: 12, color: "var(--status-success)", marginTop: 2 }}>{formatCurrency(opt?.expected_profit ?? ((opt?.optimal_price || total) - directCost))} profit</div>
+              </>)}
             </div>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={labelS}>Win probability</div>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{opt?.win_probability_at_optimal != null ? `${Math.round(opt.win_probability_at_optimal * 100)}%` : optimizing ? "…" : "—"}</div>
-              <div style={{ marginTop: 6, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((opt?.win_probability_at_optimal || 0) * 100)}%`, background: "var(--accent-primary)" }} /></div>
+              {aiLoading ? aiSpinner : (<>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{opt?.win_probability_at_optimal != null ? `${Math.round(opt.win_probability_at_optimal * 100)}%` : "—"}</div>
+                <div style={{ marginTop: 6, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((opt?.win_probability_at_optimal || 0) * 100)}%`, background: "var(--accent-primary)" }} /></div>
+              </>)}
             </div>
             <div style={{ padding: "16px 18px" }}>
               <div style={labelS}>Profit sweet-spot</div>
-              {curveData.length > 1 ? (
+              {aiLoading ? aiSpinner : curveData.length > 1 ? (
                 <ResponsiveContainer width="100%" height={62}>
                   <ComposedChart data={curveData} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
                     <defs><linearGradient id="qg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--status-success)" stopOpacity={0.35} /><stop offset="95%" stopColor="var(--status-success)" stopOpacity={0} /></linearGradient></defs>
@@ -691,7 +709,7 @@ export default function QuoteBuilder() {
                     {opt?.optimal_margin_pct != null && <ReferenceLine x={Math.round(opt.optimal_margin_pct)} stroke="var(--accent-primary)" strokeDasharray="3 3" />}
                   </ComposedChart>
                 </ResponsiveContainer>
-              ) : <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 8 }}>{optimizing ? "Analysing…" : "—"}</div>}
+              ) : <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 8 }}>—</div>}
             </div>
           </div>
 

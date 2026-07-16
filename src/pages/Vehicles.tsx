@@ -37,6 +37,20 @@ interface Vehicle {
   next_maintenance_due?: string;
   service_interval_km?: number | null;
   last_service_mileage?: number | string | null;
+  cartrack_registration?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  heading?: number | string | null;
+  speed_kmh?: number | string | null;
+  ignition_on?: boolean | null;
+  last_location_at?: string | null;
+  temp1?: number | string | null;
+  temp2?: number | string | null;
+  temp3?: number | string | null;
+  temp4?: number | string | null;
+  cartrack_current_driver_ref?: string;
+  door_open?: boolean | null;
+  last_door_event_at?: string | null;
 }
 
 interface FleetOverview {
@@ -176,6 +190,34 @@ export default function Vehicles() {
     }
     return 0;
   });
+
+  // Cartrack polls every ~20s; treat anything older than 60s as stale so a
+  // vehicle that's gone offline doesn't silently look "live" forever.
+  const LOCATION_STALE_AFTER_MS = 60_000;
+
+  const formatLastSeen = (v: Vehicle) => {
+    if (!v.last_location_at) return null;
+    const seenAt = new Date(v.last_location_at).getTime();
+    const ageMs = Date.now() - seenAt;
+    const isStale = ageMs > LOCATION_STALE_AFTER_MS;
+    const minutes = Math.floor(ageMs / 60_000);
+    const label = minutes < 1 ? 'just now' : minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`;
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        fontFamily: 'var(--font-mono)', fontSize: 10,
+        color: isStale ? 'var(--text-tertiary)' : 'var(--status-success)',
+        marginTop: 2,
+      }}>
+        <span style={{
+          width: 5, height: 5, borderRadius: '50%',
+          background: isStale ? 'var(--text-tertiary)' : 'var(--status-success)',
+          display: 'inline-block',
+        }} />
+        {label}
+      </span>
+    );
+  };
 
   const getStatusBadge = (status: string) => {
     const color = STATUS_COLOR[status] || 'var(--text-secondary)';
@@ -375,7 +417,8 @@ export default function Vehicles() {
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
                       <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                        {v.plate || v.registration || '—'}
+                        <div>{v.plate || v.registration || '—'}</div>
+                        {formatLastSeen(v)}
                       </td>
                       <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={[v.make, v.model].filter(Boolean).join(' ')}>
                         {[v.make, v.model].filter(Boolean).join(' ') || '—'}
@@ -549,6 +592,11 @@ export default function Vehicles() {
                   {drivers.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {editVehicle?.cartrack_current_driver_ref && (
+                <div style={{ marginTop: 6, fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                  Cartrack reports: {editVehicle.cartrack_current_driver_ref} (informational only — doesn't change the assignment above)
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button

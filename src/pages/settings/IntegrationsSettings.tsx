@@ -26,6 +26,14 @@ interface XeroStatus {
   last_sync?: string;
 }
 
+interface CartrackStatus {
+  configured: boolean;
+  connected: boolean;
+  base_url?: string;
+  connected_at?: string;
+  last_status_sync?: string;
+}
+
 interface APIKey {
   id: number;
   name: string;
@@ -54,6 +62,15 @@ export function IntegrationsSettings() {
   const [syncingInvoices, setSyncingInvoices] = useState(false);
   const [syncingPayments, setSyncingPayments] = useState(false);
 
+  // Cartrack state
+  const [cartrackStatus, setCartrackStatus] = useState<CartrackStatus | null>(null);
+  const [loadingCartrack, setLoadingCartrack] = useState(true);
+  const [showCartrackForm, setShowCartrackForm] = useState(false);
+  const [cartrackUsername, setCartrackUsername] = useState('');
+  const [cartrackPassword, setCartrackPassword] = useState('');
+  const [cartrackBaseUrl, setCartrackBaseUrl] = useState('');
+  const [connectingCartrack, setConnectingCartrack] = useState(false);
+
   // API Keys state
   const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
   const [loadingKeys, setLoadingKeys] = useState(true);
@@ -70,6 +87,7 @@ export function IntegrationsSettings() {
 
   useEffect(() => {
     loadXeroStatus();
+    loadCartrackStatus();
     loadAPIKeys();
     loadWebhooks();
   }, []);
@@ -79,6 +97,37 @@ export function IntegrationsSettings() {
       .then((data) => setXeroStatus(data))
       .catch(() => setXeroStatus({ connected: false }))
       .finally(() => setLoadingXero(false));
+  };
+
+  const loadCartrackStatus = () => {
+    fetchData('api/v1/integrations/cartrack/status/')
+      .then((data) => setCartrackStatus(data))
+      .catch(() => setCartrackStatus({ configured: false, connected: false }))
+      .finally(() => setLoadingCartrack(false));
+  };
+
+  const handleCartrackConnect = async () => {
+    if (!cartrackUsername.trim() || !cartrackPassword || !cartrackBaseUrl.trim()) {
+      toast.error('Please enter username, password and base URL');
+      return;
+    }
+    setConnectingCartrack(true);
+    try {
+      await postData({
+        url: 'api/v1/integrations/cartrack/connect/',
+        data: { username: cartrackUsername.trim(), password: cartrackPassword, base_url: cartrackBaseUrl.trim() },
+      });
+      toast.success('Cartrack connected');
+      setCartrackUsername('');
+      setCartrackPassword('');
+      setCartrackBaseUrl('');
+      setShowCartrackForm(false);
+      loadCartrackStatus();
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not connect to Cartrack — check your credentials and base URL');
+    } finally {
+      setConnectingCartrack(false);
+    }
   };
 
   const handleXeroConnect = async () => {
@@ -300,6 +349,104 @@ export function IntegrationsSettings() {
         ) : (
           <button onClick={handleXeroConnect} className="btn-action">
             CONNECT XERO
+          </button>
+        )}
+      </div>
+
+      {/* Cartrack Card */}
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: 4,
+            background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)',
+          }}>
+            CT
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
+              Cartrack
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+              Live vehicle location, speed and ignition status
+            </div>
+          </div>
+          <div style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: cartrackStatus?.connected ? 'var(--status-success)' : 'var(--status-danger)',
+          }} />
+        </div>
+
+        {loadingCartrack ? (
+          <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12 }} />
+        ) : cartrackStatus?.connected ? (
+          <div style={{
+            padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
+            borderRadius: 4, fontSize: 12, color: 'var(--text-secondary)',
+          }}>
+            <strong style={{ color: 'var(--text-primary)' }}>Connected:</strong> {cartrackStatus.base_url}
+            {cartrackStatus.last_status_sync && (
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
+                Last vehicle status sync: {new Date(cartrackStatus.last_status_sync).toLocaleString()}
+              </div>
+            )}
+          </div>
+        ) : showCartrackForm ? (
+          <div style={{
+            padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4,
+          }}>
+            <input
+              value={cartrackUsername}
+              onChange={(e) => setCartrackUsername(e.target.value)}
+              placeholder="Cartrack username"
+              style={{
+                width: '100%', marginBottom: 8, padding: '8px 12px',
+                background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                borderRadius: 2, color: 'var(--text-primary)', fontSize: 12, outline: 'none',
+              }}
+            />
+            <input
+              value={cartrackPassword}
+              onChange={(e) => setCartrackPassword(e.target.value)}
+              type="password"
+              placeholder="Cartrack password"
+              style={{
+                width: '100%', marginBottom: 8, padding: '8px 12px',
+                background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                borderRadius: 2, color: 'var(--text-primary)', fontSize: 12, outline: 'none',
+              }}
+            />
+            <input
+              value={cartrackBaseUrl}
+              onChange={(e) => setCartrackBaseUrl(e.target.value)}
+              placeholder="https://fleetapi-za.cartrack.com"
+              style={{
+                width: '100%', marginBottom: 8, padding: '8px 12px',
+                background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                borderRadius: 2, color: 'var(--text-primary)', fontSize: 12,
+                fontFamily: 'var(--font-mono)', outline: 'none',
+              }}
+            />
+            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 12 }}>
+              Region-specific — get your base URL and credentials from Fleetweb &gt; Settings &gt; API Settings.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={handleCartrackConnect} disabled={connectingCartrack} className="btn-action" style={{ fontSize: 10 }}>
+                {connectingCartrack ? 'CONNECTING...' : 'CONNECT'}
+              </button>
+              <button onClick={() => setShowCartrackForm(false)} style={{
+                background: 'none', border: '1px solid var(--border-subtle)',
+                color: 'var(--text-secondary)', padding: '6px 12px',
+                fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+              }}>
+                CANCEL
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setShowCartrackForm(true)} className="btn-action">
+            CONNECT CARTRACK
           </button>
         )}
       </div>

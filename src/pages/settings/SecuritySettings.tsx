@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
 import { formatRelativeTime } from "@/lib/formatters";
 import { toast } from "@/lib/toast";
@@ -94,6 +96,8 @@ function ToggleRow({ label, description, checked, onChange, badge, badgeColor }:
 }
 
 export function SecuritySettings() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [twoFactor, setTwoFactor] = useState(true);
   const [sessionTimeout, setSessionTimeout] = useState(true);
   const [loginAlerts, setLoginAlerts] = useState(true);
@@ -102,6 +106,10 @@ export function SecuritySettings() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadSessions = () => {
     setLoadingSessions(true);
@@ -177,6 +185,34 @@ export function SecuritySettings() {
       alert('Failed to update password');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setDeletePassword('');
+    setDeleteError(null);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteData({ url: 'api/v1/auth/delete-account/', data: { password: deletePassword } });
+      // Mirrors OSLayout.tsx's signOut() client-side cleanup — the server has
+      // already killed every session for this user.
+      localStorage.removeItem('access');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('onboarding_done');
+      queryClient.clear();
+      toast.success('Your account has been deleted');
+      navigate('/login');
+    } catch (err: any) {
+      setDeleteError(err?.message || 'Failed to delete account');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -278,6 +314,111 @@ export function SecuritySettings() {
           </div>
         )}
       </div>
+
+      {/* Danger Zone */}
+      <div style={{ ...sectionStyle, borderColor: 'var(--status-danger)' }}>
+        <div style={sectionHeaderStyle}>
+          <span style={{ ...sectionTitleStyle, color: 'var(--status-danger)' }}>Danger Zone</span>
+        </div>
+        <div style={{
+          padding: '16px 20px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: 16,
+        }}>
+          <div>
+            <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 2 }}>Delete my account</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+              Deactivates your account and signs you out on every device immediately.
+            </div>
+          </div>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            style={{
+              background: 'none', border: '1px solid var(--status-danger)',
+              color: 'var(--status-danger)', padding: '8px 16px',
+              fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+              cursor: 'pointer', letterSpacing: '0.06em', flexShrink: 0,
+            }}
+          >
+            DELETE MY ACCOUNT
+          </button>
+        </div>
+      </div>
+
+      {/* Delete Account confirmation modal */}
+      {showDeleteModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 2000,
+            background: 'rgba(0,0,0,0.65)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+          }}
+          onClick={closeDeleteModal}
+        >
+          <div
+            style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--status-danger)',
+              borderRadius: 4,
+              padding: 28,
+              maxWidth: 440,
+              width: '100%',
+              boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>
+              Delete your account?
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
+              Your account will be deactivated and you'll be signed out on every device
+              immediately. This can be reversed by an admin — it does not erase your data.
+            </div>
+            <label style={labelStyle}>Confirm your password</label>
+            <input
+              style={{ ...inputStyle, marginBottom: 8 }}
+              type="password"
+              autoFocus
+              value={deletePassword}
+              onChange={e => { setDeletePassword(e.target.value); setDeleteError(null); }}
+              onKeyDown={e => { if (e.key === 'Enter' && deletePassword && !deleting) handleDeleteAccount(); }}
+              placeholder="Your current password"
+            />
+            {deleteError && (
+              <div style={{ fontSize: 11, color: 'var(--status-danger)', marginBottom: 12 }}>{deleteError}</div>
+            )}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: deleteError ? 4 : 20 }}>
+              <button
+                onClick={closeDeleteModal}
+                disabled={deleting}
+                style={{
+                  padding: '8px 18px', background: 'transparent',
+                  border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
+                  borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.06em', cursor: deleting ? 'default' : 'pointer',
+                }}
+              >
+                CANCEL
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={!deletePassword || deleting}
+                style={{
+                  padding: '8px 18px',
+                  background: 'var(--status-danger)',
+                  border: 'none', color: '#fff', borderRadius: 2,
+                  fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600,
+                  letterSpacing: '0.06em',
+                  cursor: (!deletePassword || deleting) ? 'default' : 'pointer',
+                  opacity: (!deletePassword || deleting) ? 0.5 : 1,
+                }}
+              >
+                {deleting ? 'DELETING...' : 'DELETE ACCOUNT'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { postData } from '@/lib/Api';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -7,6 +8,7 @@ export const EmailVerification = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { setUser } = useAuth();
+  const queryClient = useQueryClient();
   const email = searchParams.get('email') || '';
 
   const [code, setCode] = useState('');
@@ -21,6 +23,9 @@ export const EmailVerification = () => {
     setLoading(true);
     try {
       const data: any = await postData({ url: 'api/v1/auth/verify-email/', data: { email, code } });
+      // Drop any cached data from a previous account on this browser (query
+      // keys carry no user id — see useLogin for the same guard).
+      queryClient.clear();
       localStorage.setItem('access', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setUser(data.user);

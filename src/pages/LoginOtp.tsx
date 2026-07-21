@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { postData } from '@/lib/Api';
 import { useAuth } from '@/lib/AuthContext';
 import { postLoginNavigate } from '@/lib/postLogin';
@@ -8,6 +9,7 @@ export const LoginOtp = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { setUser } = useAuth();
+  const queryClient = useQueryClient();
 
   const state = (location.state || {}) as { pendingToken?: string; email?: string };
   const pendingToken = state.pendingToken;
@@ -34,6 +36,9 @@ export const LoginOtp = () => {
         url: 'api/v1/auth/login/verify-otp/',
         data: { pending_token: pendingToken, code },
       });
+      // Drop any cached data from a previous account on this browser (query
+      // keys carry no user id — see useLogin for the same guard).
+      queryClient.clear();
       localStorage.setItem('access', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setUser(data.user);
@@ -110,7 +115,7 @@ export const LoginOtp = () => {
           </div>
 
           <button type="submit" className="btn-action" style={{ width: '100%' }} disabled={loading || code.length !== 6}>
-            {loading ? 'VERIFYING...' : 'VERIFY & SIGN IN'}
+            {loading ? 'Verifying...' : 'Verify & sign in'}
           </button>
         </form>
 
@@ -123,7 +128,7 @@ export const LoginOtp = () => {
 
         <div style={{ marginTop: 16, textAlign: 'center' }}>
           <button onClick={() => navigate('/login')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>
-            ← BACK TO LOGIN
+            ← Back to login
           </button>
         </div>
       </div>

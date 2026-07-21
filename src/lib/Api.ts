@@ -1,8 +1,30 @@
 import axios from 'axios';
 import { toast } from './toast';
 
+// Resolve the API base URL defensively. The committed dev env files point at
+// http://localhost:8001/, so a PRODUCTION build that forgot to set VITE_API_URL
+// would send every request (login, copilot, proposals) to the END USER's own
+// localhost — a silent, browser-only outage. In a prod build that isn't actually
+// running on localhost, fall back to same-origin and log loudly instead.
+function resolveApiBaseUrl(): string | undefined {
+  const configured = import.meta.env.VITE_API_URL as string | undefined;
+  const isLocal = (u?: string) => !u || /localhost|127\.0\.0\.1/.test(u);
+  if (typeof window !== 'undefined' && import.meta.env.PROD) {
+    const onLocalhost = /localhost|127\.0\.0\.1/.test(window.location.hostname);
+    if (isLocal(configured) && !onLocalhost) {
+      // eslint-disable-next-line no-console
+      console.error(
+        '[TruckWys] VITE_API_URL is unset or points at localhost in a production build. ' +
+        'Falling back to same-origin — set VITE_API_URL at build time to the real backend URL.'
+      );
+      return window.location.origin + '/';
+    }
+  }
+  return configured;
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: resolveApiBaseUrl(),
 });
 
 // Inject token on every request

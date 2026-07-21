@@ -25,6 +25,15 @@ function wsUrl(): string | null {
   return `${base}/ws/events/?token=${encodeURIComponent(token)}`;
 }
 
+function currentUserId(): string | null {
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || 'null');
+    return u?.id != null ? String(u.id) : null;
+  } catch {
+    return null;
+  }
+}
+
 const EVENT_TITLES: Record<string, string> = {
   // Bookings / Loads
   'booking.created':    'New booking',
@@ -80,7 +89,12 @@ export function LiveEvents() {
         if (!msg || msg.type === 'connected' || msg.type === 'pong') return;
         if (msg.type === 'event') {
           window.dispatchEvent(new CustomEvent('tw:live-event', { detail: msg }));
-          if (msg.message) {
+          // The push goes to every connected browser in the company, including
+          // the one that triggered it — the backend already excludes the actor
+          // from getting a persisted Notification row, so mirror that here and
+          // skip the toast too (no "you did X" popup for your own action).
+          const isOwnAction = msg.data?.actor_id != null && String(msg.data.actor_id) === currentUserId();
+          if (msg.message && !isOwnAction) {
             const label = EVENT_TITLES[msg.event] || 'Update';
             const text = label === msg.message ? label : `${label} — ${msg.message}`;
             const ntype = (msg.data?.type || '').toLowerCase();

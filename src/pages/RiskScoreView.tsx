@@ -11,6 +11,10 @@ const TIER_COLOR: Record<string, string> = {
   INELIGIBLE: 'var(--text-tertiary)',
 };
 
+// Sentence-case a single token for display: "PRIME" → "Prime".
+const cap = (s?: string) =>
+  s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+
 const TIER_BG: Record<string, string> = {
   PRIME: 'var(--status-success-bg)',
   STANDARD: 'var(--status-success-bg)',
@@ -163,7 +167,7 @@ export default function RiskScoreView() {
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{customerScores.length} scored</div>
         </div>
         {isLoading ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING SCORES...</div>
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading scores…</div>
         ) : customerScores.length === 0 ? (
           <div style={{ padding: '40px 20px', textAlign: 'center' }}>
             <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 12 }}>No risk scores calculated yet.</div>
@@ -193,7 +197,7 @@ export default function RiskScoreView() {
                     </div>
                   </td>
                   <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: TIER_COLOR[cs.tier], padding: '3px 8px', background: TIER_BG[cs.tier], borderRadius: 2, border: `1px solid ${TIER_COLOR[cs.tier]}44` }}>{cs.tier}</span>
+                    <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: TIER_COLOR[cs.tier], padding: '3px 8px', background: TIER_BG[cs.tier], borderRadius: 4, border: `1px solid ${TIER_COLOR[cs.tier]}44`, display: 'inline-block', whiteSpace: 'nowrap' }}>{cap(cs.tier)}</span>
                   </td>
                   <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{cs.factor_payment_history ?? '—'}/35</td>
                   <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{cs.factor_invoice_age ?? '—'}/20</td>
@@ -203,7 +207,7 @@ export default function RiskScoreView() {
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: cs.is_eligible ? 'var(--status-success)' : 'var(--status-danger)' }}>
-                      {cs.is_eligible ? '✓ YES' : '✗ NO'}
+                      {cs.is_eligible ? '✓ Yes' : '✗ No'}
                     </span>
                   </td>
                 </tr>

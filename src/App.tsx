@@ -51,7 +51,7 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 // Lazy load all other pages for code splitting
-const NewQuote = lazy(() => import('./pages/NewQuote'));
+const QuoteBuilder = lazy(() => import('./pages/QuoteBuilder'));
 const AIQuoteChat = lazy(() => import('./pages/AIQuoteChat'));
 const QuoteDetail = lazy(() => import('./pages/QuoteDetail'));
 const Bookings = lazy(() => import('./pages/Bookings'));
@@ -68,6 +68,7 @@ const CreateInvoice = lazy(() => import('./pages/CreateInvoice'));
 const Expenses = lazy(() => import('./pages/Expenses'));
 const FinanceReports = lazy(() => import('./pages/FinanceReports'));
 const Capital = lazy(() => import('./pages/Capital'));
+const CustomerRisk = lazy(() => import('./pages/CustomerRisk'));
 const AdvanceRequest = lazy(() => import('./pages/AdvanceRequest'));
 const AdvanceDetail = lazy(() => import('./pages/AdvanceDetail'));
 const Insights = lazy(() => import('./pages/Insights'));
@@ -230,9 +231,9 @@ const App = () => (
                 <Route path="/bookings/orders" element={<LoadsList />} />
                 <Route path="/bookings/history" element={<LoadsList />} />
                 <Route path="/bookings/quotes" element={<LoadsList />} />
-                <Route path="/bookings/quotes/new" element={<NewQuote />} />
+                <Route path="/bookings/quotes/new" element={<QuoteBuilder />} />
                 <Route path="/bookings/quotes/ai-chat" element={<AIQuoteChat />} />
-                <Route path="/bookings/quotes/:id/edit" element={<NewQuote />} />
+                <Route path="/bookings/quotes/:id/edit" element={<QuoteBuilder />} />
                 <Route path="/bookings/quotes/:id" element={<QuoteDetail />} />
                 <Route path="/bookings/:id" element={<Bookings />} />
 
@@ -264,6 +265,7 @@ const App = () => (
                 {/* Finance-role gated */}
                 <Route element={<RoleRoute roles={FINANCE_ROLES} />}>
                   <Route path="/capital" element={<Capital />} />
+                  <Route path="/customers/:id/risk" element={<CustomerRisk />} />
                   <Route path="/capital/request" element={<AdvanceRequest />} />
                   <Route path="/capital/advances/:id" element={<AdvanceDetail />} />
                   <Route path="/capital/risk-scores" element={<RiskScoreView />} />

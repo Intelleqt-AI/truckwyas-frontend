@@ -99,15 +99,15 @@ export default function PasswordReset() {
         {step === 'done' ? (
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 40, marginBottom: 16 }}>✓</div>
-            <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Password Updated</div>
+            <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Password updated</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24 }}>Your password has been reset. You can now log in.</div>
-            <button className="btn-action" style={{ width: '100%' }} onClick={() => navigate('/login')}>BACK TO LOGIN</button>
+            <button className="btn-action" style={{ width: '100%' }} onClick={() => navigate('/login')}>Back to login</button>
           </div>
         ) : (
           <>
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 6 }}>
-                {step === 'request' ? 'Reset Password' : 'Enter Reset Code'}
+                {step === 'request' ? 'Reset password' : 'Enter reset code'}
               </div>
               {step === 'confirm' && (
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -133,7 +133,7 @@ export default function PasswordReset() {
                     style={inputStyle} placeholder="your@email.com" />
                 </div>
                 <button type="submit" className="btn-action" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
-                  {loading ? 'SENDING...' : 'SEND RESET CODE'}
+                  {loading ? 'Sending...' : 'Send reset code'}
                 </button>
               </form>
             ) : (
@@ -145,7 +145,7 @@ export default function PasswordReset() {
                   </span>
                   <button type="button" onClick={handleResend} disabled={countdown > 0}
                     style={{ fontSize: 11, fontFamily: 'var(--font-mono)', background: 'none', border: 'none', cursor: countdown > 0 ? 'default' : 'pointer', color: countdown > 0 ? 'var(--text-tertiary)' : 'var(--accent-primary)', padding: 0, letterSpacing: '0.06em' }}>
-                    RESEND
+                    Resend
                   </button>
                 </div>
 
@@ -184,14 +184,14 @@ export default function PasswordReset() {
                 </div>
 
                 <button type="submit" className="btn-action" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
-                  {loading ? 'RESETTING...' : 'SET NEW PASSWORD'}
+                  {loading ? 'Resetting...' : 'Set new password'}
                 </button>
               </form>
             )}
 
             <div style={{ marginTop: 20, textAlign: 'center' }}>
               <button onClick={() => navigate('/login')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
-                ← BACK TO LOGIN
+                ← Back to login
               </button>
             </div>
           </>

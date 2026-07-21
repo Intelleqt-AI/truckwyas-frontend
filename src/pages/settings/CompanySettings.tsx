@@ -1,7 +1,14 @@
-import { useState, useEffect } from "react";
-import { fetchData, patchData } from "@/lib/Api";
+import { useState, useEffect, useRef } from "react";
+import { fetchData, patchData, postData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/lib/toast';
+
+const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const resolveLogoUrl = (url?: string) => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  return `${apiBase}/${url.replace(/^\//, '')}`;
+};
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -55,34 +62,71 @@ export function CompanySettings() {
     industry: '', website: '', description: '',
     street: '', city: '', province: '', postal_code: '', country: 'South Africa',
     phone: '', email: '', support_email: '',
+    default_quote_validity_days: '7',
   });
+  const [logoUrl, setLogoUrl] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchData('/api/v1/company/profile/').then((d: any) => {
-      if (d) setForm({
-        company_name: d.company_name || '',
-        registration_number: d.registration_number || '',
-        vat_number: d.vat_number || '',
-        industry: d.industry || '',
-        website: d.website || '',
-        description: d.description || '',
-        street: d.address?.street || '',
-        city: d.address?.city || '',
-        province: d.address?.province || '',
-        postal_code: d.address?.postal_code || '',
-        country: d.address?.country || 'South Africa',
-        phone: d.contact?.phone || '',
-        email: d.contact?.email || '',
-        support_email: d.contact?.support_email || '',
-      });
+      if (d) {
+        setForm({
+          company_name: d.company_name || '',
+          registration_number: d.registration_number || '',
+          vat_number: d.vat_number || '',
+          industry: d.industry || '',
+          website: d.website || '',
+          description: d.description || '',
+          street: d.address?.street || '',
+          city: d.address?.city || '',
+          province: d.address?.province || '',
+          postal_code: d.address?.postal_code || '',
+          country: d.address?.country || 'South Africa',
+          phone: d.contact?.phone || '',
+          email: d.contact?.email || '',
+          support_email: d.contact?.support_email || '',
+          default_quote_validity_days:
+            d.default_quote_validity_days != null ? String(d.default_quote_validity_days) : '7',
+        });
+        // Only show a real uploaded logo, not the backend's default placeholder
+        if (d.logo_url && !d.logo_url.endsWith('/brand/logo.svg')) setLogoUrl(d.logo_url);
+      }
     }).catch(() => { toast.error('Failed to load company details'); });
   }, []);
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
+  const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Logo file size exceeds 2MB limit');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const data = new FormData();
+      data.append('logo', file);
+      const res: any = await postData({ url: 'api/v1/company/logo/', data });
+      if (res?.logo_url) setLogoUrl(res.logo_url);
+      toast.success('Logo uploaded');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to upload logo');
+    }
+    setUploadingLogo(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSave = async () => {
+    const validityDays = parseInt(form.default_quote_validity_days, 10);
+    if (isNaN(validityDays) || validityDays < 1 || validityDays > 365) {
+      toast.error('Default quote validity must be between 1 and 365 days');
+      return;
+    }
     setSaving(true);
     try {
       await patchData({ url: '/api/v1/company/profile/', data: {
@@ -94,6 +138,7 @@ export function CompanySettings() {
         description: form.description,
         address: { street: form.street, city: form.city, province: form.province, postal_code: form.postal_code, country: form.country },
         contact: { phone: form.phone, email: form.email, support_email: form.support_email },
+        default_quote_validity_days: validityDays,
       } });
       setSaved(true);
       toast.success('Company details saved');
@@ -109,6 +154,48 @@ export function CompanySettings() {
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Company Details</div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Your business information and branding</div>
+      </div>
+
+      {/* Company Logo */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Company Logo</span></div>
+        <div style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{
+            width: 96, height: 96, flexShrink: 0,
+            border: '1px solid var(--border-subtle)', borderRadius: 4,
+            background: 'var(--input-bg)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+          }}>
+            {logoUrl ? (
+              <img src={resolveLogoUrl(logoUrl)} alt="Company logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            ) : (
+              <span style={{ ...labelStyle, marginBottom: 0, textAlign: 'center' }}>No logo</span>
+            )}
+          </div>
+          <div>
+            <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>
+              This logo appears on quotes and invoices sent to your customers.
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 12 }}>
+              PNG, JPG, GIF or WebP · max 2MB
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              onChange={handleLogoSelect}
+              style={{ display: 'none' }}
+            />
+            <button
+              className="btn-action"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingLogo}
+              style={{ opacity: uploadingLogo ? 0.6 : 1 }}
+            >
+              {uploadingLogo ? 'UPLOADING...' : logoUrl ? 'REPLACE LOGO' : 'UPLOAD LOGO'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Business Info */}
@@ -218,6 +305,27 @@ export function CompanySettings() {
             <div>
               <label style={labelStyle}>Support Email</label>
               <input style={inputStyle} type="email" value={form.support_email} onChange={e => set('support_email', e.target.value)} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quote Defaults */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Quote Defaults</span></div>
+        <div style={{ padding: 20 }}>
+          <div style={{ maxWidth: 320 }}>
+            <label style={labelStyle}>Default Quote Validity (Days)</label>
+            <input
+              style={inputStyle}
+              type="number"
+              min={1}
+              max={365}
+              value={form.default_quote_validity_days}
+              onChange={e => set('default_quote_validity_days', e.target.value)}
+            />
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+              New quotes will default to expire this many days after creation. Can be overridden per quote.
             </div>
           </div>
         </div>

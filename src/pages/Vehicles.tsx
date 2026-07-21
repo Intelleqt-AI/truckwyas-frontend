@@ -37,6 +37,20 @@ interface Vehicle {
   next_maintenance_due?: string;
   service_interval_km?: number | null;
   last_service_mileage?: number | string | null;
+  cartrack_registration?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  heading?: number | string | null;
+  speed_kmh?: number | string | null;
+  ignition_on?: boolean | null;
+  last_location_at?: string | null;
+  temp1?: number | string | null;
+  temp2?: number | string | null;
+  temp3?: number | string | null;
+  temp4?: number | string | null;
+  cartrack_current_driver_ref?: string;
+  door_open?: boolean | null;
+  last_door_event_at?: string | null;
 }
 
 interface FleetOverview {
@@ -84,6 +98,10 @@ const STATUS_COLOR: Record<string, string> = {
 
 const formatZAR = (v: number) =>
   'R ' + v.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+// Sentence-case a status token for display: "IN_USE" → "In use".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
 
 // Fetches all fleet data + derives lists. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed by search below) and survives navigation —
@@ -173,19 +191,48 @@ export default function Vehicles() {
     return 0;
   });
 
+  // Cartrack polls every ~20s; treat anything older than 60s as stale so a
+  // vehicle that's gone offline doesn't silently look "live" forever.
+  const LOCATION_STALE_AFTER_MS = 60_000;
+
+  const formatLastSeen = (v: Vehicle) => {
+    if (!v.last_location_at) return null;
+    const seenAt = new Date(v.last_location_at).getTime();
+    const ageMs = Date.now() - seenAt;
+    const isStale = ageMs > LOCATION_STALE_AFTER_MS;
+    const minutes = Math.floor(ageMs / 60_000);
+    const label = minutes < 1 ? 'just now' : minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`;
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        fontFamily: 'var(--font-mono)', fontSize: 10,
+        color: isStale ? 'var(--text-tertiary)' : 'var(--status-success)',
+        marginTop: 2,
+      }}>
+        <span style={{
+          width: 5, height: 5, borderRadius: '50%',
+          background: isStale ? 'var(--text-tertiary)' : 'var(--status-success)',
+          display: 'inline-block',
+        }} />
+        {label}
+      </span>
+    );
+  };
+
   const getStatusBadge = (status: string) => {
     const color = STATUS_COLOR[status] || 'var(--text-secondary)';
     return (
       <span style={{
+        display: 'inline-block',
+        whiteSpace: 'nowrap',
         fontFamily: 'var(--font-mono)',
         fontSize: 10,
         color,
         padding: '2px 6px',
         background: 'var(--bg-surface-hover)',
-        borderRadius: 2,
-        textTransform: 'uppercase'
+        borderRadius: 4,
       }}>
-        {status.replace('_', ' ')}
+        {formatStatus(status)}
       </span>
     );
   };
@@ -214,8 +261,8 @@ export default function Vehicles() {
     borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
     fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
-    fontWeight: active ? 600 : 400,
-    textTransform: 'uppercase', padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
+    fontWeight: active ? 500 : 400,
+    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
     transition: 'all 0.2s ease',
   });
 
@@ -229,8 +276,8 @@ export default function Vehicles() {
             <LiveBadge />
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>HEATMAP</button>
-            <button className="btn-action" onClick={() => setShowAddForm(true)}>+ ADD VEHICLE</button>
+            <button onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>Heatmap</button>
+            <button className="btn-action" onClick={() => setShowAddForm(true)}>+ Add vehicle</button>
           </div>
         </div>
       </div>
@@ -308,13 +355,12 @@ export default function Vehicles() {
                       fontSize: 11,
                       borderRadius: 2,
                       cursor: 'pointer',
-                      textTransform: 'uppercase',
                       letterSpacing: '0.06em',
-                      fontWeight: isActive ? 600 : 400,
+                      fontWeight: isActive ? 500 : 400,
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    {status === 'All' ? 'ALL' : status.replace('_', ' ')}
+                    {status === 'All' ? 'All' : formatStatus(status)}
                   </button>
                 );
               })}
@@ -322,7 +368,7 @@ export default function Vehicles() {
           </div>
 
           {/* Table */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
@@ -350,7 +396,7 @@ export default function Vehicles() {
                             Get started by adding your first vehicle to your fleet
                           </div>
                           <button onClick={() => setShowAddForm(true)} className="btn-action">
-                            ADD VEHICLE
+                            Add vehicle
                           </button>
                         </div>
                       </td>
@@ -370,13 +416,14 @@ export default function Vehicles() {
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
-                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
-                        {v.plate || v.registration || '—'}
+                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                        <div>{v.plate || v.registration || '—'}</div>
+                        {formatLastSeen(v)}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={[v.make, v.model].filter(Boolean).join(' ')}>
                         {[v.make, v.model].filter(Boolean).join(' ') || '—'}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.vehicle_type_name || '—'}
                       </td>
                       <td style={{ padding: '12px 20px 12px 32px' }}>{getStatusBadge(v.status)}</td>
@@ -393,13 +440,13 @@ export default function Vehicles() {
                           {Math.min(utilizationPercent, 100).toFixed(0)}%
                         </span>
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.revenue_generated ? formatZAR(v.revenue_generated) : '—'}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.total_trips ?? 0}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.fuel_efficiency_score ? `${parseFloat(v.fuel_efficiency_score as any).toFixed(0)}/100` : '—'}
                       </td>
                       <td style={{ padding: '12px 20px', textAlign: 'right' }}>
@@ -545,6 +592,11 @@ export default function Vehicles() {
                   {drivers.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {editVehicle?.cartrack_current_driver_ref && (
+                <div style={{ marginTop: 6, fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                  Cartrack reports: {editVehicle.cartrack_current_driver_ref} (informational only — doesn't change the assignment above)
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
@@ -574,15 +626,15 @@ export default function Vehicles() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600 }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
               >
-                {saving ? 'SAVING...' : 'UPDATE VEHICLE'}
+                {saving ? 'Saving…' : 'Update vehicle'}
               </button>
               <button
                 onClick={() => setEditVehicle(null)}
                 style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer' }}
               >
-                CANCEL
+                Cancel
               </button>
             </div>
           </div>

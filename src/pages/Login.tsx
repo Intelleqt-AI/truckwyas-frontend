@@ -214,7 +214,6 @@ const Login = () => {
               padding: '12px 16px',
               fontSize: 11,
               letterSpacing: '0.08em',
-              textTransform: 'uppercase',
               cursor: isPending ? 'wait' : 'pointer',
               opacity: isPending ? 0.6 : 1,
             }}

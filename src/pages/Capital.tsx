@@ -1,33 +1,45 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/formatters";
-import { fetchData, postData } from "@/lib/Api";
+import { fetchData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
 
-const TIER_COLOR: Record<string, string> = {
-  prime: "var(--accent-primary)",
-  standard: "var(--status-success)",
-  elevated: "var(--status-warning)",
-  high: "var(--status-danger)",
-  ineligible: "var(--text-tertiary)",
+const RISK_BAND_COLOR: Record<string, string> = {
+  LOW: "var(--status-success)",
+  MEDIUM: "var(--status-warning)",
+  HIGH: "var(--status-danger)",
+  CRITICAL: "var(--status-danger)",
+  NEW: "var(--text-tertiary)",
 };
-const TIER_FEE: Record<string, string> = {
-  prime: "2.0%",
-  standard: "2.5%",
-  elevated: "3.5%",
-  high: "4.5%",
-  ineligible: "N/A",
-};
-const tierEligible = (t: string) => t === "prime" || t === "standard";
+
+const MC_URL =
+  "https://getstarted.merchantcapital.co.za?actiontype=C_C&channel=Part_Trad&who=IA_SP";
+
+
+const MC_STORAGE_KEY = "mc_applied_invoice_ids";
+
+function loadAppliedIds(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(MC_STORAGE_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveAppliedId(id: string, current: Set<string>): Set<string> {
+  const next = new Set(current).add(id);
+  localStorage.setItem(MC_STORAGE_KEY, JSON.stringify([...next]));
+  return next;
+}
 
 export default function Capital() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
+  const [showIneligible, setShowIneligible] = useState(false);
+  const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
 
-  // Facility + advances — page-level data
+  // Facility data for metrics
   const {
     data,
     isLoading: loading,
@@ -39,16 +51,7 @@ export default function Capital() {
       const facilityList = Array.isArray(facilityData)
         ? facilityData
         : facilityData?.results || [];
-
-      const advancesData = await fetchData("api/v1/advances/");
-      const advancesList = Array.isArray(advancesData)
-        ? advancesData
-        : advancesData?.results || [];
-      const active = advancesList.filter((a: any) =>
-        ["REQUESTED", "ACTIVE", "FUNDED", "DISBURSED"].includes(a.status),
-      );
-
-      return { facility: facilityList[0] || null, advances: active };
+      return { facility: facilityList[0] || null };
     },
   });
 
@@ -58,106 +61,21 @@ export default function Capital() {
     queryFn: () => fetchData("api/v1/capital/eligible/").catch(() => null),
   });
 
-  // Cached data drives the view; defaults keep the first render safe.
   const facility = data?.facility ?? null;
-  const advances = data?.advances ?? [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const eligibleInvoices: any[] = eligibleData?.invoices ?? [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ineligibleInvoices: any[] = eligibleData?.ineligible_invoices ?? [];
-  const [requestingIds, setRequestingIds] = useState<Set<number>>(new Set());
-  const [settlingIds, setSettlingIds] = useState<Set<number>>(new Set());
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [invoiceErrors, setInvoiceErrors] = useState<Record<number, string>>(
-    {},
-  );
-  const [activeTab, setActiveTab] = useState<"active" | "eligible">("eligible");
-  const [showIneligible, setShowIneligible] = useState(false);
-
-  const handleRequestAdvance = async (invoice: any) => {
-    setRequestingIds((prev) => new Set(prev).add(invoice.id));
-    setSuccessMessage(null);
-    setInvoiceErrors((prev) => {
-      const next = { ...prev };
-      delete next[invoice.id];
-      return next;
-    });
-
-    try {
-      await postData({
-        url: "api/v1/advances/",
-        data: {
-          invoice_id: invoice.id,
-        },
-      });
-
-      setSuccessMessage(
-        `Advance request submitted for ${invoice.invoice_number}`,
-      );
-      // Reload both caches so invoices list also updates immediately
-      queryClient.invalidateQueries({ queryKey: ["capital-eligible"] });
-      await refetch();
-
-      setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (err: any) {
-      const msg =
-        err?.data?.error ||
-        err?.data?.reason ||
-        err?.data?.reasons?.[0] ||
-        err?.response?.data?.error ||
-        err?.response?.data?.reason ||
-        err?.message ||
-        "Request failed";
-      setInvoiceErrors((prev) => ({ ...prev, [invoice.id]: msg }));
-    } finally {
-      setRequestingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(invoice.id);
-        return next;
-      });
-    }
-  };
-
-  const handleSettleAdvance = async (advance: any) => {
-    setSettlingIds((prev) => new Set(prev).add(advance.id));
-    setSuccessMessage(null);
-
-    try {
-      await postData({
-        url: `/api/v1/advances/${advance.id}/settle/`,
-        data: {},
-      });
-
-      setSuccessMessage(
-        `Advance ${advance.invoice_number} settled successfully`,
-      );
-      // Reload cached data
-      await refetch();
-
-      setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (err: any) {
-      console.error("Failed to settle advance:", err);
-      const msg =
-        err?.data?.error || err?.message || "Failed to settle advance";
-      setError(msg);
-      setTimeout(() => setError(null), 4000);
-    } finally {
-      setSettlingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(advance.id);
-        return next;
-      });
-    }
-  };
 
   const eligibleTotal = eligibleInvoices.reduce(
     (sum, inv) => sum + (inv.total_amount || inv.amount || 0),
     0,
   );
-  const outstanding = facility?.outstanding_advances || 0;
-  const facilityLimit = facility?.facility_limit || 1000000;
-  const available = facilityLimit - outstanding;
-  const utilization = Math.round((outstanding / facilityLimit) * 100);
+  // FacilitySerializer exposes limit/outstanding/available/utilization_percent
+  const outstanding = Number(facility?.outstanding ?? 0);
+  const facilityLimit = Number(facility?.limit ?? 1000000);
+  const available = Number(facility?.available ?? facilityLimit - outstanding);
+  const utilization = Math.round(
+    Number(facility?.utilization_percent ?? (outstanding / facilityLimit) * 100),
+  );
 
   useEffect(() => {
     document.title = "Capital - TruckWys";
@@ -218,57 +136,6 @@ export default function Capital() {
             </div>
           ))}
         </div>
-        <div className="card" style={{ padding: 20 }}>
-          <div
-            style={{
-              height: 120,
-              background: "var(--bg-surface)",
-              borderRadius: 4,
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div>
-        <div style={{ marginBottom: 24 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontFamily: "var(--font-mono)",
-              color: "var(--text-tertiary)",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              marginBottom: 4,
-            }}>
-            Capital
-          </div>
-          <div
-            style={{
-              fontSize: 22,
-              fontWeight: 500,
-              color: "var(--text-primary)",
-            }}>
-            Fast Pay Facility
-          </div>
-        </div>
-        <div className="card" style={{ padding: 40, textAlign: "center" }}>
-          <div
-            style={{
-              color: "var(--status-danger)",
-              marginBottom: 8,
-              fontSize: 14,
-              fontWeight: 500,
-            }}>
-            {error}
-          </div>
-          <div style={{ color: "var(--text-secondary)", fontSize: 12 }}>
-            Unable to load capital data. Please try again later.
-          </div>
-        </div>
       </div>
     );
   }
@@ -300,37 +167,51 @@ export default function Capital() {
         </div>
       </div>
 
-      {successMessage && (
-        <div
-          style={{
-            background: "var(--status-success)",
-            color: "var(--bg-deep)",
-            padding: "12px 16px",
-            borderRadius: 4,
-            marginBottom: 16,
-            fontSize: 12,
-            fontFamily: "var(--font-mono)",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+      {/* Merchant Capital partnership banner */}
+      <div
+        className="card"
+        style={{
+          padding: "16px 20px",
+          marginBottom: 24,
+          borderLeft: "3px solid var(--accent-primary)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+        }}>
+        <div>
+          <div
             style={{
-              display: "inline-block",
-              verticalAlign: "middle",
-              marginRight: 4,
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              marginBottom: 4,
             }}>
-            <polyline points="20 6 9 17 4 12" />
-          </svg>{" "}
-          {successMessage}
+            Fast Pay powered by Merchant Capital
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            Get paid faster on your eligible invoices. Apply via our trusted
+            lending partner — approval in minutes.
+          </div>
         </div>
-      )}
+        <a
+          href={MC_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-action"
+          style={{
+            whiteSpace: "nowrap",
+            textDecoration: "none",
+            padding: "10px 20px",
+            fontSize: 11,
+            fontFamily: "var(--font-mono)",
+            fontWeight: 600,
+            letterSpacing: "0.06em",
+            display: "inline-block",
+          }}>
+          Apply for capital →
+        </a>
+      </div>
 
       {/* Facility overview */}
       <div
@@ -387,7 +268,7 @@ export default function Capital() {
         ))}
       </div>
 
-      {/* Facility utilization bar - meter visual */}
+      {/* Facility utilization bar */}
       <div className="card" style={{ padding: "14px 20px", marginBottom: 24 }}>
         <div
           style={{
@@ -442,19 +323,19 @@ export default function Capital() {
             color: "var(--text-tertiary)",
           }}>
           <div>
-            <div style={{ color: "var(--status-danger)", fontWeight: 600 }}>
+            <div style={{ color: "var(--status-danger)", fontWeight: 500 }}>
               OUTSTANDING
             </div>
             <div>{formatCurrency(outstanding)}</div>
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+            <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>
               LIMIT
             </div>
             <div>{formatCurrency(facilityLimit)}</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ color: "var(--status-success)", fontWeight: 600 }}>
+            <div style={{ color: "var(--status-success)", fontWeight: 500 }}>
               AVAILABLE
             </div>
             <div>{formatCurrency(available)}</div>
@@ -462,348 +343,155 @@ export default function Capital() {
         </div>
       </div>
 
-      {/* Tab switcher */}
-      <div
-        style={{
-          display: "flex",
-          gap: 0,
-          marginBottom: 20,
-          borderBottom: "1px solid var(--border-subtle)",
-        }}>
-        {(["eligible", "active"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+      {/* Eligible invoices */}
+      <div className="card table-card">
+        <div className="card-header" style={{ marginBottom: 16 }}>
+          <span className="card-title">Fast Pay NOW — Eligible Invoices</span>
+          <span
             style={{
-              background: "transparent",
-              border: "none",
-              borderBottom:
-                activeTab === tab
-                  ? "2px solid var(--accent-primary)"
-                  : "2px solid transparent",
-              color:
-                activeTab === tab
-                  ? "var(--text-primary)"
-                  : "var(--text-secondary)",
+              fontSize: 10,
+              color: "var(--text-tertiary)",
               fontFamily: "var(--font-mono)",
-              fontSize: 13,
-              letterSpacing: "0.05em",
-              textTransform: "uppercase",
-              fontWeight: activeTab === tab ? 600 : 400,
-              padding: "12px 0",
-              marginRight: 24,
-              cursor: "pointer",
-              marginBottom: -1,
-              transition: "all 0.2s ease",
             }}>
-            {tab === "eligible"
-              ? `ELIGIBLE (${eligibleInvoices.length})`
-              : `ACTIVE (${advances.length})`}
-          </button>
-        ))}
-      </div>
-
-      {/* Active advances — currently in use */}
-      {activeTab === "active" && advances.length > 0 && (
-        <div className="card table-card" style={{ marginBottom: 20 }}>
-          <div className="card-header" style={{ marginBottom: 16 }}>
-            <span className="card-title">Active Advances</span>
-            <span
-              style={{
-                fontSize: 10,
-                color: "var(--text-tertiary)",
-                fontFamily: "var(--font-mono)",
-              }}>
-              {advances.length} IN USE · {formatCurrency(outstanding)}{" "}
-              OUTSTANDING
-            </span>
+            {eligibleInvoices.length} INVOICES · {formatCurrency(eligibleTotal)}{" "}
+            AVAILABLE
+          </span>
+        </div>
+        {eligibleInvoices.length === 0 ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "40px 0",
+              color: "var(--text-tertiary)",
+              fontSize: 13,
+            }}>
+            No eligible invoices. Complete deliveries with POD to unlock Fast
+            Pay.
           </div>
+        ) : (
           <table className="data-table">
             <thead>
               <tr>
                 <th>Invoice #</th>
                 <th>Customer</th>
-                <th>Invoice Amt</th>
-                <th>Advanced</th>
-                <th>Fee</th>
-                <th>Due</th>
-                <th className="text-right">Status</th>
+                <th>AI Risk</th>
+                <th>Amount</th>
+                <th>Fundable</th>
+                <th className="text-right">Action</th>
               </tr>
             </thead>
             <tbody>
-              {advances.map((adv) => (
-                <tr
-                  key={adv.id}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => navigate(`/capital/advances/${adv.id}`)}>
-                  <td className="mono">
-                    {adv.invoice_number || adv.invoiceNumber}
-                  </td>
-                  <td>{adv.customer_name || adv.customerName}</td>
-                  <td className="mono">
-                    {formatCurrency(
-                      adv.gross_amount || adv.invoice_amount || adv.amount,
-                    )}
-                  </td>
-                  <td
-                    className="mono"
-                    style={{ color: "var(--accent-primary)" }}>
-                    {formatCurrency(
-                      adv.net_amount ||
-                        adv.advanced_amount ||
-                        adv.advancedAmount,
-                    )}
-                  </td>
-                  <td
-                    className="mono"
-                    style={{ color: "var(--text-secondary)" }}>
-                    {formatCurrency(adv.fee_amount || adv.fee)}
-                  </td>
-                  <td className="mono">
-                    {adv.invoice_due_date || adv.repayment_date || adv.due_date || adv.dueDate}
-                  </td>
-                  <td
-                    className="text-left"
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      // justifyContent: "flex-end",
-                      alignItems: "center",
-                    }}>
-                    <span
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 10,
-                        color:
-                          adv.status === "DISBURSED"
-                            ? "var(--status-success)"
-                            : adv.status === "REQUESTED"
-                              ? "var(--text-tertiary)"
-                              : "var(--status-warning)",
-                        padding: "2px 6px",
-                        background: "var(--bg-surface-hover)",
-                        borderRadius: 2,
-                        textTransform: "uppercase",
-                      }}>
-                      {adv.status || "FUNDED"}
-                    </span>
-                    {adv.status === "DISBURSED" && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSettleAdvance(adv);
-                        }}
-                        disabled={settlingIds.has(adv.id)}
-                        style={{
-                          background: "transparent",
-                          border: "1px solid var(--status-success)",
-                          color: "var(--status-success)",
-                          padding: "4px 10px",
-                          fontSize: 10,
-                          fontFamily: "var(--font-mono)",
-                          letterSpacing: "0.05em",
-                          borderRadius: 2,
-                          cursor: settlingIds.has(adv.id)
-                            ? "not-allowed"
-                            : "pointer",
-                          opacity: settlingIds.has(adv.id) ? 0.5 : 1,
-                        }}>
-                        {settlingIds.has(adv.id) ? "SETTLING..." : "SETTLE"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Fast Pay NOW — eligible invoices section */}
-      {activeTab === "eligible" && (
-        <div className="card table-card">
-          <div className="card-header" style={{ marginBottom: 16 }}>
-            <span className="card-title">Fast Pay NOW — Eligible Invoices</span>
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <span
-                style={{
-                  fontSize: 10,
-                  color: "var(--text-tertiary)",
-                  fontFamily: "var(--font-mono)",
-                }}>
-                {eligibleInvoices.length} INVOICES ·{" "}
-                {formatCurrency(eligibleTotal)} AVAILABLE
-              </span>
-              <button
-                onClick={() => navigate("/capital/risk-scores")}
-                style={{
-                  fontSize: 10,
-                  fontFamily: "var(--font-mono)",
-                  background: "none",
-                  border: "1px solid var(--border-subtle)",
-                  color: "var(--text-secondary)",
-                  padding: "3px 10px",
-                  borderRadius: 2,
-                  cursor: "pointer",
-                  letterSpacing: "0.06em",
-                }}>
-                RISK SCORES →
-              </button>
-            </div>
-          </div>
-          {eligibleInvoices.length === 0 ? (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "40px 0",
-                color: "var(--text-tertiary)",
-                fontSize: 13,
-              }}>
-              No eligible invoices. Complete deliveries with POD to unlock Fast
-              Pay.
-            </div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Invoice #</th>
-                  <th>Customer</th>
-                  <th>Amount</th>
-                  <th>Tier</th>
-                  <th>Advance Rate</th>
-                  <th>Fee</th>
-                  <th>You Receive</th>
-                  <th className="text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {eligibleInvoices.map((inv) => {
-                  const tier = String(inv.risk_tier || inv.tier || "standard");
-                  const tierKey = tier.toLowerCase();
-                  const amount = Number(
-                    inv.total_amount || inv.amount || inv.invoice_amount || 0,
-                  );
-                  // Use the backend's computed fee/net; only estimate if absent.
-                  const feePct = inv.fee_rate_pct ?? inv.fee_percent;
-                  const netPayout =
-                    inv.net_payout_zar ??
-                    amount *
-                      (1 - (feePct != null ? Number(feePct) / 100 : 0.025));
-                  const feeLabel =
-                    feePct != null
-                      ? `${Number(feePct).toFixed(1)}%`
-                      : TIER_FEE[tierKey] || "—";
-                  return (
-                    <tr key={inv.id}>
-                      <td className="mono">
-                        {inv.invoice_number || inv.invoiceNumber}
-                      </td>
-                      <td>
-                        {inv.customer || inv.customer_name || inv.customerName}
-                      </td>
-                      <td className="mono">{formatCurrency(amount)}</td>
-                      <td>
-                        <span
+              {eligibleInvoices.map((inv) => {
+                const amount = Number(
+                  inv.total_amount || inv.amount || inv.invoice_amount || 0,
+                );
+                const riskPct = inv.customer_risk_pct;
+                const riskBand: string = inv.customer_risk_band || "NEW";
+                const blocked = !!inv.risk_blocked;
+                const fundable = Number(inv.fundable_amount_zar ?? amount);
+                const riskColor = RISK_BAND_COLOR[riskBand] || "var(--text-tertiary)";
+                return (
+                  <tr key={inv.id}>
+                    <td className="mono">
+                      {inv.invoice_number || inv.invoiceNumber}
+                    </td>
+                    <td>
+                      {inv.customer || inv.customer_name || inv.customerName}
+                    </td>
+                    <td>
+                      {riskPct === null || riskPct === undefined ? (
+                        <span style={{ color: "var(--text-tertiary)", fontSize: 11 }}>—</span>
+                      ) : (
+                        <button
+                          onClick={() => inv.customer_id && navigate(`/customers/${inv.customer_id}/risk`)}
+                          title="Open AI risk profile"
                           style={{
                             fontFamily: "var(--font-mono)",
-                            fontSize: 10,
-                            color: TIER_COLOR[tierKey],
-                            background: "var(--bg-surface-hover)",
-                            padding: "2px 6px",
-                            borderRadius: 2,
-                            textTransform: "uppercase",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: riskColor,
+                            background: "none",
+                            border: `1px solid ${riskColor}`,
+                            borderRadius: 999,
+                            padding: "2px 10px",
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
                           }}>
-                          {tier}
-                        </span>
-                      </td>
-                      <td
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          color: "var(--text-secondary)",
-                        }}>
-                        {inv.max_advance_percent != null
-                          ? `${inv.max_advance_percent}%`
-                          : "—"}
-                      </td>
-                      <td
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          color: "var(--text-secondary)",
-                        }}>
-                        {feeLabel}
-                      </td>
-                      <td
-                        style={{
-                          color: "var(--status-success)",
-                          fontFamily: "var(--font-mono)",
-                          fontWeight: 600,
-                        }}>
-                        {formatCurrency(netPayout)}
-                      </td>
-                      <td className="text-left">
-                        <div
+                          {riskPct}%{riskBand === "NEW" ? " · New" : ""}
+                        </button>
+                      )}
+                    </td>
+                    <td className="mono">{formatCurrency(amount)}</td>
+                    <td className="mono" style={{ color: fundable < amount ? "var(--status-warning)" : undefined }}>
+                      {formatCurrency(fundable)}
+                    </td>
+                    <td className="text-left">
+                      {blocked ? (
+                        <span
+                          title={`Customer risk ${riskPct}% — above the 70% fast-pay limit`}
                           style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            // alignItems: "flex-end",
-                            gap: 4,
+                            fontSize: 10,
+                            padding: "4px 12px",
+                            background: "none",
+                            color: "var(--status-danger)",
+                            border: "1px solid var(--status-danger)",
+                            borderRadius: 4,
+                            fontFamily: "var(--font-mono)",
+                            fontWeight: 500,
+                            display: "inline-block",
+                            whiteSpace: "nowrap",
+                            opacity: 0.85,
                           }}>
-                          <button
-                            className="btn-action"
-                            disabled={requestingIds.has(inv.id)}
-                            style={{
-                              fontSize: 10,
-                              padding: "4px 12px",
-                              background: requestingIds.has(inv.id)
-                                ? "var(--border-subtle)"
-                                : "var(--accent-primary)",
-                              color: "var(--btn-action-color)",
-                              border: "none",
-                              borderRadius: 2,
-                              cursor: requestingIds.has(inv.id)
-                                ? "not-allowed"
-                                : "pointer",
-                              fontFamily: "var(--font-mono)",
-                              fontWeight: 600,
-                              opacity: requestingIds.has(inv.id) ? 0.6 : 1,
-                            }}
-                            onClick={() => handleRequestAdvance(inv)}>
-                            {requestingIds.has(inv.id)
-                              ? "REQUESTING..."
-                              : "REQUEST"}
-                          </button>
-                          {invoiceErrors[inv.id] && (
-                            <div
-                              style={{
-                                fontSize: 9,
-                                color: "var(--status-danger)",
-                                fontFamily: "var(--font-mono)",
-                                textAlign: "right",
-                                maxWidth: 200,
-                                lineHeight: 1.3,
-                              }}>
-                              {invoiceErrors[inv.id]}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+                          High risk
+                        </span>
+                      ) : (
+                        <a
+                          href={MC_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-action"
+                          onClick={() =>
+                            setAppliedIds((prev) =>
+                              saveAppliedId(String(inv.id), prev),
+                            )
+                          }
+                          style={{
+                            fontSize: 10,
+                            padding: "4px 12px",
+                            background: appliedIds.has(String(inv.id))
+                              ? "var(--status-success)"
+                              : "var(--accent-primary)",
+                            color: "var(--btn-action-color)",
+                            border: "none",
+                            borderRadius: 2,
+                            fontFamily: "var(--font-mono)",
+                            fontWeight: 600,
+                            textDecoration: "none",
+                            display: "inline-block",
+                            whiteSpace: "nowrap",
+                          }}>
+                          {appliedIds.has(String(inv.id)) ? "Applied ✓" : "Apply"}
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-      {/* Ineligible invoices — collapsible, shown only on eligible tab */}
-      {activeTab === "eligible" && ineligibleInvoices.length > 0 && (
+      {/* Ineligible invoices — collapsible */}
+      {ineligibleInvoices.length > 0 && (
         <div className="card table-card" style={{ marginTop: 16 }}>
           <div
             className="card-header"
             style={{ marginBottom: showIneligible ? 16 : 0, cursor: "pointer" }}
             onClick={() => setShowIneligible((v) => !v)}>
-            <span className="card-title" style={{ color: "var(--text-secondary)" }}>
+            <span
+              className="card-title"
+              style={{ color: "var(--text-secondary)" }}>
               Not Eligible ({ineligibleInvoices.length})
             </span>
             <span
@@ -813,7 +501,7 @@ export default function Capital() {
                 fontFamily: "var(--font-mono)",
                 userSelect: "none",
               }}>
-              {showIneligible ? "▲ HIDE" : "▼ SHOW REASONS"}
+              {showIneligible ? "▲ Hide" : "▼ Show reasons"}
             </span>
           </div>
           {showIneligible && (

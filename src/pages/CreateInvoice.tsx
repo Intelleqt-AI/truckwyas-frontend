@@ -71,9 +71,9 @@ export default function CreateInvoice() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <button onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← BACK</button>
+        <button onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← Back</button>
         <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Finance</div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>New Invoice</div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>New invoice</div>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -128,7 +128,7 @@ export default function CreateInvoice() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="DRAFT">Draft</SelectItem>
-                  <SelectItem value="SENT">Send to Customer</SelectItem>
+                  <SelectItem value="SENT">Send to customer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -145,10 +145,10 @@ export default function CreateInvoice() {
             {error && <div style={{ fontSize: 12, color: 'var(--status-danger)', padding: '12px 16px', background: 'var(--status-danger-bg)', borderRadius: 2 }}>{error}</div>}
 
             <button type="submit" className="btn-action" style={{ width: '100%', padding: '12px', fontSize: 12, opacity: (!canSubmit || mutation.isPending) ? 0.45 : 1, cursor: (!canSubmit || mutation.isPending) ? 'not-allowed' : 'pointer' }} disabled={!canSubmit || mutation.isPending}>
-              {mutation.isPending ? 'CREATING...' : 'CREATE INVOICE'}
+              {mutation.isPending ? 'Creating...' : 'Create invoice'}
             </button>
             <button type="button" onClick={() => navigate('/finance/invoices')} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '10px', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', width: '100%' }}>
-              CANCEL
+              Cancel
             </button>
           </div>
         </div>

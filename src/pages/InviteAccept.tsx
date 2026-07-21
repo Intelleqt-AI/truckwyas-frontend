@@ -104,7 +104,7 @@ export function InviteAccept() {
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
               <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-                Invalid Invite
+                Invalid invite
               </div>
               <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 {error}
@@ -115,7 +115,7 @@ export function InviteAccept() {
               className="btn-action"
               style={{ width: '100%' }}
             >
-              GO TO LOGIN
+              Go to login
             </button>
           </>
         ) : (
@@ -271,7 +271,7 @@ export function InviteAccept() {
                 className="btn-action"
                 style={{ width: '100%', marginBottom: 16 }}
               >
-                {submitting ? 'CREATING ACCOUNT...' : 'ACCEPT INVITE'}
+                {submitting ? 'Creating account...' : 'Accept invite'}
               </button>
             </form>
 

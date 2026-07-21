@@ -30,6 +30,10 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 const fmt = (dateStr?: string) =>
   dateStr ? new Date(dateStr).toLocaleDateString('en-ZA') : '—';
 
+// Sentence-case a raw status token for display: "IN_TRANSIT" → "In transit".
+const titleCase = (s?: string) =>
+  s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
+
 export default function Bookings() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -119,13 +123,13 @@ export default function Bookings() {
   };
 
   if (isLoading) return (
-    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>
+    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading...</div>
   );
 
   if (!load) return (
     <div style={{ padding: 40 }}>
       <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Load not found.</div>
-      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/bookings')}>← BACK</button>
+      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/bookings')}>← Back</button>
     </div>
   );
 
@@ -140,7 +144,7 @@ export default function Bookings() {
       {/* Header */}
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <button onClick={() => navigate('/bookings')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← BACK TO LOADS</button>
+          <button onClick={() => navigate('/bookings')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← Back to loads</button>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Load Detail</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{load.load_number}</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{load.customer_name}</div>
@@ -151,8 +155,8 @@ export default function Bookings() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={load.status}>{load.status.replace('_', ' ')}</SelectItem>
-              {allowedNextStatuses.map(s => <SelectItem key={s} value={s}>{s.replace('_', ' ')}</SelectItem>)}
+              <SelectItem value={load.status}>{titleCase(load.status)}</SelectItem>
+              {allowedNextStatuses.map(s => <SelectItem key={s} value={s}>{titleCase(s)}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -264,7 +268,7 @@ export default function Bookings() {
                   onClick={convertToInvoice}
                   disabled={converting}
                 >
-                  {converting ? 'CREATING INVOICE...' : '+ CREATE INVOICE'}
+                  {converting ? 'Creating invoice...' : '+ Create invoice'}
                 </button>
               ) : (
                 <button
@@ -272,9 +276,9 @@ export default function Bookings() {
                   style={{ width: '100%', background: 'var(--status-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                   onClick={() => navigate(`/finance/invoices/${invoiceId}`)}
                 >
-                  <span>✓ INVOICE CREATED</span>
+                  <span>✓ Invoice created</span>
                   <span style={{ opacity: 0.7, fontSize: 10 }}>—</span>
-                  <span>SEE INVOICE →</span>
+                  <span>See invoice →</span>
                 </button>
               )}
 
@@ -296,12 +300,11 @@ export default function Bookings() {
                   fontFamily: 'var(--font-mono)',
                   fontSize: 11,
                   letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
                   cursor: 'pointer',
                   borderRadius: 2,
                 }}
               >
-                {hasPOD ? `✓ POD: ${load.pod_received_by || 'Uploaded'}` : '↑ UPLOAD POD'}
+                {hasPOD ? `✓ POD: ${load.pod_received_by || 'Uploaded'}` : '↑ Upload POD'}
               </button>
             </div>
           </div>

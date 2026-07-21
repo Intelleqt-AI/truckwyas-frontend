@@ -1,7 +1,26 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ellipsis } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
+
+const MC_URL =
+  "https://getstarted.merchantcapital.co.za?actiontype=C_C&channel=Part_Trad&who=IA_SP";
+const MC_STORAGE_KEY = "mc_applied_invoice_ids";
+
+function loadAppliedIds(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(MC_STORAGE_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveAppliedId(id: string, current: Set<string>): Set<string> {
+  const next = new Set(current).add(id);
+  localStorage.setItem(MC_STORAGE_KEY, JSON.stringify([...next]));
+  return next;
+}
 import { fetchData, postData, putData, deleteData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -34,15 +53,9 @@ const EXPENSE_STATUS_COLOR: Record<string, string> = {
   REJECTED: "var(--status-danger)",
 };
 
-const CATEGORY_ICONS: Record<string, string> = {
-  FUEL: "",
-  TOLLS: "",
-  MAINTENANCE: "",
-  DRIVER_COST: "",
-  INSURANCE: "",
-  OVERHEAD: "",
-  OTHER: "",
-};
+// Sentence-case a status/token for display: "PARTIALLY_PAID" → "Partially paid".
+const formatStatus = (s?: string) =>
+  s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : "—";
 
 const PAGE_SIZE = 10;
 
@@ -91,10 +104,9 @@ export default function Invoices() {
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(
     null,
   );
-  const [requestingCapitalId, setRequestingCapitalId] = useState<string | null>(
-    null,
-  );
   const [toast, setToast] = useState<string | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
   const statuses = ["All", "SENT", "OVERDUE", "PAID", "DRAFT"];
 
   // Invoices + stats, cached across navigations.
@@ -384,28 +396,6 @@ export default function Invoices() {
     }
   };
 
-  const handleRequestCapital = async (e: React.MouseEvent, inv: any) => {
-    e.stopPropagation();
-    setRequestingCapitalId(inv.id);
-    try {
-      await postData({ url: "api/v1/advances/", data: { invoice_id: inv.id } });
-      setToast(
-        `Capital requested for ${inv.invoice_number || inv.invoiceNumber}`,
-      );
-      queryClient.invalidateQueries({ queryKey: ["capital-eligible"] });
-      queryClient.invalidateQueries({ queryKey: ["capital-page"] });
-    } catch (err: any) {
-      const reason =
-        err?.data?.reason ||
-        err?.data?.error ||
-        err?.message ||
-        "Failed to request capital";
-      setToast(`Capital request failed: ${reason}`);
-    } finally {
-      setRequestingCapitalId(null);
-      setTimeout(() => setToast(null), 4000);
-    }
-  };
 
   // Never fall back to mock data — show empty state if API returns nothing
   const allInvoices = invoices;
@@ -463,7 +453,7 @@ export default function Invoices() {
             borderRadius: 2,
             fontSize: 12,
             fontFamily: "var(--font-mono)",
-            fontWeight: 600,
+            fontWeight: 500,
           }}>
           {toast}
         </div>
@@ -501,7 +491,7 @@ export default function Invoices() {
             <button
               className="btn-action"
               onClick={() => navigate("/finance/invoices/new")}>
-              + NEW INVOICE
+              + New invoice
             </button>
           )}
           {activeTab === "expenses" && (
@@ -511,7 +501,7 @@ export default function Invoices() {
                 setShowExpenseForm(true);
                 setEditingExpense(null);
               }}>
-              + ADD EXPENSE
+              + Add expense
             </button>
           )}
         </div>
@@ -548,11 +538,10 @@ export default function Invoices() {
               padding: "12px 0",
               marginBottom: -1,
               fontSize: 13,
-              fontWeight: activeTab === tab.id ? 600 : 400,
+              fontWeight: activeTab === tab.id ? 500 : 400,
               cursor: "pointer",
               transition: "all 0.2s ease",
               fontFamily: "var(--font-mono)",
-              textTransform: "uppercase",
               letterSpacing: "0.05em",
             }}
             onMouseEnter={(e) => {
@@ -582,7 +571,6 @@ export default function Invoices() {
             cursor: "pointer",
             transition: "all 0.2s ease",
             fontFamily: "var(--font-mono)",
-            textTransform: "uppercase",
             letterSpacing: "0.05em",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
@@ -629,10 +617,10 @@ export default function Invoices() {
                   <div
                     style={{
                       fontSize: 18,
-                      fontWeight: 600,
+                      fontWeight: 500,
                       color: "var(--text-primary)",
                     }}>
-                    {editingExpense ? "Edit Expense" : "Add Expense"}
+                    {editingExpense ? "Edit expense" : "Add expense"}
                   </div>
                   <button
                     onClick={() => {
@@ -1018,7 +1006,7 @@ export default function Invoices() {
                         !expenseForm.expense_date
                       }
                       style={{ flex: 1 }}>
-                      {editingExpense ? "UPDATE EXPENSE" : "ADD EXPENSE"}
+                      {editingExpense ? "Update expense" : "Add expense"}
                     </button>
                     <button
                       onClick={() => {
@@ -1035,10 +1023,10 @@ export default function Invoices() {
                         fontSize: 11,
                         fontFamily: "var(--font-mono)",
                         cursor: "pointer",
-                        fontWeight: 600,
+                        fontWeight: 500,
                         letterSpacing: "0.05em",
                       }}>
-                      CANCEL
+                      Cancel
                     </button>
                   </div>
                 </div>
@@ -1224,7 +1212,7 @@ export default function Invoices() {
               }}>
               {expenseCategories.map((c) => (
                 <option key={c} value={c}>
-                  {c === "All" ? "All Categories" : c.replace("_", " ")}
+                  {c === "All" ? "All categories" : formatStatus(c)}
                 </option>
               ))}
             </select>
@@ -1250,12 +1238,11 @@ export default function Invoices() {
                   fontSize: 11,
                   borderRadius: 2,
                   cursor: "pointer",
-                  textTransform: "uppercase",
                   letterSpacing: "0.06em",
-                  fontWeight: expenseStatusFilter === s ? 600 : 400,
+                  fontWeight: expenseStatusFilter === s ? 500 : 400,
                   whiteSpace: "nowrap",
                 }}>
-                {s}
+                {s === "All" ? "All" : formatStatus(s)}
               </button>
             ))}
             <span
@@ -1334,7 +1321,7 @@ export default function Invoices() {
                                 <button
                                   onClick={() => setShowExpenseForm(true)}
                                   className="btn-action">
-                                  ADD EXPENSE
+                                  Add expense
                                 </button>
                               </div>
                             </td>
@@ -1366,16 +1353,16 @@ export default function Invoices() {
 
                           return (
                             <tr key={exp.id}>
-                              <td className="mono" style={{ fontSize: 12 }}>
+                              <td className="mono" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
                                 {formatDate(exp.expense_date)}
                               </td>
-                              <td style={{ fontSize: 12 }}>
+                              <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>
                                 <span
                                   style={{ fontFamily: "var(--font-sans)" }}>
-                                  {exp.category.replace("_", " ")}
+                                  {formatStatus(exp.category)}
                                 </span>
                               </td>
-                              <td style={{ fontSize: 12 }}>
+                              <td style={{ fontSize: 12, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={exp.description}>
                                 {exp.description}
                               </td>
                               <td
@@ -1388,7 +1375,7 @@ export default function Invoices() {
                               </td>
                               <td
                                 className="mono"
-                                style={{ fontSize: 13, fontWeight: 500 }}>
+                                style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap" }}>
                                 {formatCurrency(exp.amount)}
                               </td>
                               <td>
@@ -1401,9 +1388,11 @@ export default function Invoices() {
                                       "var(--text-secondary)",
                                     padding: "2px 6px",
                                     background: "var(--bg-surface-hover)",
-                                    borderRadius: 2,
+                                    borderRadius: 4,
+                                    display: "inline-block",
+                                    whiteSpace: "nowrap",
                                   }}>
-                                  {exp.status}
+                                  {formatStatus(exp.status)}
                                 </span>
                               </td>
                               <td>
@@ -1421,7 +1410,7 @@ export default function Invoices() {
                                         onClick={() =>
                                           handleApproveExpense(exp.id)
                                         }>
-                                        APPROVE
+                                        Approve
                                       </button>
                                       <button
                                         className="btn-action"
@@ -1434,7 +1423,7 @@ export default function Invoices() {
                                         onClick={() =>
                                           handleRejectExpense(exp.id)
                                         }>
-                                        REJECT
+                                        Reject
                                       </button>
                                     </>
                                   )}
@@ -1448,7 +1437,7 @@ export default function Invoices() {
                                       color: "var(--text-secondary)",
                                     }}
                                     onClick={() => handleEditExpense(exp)}>
-                                    EDIT
+                                    Edit
                                   </button>
                                   <button
                                     className="btn-action"
@@ -1460,7 +1449,7 @@ export default function Invoices() {
                                       color: "var(--status-danger)",
                                     }}
                                     onClick={() => handleDeleteExpense(exp.id)}>
-                                    DEL
+                                    Del
                                   </button>
                                 </div>
                               </td>
@@ -1497,7 +1486,7 @@ export default function Invoices() {
                             setExpensePage((p) => Math.max(1, p - 1))
                           }
                           disabled={expensePage === 1}>
-                          ← PREV
+                          ← Prev
                         </button>
                         <button
                           className="btn-action"
@@ -1505,7 +1494,7 @@ export default function Invoices() {
                             setExpensePage((p) => Math.min(totalPages, p + 1))
                           }
                           disabled={expensePage === totalPages}>
-                          NEXT →
+                          Next →
                         </button>
                       </div>
                     </div>
@@ -1647,12 +1636,11 @@ export default function Invoices() {
                     fontSize: 11,
                     borderRadius: 2,
                     cursor: "pointer",
-                    textTransform: "uppercase",
                     letterSpacing: "0.06em",
-                    fontWeight: statusFilter === s ? 600 : 400,
+                    fontWeight: statusFilter === s ? 500 : 400,
                     transition: "all 0.2s ease",
                   }}>
-                  {s}
+                  {s === "All" ? "All" : formatStatus(s)}
                 </button>
               ))}
             </div>
@@ -1676,7 +1664,7 @@ export default function Invoices() {
                 <col style={{ width: "130px" }} />
                 <col style={{ width: "160px" }} />
                 <col style={{ width: "180px" }} />
-                <col style={{ width: "220px" }} />
+                <col style={{ width: "80px" }} />
               </colgroup>
               <thead>
                 <tr>
@@ -1685,7 +1673,7 @@ export default function Invoices() {
                   <th>Amount</th>
                   <th>Status</th>
                   <th>Due Date</th>
-                  <th>Actions</th>
+                  <th style={{ textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1723,7 +1711,7 @@ export default function Invoices() {
                           <button
                             onClick={() => navigate("/bookings")}
                             className="btn-action">
-                            GO TO BOOKINGS
+                            Go to bookings
                           </button>
                         </div>
                       </td>
@@ -1784,9 +1772,9 @@ export default function Invoices() {
                         key={inv.id}
                         style={{ cursor: "pointer" }}
                         onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
-                        <td className="mono">{invNumber}</td>
-                        <td>{custName}</td>
-                        <td className="mono">{formatCurrency(amount)}</td>
+                        <td className="mono" style={{ whiteSpace: "nowrap" }}>{invNumber}</td>
+                        <td style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={custName}>{custName}</td>
+                        <td className="mono" style={{ whiteSpace: "nowrap" }}>{formatCurrency(amount)}</td>
                         <td>
                           <div
                             style={{
@@ -1803,9 +1791,11 @@ export default function Invoices() {
                                   "var(--text-secondary)",
                                 padding: "2px 6px",
                                 background: "var(--bg-surface-hover)",
-                                borderRadius: 2,
+                                borderRadius: 4,
+                                display: "inline-block",
+                                whiteSpace: "nowrap",
                               }}>
-                              {invStatus}
+                              {formatStatus(invStatus)}
                             </span>
                             {capitalEntry && tier && (
                               <span
@@ -1816,10 +1806,11 @@ export default function Invoices() {
                                     TIER_COLOR[tier] || "var(--text-tertiary)",
                                   padding: "1px 5px",
                                   border: `1px solid ${TIER_COLOR[tier] || "var(--border-subtle)"}`,
-                                  borderRadius: 2,
-                                  textTransform: "uppercase",
+                                  borderRadius: 4,
+                                  display: "inline-block",
+                                  whiteSpace: "nowrap",
                                 }}>
-                                {tier}
+                                {formatStatus(tier)}
                               </span>
                             )}
                           </div>
@@ -1858,100 +1849,203 @@ export default function Invoices() {
                             )}
                           </div>
                         </td>
-                        <td onClick={(e) => e.stopPropagation()}>
-                          <div
+                        <td
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ position: "relative", textAlign: "right" }}>
+                          {/* 3-dot menu button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDropdownId(
+                                openDropdownId === inv.id ? null : inv.id,
+                              );
+                            }}
                             style={{
-                              display: "flex",
-                              gap: 8,
-                              flexWrap: "wrap",
+                              background: "transparent",
+                              border: "1px solid var(--border-subtle)",
+                              color: "var(--text-secondary)",
+                              borderRadius: 2,
+                              cursor: "pointer",
+                              padding: "3px 8px",
+                              lineHeight: 0,
+                              display: "inline-flex",
+                              alignItems: "center",
                             }}>
-                            {invStatus === "DRAFT" && (
-                              <button
-                                className="btn-action"
-                                style={{ fontSize: 10, padding: "4px 12px" }}
-                                onClick={(e) => handleSendInvoice(e, inv.id)}
-                                disabled={sendingId === inv.id}>
-                                {sendingId === inv.id ? "SENDING..." : "SEND"}
-                              </button>
-                            )}
-                            {invStatus === "OVERDUE" && (
-                              <button
-                                className="btn-action"
+                            <Ellipsis size={14} />
+                          </button>
+
+                          {/* Dropdown */}
+                          {openDropdownId === inv.id && (
+                            <>
+                              {/* click-away overlay */}
+                              <div
                                 style={{
-                                  fontSize: 10,
-                                  padding: "4px 10px",
-                                  fontFamily: "var(--font-mono)",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.05em",
-                                  background: "transparent",
-                                  border: "1px solid var(--status-warning)",
-                                  color: "var(--status-warning)",
+                                  position: "fixed",
+                                  inset: 0,
+                                  zIndex: 99,
                                 }}
-                                onClick={(e) => handleSendReminder(e, inv.id)}
-                                disabled={sendingReminderId === inv.id}>
-                                {sendingReminderId === inv.id
-                                  ? "SENDING..."
-                                  : "REMIND"}
-                              </button>
-                            )}
-                            {invStatus !== "DRAFT" && (
-                              <button
-                                className="btn-action"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenDropdownId(null);
+                                }}
+                              />
+                              <div
                                 style={{
-                                  fontSize: 10,
-                                  padding: "4px 10px",
-                                  background: "transparent",
+                                  position: "absolute",
+                                  right: 0,
+                                  top: "calc(100% + 4px)",
+                                  zIndex: 100,
+                                  background: "#ffffff",
                                   border: "1px solid var(--border-subtle)",
-                                  color: "var(--text-secondary)",
-                                }}
-                                onClick={(e) => handleDownloadPDF(e, inv.id)}>
-                                PDF
-                              </button>
-                            )}
-                            {capitalEntry && (
-                              <button
-                                className="btn-action"
-                                style={{
-                                  fontSize: 10,
-                                  padding: "4px 10px",
-                                  background: "transparent",
-                                  border: `1px solid ${TIER_COLOR[tier || ""] || "var(--accent-primary)"}`,
-                                  color:
-                                    TIER_COLOR[tier || ""] ||
-                                    "var(--accent-primary)",
-                                  fontFamily: "var(--font-mono)",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.05em",
-                                  whiteSpace: "nowrap",
-                                }}
-                                onClick={(e) => handleRequestCapital(e, inv)}
-                                disabled={requestingCapitalId === inv.id}>
-                                {requestingCapitalId === inv.id
-                                  ? "REQUESTING..."
-                                  : "REQUEST CAPITAL"}
-                              </button>
-                            )}
-                            {ineligibleEntry && (
-                              <span
-                                title={ineligibleEntry.reason}
-                                style={{
-                                  fontSize: 9,
-                                  fontFamily: "var(--font-mono)",
-                                  color: "var(--text-tertiary)",
-                                  border: "1px solid var(--border-subtle)",
-                                  borderRadius: 2,
-                                  padding: "3px 6px",
-                                  whiteSpace: "nowrap",
-                                  maxWidth: 160,
+                                  borderRadius: 4,
+                                  minWidth: 200,
+                                  boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
                                   overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  display: "inline-block",
-                                  cursor: "default",
                                 }}>
-                                ✕ {ineligibleEntry.reason}
-                              </span>
-                            )}
-                          </div>
+                                {invStatus === "DRAFT" && (
+                                  <button
+                                    style={{
+                                      display: "block",
+                                      width: "100%",
+                                      textAlign: "left",
+                                      background: "transparent",
+                                      border: "none",
+                                      borderBottom:
+                                        "1px solid var(--border-subtle)",
+                                      color: "var(--accent-primary)",
+                                      fontFamily: "var(--font-mono)",
+                                      fontSize: 11,
+                                      letterSpacing: "0.05em",
+                                      padding: "10px 14px",
+                                      cursor: "pointer",
+                                      transition: "background 0.15s",
+                                    }}
+                                    disabled={sendingId === inv.id}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                                    onClick={(e) => {
+                                      setOpenDropdownId(null);
+                                      handleSendInvoice(e, inv.id);
+                                    }}>
+                                    {sendingId === inv.id
+                                      ? "Sending..."
+                                      : "Send to customer"}
+                                  </button>
+                                )}
+                                {invStatus === "OVERDUE" && (
+                                  <button
+                                    style={{
+                                      display: "block",
+                                      width: "100%",
+                                      textAlign: "left",
+                                      background: "transparent",
+                                      border: "none",
+                                      borderBottom:
+                                        "1px solid var(--border-subtle)",
+                                      color: "var(--status-warning)",
+                                      fontFamily: "var(--font-mono)",
+                                      fontSize: 11,
+                                      letterSpacing: "0.05em",
+                                      padding: "10px 14px",
+                                      cursor: "pointer",
+                                      transition: "background 0.15s",
+                                    }}
+                                    disabled={sendingReminderId === inv.id}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                                    onClick={(e) => {
+                                      setOpenDropdownId(null);
+                                      handleSendReminder(e, inv.id);
+                                    }}>
+                                    {sendingReminderId === inv.id
+                                      ? "Sending..."
+                                      : "Send reminder"}
+                                  </button>
+                                )}
+                                {invStatus !== "DRAFT" && (
+                                  <button
+                                    style={{
+                                      display: "block",
+                                      width: "100%",
+                                      textAlign: "left",
+                                      background: "transparent",
+                                      border: "none",
+                                      borderBottom:
+                                        "1px solid var(--border-subtle)",
+                                      color: "var(--text-secondary)",
+                                      fontFamily: "var(--font-mono)",
+                                      fontSize: 11,
+                                      letterSpacing: "0.05em",
+                                      padding: "10px 14px",
+                                      cursor: "pointer",
+                                      transition: "background 0.15s",
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                                    onClick={(e) => {
+                                      setOpenDropdownId(null);
+                                      handleDownloadPDF(e, inv.id);
+                                    }}>
+                                    Download PDF
+                                  </button>
+                                )}
+                                {capitalEntry && (
+                                  <a
+                                    href={MC_URL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => {
+                                      setOpenDropdownId(null);
+                                      setAppliedIds((prev) => saveAppliedId(String(inv.id), prev));
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                                    style={{
+                                      display: "block",
+                                      width: "100%",
+                                      textAlign: "left",
+                                      background: "transparent",
+                                      borderBottom: "1px solid var(--border-subtle)",
+                                      color: appliedIds.has(String(inv.id))
+                                        ? "var(--status-success)"
+                                        : TIER_COLOR[tier || ""] || "var(--accent-primary)",
+                                      fontFamily: "var(--font-mono)",
+                                      fontSize: 11,
+                                      letterSpacing: "0.05em",
+                                      padding: "10px 14px",
+                                      cursor: "pointer",
+                                      textDecoration: "none",
+                                      boxSizing: "border-box",
+                                      transition: "background 0.15s",
+                                    }}>
+                                    {appliedIds.has(String(inv.id)) ? "Applied ✓" : "Request capital →"}
+                                  </a>
+                                )}
+                                {ineligibleEntry && (
+                                  <div
+                                    style={{
+                                      padding: "10px 14px",
+                                      fontFamily: "var(--font-mono)",
+                                      fontSize: 10,
+                                      color: "var(--text-tertiary)",
+                                      lineHeight: 1.4,
+                                    }}>
+                                    <div
+                                      style={{
+                                        color: "var(--status-danger)",
+                                        fontWeight: 500,
+                                        marginBottom: 2,
+                                        fontSize: 9,
+                                        letterSpacing: "0.05em",
+                                      }}>
+                                      Not eligible for capital
+                                    </div>
+                                    {ineligibleEntry.reason}
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1984,13 +2078,13 @@ export default function Invoices() {
                     className="btn-action"
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}>
-                    ← PREV
+                    ← Prev
                   </button>
                   <button
                     className="btn-action"
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}>
-                    NEXT →
+                    Next →
                   </button>
                 </div>
               </div>

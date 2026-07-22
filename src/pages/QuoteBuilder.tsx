@@ -9,7 +9,9 @@ import { RouteMapView } from "@/components/RouteMapView";
 import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { MessageCircle, Map, Info, Sparkles } from "lucide-react";
+import { Dialog, DialogTrigger, DialogContent } from "@/components/ui/dialog";
+import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import { MessageCircle, Map, Info, Sparkles, Maximize2, Mic, Square } from "lucide-react";
 
 /**
  * QuoteBuilder — the redesigned single-page quote flow.
@@ -79,6 +81,10 @@ export default function QuoteBuilder() {
     const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10);
   });
   const [showDetails, setShowDetails] = useState(true);
+  // Which field the next map click fills. Auto-advances to the empty one so a
+  // "click collection, click delivery" flow needs no manual toggling — but stays
+  // user-controlled via the pills so either point can be re-picked later.
+  const [pickMode, setPickMode] = useState<"pickup" | "delivery">("pickup");
 
   // ---- pricing overrides ----
   const [editableTollCost, setEditableTollCost] = useState<number | null>(null);
@@ -274,24 +280,31 @@ export default function QuoteBuilder() {
     if (target && target > 0) { setServiceCharge(prev => Math.max(0, prev + (target - total))); toast.success("Applied AI-recommended price"); }
   };
 
-  // ---- natural-language input ----
-  const submitNL = async () => {
-    if (!nlText.trim()) return;
+  // ---- natural-language input (typed or transcribed from voice) ----
+  const submitNL = async (textOverride?: string) => {
+    const text = (textOverride ?? nlText).trim();
+    if (!text) return;
     setNlBusy(true);
     try {
-      const res = await postData({ url: "api/v1/ai/chat-quote/", data: { message: nlText, history: [], current_fields: {} } });
+      const res = await postData({ url: "api/v1/ai/chat-quote/", data: { message: text, history: [], current_fields: {} } });
       const f = res?.extracted_fields || {};
       if (f.pickup_location) { setPickup(f.pickup_location); const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(f.pickup_location)}`).catch(() => null); const s = g?.results?.[0] || g?.[0]; if (s) setPickupCoords({ lat: s.lat, lon: s.lon }); }
       if (f.delivery_location) { setDelivery(f.delivery_location); const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(f.delivery_location)}`).catch(() => null); const s = g?.results?.[0] || g?.[0]; if (s) setDeliveryCoords({ lat: s.lat, lon: s.lon }); }
       if (f.cargo_description) setCargo(f.cargo_description);
       if (f.weight) setWeight(String((f.weight / 1000) || ""));
       if (f.vehicle_type) setVehicleType(f.vehicle_type);
-      if (f.pickup_location || f.delivery_location) setShowDetails(true);
+      if (f.pickup_date) setPickupDate(f.pickup_date);
+      if (f.delivery_date) setDeliveryDate(f.delivery_date);
+      if (f.valid_until) setValidUntil(f.valid_until);
+      if (f.trip_type === "ONE_WAY" || f.trip_type === "ROUND_TRIP") setTripType(f.trip_type);
+      if (f.pickup_location || f.delivery_location || f.pickup_date || f.delivery_date) setShowDetails(true);
       toast.success(res?.reply || "Filled from your description");
-      setNlText("");
+      if (!textOverride) setNlText("");
     } catch { toast.error("Couldn't read that — try the fields instead"); }
     finally { setNlBusy(false); }
   };
+
+  const voice = useVoiceRecorder((text) => { setNlText(text); submitNL(text); });
 
   // ---- edit mode: load existing quote ----
   useEffect(() => {
@@ -457,6 +470,81 @@ export default function QuoteBuilder() {
     finally { setSaving(false); }
   };
 
+  // ---- map click-to-pick ----
+  const handleMapClick = (point: { lat: number; lon: number; label: string }) => {
+    if (pickMode === "pickup") {
+      setPickup(point.label); setPickupCoords({ lat: point.lat, lon: point.lon });
+      if (!deliveryCoords) setPickMode("delivery");
+    } else {
+      setDelivery(point.label); setDeliveryCoords({ lat: point.lat, lon: point.lon });
+      if (!pickupCoords) setPickMode("pickup");
+    }
+  };
+
+  // ---- map panel (shared between the inline card and the expanded modal) ----
+  const renderMapPanel = (height: number, expandButton?: React.ReactNode) => (
+    <>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)" }}>
+        <span style={{ fontSize: 12, color: "var(--text-tertiary)", display: "flex", alignItems: "center", gap: 6 }}>
+          <Map size={13} />
+          {pickupCoords && deliveryCoords
+            ? "Double-click the map to move a pin, or search above"
+            : <>Double-click the map to set <b style={{ color: "var(--text-secondary)" }}>{pickMode === "pickup" ? "collection" : "delivery"}</b></>}
+        </span>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <button onClick={() => setPickMode("pickup")}
+            style={{ fontSize: 11, fontFamily: "var(--font-mono)", padding: "3px 8px", borderRadius: 4, cursor: "pointer",
+              border: `1px solid ${pickMode === "pickup" ? "#16a34a" : "var(--border-subtle)"}`,
+              background: pickMode === "pickup" ? "color-mix(in srgb, #16a34a 12%, transparent)" : "transparent",
+              color: pickMode === "pickup" ? "#16a34a" : "var(--text-tertiary)" }}>
+            ● Collection
+          </button>
+          <button onClick={() => setPickMode("delivery")}
+            style={{ fontSize: 11, fontFamily: "var(--font-mono)", padding: "3px 8px", borderRadius: 4, cursor: "pointer",
+              border: `1px solid ${pickMode === "delivery" ? "#dc2626" : "var(--border-subtle)"}`,
+              background: pickMode === "delivery" ? "color-mix(in srgb, #dc2626 12%, transparent)" : "transparent",
+              color: pickMode === "delivery" ? "#dc2626" : "var(--text-tertiary)" }}>
+            ● Delivery
+          </button>
+          {expandButton}
+        </div>
+      </div>
+      <RouteMapView pickup={pickup} delivery={delivery} pickupCoords={pickupCoords} deliveryCoords={deliveryCoords} height={height}
+        onMapClick={handleMapClick}
+        geometry={route?.geometry && route.geometry.length > 1
+          ? route.geometry.map(p => [p.lat, p.lon] as [number, number])
+          : undefined} />
+      {routeData?.routes && routeData.routes.length > 1 && (
+        <div style={{ display: "flex", gap: 8, padding: 10, flexWrap: "wrap", borderTop: "1px solid var(--border-subtle)" }}>
+          {routeData.routes.map((r, i) => (
+            <Tooltip key={i}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setSelectedRouteIndex(i)}
+                  style={{ fontFamily: "var(--font-mono)", fontSize: 11, padding: "5px 9px", borderRadius: 4, cursor: "pointer",
+                    border: `1px solid ${i === selectedRouteIndex ? "var(--accent-primary)" : "var(--border-subtle)"}`,
+                    background: i === selectedRouteIndex ? "var(--status-success-bg)" : "var(--bg-surface)", color: i === selectedRouteIndex ? "var(--accent-primary)" : "var(--text-secondary)" }}>
+                  {r.label || r.summary || `Route ${i + 1}`} · {Math.round(r.distance_km)} km
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" style={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", fontSize: 12, padding: "10px 12px", maxWidth: 220 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "3px 12px" }}>
+                  <span style={{ color: "var(--text-tertiary)" }}>Distance</span><span>{Math.round(r.distance_km)} km</span>
+                  <span style={{ color: "var(--text-tertiary)" }}>Duration</span><span>{formatDuration(r.duration_minutes ?? r.duration_min)}</span>
+                  <span style={{ color: "var(--text-tertiary)" }}>Fuel</span><span>{formatCurrency(r.fuel_cost_zar)}</span>
+                  <span style={{ color: "var(--text-tertiary)" }}>Tolls</span><span>{formatCurrency(r.toll_cost_zar)}</span>
+                  <span style={{ color: "var(--text-tertiary)" }}>Total</span><span>{formatCurrency(r.total_cost_zar)}</span>
+                  {r.road_type && (<><span style={{ color: "var(--text-tertiary)" }}>Road</span><span>{r.road_type}</span></>)}
+                  {r.terrain && (<><span style={{ color: "var(--text-tertiary)" }}>Terrain</span><span>{r.terrain}</span></>)}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
   // ---- styles ----
   const cardS: React.CSSProperties = { background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, boxShadow: "var(--shadow-card)" };
   const labelS: React.CSSProperties = { fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.04em", textTransform: "uppercase" };
@@ -511,12 +599,39 @@ export default function QuoteBuilder() {
         </div>
       )}
 
-      {/* NL input */}
-      <div style={{ ...cardS, display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 14, background: "var(--bg-surface-hover)" }}>
-        <MessageCircle size={16} color="var(--text-tertiary)" />
-        <input value={nlText} onChange={e => setNlText(e.target.value)} onKeyDown={e => e.key === "Enter" && submitNL()}
-          placeholder="Describe it — “20t steel, JHB to Cape Town, flatbed, Tuesday”" style={{ ...inputS, border: "none", background: "transparent" }} />
-        <button onClick={submitNL} disabled={nlBusy || !nlText.trim()} style={{ fontSize: 13, fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 4, padding: "7px 14px", cursor: "pointer", opacity: nlText.trim() ? 1 : 0.5 }}>{nlBusy ? "Reading…" : "Fill"}</button>
+      {/* NL input — typed or voice */}
+      <div style={{ ...cardS, display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 14, background: "var(--bg-surface-hover)", minHeight: 44 }}>
+        {voice.recording ? (
+          <>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--status-danger)", flexShrink: 0, animation: "pulse-dot 1s infinite" }} />
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, height: 32 }}>
+              {voice.levels.map((h, i) => (
+                <div key={i} style={{ width: 3, height: h, borderRadius: 2, background: "var(--accent-primary)" }} />
+              ))}
+            </div>
+            <button onClick={voice.stop} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, background: "var(--status-danger)", color: "#fff", border: "none", borderRadius: 4, padding: "7px 14px", cursor: "pointer" }}>
+              <Square size={12} fill="#fff" /> Stop
+            </button>
+          </>
+        ) : voice.transcribing ? (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-tertiary)" }}>
+            <svg width="14" height="14" viewBox="0 0 16 16" style={{ animation: "spin 1s linear infinite" }}>
+              <circle cx="8" cy="8" r="6" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
+            </svg>
+            Transcribing…
+          </div>
+        ) : (
+          <>
+            <MessageCircle size={16} color="var(--text-tertiary)" />
+            <input value={nlText} onChange={e => setNlText(e.target.value)} onKeyDown={e => e.key === "Enter" && submitNL()}
+              placeholder="Describe it — “20t steel, JHB to Cape Town, flatbed, Tuesday”" style={{ ...inputS, border: "none", background: "transparent" }} />
+            <button type="button" onClick={voice.start} title="Record voice"
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface)", color: "var(--accent-primary)", cursor: "pointer", flexShrink: 0, padding: 0 }}>
+              <Mic size={14} />
+            </button>
+            <button onClick={() => submitNL()} disabled={nlBusy || !nlText.trim()} style={{ fontSize: 13, fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 4, padding: "7px 14px", cursor: "pointer", opacity: nlText.trim() ? 1 : 0.5 }}>{nlBusy ? "Reading…" : "Fill"}</button>
+          </>
+        )}
       </div>
 
       {/* 1 — inputs */}
@@ -565,56 +680,34 @@ export default function QuoteBuilder() {
         )}
       </div>
 
-      {/* empty state */}
-      {!ready && (
-        <div style={{ ...cardS, padding: 40, textAlign: "center", color: "var(--text-tertiary)" }}>
-          <div style={{ marginBottom: 10, opacity: 0.4, display: "flex", justifyContent: "center" }}><Map size={32} /></div>
-          <div style={{ fontSize: 15, color: "var(--text-secondary)" }}>Add a client, vehicle type, collection and delivery</div>
-          <div style={{ fontSize: 13, marginTop: 6 }}>The route, costs and AI quote appear here automatically.</div>
-        </div>
-      )}
-
       {/* 2 — map + cost */}
-      {ready && (
-        <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 14, marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 14, marginBottom: 14 }}>
           <div style={{ ...cardS, overflow: "hidden" }}>
-            <RouteMapView pickup={pickup} delivery={delivery} height={300}
-              geometry={route?.geometry && route.geometry.length > 1
-                ? route.geometry.map(p => [p.lat, p.lon] as [number, number])
-                : undefined} />
-            {routeData?.routes && routeData.routes.length > 1 && (
-              <div style={{ display: "flex", gap: 8, padding: 10, flexWrap: "wrap", borderTop: "1px solid var(--border-subtle)" }}>
-                {routeData.routes.map((r, i) => (
-                  <Tooltip key={i}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => setSelectedRouteIndex(i)}
-                        style={{ fontFamily: "var(--font-mono)", fontSize: 11, padding: "5px 9px", borderRadius: 4, cursor: "pointer",
-                          border: `1px solid ${i === selectedRouteIndex ? "var(--accent-primary)" : "var(--border-subtle)"}`,
-                          background: i === selectedRouteIndex ? "var(--status-success-bg)" : "var(--bg-surface)", color: i === selectedRouteIndex ? "var(--accent-primary)" : "var(--text-secondary)" }}>
-                        {r.label || r.summary || `Route ${i + 1}`} · {Math.round(r.distance_km)} km
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" style={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", fontSize: 12, padding: "10px 12px", maxWidth: 220 }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "3px 12px" }}>
-                        <span style={{ color: "var(--text-tertiary)" }}>Distance</span><span>{Math.round(r.distance_km)} km</span>
-                        <span style={{ color: "var(--text-tertiary)" }}>Duration</span><span>{formatDuration(r.duration_minutes ?? r.duration_min)}</span>
-                        <span style={{ color: "var(--text-tertiary)" }}>Fuel</span><span>{formatCurrency(r.fuel_cost_zar)}</span>
-                        <span style={{ color: "var(--text-tertiary)" }}>Tolls</span><span>{formatCurrency(r.toll_cost_zar)}</span>
-                        <span style={{ color: "var(--text-tertiary)" }}>Total</span><span>{formatCurrency(r.total_cost_zar)}</span>
-                        {r.road_type && (<><span style={{ color: "var(--text-tertiary)" }}>Road</span><span>{r.road_type}</span></>)}
-                        {r.terrain && (<><span style={{ color: "var(--text-tertiary)" }}>Terrain</span><span>{r.terrain}</span></>)}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-              </div>
-            )}
+            {renderMapPanel(300, (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <button type="button" title="Expand map"
+                    style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: 4, cursor: "pointer",
+                      border: "1px solid var(--border-subtle)", background: "transparent", color: "var(--text-tertiary)" }}>
+                    <Maximize2 size={12} />
+                  </button>
+                </DialogTrigger>
+                <DialogContent style={{ ...cardS, width: "min(1100px, 92vw)", padding: 0, overflow: "hidden" }}>
+                  {renderMapPanel(560)}
+                </DialogContent>
+              </Dialog>
+            ))}
           </div>
           <div style={{ ...cardS, padding: "14px 16px" }}>
             <div style={{ ...labelS, marginBottom: 8 }}>Cost breakdown · {vehicleType || "—"}</div>
-            {calculatingRoute && <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Calculating route…</div>}
-            {!calculatingRoute && (<>
+            {!ready && (
+              <div style={{ padding: "30px 4px", textAlign: "center", color: "var(--text-tertiary)" }}>
+                <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Add a client, vehicle type, collection and delivery</div>
+                <div style={{ fontSize: 12, marginTop: 6 }}>Costs and the AI quote appear here automatically.</div>
+              </div>
+            )}
+            {ready && calculatingRoute && <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Calculating route…</div>}
+            {ready && !calculatingRoute && (<>
               {[
                 { key: "fuel", l: `Fuel — ${fuelConsumption} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
@@ -669,8 +762,7 @@ export default function QuoteBuilder() {
               </div>
             </>)}
           </div>
-        </div>
-      )}
+      </div>
 
       {/* 3 — AI quote */}
       {ready && total > 0 && (

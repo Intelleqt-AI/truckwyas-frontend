@@ -11,6 +11,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Dialog, DialogTrigger, DialogContent } from "@/components/ui/dialog";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
 import { MessageCircle, Map, Info, Sparkles, Maximize2, Mic, Square } from "lucide-react";
 
 /**
@@ -116,6 +117,10 @@ export default function QuoteBuilder() {
   const [benchmark, setBenchmark] = useState<any>(null);
   const [nlText, setNlText] = useState("");
   const [nlBusy, setNlBusy] = useState(false);
+  // Persistent AI conversation — every message and reply lands here (see
+  // AIChatPanel) instead of a one-shot toast with no way to reply to it.
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedQuoteId, setSavedQuoteId] = useState<number | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -299,26 +304,42 @@ export default function QuoteBuilder() {
   };
 
   // ---- natural-language input (typed or transcribed from voice) ----
+  // Shared by the top quick-fill bar and the AI chat panel — both are just
+  // different entry points into the same conversation, so every message
+  // (whichever surface it came from) is recorded in chatMessages with real
+  // history/current_fields sent to the backend for follow-up context.
   const submitNL = async (textOverride?: string) => {
     const text = (textOverride ?? nlText).trim();
     if (!text) return;
+    const history = chatMessages.map(m => ({ role: m.role, content: m.text }));
+    setChatMessages(prev => [...prev, { role: "user", text }]);
+    setChatOpen(true);
     setNlBusy(true);
     try {
-      const res = await postData({ url: "api/v1/ai/chat-quote/", data: { message: text, history: [], current_fields: {} } });
+      const selectedCustomerName = customers.find((c: any) => String(c.id) === customerId)?.name || "";
+      const current_fields = {
+        pickup_location: pickup, delivery_location: delivery, weight_kg: weightKg,
+        vehicle_type: vehicleType, customer_name: selectedCustomerName, cargo_description: cargo,
+        pickup_date: pickupDate, delivery_date: deliveryDate, valid_until: validUntil, trip_type: tripType,
+      };
+      const res = await postData({ url: "api/v1/ai/chat-quote/", data: { message: text, history, current_fields } });
       const f = res?.extracted_fields || {};
       if (f.pickup_location) { setPickup(f.pickup_location); const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(f.pickup_location)}`).catch(() => null); const s = g?.results?.[0] || g?.[0]; if (s) setPickupCoords({ lat: s.lat, lon: s.lon }); }
       if (f.delivery_location) { setDelivery(f.delivery_location); const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(f.delivery_location)}`).catch(() => null); const s = g?.results?.[0] || g?.[0]; if (s) setDeliveryCoords({ lat: s.lat, lon: s.lon }); }
       if (f.cargo_description) setCargo(f.cargo_description);
       if (f.weight) setWeight(String((f.weight / 1000) || ""));
       if (f.vehicle_type) setVehicleType(f.vehicle_type);
+      if (f.customer_id) setCustomerId(String(f.customer_id));
       if (f.pickup_date) setPickupDate(f.pickup_date);
       if (f.delivery_date) setDeliveryDate(f.delivery_date);
       if (f.valid_until) setValidUntil(f.valid_until);
       if (f.trip_type === "ONE_WAY" || f.trip_type === "ROUND_TRIP") setTripType(f.trip_type);
       if (f.pickup_location || f.delivery_location || f.pickup_date || f.delivery_date) setShowDetails(true);
-      toast.success(res?.reply || "Filled from your description");
+      setChatMessages(prev => [...prev, { role: "assistant", text: res?.reply || "Got it — updated the form." }]);
       if (!textOverride) setNlText("");
-    } catch { toast.error("Couldn't read that — try the fields instead"); }
+    } catch {
+      setChatMessages(prev => [...prev, { role: "assistant", text: "Sorry, I couldn't read that — try rephrasing or use the fields directly." }]);
+    }
     finally { setNlBusy(false); }
   };
 
@@ -398,6 +419,7 @@ export default function QuoteBuilder() {
     setEditableTollCost(null); setTollManuallyEdited(false); setDriverAllowanceInput("0"); setServiceCharge(0);
     setRouteData(null); setSelectedRouteIndex(0); setRouteBlockedMessage(null);
     setAnalysis(null); setGuard(null); setBenchmark(null);
+    setChatMessages([]); setChatOpen(false);
     { const d = new Date(); d.setDate(d.getDate() + 7); setValidUntil(d.toISOString().slice(0, 10)); }
     if (isEditing) navigate("/bookings/quotes/new", { replace: true });
     toast.success("Started a new quote");
@@ -435,6 +457,13 @@ export default function QuoteBuilder() {
   // digits and gets rejected outright ("no more than 12 digits in total").
   // 6dp (~11cm precision) is far more than a freight quote needs.
   const round6 = (n?: number) => (n == null ? n : Math.round(n * 1e6) / 1e6);
+  // Same class of bug as the coordinates above, different field: base_rate,
+  // fuel_surcharge, toll_charges, driver_allowance, additional_charges and
+  // total_amount are all DecimalField(max_digits=10, decimal_places=2) —
+  // summing floats (weightSurcharge + crossBorderCost + serviceCharge, etc.)
+  // can leave a trailing artifact like 2269.0000000000002, which fails
+  // "no more than 10 digits" before Django ever gets to round it to 2dp.
+  const round2 = (n: number) => Math.round(n * 100) / 100;
 
   // ---- build the save payload (matches production) ----
   const buildPayload = (status: "DRAFT" | "SENT") => ({
@@ -444,9 +473,9 @@ export default function QuoteBuilder() {
     pickup_lat: round6(pickupCoords?.lat), pickup_lng: round6(pickupCoords?.lon), delivery_lat: round6(deliveryCoords?.lat), delivery_lng: round6(deliveryCoords?.lon),
     cargo_description: cargo || `${weight || 0}t ${vehicleType}`.trim(), weight: weightKg, distance,
     estimated_duration_minutes: route?.duration_min ? Math.round(route.duration_min) : (routeData?.duration_minutes || null),
-    vehicle_type: vehicleType, base_rate: baseCost, fuel_surcharge: fuelCost, toll_charges: tollCost,
-    driver_allowance: driverAllowance, additional_charges: weightSurcharge + crossBorderCost + serviceCharge,
-    total_amount: total, margin_percentage: marginPct, notes, status, confidence: "MEDIUM",
+    vehicle_type: vehicleType, base_rate: round2(baseCost), fuel_surcharge: round2(fuelCost), toll_charges: round2(tollCost),
+    driver_allowance: round2(driverAllowance), additional_charges: round2(weightSurcharge + crossBorderCost + serviceCharge),
+    total_amount: round2(total), margin_percentage: marginPct, notes, status, confidence: "MEDIUM",
     sla_hours: Number(companyProfile?.default_sla_hours) || 48, valid_until: validUntil, trip_type: tripType,
     win_probability: opt?.win_probability_at_optimal != null ? Math.round(opt.win_probability_at_optimal * 100) : null,
   });
@@ -948,6 +977,8 @@ export default function QuoteBuilder() {
 
       {/* notes */}
       {ready && <div style={{ marginBottom: 40 }}><div style={{ ...labelS, marginBottom: 5 }}>Notes (optional)</div><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Anything for the client or your team…" style={{ ...inputS, resize: "vertical" }} /></div>}
+
+      <AIChatPanel messages={chatMessages} busy={nlBusy} open={chatOpen} onOpenChange={setChatOpen} onSend={(t) => submitNL(t)} />
     </div>
   );
 }

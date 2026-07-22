@@ -76,11 +76,15 @@ export default function Drivers() {
   const [search, setSearch] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Only what's actually required to create a usable driver record, plus a
+  // couple of clearly useful extras (phone/email for contact). Address,
+  // medical card expiry, emergency contact, and vehicle assignment are all
+  // still editable afterward from the Edit Driver panel — deferring them here
+  // keeps this form from asking for everything up front.
   const [addForm, setAddForm] = useState({
-    first_name: '', last_name: '', email: '', phone: '', address: '',
-    license_number: '', license_expiry: '', medical_card_expiry: '', license_state: 'GP',
+    first_name: '', last_name: '', email: '', phone: '',
+    license_number: '', license_expiry: '', license_state: 'GP',
     hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE',
-    emergency_contact: '', vehicle: '',
   });
   const [editDriver, setEditDriver] = useState<Driver | null>(null);
   const [editForm, setEditForm] = useState<any>({});
@@ -451,19 +455,18 @@ export default function Drivers() {
               <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {[
-              { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan' },
-              { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter' },
-              { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
+              { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan', required: true },
+              { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter', required: true },
               { key: 'phone', label: 'Phone', placeholder: 'e.g. 082 123 4567' },
-              { key: 'address', label: 'Address', placeholder: 'e.g. 12 Main Street, Cape Town' },
-              { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001' },
-              { key: 'license_expiry', label: 'License Expiry', type: 'date' },
-              { key: 'medical_card_expiry', label: 'Medical Card Expiry', type: 'date' },
-              { key: 'hire_date', label: 'Hire Date', type: 'date' },
-              { key: 'emergency_contact', label: 'Emergency Contact', placeholder: 'e.g. Jane Doe or 082 123 4567' },
+              { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
+              { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001', required: true },
+              { key: 'license_expiry', label: 'License Expiry', type: 'date', required: true },
+              { key: 'hire_date', label: 'Hire Date', type: 'date', required: true },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                </label>
                 {f.type === 'date' ? (
                   <DatePicker
                     value={(addForm as any)[f.key]}
@@ -481,11 +484,13 @@ export default function Drivers() {
               </div>
             ))}
             {[
-              { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'] },
+              { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'], required: true },
               { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                </label>
                 <Select value={(addForm as any)[f.key]} onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}>
                   <SelectTrigger>
                     <SelectValue />
@@ -496,29 +501,16 @@ export default function Drivers() {
                 </Select>
               </div>
             ))}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>Assigned Vehicle</label>
-              <Select value={addForm.vehicle} onValueChange={val => setAddForm(prev => ({ ...prev, vehicle: val }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="— No vehicle assigned —" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vehicles.map(v => (
-                    <SelectItem key={v.id} value={String(v.id)}>
-                      {v.plate}{v.make || v.model ? ` — ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 16 }}>
+              * Required. Address, medical card, emergency contact, and vehicle assignment can be added afterward from Edit.
             </div>
+            {(() => {
+              const canCreate = !!(addForm.first_name && addForm.last_name && addForm.license_number && addForm.license_expiry && addForm.license_state && addForm.hire_date);
+              return (
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
-                disabled={saving}
+                disabled={saving || !canCreate}
                 onClick={async () => {
-                  if (!addForm.first_name || !addForm.last_name || !addForm.license_number || !addForm.license_expiry) {
-                    toast.warning('Please fill in all required fields');
-                    return;
-                  }
                   setSaving(true);
                   try {
                     // Create user first, then driver
@@ -529,31 +521,25 @@ export default function Drivers() {
                       first_name: addForm.first_name,
                       last_name: addForm.last_name,
                       phone: addForm.phone,
-                      address: addForm.address,
                       password: 'TruckWys2026!',
                       role: 'DRIVER',
                     }});
-                    const newDriver = await postData({ url: 'api/v1/drivers/', data: {
+                    await postData({ url: 'api/v1/drivers/', data: {
                       user: user.id,
                       license_number: addForm.license_number,
                       license_expiry: addForm.license_expiry,
-                      medical_card_expiry: addForm.medical_card_expiry || undefined,
                       license_state: addForm.license_state,
                       hire_date: addForm.hire_date,
                       status: addForm.status,
-                      emergency_contact: addForm.emergency_contact,
                     }});
-                    if (addForm.vehicle && newDriver?.id) {
-                      await patchData({ url: `api/v1/vehicles/${addForm.vehicle}/`, data: { driver: newDriver.id } });
-                    }
                     setShowAddForm(false);
-                    setAddForm({ first_name: '', last_name: '', email: '', phone: '', address: '', license_number: '', license_expiry: '', medical_card_expiry: '', license_state: 'GP', hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE', emergency_contact: '', vehicle: '' });
+                    setAddForm({ first_name: '', last_name: '', email: '', phone: '', license_number: '', license_expiry: '', license_state: 'GP', hire_date: new Date().toISOString().slice(0, 10), status: 'ACTIVE' });
                     // Refresh
                     refetch();
                   } catch (e: any) { toast.error(e?.message || 'Failed to create driver'); }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : canCreate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canCreate ? 1 : 0.5 }}
               >
                 {saving ? 'Saving…' : 'Create driver'}
               </button>
@@ -564,6 +550,8 @@ export default function Drivers() {
                 Cancel
               </button>
             </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -583,19 +571,21 @@ export default function Drivers() {
               </div>
             )}
             {[
-              { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan' },
-              { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter' },
+              { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan', required: true },
+              { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter', required: true },
               { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
               { key: 'phone', label: 'Phone', placeholder: 'e.g. 082 123 4567' },
               { key: 'address', label: 'Address', placeholder: 'e.g. 12 Main Street, Cape Town' },
-              { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001' },
-              { key: 'license_expiry', label: 'License Expiry', type: 'date' },
+              { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001', required: true },
+              { key: 'license_expiry', label: 'License Expiry', type: 'date', required: true },
               { key: 'medical_card_expiry', label: 'Medical Card Expiry', type: 'date' },
-              { key: 'hire_date', label: 'Hire Date', type: 'date' },
+              { key: 'hire_date', label: 'Hire Date', type: 'date', required: true },
               { key: 'emergency_contact', label: 'Emergency Contact', placeholder: 'e.g. Jane Doe or 082 123 4567' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                </label>
                 {f.type === 'date' ? (
                   <DatePicker
                     value={(editForm as any)[f.key] ?? ''}
@@ -613,11 +603,13 @@ export default function Drivers() {
               </div>
             ))}
             {[
-              { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'] },
+              { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'], required: true },
               { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>{f.label}</label>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                </label>
                 <Select value={(editForm as any)[f.key]} onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}>
                   <SelectTrigger>
                     <SelectValue />
@@ -643,9 +635,15 @@ export default function Drivers() {
                 </SelectContent>
               </Select>
             </div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 16 }}>
+              * Required.
+            </div>
+            {(() => {
+              const canUpdate = !!(editForm.first_name && editForm.last_name && editForm.license_number && editForm.license_expiry && editForm.license_state && editForm.hire_date);
+              return (
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
-                disabled={saving}
+                disabled={saving || !canUpdate}
                 onClick={async () => {
                   setSaving(true);
                   setError(null);
@@ -679,7 +677,7 @@ export default function Drivers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : canUpdate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canUpdate ? 1 : 0.5 }}
               >
                 {saving ? 'Saving…' : 'Update driver'}
               </button>
@@ -690,6 +688,8 @@ export default function Drivers() {
                 Cancel
               </button>
             </div>
+              );
+            })()}
           </div>
         </div>
       )}

@@ -11,16 +11,16 @@
 :root,
 [data-theme="dark"] {
   /* Base Surfaces */
-  --bg-deep: #030303;
-  --bg-surface: #0A0A0A;
-  --bg-surface-hover: #121212;
-  --bg-sidebar: rgba(10, 10, 10, 0.5);
+  --bg-deep: #060709;
+  --bg-surface: #101215;
+  --bg-surface-hover: #181B20;
+  --bg-sidebar: rgba(16, 18, 21, 0.5);
   --modal-backdrop: rgba(0, 0, 0, 0.6);
 
   /* Borders */
-  --border-subtle: #1F1F1F;
-  --border-active: #333333;
-  --border-row: #141414;
+  --border-subtle: #2A2E34;
+  --border-active: #3C424A;
+  --border-row: #1E2126;
 
   /* Accent - Blue */
   --accent-primary: #4D9EFF;
@@ -30,8 +30,8 @@
 
   /* Text */
   --text-primary: #EDEDED;
-  --text-secondary: #888888;
-  --text-tertiary: #444444;
+  --text-secondary: #9AA1A9;
+  --text-tertiary: #6E757D;
 
   /* Status Colors */
   --status-success: #4D9EFF;
@@ -41,18 +41,18 @@
   --status-danger: #FF4949;
   --status-danger-bg: rgba(255, 73, 73, 0.1);
   --status-neutral: #888888;
-  --status-neutral-bg: #141414;
+  --status-neutral-bg: #1B1E23;
 
   /* Header */
-  --header-bg: rgba(3, 3, 3, 0.8);
+  --header-bg: rgba(6, 7, 9, 0.8);
 
   /* Chart colors */
-  --chart-bar: #1A1A1A;
+  --chart-bar: #1E2126;
   --chart-bar-highlight: var(--accent-primary);
   --chart-bar-gradient: var(--accent-dim);
 
   /* Heatmap */
-  --heat-empty: #1a1a1a;
+  --heat-empty: #1E2126;
   --heat-low: #0D2A4A;
   --heat-medium: #1A4A8A;
   --heat-high: var(--accent-primary);
@@ -63,15 +63,15 @@
   --glow-transparent: rgba(5, 5, 5, 0);
 
   /* Scrollbar */
-  --scrollbar-thumb: #222;
-  --scrollbar-thumb-hover: #333;
+  --scrollbar-thumb: #2A2E34;
+  --scrollbar-thumb-hover: #3C424A;
 
   /* Shadows */
   --shadow-card: none;
   --shadow-card-hover: none;
 
   /* Input specific */
-  --input-bg: #1a1a1a;
+  --input-bg: #191C21;
   --input-bg-focus: var(--bg-surface);
 
   /* Card */

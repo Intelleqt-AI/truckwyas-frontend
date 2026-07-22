@@ -253,18 +253,20 @@ export function ProfileSettings() {
               </Select>
             </div>
           </div>
-          <div style={{ marginBottom: 20, maxWidth: 240 }}>
-            <label style={labelStyle}>Date Format</label>
-            <Select value={form.date_format} onValueChange={val => set('date_format', val)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
-                <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
-                <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
-              </SelectContent>
-            </Select>
+          <div style={{ ...gridStyle, marginBottom: 20 }}>
+            <div>
+              <label style={labelStyle}>Date Format</label>
+              <Select value={form.date_format} onValueChange={val => set('date_format', val)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+                  <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
+                  <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button

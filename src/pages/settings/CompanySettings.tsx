@@ -63,6 +63,7 @@ export function CompanySettings() {
     street: '', city: '', province: '', postal_code: '', country: 'South Africa',
     phone: '', email: '', support_email: '',
     default_quote_validity_days: '7',
+    allow_cross_border: 'yes',
   });
   const [logoUrl, setLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -90,6 +91,7 @@ export function CompanySettings() {
           support_email: d.contact?.support_email || '',
           default_quote_validity_days:
             d.default_quote_validity_days != null ? String(d.default_quote_validity_days) : '7',
+          allow_cross_border: d.allow_cross_border === false ? 'no' : 'yes',
         });
         // Only show a real uploaded logo, not the backend's default placeholder
         if (d.logo_url && !d.logo_url.endsWith('/brand/logo.svg')) setLogoUrl(d.logo_url);
@@ -139,6 +141,7 @@ export function CompanySettings() {
         address: { street: form.street, city: form.city, province: form.province, postal_code: form.postal_code, country: form.country },
         contact: { phone: form.phone, email: form.email, support_email: form.support_email },
         default_quote_validity_days: validityDays,
+        allow_cross_border: form.allow_cross_border === 'yes',
       } });
       setSaved(true);
       toast.success('Company details saved');
@@ -314,18 +317,37 @@ export function CompanySettings() {
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Quote Defaults</span></div>
         <div style={{ padding: 20 }}>
-          <div style={{ maxWidth: 320 }}>
-            <label style={labelStyle}>Default Quote Validity (Days)</label>
-            <input
-              style={inputStyle}
-              type="number"
-              min={1}
-              max={365}
-              value={form.default_quote_validity_days}
-              onChange={e => set('default_quote_validity_days', e.target.value)}
-            />
-            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
-              New quotes will default to expire this many days after creation. Can be overridden per quote.
+          <div style={grid2}>
+            <div>
+              <label style={labelStyle}>Default Quote Validity (Days)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min={1}
+                max={365}
+                value={form.default_quote_validity_days}
+                onChange={e => set('default_quote_validity_days', e.target.value)}
+              />
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                New quotes will default to expire this many days after creation. Can be overridden per quote.
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Cross-Border Routes</label>
+              <Select value={form.allow_cross_border} onValueChange={val => set('allow_cross_border', val)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                Whether your fleet is set up to run loads that cross into neighbouring
+                countries. When set to "No", any quote whose route actually crosses a
+                border is refused rather than priced.
+              </div>
             </div>
           </div>
         </div>

@@ -45,12 +45,41 @@ export default function Bookings() {
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
+  const [editingAssignment, setEditingAssignment] = useState(false);
+  const [assignDriverId, setAssignDriverId] = useState('');
+  const [assignVehicleId, setAssignVehicleId] = useState('');
+  const [assignSaving, setAssignSaving] = useState(false);
 
   const { data: load, isLoading } = useQuery({
     queryKey: ['load', id],
     queryFn: () => fetchData(`api/v1/loads/${id}/`),
     enabled: !!id,
   });
+
+  const { data: driversData } = useQuery({
+    queryKey: ['drivers-active'],
+    queryFn: () => fetchData('api/v1/drivers/?status=ACTIVE'),
+    enabled: editingAssignment,
+  });
+  const { data: vehiclesData } = useQuery({
+    queryKey: ['vehicles-available'],
+    queryFn: () => fetchData('api/v1/vehicles/?status=AVAILABLE'),
+    enabled: editingAssignment,
+  });
+  const assignableDrivers: { id: number; user_details?: { name?: string; username?: string } }[] =
+    driversData?.results || driversData || [];
+  const assignableVehicles: { id: number; make?: string; model?: string; plate?: string }[] =
+    vehiclesData?.results || vehiclesData || [];
+
+  // Every mutation below changes something the Bookings/Orders list also
+  // displays (status, driver, vehicle, invoice) — invalidate that cache too,
+  // not just this detail view, so the list doesn't sit stale until its own
+  // 30s auto-refresh happens to catch up.
+  const invalidateLoad = () => {
+    qc.invalidateQueries({ queryKey: ['load', id] });
+    qc.invalidateQueries({ queryKey: ['loads-list'] });
+    qc.invalidateQueries({ queryKey: ['loads'] });
+  };
 
   const updateStatus = async (newStatus: string) => {
     const currentStatus = load?.status;
@@ -70,7 +99,7 @@ export default function Bookings() {
         onConfirm: async () => {
           try {
             await patchData({ url: `api/v1/loads/${id}/`, data: { status: newStatus } });
-            qc.invalidateQueries({ queryKey: ['load', id] });
+            invalidateLoad();
             toast.success('Load cancelled');
           } catch (e: any) {
             toast.error(e?.message || 'Failed to update status');
@@ -82,7 +111,7 @@ export default function Bookings() {
 
     try {
       await patchData({ url: `api/v1/loads/${id}/`, data: { status: newStatus } });
-      qc.invalidateQueries({ queryKey: ['load', id] });
+      invalidateLoad();
       toast.success(`Status updated to ${newStatus.replace('_', ' ')}`);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to update status');
@@ -94,7 +123,7 @@ export default function Bookings() {
     try {
       const result = await postData({ url: `api/v1/loads/${id}/convert_to_invoice/`, data: {} });
       setCreatedInvoiceId(result.invoice_id);
-      qc.invalidateQueries({ queryKey: ['load', id] });
+      invalidateLoad();
       toast.success(`Invoice ${result.invoice_number} created`);
     } catch (e: any) {
       const existingId = (e as any)?.data?.invoice_id;
@@ -115,10 +144,33 @@ export default function Bookings() {
     formData.append('pod_document', file);
     try {
       const data = await postData({ url: `api/v1/loads/${id}/upload_pod/`, data: formData });
-      qc.invalidateQueries({ queryKey: ['load', id] });
+      invalidateLoad();
       toast.success(`POD uploaded: ${data.filename}`);
     } catch (e: any) {
       toast.error(e?.message || 'Upload failed');
+    }
+  };
+
+  const startEditAssignment = () => {
+    setAssignDriverId(load?.driver ? String(load.driver) : '');
+    setAssignVehicleId(load?.vehicle ? String(load.vehicle) : '');
+    setEditingAssignment(true);
+  };
+
+  const saveAssignment = async () => {
+    setAssignSaving(true);
+    try {
+      await postData({ url: `api/v1/loads/${id}/assign_driver/`, data: {
+        driver_id: assignDriverId || null,
+        vehicle_id: assignVehicleId || null,
+      }});
+      invalidateLoad();
+      setEditingAssignment(false);
+      toast.success('Assignment updated');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update assignment');
+    } finally {
+      setAssignSaving(false);
     }
   };
 
@@ -311,16 +363,79 @@ export default function Bookings() {
 
           {/* Assignment */}
           <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 12 }}>Assignment</div>
-            {[
-              { label: 'Driver', value: load.driver_name || '—' },
-              { label: 'Vehicle', value: load.vehicle_info || '—' },
-            ].map(r => (
-              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.label}</span>
-                <span style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
-              </div>
-            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div className="card-title">Assignment</div>
+              {!editingAssignment && (
+                <button
+                  onClick={startEditAssignment}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', cursor: 'pointer', padding: 0 }}
+                >
+                  EDIT
+                </button>
+              )}
+            </div>
+
+            {!editingAssignment ? (
+              [
+                { label: 'Driver', value: load.driver_name || '—' },
+                { label: 'Vehicle', value: load.vehicle_info || '—' },
+              ].map(r => (
+                <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.label}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
+                </div>
+              ))
+            ) : (
+              <>
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Driver</div>
+                  <Select value={assignDriverId} onValueChange={setAssignDriverId}>
+                    <SelectTrigger><SelectValue placeholder="— No driver —" /></SelectTrigger>
+                    <SelectContent>
+                      {assignableDrivers.map(d => (
+                        <SelectItem key={d.id} value={String(d.id)}>
+                          {d.user_details?.name || d.user_details?.username || `Driver #${d.id}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Vehicle</div>
+                  <Select value={assignVehicleId} onValueChange={setAssignVehicleId}>
+                    <SelectTrigger><SelectValue placeholder="— No vehicle —" /></SelectTrigger>
+                    <SelectContent>
+                      {assignableVehicles.map(v => (
+                        <SelectItem key={v.id} value={String(v.id)}>
+                          {[v.make, v.model].filter(Boolean).join(' ')}{v.plate ? ` · ${v.plate}` : ` #${v.id}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {(!!assignDriverId !== !!assignVehicleId) && (
+                  <div style={{ fontSize: 11, color: 'var(--status-warning)', marginBottom: 8 }}>
+                    Select both, or clear both to unassign.
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button
+                    className="btn-action"
+                    style={{ flex: 1, opacity: assignSaving || (!!assignDriverId !== !!assignVehicleId) ? 0.6 : 1 }}
+                    disabled={assignSaving || (!!assignDriverId !== !!assignVehicleId)}
+                    onClick={saveAssignment}
+                  >
+                    {assignSaving ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => setEditingAssignment(false)}
+                    style={{ padding: '10px 16px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

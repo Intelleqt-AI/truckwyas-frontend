@@ -175,6 +175,7 @@ export default function Capital() {
           marginBottom: 24,
           borderLeft: "3px solid var(--accent-primary)",
           display: "flex",
+          flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 16,
@@ -194,23 +195,6 @@ export default function Capital() {
             lending partner — approval in minutes.
           </div>
         </div>
-        <a
-          href={MC_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-action"
-          style={{
-            whiteSpace: "nowrap",
-            textDecoration: "none",
-            padding: "10px 20px",
-            fontSize: 11,
-            fontFamily: "var(--font-mono)",
-            fontWeight: 600,
-            letterSpacing: "0.06em",
-            display: "inline-block",
-          }}>
-          Apply for capital →
-        </a>
       </div>
 
       {/* Facility overview */}

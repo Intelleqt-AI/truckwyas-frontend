@@ -33,6 +33,9 @@ const extractCode = (s: string) => {
   for (const key in m) if (k.includes(key)) return m[key];
   return (s || "").slice(0, 3).toUpperCase();
 };
+// Mirrors the backend's country detection (core/services/cross_border.py):
+// anything that isn't South Africa itself counts as a foreign location.
+const isForeignCountry = (code?: string) => !!code && !["ZA", "ZAF"].includes(code.toUpperCase());
 
 interface TollBreakdownItem { plaza: string; route: string; location_km: number; tariff: number; }
 interface RouteOption {
@@ -74,8 +77,7 @@ export default function QuoteBuilder() {
   const [cargo, setCargo] = useState("");
   const [pickupDate, setPickupDate] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
-  const [tripType, setTripType] = useState<"ONE_WAY" | "ROUND_TRIP">("ROUND_TRIP");
-  const [crossBorder, setCrossBorder] = useState(true);
+  const [tripType, setTripType] = useState<"ONE_WAY" | "ROUND_TRIP">("ONE_WAY");
   const [notes, setNotes] = useState("");
   const [validUntil, setValidUntil] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10);
@@ -105,6 +107,9 @@ export default function QuoteBuilder() {
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
   const [calculatingRoute, setCalculatingRoute] = useState(false);
+  // Set when the backend's cross-border company-policy gate refuses this
+  // route (RouteCalculatorView) — shown in place of the cost breakdown.
+  const [routeBlockedMessage, setRouteBlockedMessage] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<any>(null);
   const [optimizing, setOptimizing] = useState(false);
   const [guard, setGuard] = useState<any>(null);
@@ -154,7 +159,6 @@ export default function QuoteBuilder() {
   useEffect(() => {
     if (companyProfile) {
       if (companyProfile.default_base_rate_per_km) setBaseRatePerKm(String(companyProfile.default_base_rate_per_km));
-      if (companyProfile.allow_cross_border === false) setCrossBorder(false);
     }
   }, [companyProfile]);
 
@@ -196,18 +200,32 @@ export default function QuoteBuilder() {
   const calculateRoute = async () => {
     if (!pickupCoords || !deliveryCoords) return;
     setCalculatingRoute(true);
+    setRouteBlockedMessage(null);
     try {
       const data = await postData({ url: "/api/v1/route/calculate/", data: {
         origin: pickup, destination: delivery,
         origin_lat: pickupCoords.lat, origin_lon: pickupCoords.lon, origin_country: pickupCoords.country_code,
         dest_lat: deliveryCoords.lat, dest_lon: deliveryCoords.lon, dest_country: deliveryCoords.country_code,
-        vehicle_type: vehicleType || "Flatbed", cross_border_enabled: crossBorder, weight_kg: weightKg || 20000,
+        vehicle_type: vehicleType || "Flatbed", weight_kg: weightKg || 20000,
       }});
       if (data?.success !== false) {
         setRouteData(data);
         setSelectedRouteIndex(data.best_index ?? 0);
       }
-    } catch { toast.error("Couldn't calculate the route"); }
+    } catch (e: any) {
+      // Company policy gate (see RouteCalculatorView): this route genuinely
+      // crosses a border but the company isn't set up for cross-border work.
+      // Surface the real reason instead of a generic failure toast. Api.ts's
+      // response interceptor reshapes axios errors into a plain Error with
+      // .data/.status (not .response.data) — read from there, not .response.
+      const body = e?.data;
+      if (body?.error === "cross_border_not_allowed") {
+        setRouteBlockedMessage(body.message || "This route isn't allowed for your company.");
+        setRouteData(null);
+      } else {
+        toast.error("Couldn't calculate the route");
+      }
+    }
     finally { setCalculatingRoute(false); }
   };
 
@@ -217,7 +235,7 @@ export default function QuoteBuilder() {
     calcRef.current = setTimeout(() => { calculateRoute(); }, 500);
     return () => { if (calcRef.current) clearTimeout(calcRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, pickupCoords, deliveryCoords, vehicleType, crossBorder]);
+  }, [ready, pickupCoords, deliveryCoords, vehicleType]);
 
   // ---- AI analyze + guard + benchmark once cost is ready ----
   const analyzeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -375,34 +393,55 @@ export default function QuoteBuilder() {
     setSavedQuoteId(null); setLastSavedAt(null); setResumable(null);
     setCustomerId(""); setVehicleType(""); setPickup(""); setDelivery("");
     setPickupCoords(null); setDeliveryCoords(null);
-    setWeight(""); setCargo(""); setNotes(""); setTripType("ROUND_TRIP");
+    setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
     setPickupDate(""); setDeliveryDate(""); setShowDetails(false); setNlText("");
     setEditableTollCost(null); setTollManuallyEdited(false); setDriverAllowanceInput("0"); setServiceCharge(0);
-    setRouteData(null); setSelectedRouteIndex(0);
+    setRouteData(null); setSelectedRouteIndex(0); setRouteBlockedMessage(null);
     setAnalysis(null); setGuard(null); setBenchmark(null);
+    { const d = new Date(); d.setDate(d.getDate() + 7); setValidUntil(d.toISOString().slice(0, 10)); }
     if (isEditing) navigate("/bookings/quotes/new", { replace: true });
     toast.success("Started a new quote");
   };
 
   const draftRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Holds a closure over "what would be saved right now" — read by the
+  // unmount-flush effect below so navigating away mid-debounce still writes
+  // the latest edits instead of the pending save just getting cancelled.
+  const draftFlushRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (isEditing) return;
     // Don't persist an empty form — otherwise a blank "New quote" mount would
     // overwrite (and destroy) the unsaved draft the Resume banner is offering.
     if (!(customerId || pickup || delivery)) return;
     if (draftRef.current) clearTimeout(draftRef.current);
-    draftRef.current = setTimeout(() => {
+    const doSave = () => {
       try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType })); } catch { /* ignore */ }
-    }, 800);
+    };
+    draftFlushRef.current = doSave;
+    draftRef.current = setTimeout(() => { draftFlushRef.current = null; doSave(); }, 800);
     return () => { if (draftRef.current) clearTimeout(draftRef.current); };
   }, [isEditing, customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType]);
+
+  // Runs its cleanup ONLY on true unmount (empty deps) — unlike the effect
+  // above, whose cleanup also fires on every keystroke as it re-debounces.
+  // This is what actually flushes a still-pending save when the user leaves
+  // the page before the debounce timer would have fired on its own.
+  useEffect(() => {
+    return () => { draftFlushRef.current?.(); };
+  }, []);
+
+  // Backend stores coords as DecimalField(max_digits=12, decimal_places=7) —
+  // a raw JS float (map click, some geocoders) can carry 15+ significant
+  // digits and gets rejected outright ("no more than 12 digits in total").
+  // 6dp (~11cm precision) is far more than a freight quote needs.
+  const round6 = (n?: number) => (n == null ? n : Math.round(n * 1e6) / 1e6);
 
   // ---- build the save payload (matches production) ----
   const buildPayload = (status: "DRAFT" | "SENT") => ({
     customer: parseInt(customerId), pickup_location: pickup, delivery_location: delivery,
     pickup_date: pickupDate || null, delivery_date: deliveryDate || null,
     origin: extractCode(pickup), destination: extractCode(delivery),
-    pickup_lat: pickupCoords?.lat, pickup_lng: pickupCoords?.lon, delivery_lat: deliveryCoords?.lat, delivery_lng: deliveryCoords?.lon,
+    pickup_lat: round6(pickupCoords?.lat), pickup_lng: round6(pickupCoords?.lon), delivery_lat: round6(deliveryCoords?.lat), delivery_lng: round6(deliveryCoords?.lon),
     cargo_description: cargo || `${weight || 0}t ${vehicleType}`.trim(), weight: weightKg, distance,
     estimated_duration_minutes: route?.duration_min ? Math.round(route.duration_min) : (routeData?.duration_minutes || null),
     vehicle_type: vehicleType, base_rate: baseCost, fuel_surcharge: fuelCost, toll_charges: tollCost,
@@ -414,6 +453,11 @@ export default function QuoteBuilder() {
 
   // ---- auto-save DB draft once substantive (debounced) ----
   const dbRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Same "flush on real unmount" pattern as the localStorage draft above —
+  // without it, filling in the form and immediately navigating away (within
+  // the 1.5s debounce window) cancelled the pending save instead of firing
+  // it, so the quote was never actually written to the database at all.
+  const dbFlushRef = useRef<((isFlush: boolean) => void) | null>(null);
   const substantive = ready && total > 0;
   useEffect(() => {
     // Autosave a brand-new quote, or one we created this session (createdRef).
@@ -421,7 +465,7 @@ export default function QuoteBuilder() {
     if (isEditing && !createdRef.current) return;
     if (!substantive) return;
     if (dbRef.current) clearTimeout(dbRef.current);
-    dbRef.current = setTimeout(async () => {
+    const doSave = async (isFlush: boolean) => {
       const existingId = savedIdRef.current ?? savedQuoteId;
       try {
         if (existingId) {
@@ -439,21 +483,33 @@ export default function QuoteBuilder() {
             localStorage.removeItem(DRAFT_KEY);
             setResumable(null);
             queryClient.invalidateQueries({ queryKey: ["quotes"] });
-            navigate(`/bookings/quotes/${res.id}/edit`, { replace: true });
+            // A flush-on-unmount save means the user is already navigating
+            // somewhere else on their own — redirecting them back to this
+            // quote's edit URL would fight that. Still save, just don't redirect.
+            if (!isFlush) navigate(`/bookings/quotes/${res.id}/edit`, { replace: true });
           }
           creatingRef.current = false;
         }
         setLastSavedAt(new Date());
       } catch { creatingRef.current = false; /* silent — localStorage still holds it */ }
-    }, 1500);
+    };
+    dbFlushRef.current = doSave;
+    dbRef.current = setTimeout(() => { dbFlushRef.current = null; doSave(false); }, 1500);
     return () => { if (dbRef.current) clearTimeout(dbRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [substantive, total, customerId, vehicleType, pickup, delivery, tollCost, driverAllowance, serviceCharge]);
+
+  // True unmount only (empty deps) — flushes whatever save is still pending
+  // the instant the user actually leaves the page.
+  useEffect(() => {
+    return () => { dbFlushRef.current?.(true); };
+  }, []);
 
   // ---- explicit save / send ----
   const save = async (send: boolean) => {
     if (!customerId) { toast.error("Pick a client first"); return; }
     if (!ready) { toast.error("Add vehicle type, collection and delivery"); return; }
+    if (routeBlockedMessage) { toast.error(routeBlockedMessage); return; }
     setSaving(true);
     try {
       let quoteId = savedQuoteId || (isEditing ? Number(editId) : null);
@@ -579,9 +635,9 @@ export default function QuoteBuilder() {
             {saving ? "Saving…" : lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Auto-saves as you work"}
             <span style={dot(saving ? "var(--status-warning)" : lastSavedAt ? "var(--status-success)" : "var(--text-tertiary)")} />
           </div>
-          <button onClick={startNew} title="Start a fresh quote (this one stays saved)"
+          <button onClick={startNew} title="Clear every field and start a fresh quote (this one stays saved)"
             style={{ fontSize: 13, fontWeight: 500, background: "transparent", color: "var(--accent-primary)", border: "1px solid var(--accent-primary)", borderRadius: 4, padding: "6px 12px", cursor: "pointer" }}>
-            + New quote
+            Clear &amp; New Quote
           </button>
         </div>
       </div>
@@ -660,6 +716,20 @@ export default function QuoteBuilder() {
         </div>
       </div>
 
+      {/* Early heads-up the moment a picked location is outside SA, before the
+          rest of the form is even filled in — the real enforcement (blocking
+          the actual quote) only happens once /route/calculate runs, see
+          routeBlockedMessage below. This just avoids the user filling out the
+          whole form before finding out. */}
+      {companyProfile?.allow_cross_border === false && (isForeignCountry(pickupCoords?.country_code) || isForeignCountry(deliveryCoords?.country_code)) && (
+        <div style={{ ...cardS, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", marginBottom: 12, borderColor: "var(--status-warning)", background: "var(--status-warning-bg)" }}>
+          <Info size={14} color="var(--status-warning)" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+            This location is outside South Africa, but your company isn't set up for cross-border routes (Settings → Company Details). This quote will be refused once calculated — pick a domestic location or ask an admin to enable cross-border routes.
+          </span>
+        </div>
+      )}
+
       {/* details (collapsible) */}
       <div style={{ marginBottom: 18 }}>
         <button onClick={() => setShowDetails(s => !s)} style={{ ...labelS, background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}>{showDetails ? "▾" : "▸"} Details · weight, dates, trip type</button>
@@ -670,12 +740,11 @@ export default function QuoteBuilder() {
             <div><div style={{ ...labelS, marginBottom: 5 }}>Delivery date</div><input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} style={inputS} /></div>
             <div><div style={{ ...labelS, marginBottom: 5 }}>Valid until</div><input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputS} /></div>
             <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Cargo</div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} /></div>
-            <div><div style={{ ...labelS, marginBottom: 5 }}>Trip</div>
+            <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Trip</div>
               <div style={{ display: "flex", gap: 6 }}>
                 {(["ONE_WAY", "ROUND_TRIP"] as const).map(t => <button key={t} onClick={() => setTripType(t)} style={{ ...inputS, width: "auto", flex: 1, cursor: "pointer", background: tripType === t ? "var(--accent-primary)" : "var(--input-bg)", color: tripType === t ? "var(--btn-action-color)" : "var(--text-secondary)", fontSize: 12 }}>{t === "ONE_WAY" ? "One way" : "Round"}</button>)}
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "flex-end" }}><label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-secondary)", cursor: "pointer" }}><input type="checkbox" checked={crossBorder} onChange={e => setCrossBorder(e.target.checked)} disabled={companyProfile?.allow_cross_border === false} /> Cross-border routes</label></div>
           </div>
         )}
       </div>
@@ -706,8 +775,14 @@ export default function QuoteBuilder() {
                 <div style={{ fontSize: 12, marginTop: 6 }}>Costs and the AI quote appear here automatically.</div>
               </div>
             )}
-            {ready && calculatingRoute && <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Calculating route…</div>}
-            {ready && !calculatingRoute && (<>
+            {ready && routeBlockedMessage && (
+              <div style={{ padding: "20px 4px" }}>
+                <div style={{ fontSize: 13, color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Route not allowed</div>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{routeBlockedMessage}</div>
+              </div>
+            )}
+            {ready && !routeBlockedMessage && calculatingRoute && <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Calculating route…</div>}
+            {ready && !routeBlockedMessage && !calculatingRoute && (<>
               {[
                 { key: "fuel", l: `Fuel — ${fuelConsumption} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
@@ -746,6 +821,46 @@ export default function QuoteBuilder() {
                         </PopoverContent>
                       </Popover>
                     )}
+                    {r.key === "cb" && (() => {
+                      const border = routeData?.additional_costs?.border_fees || 0;
+                      const weighbridge = routeData?.additional_costs?.weighbridge_fees || 0;
+                      const nonSaTolls = routeData?.additional_costs?.non_sa_tolls || 0;
+                      const cbRows = [
+                        { label: "Border fees", v: border },
+                        { label: "Weighbridge fees", v: weighbridge },
+                        { label: "Non-SA tolls", v: nonSaTolls },
+                      ].filter(row => row.v > 0);
+                      const cbOneWayTotal = border + weighbridge + nonSaTolls;
+                      return (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button type="button" title="Cross-border breakdown"
+                              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1 }}>
+                              <Info size={11} />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                            <div style={{ ...labelS, marginBottom: 8 }}>
+                              Cross-border charges{routeData?.countries?.length ? ` · crosses ${routeData.countries.join("→")}` : ""}
+                            </div>
+                            {cbRows.length === 0 ? (
+                              <div style={{ color: "var(--text-tertiary)" }}>No itemised breakdown available for this route.</div>
+                            ) : (<>
+                              {cbRows.map((row, ri) => (
+                                <div key={ri} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "4px 0", borderBottom: "1px solid var(--border-row)" }}>
+                                  <span>{row.label}</span>
+                                  <span style={{ fontFamily: "var(--font-mono)", flexShrink: 0 }}>{formatCurrency(row.v)}</span>
+                                </div>
+                              ))}
+                              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border-subtle)", fontWeight: 600 }}>
+                                <span>One way total</span><span style={{ fontFamily: "var(--font-mono)" }}>{formatCurrency(cbOneWayTotal)}</span>
+                              </div>
+                              {legs === 2 && <div style={{ color: "var(--text-tertiary)", marginTop: 4 }}>× 2 for round trip = {formatCurrency(cbOneWayTotal * 2)}</div>}
+                            </>)}
+                          </PopoverContent>
+                        </Popover>
+                      );
+                    })()}
                   </span>
                   <span style={{ fontFamily: "var(--font-mono)" }}>{formatCurrency(r.v)}</span>
                 </div>
@@ -765,7 +880,7 @@ export default function QuoteBuilder() {
       </div>
 
       {/* 3 — AI quote */}
-      {ready && total > 0 && (
+      {ready && !routeBlockedMessage && total > 0 && (
         <div style={{ ...cardS, border: "1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-subtle))", marginBottom: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.4fr" }}>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>

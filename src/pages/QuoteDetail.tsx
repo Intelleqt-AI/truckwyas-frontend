@@ -5,6 +5,7 @@ import { fetchData, patchData, deleteData, postData, downloadBlob } from '@/lib/
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { ConvertToBookingModal } from '@/components/ConvertToBookingModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -43,6 +44,7 @@ export default function QuoteDetail() {
   const [finalPrice, setFinalPrice] = useState('');
   const [fuelAlert, setFuelAlert] = useState<any>(null);
   const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void; danger?: boolean } | null>(null);
+  const [showConvertModal, setShowConvertModal] = useState(false);
 
   const { data: quote, isLoading, error } = useQuery({
     queryKey: ['quote', id],
@@ -129,13 +131,14 @@ export default function QuoteDetail() {
   });
 
   const convertToLoadMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: ({ driverId, vehicleId }: { driverId: string; vehicleId: string }) =>
       postData({
         url: `api/v1/quotes/${id}/convert_to_load/`,
-        data: {},
+        data: { driver_id: driverId, vehicle_id: vehicleId },
       }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['loads'] });
+      setShowConvertModal(false);
       toast.success('Quote converted to booking');
       if (data?.id) {
         navigate(`/bookings/${data.id}`);
@@ -174,12 +177,7 @@ export default function QuoteDetail() {
   };
 
   const handleConvertToLoad = () => {
-    setConfirmOpts({
-      title: 'Convert to Booking',
-      message: `Convert ${quote?.quote_number} to an active booking/load?`,
-      confirmLabel: 'Convert',
-      onConfirm: () => convertToLoadMutation.mutate(),
-    });
+    setShowConvertModal(true);
   };
 
   if (isLoading) {
@@ -438,19 +436,24 @@ export default function QuoteDetail() {
             <div className="card-title" style={{ marginBottom: 16 }}>Cost Breakdown</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {(() => {
-                const total = parseFloat(quote.total_amount || '0');
                 const fuel = parseFloat(quote.fuel_surcharge || '0');
                 const toll = parseFloat(quote.toll_charges || '0');
                 const driver = parseFloat(quote.driver_allowance || '0');
                 const additional = parseFloat(quote.additional_charges || '0');
-                const serviceCharge = Math.round((total - fuel - toll - driver - additional) * 100) / 100;
+                const baseRate = parseFloat(quote.base_rate || '0');
 
+                // Mirrors the quote builder's own breakdown exactly — base_rate,
+                // fuel_surcharge, toll_charges, driver_allowance and
+                // additional_charges are the only cost fields the backend
+                // actually stores (they sum to total_amount). This used to
+                // derive a "Service Charge" as total minus the other four,
+                // which is mathematically just base_rate under a wrong label.
                 const rows = [
                   { label: 'Fuel Surcharge', value: fuel },
                   { label: 'Toll Charges', value: toll },
                   { label: 'Driver Allowance', value: driver },
                   ...(additional > 0 ? [{ label: 'Additional Charges', value: additional }] : []),
-                  ...(serviceCharge > 0 ? [{ label: 'Service Charge', value: serviceCharge }] : []),
+                  { label: 'Base Rate', value: baseRate },
                 ];
 
                 return rows.map((item) => (
@@ -854,6 +857,15 @@ export default function QuoteDetail() {
           danger={confirmOpts.danger}
           onConfirm={confirmOpts.onConfirm}
           onCancel={() => setConfirmOpts(null)}
+        />
+      )}
+
+      {showConvertModal && (
+        <ConvertToBookingModal
+          quoteNumber={quote?.quote_number}
+          busy={convertToLoadMutation.isPending}
+          onConfirm={(driverId, vehicleId) => convertToLoadMutation.mutate({ driverId, vehicleId })}
+          onCancel={() => setShowConvertModal(false)}
         />
       )}
     </div>

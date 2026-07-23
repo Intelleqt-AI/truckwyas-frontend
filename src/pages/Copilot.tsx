@@ -305,15 +305,27 @@ export default function Copilot() {
     refreshConversations();
   };
 
-  const avatar = (role: 'user' | 'assistant') => (
-    <div style={{
-      flexShrink: 0, width: 26, height: 26, borderRadius: 2, display: 'grid', placeItems: 'center',
-      background: role === 'user' ? 'var(--bg-surface)' : 'var(--accent-primary)',
-      border: role === 'user' ? '1px solid var(--border-subtle)' : 'none',
-      color: role === 'user' ? 'var(--text-secondary)' : 'var(--bg-deep)',
-      fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '0.05em',
-    }}>{role === 'user' ? 'YOU' : 'AI'}</div>
-  );
+  const avatar = (role: 'user' | 'assistant') => {
+    const userAvatar = (user?.avatar as string) || undefined;
+    if (role === 'user' && userAvatar) {
+      return (
+        <img
+          src={userAvatar}
+          alt="You"
+          style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 2, objectFit: 'cover' }}
+        />
+      );
+    }
+    return (
+      <div style={{
+        flexShrink: 0, width: 26, height: 26, borderRadius: 2, display: 'grid', placeItems: 'center',
+        background: role === 'user' ? 'var(--bg-surface)' : 'var(--accent-primary)',
+        border: role === 'user' ? '1px solid var(--border-subtle)' : 'none',
+        color: role === 'user' ? 'var(--text-secondary)' : 'var(--bg-deep)',
+        fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700, letterSpacing: '0.05em',
+      }}>{role === 'user' ? 'YOU' : 'AI'}</div>
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>

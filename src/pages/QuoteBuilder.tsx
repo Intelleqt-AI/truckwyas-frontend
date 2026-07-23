@@ -159,15 +159,34 @@ export default function QuoteBuilder() {
   const fuelPricePerL = Number(fuelPrice?.diesel_inland) || Number(companyProfile?.fuel_price_per_litre) || 21.7;
   const fuelConsumption = Number(selectedVT?.fuel_consumption_l_per_100km) || FUEL_FALLBACK[vehicleType] || 32;
 
-  // Apply company defaults once loaded. The per-km rate is the company default
-  // (VehicleType.base_rate is a flat/min figure, not a per-km rate).
+  // Fallback only, for before any vehicle type is picked — once one is
+  // selected, applyVehicleType() below takes over and uses that type's own
+  // rate instead (Settings > Vehicle Types labels this field "R/km", so it's
+  // the more specific, more correct source once it's available).
   useEffect(() => {
-    if (companyProfile) {
+    if (companyProfile && !vehicleType) {
       if (companyProfile.default_base_rate_per_km) setBaseRatePerKm(String(companyProfile.default_base_rate_per_km));
     }
-  }, [companyProfile]);
+  }, [companyProfile, vehicleType]);
 
-  const ready = !!(customerId && vehicleType && pickup && delivery && pickupCoords && deliveryCoords);
+  // Selecting a vehicle type prefills the per-km rate from that type's own
+  // configured rate, falling back to the company default if it has none set.
+  // This only runs on an actual selection (called from the dropdown's
+  // onChange, AI/voice extraction, and resuming a draft) — never from a
+  // passive effect keyed on the selected type, which would incorrectly
+  // re-fire and clobber the saved rate whenever an existing quote is loaded
+  // for editing (its own saved base_rate/distance is restored separately).
+  const applyVehicleType = (name: string) => {
+    setVehicleType(name);
+    const vt = vehicleTypes.find((v: any) => v.name === name);
+    if (vt?.base_rate) {
+      setBaseRatePerKm(String(vt.base_rate));
+    } else if (companyProfile?.default_base_rate_per_km) {
+      setBaseRatePerKm(String(companyProfile.default_base_rate_per_km));
+    }
+  };
+
+  const ready = !!(customerId && vehicleType && pickup && delivery && pickupCoords && deliveryCoords && Number(weight) > 0);
 
   // ---- derived costs ----
   const route = routeData?.routes?.[selectedRouteIndex] || null;
@@ -328,7 +347,7 @@ export default function QuoteBuilder() {
       if (f.delivery_location) { setDelivery(f.delivery_location); const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(f.delivery_location)}`).catch(() => null); const s = g?.results?.[0] || g?.[0]; if (s) setDeliveryCoords({ lat: s.lat, lon: s.lon }); }
       if (f.cargo_description) setCargo(f.cargo_description);
       if (f.weight) setWeight(String((f.weight / 1000) || ""));
-      if (f.vehicle_type) setVehicleType(f.vehicle_type);
+      if (f.vehicle_type) applyVehicleType(f.vehicle_type);
       if (f.customer_id) setCustomerId(String(f.customer_id));
       if (f.pickup_date) setPickupDate(f.pickup_date);
       if (f.delivery_date) setDeliveryDate(f.delivery_date);
@@ -395,7 +414,7 @@ export default function QuoteBuilder() {
 
   const applyResumable = () => {
     const d = resumable; if (!d) return;
-    setCustomerId(d.customerId || ""); setVehicleType(d.vehicleType || "");
+    setCustomerId(d.customerId || ""); if (d.vehicleType) applyVehicleType(d.vehicleType);
     setPickup(d.pickup || ""); setDelivery(d.delivery || "");
     setPickupCoords(d.pickupCoords || null); setDeliveryCoords(d.deliveryCoords || null);
     setWeight(d.weight || ""); setCargo(d.cargo || ""); setNotes(d.notes || "");
@@ -537,7 +556,7 @@ export default function QuoteBuilder() {
   // ---- explicit save / send ----
   const save = async (send: boolean) => {
     if (!customerId) { toast.error("Pick a client first"); return; }
-    if (!ready) { toast.error("Add vehicle type, collection and delivery"); return; }
+    if (!ready) { toast.error("Add vehicle type, collection, delivery and weight"); return; }
     if (routeBlockedMessage) { toast.error(routeBlockedMessage); return; }
     setSaving(true);
     try {
@@ -633,6 +652,8 @@ export default function QuoteBuilder() {
   // ---- styles ----
   const cardS: React.CSSProperties = { background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, boxShadow: "var(--shadow-card)" };
   const labelS: React.CSSProperties = { fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.04em", textTransform: "uppercase" };
+  // Marks a field required for the cost calculation to run (see `ready`).
+  const Req = () => <span style={{ display: "inline-block", width: 4, height: 4, borderRadius: "50%", background: "var(--status-danger)", marginLeft: 5, verticalAlign: "middle" }} />;
   const inputS: React.CSSProperties = { background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: "9px 11px", color: "var(--text-primary)", fontSize: 14, width: "100%", outline: "none" };
   const dot = (c: string): React.CSSProperties => ({ width: 7, height: 7, borderRadius: 2, background: c, flexShrink: 0 });
 
@@ -722,25 +743,25 @@ export default function QuoteBuilder() {
       {/* 1 — inputs */}
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
         <div>
-          <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Client</span><span onClick={() => navigate("/customers")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span></div>
+          <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Client<Req /></span><span onClick={() => navigate("/customers")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span></div>
           <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={inputS}>
             <option value="">Select client…</option>
             {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
         <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Vehicle type</div>
-          <select value={vehicleType} onChange={e => setVehicleType(e.target.value)} style={inputS}>
+          <div style={{ ...labelS, marginBottom: 5 }}>Vehicle type<Req /></div>
+          <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS}>
             <option value="">Select…</option>
             {vehicleTypes.map((v: any) => <option key={v.id || v.name} value={v.name}>{v.name}</option>)}
           </select>
         </div>
         <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Collection</div>
+          <div style={{ ...labelS, marginBottom: 5 }}>Collection<Req /></div>
           <LocationInput value={pickup} onChange={(v, c) => { setPickup(v); setPickupCoords(c || null); }} placeholder="City / address" style={inputS} />
         </div>
         <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Delivery</div>
+          <div style={{ ...labelS, marginBottom: 5 }}>Delivery<Req /></div>
           <LocationInput value={delivery} onChange={(v, c) => { setDelivery(v); setDeliveryCoords(c || null); }} placeholder="City / address" style={inputS} />
         </div>
       </div>
@@ -764,7 +785,7 @@ export default function QuoteBuilder() {
         <button onClick={() => setShowDetails(s => !s)} style={{ ...labelS, background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}>{showDetails ? "▾" : "▸"} Details · weight, dates, trip type</button>
         {showDetails && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: 10 }}>
-            <div><div style={{ ...labelS, marginBottom: 5 }}>Weight (t)</div><input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} /></div>
+            <div><div style={{ ...labelS, marginBottom: 5 }}>Weight (t)<Req /></div><input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} /></div>
             <div><div style={{ ...labelS, marginBottom: 5 }}>Pickup date</div><input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} style={inputS} /></div>
             <div><div style={{ ...labelS, marginBottom: 5 }}>Delivery date</div><input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} style={inputS} /></div>
             <div><div style={{ ...labelS, marginBottom: 5 }}>Valid until</div><input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputS} /></div>
@@ -800,7 +821,7 @@ export default function QuoteBuilder() {
             <div style={{ ...labelS, marginBottom: 8 }}>Cost breakdown · {vehicleType || "—"}</div>
             {!ready && (
               <div style={{ padding: "30px 4px", textAlign: "center", color: "var(--text-tertiary)" }}>
-                <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Add a client, vehicle type, collection and delivery</div>
+                <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Add a client, vehicle type, collection, delivery and weight</div>
                 <div style={{ fontSize: 12, marginTop: 6 }}>Costs and the AI quote appear here automatically.</div>
               </div>
             )}

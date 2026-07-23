@@ -64,6 +64,8 @@ export function CompanySettings() {
     phone: '', email: '', support_email: '',
     default_quote_validity_days: '7',
     allow_cross_border: 'yes',
+    weight_surcharge_threshold_kg: '5000',
+    weight_surcharge_pct: '15',
   });
   const [logoUrl, setLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -92,6 +94,10 @@ export function CompanySettings() {
           default_quote_validity_days:
             d.default_quote_validity_days != null ? String(d.default_quote_validity_days) : '7',
           allow_cross_border: d.allow_cross_border === false ? 'no' : 'yes',
+          weight_surcharge_threshold_kg:
+            d.weight_surcharge_threshold_kg != null ? String(d.weight_surcharge_threshold_kg) : '5000',
+          weight_surcharge_pct:
+            d.weight_surcharge_pct != null ? String(d.weight_surcharge_pct) : '15',
         });
         // Only show a real uploaded logo, not the backend's default placeholder
         if (d.logo_url && !d.logo_url.endsWith('/brand/logo.svg')) setLogoUrl(d.logo_url);
@@ -129,6 +135,16 @@ export function CompanySettings() {
       toast.error('Default quote validity must be between 1 and 365 days');
       return;
     }
+    const surchargeThreshold = parseFloat(form.weight_surcharge_threshold_kg);
+    if (isNaN(surchargeThreshold) || surchargeThreshold < 0) {
+      toast.error('Weight surcharge threshold must be 0 or more');
+      return;
+    }
+    const surchargePct = parseFloat(form.weight_surcharge_pct);
+    if (isNaN(surchargePct) || surchargePct < 0 || surchargePct > 100) {
+      toast.error('Weight surcharge % must be between 0 and 100');
+      return;
+    }
     setSaving(true);
     try {
       await patchData({ url: '/api/v1/company/profile/', data: {
@@ -142,6 +158,8 @@ export function CompanySettings() {
         contact: { phone: form.phone, email: form.email, support_email: form.support_email },
         default_quote_validity_days: validityDays,
         allow_cross_border: form.allow_cross_border === 'yes',
+        weight_surcharge_threshold_kg: surchargeThreshold,
+        weight_surcharge_pct: surchargePct,
       } });
       setSaved(true);
       toast.success('Company details saved');
@@ -347,6 +365,37 @@ export function CompanySettings() {
                 Whether your fleet is set up to run loads that cross into neighbouring
                 countries. When set to "No", any quote whose route actually crosses a
                 border is refused rather than priced.
+              </div>
+            </div>
+          </div>
+          <div style={{ ...grid2, marginTop: 16 }}>
+            <div>
+              <label style={labelStyle}>Weight Surcharge Threshold (kg)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min={0}
+                step={100}
+                value={form.weight_surcharge_threshold_kg}
+                onChange={e => set('weight_surcharge_threshold_kg', e.target.value)}
+              />
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                Cargo above this weight gets the surcharge below added to the quote.
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Weight Surcharge (%)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={form.weight_surcharge_pct}
+                onChange={e => set('weight_surcharge_pct', e.target.value)}
+              />
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                Added on top of the base rate (distance × rate/km), not on the cargo weight itself.
               </div>
             </div>
           </div>

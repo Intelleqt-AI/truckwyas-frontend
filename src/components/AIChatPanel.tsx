@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { MessageCircle, X, Mic, Square, Send } from "lucide-react";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 
 export interface ChatMessage {
   role: "user" | "assistant";
   text: string;
+  // A manual-add deep link offered alongside a message (e.g. "no such client —
+  // add one here"). Rendered as a real clickable link, not raw text in the bubble.
+  link?: { label: string; href: string };
 }
 
 interface AIChatPanelProps {
@@ -98,7 +102,15 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend }: AICh
                   color: m.role === "user" ? "var(--btn-action-color)" : "var(--text-primary)",
                   border: m.role === "user" ? "none" : "1px solid var(--border-subtle)",
                 }}>
-                  {m.text}
+                  <div>{m.text}</div>
+                  {m.link && (
+                    <Link
+                      to={m.link.href}
+                      style={{ display: "inline-block", marginTop: 6, fontSize: 12, color: "var(--accent-primary)", textDecoration: "underline" }}
+                    >
+                      {m.link.label} →
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}

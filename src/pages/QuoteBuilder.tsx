@@ -121,6 +121,12 @@ export default function QuoteBuilder() {
   // AIChatPanel) instead of a one-shot toast with no way to reply to it.
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
+  // In-progress "create this client/vehicle type" mini-conversation (see
+  // backend/core/services/quote_entity_chat.py) — round-tripped every turn
+  // since the endpoint is otherwise stateless. declinedEntities remembers
+  // names the user said no to this session so they aren't re-asked.
+  const [pendingEntity, setPendingEntity] = useState<any>(null);
+  const [declinedEntities, setDeclinedEntities] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [savedQuoteId, setSavedQuoteId] = useState<number | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -341,8 +347,17 @@ export default function QuoteBuilder() {
         vehicle_type: vehicleType, customer_name: selectedCustomerName, cargo_description: cargo,
         pickup_date: pickupDate, delivery_date: deliveryDate, valid_until: validUntil, trip_type: tripType,
       };
-      const res = await postData({ url: "api/v1/ai/chat-quote/", data: { message: text, history, current_fields } });
+      const res = await postData({ url: "api/v1/ai/chat-quote/", data: {
+        message: text, history, current_fields,
+        pending_entity: pendingEntity, declined_entities: declinedEntities,
+      } });
+      setPendingEntity(res?.pending_entity ?? null);
+      if (res?.declined_entity) setDeclinedEntities(prev => [...prev, String(res.declined_entity).toLowerCase()]);
       const f = res?.extracted_fields || {};
+      // A client/vehicle type just created via chat isn't in the cached
+      // dropdown list yet — refetch so it actually appears as a selectable option.
+      if (f.customer_id) queryClient.invalidateQueries({ queryKey: ["customers"] });
+      if (f.vehicle_type) queryClient.invalidateQueries({ queryKey: ["vehicle-types"] });
       if (f.pickup_location) { setPickup(f.pickup_location); const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(f.pickup_location)}`).catch(() => null); const s = g?.results?.[0] || g?.[0]; if (s) setPickupCoords({ lat: s.lat, lon: s.lon }); }
       if (f.delivery_location) { setDelivery(f.delivery_location); const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(f.delivery_location)}`).catch(() => null); const s = g?.results?.[0] || g?.[0]; if (s) setDeliveryCoords({ lat: s.lat, lon: s.lon }); }
       if (f.cargo_description) setCargo(f.cargo_description);
@@ -354,7 +369,7 @@ export default function QuoteBuilder() {
       if (f.valid_until) setValidUntil(f.valid_until);
       if (f.trip_type === "ONE_WAY" || f.trip_type === "ROUND_TRIP") setTripType(f.trip_type);
       if (f.pickup_location || f.delivery_location || f.pickup_date || f.delivery_date) setShowDetails(true);
-      setChatMessages(prev => [...prev, { role: "assistant", text: res?.reply || "Got it — updated the form." }]);
+      setChatMessages(prev => [...prev, { role: "assistant", text: res?.reply || "Got it — updated the form.", link: res?.link || undefined }]);
       if (!textOverride) setNlText("");
     } catch {
       setChatMessages(prev => [...prev, { role: "assistant", text: "Sorry, I couldn't read that — try rephrasing or use the fields directly." }]);
@@ -438,7 +453,7 @@ export default function QuoteBuilder() {
     setEditableTollCost(null); setTollManuallyEdited(false); setDriverAllowanceInput("0"); setServiceCharge(0);
     setRouteData(null); setSelectedRouteIndex(0); setRouteBlockedMessage(null);
     setAnalysis(null); setGuard(null); setBenchmark(null);
-    setChatMessages([]); setChatOpen(false);
+    setChatMessages([]); setChatOpen(false); setPendingEntity(null); setDeclinedEntities([]);
     { const d = new Date(); d.setDate(d.getDate() + 7); setValidUntil(d.toISOString().slice(0, 10)); }
     if (isEditing) navigate("/bookings/quotes/new", { replace: true });
     toast.success("Started a new quote");

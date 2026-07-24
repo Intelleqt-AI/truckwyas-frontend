@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData } from "@/lib/Api";
+import { useAuth } from "@/lib/AuthContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const sectionStyle: React.CSSProperties = {
@@ -73,6 +74,7 @@ export function ProfileSettings() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { refreshUser } = useAuth();
 
   useEffect(() => {
     fetchData('api/auth/me/').then((d: any) => {
@@ -105,6 +107,8 @@ export function ProfileSettings() {
       formData.append('avatar', file);
       const result = await patchData({ url: 'api/auth/me/', data: formData });
       if (result?.avatar) setAvatarUrl(result.avatar);
+      // Refresh the auth context so the header/dropdown/Copilot avatars update immediately.
+      refreshUser();
     } catch {}
     setUploadingAvatar(false);
     e.target.value = '';

@@ -933,6 +933,7 @@ export default function QuoteDetail() {
       {showConvertModal && (
         <ConvertToBookingModal
           quoteNumber={quote?.quote_number}
+          vehicleType={quote?.vehicle_type}
           busy={convertToLoadMutation.isPending}
           onConfirm={(driverId, vehicleId) => convertToLoadMutation.mutate({ driverId, vehicleId })}
           onCancel={() => setShowConvertModal(false)}

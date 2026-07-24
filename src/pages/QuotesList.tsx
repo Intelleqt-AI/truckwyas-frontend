@@ -535,6 +535,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
       {pendingConvertQuote && (
         <ConvertToBookingModal
           quoteNumber={pendingConvertQuote.quote_number}
+          vehicleType={pendingConvertQuote.vehicle_type}
           busy={convertToLoadMutation.isPending}
           onConfirm={(driverId, vehicleId) => convertToLoadMutation.mutate({ quote: pendingConvertQuote, driverId, vehicleId })}
           onCancel={() => setPendingConvertQuote(null)}

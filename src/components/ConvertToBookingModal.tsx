@@ -4,6 +4,7 @@ import { fetchData } from '@/lib/Api';
 
 interface Props {
   quoteNumber?: string;
+  vehicleType?: string;
   busy?: boolean;
   onConfirm: (driverId: string, vehicleId: string) => void;
   onCancel: () => void;
@@ -72,7 +73,7 @@ const fieldLabelStyle: React.CSSProperties = {
 // action button's label reflects whatever's chosen: nothing picked converts
 // and leaves the booking unassigned (pick it up later from Bookings), both
 // picked converts pre-assigned.
-export function ConvertToBookingModal({ quoteNumber, busy, onConfirm, onCancel }: Props) {
+export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfirm, onCancel }: Props) {
   const [showAssign, setShowAssign] = useState(false);
   const [driverId, setDriverId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
@@ -89,8 +90,10 @@ export function ConvertToBookingModal({ quoteNumber, busy, onConfirm, onCancel }
     enabled: showAssign,
   });
   const { data: vehiclesData } = useQuery({
-    queryKey: ['vehicles-available-for-booking'],
-    queryFn: () => fetchData('api/v1/vehicles/?status=AVAILABLE'),
+    queryKey: ['vehicles-available-for-booking', vehicleType],
+    queryFn: () => fetchData(
+      `api/v1/vehicles/?status=AVAILABLE${vehicleType ? `&vehicle_type__name=${encodeURIComponent(vehicleType)}` : ''}`
+    ),
     enabled: showAssign,
   });
   const drivers: DriverOption[] = driversData?.results || driversData || [];
@@ -136,7 +139,7 @@ export function ConvertToBookingModal({ quoteNumber, busy, onConfirm, onCancel }
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <div style={fieldLabelStyle}>Vehicle</div>
+              <div style={fieldLabelStyle}>Vehicle{vehicleType ? ` (${vehicleType})` : ''}</div>
               <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={selectStyle}>
                 <option value="">Select vehicle…</option>
                 {vehicles.map((v) => (
@@ -147,7 +150,9 @@ export function ConvertToBookingModal({ quoteNumber, busy, onConfirm, onCancel }
               </select>
               {vehicles.length === 0 && (
                 <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>
-                  No available vehicles — check the Fleet page.
+                  {vehicleType
+                    ? `No available ${vehicleType} vehicles — check the Fleet page.`
+                    : 'No available vehicles — check the Fleet page.'}
                 </div>
               )}
             </div>

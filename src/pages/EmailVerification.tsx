@@ -1,14 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { postData } from '@/lib/Api';
-import { useAuth } from '@/lib/AuthContext';
 
 export const EmailVerification = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { setUser } = useAuth();
-  const queryClient = useQueryClient();
   const email = searchParams.get('email') || '';
 
   const [code, setCode] = useState('');
@@ -16,23 +12,39 @@ export const EmailVerification = () => {
   const [error, setError] = useState('');
   const [resentMsg, setResentMsg] = useState('');
 
+  // Leaving for Paystack is a full-page navigation (window.location.href), so
+  // coming back — e.g. hitting the browser's back button after declining —
+  // can restore this page from the bfcache exactly as it was mid-submit
+  // ("Verifying..." stuck forever), instead of the app ever regaining
+  // control. Detect that restore and forward to the payment-status page,
+  // which has the real "payment failed, try again" handling.
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted && sessionStorage.getItem('signup_email') === email) {
+        navigate('/signup/complete', { replace: true });
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, [email, navigate]);
+
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (code.length !== 6) { setError('Please enter the 6-digit code.'); return; }
     setLoading(true);
     try {
-      const data: any = await postData({ url: 'api/v1/auth/verify-email/', data: { email, code } });
-      // Drop any cached data from a previous account on this browser (query
-      // keys carry no user id — see useLogin for the same guard).
-      queryClient.clear();
-      localStorage.setItem('access', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      setUser(data.user);
-      navigate('/onboarding');
+      // No account exists yet — verifying the code just starts the mandatory
+      // Paystack checkout. The account is only created once that succeeds
+      // (see SignupComplete, which handles the redirect back from Paystack).
+      const data: any = await postData({
+        url: 'api/v1/auth/verify-email/',
+        data: { email, code, return_url: `${window.location.origin}/signup/complete` },
+      });
+      sessionStorage.setItem('signup_email', email);
+      window.location.href = data.authorization_url;
     } catch (err: any) {
       setError(err?.data?.detail || 'Invalid or expired code. Please try again.');
-    } finally {
       setLoading(false);
     }
   };
@@ -61,7 +73,7 @@ export const EmailVerification = () => {
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
             We sent a 6-digit verification code to{' '}
             <strong style={{ color: 'var(--text-primary)' }}>{email || 'your email'}</strong>.
-            Enter it below to activate your account.
+            Enter it below to continue to payment and activate your account.
           </div>
         </div>
 

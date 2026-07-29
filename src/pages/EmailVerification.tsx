@@ -1,6 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Check } from 'lucide-react';
 import { postData } from '@/lib/Api';
+
+// Kept in sync with Signup.tsx / core/services/paystack.py — this is step 2
+// of that same 3-step flow, so it shows the identical price/steps rather than
+// making the user recall what Signup told them.
+const MONTHLY_FEE = "4,499";
+const TAKE_RATE_PCT = "0.25";
+
+const SIGNUP_STEPS = [
+  { label: "Create your account", detail: "Name, email, password" },
+  { label: "Verify your email", detail: "Enter the 6-digit code — you're here now" },
+  { label: "Add a card & pay", detail: `R${MONTHLY_FEE}/month, charged via Paystack — your fleet goes live the moment it clears` },
+];
+
+const PLAN_FEATURES = [
+  "Unlimited loads & invoices",
+  "AI-powered quote optimisation",
+  "Fast Pay capital access",
+  "Advanced analytics & reporting",
+  "Fleet intelligence dashboard",
+  "Multi-user access",
+  "API & integrations",
+  "Priority support",
+];
 
 export const EmailVerification = () => {
   const navigate = useNavigate();
@@ -60,8 +84,105 @@ export const EmailVerification = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-sans)' }}>
-      <div style={{ width: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
+    <div className="verify-split">
+      <style>{`
+        .verify-split {
+          /* html/body/#root are pinned to height:100vh + overflow:hidden
+             app-wide — this page needs its own scroll container (see
+             Signup.tsx for the full reasoning). */
+          height: 100vh;
+          overflow-y: auto;
+          display: flex;
+          background: var(--bg-deep);
+          font-family: var(--font-sans);
+        }
+        .verify-split__content, .verify-split__form {
+          flex: 1 1 50%;
+          min-width: 0;
+          padding: 48px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+        .verify-split__form { align-items: center; }
+        @media (max-width: 860px) {
+          .verify-split { flex-direction: column; }
+          .verify-split__content, .verify-split__form { flex: none; padding: 32px 24px; }
+        }
+      `}</style>
+
+      {/* Content side — the same steps/price Signup showed, step 2 now active */}
+      <div className="verify-split__content" style={{
+        position: 'relative', overflow: 'hidden',
+        background: `radial-gradient(120% 100% at 0% 0%, var(--glow-color), var(--glow-transparent)), var(--bg-surface)`,
+        borderRight: '1px solid var(--border-subtle)',
+      }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
+          <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
+
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent-primary)', marginBottom: 10 }}>
+            Step 2 of 3
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3, marginBottom: 28, letterSpacing: '-0.01em' }}>
+            Almost there — <span style={{ color: 'var(--accent-primary)' }}>just confirm it's you</span>.
+          </div>
+
+          <div style={{
+            border: '1px solid var(--border-active)', borderRadius: 'var(--card-radius)',
+            padding: 24, marginBottom: 28, background: 'var(--bg-surface-hover)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 34, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                R{MONTHLY_FEE}
+              </span>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>/ month</span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              + {TAKE_RATE_PCT}% of every delivered load's value
+            </div>
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}>
+              THIS IS WHAT STEP 3 WILL CHARGE — NOTHING YET
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 28 }}>
+            {SIGNUP_STEPS.map((step, i) => (
+              <div key={step.label} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <div style={{
+                  flex: 'none', width: 22, height: 22, borderRadius: '50%',
+                  border: `1px solid ${i <= 1 ? 'var(--accent-primary)' : 'var(--border-active)'}`,
+                  color: i <= 1 ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, marginTop: 1,
+                }}>
+                  {i < 1 ? '✓' : i + 1}
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: i <= 1 ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{step.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 1 }}>{step.detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+            {PLAN_FEATURES.map(f => (
+              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+                <Check size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                {f}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginTop: 32, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
+            PAYMENTS SECURED BY PAYSTACK
+          </div>
+        </div>
+      </div>
+
+      {/* Form side */}
+      <div className="verify-split__form">
+      <div style={{ width: '100%', maxWidth: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
         {/* Logo */}
         <div style={{ marginBottom: 32, textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>TRUCKWYS</div>
@@ -130,6 +251,7 @@ export const EmailVerification = () => {
             ← Back to login
           </button>
         </div>
+      </div>
       </div>
     </div>
   );

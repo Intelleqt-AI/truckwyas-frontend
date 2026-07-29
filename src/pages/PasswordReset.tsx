@@ -1,7 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Check } from 'lucide-react';
 import { postData } from '@/lib/Api';
+
+// Same list Signup.tsx / Login.tsx / BillingSettings.tsx show — kept
+// identical everywhere the plan is mentioned.
+const PLAN_FEATURES = [
+  "Unlimited loads & invoices",
+  "AI-powered quote optimisation",
+  "Fast Pay capital access",
+  "Advanced analytics & reporting",
+  "Fleet intelligence dashboard",
+  "Multi-user access",
+  "API & integrations",
+  "Priority support",
+];
 
 const RESEND_SECONDS = 180;
 
@@ -88,8 +101,70 @@ export default function PasswordReset() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-sans)' }}>
-      <div style={{ width: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
+    <div className="pwreset-split">
+      <style>{`
+        .pwreset-split {
+          /* html/body/#root are pinned to height:100vh + overflow:hidden
+             app-wide — this page needs its own scroll container (see
+             Signup.tsx for the full reasoning). */
+          height: 100vh;
+          overflow-y: auto;
+          display: flex;
+          background: var(--bg-deep);
+          font-family: var(--font-sans);
+        }
+        .pwreset-split__content, .pwreset-split__form {
+          flex: 1 1 50%;
+          min-width: 0;
+          padding: 48px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+        .pwreset-split__form { align-items: center; }
+        @media (max-width: 860px) {
+          .pwreset-split { flex-direction: column; }
+          .pwreset-split__content, .pwreset-split__form { flex: none; padding: 32px 24px; }
+        }
+      `}</style>
+
+      {/* Content side — same "welcome back" framing as Login, not a sales pitch */}
+      <div className="pwreset-split__content" style={{
+        position: 'relative', overflow: 'hidden',
+        background: `radial-gradient(120% 100% at 0% 0%, var(--glow-color), var(--glow-transparent)), var(--bg-surface)`,
+        borderRight: '1px solid var(--border-subtle)',
+      }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
+          <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
+
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent-primary)', marginBottom: 10 }}>
+            Account recovery
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3, marginBottom: 16, letterSpacing: '-0.01em' }}>
+            Let's get you <span style={{ color: 'var(--accent-primary)' }}>back in</span>.
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 32 }}>
+            Loads, quotes, invoices, and fleet intelligence — all in one dashboard, waiting right where you left them.
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+            {PLAN_FEATURES.map(f => (
+              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+                <Check size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                {f}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginTop: 32, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
+            BUILT FOR SOUTH AFRICAN ROAD FREIGHT
+          </div>
+        </div>
+      </div>
+
+      {/* Form side */}
+      <div className="pwreset-split__form">
+      <div style={{ width: '100%', maxWidth: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
         {/* Logo */}
         <div style={{ marginBottom: 32, textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>TRUCKWYS</div>
@@ -196,6 +271,7 @@ export default function PasswordReset() {
             </div>
           </>
         )}
+      </div>
       </div>
     </div>
   );

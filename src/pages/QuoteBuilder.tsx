@@ -932,31 +932,48 @@ export default function QuoteBuilder() {
       {/* 3 — AI quote */}
       {ready && !routeBlockedMessage && total > 0 && (
         <div style={{ ...cardS, border: "1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-subtle))", marginBottom: 14 }}>
+          {/* still learning — shown first, above the price block, while under the outcome threshold */}
+          {aiLearning && (
+            <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-row)", background: "var(--status-warning-bg)", display: "flex", gap: 10, fontSize: 13 }}>
+              <Sparkles size={16} color="var(--status-warning)" style={{ flexShrink: 0 }} />
+              <div><b>AI pricing is still learning your fleet.</b><span style={{ color: "var(--text-secondary)" }}> Priced on true cost + your {vehicleType} base rate for now — the optimiser needs ~{winModel.outcomes_needed} completed loads to learn what wins with your clients ({winModel.outcomes_collected}/{winModel.outcomes_needed} logged). Every quote you close sharpens it.</span></div>
+            </div>
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.4fr" }}>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
-              <div style={labelS}>Recommended price</div>
-              {aiLoading ? aiSpinner : (<>
+              <div style={labelS}>{aiLearning ? "Suggested price" : "Recommended price"}</div>
+              {aiLoading ? aiSpinner : aiLearning ? (<>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{formatCurrency(total * 1.25)}</div>
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>true cost + 25%</div>
+              </>) : (<>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, color: "var(--accent-primary)", marginTop: 4 }}>{opt?.optimal_price ? formatCurrency(opt.optimal_price) : formatCurrency(total)}</div>
                 <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>to this client</div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={labelS}>Margin</div>
-              {aiLoading ? aiSpinner : (<>
+              {aiLoading ? aiSpinner : aiLearning ? (
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
+              ) : (<>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{opt?.optimal_margin_pct ? `${Math.round(opt.optimal_margin_pct)}%` : `${marginPct}%`}</div>
                 <div style={{ fontSize: 12, color: "var(--status-success)", marginTop: 2 }}>{formatCurrency(opt?.expected_profit ?? ((opt?.optimal_price || total) - directCost))} profit</div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={labelS}>Win probability</div>
-              {aiLoading ? aiSpinner : (<>
+              {aiLoading ? aiSpinner : aiLearning ? (
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
+              ) : (<>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{opt?.win_probability_at_optimal != null ? `${Math.round(opt.win_probability_at_optimal * 100)}%` : "—"}</div>
                 <div style={{ marginTop: 6, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((opt?.win_probability_at_optimal || 0) * 100)}%`, background: "var(--accent-primary)" }} /></div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px" }}>
               <div style={labelS}>Profit sweet-spot</div>
-              {aiLoading ? aiSpinner : curveData.length > 1 ? (
+              {aiLoading ? aiSpinner : aiLearning ? (
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
+              ) : curveData.length > 1 ? (
                 <ResponsiveContainer width="100%" height={62}>
                   <ComposedChart data={curveData} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
                     <defs><linearGradient id="qg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--status-success)" stopOpacity={0.35} /><stop offset="95%" stopColor="var(--status-success)" stopOpacity={0} /></linearGradient></defs>
@@ -975,14 +992,6 @@ export default function QuoteBuilder() {
             <div style={{ padding: "10px 18px", borderTop: "1px solid var(--border-row)", background: guard.risk_level === "AT_RISK" ? "var(--status-danger-bg)" : "var(--status-warning-bg)", fontSize: 13 }}>
               <b style={{ color: guard.risk_level === "AT_RISK" ? "var(--status-danger)" : "var(--status-warning)" }}>{guard.risk_level === "AT_RISK" ? "At risk" : "Caution"}</b>
               <span style={{ color: "var(--text-secondary)" }}> · {(guard.explanations || guard.warnings || [])[0]}{guard.suggestions?.[0] ? ` — ${guard.suggestions[0]}` : ""}</span>
-            </div>
-          )}
-
-          {/* still learning */}
-          {aiLearning && (
-            <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border-row)", background: "var(--status-warning-bg)", display: "flex", gap: 10, fontSize: 13 }}>
-              <Sparkles size={16} color="var(--status-warning)" style={{ flexShrink: 0 }} />
-              <div><b>AI pricing is still learning your fleet.</b><span style={{ color: "var(--text-secondary)" }}> Priced on true cost + your {vehicleType} base rate for now — the optimiser needs ~{winModel.outcomes_needed} completed loads to learn what wins with your clients ({winModel.outcomes_collected}/{winModel.outcomes_needed} logged). Every quote you close sharpens it.</span></div>
             </div>
           )}
 

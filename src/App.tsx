@@ -52,7 +52,6 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
 }
 // Lazy load all other pages for code splitting
 const QuoteBuilder = lazy(() => import('./pages/QuoteBuilder'));
-const AIQuoteChat = lazy(() => import('./pages/AIQuoteChat'));
 const QuoteDetail = lazy(() => import('./pages/QuoteDetail'));
 const Bookings = lazy(() => import('./pages/Bookings'));
 const LoadsList = lazy(() => import('./pages/LoadsList'));
@@ -87,6 +86,11 @@ const InviteAccept = lazy(() => import('./pages/InviteAccept').then(m => ({ defa
 const EmailVerification = lazy(() =>
   import('./pages/EmailVerification').then(m => ({
     default: m.EmailVerification,
+  })),
+);
+const SignupComplete = lazy(() =>
+  import('./pages/SignupComplete').then(m => ({
+    default: m.SignupComplete,
   })),
 );
 const Onboarding = lazy(() => import('./pages/Onboarding').then(m => ({ default: m.Onboarding })));
@@ -198,6 +202,14 @@ const App = () => (
                   </PublicOnly>
                 }
               />
+              <Route
+                path="/signup/complete"
+                element={
+                  <PublicOnly>
+                    <SignupComplete />
+                  </PublicOnly>
+                }
+              />
               <Route path="/quotes/view/:quoteId/:token" element={<ClientQuoteView />} />
               <Route path="/invoice/view/:id/:token" element={<PublicInvoice />} />
               <Route path="/invoice/view/:id" element={<PublicInvoice />} />
@@ -215,7 +227,10 @@ const App = () => (
               <Route path="/bookings/list" element={<Navigate to="/bookings/orders" replace />} />
               <Route path="/quotes" element={<Navigate to="/bookings/quotes" replace />} />
               <Route path="/quotes/new" element={<Navigate to="/bookings/quotes/new" replace />} />
-              <Route path="/quotes/ai-chat" element={<Navigate to="/bookings/quotes/ai-chat" replace />} />
+              {/* AI Quote Chat was a standalone page duplicating the quote builder's
+                  inline AI panel — removed; both legacy links land on the builder. */}
+              <Route path="/quotes/ai-chat" element={<Navigate to="/bookings/quotes/new" replace />} />
+              <Route path="/bookings/quotes/ai-chat" element={<Navigate to="/bookings/quotes/new" replace />} />
               <Route path="/bookings" element={<Navigate to="/bookings/orders" replace />} />
               <Route path="/cash" element={<Navigate to="/insights" replace />} />
               <Route path="/control" element={<Navigate to="/insights" replace />} />
@@ -232,7 +247,6 @@ const App = () => (
                 <Route path="/bookings/history" element={<LoadsList />} />
                 <Route path="/bookings/quotes" element={<LoadsList />} />
                 <Route path="/bookings/quotes/new" element={<QuoteBuilder />} />
-                <Route path="/bookings/quotes/ai-chat" element={<AIQuoteChat />} />
                 <Route path="/bookings/quotes/:id/edit" element={<QuoteBuilder />} />
                 <Route path="/bookings/quotes/:id" element={<QuoteDetail />} />
                 <Route path="/bookings/:id" element={<Bookings />} />

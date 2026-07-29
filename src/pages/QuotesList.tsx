@@ -200,7 +200,25 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       patchData({ url: `api/v1/quotes/${id}/`, data: { status } }),
-    onSuccess: () => {
+    // Optimistic: move the card in the cache immediately on drop, instead of
+    // waiting for the PATCH round-trip — otherwise the card snaps back to its
+    // old column the instant you let go, then jumps to the new one only once
+    // the network response arrives (very visible on a slow connection).
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['quotes'] });
+      const previous = queryClient.getQueryData(['quotes']);
+      queryClient.setQueryData(['quotes'], (old: any) => {
+        const list: any[] = old?.results || old || [];
+        const updated = list.map(q => String(q.id) === id ? { ...q, status } : q);
+        return old?.results ? { ...old, results: updated } : updated;
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(['quotes'], context.previous);
+      toast.error('Failed to update quote status — reverted.');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
     },
   });
@@ -304,9 +322,6 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
               <LiveBadge />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-action" style={{ background: 'var(--accent-primary)', color: 'var(--bg-deep)' }} onClick={() => navigate('/bookings/quotes/ai-chat')}>
-                AI quote
-              </button>
               <button className="btn-action" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={() => navigate('/bookings/quotes/new')}>
                 + New quote
               </button>

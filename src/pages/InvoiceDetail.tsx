@@ -291,6 +291,28 @@ export default function InvoiceDetail() {
         </div>
       )}
 
+      {/* Platform fee (0.25% take-rate) — charged automatically on delivery */}
+      {invoice.delivery_fee_charge && (
+        <div className="card" style={{ marginBottom: 24, padding: '14px 20px', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <div>
+            <span className="card-title">Platform fee ({Number(invoice.delivery_fee_charge.rate_pct)}%)</span>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+              {invoice.delivery_fee_charge.status === 'charged'
+                ? `Charged ${invoice.delivery_fee_charge.charged_at?.slice(0, 10) || ''} to the card on file`
+                : invoice.delivery_fee_charge.status === 'failed'
+                ? `Not yet charged — ${invoice.delivery_fee_charge.failure_reason || 'retrying automatically'}`
+                : 'Pending'}
+            </div>
+          </div>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' as const,
+            color: invoice.delivery_fee_charge.status === 'charged' ? 'var(--accent-primary)' : 'var(--status-warning)',
+          }}>
+            {formatCurrency(invoice.delivery_fee_charge.amount)}
+          </span>
+        </div>
+      )}
+
       {/* Payment History */}
       {payments && payments.length > 0 && (
         <div className="card table-card" style={{ marginBottom: 24 }}>

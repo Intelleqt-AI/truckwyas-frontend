@@ -256,14 +256,6 @@ export default function LoadsList() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={() => navigate('/bookings/quotes/ai-chat')}
-            style={{
-              background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)',
-              padding: '8px 16px', fontSize: 13,
-              fontWeight: 500, borderRadius: 4, cursor: 'pointer',
-            }}
-          >AI quote</button>
-          <button
             onClick={() => navigate('/bookings/quotes/new')}
             style={{
               background: 'var(--accent-primary)', border: 'none', color: 'var(--btn-action-color, #fff)',

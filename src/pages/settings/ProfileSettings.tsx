@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData } from "@/lib/Api";
+import { useAuth } from "@/lib/AuthContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const sectionStyle: React.CSSProperties = {
@@ -73,6 +74,7 @@ export function ProfileSettings() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { refreshUser } = useAuth();
 
   useEffect(() => {
     fetchData('api/auth/me/').then((d: any) => {
@@ -105,6 +107,8 @@ export function ProfileSettings() {
       formData.append('avatar', file);
       const result = await patchData({ url: 'api/auth/me/', data: formData });
       if (result?.avatar) setAvatarUrl(result.avatar);
+      // Refresh the auth context so the header/dropdown/Copilot avatars update immediately.
+      refreshUser();
     } catch {}
     setUploadingAvatar(false);
     e.target.value = '';
@@ -253,18 +257,20 @@ export function ProfileSettings() {
               </Select>
             </div>
           </div>
-          <div style={{ marginBottom: 20, maxWidth: 240 }}>
-            <label style={labelStyle}>Date Format</label>
-            <Select value={form.date_format} onValueChange={val => set('date_format', val)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
-                <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
-                <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
-              </SelectContent>
-            </Select>
+          <div style={{ ...gridStyle, marginBottom: 20 }}>
+            <div>
+              <label style={labelStyle}>Date Format</label>
+              <Select value={form.date_format} onValueChange={val => set('date_format', val)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+                  <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
+                  <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button

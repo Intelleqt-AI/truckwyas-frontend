@@ -26,6 +26,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   const { user: authUser } = useAuth();
   const userName = authUser?.name || authUser?.username || 'User';
   const userRole = (authUser?.role || 'VIEWER').toUpperCase();
+  const avatarUrl = (authUser?.avatar as string) || undefined;
   const initials =
     userName
       .split(' ')
@@ -275,9 +276,10 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
               style={{
                 width: 30,
                 height: 30,
-                background: 'var(--accent-dim)',
+                background: avatarUrl ? 'transparent' : 'var(--accent-dim)',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: '50%',
+                overflow: 'hidden',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -288,7 +290,11 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
               }}
               title={userName}
             >
-              {initials}
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={userName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                initials
+              )}
             </div>
             {showProfileMenu && (
               <div
@@ -304,12 +310,21 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
                   boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
                 }}
               >
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
-                  <div style={{ fontSize: 12, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', fontWeight: 600 }}>
-                    {userName}
-                  </div>
-                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                    {authUser?.email || authUser?.username || ''}
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {avatarUrl && (
+                    <img
+                      src={avatarUrl}
+                      alt={userName}
+                      style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                    />
+                  )}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', fontWeight: 600 }}>
+                      {userName}
+                    </div>
+                    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                      {authUser?.email || authUser?.username || ''}
+                    </div>
                   </div>
                 </div>
                 <div

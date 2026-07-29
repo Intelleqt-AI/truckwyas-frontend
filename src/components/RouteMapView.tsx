@@ -145,7 +145,13 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
 
       map.on('dblclick', (e: { latlng: { lat: number; lng: number } }) => {
         if (!onMapClickRef.current) return;
-        const { lat, lng } = e.latlng;
+        // Leaflet's raw lat/lng are full-precision floats (15+ significant
+        // digits) — the backend's DecimalField(max_digits=12, decimal_places=7)
+        // rejects that outright ("no more than 12 digits in total"). Round to
+        // 6dp (~11cm precision, far more than a freight quote needs) before it
+        // goes anywhere.
+        const lat = Math.round(e.latlng.lat * 1e6) / 1e6;
+        const lng = Math.round(e.latlng.lng * 1e6) / 1e6;
         // Instant feedback: drop a temp pin right away, reverse-geocode in the background.
         tempMarkerRef.current?.remove();
         tempMarkerRef.current = L.marker([lat, lng], { icon: dotIcon(L, '#6b7280') }).addTo(map);

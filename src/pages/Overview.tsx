@@ -19,6 +19,7 @@ async function loadOverview() {
     activityData,
     vehiclesData,
     fleetData,
+    eligibleData,
   ] = await Promise.all([
     fetchData("api/v1/dashboard/finance/").catch(() => null),
     fetchData("api/v1/dashboard/signals/").catch(() =>
@@ -30,6 +31,11 @@ async function loadOverview() {
     fetchData("api/v1/activity/").catch(() => []),
     fetchData("api/v1/vehicles/").catch(() => []),
     fetchData("api/v1/fleet/overview/").catch(() => null),
+    // Invoices that qualify for a fast-pay advance but don't have one
+    // requested yet — this is the actionable "Capital" opportunity today,
+    // since the Capital page's "Apply" button routes to an external lender
+    // (Merchant Capital) and never creates an internal AdvanceRequest.
+    fetchData("api/v1/capital/eligible/").catch(() => null),
   ]);
 
   const insightsArr = Array.isArray(insightsData)
@@ -48,12 +54,23 @@ async function loadOverview() {
     ? advancesData
     : advancesData?.results || [];
 
+  // The backend already excludes invoices that have an active AdvanceRequest
+  // from this eligible list (see CapitalEligibleInvoicesView), so this and
+  // pendingAdvancesCount below count disjoint invoices — safe to add together.
+  const eligibleInvoicesCount = (eligibleData?.invoices || []).length;
+
   const quotes = quotesData?.results || quotesData || [];
   const recentQuotes = quotes.slice(0, 5);
 
   const loads = loadsData?.results || loadsData || [];
+  // "Active" = anywhere in the open lifecycle (PENDING/ASSIGNED/LOADING/
+  // IN_TRANSIT), not just physically moving — matches what the Bookings page
+  // this tile links to actually shows as open orders. Excluding by terminal
+  // status (rather than listing the active ones) means a new in-progress
+  // status added later is counted by default instead of silently dropped.
+  const TERMINAL_LOAD_STATUSES = ["DELIVERED", "INVOICED", "CANCELLED"];
   const activeLoadsCount = loads.filter(
-    (l: any) => l.status === "IN_TRANSIT" || l.status === "LOADING",
+    (l: any) => !TERMINAL_LOAD_STATUSES.includes(l.status),
   ).length;
   const recentLoads = loads.slice(0, 5);
 
@@ -89,6 +106,7 @@ async function loadOverview() {
     financeData: finance,
     insights,
     advances,
+    eligibleInvoicesCount,
     recentQuotes,
     recentLoads,
     activeLoadsCount,
@@ -141,6 +159,20 @@ export default function Overview() {
   const financeData = data?.financeData ?? null;
   const insights = data?.insights ?? [];
   const advances = data?.advances ?? [];
+  // Advances actually in TruckWys's own request pipeline — REQUESTED
+  // (submitted, not yet scored) or SCORING (risk engine actively evaluating
+  // it). In practice this is usually 0: the Capital page's "Apply" button
+  // routes to an external lender (Merchant Capital) rather than creating an
+  // AdvanceRequest, so it's added to the eligible-invoice count below rather
+  // than shown alone.
+  const pendingAdvancesCount = advances.filter(
+    (a: any) => a.status === "REQUESTED" || a.status === "SCORING",
+  ).length;
+  // Invoices that qualify for an advance but don't have one requested yet —
+  // the backend excludes invoices with an active request from this list, so
+  // it's disjoint from pendingAdvancesCount and safe to add.
+  const eligibleInvoicesCount = data?.eligibleInvoicesCount ?? 0;
+  const advancesActionableCount = pendingAdvancesCount + eligibleInvoicesCount;
   const recentQuotes = data?.recentQuotes ?? [];
   const recentLoads = data?.recentLoads ?? [];
   const activeLoadsCount = data?.activeLoadsCount ?? 0;
@@ -284,14 +316,9 @@ export default function Overview() {
                   },
                   {
                     label: "Advances pending",
-                    value: String(
-                      advances.filter((a: any) => a.status === "REQUESTED")
-                        .length,
-                    ),
+                    value: String(advancesActionableCount),
                     route: "/capital",
-                    warn:
-                      advances.filter((a: any) => a.status === "REQUESTED")
-                        .length > 0,
+                    warn: advancesActionableCount > 0,
                   },
                 ] as const
               ).map((s) => (

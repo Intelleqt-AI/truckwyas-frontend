@@ -45,6 +45,7 @@ interface User {
   role: string;
   status: string;
   last_active?: string;
+  avatar?: string;
 }
 
 interface PendingInvite {
@@ -297,14 +298,22 @@ export function UsersPermissions() {
               <tr key={u.id} style={{ borderBottom: '1px solid var(--border-row)' }}>
                 <td style={{ padding: '12px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{
-                      width: 30, height: 30, borderRadius: '50%',
-                      background: 'var(--accent-dim)', display: 'flex', alignItems: 'center',
-                      justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 11,
-                      color: 'var(--accent-primary)', flexShrink: 0,
-                    }}>
-                      {u.name?.charAt(0).toUpperCase() || '?'}
-                    </div>
+                    {u.avatar ? (
+                      <img
+                        src={u.avatar}
+                        alt={u.name}
+                        style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: 30, height: 30, borderRadius: '50%',
+                        background: 'var(--accent-dim)', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 11,
+                        color: 'var(--accent-primary)', flexShrink: 0,
+                      }}>
+                        {u.name?.charAt(0).toUpperCase() || '?'}
+                      </div>
+                    )}
                     <div>
                       <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{u.name}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{u.email}</div>

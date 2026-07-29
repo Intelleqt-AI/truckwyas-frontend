@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
+import { fetchData } from '@/lib/Api';
 
 /**
  * Global real-time event client. Mounted once (in OSLayout) for authenticated
@@ -47,11 +48,16 @@ const EVENT_TITLES: Record<string, string> = {
   'quote.accepted':  'Quote accepted',
   'quote.declined':  'Quote declined',
   'quote.completed': 'Quote completed',
+  'quote.expired':   'Quote expired',
   // Invoices
   'invoice.auto_created': 'Invoice raised',
   'invoice.paid':         'Invoice paid',
   'invoice.overdue':      'Invoice overdue',
   'invoice.status':       'Invoice updated',
+  // Payments / fleet / drivers
+  'payment.received':      'Payment received',
+  'maintenance.due':       'Maintenance due',
+  'driver.status_changed': 'Driver update',
   // Capital
   'advance.approved': 'Advance approved',
   'advance.disbursed': 'Funds disbursed',
@@ -62,6 +68,21 @@ const EVENT_TITLES: Record<string, string> = {
 export function LiveEvents() {
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
+  // The user's push preferences: toasts for a category the user disabled are
+  // suppressed (the event still refreshes screens via tw:live-event, and the
+  // bell keeps the full history). Null until loaded — show everything.
+  const pushPrefsRef = useRef<Record<string, boolean> | null>(null);
+
+  useEffect(() => {
+    const loadPrefs = () => {
+      fetchData('/api/v1/notifications/settings/')
+        .then((d: any) => { if (d?.push) pushPrefsRef.current = d.push; })
+        .catch(() => { /* keep previous prefs */ });
+    };
+    loadPrefs();
+    window.addEventListener('tw:settings-changed', loadPrefs);
+    return () => window.removeEventListener('tw:settings-changed', loadPrefs);
+  }, []);
 
   useEffect(() => {
     // `stopped` is closure-local so each effect instance has its own flag.
@@ -94,13 +115,21 @@ export function LiveEvents() {
           // from getting a persisted Notification row, so mirror that here and
           // skip the toast too (no "you did X" popup for your own action).
           const isOwnAction = msg.data?.actor_id != null && String(msg.data.actor_id) === currentUserId();
-          if (msg.message && !isOwnAction) {
+          // Per-user toast gating: events carry the push category they map to
+          // (backend notification_prefs.EVENT_CATEGORY); uncategorized events
+          // always toast.
+          const category = msg.data?.category;
+          const prefs = pushPrefsRef.current;
+          const mutedByPrefs = !!category && !!prefs && prefs[category] === false;
+          if (msg.message && !isOwnAction && !mutedByPrefs) {
             const label = EVENT_TITLES[msg.event] || 'Update';
             const text = label === msg.message ? label : `${label} — ${msg.message}`;
             const ntype = (msg.data?.type || '').toLowerCase();
-            if (ntype === 'success') toast.success(text);
-            else if (ntype === 'alert') toast.error(text);
-            else toast.info(text);
+            // event_id (uuid per event) as toastId dedupes replayed frames.
+            const opts = msg.data?.event_id ? { toastId: msg.data.event_id } : undefined;
+            if (ntype === 'success') toast.success(text, opts);
+            else if (ntype === 'alert') toast.error(text, opts);
+            else toast.info(text, opts);
           }
         }
       };

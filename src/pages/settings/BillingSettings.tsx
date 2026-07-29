@@ -25,37 +25,63 @@ const sectionTitleStyle: React.CSSProperties = {
   fontWeight: 600,
 };
 
+interface FlatPlan {
+  key: string;
+  label: string;
+  amount: string;
+  take_rate_pct: string;
+}
+
+interface CardOnFile {
+  last4?: string;
+  card_type?: string;
+  bank?: string;
+}
+
+interface Grace {
+  grace_period_expires_at: string;
+  days_remaining: number;
+  grace_period_days: number;
+}
+
 interface BillingStatus {
   subscription_plan?: string | null;
   subscription_status?: string | null;
   subscription_start?: string | null;
+  next_billing_date?: string | null;
+  amount?: string;
+  item_name?: string;
+  flat_plan?: FlatPlan | null;
+  card?: CardOnFile | null;
+  grace?: Grace | null;
+  suspended?: boolean;
 }
 
 interface BillingTransaction {
   id: string;
-  payfast_payment_id?: string;
-  payment_id?: string;
+  kind: 'subscription' | 'delivery_fee';
+  label: string;
+  reference?: string;
   created_at: string;
-  amount: number;
+  amount: string | number;
   status: string;
-  plan?: string;
 }
 
-const PRO_PLAN = {
-  key: 'pro',
-  name: 'TruckWys Pro',
-  price: 4999,
-  features: [
-    'Unlimited loads & invoices',
-    'AI-powered quote optimisation',
-    'Fast Pay capital access',
-    'Advanced analytics & reporting',
-    'Fleet intelligence dashboard',
-    'Multi-user access',
-    'API & integrations',
-    'Priority support',
-  ],
-};
+// Pricing is server-driven (billing/status/ returns flat_plan) — only the
+// feature list lives here.
+const PLAN_FEATURES = [
+  'Unlimited loads & invoices',
+  'AI-powered quote optimisation',
+  'Fast Pay capital access',
+  'Advanced analytics & reporting',
+  'Fleet intelligence dashboard',
+  'Multi-user access',
+  'API & integrations',
+  'Priority support',
+];
+
+const formatRand = (amount?: string | number | null) =>
+  `R${Number(amount ?? 0).toLocaleString('en-ZA')}`;
 
 export function BillingSettings() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -88,34 +114,24 @@ export function BillingSettings() {
     }
   }, []);
 
-  // On mount: load billing data, then handle PayFast return URL params
+  // On mount: load billing data, then handle the Paystack return —
+  // callback_url comes back with ?reference=...&trxref=... appended.
   useEffect(() => {
-    const returnSuccess = searchParams.get('success') === '1';
-    const returnCancelled = searchParams.get('cancelled') === '1';
+    const reference = searchParams.get('reference') || searchParams.get('trxref');
 
-    // Clear URL params immediately so refresh doesn't re-trigger
-    if (returnSuccess || returnCancelled) {
-      setSearchParams({}, { replace: true });
+    if (reference) {
+      setSearchParams({}, { replace: true }); // clear URL params so refresh doesn't re-trigger
     }
 
     const init = async () => {
-      if (returnCancelled) {
-        toast.info('Payment cancelled. Your subscription was not changed.');
-        await Promise.all([loadStatus(), loadHistory()]);
-        setLoading(false);
-        return;
-      }
-
-      if (returnSuccess) {
-        // Call confirm endpoint — activates subscription even if ITN hasn't
-        // arrived yet (important for localhost where ITN can't reach the server)
+      if (reference) {
         setConfirming(true);
         try {
-          const confirmed = await postData({ url: 'api/v1/billing/confirm/', data: {} });
-          setBillingStatus(confirmed);
-          toast.success('Subscription activated! Welcome to TruckWys Pro.');
+          await postData({ url: 'api/v1/billing/confirm/', data: { reference } });
+          await loadStatus(); // confirm/ returns only the base fields, not flat_plan/card
+          toast.success('Subscription activated!');
         } catch {
-          // ITN may have already processed it — just re-fetch status
+          toast.error('Payment was not successful or was cancelled.');
           await loadStatus();
         } finally {
           setConfirming(false);
@@ -135,31 +151,19 @@ export function BillingSettings() {
   const handleSubscribe = async () => {
     setSubscribing(true);
     try {
+      // No plan is sent — the backend always charges the one flat plan and
+      // never trusts a client-chosen price.
       const data = await postData({ url: 'api/v1/billing/subscribe/', data: {
-        plan: 'pro',
-        return_url: `${window.location.origin}/settings/billing?success=1`,
-        cancel_url: `${window.location.origin}/settings/billing?cancelled=1`,
+        return_url: `${window.location.origin}/settings/billing`,
       }});
-      if ((data.payfast_url || data.payment_url) && data.form_data) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = data.payfast_url || data.payment_url;
-        Object.entries(data.form_data).forEach(([key, value]) => {
-          if (value === '' || value === null || value === undefined) return;
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = key;
-          input.value = String(value);
-          form.appendChild(input);
-        });
-        document.body.appendChild(form);
-        form.submit();
+      if (data.authorization_url) {
+        window.location.href = data.authorization_url;
       } else {
         toast.error('Could not initiate payment. Please try again.');
+        setSubscribing(false);
       }
     } catch {
       toast.error('Failed to start subscription. Please try again.');
-    } finally {
       setSubscribing(false);
     }
   };
@@ -167,7 +171,7 @@ export function BillingSettings() {
   const handleCancel = () => {
     setConfirmOpts({
       title: 'Cancel Subscription',
-      message: 'Are you sure you want to cancel your TruckWys Pro subscription? You will lose access to Pro features at the end of your billing period.',
+      message: 'Are you sure you want to cancel your subscription? You will lose access to paid features at the end of your billing period.',
       confirmLabel: 'Cancel Plan',
       danger: true,
       onConfirm: async () => {
@@ -188,7 +192,13 @@ export function BillingSettings() {
 
   const planKey = billingStatus?.subscription_plan?.toLowerCase() || 'free';
   const subStatus = billingStatus?.subscription_status?.toLowerCase() || 'none';
-  const isPro = ['pro', 'growth', 'enterprise'].includes(planKey) && subStatus === 'active';
+  // active AND grace_period both keep full access (spec §4) — only
+  // suspended/cancelled lose it.
+  const isPaid = planKey !== 'free' && planKey !== 'starter' && (subStatus === 'active' || subStatus === 'grace_period');
+  const flatPlan = billingStatus?.flat_plan ?? null;
+  const grace = billingStatus?.grace ?? null;
+  const isSuspended = !!billingStatus?.suspended;
+  const subscribeAmount = flatPlan?.amount;
 
   const showLoading = loading || confirming;
 
@@ -223,9 +233,9 @@ export function BillingSettings() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                   <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {isPro ? PRO_PLAN.name : 'Free Plan'}
+                    {isPaid ? (billingStatus?.item_name || 'TruckWys Fleet') : 'Free Plan'}
                   </span>
-                  {isPro && (
+                  {isPaid && (
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 7px',
                       background: 'var(--status-success-bg)', color: 'var(--accent-primary)',
@@ -241,13 +251,18 @@ export function BillingSettings() {
                   )}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
-                  {isPro
-                    ? `R ${PRO_PLAN.price.toLocaleString()} / month${billingStatus?.subscription_start ? ` · since ${new Date(billingStatus.subscription_start).toLocaleDateString('en-ZA')}` : ''}`
+                  {isPaid
+                    ? `${formatRand(billingStatus?.amount)} / month${billingStatus?.next_billing_date ? ` · next charge ${new Date(billingStatus.next_billing_date).toLocaleDateString('en-ZA')}` : ''}`
                     : 'No active subscription'}
                 </div>
+                {billingStatus?.card?.last4 && (
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2, textTransform: 'capitalize' as const }}>
+                    {billingStatus.card.bank ? `${billingStatus.card.bank} ` : ''}{billingStatus.card.card_type} card ending {billingStatus.card.last4}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                {isPro ? (
+                {isPaid ? (
                   <button onClick={handleCancel} disabled={cancelling} style={{
                     background: 'none', border: '1px solid var(--border-subtle)',
                     color: 'var(--text-secondary)', padding: '7px 14px',
@@ -257,23 +272,63 @@ export function BillingSettings() {
                     {cancelling ? 'CANCELLING...' : 'CANCEL PLAN'}
                   </button>
                 ) : (
-                  <button onClick={handleSubscribe} disabled={subscribing} className="btn-action">
-                    {subscribing ? 'REDIRECTING...' : 'SUBSCRIBE — R4,999/MO'}
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <button onClick={handleSubscribe} disabled={subscribing} className="btn-action">
+                      {subscribing ? 'REDIRECTING...' : isSuspended ? `REACTIVATE — ${formatRand(subscribeAmount)}/MO` : `SUBSCRIBE — ${formatRand(subscribeAmount)}/MO`}
+                    </button>
+                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' as const }}>
+                      + {flatPlan?.take_rate_pct}% of every delivered load
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
 
+            {isSuspended && (
+              <div style={{
+                marginBottom: 16, padding: 14,
+                background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)',
+                borderRadius: 2, fontSize: 13, color: 'var(--status-danger)',
+              }}>
+                <strong>Your account is suspended.</strong> You can still view existing data and manage
+                drivers/vehicles, but can't create quotes or invoices until you update your payment method.
+              </div>
+            )}
+
+            {grace && (
+              <div style={{
+                marginBottom: 16, padding: 14,
+                background: 'var(--status-warning-bg)', border: '1px solid var(--status-warning)',
+                borderRadius: 2, fontSize: 13, color: 'var(--text-primary)',
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                  We couldn't charge your card
+                </div>
+                <div style={{ color: 'var(--status-warning)', fontWeight: 500 }}>
+                  {grace.days_remaining > 0
+                    ? `${grace.days_remaining} day${grace.days_remaining === 1 ? '' : 's'} left to resolve this before your account is suspended.`
+                    : 'Grace period has ended — a successful charge is needed to avoid suspension.'}
+                </div>
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              {PRO_PLAN.features.map(f => (
-                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: isPro ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}>
-                  <span style={{ color: isPro ? 'var(--accent-primary)' : 'var(--border-subtle)', fontSize: 14 }}>✓</span>
+              {PLAN_FEATURES.map(f => (
+                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: isPaid ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}>
+                  <span style={{ color: isPaid ? 'var(--accent-primary)' : 'var(--border-subtle)', fontSize: 14 }}>✓</span>
                   {f}
                 </div>
               ))}
             </div>
 
-            {!isPro && subStatus !== 'cancelled' && (
+            {isPaid && (
+              <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-tertiary)' }}>
+                Every delivered load is also charged {billingStatus?.flat_plan?.take_rate_pct}% of its invoice value
+                automatically to this card, on top of the monthly fee — see Billing History below for every charge taken.
+              </div>
+            )}
+
+            {!isPaid && subStatus !== 'cancelled' && !isSuspended && (
               <div style={{
                 marginTop: 16, padding: 12,
                 background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
@@ -281,7 +336,10 @@ export function BillingSettings() {
               }}>
                 <strong style={{ color: 'var(--accent-primary)' }}>Unlock the full platform</strong>
                 <br />
-                Subscribe to TruckWys Pro for AI-powered insights, Fast Pay capital access, and unlimited loads.
+                Subscribe to TruckWys for AI-powered insights, Fast Pay capital access, and unlimited loads —
+                one flat fee of {formatRand(flatPlan?.amount)}/month, whatever your fleet size,{' '}
+                <strong>plus {flatPlan?.take_rate_pct}% of every delivered load's value</strong>, charged
+                automatically to the same card the moment each load is delivered.
               </div>
             )}
           </div>
@@ -301,7 +359,7 @@ export function BillingSettings() {
             <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
               <thead>
                 <tr>
-                  {['Payment ID', 'Plan', 'Date', 'Amount', 'Status'].map(h => (
+                  {['Charge', 'Reference', 'Date', 'Amount', 'Status'].map(h => (
                     <th key={h} style={{
                       padding: '10px 20px', textAlign: 'left' as const,
                       fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
@@ -314,17 +372,17 @@ export function BillingSettings() {
               <tbody>
                 {billingHistory.map((tx, i) => (
                   <tr key={tx.id} style={{ borderBottom: i < billingHistory.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                    <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>
-                      {tx.payfast_payment_id || tx.payment_id || tx.id}
+                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-primary)' }}>
+                      {tx.label}
                     </td>
-                    <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
-                      {tx.plan || '—'}
+                    <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                      {tx.reference || '—'}
                     </td>
                     <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
                       {new Date(tx.created_at).toLocaleDateString('en-ZA')}
                     </td>
                     <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>
-                      R {Number(tx.amount).toLocaleString()}
+                      {formatRand(tx.amount)}
                     </td>
                     <td style={{ padding: '12px 20px' }}>
                       <span style={{

@@ -48,6 +48,15 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
 };
 
+// Maps the activity endpoint's event subtypes to a row label + dot color.
+const ACTIVITY_META: Record<string, { label: string; color: string }> = {
+  login: { label: 'Signed in', color: 'var(--status-success)' },
+  logout: { label: 'Signed out', color: 'var(--text-tertiary)' },
+  revoked: { label: 'Session revoked', color: 'var(--status-danger)' },
+  revoked_others: { label: 'Other sessions revoked', color: 'var(--status-danger)' },
+  revoked_all: { label: 'All sessions revoked', color: 'var(--status-danger)' },
+};
+
 interface ToggleRowProps {
   label: string;
   description?: string;
@@ -106,6 +115,9 @@ export function SecuritySettings() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [activity, setActivity] = useState<any[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(true);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -123,8 +135,21 @@ export function SecuritySettings() {
       .finally(() => setLoadingSessions(false));
   };
 
+  const loadActivity = () => {
+    setLoadingActivity(true);
+    return fetchData('api/v1/auth/sessions/activity/')
+      .then((d: any) => {
+        setActivity(Array.isArray(d) ? d : (d?.results || []));
+      })
+      .catch(() => {
+        setActivity([]);
+      })
+      .finally(() => setLoadingActivity(false));
+  };
+
   useEffect(() => {
     loadSessions();
+    loadActivity();
     // Load persisted security toggles
     fetchData('api/v1/auth/security-settings/')
       .then((s: any) => {
@@ -160,12 +185,49 @@ export function SecuritySettings() {
     setRevokingId(id);
     try {
       await deleteData({ url: `api/v1/auth/sessions/${id}/` });
-      await loadSessions();
+      await Promise.all([loadSessions(), loadActivity()]);
       toast.success('Session revoked');
     } catch (err) {
       toast.error('Failed to revoke session');
     } finally {
       setRevokingId(null);
+    }
+  };
+
+  const otherCount = sessions.filter(s => !s.current).length;
+  const hasOthers = otherCount > 0;
+
+  const handleBulkLogout = async () => {
+    if (hasOthers) {
+      if (!window.confirm(`Sign out ${otherCount} other session${otherCount === 1 ? '' : 's'}? Those devices will need to log in again.`)) return;
+      setBulkBusy(true);
+      try {
+        await deleteData({ url: 'api/v1/auth/sessions/?scope=others' });
+        await Promise.all([loadSessions(), loadActivity()]);
+        toast.success('Signed out other sessions');
+      } catch (err) {
+        toast.error('Failed to sign out other sessions');
+      } finally {
+        setBulkBusy(false);
+      }
+    } else {
+      if (!window.confirm('Sign out ALL sessions, including this one? You will be returned to the login screen.')) return;
+      setBulkBusy(true);
+      try {
+        await deleteData({ url: 'api/v1/auth/sessions/?scope=all' });
+        // Mirrors OSLayout.tsx's signOut() client-side cleanup — the server has
+        // already killed this session, so no further authenticated calls.
+        localStorage.removeItem('access');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('onboarding_done');
+        queryClient.clear();
+        toast.success('Signed out everywhere');
+        navigate('/login');
+      } catch (err) {
+        setBulkBusy(false);
+        toast.error('Failed to sign out');
+      }
     }
   };
 
@@ -311,6 +373,58 @@ export function SecuritySettings() {
               )}
             </div>
           ))}
+          <div style={{
+            display: 'flex', justifyContent: 'flex-end',
+            padding: '12px 20px', borderTop: '1px solid var(--border-row)',
+          }}>
+            <button
+              onClick={handleBulkLogout}
+              disabled={bulkBusy}
+              style={{
+                background: 'none', border: '1px solid var(--status-danger)',
+                color: 'var(--status-danger)', padding: '6px 12px',
+                fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                cursor: bulkBusy ? 'default' : 'pointer',
+                letterSpacing: '0.05em', opacity: bulkBusy ? 0.5 : 1,
+              }}
+            >{bulkBusy ? 'WORKING...' : hasOthers ? 'LOG OUT OTHER SESSIONS' : 'LOG OUT ALL SESSIONS'}</button>
+          </div>
+          </div>
+        )}
+      </div>
+
+      {/* Login Activity */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <span style={sectionTitleStyle}>Login Activity</span>
+        </div>
+        {loadingActivity ? (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>Loading activity...</div>
+        ) : activity.length === 0 ? (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>No recent activity</div>
+        ) : (
+          <div>
+          {activity.map((a, i) => {
+            const meta = ACTIVITY_META[a.event]
+              || (a.action === 'LOGIN' ? ACTIVITY_META.login : ACTIVITY_META.logout);
+            return (
+              <div key={a.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '12px 20px', borderBottom: i < activity.length - 1 ? '1px solid var(--border-row)' : 'none',
+              }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                  background: meta.color,
+                }} />
+                <div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 2 }}>{meta.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                    {a.device} · {a.ip} · {formatRelativeTime(a.time)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
           </div>
         )}
       </div>

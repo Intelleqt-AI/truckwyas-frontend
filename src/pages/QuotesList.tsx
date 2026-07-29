@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/formatters";
 import { LiveBadge } from "@/components/LiveBadge";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
+import { ConvertToBookingModal } from "@/components/ConvertToBookingModal";
 import {
   DndContext,
   DragEndEvent,
@@ -159,6 +160,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
   const [activeQuoteId, setActiveQuoteId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void } | null>(null);
+  const [pendingConvertQuote, setPendingConvertQuote] = useState<any>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -198,22 +200,41 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       patchData({ url: `api/v1/quotes/${id}/`, data: { status } }),
-    onSuccess: () => {
+    // Optimistic: move the card in the cache immediately on drop, instead of
+    // waiting for the PATCH round-trip — otherwise the card snaps back to its
+    // old column the instant you let go, then jumps to the new one only once
+    // the network response arrives (very visible on a slow connection).
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['quotes'] });
+      const previous = queryClient.getQueryData(['quotes']);
+      queryClient.setQueryData(['quotes'], (old: any) => {
+        const list: any[] = old?.results || old || [];
+        const updated = list.map(q => String(q.id) === id ? { ...q, status } : q);
+        return old?.results ? { ...old, results: updated } : updated;
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(['quotes'], context.previous);
+      toast.error('Failed to update quote status — reverted.');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
     },
   });
 
   const convertToLoadMutation = useMutation({
-    mutationFn: (quote: any) =>
+    mutationFn: ({ quote, driverId, vehicleId }: { quote: any; driverId: string; vehicleId: string }) =>
       postData({
         url: `api/v1/quotes/${quote.id}/convert_to_load/`,
-        data: {},
-      }),
-    onSuccess: (_data, quote) => {
+        data: { driver_id: driverId, vehicle_id: vehicleId },
+      }).then(data => ({ data, quote })),
+    onSuccess: ({ quote }) => {
       // Invalidate both keys — QuotesList uses 'loads', LoadsList uses 'loads-list'
       queryClient.invalidateQueries({ queryKey: ['loads'] });
       queryClient.invalidateQueries({ queryKey: ['loads-list'] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      setPendingConvertQuote(null);
       toast.success(`Quote ${quote.quote_number} converted to load`);
     },
     onError: (err: any) => {
@@ -223,12 +244,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
 
   const handleConvertToLoad = (e: React.MouseEvent, quote: any) => {
     e.stopPropagation();
-    setConfirmOpts({
-      title: 'Convert to Booking',
-      message: `Convert ${quote.quote_number} to an active booking/load?`,
-      confirmLabel: 'Convert',
-      onConfirm: () => convertToLoadMutation.mutate(quote),
-    });
+    setPendingConvertQuote(quote);
   };
 
   const filteredLoads = loads.filter(l =>
@@ -282,9 +298,11 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
     const quote = quotes.find(q => String(q.id) === quoteId);
     if (!quote || quote.status === newStatus) return;
 
-    // Dragging to In-Transit must create a load record, not just patch status
+    // Dragging to In-Transit must create a load record, not just patch status —
+    // and that now requires picking a driver + vehicle, so open the same modal
+    // the "Convert to Booking" button uses rather than converting immediately.
     if (newStatus === 'IT') {
-      convertToLoadMutation.mutate(quote);
+      setPendingConvertQuote(quote);
     } else {
       statusMutation.mutate({ id: quoteId, status: newStatus });
     }
@@ -304,9 +322,6 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
               <LiveBadge />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-action" style={{ background: 'var(--accent-primary)', color: 'var(--bg-deep)' }} onClick={() => navigate('/bookings/quotes/ai-chat')}>
-                AI quote
-              </button>
               <button className="btn-action" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={() => navigate('/bookings/quotes/new')}>
                 + New quote
               </button>
@@ -529,6 +544,16 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
           confirmLabel={confirmOpts.confirmLabel}
           onConfirm={confirmOpts.onConfirm}
           onCancel={() => setConfirmOpts(null)}
+        />
+      )}
+
+      {pendingConvertQuote && (
+        <ConvertToBookingModal
+          quoteNumber={pendingConvertQuote.quote_number}
+          vehicleType={pendingConvertQuote.vehicle_type}
+          busy={convertToLoadMutation.isPending}
+          onConfirm={(driverId, vehicleId) => convertToLoadMutation.mutate({ quote: pendingConvertQuote, driverId, vehicleId })}
+          onCancel={() => setPendingConvertQuote(null)}
         />
       )}
     </div>

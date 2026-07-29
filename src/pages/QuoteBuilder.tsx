@@ -11,6 +11,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Dialog, DialogTrigger, DialogContent } from "@/components/ui/dialog";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
 import { MessageCircle, Map, Info, Sparkles, Maximize2, Mic, Square } from "lucide-react";
 
 /**
@@ -33,6 +34,9 @@ const extractCode = (s: string) => {
   for (const key in m) if (k.includes(key)) return m[key];
   return (s || "").slice(0, 3).toUpperCase();
 };
+// Mirrors the backend's country detection (core/services/cross_border.py):
+// anything that isn't South Africa itself counts as a foreign location.
+const isForeignCountry = (code?: string) => !!code && !["ZA", "ZAF"].includes(code.toUpperCase());
 
 interface TollBreakdownItem { plaza: string; route: string; location_km: number; tariff: number; }
 interface RouteOption {
@@ -74,8 +78,7 @@ export default function QuoteBuilder() {
   const [cargo, setCargo] = useState("");
   const [pickupDate, setPickupDate] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
-  const [tripType, setTripType] = useState<"ONE_WAY" | "ROUND_TRIP">("ROUND_TRIP");
-  const [crossBorder, setCrossBorder] = useState(true);
+  const [tripType, setTripType] = useState<"ONE_WAY" | "ROUND_TRIP">("ONE_WAY");
   const [notes, setNotes] = useState("");
   const [validUntil, setValidUntil] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10);
@@ -105,12 +108,25 @@ export default function QuoteBuilder() {
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
   const [calculatingRoute, setCalculatingRoute] = useState(false);
+  // Set when the backend's cross-border company-policy gate refuses this
+  // route (RouteCalculatorView) — shown in place of the cost breakdown.
+  const [routeBlockedMessage, setRouteBlockedMessage] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<any>(null);
   const [optimizing, setOptimizing] = useState(false);
   const [guard, setGuard] = useState<any>(null);
   const [benchmark, setBenchmark] = useState<any>(null);
   const [nlText, setNlText] = useState("");
   const [nlBusy, setNlBusy] = useState(false);
+  // Persistent AI conversation — every message and reply lands here (see
+  // AIChatPanel) instead of a one-shot toast with no way to reply to it.
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
+  // In-progress "create this client/vehicle type" mini-conversation (see
+  // backend/core/services/quote_entity_chat.py) — round-tripped every turn
+  // since the endpoint is otherwise stateless. declinedEntities remembers
+  // names the user said no to this session so they aren't re-asked.
+  const [pendingEntity, setPendingEntity] = useState<any>(null);
+  const [declinedEntities, setDeclinedEntities] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [savedQuoteId, setSavedQuoteId] = useState<number | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -149,16 +165,34 @@ export default function QuoteBuilder() {
   const fuelPricePerL = Number(fuelPrice?.diesel_inland) || Number(companyProfile?.fuel_price_per_litre) || 21.7;
   const fuelConsumption = Number(selectedVT?.fuel_consumption_l_per_100km) || FUEL_FALLBACK[vehicleType] || 32;
 
-  // Apply company defaults once loaded. The per-km rate is the company default
-  // (VehicleType.base_rate is a flat/min figure, not a per-km rate).
+  // Fallback only, for before any vehicle type is picked — once one is
+  // selected, applyVehicleType() below takes over and uses that type's own
+  // rate instead (Settings > Vehicle Types labels this field "R/km", so it's
+  // the more specific, more correct source once it's available).
   useEffect(() => {
-    if (companyProfile) {
+    if (companyProfile && !vehicleType) {
       if (companyProfile.default_base_rate_per_km) setBaseRatePerKm(String(companyProfile.default_base_rate_per_km));
-      if (companyProfile.allow_cross_border === false) setCrossBorder(false);
     }
-  }, [companyProfile]);
+  }, [companyProfile, vehicleType]);
 
-  const ready = !!(customerId && vehicleType && pickup && delivery && pickupCoords && deliveryCoords);
+  // Selecting a vehicle type prefills the per-km rate from that type's own
+  // configured rate, falling back to the company default if it has none set.
+  // This only runs on an actual selection (called from the dropdown's
+  // onChange, AI/voice extraction, and resuming a draft) — never from a
+  // passive effect keyed on the selected type, which would incorrectly
+  // re-fire and clobber the saved rate whenever an existing quote is loaded
+  // for editing (its own saved base_rate/distance is restored separately).
+  const applyVehicleType = (name: string) => {
+    setVehicleType(name);
+    const vt = vehicleTypes.find((v: any) => v.name === name);
+    if (vt?.base_rate) {
+      setBaseRatePerKm(String(vt.base_rate));
+    } else if (companyProfile?.default_base_rate_per_km) {
+      setBaseRatePerKm(String(companyProfile.default_base_rate_per_km));
+    }
+  };
+
+  const ready = !!(customerId && vehicleType && pickup && delivery && pickupCoords && deliveryCoords && Number(weight) > 0);
 
   // ---- derived costs ----
   const route = routeData?.routes?.[selectedRouteIndex] || null;
@@ -196,18 +230,32 @@ export default function QuoteBuilder() {
   const calculateRoute = async () => {
     if (!pickupCoords || !deliveryCoords) return;
     setCalculatingRoute(true);
+    setRouteBlockedMessage(null);
     try {
       const data = await postData({ url: "/api/v1/route/calculate/", data: {
         origin: pickup, destination: delivery,
         origin_lat: pickupCoords.lat, origin_lon: pickupCoords.lon, origin_country: pickupCoords.country_code,
         dest_lat: deliveryCoords.lat, dest_lon: deliveryCoords.lon, dest_country: deliveryCoords.country_code,
-        vehicle_type: vehicleType || "Flatbed", cross_border_enabled: crossBorder, weight_kg: weightKg || 20000,
+        vehicle_type: vehicleType || "Flatbed", weight_kg: weightKg || 20000,
       }});
       if (data?.success !== false) {
         setRouteData(data);
         setSelectedRouteIndex(data.best_index ?? 0);
       }
-    } catch { toast.error("Couldn't calculate the route"); }
+    } catch (e: any) {
+      // Company policy gate (see RouteCalculatorView): this route genuinely
+      // crosses a border but the company isn't set up for cross-border work.
+      // Surface the real reason instead of a generic failure toast. Api.ts's
+      // response interceptor reshapes axios errors into a plain Error with
+      // .data/.status (not .response.data) — read from there, not .response.
+      const body = e?.data;
+      if (body?.error === "cross_border_not_allowed") {
+        setRouteBlockedMessage(body.message || "This route isn't allowed for your company.");
+        setRouteData(null);
+      } else {
+        toast.error("Couldn't calculate the route");
+      }
+    }
     finally { setCalculatingRoute(false); }
   };
 
@@ -217,7 +265,7 @@ export default function QuoteBuilder() {
     calcRef.current = setTimeout(() => { calculateRoute(); }, 500);
     return () => { if (calcRef.current) clearTimeout(calcRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, pickupCoords, deliveryCoords, vehicleType, crossBorder]);
+  }, [ready, pickupCoords, deliveryCoords, vehicleType]);
 
   // ---- AI analyze + guard + benchmark once cost is ready ----
   const analyzeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -281,26 +329,51 @@ export default function QuoteBuilder() {
   };
 
   // ---- natural-language input (typed or transcribed from voice) ----
+  // Shared by the top quick-fill bar and the AI chat panel — both are just
+  // different entry points into the same conversation, so every message
+  // (whichever surface it came from) is recorded in chatMessages with real
+  // history/current_fields sent to the backend for follow-up context.
   const submitNL = async (textOverride?: string) => {
     const text = (textOverride ?? nlText).trim();
     if (!text) return;
+    const history = chatMessages.map(m => ({ role: m.role, content: m.text }));
+    setChatMessages(prev => [...prev, { role: "user", text }]);
+    setChatOpen(true);
     setNlBusy(true);
     try {
-      const res = await postData({ url: "api/v1/ai/chat-quote/", data: { message: text, history: [], current_fields: {} } });
+      const selectedCustomerName = customers.find((c: any) => String(c.id) === customerId)?.name || "";
+      const current_fields = {
+        pickup_location: pickup, delivery_location: delivery, weight_kg: weightKg,
+        vehicle_type: vehicleType, customer_name: selectedCustomerName, cargo_description: cargo,
+        pickup_date: pickupDate, delivery_date: deliveryDate, valid_until: validUntil, trip_type: tripType,
+      };
+      const res = await postData({ url: "api/v1/ai/chat-quote/", data: {
+        message: text, history, current_fields,
+        pending_entity: pendingEntity, declined_entities: declinedEntities,
+      } });
+      setPendingEntity(res?.pending_entity ?? null);
+      if (res?.declined_entity) setDeclinedEntities(prev => [...prev, String(res.declined_entity).toLowerCase()]);
       const f = res?.extracted_fields || {};
+      // A client/vehicle type just created via chat isn't in the cached
+      // dropdown list yet — refetch so it actually appears as a selectable option.
+      if (f.customer_id) queryClient.invalidateQueries({ queryKey: ["customers"] });
+      if (f.vehicle_type) queryClient.invalidateQueries({ queryKey: ["vehicle-types"] });
       if (f.pickup_location) { setPickup(f.pickup_location); const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(f.pickup_location)}`).catch(() => null); const s = g?.results?.[0] || g?.[0]; if (s) setPickupCoords({ lat: s.lat, lon: s.lon }); }
       if (f.delivery_location) { setDelivery(f.delivery_location); const g = await fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(f.delivery_location)}`).catch(() => null); const s = g?.results?.[0] || g?.[0]; if (s) setDeliveryCoords({ lat: s.lat, lon: s.lon }); }
       if (f.cargo_description) setCargo(f.cargo_description);
       if (f.weight) setWeight(String((f.weight / 1000) || ""));
-      if (f.vehicle_type) setVehicleType(f.vehicle_type);
+      if (f.vehicle_type) applyVehicleType(f.vehicle_type);
+      if (f.customer_id) setCustomerId(String(f.customer_id));
       if (f.pickup_date) setPickupDate(f.pickup_date);
       if (f.delivery_date) setDeliveryDate(f.delivery_date);
       if (f.valid_until) setValidUntil(f.valid_until);
       if (f.trip_type === "ONE_WAY" || f.trip_type === "ROUND_TRIP") setTripType(f.trip_type);
       if (f.pickup_location || f.delivery_location || f.pickup_date || f.delivery_date) setShowDetails(true);
-      toast.success(res?.reply || "Filled from your description");
+      setChatMessages(prev => [...prev, { role: "assistant", text: res?.reply || "Got it — updated the form.", link: res?.link || undefined }]);
       if (!textOverride) setNlText("");
-    } catch { toast.error("Couldn't read that — try the fields instead"); }
+    } catch {
+      setChatMessages(prev => [...prev, { role: "assistant", text: "Sorry, I couldn't read that — try rephrasing or use the fields directly." }]);
+    }
     finally { setNlBusy(false); }
   };
 
@@ -356,7 +429,7 @@ export default function QuoteBuilder() {
 
   const applyResumable = () => {
     const d = resumable; if (!d) return;
-    setCustomerId(d.customerId || ""); setVehicleType(d.vehicleType || "");
+    setCustomerId(d.customerId || ""); if (d.vehicleType) applyVehicleType(d.vehicleType);
     setPickup(d.pickup || ""); setDelivery(d.delivery || "");
     setPickupCoords(d.pickupCoords || null); setDeliveryCoords(d.deliveryCoords || null);
     setWeight(d.weight || ""); setCargo(d.cargo || ""); setNotes(d.notes || "");
@@ -375,45 +448,79 @@ export default function QuoteBuilder() {
     setSavedQuoteId(null); setLastSavedAt(null); setResumable(null);
     setCustomerId(""); setVehicleType(""); setPickup(""); setDelivery("");
     setPickupCoords(null); setDeliveryCoords(null);
-    setWeight(""); setCargo(""); setNotes(""); setTripType("ROUND_TRIP");
+    setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
     setPickupDate(""); setDeliveryDate(""); setShowDetails(false); setNlText("");
     setEditableTollCost(null); setTollManuallyEdited(false); setDriverAllowanceInput("0"); setServiceCharge(0);
-    setRouteData(null); setSelectedRouteIndex(0);
+    setRouteData(null); setSelectedRouteIndex(0); setRouteBlockedMessage(null);
     setAnalysis(null); setGuard(null); setBenchmark(null);
+    setChatMessages([]); setChatOpen(false); setPendingEntity(null); setDeclinedEntities([]);
+    { const d = new Date(); d.setDate(d.getDate() + 7); setValidUntil(d.toISOString().slice(0, 10)); }
     if (isEditing) navigate("/bookings/quotes/new", { replace: true });
     toast.success("Started a new quote");
   };
 
   const draftRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Holds a closure over "what would be saved right now" — read by the
+  // unmount-flush effect below so navigating away mid-debounce still writes
+  // the latest edits instead of the pending save just getting cancelled.
+  const draftFlushRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (isEditing) return;
     // Don't persist an empty form — otherwise a blank "New quote" mount would
     // overwrite (and destroy) the unsaved draft the Resume banner is offering.
     if (!(customerId || pickup || delivery)) return;
     if (draftRef.current) clearTimeout(draftRef.current);
-    draftRef.current = setTimeout(() => {
+    const doSave = () => {
       try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType })); } catch { /* ignore */ }
-    }, 800);
+    };
+    draftFlushRef.current = doSave;
+    draftRef.current = setTimeout(() => { draftFlushRef.current = null; doSave(); }, 800);
     return () => { if (draftRef.current) clearTimeout(draftRef.current); };
   }, [isEditing, customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType]);
+
+  // Runs its cleanup ONLY on true unmount (empty deps) — unlike the effect
+  // above, whose cleanup also fires on every keystroke as it re-debounces.
+  // This is what actually flushes a still-pending save when the user leaves
+  // the page before the debounce timer would have fired on its own.
+  useEffect(() => {
+    return () => { draftFlushRef.current?.(); };
+  }, []);
+
+  // Backend stores coords as DecimalField(max_digits=12, decimal_places=7) —
+  // a raw JS float (map click, some geocoders) can carry 15+ significant
+  // digits and gets rejected outright ("no more than 12 digits in total").
+  // 6dp (~11cm precision) is far more than a freight quote needs.
+  const round6 = (n?: number) => (n == null ? n : Math.round(n * 1e6) / 1e6);
+  // Same class of bug as the coordinates above, different field: base_rate,
+  // fuel_surcharge, toll_charges, driver_allowance, additional_charges and
+  // total_amount are all DecimalField(max_digits=10, decimal_places=2) —
+  // summing floats (weightSurcharge + crossBorderCost + serviceCharge, etc.)
+  // can leave a trailing artifact like 2269.0000000000002, which fails
+  // "no more than 10 digits" before Django ever gets to round it to 2dp.
+  const round2 = (n: number) => Math.round(n * 100) / 100;
 
   // ---- build the save payload (matches production) ----
   const buildPayload = (status: "DRAFT" | "SENT") => ({
     customer: parseInt(customerId), pickup_location: pickup, delivery_location: delivery,
     pickup_date: pickupDate || null, delivery_date: deliveryDate || null,
     origin: extractCode(pickup), destination: extractCode(delivery),
-    pickup_lat: pickupCoords?.lat, pickup_lng: pickupCoords?.lon, delivery_lat: deliveryCoords?.lat, delivery_lng: deliveryCoords?.lon,
+    pickup_lat: round6(pickupCoords?.lat), pickup_lng: round6(pickupCoords?.lon), delivery_lat: round6(deliveryCoords?.lat), delivery_lng: round6(deliveryCoords?.lon),
     cargo_description: cargo || `${weight || 0}t ${vehicleType}`.trim(), weight: weightKg, distance,
     estimated_duration_minutes: route?.duration_min ? Math.round(route.duration_min) : (routeData?.duration_minutes || null),
-    vehicle_type: vehicleType, base_rate: baseCost, fuel_surcharge: fuelCost, toll_charges: tollCost,
-    driver_allowance: driverAllowance, additional_charges: weightSurcharge + crossBorderCost + serviceCharge,
-    total_amount: total, margin_percentage: marginPct, notes, status, confidence: "MEDIUM",
+    vehicle_type: vehicleType, base_rate: round2(baseCost), fuel_surcharge: round2(fuelCost), toll_charges: round2(tollCost),
+    driver_allowance: round2(driverAllowance), additional_charges: round2(weightSurcharge + crossBorderCost + serviceCharge),
+    total_amount: round2(total), margin_percentage: marginPct, notes, status, confidence: "MEDIUM",
     sla_hours: Number(companyProfile?.default_sla_hours) || 48, valid_until: validUntil, trip_type: tripType,
     win_probability: opt?.win_probability_at_optimal != null ? Math.round(opt.win_probability_at_optimal * 100) : null,
   });
 
   // ---- auto-save DB draft once substantive (debounced) ----
   const dbRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Same "flush on real unmount" pattern as the localStorage draft above —
+  // without it, filling in the form and immediately navigating away (within
+  // the 1.5s debounce window) cancelled the pending save instead of firing
+  // it, so the quote was never actually written to the database at all.
+  const dbFlushRef = useRef<((isFlush: boolean) => void) | null>(null);
   const substantive = ready && total > 0;
   useEffect(() => {
     // Autosave a brand-new quote, or one we created this session (createdRef).
@@ -421,7 +528,7 @@ export default function QuoteBuilder() {
     if (isEditing && !createdRef.current) return;
     if (!substantive) return;
     if (dbRef.current) clearTimeout(dbRef.current);
-    dbRef.current = setTimeout(async () => {
+    const doSave = async (isFlush: boolean) => {
       const existingId = savedIdRef.current ?? savedQuoteId;
       try {
         if (existingId) {
@@ -439,21 +546,33 @@ export default function QuoteBuilder() {
             localStorage.removeItem(DRAFT_KEY);
             setResumable(null);
             queryClient.invalidateQueries({ queryKey: ["quotes"] });
-            navigate(`/bookings/quotes/${res.id}/edit`, { replace: true });
+            // A flush-on-unmount save means the user is already navigating
+            // somewhere else on their own — redirecting them back to this
+            // quote's edit URL would fight that. Still save, just don't redirect.
+            if (!isFlush) navigate(`/bookings/quotes/${res.id}/edit`, { replace: true });
           }
           creatingRef.current = false;
         }
         setLastSavedAt(new Date());
       } catch { creatingRef.current = false; /* silent — localStorage still holds it */ }
-    }, 1500);
+    };
+    dbFlushRef.current = doSave;
+    dbRef.current = setTimeout(() => { dbFlushRef.current = null; doSave(false); }, 1500);
     return () => { if (dbRef.current) clearTimeout(dbRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [substantive, total, customerId, vehicleType, pickup, delivery, tollCost, driverAllowance, serviceCharge]);
 
+  // True unmount only (empty deps) — flushes whatever save is still pending
+  // the instant the user actually leaves the page.
+  useEffect(() => {
+    return () => { dbFlushRef.current?.(true); };
+  }, []);
+
   // ---- explicit save / send ----
   const save = async (send: boolean) => {
     if (!customerId) { toast.error("Pick a client first"); return; }
-    if (!ready) { toast.error("Add vehicle type, collection and delivery"); return; }
+    if (!ready) { toast.error("Add vehicle type, collection, delivery and weight"); return; }
+    if (routeBlockedMessage) { toast.error(routeBlockedMessage); return; }
     setSaving(true);
     try {
       let quoteId = savedQuoteId || (isEditing ? Number(editId) : null);
@@ -548,6 +667,8 @@ export default function QuoteBuilder() {
   // ---- styles ----
   const cardS: React.CSSProperties = { background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, boxShadow: "var(--shadow-card)" };
   const labelS: React.CSSProperties = { fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.04em", textTransform: "uppercase" };
+  // Marks a field required for the cost calculation to run (see `ready`).
+  const Req = () => <span style={{ display: "inline-block", width: 4, height: 4, borderRadius: "50%", background: "var(--status-danger)", marginLeft: 5, verticalAlign: "middle" }} />;
   const inputS: React.CSSProperties = { background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: "9px 11px", color: "var(--text-primary)", fontSize: 14, width: "100%", outline: "none" };
   const dot = (c: string): React.CSSProperties => ({ width: 7, height: 7, borderRadius: 2, background: c, flexShrink: 0 });
 
@@ -579,9 +700,9 @@ export default function QuoteBuilder() {
             {saving ? "Saving…" : lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Auto-saves as you work"}
             <span style={dot(saving ? "var(--status-warning)" : lastSavedAt ? "var(--status-success)" : "var(--text-tertiary)")} />
           </div>
-          <button onClick={startNew} title="Start a fresh quote (this one stays saved)"
+          <button onClick={startNew} title="Clear every field and start a fresh quote (this one stays saved)"
             style={{ fontSize: 13, fontWeight: 500, background: "transparent", color: "var(--accent-primary)", border: "1px solid var(--accent-primary)", borderRadius: 4, padding: "6px 12px", cursor: "pointer" }}>
-            + New quote
+            Clear &amp; New Quote
           </button>
         </div>
       </div>
@@ -637,45 +758,58 @@ export default function QuoteBuilder() {
       {/* 1 — inputs */}
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
         <div>
-          <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Client</span><span onClick={() => navigate("/customers")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span></div>
+          <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Client<Req /></span><span onClick={() => navigate("/customers")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span></div>
           <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={inputS}>
             <option value="">Select client…</option>
             {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
         <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Vehicle type</div>
-          <select value={vehicleType} onChange={e => setVehicleType(e.target.value)} style={inputS}>
+          <div style={{ ...labelS, marginBottom: 5 }}>Vehicle type<Req /></div>
+          <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS}>
             <option value="">Select…</option>
             {vehicleTypes.map((v: any) => <option key={v.id || v.name} value={v.name}>{v.name}</option>)}
           </select>
         </div>
         <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Collection</div>
+          <div style={{ ...labelS, marginBottom: 5 }}>Collection<Req /></div>
           <LocationInput value={pickup} onChange={(v, c) => { setPickup(v); setPickupCoords(c || null); }} placeholder="City / address" style={inputS} />
         </div>
         <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Delivery</div>
+          <div style={{ ...labelS, marginBottom: 5 }}>Delivery<Req /></div>
           <LocationInput value={delivery} onChange={(v, c) => { setDelivery(v); setDeliveryCoords(c || null); }} placeholder="City / address" style={inputS} />
         </div>
       </div>
+
+      {/* Early heads-up the moment a picked location is outside SA, before the
+          rest of the form is even filled in — the real enforcement (blocking
+          the actual quote) only happens once /route/calculate runs, see
+          routeBlockedMessage below. This just avoids the user filling out the
+          whole form before finding out. */}
+      {companyProfile?.allow_cross_border === false && (isForeignCountry(pickupCoords?.country_code) || isForeignCountry(deliveryCoords?.country_code)) && (
+        <div style={{ ...cardS, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", marginBottom: 12, borderColor: "var(--status-warning)", background: "var(--status-warning-bg)" }}>
+          <Info size={14} color="var(--status-warning)" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+            This location is outside South Africa, but your company isn't set up for cross-border routes (Settings → Company Details). This quote will be refused once calculated — pick a domestic location or ask an admin to enable cross-border routes.
+          </span>
+        </div>
+      )}
 
       {/* details (collapsible) */}
       <div style={{ marginBottom: 18 }}>
         <button onClick={() => setShowDetails(s => !s)} style={{ ...labelS, background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}>{showDetails ? "▾" : "▸"} Details · weight, dates, trip type</button>
         {showDetails && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: 10 }}>
-            <div><div style={{ ...labelS, marginBottom: 5 }}>Weight (t)</div><input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} /></div>
+            <div><div style={{ ...labelS, marginBottom: 5 }}>Weight (t)<Req /></div><input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} /></div>
             <div><div style={{ ...labelS, marginBottom: 5 }}>Pickup date</div><input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} style={inputS} /></div>
             <div><div style={{ ...labelS, marginBottom: 5 }}>Delivery date</div><input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} style={inputS} /></div>
             <div><div style={{ ...labelS, marginBottom: 5 }}>Valid until</div><input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputS} /></div>
             <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Cargo</div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} /></div>
-            <div><div style={{ ...labelS, marginBottom: 5 }}>Trip</div>
+            <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Trip</div>
               <div style={{ display: "flex", gap: 6 }}>
                 {(["ONE_WAY", "ROUND_TRIP"] as const).map(t => <button key={t} onClick={() => setTripType(t)} style={{ ...inputS, width: "auto", flex: 1, cursor: "pointer", background: tripType === t ? "var(--accent-primary)" : "var(--input-bg)", color: tripType === t ? "var(--btn-action-color)" : "var(--text-secondary)", fontSize: 12 }}>{t === "ONE_WAY" ? "One way" : "Round"}</button>)}
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "flex-end" }}><label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-secondary)", cursor: "pointer" }}><input type="checkbox" checked={crossBorder} onChange={e => setCrossBorder(e.target.checked)} disabled={companyProfile?.allow_cross_border === false} /> Cross-border routes</label></div>
           </div>
         )}
       </div>
@@ -702,12 +836,18 @@ export default function QuoteBuilder() {
             <div style={{ ...labelS, marginBottom: 8 }}>Cost breakdown · {vehicleType || "—"}</div>
             {!ready && (
               <div style={{ padding: "30px 4px", textAlign: "center", color: "var(--text-tertiary)" }}>
-                <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Add a client, vehicle type, collection and delivery</div>
+                <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Add a client, vehicle type, collection, delivery and weight</div>
                 <div style={{ fontSize: 12, marginTop: 6 }}>Costs and the AI quote appear here automatically.</div>
               </div>
             )}
-            {ready && calculatingRoute && <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Calculating route…</div>}
-            {ready && !calculatingRoute && (<>
+            {ready && routeBlockedMessage && (
+              <div style={{ padding: "20px 4px" }}>
+                <div style={{ fontSize: 13, color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Route not allowed</div>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{routeBlockedMessage}</div>
+              </div>
+            )}
+            {ready && !routeBlockedMessage && calculatingRoute && <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Calculating route…</div>}
+            {ready && !routeBlockedMessage && !calculatingRoute && (<>
               {[
                 { key: "fuel", l: `Fuel — ${fuelConsumption} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
@@ -746,6 +886,46 @@ export default function QuoteBuilder() {
                         </PopoverContent>
                       </Popover>
                     )}
+                    {r.key === "cb" && (() => {
+                      const border = routeData?.additional_costs?.border_fees || 0;
+                      const weighbridge = routeData?.additional_costs?.weighbridge_fees || 0;
+                      const nonSaTolls = routeData?.additional_costs?.non_sa_tolls || 0;
+                      const cbRows = [
+                        { label: "Border fees", v: border },
+                        { label: "Weighbridge fees", v: weighbridge },
+                        { label: "Non-SA tolls", v: nonSaTolls },
+                      ].filter(row => row.v > 0);
+                      const cbOneWayTotal = border + weighbridge + nonSaTolls;
+                      return (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button type="button" title="Cross-border breakdown"
+                              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1 }}>
+                              <Info size={11} />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                            <div style={{ ...labelS, marginBottom: 8 }}>
+                              Cross-border charges{routeData?.countries?.length ? ` · crosses ${routeData.countries.join("→")}` : ""}
+                            </div>
+                            {cbRows.length === 0 ? (
+                              <div style={{ color: "var(--text-tertiary)" }}>No itemised breakdown available for this route.</div>
+                            ) : (<>
+                              {cbRows.map((row, ri) => (
+                                <div key={ri} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "4px 0", borderBottom: "1px solid var(--border-row)" }}>
+                                  <span>{row.label}</span>
+                                  <span style={{ fontFamily: "var(--font-mono)", flexShrink: 0 }}>{formatCurrency(row.v)}</span>
+                                </div>
+                              ))}
+                              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border-subtle)", fontWeight: 600 }}>
+                                <span>One way total</span><span style={{ fontFamily: "var(--font-mono)" }}>{formatCurrency(cbOneWayTotal)}</span>
+                              </div>
+                              {legs === 2 && <div style={{ color: "var(--text-tertiary)", marginTop: 4 }}>× 2 for round trip = {formatCurrency(cbOneWayTotal * 2)}</div>}
+                            </>)}
+                          </PopoverContent>
+                        </Popover>
+                      );
+                    })()}
                   </span>
                   <span style={{ fontFamily: "var(--font-mono)" }}>{formatCurrency(r.v)}</span>
                 </div>
@@ -765,33 +945,50 @@ export default function QuoteBuilder() {
       </div>
 
       {/* 3 — AI quote */}
-      {ready && total > 0 && (
+      {ready && !routeBlockedMessage && total > 0 && (
         <div style={{ ...cardS, border: "1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-subtle))", marginBottom: 14 }}>
+          {/* still learning — shown first, above the price block, while under the outcome threshold */}
+          {aiLearning && (
+            <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-row)", background: "var(--status-warning-bg)", display: "flex", gap: 10, fontSize: 13 }}>
+              <Sparkles size={16} color="var(--status-warning)" style={{ flexShrink: 0 }} />
+              <div><b>AI pricing is still learning your fleet.</b><span style={{ color: "var(--text-secondary)" }}> Priced on true cost + your {vehicleType} base rate for now — the optimiser needs ~{winModel.outcomes_needed} completed loads to learn what wins with your clients ({winModel.outcomes_collected}/{winModel.outcomes_needed} logged). Every quote you close sharpens it.</span></div>
+            </div>
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.4fr" }}>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
-              <div style={labelS}>Recommended price</div>
-              {aiLoading ? aiSpinner : (<>
+              <div style={labelS}>{aiLearning ? "Suggested price" : "Recommended price"}</div>
+              {aiLoading ? aiSpinner : aiLearning ? (<>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{formatCurrency(total * 1.25)}</div>
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>true cost + 25%</div>
+              </>) : (<>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, color: "var(--accent-primary)", marginTop: 4 }}>{opt?.optimal_price ? formatCurrency(opt.optimal_price) : formatCurrency(total)}</div>
                 <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>to this client</div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={labelS}>Margin</div>
-              {aiLoading ? aiSpinner : (<>
+              {aiLoading ? aiSpinner : aiLearning ? (
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
+              ) : (<>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{opt?.optimal_margin_pct ? `${Math.round(opt.optimal_margin_pct)}%` : `${marginPct}%`}</div>
                 <div style={{ fontSize: 12, color: "var(--status-success)", marginTop: 2 }}>{formatCurrency(opt?.expected_profit ?? ((opt?.optimal_price || total) - directCost))} profit</div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={labelS}>Win probability</div>
-              {aiLoading ? aiSpinner : (<>
+              {aiLoading ? aiSpinner : aiLearning ? (
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
+              ) : (<>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{opt?.win_probability_at_optimal != null ? `${Math.round(opt.win_probability_at_optimal * 100)}%` : "—"}</div>
                 <div style={{ marginTop: 6, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((opt?.win_probability_at_optimal || 0) * 100)}%`, background: "var(--accent-primary)" }} /></div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px" }}>
               <div style={labelS}>Profit sweet-spot</div>
-              {aiLoading ? aiSpinner : curveData.length > 1 ? (
+              {aiLoading ? aiSpinner : aiLearning ? (
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
+              ) : curveData.length > 1 ? (
                 <ResponsiveContainer width="100%" height={62}>
                   <ComposedChart data={curveData} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
                     <defs><linearGradient id="qg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--status-success)" stopOpacity={0.35} /><stop offset="95%" stopColor="var(--status-success)" stopOpacity={0} /></linearGradient></defs>
@@ -813,14 +1010,6 @@ export default function QuoteBuilder() {
             </div>
           )}
 
-          {/* still learning */}
-          {aiLearning && (
-            <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border-row)", background: "var(--status-warning-bg)", display: "flex", gap: 10, fontSize: 13 }}>
-              <Sparkles size={16} color="var(--status-warning)" style={{ flexShrink: 0 }} />
-              <div><b>AI pricing is still learning your fleet.</b><span style={{ color: "var(--text-secondary)" }}> Priced on true cost + your {vehicleType} base rate for now — the optimiser needs ~{winModel.outcomes_needed} completed loads to learn what wins with your clients ({winModel.outcomes_collected}/{winModel.outcomes_needed} logged). Every quote you close sharpens it.</span></div>
-            </div>
-          )}
-
           {/* actions */}
           <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "14px 18px", borderTop: "1px solid var(--border-row)" }}>
             {opt && (opt.optimal_price || analysis?.suggested_price) && <button onClick={applyOptimal} style={{ fontSize: 14, fontWeight: 500, background: "transparent", border: "1px solid var(--accent-primary)", color: "var(--accent-primary)", borderRadius: 4, padding: "9px 14px", cursor: "pointer" }}>Apply recommended</button>}
@@ -833,6 +1022,8 @@ export default function QuoteBuilder() {
 
       {/* notes */}
       {ready && <div style={{ marginBottom: 40 }}><div style={{ ...labelS, marginBottom: 5 }}>Notes (optional)</div><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Anything for the client or your team…" style={{ ...inputS, resize: "vertical" }} /></div>}
+
+      <AIChatPanel messages={chatMessages} busy={nlBusy} open={chatOpen} onOpenChange={setChatOpen} onSend={(t) => submitNL(t)} />
     </div>
   );
 }

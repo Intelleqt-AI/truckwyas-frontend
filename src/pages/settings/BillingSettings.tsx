@@ -49,6 +49,7 @@ interface BillingStatus {
   subscription_status?: string | null;
   subscription_start?: string | null;
   next_billing_date?: string | null;
+  next_billing_at?: string | null;
   amount?: string;
   item_name?: string;
   flat_plan?: FlatPlan | null;
@@ -82,6 +83,50 @@ const PLAN_FEATURES = [
 
 const formatRand = (amount?: string | number | null) =>
   `R${Number(amount ?? 0).toLocaleString('en-ZA')}`;
+
+// Live-ticking countdown to next_billing_at. Under 48h out it ticks every
+// second (HH:MM:SS, or MM:SS once under an hour) so a fast test cycle is
+// actually watchable; beyond that it's just "in N days" — nobody needs a
+// second-by-second countdown to a charge three weeks away.
+function NextPaymentCountdown({ nextBillingAt }: { nextBillingAt?: string | null }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!nextBillingAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [nextBillingAt]);
+
+  if (!nextBillingAt) return null;
+  const targetMs = new Date(nextBillingAt).getTime();
+  const diffMs = targetMs - now;
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  let label: string;
+  if (diffMs <= 0) {
+    label = 'Payment processing…';
+  } else if (diffMs < 48 * 3600_000) {
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    label = h > 0
+      ? `Next payment in ${h}:${pad(m)}:${pad(s)}`
+      : `Next payment in ${pad(m)}:${pad(s)}`;
+  } else {
+    const days = Math.ceil(diffMs / 86400_000);
+    label = `Next payment in ${days} days`;
+  }
+
+  return (
+    <div style={{
+      fontSize: 12, color: 'var(--accent-primary)', marginTop: 2,
+      fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' as const,
+    }}>
+      {label} · {new Date(nextBillingAt).toLocaleDateString('en-ZA')}
+    </div>
+  );
+}
 
 export function BillingSettings() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -147,6 +192,7 @@ export function BillingSettings() {
 
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   const handleSubscribe = async () => {
     setSubscribing(true);
@@ -251,10 +297,9 @@ export function BillingSettings() {
                   )}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
-                  {isPaid
-                    ? `${formatRand(billingStatus?.amount)} / month${billingStatus?.next_billing_date ? ` · next charge ${new Date(billingStatus.next_billing_date).toLocaleDateString('en-ZA')}` : ''}`
-                    : 'No active subscription'}
+                  {isPaid ? `${formatRand(billingStatus?.amount)} / month` : 'No active subscription'}
                 </div>
+                {isPaid && <NextPaymentCountdown nextBillingAt={billingStatus?.next_billing_at} />}
                 {billingStatus?.card?.last4 && (
                   <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2, textTransform: 'capitalize' as const }}>
                     {billingStatus.card.bank ? `${billingStatus.card.bank} ` : ''}{billingStatus.card.card_type} card ending {billingStatus.card.last4}

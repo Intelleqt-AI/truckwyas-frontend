@@ -765,7 +765,7 @@ export default function QuoteBuilder() {
           </select>
         </div>
         <div>
-          <div style={{ ...labelS, marginBottom: 5 }}>Vehicle type<Req /></div>
+          <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Vehicle type<Req /></span><span onClick={() => navigate("/fleet/vehicles")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span></div>
           <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS}>
             <option value="">Select…</option>
             {vehicleTypes.map((v: any) => <option key={v.id || v.name} value={v.name}>{v.name}</option>)}

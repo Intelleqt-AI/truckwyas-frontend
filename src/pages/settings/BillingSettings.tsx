@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { fetchData, postData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -129,6 +129,7 @@ function NextPaymentCountdown({ nextBillingAt }: { nextBillingAt?: string | null
 }
 
 export function BillingSettings() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [billingHistory, setBillingHistory] = useState<BillingTransaction[]>([]);
@@ -357,14 +358,16 @@ export function BillingSettings() {
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              {PLAN_FEATURES.map(f => (
-                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: isPaid ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}>
-                  <span style={{ color: isPaid ? 'var(--accent-primary)' : 'var(--border-subtle)', fontSize: 14 }}>✓</span>
-                  {f}
-                </div>
-              ))}
-            </div>
+            {!isPaid && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                {PLAN_FEATURES.map(f => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>
+                    <span style={{ color: 'var(--border-subtle)', fontSize: 14 }}>✓</span>
+                    {f}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {isPaid && (
               <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-tertiary)' }}>
@@ -393,7 +396,18 @@ export function BillingSettings() {
 
       {!showLoading && (
         <div style={sectionStyle}>
-          <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Billing History</span></div>
+          <div style={{ ...sectionHeaderStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={sectionTitleStyle}>Billing History</span>
+            {billingHistory.length > 0 && (
+              <button onClick={() => navigate('/settings/billing/history')} style={{
+                background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--accent-primary)',
+                padding: '5px 12px', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em',
+                borderRadius: 2, cursor: 'pointer',
+              }}>
+                FULL HISTORY →
+              </button>
+            )}
+          </div>
           {billingHistory.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}>
               <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>📄</div>
@@ -415,8 +429,8 @@ export function BillingSettings() {
                 </tr>
               </thead>
               <tbody>
-                {billingHistory.map((tx, i) => (
-                  <tr key={tx.id} style={{ borderBottom: i < billingHistory.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
+                {billingHistory.slice(0, 5).map((tx, i, arr) => (
+                  <tr key={tx.id} style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
                     <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-primary)' }}>
                       {tx.label}
                     </td>

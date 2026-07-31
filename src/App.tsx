@@ -76,6 +76,7 @@ const Copilot = lazy(() => import('./pages/Copilot'));
 const Settings = lazy(() => import('./pages/Settings'));
 const XeroIntegration = lazy(() => import('./pages/settings/XeroIntegration'));
 const FleetImport = lazy(() => import('./pages/settings/FleetImport'));
+const BillingHistoryPage = lazy(() => import('./pages/settings/BillingHistoryPage'));
 const Login = lazy(() => import('./pages/Login'));
 const LoginOtp = lazy(() => import('./pages/LoginOtp').then(m => ({ default: m.LoginOtp })));
 const Signup = lazy(() => import('./pages/Signup'));
@@ -285,6 +286,7 @@ const App = () => (
                   <Route path="/capital/risk-scores" element={<RiskScoreView />} />
                   <Route path="/settings/integrations/xero" element={<XeroIntegration />} />
                   <Route path="/settings/integrations/fleet" element={<FleetImport />} />
+                  <Route path="/settings/billing/history" element={<BillingHistoryPage />} />
                   <Route path="/settings/:section?" element={<Settings />} />
                   <Route path="/fleet/vehicles/:id/financial" element={<VehicleFinancialProfile />} />
                 </Route>

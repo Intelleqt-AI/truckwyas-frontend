@@ -1,7 +1,32 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Check } from "lucide-react";
 import { postData } from "@/lib/Api";
+
+// Kept in sync with core/services/paystack.py (MONTHLY_FEE / MONTHLY_FEE_ITEM_NAME)
+// and settings.DELIVERY_FEE_PCT — server-enforced, this is just the up-front
+// disclosure so nobody discovers the price for the first time on step 3.
+const MONTHLY_FEE = "4,499";
+const TAKE_RATE_PCT = "0.25";
+
+const SIGNUP_STEPS = [
+  { label: "Create your account", detail: "Name, email, password — just below" },
+  { label: "Verify your email", detail: "We send a 6-digit code, valid for 10 minutes" },
+  { label: "Add a card & pay", detail: `R${MONTHLY_FEE}/month, charged via Paystack — your fleet goes live the moment it clears` },
+];
+
+// Same list BillingSettings.tsx shows for an active subscription — kept
+// identical so nothing you're promised here differs from what you see later.
+const PLAN_FEATURES = [
+  "Unlimited loads & invoices",
+  "AI-powered quote optimisation",
+  "Fast Pay capital access",
+  "Advanced analytics & reporting",
+  "Fleet intelligence dashboard",
+  "Multi-user access",
+  "API & integrations",
+  "Priority support",
+];
 
 const rules = [
   { key: 'length',    label: '8+ characters',   test: (p: string) => p.length >= 8 },
@@ -119,15 +144,112 @@ const Signup = () => {
   const strength = formData.password ? getStrength(formData.password) : null;
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-deep)', padding: 24 }}>
-      <div style={{ marginBottom: 32 }}>
-        <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 40, width: 'auto' }} />
+    <div className="signup-split">
+      <style>{`
+        .signup-split {
+          /* html/body/#root are pinned to height:100vh + overflow:hidden
+             app-wide (the dashboard shell scrolls internally instead) — this
+             page's content can be taller than one viewport (esp. the stacked
+             mobile layout below), so it needs to be its own scroll container
+             or the form at the bottom becomes unreachable. */
+          height: 100vh;
+          overflow-y: auto;
+          display: flex;
+          background: var(--bg-deep);
+        }
+        .signup-split__content, .signup-split__form {
+          flex: 1 1 50%;
+          min-width: 0;
+          padding: 48px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+        .signup-split__form { align-items: center; }
+        @media (max-width: 860px) {
+          .signup-split { flex-direction: column; }
+          .signup-split__content, .signup-split__form { flex: none; padding: 32px 24px; }
+        }
+      `}</style>
+
+      {/* Content side — what you're signing up for, before the form asks for anything */}
+      <div className="signup-split__content" style={{
+        position: 'relative', overflow: 'hidden',
+        background: `radial-gradient(120% 100% at 0% 0%, var(--glow-color), var(--glow-transparent)), var(--bg-surface)`,
+        borderRight: '1px solid var(--border-subtle)',
+      }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
+          <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
+
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent-primary)', marginBottom: 10 }}>
+            One flat price, no hidden tiers
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3, marginBottom: 28, letterSpacing: '-0.01em' }}>
+            Everything your fleet needs — <span style={{ color: 'var(--accent-primary)' }}>one subscription</span>.
+          </div>
+
+          {/* Price card — the thing users currently only discover on step 3 */}
+          <div style={{
+            border: '1px solid var(--border-active)', borderRadius: 'var(--card-radius)',
+            padding: 24, marginBottom: 28, background: 'var(--bg-surface-hover)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 34, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                R{MONTHLY_FEE}
+              </span>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>/ month</span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              + {TAKE_RATE_PCT}% of every delivered load's value
+            </div>
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}>
+              CANCEL ANYTIME — NO LONG-TERM CONTRACT
+            </div>
+          </div>
+
+          {/* The 3 steps — sets the expectation up front instead of surprising
+              people at the payment step */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 28 }}>
+            {SIGNUP_STEPS.map((step, i) => (
+              <div key={step.label} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <div style={{
+                  flex: 'none', width: 22, height: 22, borderRadius: '50%',
+                  border: `1px solid ${i === 0 ? 'var(--accent-primary)' : 'var(--border-active)'}`,
+                  color: i === 0 ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, marginTop: 1,
+                }}>
+                  {i + 1}
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{step.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 1 }}>{step.detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+            {PLAN_FEATURES.map(f => (
+              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+                <Check size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                {f}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginTop: 32, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
+            PAYMENTS SECURED BY PAYSTACK
+          </div>
+        </div>
       </div>
 
+      {/* Form side */}
+      <div className="signup-split__form">
       <div style={{ width: '100%', maxWidth: 400, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, padding: 32 }}>
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Create an account</div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Enter your information to get started</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Step 1 of 3 — verification and payment come next</div>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -210,6 +332,7 @@ const Signup = () => {
           Already have an account?{" "}
           <Link to="/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>Sign in</Link>
         </div>
+      </div>
       </div>
     </div>
   );

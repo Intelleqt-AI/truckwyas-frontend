@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { fetchData, postData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -49,6 +49,7 @@ interface BillingStatus {
   subscription_status?: string | null;
   subscription_start?: string | null;
   next_billing_date?: string | null;
+  next_billing_at?: string | null;
   amount?: string;
   item_name?: string;
   flat_plan?: FlatPlan | null;
@@ -83,7 +84,52 @@ const PLAN_FEATURES = [
 const formatRand = (amount?: string | number | null) =>
   `R${Number(amount ?? 0).toLocaleString('en-ZA')}`;
 
+// Live-ticking countdown to next_billing_at. Under 48h out it ticks every
+// second (HH:MM:SS, or MM:SS once under an hour) so a fast test cycle is
+// actually watchable; beyond that it's just "in N days" — nobody needs a
+// second-by-second countdown to a charge three weeks away.
+function NextPaymentCountdown({ nextBillingAt }: { nextBillingAt?: string | null }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!nextBillingAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [nextBillingAt]);
+
+  if (!nextBillingAt) return null;
+  const targetMs = new Date(nextBillingAt).getTime();
+  const diffMs = targetMs - now;
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  let label: string;
+  if (diffMs <= 0) {
+    label = 'Payment processing…';
+  } else if (diffMs < 48 * 3600_000) {
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    label = h > 0
+      ? `Next payment in ${h}:${pad(m)}:${pad(s)}`
+      : `Next payment in ${pad(m)}:${pad(s)}`;
+  } else {
+    const days = Math.ceil(diffMs / 86400_000);
+    label = `Next payment in ${days} days`;
+  }
+
+  return (
+    <div style={{
+      fontSize: 12, color: 'var(--accent-primary)', marginTop: 2,
+      fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' as const,
+    }}>
+      {label} · {new Date(nextBillingAt).toLocaleDateString('en-ZA')}
+    </div>
+  );
+}
+
 export function BillingSettings() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [billingHistory, setBillingHistory] = useState<BillingTransaction[]>([]);
@@ -147,6 +193,7 @@ export function BillingSettings() {
 
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   const handleSubscribe = async () => {
     setSubscribing(true);
@@ -251,10 +298,9 @@ export function BillingSettings() {
                   )}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
-                  {isPaid
-                    ? `${formatRand(billingStatus?.amount)} / month${billingStatus?.next_billing_date ? ` · next charge ${new Date(billingStatus.next_billing_date).toLocaleDateString('en-ZA')}` : ''}`
-                    : 'No active subscription'}
+                  {isPaid ? `${formatRand(billingStatus?.amount)} / month` : 'No active subscription'}
                 </div>
+                {isPaid && <NextPaymentCountdown nextBillingAt={billingStatus?.next_billing_at} />}
                 {billingStatus?.card?.last4 && (
                   <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2, textTransform: 'capitalize' as const }}>
                     {billingStatus.card.bank ? `${billingStatus.card.bank} ` : ''}{billingStatus.card.card_type} card ending {billingStatus.card.last4}
@@ -312,14 +358,16 @@ export function BillingSettings() {
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              {PLAN_FEATURES.map(f => (
-                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: isPaid ? 'var(--text-secondary)' : 'var(--text-tertiary)' }}>
-                  <span style={{ color: isPaid ? 'var(--accent-primary)' : 'var(--border-subtle)', fontSize: 14 }}>✓</span>
-                  {f}
-                </div>
-              ))}
-            </div>
+            {!isPaid && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                {PLAN_FEATURES.map(f => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>
+                    <span style={{ color: 'var(--border-subtle)', fontSize: 14 }}>✓</span>
+                    {f}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {isPaid && (
               <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-tertiary)' }}>
@@ -348,7 +396,18 @@ export function BillingSettings() {
 
       {!showLoading && (
         <div style={sectionStyle}>
-          <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Billing History</span></div>
+          <div style={{ ...sectionHeaderStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={sectionTitleStyle}>Billing History</span>
+            {billingHistory.length > 0 && (
+              <button onClick={() => navigate('/settings/billing/history')} style={{
+                background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--accent-primary)',
+                padding: '5px 12px', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em',
+                borderRadius: 2, cursor: 'pointer',
+              }}>
+                FULL HISTORY →
+              </button>
+            )}
+          </div>
           {billingHistory.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center' }}>
               <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>📄</div>
@@ -370,8 +429,8 @@ export function BillingSettings() {
                 </tr>
               </thead>
               <tbody>
-                {billingHistory.map((tx, i) => (
-                  <tr key={tx.id} style={{ borderBottom: i < billingHistory.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
+                {billingHistory.slice(0, 5).map((tx, i, arr) => (
+                  <tr key={tx.id} style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
                     <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-primary)' }}>
                       {tx.label}
                     </td>

@@ -449,7 +449,10 @@ export default function InvoiceDetail() {
                   <SelectContent>
                     <SelectItem value="EFT">EFT</SelectItem>
                     <SelectItem value="CASH">Cash</SelectItem>
-                    <SelectItem value="CARD">Card</SelectItem>
+                    {/* CREDIT_CARD, not CARD — Payment.PAYMENT_METHOD_CHOICES
+                        has no 'CARD', so picking Card used to fail validation
+                        with '"CARD" is not a valid choice.' */}
+                    <SelectItem value="CREDIT_CARD">Card</SelectItem>
                     <SelectItem value="CHEQUE">Cheque</SelectItem>
                   </SelectContent>
                 </Select>

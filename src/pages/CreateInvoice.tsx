@@ -45,13 +45,18 @@ export default function CreateInvoice() {
     fontFamily: 'var(--font-sans)',
   };
 
+  // Start of today, so a due date of "today" is allowed.
   const today = new Date();
-  today.setHours(23, 59, 59, 999);
+  today.setHours(0, 0, 0, 0);
 
+  // A due date is a deadline, so it must be today or LATER. This used to
+  // require `d <= today`, which made it impossible to create an invoice due
+  // next month — it looks like the payment-date rule (where "not in the
+  // future" is correct) was copied here by mistake.
   const dueDateValid = (() => {
     if (!form.due_date) return false;
     const d = new Date(form.due_date);
-    return !isNaN(d.getTime()) && d <= today;
+    return !isNaN(d.getTime()) && d >= today;
   })();
 
   const canSubmit = !!form.customer && !!form.amount && parseFloat(form.amount) > 0 && dueDateValid;
@@ -108,7 +113,7 @@ export default function CreateInvoice() {
                   </div>
                   <div>
                     <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>DUE DATE</div>
-                    <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} maxDate={today} />
+                    <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} minDate={today} />
                   </div>
                 </div>
                 <div>

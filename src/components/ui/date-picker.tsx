@@ -11,6 +11,8 @@ interface DatePickerProps {
   placeholder?: string
   style?: React.CSSProperties
   maxDate?: Date
+  /** Earliest selectable date — e.g. an invoice due date can't be in the past. */
+  minDate?: Date
 }
 
 // Formats tried in order when parsing typed input
@@ -24,7 +26,7 @@ function tryParse(raw: string): Date | null {
   return null
 }
 
-export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style, maxDate }: DatePickerProps) {
+export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style, maxDate, minDate }: DatePickerProps) {
   const [open, setOpen] = useState(false)
   const [inputVal, setInputVal] = useState('')
   const [month, setMonth] = useState<Date>(new Date())
@@ -50,7 +52,7 @@ export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style,
       return
     }
     const d = tryParse(raw)
-    if (d && (!maxDate || d <= maxDate)) {
+    if (d && (!maxDate || d <= maxDate) && (!minDate || d >= minDate)) {
       onChange(format(d, 'yyyy-MM-dd'))
       setMonth(d)
     }
@@ -70,6 +72,7 @@ export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style,
 
   const handleCalendarSelect = (date: Date | undefined) => {
     if (date && maxDate && date > maxDate) return
+    if (date && minDate && date < minDate) return
     onChange(date ? format(date, 'yyyy-MM-dd') : '')
     setOpen(false)
   }
@@ -146,7 +149,11 @@ export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style,
           month={month}
           onMonthChange={setMonth}
           onSelect={handleCalendarSelect}
-          disabled={maxDate ? (day: Date) => day > maxDate : undefined}
+          disabled={
+            maxDate || minDate
+              ? (day: Date) => (!!maxDate && day > maxDate) || (!!minDate && day < minDate)
+              : undefined
+          }
           initialFocus
         />
       </PopoverContent>

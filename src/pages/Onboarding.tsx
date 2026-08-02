@@ -76,6 +76,10 @@ export function Onboarding() {
 
   const handleSkip = () => {
     localStorage.setItem('onboarding_done', 'true');
+    patchData({
+      url: 'api/v1/company/profile/',
+      data: { onboarding_completed_at: new Date().toISOString() },
+    }).catch(() => { /* localStorage flag still covers this session */ });
     navigate('/');
   };
 
@@ -140,6 +144,10 @@ export function Onboarding() {
 
   const handleComplete = () => {
     localStorage.setItem('onboarding_done', 'true');
+    patchData({
+      url: 'api/v1/company/profile/',
+      data: { onboarding_completed_at: new Date().toISOString() },
+    }).catch(() => { /* localStorage flag still covers this session */ });
     navigate('/');
   };
 

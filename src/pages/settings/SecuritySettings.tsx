@@ -107,8 +107,8 @@ function ToggleRow({ label, description, checked, onChange, badge, badgeColor }:
 export function SecuritySettings() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [twoFactor, setTwoFactor] = useState(true);
-  const [sessionTimeout, setSessionTimeout] = useState(true);
+  const [twoFactor, setTwoFactor] = useState(false);
+  const [sessionTimeout, setSessionTimeout] = useState(false);
   const [loginAlerts, setLoginAlerts] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pwForm, setPwForm] = useState({ current: '', new1: '', new2: '' });

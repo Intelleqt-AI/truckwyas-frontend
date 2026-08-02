@@ -26,13 +26,17 @@ import { CSS } from "@dnd-kit/utilities";
 
 // Distinct hue per pipeline stage so the board reads as progression
 // (the design system's --status-success and --accent-primary are the same blue,
-// which made Accepted / In-Transit / Completed indistinguishable).
+// which made Accepted / Declined indistinguishable from neutral).
+// IT/COMPLETED aren't pipeline columns anymore (that's the Order's delivery
+// status now — see convert_to_load) but the colors stay so any pre-existing
+// quote still carrying one of those statuses renders sensibly in the list view.
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',   // neutral grey
   SENT: '#F59E0B',                 // amber — awaiting reply
   ACCEPTED: '#22C55E',             // green — won
-  IT: 'var(--accent-primary)',     // blue — in motion
-  COMPLETED: '#14B8A6',            // teal — done
+  DECLINED: 'var(--status-danger)',
+  IT: 'var(--accent-primary)',     // blue — in motion (legacy)
+  COMPLETED: '#14B8A6',            // teal — done (legacy)
 };
 
 const WON_GREEN = '#22C55E';
@@ -48,11 +52,19 @@ const routeOf = (q: any) =>
 const sentenceCase = (s?: string) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '';
 
-const COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'IT', 'COMPLETED'];
+// A quote's own lifecycle ends at Accepted or Declined — once accepted it
+// converts to an Order (Load), which owns delivery status from there
+// (Pending/Assigned/Loading/In-Transit/Delivered/Invoiced). IT/COMPLETED
+// used to double as quote-pipeline columns too, which let a quote be
+// dragged straight to "Completed" with no Order behind it at all.
+const COLUMNS = ['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED'];
 const COLUMN_LABELS: Record<string, string> = {
   DRAFT: 'Draft',
   SENT: 'Sent',
   ACCEPTED: 'Accepted',
+  DECLINED: 'Declined',
+  // Not board columns — kept only so a quote from before this change still
+  // renders a readable label in the list view instead of the raw code.
   IT: 'In-Transit',
   COMPLETED: 'Completed',
 };
@@ -272,9 +284,14 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
     return acc;
   }, {} as Record<string, any[]>);
 
-  // Drop unrecognised statuses into DRAFT
   filteredQuotes.forEach(q => {
-    if (!COLUMNS.includes(q.status)) {
+    if (COLUMNS.includes(q.status)) return;
+    // Pre-existing quotes still carrying a legacy IT/COMPLETED status were
+    // already accepted and converted — show them with the other won quotes
+    // rather than lumping them in with brand-new drafts.
+    if (q.status === 'IT' || q.status === 'COMPLETED') {
+      quotesByStatus['ACCEPTED'].push(q);
+    } else {
       quotesByStatus['DRAFT'].push(q);
     }
   });
@@ -298,14 +315,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
     const quote = quotes.find(q => String(q.id) === quoteId);
     if (!quote || quote.status === newStatus) return;
 
-    // Dragging to In-Transit must create a load record, not just patch status —
-    // and that now requires picking a driver + vehicle, so open the same modal
-    // the "Convert to Booking" button uses rather than converting immediately.
-    if (newStatus === 'IT') {
-      setPendingConvertQuote(quote);
-    } else {
-      statusMutation.mutate({ id: quoteId, status: newStatus });
-    }
+    statusMutation.mutate({ id: quoteId, status: newStatus });
   };
 
   const activeQuote = activeQuoteId ? quotes.find(q => String(q.id) === activeQuoteId) : null;
@@ -372,7 +382,7 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
         >
           {/* Quotes Kanban */}
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 16 }}>QUOTES PIPELINE — DRAG TO UPDATE STATUS</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24, alignItems: 'start' }}>
             {COLUMNS.map(col => {
               const colItems = quotesByStatus[col] || [];
               const colTotal = colItems.reduce((s, q) => s + parseFloat(q.total_amount || '0'), 0);

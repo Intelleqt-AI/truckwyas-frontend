@@ -543,8 +543,13 @@ export default function QuoteDetail() {
                     <SelectItem value="SENT">Sent</SelectItem>
                     <SelectItem value="ACCEPTED">Accepted</SelectItem>
                     <SelectItem value="DECLINED">Declined</SelectItem>
-                    <SelectItem value="IT">In-Transit</SelectItem>
-                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                    {/* Not selectable — In-Transit/Completed now live on the Order created via
+                        "Convert to booking", not on the quote itself (the backend rejects a
+                        direct write to either anyway). Kept as SelectItems only so a quote that
+                        already carries one of these legacy statuses still displays correctly. */}
+                    {(quote.status === 'IT' || quote.status === 'COMPLETED') && (
+                      <SelectItem value={quote.status}>{STATUS_LABEL[quote.status]}</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

@@ -320,13 +320,29 @@ export default function QuoteBuilder() {
   }, [routeData]);
 
   const opt = analysis?.price_optimization;
+  // Single source of truth for "the AI-recommended price" — used for the
+  // on-screen number AND the apply target, so clicking Apply always sets the
+  // total to the exact figure the user just saw. In learning mode this is
+  // "true cost + 25%" based on directCost (never on `total`, which may
+  // already include a previously-applied markup — using `total` here would
+  // make the suggestion compound upward on every apply).
+  const suggestedPrice = aiLearning
+    ? Math.round(directCost * 1.25)
+    : (opt?.optimal_price || analysis?.suggested_price || null);
+  // Once the total already matches the suggestion (within a rand), there's
+  // nothing left to apply — hide the button instead of leaving a no-op
+  // control that looks like the recommendation "came back".
+  const alreadyApplied = suggestedPrice != null && Math.abs(total - suggestedPrice) < 1;
   const applyOptimal = () => {
-    const target = opt?.optimal_price || analysis?.suggested_price;
     // Floored at 0: serviceCharge has no visible line item in the cost
     // breakdown, so letting it go negative would silently apply a hidden
     // discount below full cost with no on-screen explanation.
-    if (target && target > 0) { setServiceCharge(prev => Math.max(0, prev + (target - total))); toast.success("Applied AI-recommended price"); }
+    if (suggestedPrice && suggestedPrice > 0) { setServiceCharge(prev => Math.max(0, prev + (suggestedPrice - total))); toast.success("Applied AI-recommended price"); }
   };
+  // serviceCharge is only ever written by applyOptimal (or the form reset) —
+  // there's no other manual markup control — so it's purely the AI delta.
+  // Zeroing it drops the total back to directCost, the real cost-based price.
+  const cancelAiPrice = () => { setServiceCharge(0); toast.success("Reverted to actual price"); };
 
   // ---- natural-language input (typed or transcribed from voice) ----
   // Shared by the top quick-fill bar and the AI chat panel — both are just
@@ -949,21 +965,28 @@ export default function QuoteBuilder() {
         <div style={{ ...cardS, border: "1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-subtle))", marginBottom: 14 }}>
           {/* still learning — shown first, above the price block, while under the outcome threshold */}
           {aiLearning && (
-            <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-row)", background: "var(--status-warning-bg)", display: "flex", gap: 10, fontSize: 13 }}>
-              <Sparkles size={16} color="var(--status-warning)" style={{ flexShrink: 0 }} />
-              <div><b>AI pricing is still learning your fleet.</b><span style={{ color: "var(--text-secondary)" }}> Priced on true cost + your {vehicleType} base rate for now — the optimiser needs ~{winModel.outcomes_needed} completed loads to learn what wins with your clients ({winModel.outcomes_collected}/{winModel.outcomes_needed} logged). Every quote you close sharpens it.</span></div>
+            <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-row)", background: "var(--status-warning-bg)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, fontSize: 13 }}>
+              <div style={{ display: "flex", gap: 10 }}>
+                <Sparkles size={16} color="var(--status-warning)" style={{ flexShrink: 0 }} />
+                <div><b>AI pricing is still learning your fleet.</b><span style={{ color: "var(--text-secondary)" }}> Priced on true cost + your {vehicleType} base rate for now. Every quote you close sharpens it.</span></div>
+              </div>
+              <div style={{ flexShrink: 0, textAlign: "right" }}>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
+                  {winModel.outcomes_collected}/{winModel.outcomes_needed} <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>logged</span>
+                </div>
+                <div style={{ marginTop: 4, width: 110, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${Math.min(100, Math.round((winModel.outcomes_collected / winModel.outcomes_needed) * 100))}%`, background: "var(--status-warning)" }} />
+                </div>
+              </div>
             </div>
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.4fr" }}>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={labelS}>{aiLearning ? "Suggested price" : "Recommended price"}</div>
-              {aiLoading ? aiSpinner : aiLearning ? (<>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{formatCurrency(total * 1.25)}</div>
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>true cost + 25%</div>
-              </>) : (<>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, color: "var(--accent-primary)", marginTop: 4 }}>{opt?.optimal_price ? formatCurrency(opt.optimal_price) : formatCurrency(total)}</div>
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>to this client</div>
+              {aiLoading ? aiSpinner : (<>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, color: aiLearning ? undefined : "var(--accent-primary)", marginTop: 4 }}>{suggestedPrice ? formatCurrency(suggestedPrice) : formatCurrency(total)}</div>
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>{aiLearning ? "true cost + 25%" : "to this client"}</div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
@@ -972,7 +995,7 @@ export default function QuoteBuilder() {
                 <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
               ) : (<>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{opt?.optimal_margin_pct ? `${Math.round(opt.optimal_margin_pct)}%` : `${marginPct}%`}</div>
-                <div style={{ fontSize: 12, color: "var(--status-success)", marginTop: 2 }}>{formatCurrency(opt?.expected_profit ?? ((opt?.optimal_price || total) - directCost))} profit</div>
+                <div style={{ fontSize: 12, color: "var(--status-success)", marginTop: 2 }}>{formatCurrency(opt?.expected_profit ?? ((suggestedPrice || total) - directCost))} profit</div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
@@ -1012,7 +1035,13 @@ export default function QuoteBuilder() {
 
           {/* actions */}
           <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "14px 18px", borderTop: "1px solid var(--border-row)" }}>
-            {opt && (opt.optimal_price || analysis?.suggested_price) && <button onClick={applyOptimal} style={{ fontSize: 14, fontWeight: 500, background: "transparent", border: "1px solid var(--accent-primary)", color: "var(--accent-primary)", borderRadius: 4, padding: "9px 14px", cursor: "pointer" }}>Apply recommended</button>}
+            {!aiLoading && suggestedPrice != null && suggestedPrice > 0 && !alreadyApplied && <button onClick={applyOptimal} style={{ fontSize: 14, fontWeight: 500, background: "transparent", border: "1px solid var(--accent-primary)", color: "var(--accent-primary)", borderRadius: 4, padding: "9px 14px", cursor: "pointer" }}>Apply recommended</button>}
+            {!aiLoading && alreadyApplied && (
+              <>
+                <span style={{ fontSize: 13, color: "var(--status-success)" }}>✓ AI price applied</span>
+                <button onClick={cancelAiPrice} style={{ fontSize: 14, background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 4, padding: "10px 16px", cursor: "pointer" }}>Use actual price</button>
+              </>
+            )}
             <button onClick={() => save(true)} disabled={saving} style={{ fontSize: 14, fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 4, padding: "10px 16px", cursor: "pointer" }}>Send quote to client</button>
             <button onClick={() => save(false)} disabled={saving} style={{ fontSize: 14, background: "transparent", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 4, padding: "10px 16px", cursor: "pointer" }}>Save as draft</button>
             {benchmark?.market_avg_rate ? <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--text-tertiary)" }}>Benchmark: {formatCurrency(benchmark.market_avg_rate)} avg · {benchmark.recommendation || ""}</span> : null}

@@ -188,15 +188,14 @@ export default function QuoteBuilder() {
   }, [companyProfile, vehicleType]);
 
   // Selecting a vehicle type prefills the per-km rate from that type's own
-  // configured rate, falling back to the company default if it has none set,
-  // and prefills the load weight from that type's own capacity — a starting
-  // point (the truck's max load), not a lock; still freely editable once the
-  // real cargo weight is known. This only runs on an actual selection (called
-  // from the dropdown's onChange, AI/voice extraction, and resuming a draft)
-  // — never from a passive effect keyed on the selected type, which would
-  // incorrectly re-fire and clobber the saved rate/weight whenever an
-  // existing quote is loaded for editing (its own saved values are restored
-  // separately).
+  // configured rate, falling back to the company default if it has none set.
+  // Weight is deliberately left alone — it's the real cargo weight, not
+  // something to guess from the truck's max capacity. This only runs on an
+  // actual selection (called from the dropdown's onChange, AI/voice
+  // extraction, and resuming a draft) — never from a passive effect keyed on
+  // the selected type, which would incorrectly re-fire and clobber the saved
+  // rate whenever an existing quote is loaded for editing (its own saved
+  // value is restored separately).
   const applyVehicleType = (name: string) => {
     setVehicleType(name);
     const vt = vehicleTypes.find((v: any) => v.name === name);
@@ -205,7 +204,6 @@ export default function QuoteBuilder() {
     } else if (companyProfile?.default_base_rate_per_km) {
       setBaseRatePerKm(String(companyProfile.default_base_rate_per_km));
     }
-    if (vt?.capacity) setWeight(String(vt.capacity));
   };
 
   const ready = !!(customerId && vehicleType && pickup && delivery && pickupCoords && deliveryCoords && Number(weight) > 0);

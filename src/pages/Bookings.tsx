@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/formatters";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RouteMapView } from "@/components/RouteMapView";
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: 'var(--text-tertiary)',
@@ -66,6 +67,32 @@ export default function Bookings() {
     queryFn: () => fetchData('api/v1/vehicles/?status=AVAILABLE'),
     enabled: editingAssignment,
   });
+  const { data: vehicleDetail } = useQuery({
+    queryKey: ['vehicle-detail', load?.vehicle],
+    queryFn: () => fetchData(`api/v1/vehicles/${load.vehicle}/`),
+    enabled: !!load?.vehicle,
+  });
+  const [syncingLocation, setSyncingLocation] = useState(false);
+  const handleSyncLocation = async () => {
+    setSyncingLocation(true);
+    try {
+      const result: any = await postData({
+        url: 'api/v1/integrations/ctrlfleet/sync-positions/',
+        data: { vehicle_id: load?.vehicle },
+      });
+      toast.success(
+        result?.sync?.updated
+          ? `Position updated for ${vehicleDetail?.plate || 'this vehicle'}`
+          : 'No live position available for this vehicle right now'
+      );
+      qc.invalidateQueries({ queryKey: ['vehicle-detail', load?.vehicle] });
+    } catch (err: any) {
+      toast.error(err?.message || 'Location sync failed');
+    } finally {
+      setSyncingLocation(false);
+    }
+  };
+
   const assignableDrivers: { id: number; user_details?: { name?: string; username?: string } }[] =
     driversData?.results || driversData || [];
   const assignableVehicles: { id: number; make?: string; model?: string; plate?: string }[] =
@@ -287,6 +314,46 @@ export default function Bookings() {
               <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{load.delivery_location}</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{load.delivery_city}, {load.delivery_state}</div>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>{fmt(load.delivery_date)}</div>
+            </div>
+          </div>
+
+          {/* Live map — pickup, delivery, and (if the assigned vehicle is CtrlFleet-linked) its last known position */}
+          <div style={{ marginTop: 16 }}>
+            <RouteMapView
+              pickup={`${load.pickup_location}, ${load.pickup_city}`}
+              delivery={`${load.delivery_location}, ${load.delivery_city}`}
+              currentLocation={
+                vehicleDetail?.latitude && vehicleDetail?.longitude
+                  ? { lat: parseFloat(vehicleDetail.latitude), lon: parseFloat(vehicleDetail.longitude) }
+                  : null
+              }
+              currentLocationLabel={
+                vehicleDetail?.last_location_at
+                  ? `${vehicleDetail.plate} — last seen ${new Date(vehicleDetail.last_location_at).toLocaleString()}`
+                  : undefined
+              }
+              height={220}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                {!load.vehicle
+                  ? 'No vehicle assigned yet'
+                  : !vehicleDetail?.ctrlfleet_vehicle_code
+                    ? 'Assigned vehicle isn’t linked to CtrlFleet — no live tracking'
+                    : vehicleDetail?.last_location_at
+                      ? `Last synced ${new Date(vehicleDetail.last_location_at).toLocaleString()}`
+                      : 'Linked to CtrlFleet — no position synced yet'}
+              </div>
+              {load.vehicle && vehicleDetail?.ctrlfleet_vehicle_code && (
+                <button
+                  onClick={handleSyncLocation}
+                  disabled={syncingLocation}
+                  className="btn-action"
+                  style={{ fontSize: 10 }}
+                >
+                  {syncingLocation ? 'SYNCING...' : 'SYNC LOCATION'}
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -28,6 +28,15 @@ const DRAFT_KEY = "truckwyas_newquote_draft";
 const FUEL_FALLBACK: Record<string, number> = {
   Flatbed: 32, Tautliner: 33, Refrigerated: 38, Tanker: 35, "Box Truck": 28, "Danger Load": 34,
 };
+// Which company-level default price applies, keyed by a vehicle type's own
+// fuel_type — Company stores one default per fuel type (fuel_price_per_litre
+// doubles as the Diesel default, since it predates the other three).
+const FUEL_PRICE_FIELD_BY_TYPE: Record<string, string> = {
+  Diesel: "fuel_price_per_litre",
+  Petrol: "fuel_price_petrol",
+  Electric: "fuel_price_electric",
+  Hybrid: "fuel_price_hybrid",
+};
 const extractCode = (s: string) => {
   const m: Record<string, string> = { johannesburg: "JHB", joburg: "JHB", jhb: "JHB", "cape town": "CPT", cpt: "CPT", durban: "DUR", dur: "DUR", "port elizabeth": "PE", pretoria: "PTA", bloemfontein: "BFN" };
   const k = (s || "").toLowerCase();
@@ -148,7 +157,6 @@ export default function QuoteBuilder() {
   const { data: companyProfile } = useQuery({ queryKey: ["company-profile"], queryFn: () => fetchData("api/v1/company/profile/") });
   const { data: customersRaw } = useQuery({ queryKey: ["customers"], queryFn: () => fetchData("api/v1/customers/") });
   const { data: vehicleTypesRaw } = useQuery({ queryKey: ["vehicle-types"], queryFn: () => fetchData("api/v1/vehicle-types/") });
-  const { data: fuelPrice } = useQuery({ queryKey: ["fuel-current"], queryFn: () => fetchData("/api/v1/fuel-prices/current/") });
   const { data: modelStats } = useQuery({ queryKey: ["quote-model-stats"], queryFn: () => fetchData("/api/v1/quotes/model-stats/") });
 
   const customers: any[] = customersRaw?.results || customersRaw || [];
@@ -162,7 +170,11 @@ export default function QuoteBuilder() {
   const aiLearning = winModel && winModel.mode === "heuristic";
 
   const selectedVT = useMemo(() => vehicleTypes.find((v: any) => v.name === vehicleType), [vehicleTypes, vehicleType]);
-  const fuelPricePerL = Number(fuelPrice?.diesel_inland) || Number(companyProfile?.fuel_price_per_litre) || 21.7;
+  // Fuel price comes from the company's own per-fuel-type defaults, keyed by
+  // the SELECTED vehicle type's fuel type — not a separately-fetched live
+  // diesel price, and not always Diesel regardless of what's actually chosen.
+  const companyFuelPriceField = (FUEL_PRICE_FIELD_BY_TYPE as Record<string, string>)[selectedVT?.fuel_type || 'Diesel'] || 'fuel_price_per_litre';
+  const fuelPricePerL = Number(companyProfile?.[companyFuelPriceField]) || Number(companyProfile?.fuel_price_per_litre) || 21.7;
   const fuelConsumption = Number(selectedVT?.fuel_consumption_l_per_100km) || FUEL_FALLBACK[vehicleType] || 32;
 
   // Fallback only, for before any vehicle type is picked — once one is
@@ -176,12 +188,15 @@ export default function QuoteBuilder() {
   }, [companyProfile, vehicleType]);
 
   // Selecting a vehicle type prefills the per-km rate from that type's own
-  // configured rate, falling back to the company default if it has none set.
-  // This only runs on an actual selection (called from the dropdown's
-  // onChange, AI/voice extraction, and resuming a draft) — never from a
-  // passive effect keyed on the selected type, which would incorrectly
-  // re-fire and clobber the saved rate whenever an existing quote is loaded
-  // for editing (its own saved base_rate/distance is restored separately).
+  // configured rate, falling back to the company default if it has none set,
+  // and prefills the load weight from that type's own capacity — a starting
+  // point (the truck's max load), not a lock; still freely editable once the
+  // real cargo weight is known. This only runs on an actual selection (called
+  // from the dropdown's onChange, AI/voice extraction, and resuming a draft)
+  // — never from a passive effect keyed on the selected type, which would
+  // incorrectly re-fire and clobber the saved rate/weight whenever an
+  // existing quote is loaded for editing (its own saved values are restored
+  // separately).
   const applyVehicleType = (name: string) => {
     setVehicleType(name);
     const vt = vehicleTypes.find((v: any) => v.name === name);
@@ -190,6 +205,7 @@ export default function QuoteBuilder() {
     } else if (companyProfile?.default_base_rate_per_km) {
       setBaseRatePerKm(String(companyProfile.default_base_rate_per_km));
     }
+    if (vt?.capacity) setWeight(String(vt.capacity));
   };
 
   const ready = !!(customerId && vehicleType && pickup && delivery && pickupCoords && deliveryCoords && Number(weight) > 0);

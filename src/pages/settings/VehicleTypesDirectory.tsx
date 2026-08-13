@@ -10,8 +10,11 @@ interface VehicleType {
   capacity?: string | number;
   max_distance?: string | number;
   base_rate?: string | number;
+  fuel_type?: string;
   active: boolean;
 }
+
+const FUEL_TYPE_OPTIONS = ['Diesel', 'Petrol', 'Electric', 'Hybrid'];
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -38,14 +41,14 @@ export function VehicleTypesDirectory() {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addErr, setAddErr] = useState('');
-  const [form, setForm] = useState({ name: '', description: '', capacity: '', base_rate: '' });
+  const [form, setForm] = useState({ name: '', description: '', capacity: '', base_rate: '', fuel_type: 'Diesel', active: 'true' });
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [editType, setEditType] = useState<VehicleType | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', description: '', capacity: '', base_rate: '', active: 'true' });
+  const [editForm, setEditForm] = useState({ name: '', description: '', capacity: '', base_rate: '', fuel_type: 'Diesel', active: 'true' });
   const [editSaving, setEditSaving] = useState(false);
   const [editErr, setEditErr] = useState('');
 
@@ -100,9 +103,10 @@ export function VehicleTypesDirectory() {
         description: form.description.trim(),
         capacity: form.capacity ? Number(form.capacity) : 0,
         base_rate: form.base_rate ? Number(form.base_rate) : 0,
-        active: true,
+        fuel_type: form.fuel_type,
+        active: form.active === 'true',
       }});
-      setForm({ name: '', description: '', capacity: '', base_rate: '' });
+      setForm({ name: '', description: '', capacity: '', base_rate: '', fuel_type: 'Diesel', active: 'true' });
       setShowAdd(false);
       load();
     } catch (e: any) {
@@ -119,6 +123,7 @@ export function VehicleTypesDirectory() {
       description: t.description || '',
       capacity: t.capacity != null ? String(t.capacity) : '',
       base_rate: t.base_rate != null ? String(t.base_rate) : '',
+      fuel_type: t.fuel_type || 'Diesel',
       active: t.active ? 'true' : 'false',
     });
     setEditErr('');
@@ -135,6 +140,7 @@ export function VehicleTypesDirectory() {
         description: editForm.description.trim(),
         capacity: editForm.capacity ? Number(editForm.capacity) : 0,
         base_rate: editForm.base_rate ? Number(editForm.base_rate) : 0,
+        fuel_type: editForm.fuel_type,
         active: editForm.active === 'true',
       }});
       setEditType(null);
@@ -186,44 +192,11 @@ export function VehicleTypesDirectory() {
                 fontSize: 12, outline: 'none', width: 160,
               }}
             />
-            <button className="btn-action" onClick={() => { setShowAdd(s => !s); setAddErr(''); }}>
-              {showAdd ? 'CLOSE' : '+ ADD TYPE'}
+            <button className="btn-action" onClick={() => { setShowAdd(true); setAddErr(''); }}>
+              + ADD TYPE
             </button>
           </div>
         </div>
-
-        {/* Add form */}
-        {showAdd && (
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-deep)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.6fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
-              {([
-                { k: 'name', ph: 'Name *', type: 'text' },
-                { k: 'description', ph: 'Description', type: 'text' },
-                { k: 'capacity', ph: 'Capacity (ton)', type: 'number' },
-                { k: 'base_rate', ph: 'Base rate /km', type: 'number' },
-              ] as const).map(f => (
-                <input
-                  key={f.k}
-                  type={f.type}
-                  value={(form as any)[f.k]}
-                  onChange={e => setForm(prev => ({ ...prev, [f.k]: e.target.value }))}
-                  placeholder={f.ph}
-                  style={{
-                    background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                    borderRadius: 2, padding: '8px 10px', color: 'var(--text-primary)',
-                    fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box',
-                  }}
-                />
-              ))}
-            </div>
-            {addErr && <div style={{ color: 'var(--status-danger)', fontSize: 12, marginBottom: 10 }}>{addErr}</div>}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="btn-action" onClick={handleAdd} disabled={saving}>
-                {saving ? 'SAVING...' : 'SAVE TYPE'}
-              </button>
-            </div>
-          </div>
-        )}
 
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center' as const, color: 'var(--text-tertiary)', fontSize: 13 }}>Loading...</div>
@@ -322,6 +295,78 @@ export function VehicleTypesDirectory() {
         />
       )}
 
+      {/* Add slide-out — same shape as the Edit drawer below, deliberately kept
+          in lockstep with it (same 7 fields, same order) rather than each
+          keeping its own copy that can quietly drift. */}
+      {showAdd && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setShowAdd(false)} />
+          <div style={{ position: 'relative', width: 420, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Add Vehicle Type</div>
+              <button onClick={() => setShowAdd(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            {addErr && (
+              <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+                {addErr}
+              </div>
+            )}
+            {([
+              { key: 'name', label: 'Name', type: 'text', required: true },
+              { key: 'description', label: 'Description', type: 'text', required: false },
+              { key: 'capacity', label: 'Capacity (ton)', type: 'number', required: false },
+              { key: 'base_rate', label: 'Base Rate (R/km)', type: 'number', required: false },
+            ] as const).map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                </label>
+                <input
+                  type={f.type}
+                  value={(form as any)[f.key]}
+                  onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  style={inputStyle}
+                />
+              </div>
+            ))}
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Fuel Type</label>
+              <Select value={form.fuel_type} onValueChange={val => setForm(prev => ({ ...prev, fuel_type: val }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {FUEL_TYPE_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Status</label>
+              <Select value={form.active} onValueChange={val => setForm(prev => ({ ...prev, active: val }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Active</SelectItem>
+                  <SelectItem value="false">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+              <button
+                disabled={saving}
+                onClick={handleAdd}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase' }}
+              >
+                {saving ? 'SAVING...' : 'SAVE TYPE'}
+              </button>
+              <button
+                onClick={() => setShowAdd(false)}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase' }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit slide-out */}
       {editType && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
@@ -352,6 +397,15 @@ export function VehicleTypesDirectory() {
                 />
               </div>
             ))}
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Fuel Type</label>
+              <Select value={editForm.fuel_type} onValueChange={val => setEditForm(prev => ({ ...prev, fuel_type: val }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {FUEL_TYPE_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>Status</label>
               <Select value={editForm.active} onValueChange={val => setEditForm(prev => ({ ...prev, active: val }))}>

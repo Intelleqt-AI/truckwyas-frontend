@@ -12,24 +12,30 @@ interface Props {
 
 const EMPTY_FORM = {
   vin: '', make: '', model: '', year: new Date().getFullYear(), plate: '',
-  type: 'Rigid Truck', capacity: '', mileage: '', fuel_type: 'Diesel', status: 'AVAILABLE',
+  type: 'Rigid Truck', capacity: '', mileage: '',
+  // No longer a user-facing field (moving to vehicle type level) — kept here
+  // as a silent default since the backend still requires it on Vehicle.
+  fuel_type: 'Diesel',
+  status: 'AVAILABLE',
   registration_expiry: '', last_maintenance_date: '',
   service_interval_km: '', last_service_mileage: '',
   driver: '',
 };
 
+// required flags match EditVehicleDrawer's TEXT_FIELDS exactly — the two
+// forms are deliberately kept in lockstep rather than each drifting on its
+// own idea of what's required.
 const TEXT_FIELDS = [
-  { key: 'vin', label: 'VIN Number', placeholder: 'e.g. WDB9634031L123456' },
-  { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz' },
-  { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645' },
-  { key: 'year', label: 'Year', placeholder: '2024', type: 'number' },
-  { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB' },
-  { key: 'capacity', label: 'Capacity (ton)', placeholder: 'e.g. 30', type: 'number' },
-  { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
-  { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
-  { key: 'last_maintenance_date', label: 'Last Maintenance Date', type: 'date' },
-  { key: 'service_interval_km', label: 'Service Interval (km)', placeholder: 'e.g. 10000', type: 'number' },
-  { key: 'last_service_mileage', label: 'Last Service Odometer (km)', placeholder: 'e.g. 145000', type: 'number' },
+  { key: 'vin', label: 'VIN Number', placeholder: 'e.g. WDB9634031L123456', required: true },
+  { key: 'make', label: 'Make', placeholder: 'e.g. Mercedes-Benz', required: true },
+  { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645', required: true },
+  { key: 'year', label: 'Year', placeholder: '2024', type: 'number', required: true },
+  { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB', required: true },
+  { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number', required: false },
+  { key: 'registration_expiry', label: 'Registration Expiry', type: 'date', required: false },
+  { key: 'last_maintenance_date', label: 'Last Maintenance Date', type: 'date', required: false },
+  { key: 'service_interval_km', label: 'Service Interval (km)', placeholder: 'e.g. 10000', type: 'number', required: false },
+  { key: 'last_service_mileage', label: 'Last Service Odometer (km)', placeholder: 'e.g. 145000', type: 'number', required: false },
 ];
 
 const labelStyle: React.CSSProperties = {
@@ -48,14 +54,32 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [vehicleTypes, setVehicleTypes] = useState<{ id: number; name: string }[]>([]);
+  const [vehicleTypes, setVehicleTypes] = useState<{ id: number; name: string; capacity?: number | string }[]>([]);
   const [drivers, setDrivers] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
     if (!open) { setSubmitError(null); return; }
     fetchData('api/v1/vehicle-types/').then((d: any) => {
       const arr = Array.isArray(d) ? d : (d?.results || []);
-      setVehicleTypes(arr.map((vt: any) => ({ id: vt.id, name: vt.name })));
+      // A company can have its own custom type sharing a name with one of the
+      // shared defaults (e.g. two separate "Tanker" rows) — Radix's Select
+      // concatenates the label text of every item sharing a value, so an
+      // un-deduped list renders as "TankerTanker". Keep only the first per name.
+      const seen = new Set<string>();
+      const deduped = arr
+        .map((vt: any) => ({ id: vt.id, name: vt.name, capacity: vt.capacity }))
+        .filter((vt: any) => (seen.has(vt.name) ? false : (seen.add(vt.name), true)));
+      setVehicleTypes(deduped);
+      // The form opens with a default type already selected (EMPTY_FORM.type)
+      // but that's set before this fetch resolves, so it never went through
+      // handleTypeChange's auto-fill — do the same fill here, once, for
+      // whichever type is currently selected and only while capacity is
+      // still blank (never overwrite something the user already typed).
+      setForm(prev => {
+        if (prev.capacity) return prev;
+        const vt = deduped.find((v: any) => v.name === prev.type);
+        return vt?.capacity != null ? { ...prev, capacity: String(vt.capacity) } : prev;
+      });
     }).catch(() => {});
     fetchData('api/v1/drivers/').then((d: any) => {
       const arr = Array.isArray(d) ? d : (d?.results || []);
@@ -67,6 +91,14 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
   }, [open]);
 
   const set = (k: string, v: any) => setForm(prev => ({ ...prev, [k]: v }));
+
+  // Picking a type fills capacity with that type's own reference capacity —
+  // a starting point, not a lock; the field stays freely editable afterwards
+  // since real vehicles of the same type can legitimately vary in size.
+  const handleTypeChange = (name: string) => {
+    const vt = vehicleTypes.find(v => v.name === name);
+    setForm(prev => ({ ...prev, type: name, capacity: vt?.capacity != null ? String(vt.capacity) : prev.capacity }));
+  };
 
   const handleCreate = async () => {
     setSaving(true);
@@ -137,7 +169,50 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
           </div>
         )}
 
-        {TEXT_FIELDS.map(f => (
+        {/* Required fields first, optional fields after — so nothing required
+            is buried below a run of optional ones. Vehicle Type comes before
+            Capacity: picking a type fills in a starting capacity below. */}
+        {TEXT_FIELDS.filter(f => f.required).map(f => (
+          <div key={f.key} style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>
+              {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+            </label>
+            <input
+              type={f.type || 'text'}
+              placeholder={f.placeholder}
+              value={(form as any)[f.key]}
+              onChange={e => set(f.key, e.target.value)}
+              style={inputStyle}
+            />
+          </div>
+        ))}
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>
+            Vehicle Type<span style={{ color: 'var(--status-danger)' }}> *</span>
+          </label>
+          <Select value={form.type} onValueChange={handleTypeChange}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {typeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>
+            Capacity (ton)<span style={{ color: 'var(--status-danger)' }}> *</span>
+          </label>
+          <input
+            type="number"
+            placeholder="e.g. 30"
+            value={form.capacity}
+            onChange={e => set('capacity', e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+
+        {TEXT_FIELDS.filter(f => !f.required).map(f => (
           <div key={f.key} style={{ marginBottom: 16 }}>
             <label style={labelStyle}>{f.label}</label>
             {f.type === 'date' ? (
@@ -158,8 +233,6 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
         ))}
 
         {[
-          { key: 'type', label: 'Vehicle Type', options: typeOptions },
-          { key: 'fuel_type', label: 'Fuel Type', options: ['Diesel', 'Petrol', 'Electric', 'Hybrid'] },
           { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE', 'OUT_OF_SERVICE'] },
         ].map(f => (
           <div key={f.key} style={{ marginBottom: 16 }}>

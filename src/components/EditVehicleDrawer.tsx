@@ -42,7 +42,6 @@ const TEXT_FIELDS = [
   { key: 'model', label: 'Model', placeholder: 'e.g. Actros 2645', required: true },
   { key: 'year', label: 'Year', placeholder: '2024', type: 'number', required: true },
   { key: 'plate', label: 'Registration Plate', placeholder: 'e.g. GP 567 ZAB', required: true },
-  { key: 'capacity', label: 'Capacity (ton)', placeholder: 'e.g. 30', type: 'number', required: true },
   { key: 'mileage', label: 'Mileage (km)', placeholder: 'e.g. 150000', type: 'number' },
   { key: 'registration_expiry', label: 'Registration Expiry', type: 'date' },
   { key: 'last_maintenance_date', label: 'Last Maintenance Date', type: 'date' },
@@ -66,7 +65,7 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
   const [form, setForm] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [vehicleTypes, setVehicleTypes] = useState<{ id: number; name: string }[]>([]);
+  const [vehicleTypes, setVehicleTypes] = useState<{ id: number; name: string; capacity?: number | string }[]>([]);
   const [drivers, setDrivers] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
@@ -84,14 +83,30 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
       last_maintenance_date: vehicle.last_maintenance_date?.slice(0, 10) || '',
       service_interval_km: vehicle.service_interval_km != null ? String(vehicle.service_interval_km) : '',
       last_service_mileage: vehicle.last_service_mileage != null ? String(vehicle.last_service_mileage) : '',
-      type: vehicle.type || vehicle.vehicle_type_name || '',
+      // vehicle_type_name (the linked catalog type) takes priority over the
+      // loose free-text `type` field — the dropdown's options come from that
+      // same catalog, so only vehicle_type_name is guaranteed to match one of
+      // them. If the two have drifted apart (confirmed to happen with real
+      // data), preferring `type` left the dropdown with nothing to select.
+      type: vehicle.vehicle_type_name || vehicle.type || '',
+      // No longer a user-facing field (moving to vehicle type level) — kept
+      // here as a silent default/passthrough since the backend still
+      // requires it on Vehicle.
       fuel_type: vehicle.fuel_type || 'Diesel',
       status: vehicle.status || 'AVAILABLE',
       driver: vehicle.driver != null ? String(vehicle.driver) : '',
     });
     fetchData('api/v1/vehicle-types/').then((d: any) => {
       const arr = Array.isArray(d) ? d : (d?.results || []);
-      setVehicleTypes(arr.map((vt: any) => ({ id: vt.id, name: vt.name })));
+      // A company can have its own custom type sharing a name with one of the
+      // shared defaults (e.g. two separate "Tanker" rows) — Radix's Select
+      // concatenates the label text of every item sharing a value, so an
+      // un-deduped list renders as "TankerTanker". Keep only the first per name.
+      const seen = new Set<string>();
+      const deduped = arr
+        .map((vt: any) => ({ id: vt.id, name: vt.name, capacity: vt.capacity }))
+        .filter((vt: any) => (seen.has(vt.name) ? false : (seen.add(vt.name), true)));
+      setVehicleTypes(deduped);
     }).catch(() => {});
     fetchData('api/v1/drivers/').then((d: any) => {
       const arr = Array.isArray(d) ? d : (d?.results || []);
@@ -104,7 +119,15 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
 
   const set = (k: string, v: any) => setForm(prev => ({ ...prev, [k]: v }));
 
-  const canSave = !!(form.vin && form.make && form.model && form.year && form.plate && form.capacity && form.type && form.fuel_type);
+  // Picking a type fills capacity with that type's own reference capacity —
+  // a starting point, not a lock; the field stays freely editable afterwards
+  // since real vehicles of the same type can legitimately vary in size.
+  const handleTypeChange = (name: string) => {
+    const vt = vehicleTypes.find(v => v.name === name);
+    setForm(prev => ({ ...prev, type: name, capacity: vt?.capacity != null ? String(vt.capacity) : prev.capacity }));
+  };
+
+  const canSave = !!(form.vin && form.make && form.model && form.year && form.plate && form.capacity && form.type);
 
   const handleSave = async () => {
     if (!vehicle) return;
@@ -170,11 +193,52 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
           </div>
         )}
 
-        {TEXT_FIELDS.map(f => (
+        {/* Required fields first, optional fields after — matches
+            AddVehicleDrawer. Vehicle Type comes before Capacity: picking a
+            type fills in a starting capacity below. */}
+        {TEXT_FIELDS.filter(f => f.required).map(f => (
           <div key={f.key} style={{ marginBottom: 16 }}>
             <label style={labelStyle}>
               {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
             </label>
+            <input
+              type={f.type || 'text'}
+              placeholder={f.placeholder}
+              value={form[f.key] ?? ''}
+              onChange={e => set(f.key, e.target.value)}
+              style={inputStyle}
+            />
+          </div>
+        ))}
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>
+            Vehicle Type<span style={{ color: 'var(--status-danger)' }}> *</span>
+          </label>
+          <Select value={form.type ?? ''} onValueChange={handleTypeChange}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {typeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>
+            Capacity (ton)<span style={{ color: 'var(--status-danger)' }}> *</span>
+          </label>
+          <input
+            type="number"
+            placeholder="e.g. 30"
+            value={form.capacity ?? ''}
+            onChange={e => set('capacity', e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+
+        {TEXT_FIELDS.filter(f => !f.required).map(f => (
+          <div key={f.key} style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>{f.label}</label>
             {f.type === 'date' ? (
               <DatePicker
                 value={form[f.key] ?? ''}
@@ -193,14 +257,10 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
         ))}
 
         {[
-          { key: 'type', label: 'Vehicle Type', options: typeOptions, required: true },
-          { key: 'fuel_type', label: 'Fuel Type', options: ['Diesel', 'Petrol', 'Electric', 'Hybrid'], required: true },
           { key: 'status', label: 'Status', options: ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE', 'OUT_OF_SERVICE'] },
         ].map(f => (
           <div key={f.key} style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>
-              {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
-            </label>
+            <label style={labelStyle}>{f.label}</label>
             <Select value={form[f.key] ?? ''} onValueChange={val => set(f.key, val)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>

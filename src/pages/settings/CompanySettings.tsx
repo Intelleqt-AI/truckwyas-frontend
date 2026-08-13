@@ -66,12 +66,44 @@ export function CompanySettings() {
     allow_cross_border: 'yes',
     weight_surcharge_threshold_kg: '5000',
     weight_surcharge_pct: '15',
+    fuel_price_per_litre: '', fuel_price_petrol: '', fuel_price_electric: '', fuel_price_hybrid: '',
   });
   const [logoUrl, setLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [livePrice, setLivePrice] = useState<any>(null);
+  const [fetchingLivePrice, setFetchingLivePrice] = useState(false);
+
+  const loadLivePrice = (force: boolean) => {
+    setFetchingLivePrice(true);
+    fetchData(`api/v1/fuel-prices/current/${force ? '?force=true' : ''}`).then((d: any) => {
+      setLivePrice(d);
+      setForm(prev => {
+        const next = { ...prev };
+        // A manual "Fetch Now" always applies the fresh value. On initial
+        // load, only nudge a field when it still looks untouched — Diesel
+        // has a real factory default (23.50) to compare against; Petrol has
+        // no forced default, so "untouched" just means blank. Never silently
+        // overwrite a price a company deliberately set.
+        if (d?.inland_price != null) {
+          const current = parseFloat(prev.fuel_price_per_litre);
+          const dieselUntouched = !prev.fuel_price_per_litre || Math.abs(current - 23.5) < 0.001;
+          if (force || dieselUntouched) next.fuel_price_per_litre = String(d.inland_price);
+        }
+        if (d?.petrol_95) {
+          if (force || !prev.fuel_price_petrol) next.fuel_price_petrol = String(d.petrol_95);
+        }
+        return next;
+      });
+      if (force) {
+        if (d?.success === false) toast.error(d?.error || 'Could not fetch live fuel prices');
+        else toast.success('Fuel prices refreshed');
+      }
+    }).catch(() => { if (force) toast.error('Could not fetch live fuel prices'); })
+      .finally(() => setFetchingLivePrice(false));
+  };
 
   useEffect(() => {
     fetchData('/api/v1/company/profile/').then((d: any) => {
@@ -98,11 +130,19 @@ export function CompanySettings() {
             d.weight_surcharge_threshold_kg != null ? String(d.weight_surcharge_threshold_kg) : '5000',
           weight_surcharge_pct:
             d.weight_surcharge_pct != null ? String(d.weight_surcharge_pct) : '15',
+          fuel_price_per_litre: d.fuel_price_per_litre != null ? String(d.fuel_price_per_litre) : '',
+          fuel_price_petrol: d.fuel_price_petrol != null ? String(d.fuel_price_petrol) : '',
+          fuel_price_electric: d.fuel_price_electric != null ? String(d.fuel_price_electric) : '',
+          fuel_price_hybrid: d.fuel_price_hybrid != null ? String(d.fuel_price_hybrid) : '',
         });
         // Only show a real uploaded logo, not the backend's default placeholder
         if (d.logo_url && !d.logo_url.endsWith('/brand/logo.svg')) setLogoUrl(d.logo_url);
       }
-    }).catch(() => { toast.error('Failed to load company details'); });
+    }).catch(() => { toast.error('Failed to load company details'); })
+      // Chained, not parallel: the live-price nudge below reads the current
+      // Diesel field to decide whether it looks untouched, so it must run
+      // after the real saved value has actually landed in form state.
+      .finally(() => loadLivePrice(false));
   }, []);
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
@@ -145,6 +185,16 @@ export function CompanySettings() {
       toast.error('Weight surcharge % must be between 0 and 100');
       return;
     }
+    for (const [key, label] of [
+      ['fuel_price_per_litre', 'Diesel'], ['fuel_price_petrol', 'Petrol'],
+      ['fuel_price_electric', 'Electric'], ['fuel_price_hybrid', 'Hybrid'],
+    ] as const) {
+      const raw = (form as any)[key];
+      if (raw && (isNaN(parseFloat(raw)) || parseFloat(raw) < 0)) {
+        toast.error(`${label} fuel price must be a positive number`);
+        return;
+      }
+    }
     setSaving(true);
     try {
       await patchData({ url: '/api/v1/company/profile/', data: {
@@ -160,6 +210,10 @@ export function CompanySettings() {
         allow_cross_border: form.allow_cross_border === 'yes',
         weight_surcharge_threshold_kg: surchargeThreshold,
         weight_surcharge_pct: surchargePct,
+        fuel_price_per_litre: form.fuel_price_per_litre ? parseFloat(form.fuel_price_per_litre) : 23.50,
+        fuel_price_petrol: form.fuel_price_petrol ? parseFloat(form.fuel_price_petrol) : null,
+        fuel_price_electric: form.fuel_price_electric ? parseFloat(form.fuel_price_electric) : null,
+        fuel_price_hybrid: form.fuel_price_hybrid ? parseFloat(form.fuel_price_hybrid) : null,
       } });
       setSaved(true);
       toast.success('Company details saved');
@@ -397,6 +451,112 @@ export function CompanySettings() {
               <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
                 Added on top of the base rate (distance × rate/km), not on the cargo weight itself.
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Fuel Price Defaults */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Fuel Price Defaults</span></div>
+        <div style={{ padding: 20 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 16 }}>
+            Used as the default price when a vehicle type of that fuel type doesn't have
+            its own fuel price set (Settings &gt; Vehicle Types). Diesel already falls back
+            to the live national price if left blank; the other three have no such feed,
+            so they stay unset until you add one.
+          </div>
+          <div style={grid2}>
+            <div>
+              <label style={labelStyle}>Diesel (R/L)</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  placeholder="e.g. 23.50"
+                  value={form.fuel_price_per_litre}
+                  onChange={e => set('fuel_price_per_litre', e.target.value)}
+                />
+                <button
+                  onClick={() => loadLivePrice(true)}
+                  disabled={fetchingLivePrice}
+                  style={{
+                    flexShrink: 0, background: 'none', border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-secondary)', padding: '0 12px',
+                    fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                    cursor: fetchingLivePrice ? 'wait' : 'pointer', letterSpacing: '0.04em',
+                  }}
+                >
+                  {fetchingLivePrice ? '...' : 'FETCH NOW'}
+                </button>
+              </div>
+              {livePrice?.success !== false && livePrice?.inland_price != null && (
+                <div style={{ fontSize: 11, color: livePrice.is_stale ? 'var(--status-warning)' : 'var(--text-tertiary)', marginTop: 6 }}>
+                  Live national price: R{Number(livePrice.inland_price).toFixed(2)}/L
+                  {livePrice.last_updated && ` · updated ${new Date(livePrice.last_updated).toLocaleDateString()}`}
+                  {livePrice.stale_warning && ` · ${livePrice.stale_warning}`}
+                </div>
+              )}
+            </div>
+            <div>
+              <label style={labelStyle}>Petrol (R/L)</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  placeholder="Not set"
+                  value={form.fuel_price_petrol}
+                  onChange={e => set('fuel_price_petrol', e.target.value)}
+                />
+                <button
+                  onClick={() => loadLivePrice(true)}
+                  disabled={fetchingLivePrice}
+                  style={{
+                    flexShrink: 0, background: 'none', border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-secondary)', padding: '0 12px',
+                    fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                    cursor: fetchingLivePrice ? 'wait' : 'pointer', letterSpacing: '0.04em',
+                  }}
+                >
+                  {fetchingLivePrice ? '...' : 'FETCH NOW'}
+                </button>
+              </div>
+              {livePrice?.success !== false && livePrice?.petrol_95 != null && (
+                <div style={{ fontSize: 11, color: livePrice.is_stale ? 'var(--status-warning)' : 'var(--text-tertiary)', marginTop: 6 }}>
+                  Live national price (95 unleaded): R{Number(livePrice.petrol_95).toFixed(2)}/L
+                  {livePrice.last_updated && ` · updated ${new Date(livePrice.last_updated).toLocaleDateString()}`}
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ ...grid2, marginTop: 16 }}>
+            <div>
+              <label style={labelStyle}>Electric (R/kWh)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min={0}
+                step={0.01}
+                placeholder="Not set"
+                value={form.fuel_price_electric}
+                onChange={e => set('fuel_price_electric', e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Hybrid (R/L)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min={0}
+                step={0.01}
+                placeholder="Not set"
+                value={form.fuel_price_hybrid}
+                onChange={e => set('fuel_price_hybrid', e.target.value)}
+              />
             </div>
           </div>
         </div>

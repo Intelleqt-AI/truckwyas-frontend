@@ -454,11 +454,11 @@ export default function Drivers() {
               <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Add Driver</div>
               <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
+            {/* Required fields first (Name through License Province), optional
+                fields (Phone, Email, Status) after. */}
             {[
               { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan', required: true },
               { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter', required: true },
-              { key: 'phone', label: 'Phone', placeholder: 'e.g. 082 123 4567' },
-              { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
               { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001', required: true },
               { key: 'license_expiry', label: 'License Expiry', type: 'date', required: true },
               { key: 'hire_date', label: 'Hire Date', type: 'date', required: true },
@@ -485,11 +485,44 @@ export default function Drivers() {
             ))}
             {[
               { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'], required: true },
-              { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
                   {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                </label>
+                <Select value={(addForm as any)[f.key]} onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {f.options.map(o => <SelectItem key={o} value={o}>{o.replace('_', ' ')}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+            {[
+              { key: 'phone', label: 'Phone', placeholder: 'e.g. 082 123 4567' },
+              { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                  {f.label}
+                </label>
+                <input
+                  type={f.type || 'text'}
+                  placeholder={f.placeholder}
+                  value={(addForm as any)[f.key]}
+                  onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
+            {[
+              { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                  {f.label}
                 </label>
                 <Select value={(addForm as any)[f.key]} onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}>
                   <SelectTrigger>
@@ -570,17 +603,14 @@ export default function Drivers() {
                 {error}
               </div>
             )}
+            {/* Required fields first (Name through Hire Date, then License
+                Province), optional fields after. */}
             {[
               { key: 'first_name', label: 'First Name', placeholder: 'e.g. Riaan', required: true },
               { key: 'last_name', label: 'Last Name', placeholder: 'e.g. Venter', required: true },
-              { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
-              { key: 'phone', label: 'Phone', placeholder: 'e.g. 082 123 4567' },
-              { key: 'address', label: 'Address', placeholder: 'e.g. 12 Main Street, Cape Town' },
               { key: 'license_number', label: 'License Number', placeholder: 'e.g. DRV-2024-001', required: true },
               { key: 'license_expiry', label: 'License Expiry', type: 'date', required: true },
-              { key: 'medical_card_expiry', label: 'Medical Card Expiry', type: 'date' },
               { key: 'hire_date', label: 'Hire Date', type: 'date', required: true },
-              { key: 'emergency_contact', label: 'Emergency Contact', placeholder: 'e.g. Jane Doe or 082 123 4567' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
@@ -604,11 +634,54 @@ export default function Drivers() {
             ))}
             {[
               { key: 'license_state', label: 'License Province', options: ['GP', 'WC', 'KZN', 'EC', 'MP', 'LP', 'NW', 'FS', 'NC'], required: true },
-              { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
                   {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+                </label>
+                <Select value={(editForm as any)[f.key]} onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {f.options.map(o => <SelectItem key={o} value={o}>{o.replace('_', ' ')}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+            {[
+              { key: 'email', label: 'Email', placeholder: 'e.g. riaan@truckwys.co.za', type: 'email' },
+              { key: 'phone', label: 'Phone', placeholder: 'e.g. 082 123 4567' },
+              { key: 'address', label: 'Address', placeholder: 'e.g. 12 Main Street, Cape Town' },
+              { key: 'medical_card_expiry', label: 'Medical Card Expiry', type: 'date' },
+              { key: 'emergency_contact', label: 'Emergency Contact', placeholder: 'e.g. Jane Doe or 082 123 4567' },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                  {f.label}
+                </label>
+                {f.type === 'date' ? (
+                  <DatePicker
+                    value={(editForm as any)[f.key] ?? ''}
+                    onChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}
+                  />
+                ) : (
+                  <input
+                    type={f.type || 'text'}
+                    placeholder={f.placeholder}
+                    value={(editForm as any)[f.key] ?? ''}
+                    onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                )}
+              </div>
+            ))}
+            {[
+              { key: 'status', label: 'Status', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
+            ].map(f => (
+              <div key={f.key} style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase' }}>
+                  {f.label}
                 </label>
                 <Select value={(editForm as any)[f.key]} onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}>
                   <SelectTrigger>

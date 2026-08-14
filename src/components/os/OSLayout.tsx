@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { fetchData, postData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { useIdleLogout } from '@/hooks/useIdleLogout';
+import { isSubscriptionBlocked, subscriptionStatusDetail, subscriptionStatusLabel } from '@/lib/subscriptionStatus';
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // "Auto sign out after 30 minutes of inactivity"
 
@@ -15,6 +16,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
     return (localStorage.getItem('tw-theme') as 'dark' | 'light') || 'dark';
   });
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showStatusPopover, setShowStatusPopover] = useState(false);
   const [agentQuery, setAgentQuery] = useState('');
   // Default ON to match the backend default; corrected by the fetch below.
   const [sessionTimeoutEnabled, setSessionTimeoutEnabled] = useState(true);
@@ -24,6 +26,8 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
 
   const { user: authUser } = useAuth();
+  const subStatus = authUser?.subscription_status;
+  const statusBadgeClass = isSubscriptionBlocked(subStatus) ? 'delayed' : subStatus === 'grace_period' ? 'warning' : 'active';
   const userName = authUser?.name || authUser?.username || 'User';
   const userRole = (authUser?.role || 'VIEWER').toUpperCase();
   const avatarUrl = (authUser?.avatar as string) || undefined;
@@ -246,9 +250,36 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <div className="status-badge active">
+          <div
+            className={`status-badge ${statusBadgeClass}`}
+            style={{ position: 'relative', cursor: 'default' }}
+            onMouseEnter={() => setShowStatusPopover(true)}
+            onMouseLeave={() => setShowStatusPopover(false)}
+          >
             <span style={{ width: 6, height: 6, background: 'currentColor', borderRadius: '50%', display: 'inline-block' }} />
-            ONLINE
+            {subscriptionStatusLabel(subStatus)}
+            {showStatusPopover && (
+              <div style={{
+                position: 'absolute', top: '100%', right: 0, marginTop: 8,
+                width: 260, padding: 14, background: 'var(--bg-surface)',
+                border: '1px solid var(--border-subtle)', borderRadius: 6,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.3)', zIndex: 1000,
+                textAlign: 'left' as const, fontWeight: 400, whiteSpace: 'normal' as const,
+              }}>
+                <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: isSubscriptionBlocked(subStatus) ? 10 : 0 }}>
+                  {subscriptionStatusDetail(subStatus)}
+                </div>
+                {isSubscriptionBlocked(subStatus) && (
+                  <button
+                    onClick={() => navigate('/settings/billing')}
+                    className="btn-action"
+                    style={{ width: '100%', fontSize: 10 }}
+                  >
+                    GO TO BILLING
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           <NotificationBell />
           <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">

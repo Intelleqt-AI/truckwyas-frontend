@@ -685,6 +685,12 @@ body {
   border-color: var(--status-badge-delayed-border);
 }
 
+.status-badge.warning {
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
+  border-color: var(--status-warning);
+}
+
 /* ===========================
    AGENT SIDEBAR
    =========================== */

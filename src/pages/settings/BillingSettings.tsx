@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { fetchData, postData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
+import { useAuth } from "@/lib/AuthContext";
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -56,6 +57,11 @@ interface BillingStatus {
   card?: CardOnFile | null;
   grace?: Grace | null;
   suspended?: boolean;
+  // True once Cancel Plan has been clicked but the already-paid period
+  // hasn't ended yet — access continues in full until next_billing_date,
+  // at which point a daily backend sweep finalises subscription_status to
+  // 'cancelled'. Lets Undo run right up to that date.
+  cancel_at_period_end?: boolean;
 }
 
 interface BillingTransaction {
@@ -88,7 +94,7 @@ const formatRand = (amount?: string | number | null) =>
 // second (HH:MM:SS, or MM:SS once under an hour) so a fast test cycle is
 // actually watchable; beyond that it's just "in N days" — nobody needs a
 // second-by-second countdown to a charge three weeks away.
-function NextPaymentCountdown({ nextBillingAt }: { nextBillingAt?: string | null }) {
+function NextPaymentCountdown({ nextBillingAt, mode = 'charge' }: { nextBillingAt?: string | null; mode?: 'charge' | 'cancel' }) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -101,35 +107,38 @@ function NextPaymentCountdown({ nextBillingAt }: { nextBillingAt?: string | null
   const targetMs = new Date(nextBillingAt).getTime();
   const diffMs = targetMs - now;
   const pad = (n: number) => String(n).padStart(2, '0');
+  const actionLabel = mode === 'cancel' ? 'Access ends' : 'Next payment';
 
   let label: string;
   if (diffMs <= 0) {
-    label = 'Payment processing…';
+    label = mode === 'cancel' ? 'Finalizing cancellation…' : 'Payment processing…';
   } else if (diffMs < 48 * 3600_000) {
     const totalSeconds = Math.floor(diffMs / 1000);
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
     label = h > 0
-      ? `Next payment in ${h}:${pad(m)}:${pad(s)}`
-      : `Next payment in ${pad(m)}:${pad(s)}`;
+      ? `${actionLabel} in ${h}:${pad(m)}:${pad(s)}`
+      : `${actionLabel} in ${pad(m)}:${pad(s)}`;
   } else {
     const days = Math.ceil(diffMs / 86400_000);
-    label = `Next payment in ${days} days`;
+    label = `${actionLabel} in ${days} days`;
   }
 
   return (
     <div style={{
-      fontSize: 12, color: 'var(--accent-primary)', marginTop: 2,
+      fontSize: 12, color: mode === 'cancel' ? 'var(--status-warning)' : 'var(--accent-primary)', marginTop: 2,
       fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' as const,
     }}>
       {label} · {new Date(nextBillingAt).toLocaleDateString('en-ZA')}
+      {mode === 'cancel' && ' — you won\'t be charged again'}
     </div>
   );
 }
 
 export function BillingSettings() {
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [billingHistory, setBillingHistory] = useState<BillingTransaction[]>([]);
@@ -175,6 +184,7 @@ export function BillingSettings() {
         try {
           await postData({ url: 'api/v1/billing/confirm/', data: { reference } });
           await loadStatus(); // confirm/ returns only the base fields, not flat_plan/card
+          refreshUser(); // sync AuthContext so the header badge updates without a reload
           toast.success('Subscription activated!');
         } catch {
           toast.error('Payment was not successful or was cancelled.');
@@ -194,6 +204,35 @@ export function BillingSettings() {
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-fetch the moment a subscription.* event arrives over the live
+  // WebSocket (components/LiveEvents.tsx) — this page's billingStatus/
+  // billingHistory are plain local state loaded once on mount, so without
+  // this a background change (the monthly-fee cron recharging, or
+  // check_pending_cancellations finalising a cancellation) sits stale here
+  // until a manual reload, even though AuthContext's own subscription_status
+  // already updates live via the same event.
+  useEffect(() => {
+    const onLiveEvent = (e: Event) => {
+      const { detail } = e as CustomEvent;
+      if (typeof detail?.event === 'string' && detail.event.startsWith('subscription.')) {
+        loadStatus();
+        loadHistory();
+      }
+    };
+    window.addEventListener('tw:live-event', onLiveEvent);
+    return () => window.removeEventListener('tw:live-event', onLiveEvent);
+  }, [loadStatus, loadHistory]);
+
+  // Polling safety net, independent of the WebSocket above — the live push
+  // depends on a working Redis connection end-to-end, and this is the one
+  // page where a stuck "Payment processing…"/"Finalizing…" display is most
+  // visible and most actively watched during a test cycle. 5s is cheap and
+  // fine for a single settings page (unlike AuthContext's 30s, which runs
+  // app-wide on every page for the lifetime of the session).
+  useEffect(() => {
+    const id = setInterval(() => { loadStatus(); loadHistory(); }, 5000);
+    return () => clearInterval(id);
+  }, [loadStatus, loadHistory]);
 
   const handleSubscribe = async () => {
     setSubscribing(true);
@@ -218,15 +257,29 @@ export function BillingSettings() {
   const handleCancel = () => {
     setConfirmOpts({
       title: 'Cancel Subscription',
-      message: 'Are you sure you want to cancel your subscription? You will lose access to paid features at the end of your billing period.',
+      message: 'Are you sure you want to cancel your subscription? Access continues in full until the end of your current billing period — you won\'t be charged again, and you can undo this any time before then.',
       confirmLabel: 'Cancel Plan',
       danger: true,
       onConfirm: async () => {
         setCancelling(true);
         try {
-          await postData({ url: 'api/v1/billing/cancel/', data: {} });
-          toast.success('Subscription cancelled.');
-          setBillingStatus(prev => prev ? { ...prev, subscription_status: 'cancelled' } : prev);
+          const result = await postData({ url: 'api/v1/billing/cancel/', data: {} });
+          if (result?.cancel_at_period_end) {
+            // Paying company — access holds until next_billing_date, only the
+            // flag flips now; the backend's daily sweep finalises the actual
+            // 'cancelled' status once that date passes.
+            setBillingStatus(prev => prev ? {
+              ...prev,
+              cancel_at_period_end: true,
+              next_billing_date: result.access_until ?? prev.next_billing_date,
+            } : prev);
+            toast.success('Subscription will cancel at the end of your billing period.');
+          } else {
+            // Trialing — no paid period to honour, cancels immediately.
+            setBillingStatus(prev => prev ? { ...prev, subscription_status: 'cancelled' } : prev);
+            toast.success('Subscription cancelled.');
+          }
+          refreshUser(); // sync AuthContext so the header badge updates without a reload
         } catch {
           toast.error('Failed to cancel subscription. Please contact support.');
         } finally {
@@ -235,6 +288,19 @@ export function BillingSettings() {
         }
       },
     });
+  };
+
+  const handleUndoCancel = async () => {
+    setCancelling(true);
+    try {
+      await postData({ url: 'api/v1/billing/undo-cancel/', data: {} });
+      setBillingStatus(prev => prev ? { ...prev, cancel_at_period_end: false } : prev);
+      toast.success('Cancellation undone — your subscription will continue.');
+    } catch {
+      toast.error('Failed to undo cancellation. Please try again.');
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const planKey = billingStatus?.subscription_plan?.toLowerCase() || 'free';
@@ -282,12 +348,19 @@ export function BillingSettings() {
                   <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>
                     {isPaid ? (billingStatus?.item_name || 'TruckWys Fleet') : 'Free Plan'}
                   </span>
-                  {isPaid && (
+                  {isPaid && !billingStatus?.cancel_at_period_end && (
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 7px',
                       background: 'var(--status-success-bg)', color: 'var(--accent-primary)',
                       borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
                     }}>Active</span>
+                  )}
+                  {isPaid && billingStatus?.cancel_at_period_end && (
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 7px',
+                      background: 'var(--status-warning-bg)', color: 'var(--status-warning)',
+                      borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
+                    }}>Cancelling</span>
                   )}
                   {subStatus === 'cancelled' && (
                     <span style={{
@@ -300,7 +373,12 @@ export function BillingSettings() {
                 <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
                   {isPaid ? `${formatRand(billingStatus?.amount)} / month` : 'No active subscription'}
                 </div>
-                {isPaid && <NextPaymentCountdown nextBillingAt={billingStatus?.next_billing_at} />}
+                {isPaid && billingStatus?.cancel_at_period_end && (
+                  <NextPaymentCountdown nextBillingAt={billingStatus?.next_billing_at} mode="cancel" />
+                )}
+                {isPaid && !billingStatus?.cancel_at_period_end && (
+                  <NextPaymentCountdown nextBillingAt={billingStatus?.next_billing_at} mode="charge" />
+                )}
                 {billingStatus?.card?.last4 && (
                   <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2, textTransform: 'capitalize' as const }}>
                     {billingStatus.card.bank ? `${billingStatus.card.bank} ` : ''}{billingStatus.card.card_type} card ending {billingStatus.card.last4}
@@ -308,7 +386,11 @@ export function BillingSettings() {
                 )}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                {isPaid ? (
+                {isPaid && billingStatus?.cancel_at_period_end ? (
+                  <button onClick={handleUndoCancel} disabled={cancelling} className="btn-action">
+                    {cancelling ? 'RESTORING...' : 'KEEP SUBSCRIPTION'}
+                  </button>
+                ) : isPaid ? (
                   <button onClick={handleCancel} disabled={cancelling} style={{
                     background: 'none', border: '1px solid var(--border-subtle)',
                     color: 'var(--text-secondary)', padding: '7px 14px',

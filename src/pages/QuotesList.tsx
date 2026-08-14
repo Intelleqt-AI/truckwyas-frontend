@@ -7,6 +7,8 @@ import { LiveBadge } from "@/components/LiveBadge";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { ConvertToBookingModal } from "@/components/ConvertToBookingModal";
+import { useAuth } from "@/lib/AuthContext";
+import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
 import {
   DndContext,
   DragEndEvent,
@@ -70,7 +72,7 @@ const COLUMN_LABELS: Record<string, string> = {
 };
 
 // Draggable Quote Card Component
-function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; onClick: () => void; onConvertToLoad?: (e: React.MouseEvent, quote: any) => void }) {
+function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, convertedLoad, dragDisabled }: { quote: any; onClick: () => void; onConvertToLoad?: (e: React.MouseEvent, quote: any) => void; onViewBooking?: (e: React.MouseEvent, load: any) => void; convertedLoad?: any; dragDisabled?: boolean }) {
   const {
     attributes,
     listeners,
@@ -78,14 +80,14 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: String(quote.id) });
+  } = useSortable({ id: String(quote.id), disabled: dragDisabled });
 
   const accent = STATUS_COLOR[quote.status] || 'var(--border-subtle)';
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    cursor: isDragging ? 'grabbing' : 'grab',
+    cursor: dragDisabled ? 'pointer' : (isDragging ? 'grabbing' : 'grab'),
     background: 'var(--bg-surface)',
     border: '1px solid var(--border-subtle)',
     borderRadius: 2,
@@ -97,7 +99,7 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
+      {...(dragDisabled ? {} : listeners)}
       onClick={onClick}
       onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.background = 'var(--bg-surface-hover)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-surface)'; }}
@@ -130,7 +132,15 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad }: { quote: any; o
             <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', color: confidenceColor(quote.confidence), border: `1px solid ${confidenceColor(quote.confidence)}` }}>{sentenceCase(quote.confidence)}</span>
           )}
         </div>
-        {quote.status === 'ACCEPTED' && onConvertToLoad && (
+        {quote.status === 'ACCEPTED' && convertedLoad && (
+          <button
+            onClick={(e) => onViewBooking?.(e, convertedLoad)}
+            style={{ width: '100%', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '0.05em', padding: '7px 8px', background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
+          >
+            ✓ Converted — View booking →
+          </button>
+        )}
+        {quote.status === 'ACCEPTED' && !convertedLoad && onConvertToLoad && (
           <button
             onClick={(e) => onConvertToLoad(e, quote)}
             style={{ width: '100%', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '0.05em', padding: '7px 8px', background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
@@ -167,6 +177,8 @@ function DroppableColumn({ columnId, items, children }: { columnId: string; item
 export function QuotesList({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user: authUser } = useAuth();
+  const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'board' | 'list'>('board');
   const [activeQuoteId, setActiveQuoteId] = useState<string | null>(null);
@@ -196,6 +208,14 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
 
   const loads: any[] = loadsData?.results || loadsData || [];
   const quotes: any[] = quotesData?.results || quotesData || [];
+
+  // A quote converts to at most one load (convert_to_load blocks a second
+  // conversion) — map quote id -> its load so the "Convert to booking"
+  // button can be swapped for a "View booking" link once that's happened.
+  const loadByQuoteId = new Map<string, any>();
+  loads.forEach(l => {
+    if (l.quote != null) loadByQuoteId.set(String(l.quote), l);
+  });
 
   // Live update: refetch when backend pushes any quote event over WebSocket
   useEffect(() => {
@@ -304,6 +324,9 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
     const { active, over } = event;
     setActiveQuoteId(null);
 
+    // Defense in depth — cards already have dragging disabled via useSortable
+    // when blocked, but a status PATCH here would just 402 anyway.
+    if (billingBlocked) return;
     if (!over) return;
 
     const quoteId = active.id as string;
@@ -373,6 +396,21 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
 
       </div>
 
+      {billingBlocked && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, padding: 14,
+          borderRadius: 6, background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)',
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--status-danger)', marginBottom: 2 }}>Quoting is blocked</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{subscriptionStatusDetail(authUser?.subscription_status)} Drag-and-drop status changes are disabled until then.</div>
+          </div>
+          <button onClick={() => navigate('/settings/billing')} className="btn-action" style={{ fontSize: 11, flexShrink: 0 }}>
+            GO TO BILLING
+          </button>
+        </div>
+      )}
+
       {/* Tabs */}
       {view === 'board' ? (
         <DndContext
@@ -404,6 +442,9 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                       quote={q}
                       onClick={() => navigate(`/bookings/quotes/${q.id}`)}
                       onConvertToLoad={handleConvertToLoad}
+                      onViewBooking={(e, load) => { e.stopPropagation(); navigate(`/bookings/${load.id}`); }}
+                      convertedLoad={loadByQuoteId.get(String(q.id))}
+                      dragDisabled={billingBlocked}
                     />
                   ))}
                   {colItems.length === 0 && (
@@ -529,7 +570,15 @@ export function QuotesList({ embedded = false }: { embedded?: boolean }) {
                       {formatCurrency(parseFloat(quote.total_amount || '0'))}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                      {quote.status === 'ACCEPTED' && (
+                      {quote.status === 'ACCEPTED' && loadByQuoteId.has(String(quote.id)) && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/bookings/${loadByQuoteId.get(String(quote.id)).id}`); }}
+                          style={{ background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                        >
+                          ✓ View booking
+                        </button>
+                      )}
+                      {quote.status === 'ACCEPTED' && !loadByQuoteId.has(String(quote.id)) && (
                         <button
                           onClick={(e) => handleConvertToLoad(e, quote)}
                           style={{ background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}

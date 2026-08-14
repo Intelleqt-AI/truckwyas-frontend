@@ -6,6 +6,8 @@ import { formatCurrency } from "@/lib/formatters";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/lib/AuthContext';
+import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: 'var(--text-tertiary)',
@@ -39,6 +41,8 @@ export default function Bookings() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
+  const { user: authUser } = useAuth();
+  const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
 
   const [converting, setConverting] = useState(false);
   const [createdInvoiceId, setCreatedInvoiceId] = useState<string | null>(null);
@@ -49,6 +53,7 @@ export default function Bookings() {
   const [assignDriverId, setAssignDriverId] = useState('');
   const [assignVehicleId, setAssignVehicleId] = useState('');
   const [assignSaving, setAssignSaving] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
 
   const { data: load, isLoading } = useQuery({
     queryKey: ['load', id],
@@ -59,12 +64,12 @@ export default function Bookings() {
   const { data: driversData } = useQuery({
     queryKey: ['drivers-active'],
     queryFn: () => fetchData('api/v1/drivers/?status=ACTIVE'),
-    enabled: editingAssignment,
+    enabled: editingAssignment || assignModalOpen,
   });
   const { data: vehiclesData } = useQuery({
     queryKey: ['vehicles-available'],
     queryFn: () => fetchData('api/v1/vehicles/?status=AVAILABLE'),
-    enabled: editingAssignment,
+    enabled: editingAssignment || assignModalOpen,
   });
   const assignableDrivers: { id: number; user_details?: { name?: string; username?: string } }[] =
     driversData?.results || driversData || [];
@@ -82,11 +87,25 @@ export default function Bookings() {
   };
 
   const updateStatus = async (newStatus: string) => {
+    // Dropdown is already disabled when blocked — this is defense in depth,
+    // since a PATCH here would just 402 anyway.
+    if (billingBlocked) return;
+
     const currentStatus = load?.status;
     const allowed = VALID_TRANSITIONS[currentStatus] || [];
 
     if (!allowed.includes(newStatus)) {
       toast.error(`Cannot transition from ${currentStatus} to ${newStatus.replace('_', ' ')}`);
+      return;
+    }
+
+    // A load can't be marked Assigned without both a driver and a vehicle —
+    // rather than let the PATCH 400, open the assign flow right here so the
+    // user can pick them and land on Assigned in one step.
+    if (newStatus === 'ASSIGNED' && (!load?.driver || !load?.vehicle)) {
+      setAssignDriverId(load?.driver ? String(load.driver) : '');
+      setAssignVehicleId(load?.vehicle ? String(load.vehicle) : '');
+      setAssignModalOpen(true);
       return;
     }
 
@@ -158,6 +177,7 @@ export default function Bookings() {
   };
 
   const saveAssignment = async () => {
+    if (billingBlocked) return;
     setAssignSaving(true);
     try {
       await postData({ url: `api/v1/loads/${id}/assign_driver/`, data: {
@@ -169,6 +189,32 @@ export default function Bookings() {
       toast.success('Assignment updated');
     } catch (e: any) {
       toast.error(e?.message || 'Failed to update assignment');
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
+  const submitAssignAndActivate = async () => {
+    if (billingBlocked) return;
+    if (!assignDriverId || !assignVehicleId) {
+      toast.error('Select both a driver and a vehicle');
+      return;
+    }
+    setAssignSaving(true);
+    try {
+      await postData({ url: `api/v1/loads/${id}/assign_driver/`, data: {
+        driver_id: assignDriverId,
+        vehicle_id: assignVehicleId,
+      }});
+      // assign_driver only auto-promotes PENDING -> ASSIGNED; force it
+      // explicitly so this also works from LOADING, the other status that
+      // can lead to ASSIGNED.
+      await patchData({ url: `api/v1/loads/${id}/`, data: { status: 'ASSIGNED' } });
+      invalidateLoad();
+      setAssignModalOpen(false);
+      toast.success('Driver and vehicle assigned — status set to Assigned');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to assign driver and vehicle');
     } finally {
       setAssignSaving(false);
     }
@@ -201,8 +247,8 @@ export default function Bookings() {
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{load.load_number}</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{load.customer_name}</div>
         </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <Select value={load.status} onValueChange={updateStatus}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
+          <Select value={load.status} onValueChange={updateStatus} disabled={billingBlocked}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -211,6 +257,14 @@ export default function Bookings() {
               {allowedNextStatuses.map(s => <SelectItem key={s} value={s}>{titleCase(s)}</SelectItem>)}
             </SelectContent>
           </Select>
+          {billingBlocked && (
+            <div style={{ fontSize: 11, color: 'var(--status-danger)', textAlign: 'right', maxWidth: 220 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+              Status changes are blocked —{' '}
+              <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/settings/billing')}>
+                go to billing
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -314,14 +368,26 @@ export default function Bookings() {
             <div className="card-title" style={{ marginBottom: 16 }}>Actions</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {!hasInvoice ? (
-                <button
-                  className="btn-action"
-                  style={{ width: '100%', opacity: converting ? 0.6 : 1 }}
-                  onClick={convertToInvoice}
-                  disabled={converting}
-                >
-                  {converting ? 'Creating invoice...' : '+ Create invoice'}
-                </button>
+                billingBlocked ? (
+                  <div style={{ padding: '10px 12px', background: 'var(--status-warning-dim, rgba(230,160,60,0.1))', border: '1px solid var(--status-warning)', borderRadius: 2, fontSize: 11, color: 'var(--status-warning)', lineHeight: 1.5 }}>
+                    Manual invoice creation is unavailable — {subscriptionStatusDetail(authUser?.subscription_status)}{' '}
+                    <span
+                      onClick={() => navigate('/settings/billing')}
+                      style={{ textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      go to billing
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    className="btn-action"
+                    style={{ width: '100%', opacity: converting ? 0.6 : 1 }}
+                    onClick={convertToInvoice}
+                    disabled={converting}
+                  >
+                    {converting ? 'Creating invoice...' : '+ Create invoice'}
+                  </button>
+                )
               ) : (
                 <button
                   className="btn-action"
@@ -365,7 +431,7 @@ export default function Bookings() {
           <div className="card" style={{ padding: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div className="card-title">Assignment</div>
-              {!editingAssignment && (
+              {!editingAssignment && !billingBlocked && (
                 <button
                   onClick={startEditAssignment}
                   style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', cursor: 'pointer', padding: 0 }}
@@ -374,6 +440,14 @@ export default function Bookings() {
                 </button>
               )}
             </div>
+            {billingBlocked && (
+              <div style={{ fontSize: 11, color: 'var(--status-danger)', marginBottom: 8 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+                Assignment is locked —{' '}
+                <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/settings/billing')}>
+                  go to billing
+                </span>
+              </div>
+            )}
 
             {!editingAssignment ? (
               [
@@ -450,6 +524,78 @@ export default function Bookings() {
         onConfirm={confirmOpts.onConfirm}
         onCancel={() => setConfirmOpts(null)}
       />
+    )}
+
+    {assignModalOpen && (
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+        onClick={() => setAssignModalOpen(false)}
+      >
+        <div
+          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 4, padding: 28, maxWidth: 420, width: '100%', boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>Assign Driver & Vehicle</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
+            This order needs a driver and a vehicle before it can be marked <b>Assigned</b>.
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Driver</div>
+            <Select value={assignDriverId} onValueChange={setAssignDriverId}>
+              <SelectTrigger><SelectValue placeholder="Select driver…" /></SelectTrigger>
+              <SelectContent>
+                {assignableDrivers.map(d => (
+                  <SelectItem key={d.id} value={String(d.id)}>
+                    {d.user_details?.name || d.user_details?.username || `Driver #${d.id}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {assignableDrivers.length === 0 && (
+              <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>No available drivers — check the Fleet page.</div>
+            )}
+          </div>
+
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Vehicle</div>
+            <Select value={assignVehicleId} onValueChange={setAssignVehicleId}>
+              <SelectTrigger><SelectValue placeholder="Select vehicle…" /></SelectTrigger>
+              <SelectContent>
+                {assignableVehicles.map(v => (
+                  <SelectItem key={v.id} value={String(v.id)}>
+                    {[v.make, v.model].filter(Boolean).join(' ')}{v.plate ? ` · ${v.plate}` : ` #${v.id}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {assignableVehicles.length === 0 && (
+              <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>No available vehicles — check the Fleet page.</div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+            <button
+              onClick={() => setAssignModalOpen(false)}
+              style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', cursor: 'pointer' }}
+            >
+              CANCEL
+            </button>
+            <button
+              onClick={submitAssignAndActivate}
+              disabled={assignSaving || !assignDriverId || !assignVehicleId}
+              style={{
+                padding: '8px 18px', background: 'var(--accent-primary)', border: 'none', color: '#fff',
+                borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.06em',
+                cursor: (assignSaving || !assignDriverId || !assignVehicleId) ? 'not-allowed' : 'pointer',
+                opacity: (assignSaving || !assignDriverId || !assignVehicleId) ? 0.5 : 1,
+              }}
+            >
+              {assignSaving ? 'ASSIGNING…' : 'ASSIGN & SET ASSIGNED'}
+            </button>
+          </div>
+        </div>
+      </div>
     )}
     </>
   );

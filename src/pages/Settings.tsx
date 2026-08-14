@@ -76,11 +76,19 @@ export default function Settings() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100%', gap: 0 }}>
-      {/* Sidebar */}
+      {/* Sidebar — this outer column stays full height so its right border
+          runs top to bottom alongside the (taller) settings panel; only the
+          nav content inside is sticky, via the inner wrapper below. */}
       <div style={{
         width: 220,
         flexShrink: 0,
         borderRight: '1px solid var(--border-subtle)',
+      }}>
+      <div style={{
+        position: 'sticky',
+        top: 0,
+        maxHeight: '100vh',
+        overflowY: 'auto',
         paddingTop: 8,
         paddingBottom: 24,
       }}>
@@ -120,6 +128,7 @@ export default function Settings() {
             })}
           </div>
         ))}
+      </div>
       </div>
 
       {/* Content */}

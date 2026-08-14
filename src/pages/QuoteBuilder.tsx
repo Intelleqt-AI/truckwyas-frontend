@@ -12,6 +12,8 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Dialog, DialogTrigger, DialogContent } from "@/components/ui/dialog";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
+import { useAuth } from "@/lib/AuthContext";
+import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
 import { MessageCircle, Map, Info, Sparkles, Maximize2, Mic, Square } from "lucide-react";
 
 /**
@@ -73,6 +75,14 @@ export default function QuoteBuilder() {
   const queryClient = useQueryClient();
   const { id: editId } = useParams();
   const isEditing = !!editId;
+
+  // Known from the same /auth/me/ call the whole app already makes on load —
+  // no need to wait for a 402 to discover this. Mirrors exactly what
+  // PlanLimitsMiddleware blocks server-side (POST/PATCH/PUT quotes, POST
+  // invoices), so gating the AI calls and the send/save actions on it here
+  // never disagrees with what the backend would actually allow.
+  const { user: authUser } = useAuth();
+  const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
 
   // ---- core inputs ----
   const [customerId, setCustomerId] = useState("");
@@ -274,12 +284,12 @@ export default function QuoteBuilder() {
   };
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || billingBlocked) return;
     if (calcRef.current) clearTimeout(calcRef.current);
     calcRef.current = setTimeout(() => { calculateRoute(); }, 500);
     return () => { if (calcRef.current) clearTimeout(calcRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, pickupCoords, deliveryCoords, vehicleType]);
+  }, [ready, pickupCoords, deliveryCoords, vehicleType, billingBlocked]);
 
   // ---- AI analyze + guard + benchmark once cost is ready ----
   const analyzeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -313,6 +323,9 @@ export default function QuoteBuilder() {
   };
   useEffect(() => {
     if (!routeData || total <= 0) return;
+    // Billing blocked: quotes can't be sent/saved anyway, so skip the AI
+    // round-trips entirely rather than call them just to discard the result.
+    if (billingBlocked) { setAnalysis(null); setGuard(null); setOptimizing(false); return; }
     // Any total-affecting change (trip-type flip, toll/driver/rate edit, route
     // switch) invalidates the numbers on screen: clear them and flag loading so
     // all four AI fields show a spinner together until the fresh analysis lands.
@@ -323,15 +336,15 @@ export default function QuoteBuilder() {
     // selectedRouteIndex/legs are folded into `total`, but list them so an
     // alternate-route pick (or trip-type flip) always re-runs the AI explicitly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeData, total, selectedRouteIndex, legs]);
+  }, [routeData, total, selectedRouteIndex, legs, billingBlocked]);
 
   // benchmark on lane resolve
   useEffect(() => {
-    if (!routeData) return;
+    if (!routeData || billingBlocked) return;
     fetchData(`/api/v1/quotes/benchmark/?origin=${extractCode(pickup)}&destination=${extractCode(delivery)}&vehicle_type=${vehicleType.toLowerCase()}`)
       .then(b => { if (b?.success !== false) setBenchmark(b); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeData]);
+  }, [routeData, billingBlocked]);
 
   const opt = analysis?.price_optimization;
   // Single source of truth for "the AI-recommended price" — used for the
@@ -557,6 +570,10 @@ export default function QuoteBuilder() {
     // A pre-existing quote opened for editing saves explicitly, not on every keystroke.
     if (isEditing && !createdRef.current) return;
     if (!substantive) return;
+    // Billing blocked: POST/PATCH /quotes/ would just 402 anyway (matches
+    // PlanLimitsMiddleware) — don't fire it at all rather than fail silently
+    // in the background on every keystroke.
+    if (billingBlocked) return;
     if (dbRef.current) clearTimeout(dbRef.current);
     const doSave = async (isFlush: boolean) => {
       const existingId = savedIdRef.current ?? savedQuoteId;
@@ -590,7 +607,7 @@ export default function QuoteBuilder() {
     dbRef.current = setTimeout(() => { dbFlushRef.current = null; doSave(false); }, 1500);
     return () => { if (dbRef.current) clearTimeout(dbRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [substantive, total, customerId, vehicleType, pickup, delivery, tollCost, driverAllowance, serviceCharge]);
+  }, [substantive, total, customerId, vehicleType, pickup, delivery, tollCost, driverAllowance, serviceCharge, billingBlocked]);
 
   // True unmount only (empty deps) — flushes whatever save is still pending
   // the instant the user actually leaves the page.
@@ -864,20 +881,40 @@ export default function QuoteBuilder() {
           </div>
           <div style={{ ...cardS, padding: "14px 16px" }}>
             <div style={{ ...labelS, marginBottom: 8 }}>Cost breakdown · {vehicleType || "—"}</div>
-            {!ready && (
+            {billingBlocked && (
+              <div style={{
+                padding: 14, marginBottom: ready ? 14 : 0, borderRadius: 6,
+                background: "var(--status-danger-bg)", border: "1px solid var(--status-danger)",
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--status-danger)", marginBottom: 4 }}>
+                  Quoting is blocked
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 10 }}>
+                  {subscriptionStatusDetail(authUser?.subscription_status)}
+                </div>
+                <button
+                  onClick={() => navigate("/settings/billing")}
+                  className="btn-action"
+                  style={{ fontSize: 12 }}
+                >
+                  GO TO BILLING
+                </button>
+              </div>
+            )}
+            {!billingBlocked && !ready && (
               <div style={{ padding: "30px 4px", textAlign: "center", color: "var(--text-tertiary)" }}>
                 <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Add a client, vehicle type, collection, delivery and weight</div>
                 <div style={{ fontSize: 12, marginTop: 6 }}>Costs and the AI quote appear here automatically.</div>
               </div>
             )}
-            {ready && routeBlockedMessage && (
+            {!billingBlocked && ready && routeBlockedMessage && (
               <div style={{ padding: "20px 4px" }}>
                 <div style={{ fontSize: 13, color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Route not allowed</div>
                 <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{routeBlockedMessage}</div>
               </div>
             )}
-            {ready && !routeBlockedMessage && calculatingRoute && <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Calculating route…</div>}
-            {ready && !routeBlockedMessage && !calculatingRoute && (<>
+            {!billingBlocked && ready && !routeBlockedMessage && calculatingRoute && <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Calculating route…</div>}
+            {!billingBlocked && ready && !routeBlockedMessage && !calculatingRoute && (<>
               {[
                 { key: "fuel", l: `Fuel — ${fuelConsumption} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
@@ -975,7 +1012,7 @@ export default function QuoteBuilder() {
       </div>
 
       {/* 3 — AI quote */}
-      {ready && !routeBlockedMessage && total > 0 && (
+      {!billingBlocked && ready && !routeBlockedMessage && total > 0 && (
         <div style={{ ...cardS, border: "1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-subtle))", marginBottom: 14 }}>
           {/* still learning — shown first, above the price block, while under the outcome threshold */}
           {aiLearning && (

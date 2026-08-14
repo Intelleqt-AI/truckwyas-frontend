@@ -7,6 +7,8 @@ import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ConvertToBookingModal } from '@/components/ConvertToBookingModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/lib/AuthContext';
+import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',
@@ -59,6 +61,8 @@ export default function QuoteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user: authUser } = useAuth();
+  const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [emailStatus, setEmailStatus] = useState<{ sent: boolean; address: string | null } | null>(null);
 
@@ -534,7 +538,7 @@ export default function QuoteDetail() {
               </div>
               <div>
                 {label('Status')}
-                <Select value={quote.status} onValueChange={(val) => statusMutation.mutate(val)} disabled={statusMutation.isPending}>
+                <Select value={quote.status} onValueChange={(val) => statusMutation.mutate(val)} disabled={statusMutation.isPending || billingBlocked}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -552,6 +556,14 @@ export default function QuoteDetail() {
                     )}
                   </SelectContent>
                 </Select>
+                {billingBlocked && (
+                  <div style={{ fontSize: 11, color: 'var(--status-danger)', marginTop: 4 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+                    Status changes are blocked —{' '}
+                    <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/settings/billing')}>
+                      go to billing
+                    </span>
+                  </div>
+                )}
               </div>
               <div>
                 {label('Confidence')}

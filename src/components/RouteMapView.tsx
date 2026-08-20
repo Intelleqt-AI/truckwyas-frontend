@@ -85,6 +85,15 @@ function dotIcon(L: LeafletModule, color: string) {
   });
 }
 
+function numberedIcon(L: LeafletModule, n: number) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:18px;height:18px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;font-family:monospace;">${n}</div>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
+}
+
 interface PointCoords { lat: number; lon: number; }
 interface ClickedPoint extends PointCoords { label: string; }
 
@@ -103,16 +112,24 @@ interface RouteMapViewProps {
    * pickup/delivery text and fetching a route itself.
    */
   geometry?: [number, number][];
+  /**
+   * Intermediate stops between pickup and delivery, in order — drawn as
+   * numbered pins. UI-only for now: purely visual, doesn't affect the route
+   * line/geometry above (that needs the backend to actually route through
+   * them, which isn't wired up yet).
+   */
+  stops?: { lat: number; lon: number; label: string }[];
   /** Fired when the user clicks the map to pick a point; label is reverse-geocoded. */
   onMapClick?: (point: ClickedPoint) => void;
 }
 
-export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, height = 260, geometry, onMapClick }: RouteMapViewProps) {
+export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, height = 260, geometry, stops, onMapClick }: RouteMapViewProps) {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<{ map: LeafletMap; L: LeafletModule } | null>(null);
   const pickupMarkerRef = useRef<Marker | null>(null);
   const deliveryMarkerRef = useRef<Marker | null>(null);
   const routeLineRef = useRef<Polyline | null>(null);
+  const stopMarkersRef = useRef<Marker[]>([]);
   const tempMarkerRef = useRef<Marker | null>(null);
   const fittedKeyRef = useRef<string | null>(null);
 
@@ -180,6 +197,9 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
   const geomKey = geometry && geometry.length > 1
     ? `${geometry.length}:${geometry[0].join()}:${geometry[geometry.length - 1].join()}`
     : '';
+  // Same idea for stops — a new array reference every render would otherwise
+  // re-trigger the draw effect (and its route re-fetch) on every keystroke.
+  const stopsKey = (stops || []).map((s) => `${s.lat},${s.lon}`).join('|');
 
   // Draw / redraw markers + route line whenever the selected route (geometry) or
   // the pickup/delivery text changes.
@@ -193,6 +213,19 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
       pickupMarkerRef.current?.remove(); pickupMarkerRef.current = null;
       deliveryMarkerRef.current?.remove(); deliveryMarkerRef.current = null;
       routeLineRef.current?.remove(); routeLineRef.current = null;
+      stopMarkersRef.current.forEach((m) => m.remove());
+      stopMarkersRef.current = [];
+    };
+
+    const drawStops = () => {
+      (stops || []).forEach((s, i) => {
+        if (cancelled) return;
+        stopMarkersRef.current.push(
+          L.marker([s.lat, s.lon], { icon: numberedIcon(L, i + 1) })
+            .bindTooltip(`Stop ${i + 1}${s.label ? `: ${s.label}` : ''}`, { direction: 'top' })
+            .addTo(map)
+        );
+      });
     };
 
     const drawLine = (points: [number, number][], dashed = false) => {
@@ -227,6 +260,7 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
     };
 
     clear();
+    drawStops();
 
     // Preferred path: draw the exact geometry of the selected route.
     if (geometry && geometry.length > 1) {
@@ -260,7 +294,7 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, geomKey, pickup, delivery, pickupCoords?.lat, pickupCoords?.lon, deliveryCoords?.lat, deliveryCoords?.lon]);
+  }, [ready, geomKey, stopsKey, pickup, delivery, pickupCoords?.lat, pickupCoords?.lon, deliveryCoords?.lat, deliveryCoords?.lon]);
 
   return (
     <div
@@ -268,7 +302,6 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
       style={{
         width: '100%',
         height,
-        borderRadius: 6,
         overflow: 'hidden',
         border: '1px solid #e5e7eb',
       }}

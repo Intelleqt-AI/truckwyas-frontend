@@ -14,7 +14,10 @@ import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
 import { useAuth } from "@/lib/AuthContext";
 import { isSubscriptionBlocked, subscriptionStatusDetail } from "@/lib/subscriptionStatus";
-import { MessageCircle, Map, Info, Sparkles, Maximize2, Mic, Square } from "lucide-react";
+import { MessageCircle, Map, Info, Sparkles, Maximize2, Mic, Square, X, Plus, GripVertical, ChevronDown, ChevronUp } from "lucide-react";
+import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 /**
  * QuoteBuilder — the redesigned single-page quote flow.
@@ -50,6 +53,89 @@ const extractCode = (s: string) => {
 const isForeignCountry = (code?: string) => !!code && !["ZA", "ZAF"].includes(code.toUpperCase());
 
 interface TollBreakdownItem { plaza: string; route: string; location_km: number; tariff: number; }
+interface QuoteStop { id: string; location: string; coords: LocationCoords | null; }
+
+// One draggable stop row — a plain grip + location input + remove button,
+// no card/box around it (matches the rest of the form's flat inputs).
+// useSortable needs its own component instance per item, so this can't be
+// inlined into the .map() below.
+function SortableStopRow({ stop, index, inputStyle, onLocationChange, onRemove }: {
+  stop: QuoteStop; index: number; inputStyle: React.CSSProperties;
+  onLocationChange: (v: string, c: LocationCoords | null) => void; onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: stop.id });
+  const [hoverRemove, setHoverRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  // Play the fade/shrink first, then actually drop it from state — an
+  // instant removal reads as the list glitching, not as something deleted.
+  const handleRemoveClick = () => {
+    setRemoving(true);
+    setTimeout(onRemove, 160);
+  };
+  const dragTransform = CSS.Transform.toString(transform);
+  return (
+    <div ref={setNodeRef} style={{
+      position: "relative", display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 8,
+      transform: removing ? `${dragTransform ?? ""} scale(0.95)`.trim() : dragTransform,
+      transition: removing ? "opacity 160ms ease, transform 160ms ease" : transition,
+      opacity: removing ? 0 : (isDragging ? 0.5 : 1),
+      zIndex: isDragging ? 2 : "auto",
+    }}>
+      <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--accent-primary)", color: "var(--btn-action-color)", fontSize: 10, fontFamily: "var(--font-mono)", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {index + 1}
+      </span>
+      <span {...attributes} {...listeners} title="Drag to reorder"
+        style={{ width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", cursor: "grab", color: "var(--text-tertiary)", flexShrink: 0, touchAction: "none" }}>
+        <GripVertical size={14} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <LocationInput value={stop.location} onChange={onLocationChange} placeholder="Stop location" style={inputStyle} />
+      </div>
+      <button type="button" onClick={handleRemoveClick} title="Remove stop"
+        onMouseEnter={() => setHoverRemove(true)} onMouseLeave={() => setHoverRemove(false)}
+        style={{
+          width: 20, height: 20, marginTop: 6, borderRadius: "50%",
+          display: "flex", alignItems: "center", justifyContent: "center", border: "none",
+          background: hoverRemove ? "var(--status-danger-bg)" : "transparent",
+          color: "var(--status-danger)", cursor: "pointer", flexShrink: 0,
+          transition: "background 120ms ease",
+        }}>
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
+// The map header's numbered pick-target pill for one stop — a hover-only
+// remove button in the corner needs its own hover state per pill, so this
+// can't be inlined into the .map() below either.
+function StopPickPill({ index, active, filled, onSelect, onRemove }: {
+  index: number; active: boolean; filled: boolean; onSelect: () => void; onRemove: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div style={{ position: "relative" }} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      <button onClick={onSelect}
+        style={{ height: 24, minWidth: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontFamily: "var(--font-mono)", padding: "0 8px", borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
+          border: `1px solid ${active || filled ? "var(--accent-primary)" : "var(--border-subtle)"}`,
+          background: active ? "var(--status-success-bg)" : "transparent",
+          color: active || filled ? "var(--accent-primary)" : "var(--text-tertiary)" }}>
+        {index + 1}
+      </button>
+      {hovered && (
+        <button type="button" onClick={onRemove} title="Remove stop"
+          style={{
+            position: "absolute", top: -6, right: -6, width: 15, height: 15, borderRadius: "50%",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+            border: "1px solid var(--bg-surface)", background: "var(--status-danger)", color: "#fff", cursor: "pointer",
+          }}>
+          <X size={9} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface RouteOption {
   summary?: string; distance_km: number; duration_min?: number; duration_minutes?: number;
   toll_cost_zar?: number; toll_breakdown?: TollBreakdownItem[]; fuel_cost_zar?: number; total_cost_zar?: number;
@@ -68,6 +154,7 @@ interface RouteData {
   additional_costs?: { border_fees?: number; weighbridge_fees?: number; non_sa_tolls?: number };
   toll_breakdown?: TollBreakdownItem[]; warnings?: string[];
   origin_resolved?: string; dest_resolved?: string;
+  stops_count?: number;
 }
 
 export default function QuoteBuilder() {
@@ -92,6 +179,35 @@ export default function QuoteBuilder() {
   const [delivery, setDelivery] = useState("");
   const [deliveryCoords, setDeliveryCoords] = useState<LocationCoords | null>(null);
 
+  // ---- intermediate stops (UI only for now — not yet sent to the backend
+  // or factored into route/distance calculation; that's the follow-up once
+  // this is wired up server-side) ----
+  const [stops, setStops] = useState<QuoteStop[]>([]);
+  const stopIdRef = useRef(0);
+  const addStop = () => {
+    stopIdRef.current += 1;
+    const id = `stop-${stopIdRef.current}`;
+    setStops(prev => [...prev, { id, location: "", coords: null }]);
+    // Auto-select the new stop as the map-pick target — same "just added,
+    // now pick where" flow as Collection auto-advancing to Delivery below.
+    setPickMode(id);
+  };
+  const [stopsExpanded, setStopsExpanded] = useState(false);
+  const removeStop = (id: string) => setStops(prev => prev.filter(s => s.id !== id));
+  const updateStop = (id: string, patch: Partial<QuoteStop>) =>
+    setStops(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)));
+  const stopSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const handleStopDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setStops(prev => {
+      const oldIndex = prev.findIndex(s => s.id === active.id);
+      const newIndex = prev.findIndex(s => s.id === over.id);
+      if (oldIndex < 0 || newIndex < 0) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  };
+
   // ---- details ----
   const [weight, setWeight] = useState("");
   const [cargo, setCargo] = useState("");
@@ -106,7 +222,9 @@ export default function QuoteBuilder() {
   // Which field the next map click fills. Auto-advances to the empty one so a
   // "click collection, click delivery" flow needs no manual toggling — but stays
   // user-controlled via the pills so either point can be re-picked later.
-  const [pickMode, setPickMode] = useState<"pickup" | "delivery">("pickup");
+  // "pickup" | "delivery" | a stop's id — which target the next map
+  // double-click sets.
+  const [pickMode, setPickMode] = useState<string>("pickup");
 
   // ---- pricing overrides ----
   const [editableTollCost, setEditableTollCost] = useState<number | null>(null);
@@ -261,6 +379,12 @@ export default function QuoteBuilder() {
         origin_lat: pickupCoords.lat, origin_lon: pickupCoords.lon, origin_country: pickupCoords.country_code,
         dest_lat: deliveryCoords.lat, dest_lon: deliveryCoords.lon, dest_country: deliveryCoords.country_code,
         vehicle_type: vehicleType || "Flatbed", weight_kg: weightKg || 20000,
+        // Only stops with a resolved location count as routing waypoints —
+        // one still being typed in is skipped rather than breaking the calc.
+        // Route alternatives aren't available once stops are involved (a
+        // TomTom limitation, not ours), so `routes` comes back with exactly
+        // one entry in that case — see the single-route summary below.
+        stops: stops.filter(s => s.coords).map(s => ({ lat: s.coords!.lat, lon: s.coords!.lon })),
       }});
       if (data?.success !== false) {
         setRouteData(data);
@@ -283,13 +407,19 @@ export default function QuoteBuilder() {
     finally { setCalculatingRoute(false); }
   };
 
+  // Stable key so the route only recalculates when a stop's actual
+  // coordinates change (added/removed/reordered/relocated) — a new array
+  // reference on every render would otherwise refire this on every keystroke
+  // elsewhere in the form.
+  const stopsRouteKey = stops.filter(s => s.coords).map(s => `${s.coords!.lat},${s.coords!.lon}`).join("|");
+
   useEffect(() => {
     if (!ready || billingBlocked) return;
     if (calcRef.current) clearTimeout(calcRef.current);
     calcRef.current = setTimeout(() => { calculateRoute(); }, 500);
     return () => { if (calcRef.current) clearTimeout(calcRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, pickupCoords, deliveryCoords, vehicleType, billingBlocked]);
+  }, [ready, pickupCoords, deliveryCoords, vehicleType, billingBlocked, stopsRouteKey]);
 
   // ---- AI analyze + guard + benchmark once cost is ready ----
   const analyzeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -491,6 +621,7 @@ export default function QuoteBuilder() {
     setSavedQuoteId(null); setLastSavedAt(null); setResumable(null);
     setCustomerId(""); setVehicleType(""); setPickup(""); setDelivery("");
     setPickupCoords(null); setDeliveryCoords(null);
+    setStops([]); setPickMode("pickup"); setStopsExpanded(false);
     setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
     setPickupDate(""); setDeliveryDate(""); setShowDetails(false); setNlText("");
     setEditableTollCost(null); setTollManuallyEdited(false); setDriverAllowanceInput("0"); setServiceCharge(0);
@@ -641,9 +772,12 @@ export default function QuoteBuilder() {
     if (pickMode === "pickup") {
       setPickup(point.label); setPickupCoords({ lat: point.lat, lon: point.lon });
       if (!deliveryCoords) setPickMode("delivery");
-    } else {
+    } else if (pickMode === "delivery") {
       setDelivery(point.label); setDeliveryCoords({ lat: point.lat, lon: point.lon });
       if (!pickupCoords) setPickMode("pickup");
+    } else {
+      // pickMode is a stop's id
+      updateStop(pickMode, { location: point.label, coords: { lat: point.lat, lon: point.lon } });
     }
   };
 
@@ -659,27 +793,101 @@ export default function QuoteBuilder() {
         </span>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <button onClick={() => setPickMode("pickup")}
-            style={{ fontSize: 11, fontFamily: "var(--font-mono)", padding: "3px 8px", borderRadius: 4, cursor: "pointer",
-              border: `1px solid ${pickMode === "pickup" ? "#16a34a" : "var(--border-subtle)"}`,
+            style={{ height: 24, display: "inline-flex", alignItems: "center", fontSize: 11, fontFamily: "var(--font-mono)", padding: "0 8px", borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
+              border: `1px solid ${pickMode === "pickup" || pickupCoords ? "#16a34a" : "var(--border-subtle)"}`,
               background: pickMode === "pickup" ? "color-mix(in srgb, #16a34a 12%, transparent)" : "transparent",
-              color: pickMode === "pickup" ? "#16a34a" : "var(--text-tertiary)" }}>
-            ● Collection
+              color: pickMode === "pickup" || pickupCoords ? "#16a34a" : "var(--text-tertiary)" }}>
+            Collection
           </button>
+          {stops.map((stop, i) => (
+            <StopPickPill key={stop.id} index={i} active={pickMode === stop.id} filled={!!stop.coords}
+              onSelect={() => setPickMode(stop.id)} onRemove={() => removeStop(stop.id)} />
+          ))}
+          {pickupCoords && deliveryCoords && (
+            <button type="button" onClick={addStop} title="Add stop"
+              style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, borderRadius: 4, cursor: "pointer", flexShrink: 0,
+                border: "1px solid var(--border-subtle)", background: "transparent", color: "var(--accent-primary)" }}>
+              <Plus size={13} />
+            </button>
+          )}
           <button onClick={() => setPickMode("delivery")}
-            style={{ fontSize: 11, fontFamily: "var(--font-mono)", padding: "3px 8px", borderRadius: 4, cursor: "pointer",
-              border: `1px solid ${pickMode === "delivery" ? "#dc2626" : "var(--border-subtle)"}`,
+            style={{ height: 24, display: "inline-flex", alignItems: "center", fontSize: 11, fontFamily: "var(--font-mono)", padding: "0 8px", borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
+              border: `1px solid ${pickMode === "delivery" || deliveryCoords ? "#dc2626" : "var(--border-subtle)"}`,
               background: pickMode === "delivery" ? "color-mix(in srgb, #dc2626 12%, transparent)" : "transparent",
-              color: pickMode === "delivery" ? "#dc2626" : "var(--text-tertiary)" }}>
-            ● Delivery
+              color: pickMode === "delivery" || deliveryCoords ? "#dc2626" : "var(--text-tertiary)" }}>
+            Delivery
           </button>
           {expandButton}
         </div>
       </div>
       <RouteMapView pickup={pickup} delivery={delivery} pickupCoords={pickupCoords} deliveryCoords={deliveryCoords} height={height}
         onMapClick={handleMapClick}
+        stops={stops.filter(s => s.coords).map(s => ({ lat: s.coords!.lat, lon: s.coords!.lon, label: s.location }))}
         geometry={route?.geometry && route.geometry.length > 1
           ? route.geometry.map(p => [p.lat, p.lon] as [number, number])
           : undefined} />
+      {/* Stops — optional intermediate points between Collection and Delivery,
+          actually routed through (RouteCalculatorView chains them into the
+          TomTom call) and reflected in distance/fuel/toll/base-rate. Right
+          below the map, only once both locations are set: a plain
+          "+ Add stop" trigger until the first stop exists, at which point
+          the trigger is replaced by a collapsible header + the stop list. */}
+      {pickupCoords && deliveryCoords && (
+        <div style={{ padding: "10px", borderTop: "1px solid var(--border-subtle)" }}>
+          {stops.length === 0 ? (
+            <button type="button" onClick={addStop}
+              style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: 0, color: "var(--accent-primary)", cursor: "pointer", fontSize: 12, fontWeight: 500 }}>
+              <Plus size={12} /> Add stop
+            </button>
+          ) : (
+            <div>
+              <div onClick={() => setStopsExpanded(v => !v)}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", marginBottom: stopsExpanded ? 8 : 0 }}>
+                <span style={{ ...labelS, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {stops.length} stop{stops.length > 1 ? "s" : ""}
+                  {!stopsExpanded && ` — ${stops.map(s => s.location || "…").join(" → ")}`}
+                </span>
+                {stopsExpanded ? <ChevronUp size={14} color="var(--text-tertiary)" /> : <ChevronDown size={14} color="var(--text-tertiary)" />}
+              </div>
+
+              {stopsExpanded && (
+                <div style={{ position: "relative" }}>
+                  <div style={{ position: "absolute", left: 9, top: 10, bottom: 10, width: 1, background: "var(--border-subtle)" }} />
+
+                  <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid #16a34a", flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 400 }}>{pickup || "Collection"}</span>
+                  </div>
+
+                  <DndContext sensors={stopSensors} onDragEnd={handleStopDragEnd}>
+                    <SortableContext items={stops.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                      {stops.map((stop, i) => (
+                        <SortableStopRow
+                          key={stop.id}
+                          stop={stop}
+                          index={i}
+                          inputStyle={{ ...inputS, fontSize: 12, fontFamily: "var(--font-sans)", padding: "7px 10px" }}
+                          onLocationChange={(v, c) => updateStop(stop.id, { location: v, coords: c || null })}
+                          onRemove={() => removeStop(stop.id)}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+
+                  <button type="button" onClick={addStop} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: "0 0 10px 28px", color: "var(--accent-primary)", cursor: "pointer", fontSize: 12, fontWeight: 500 }}>
+                    <Plus size={12} /> Add stop
+                  </button>
+
+                  <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid #dc2626", flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 400 }}>{delivery || "Delivery"}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       {routeData?.routes && routeData.routes.length > 1 && (
         <div style={{ display: "flex", gap: 8, padding: 10, flexWrap: "wrap", borderTop: "1px solid var(--border-subtle)" }}>
           {routeData.routes.map((r, i) => (
@@ -706,6 +914,23 @@ export default function QuoteBuilder() {
               </TooltipContent>
             </Tooltip>
           ))}
+        </div>
+      )}
+      {/* Once stops are involved, TomTom returns exactly one route (no
+          alternatives — see RouteCalculatorView._route) — a single summary
+          instead of the picker above, so the UI is honest about there being
+          only one option rather than silently showing nothing. */}
+      {routeData?.routes?.length === 1 && (routeData.stops_count ?? stops.length) > 0 && (
+        <div style={{ padding: 10, borderTop: "1px solid var(--border-subtle)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--status-success-bg)", border: "1px solid var(--accent-primary)", borderRadius: 4 }}>
+            <Map size={13} color="var(--accent-primary)" />
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--accent-primary)" }}>
+              Route via {routeData.stops_count ?? stops.length} stop{(routeData.stops_count ?? stops.length) > 1 ? "s" : ""} · {Math.round(routeData.routes[0].distance_km)} km · {formatDuration(routeData.routes[0].duration_minutes)}
+            </span>
+          </div>
+          <div style={{ marginTop: 6, fontSize: 11, color: "var(--text-tertiary)" }}>
+            Alternative routes aren't available once stops are added.
+          </div>
         </div>
       )}
     </>
@@ -873,7 +1098,7 @@ export default function QuoteBuilder() {
                     <Maximize2 size={12} />
                   </button>
                 </DialogTrigger>
-                <DialogContent style={{ ...cardS, width: "min(1100px, 92vw)", padding: 0, overflow: "hidden" }}>
+                <DialogContent style={{ ...cardS, width: "min(1100px, 92vw)", padding: 0 }}>
                   {renderMapPanel(560)}
                 </DialogContent>
               </Dialog>

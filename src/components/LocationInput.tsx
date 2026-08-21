@@ -85,7 +85,11 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
     setMode('gps');
     setSuggestions([]);
     setOpen(false);
-    // Pre-fill if value looks like coords already
+    // Pre-fill if value looks like coords already; otherwise just leave the
+    // two GPS fields blank for fresh input. Deliberately does NOT clear an
+    // existing address value here — merely opening this toggle shouldn't
+    // wipe a location that was already set correctly; it's only replaced
+    // once the user actually types real coordinates (handleGpsChange).
     const parts = value.split(',').map(s => s.trim());
     if (parts.length === 2 && !isNaN(parseFloat(parts[0])) && !isNaN(parseFloat(parts[1]))) {
       setLat(parts[0]);
@@ -93,7 +97,6 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
     } else {
       setLat('');
       setLng('');
-      onChange('');
     }
   };
 
@@ -101,7 +104,10 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
     setMode('search');
     setLat('');
     setLng('');
-    onChange('');
+    // Same principle as switchToGps: merely toggling back to the search view
+    // must not erase whatever value was already set (an untouched original
+    // address, or real coordinates just entered in GPS mode) — only actually
+    // typing a new search value should change it.
   };
 
   const toggleLink: React.CSSProperties = {

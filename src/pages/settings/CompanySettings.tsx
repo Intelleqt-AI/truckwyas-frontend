@@ -99,6 +99,7 @@ export function CompanySettings() {
       });
       if (force) {
         if (d?.success === false) toast.error(d?.error || 'Could not fetch live fuel prices');
+        else if (d?.inland_price == null) toast.error(d?.stale_warning || "Couldn't reach a live fuel-price source");
         else toast.success('Fuel prices refreshed');
       }
     }).catch(() => { if (force) toast.error('Could not fetch live fuel prices'); })
@@ -492,11 +493,21 @@ export function CompanySettings() {
                   {fetchingLivePrice ? '...' : 'FETCH NOW'}
                 </button>
               </div>
-              {livePrice?.success !== false && livePrice?.inland_price != null && (
+              {livePrice?.success !== false && (livePrice?.inland_price != null || livePrice?.stale_warning) && (
                 <div style={{ fontSize: 11, color: livePrice.is_stale ? 'var(--status-warning)' : 'var(--text-tertiary)', marginTop: 6 }}>
-                  Live national price: R{Number(livePrice.inland_price).toFixed(2)}/L
-                  {livePrice.last_updated && ` · updated ${new Date(livePrice.last_updated).toLocaleDateString()}`}
-                  {livePrice.stale_warning && ` · ${livePrice.stale_warning}`}
+                  {livePrice.inland_price != null ? (
+                    <>
+                      Live national price: R{Number(livePrice.inland_price).toFixed(2)}/L
+                      {livePrice.last_updated && ` · for ${new Date(livePrice.last_updated).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}`}
+                      {livePrice.last_checked_at && ` · checked ${new Date(livePrice.last_checked_at).toLocaleString('en-ZA')}`}
+                      {livePrice.stale_warning && ` · ${livePrice.stale_warning}`}
+                    </>
+                  ) : (
+                    <>
+                      {livePrice.stale_warning}
+                      {livePrice.last_checked_at && ` (checked ${new Date(livePrice.last_checked_at).toLocaleString('en-ZA')})`}
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -525,10 +536,20 @@ export function CompanySettings() {
                   {fetchingLivePrice ? '...' : 'FETCH NOW'}
                 </button>
               </div>
-              {livePrice?.success !== false && livePrice?.petrol_95 != null && (
+              {livePrice?.success !== false && (livePrice?.petrol_95 != null || livePrice?.stale_warning) && (
                 <div style={{ fontSize: 11, color: livePrice.is_stale ? 'var(--status-warning)' : 'var(--text-tertiary)', marginTop: 6 }}>
-                  Live national price (95 unleaded): R{Number(livePrice.petrol_95).toFixed(2)}/L
-                  {livePrice.last_updated && ` · updated ${new Date(livePrice.last_updated).toLocaleDateString()}`}
+                  {livePrice.petrol_95 != null ? (
+                    <>
+                      Live national price (95 unleaded): R{Number(livePrice.petrol_95).toFixed(2)}/L
+                      {livePrice.last_updated && ` · for ${new Date(livePrice.last_updated).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}`}
+                      {livePrice.last_checked_at && ` · checked ${new Date(livePrice.last_checked_at).toLocaleString('en-ZA')}`}
+                    </>
+                  ) : (
+                    <>
+                      {livePrice.stale_warning}
+                      {livePrice.last_checked_at && ` (checked ${new Date(livePrice.last_checked_at).toLocaleString('en-ZA')})`}
+                    </>
+                  )}
                 </div>
               )}
             </div>

@@ -506,7 +506,7 @@ export default function QuoteBuilder() {
   // different entry points into the same conversation, so every message
   // (whichever surface it came from) is recorded in chatMessages with real
   // history/current_fields sent to the backend for follow-up context.
-  const submitNL = async (textOverride?: string) => {
+  const submitNL = async (textOverride?: string, detectedLanguage?: string | null) => {
     const text = (textOverride ?? nlText).trim();
     if (!text) return;
     const history = chatMessages.map(m => ({ role: m.role, content: m.text }));
@@ -523,6 +523,10 @@ export default function QuoteBuilder() {
       const res = await postData({ url: "api/v1/ai/chat-quote/", data: {
         message: text, history, current_fields,
         pending_entity: pendingEntity, declined_entities: declinedEntities,
+        // Voice-sourced: Whisper's own authoritative language code, so the
+        // assistant's reply matches it instead of guessing from the text.
+        // Typed messages omit this — the backend runs its own text detector.
+        ...(detectedLanguage ? { detected_language: detectedLanguage } : {}),
       } });
       setPendingEntity(res?.pending_entity ?? null);
       if (res?.declined_entity) setDeclinedEntities(prev => [...prev, String(res.declined_entity).toLowerCase()]);
@@ -550,7 +554,7 @@ export default function QuoteBuilder() {
     finally { setNlBusy(false); }
   };
 
-  const voice = useVoiceRecorder((text) => { setNlText(text); submitNL(text); });
+  const voice = useVoiceRecorder((text, lang) => { setNlText(text); submitNL(text, lang); });
 
   // ---- edit mode: load existing quote ----
   useEffect(() => {
@@ -1328,7 +1332,7 @@ export default function QuoteBuilder() {
       {/* notes */}
       {ready && <div style={{ marginBottom: 40 }}><div style={{ ...labelS, marginBottom: 5 }}>Notes (optional)</div><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Anything for the client or your team…" style={{ ...inputS, resize: "vertical" }} /></div>}
 
-      <AIChatPanel messages={chatMessages} busy={nlBusy} open={chatOpen} onOpenChange={setChatOpen} onSend={(t) => submitNL(t)} />
+      <AIChatPanel messages={chatMessages} busy={nlBusy} open={chatOpen} onOpenChange={setChatOpen} onSend={(t, lang) => submitNL(t, lang)} />
     </div>
   );
 }

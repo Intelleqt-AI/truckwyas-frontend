@@ -16,7 +16,7 @@ interface AIChatPanelProps {
   busy: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSend: (text: string) => void;
+  onSend: (text: string, detectedLanguage?: string | null) => void;
 }
 
 /**
@@ -49,7 +49,7 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend }: AICh
     return () => clearTimeout(t);
   }, [open]);
 
-  const voice = useVoiceRecorder((transcribed) => { onSend(transcribed); });
+  const voice = useVoiceRecorder((transcribed, lang) => { onSend(transcribed, lang); });
 
   useEffect(() => {
     if (open) listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });

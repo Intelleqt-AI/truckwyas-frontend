@@ -12,6 +12,10 @@ export interface AuthUser {
   // recent charge failed but access continues, 'suspended'/'cancelled' block
   // quoting/invoicing (see core/models/company.py's subscription_status).
   subscription_status?: string;
+  // True while a cancellation is pending — subscription_status itself stays
+  // 'active'/'grace_period' until the paid period actually ends, so this is
+  // the only signal that a cancellation is scheduled.
+  cancel_at_period_end?: boolean;
   [key: string]: any;
 }
 
@@ -94,15 +98,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('tw:live-event', onLiveEvent);
   }, [refreshUser]);
 
-  // Polling safety net, independent of the WebSocket above — the live push
-  // depends on a working Redis connection end-to-end (server + broker), and
-  // there's no user-facing signal if that chain is ever silently broken,
-  // just a stale subscription_status sitting there indefinitely. 30s is
-  // cheap (one lightweight GET) and guarantees this self-heals within half
-  // a minute even if the live event never arrives at all.
+  // Also re-sync once, right after the WebSocket reconnects post-drop (see
+  // components/LiveEvents.tsx) — catches anything pushed while the socket
+  // was down, without polling on a fixed schedule. Fires only on an actual
+  // reconnect event, never on a timer.
   useEffect(() => {
-    const id = setInterval(refreshUser, 30000);
-    return () => clearInterval(id);
+    window.addEventListener('tw:live-reconnected', refreshUser);
+    return () => window.removeEventListener('tw:live-reconnected', refreshUser);
   }, [refreshUser]);
 
   return (

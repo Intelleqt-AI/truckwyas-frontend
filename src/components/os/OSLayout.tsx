@@ -27,7 +27,8 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
 
   const { user: authUser } = useAuth();
   const subStatus = authUser?.subscription_status;
-  const statusBadgeClass = isSubscriptionBlocked(subStatus) ? 'delayed' : subStatus === 'grace_period' ? 'warning' : 'active';
+  const cancelAtPeriodEnd = !!authUser?.cancel_at_period_end;
+  const statusBadgeClass = isSubscriptionBlocked(subStatus) ? 'delayed' : (subStatus === 'grace_period' || cancelAtPeriodEnd) ? 'warning' : 'active';
   const userName = authUser?.name || authUser?.username || 'User';
   const userRole = (authUser?.role || 'VIEWER').toUpperCase();
   const avatarUrl = (authUser?.avatar as string) || undefined;
@@ -257,7 +258,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
             onMouseLeave={() => setShowStatusPopover(false)}
           >
             <span style={{ width: 6, height: 6, background: 'currentColor', borderRadius: '50%', display: 'inline-block' }} />
-            {subscriptionStatusLabel(subStatus)}
+            {subscriptionStatusLabel(subStatus, cancelAtPeriodEnd)}
             {showStatusPopover && (
               <div style={{
                 position: 'absolute', top: '100%', right: 0, marginTop: 8,
@@ -266,10 +267,10 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
                 boxShadow: '0 8px 24px rgba(0,0,0,0.3)', zIndex: 1000,
                 textAlign: 'left' as const, fontWeight: 400, whiteSpace: 'normal' as const,
               }}>
-                <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: isSubscriptionBlocked(subStatus) ? 10 : 0 }}>
-                  {subscriptionStatusDetail(subStatus)}
+                <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: (isSubscriptionBlocked(subStatus) || cancelAtPeriodEnd) ? 10 : 0 }}>
+                  {subscriptionStatusDetail(subStatus, cancelAtPeriodEnd)}
                 </div>
-                {isSubscriptionBlocked(subStatus) && (
+                {(isSubscriptionBlocked(subStatus) || cancelAtPeriodEnd) && (
                   <button
                     onClick={() => navigate('/settings/billing')}
                     className="btn-action"

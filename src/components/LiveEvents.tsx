@@ -102,7 +102,18 @@ export function LiveEvents() {
       }
       wsRef.current = ws;
 
-      ws.onopen = () => { retryRef.current = 0; };
+      ws.onopen = () => {
+        // Only a genuine reconnect (retryRef > 0 means at least one prior
+        // close+retry cycle happened) — not the page's very first connect —
+        // dispatches this, so listeners can do a one-time catch-up fetch for
+        // whatever might have been pushed while the socket was down. Cheaper
+        // and more precise than polling on a timer: this only ever fires
+        // right after a real gap, not on a fixed schedule.
+        if (retryRef.current > 0) {
+          window.dispatchEvent(new CustomEvent('tw:live-reconnected'));
+        }
+        retryRef.current = 0;
+      };
 
       ws.onmessage = (e) => {
         let msg: any;

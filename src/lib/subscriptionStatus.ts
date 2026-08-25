@@ -7,7 +7,8 @@ export function isSubscriptionBlocked(status?: string | null): boolean {
   return status === 'suspended' || status === 'cancelled';
 }
 
-export function subscriptionStatusLabel(status?: string | null): string {
+export function subscriptionStatusLabel(status?: string | null, cancelAtPeriodEnd?: boolean): string {
+  if (cancelAtPeriodEnd) return 'CANCELLING';
   switch (status) {
     case 'trialing': return 'TRIAL';
     case 'grace_period': return 'OVERDUE';
@@ -17,7 +18,8 @@ export function subscriptionStatusLabel(status?: string | null): string {
   }
 }
 
-export function subscriptionStatusColor(status?: string | null): string {
+export function subscriptionStatusColor(status?: string | null, cancelAtPeriodEnd?: boolean): string {
+  if (cancelAtPeriodEnd) return 'var(--status-warning)';
   switch (status) {
     case 'grace_period': return 'var(--status-warning)';
     case 'suspended':
@@ -27,7 +29,10 @@ export function subscriptionStatusColor(status?: string | null): string {
   }
 }
 
-export function subscriptionStatusDetail(status?: string | null): string {
+export function subscriptionStatusDetail(status?: string | null, cancelAtPeriodEnd?: boolean): string {
+  if (cancelAtPeriodEnd) {
+    return "Your subscription is cancelled and won't renew — you keep full access until the end of your current billing period. You can undo this any time before then from Settings → Billing.";
+  }
   switch (status) {
     case 'trialing':
       return "You're on a trial. Subscribe from Billing before it ends to keep quoting and invoicing without interruption.";

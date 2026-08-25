@@ -223,15 +223,13 @@ export function BillingSettings() {
     return () => window.removeEventListener('tw:live-event', onLiveEvent);
   }, [loadStatus, loadHistory]);
 
-  // Polling safety net, independent of the WebSocket above — the live push
-  // depends on a working Redis connection end-to-end, and this is the one
-  // page where a stuck "Payment processing…"/"Finalizing…" display is most
-  // visible and most actively watched during a test cycle. 5s is cheap and
-  // fine for a single settings page (unlike AuthContext's 30s, which runs
-  // app-wide on every page for the lifetime of the session).
+  // Also re-fetch once, right after the WebSocket reconnects post-drop (see
+  // components/LiveEvents.tsx) — catches anything pushed while this page's
+  // socket was down, without polling on a fixed schedule.
   useEffect(() => {
-    const id = setInterval(() => { loadStatus(); loadHistory(); }, 5000);
-    return () => clearInterval(id);
+    const onReconnect = () => { loadStatus(); loadHistory(); };
+    window.addEventListener('tw:live-reconnected', onReconnect);
+    return () => window.removeEventListener('tw:live-reconnected', onReconnect);
   }, [loadStatus, loadHistory]);
 
   const handleSubscribe = async () => {

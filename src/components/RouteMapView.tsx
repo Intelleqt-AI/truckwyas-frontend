@@ -132,6 +132,7 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
   const stopMarkersRef = useRef<Marker[]>([]);
   const tempMarkerRef = useRef<Marker | null>(null);
   const fittedKeyRef = useRef<string | null>(null);
+  const geocodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // onMapClick closes over changing parent state on every render; keep the
   // live callback in a ref so the map (created once) always calls the latest version.
@@ -279,20 +280,38 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
 
     // Last resort: no coords supplied at all, only free text — geocode it ourselves.
     if (!pickup && !delivery) return () => { cancelled = true; };
-    (async () => {
-      const [pc, dc] = await Promise.all([geocodeText(pickup), geocodeText(delivery)]);
-      if (cancelled || !mapInstanceRef.current) return;
-      if (pc && dc) {
-        const points = await fetchRoute(pc, dc);
-        if (!cancelled) drawLine(points, true);
-      } else if (pc) {
-        drawSingle([pc.lat, pc.lon], '#16a34a', `Pickup: ${pickup}`);
-      } else if (dc) {
-        drawSingle([dc.lat, dc.lon], '#dc2626', `Delivery: ${delivery}`);
-      }
-    })();
+    // Debounced: pickup/delivery are raw typed text here (no coords picked
+    // yet), and this effect re-runs on every keystroke — without this,
+    // every character typed fired its own geocoding request (TomTom if
+    // configured, else straight to Nominatim's public rate-limited API,
+    // which started 429ing under that load).
+    if (geocodeDebounceRef.current) clearTimeout(geocodeDebounceRef.current);
+    geocodeDebounceRef.current = setTimeout(() => {
+      (async () => {
+        // Only geocode whichever side actually has text — calling geocodeText('')
+        // for the still-empty field (a common mid-typing state, one field filled
+        // in before the other) fired a request with an empty query straight to
+        // Nominatim too.
+        const [pc, dc] = await Promise.all([
+          pickup ? geocodeText(pickup) : Promise.resolve(null),
+          delivery ? geocodeText(delivery) : Promise.resolve(null),
+        ]);
+        if (cancelled || !mapInstanceRef.current) return;
+        if (pc && dc) {
+          const points = await fetchRoute(pc, dc);
+          if (!cancelled) drawLine(points, true);
+        } else if (pc) {
+          drawSingle([pc.lat, pc.lon], '#16a34a', `Pickup: ${pickup}`);
+        } else if (dc) {
+          drawSingle([dc.lat, dc.lon], '#dc2626', `Delivery: ${delivery}`);
+        }
+      })();
+    }, 500);
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (geocodeDebounceRef.current) clearTimeout(geocodeDebounceRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, geomKey, stopsKey, pickup, delivery, pickupCoords?.lat, pickupCoords?.lon, deliveryCoords?.lat, deliveryCoords?.lon]);
 

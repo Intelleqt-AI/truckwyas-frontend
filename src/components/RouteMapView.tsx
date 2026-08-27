@@ -121,9 +121,13 @@ interface RouteMapViewProps {
   stops?: { lat: number; lon: number; label: string }[];
   /** Fired when the user clicks the map to pick a point; label is reverse-geocoded. */
   onMapClick?: (point: ClickedPoint) => void;
+  /** Live vehicle position (e.g. from CtrlFleet/Cartrack) — drawn as a distinct marker, independent of the pickup/delivery route drawing below. Pass null/undefined to hide it. */
+  currentLocation?: PointCoords | null;
+  /** Tooltip text for the current-location marker, e.g. "Truck ABC123 — 2m ago". */
+  currentLocationLabel?: string;
 }
 
-export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, height = 260, geometry, stops, onMapClick }: RouteMapViewProps) {
+export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, height = 260, geometry, stops, onMapClick, currentLocation, currentLocationLabel }: RouteMapViewProps) {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<{ map: LeafletMap; L: LeafletModule } | null>(null);
   const pickupMarkerRef = useRef<Marker | null>(null);
@@ -131,6 +135,7 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
   const routeLineRef = useRef<Polyline | null>(null);
   const stopMarkersRef = useRef<Marker[]>([]);
   const tempMarkerRef = useRef<Marker | null>(null);
+  const vehicleMarkerRef = useRef<Marker | null>(null);
   const fittedKeyRef = useRef<string | null>(null);
   const geocodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -187,6 +192,7 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
 
     return () => {
       tempMarkerRef.current?.remove();
+      vehicleMarkerRef.current?.remove();
       mapInstanceRef.current?.map.remove();
       mapInstanceRef.current = null;
     };
@@ -201,6 +207,25 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
   // Same idea for stops — a new array reference every render would otherwise
   // re-trigger the draw effect (and its route re-fetch) on every keystroke.
   const stopsKey = (stops || []).map((s) => `${s.lat},${s.lon}`).join('|');
+
+  // Current vehicle position — kept in its own effect so refreshing it (e.g. a
+  // "Sync Location" click) never re-triggers the pickup/delivery geocoding or
+  // route fetch below, and never fights that effect's fitBounds/zoom logic.
+  useEffect(() => {
+    const inst = mapInstanceRef.current;
+    if (!inst) return;
+    const { map, L } = inst;
+
+    vehicleMarkerRef.current?.remove();
+    vehicleMarkerRef.current = null;
+
+    if (!currentLocation) return;
+
+    vehicleMarkerRef.current = L.marker([currentLocation.lat, currentLocation.lon], {
+      icon: dotIcon(L, '#2563eb'),
+    }).bindTooltip(currentLocationLabel || 'Current location', { direction: 'top' }).addTo(map);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, currentLocation?.lat, currentLocation?.lon, currentLocationLabel]);
 
   // Draw / redraw markers + route line whenever the selected route (geometry) or
   // the pickup/delivery text changes.

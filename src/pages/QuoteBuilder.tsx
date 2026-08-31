@@ -218,7 +218,6 @@ export default function QuoteBuilder() {
   const [validUntil, setValidUntil] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10);
   });
-  const [showDetails, setShowDetails] = useState(true);
   // Which field the next map click fills. Auto-advances to the empty one so a
   // "click collection, click delivery" flow needs no manual toggling — but stays
   // user-controlled via the pills so either point can be re-picked later.
@@ -545,7 +544,6 @@ export default function QuoteBuilder() {
       if (f.delivery_date) setDeliveryDate(f.delivery_date);
       if (f.valid_until) setValidUntil(f.valid_until);
       if (f.trip_type === "ONE_WAY" || f.trip_type === "ROUND_TRIP") setTripType(f.trip_type);
-      if (f.pickup_location || f.delivery_location || f.pickup_date || f.delivery_date) setShowDetails(true);
       setChatMessages(prev => [...prev, { role: "assistant", text: res?.reply || "Got it — updated the form.", link: res?.link || undefined }]);
       if (!textOverride) setNlText("");
     } catch {
@@ -627,7 +625,7 @@ export default function QuoteBuilder() {
     setPickupCoords(null); setDeliveryCoords(null);
     setStops([]); setPickMode("pickup"); setStopsExpanded(false);
     setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
-    setPickupDate(""); setDeliveryDate(""); setShowDetails(false); setNlText("");
+    setPickupDate(""); setDeliveryDate(""); setNlText("");
     setEditableTollCost(null); setTollManuallyEdited(false); setDriverAllowanceInput("0"); setServiceCharge(0);
     setRouteData(null); setSelectedRouteIndex(0); setRouteBlockedMessage(null);
     setAnalysis(null); setGuard(null); setBenchmark(null);
@@ -1071,23 +1069,20 @@ export default function QuoteBuilder() {
         </div>
       )}
 
-      {/* details (collapsible) */}
+      {/* details */}
       <div style={{ marginBottom: 18 }}>
-        <button onClick={() => setShowDetails(s => !s)} style={{ ...labelS, background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}>{showDetails ? "▾" : "▸"} Details · weight, dates, trip type</button>
-        {showDetails && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: 10 }}>
-            <div><div style={{ ...labelS, marginBottom: 5 }}>Weight (t)<Req /></div><input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} /></div>
-            <div><div style={{ ...labelS, marginBottom: 5 }}>Pickup date</div><input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} style={inputS} /></div>
-            <div><div style={{ ...labelS, marginBottom: 5 }}>Delivery date</div><input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} style={inputS} /></div>
-            <div><div style={{ ...labelS, marginBottom: 5 }}>Valid until</div><input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputS} /></div>
-            <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Cargo</div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} /></div>
-            <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Trip</div>
-              <div style={{ display: "flex", gap: 6 }}>
-                {(["ONE_WAY", "ROUND_TRIP"] as const).map(t => <button key={t} onClick={() => setTripType(t)} style={{ ...inputS, width: "auto", flex: 1, cursor: "pointer", background: tripType === t ? "var(--accent-primary)" : "var(--input-bg)", color: tripType === t ? "var(--btn-action-color)" : "var(--text-secondary)", fontSize: 12 }}>{t === "ONE_WAY" ? "One way" : "Round"}</button>)}
-              </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+          <div><div style={{ ...labelS, marginBottom: 5 }}>Weight (t)<Req /></div><input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} /></div>
+          <div><div style={{ ...labelS, marginBottom: 5 }}>Pickup date</div><input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} style={inputS} /></div>
+          <div><div style={{ ...labelS, marginBottom: 5 }}>Delivery date</div><input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} style={inputS} /></div>
+          <div><div style={{ ...labelS, marginBottom: 5 }}>Valid until</div><input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputS} /></div>
+          <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Cargo</div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} /></div>
+          <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Trip</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["ONE_WAY", "ROUND_TRIP"] as const).map(t => <button key={t} onClick={() => setTripType(t)} style={{ ...inputS, width: "auto", flex: 1, cursor: "pointer", background: tripType === t ? "var(--accent-primary)" : "var(--input-bg)", color: tripType === t ? "var(--btn-action-color)" : "var(--text-secondary)", fontSize: 12 }}>{t === "ONE_WAY" ? "One way" : "Round"}</button>)}
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* 2 — map + cost */}

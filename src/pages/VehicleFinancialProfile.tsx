@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader } from '@/components/Loader';
 
 const VEHICLE_STATUSES = ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'OUT_OF_SERVICE'] as const;
 
@@ -72,9 +73,7 @@ export default function VehicleFinancialProfile() {
     return { id: d.id, name: fn && ln ? `${fn} ${ln}` : fn || ln || `Driver ${d.id}` };
   });
 
-  if (isLoading) return (
-    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading…</div>
-  );
+  if (isLoading) return <Loader fullScreen />;
   if (!vehicle) return (
     <div style={{ padding: 40 }}>
       <div style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Vehicle not found.</div>

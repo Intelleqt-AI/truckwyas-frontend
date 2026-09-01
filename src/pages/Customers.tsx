@@ -7,6 +7,7 @@ import { LiveBadge } from "@/components/LiveBadge";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader } from '@/components/Loader';
 
 interface Customer {
   id: number;
@@ -146,9 +147,7 @@ export default function Customers() {
     });
   }
 
-  if (loading) return (
-    <div style={{ padding: 40, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 12 }}>Loading…</div>
-  );
+  if (loading) return <Loader fullScreen />;
 
   return (
     <div>

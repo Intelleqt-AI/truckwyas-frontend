@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams } from 'react
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OSLayout } from './components/os/OSLayout';
+import { Loader } from './components/Loader';
 // Eager load — Overview for fast first load
 import Overview from './pages/Overview';
 
@@ -128,11 +129,9 @@ const LoadingFallback = () => (
       justifyContent: 'center',
       minHeight: '100vh',
       background: 'var(--bg-deep)',
-      color: 'var(--text-tertiary)',
-      fontSize: 14,
     }}
   >
-    Loading...
+    <Loader size={56} />
   </div>
 );
 

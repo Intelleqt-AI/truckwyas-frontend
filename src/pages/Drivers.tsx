@@ -8,6 +8,7 @@ import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader } from '@/components/Loader';
 
 interface Driver {
   id: number;
@@ -206,9 +207,7 @@ export default function Drivers() {
     transition: 'all 0.2s ease',
   });
 
-  if (loading) return (
-    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading…</div>
-  );
+  if (loading) return <Loader fullScreen />;
 
   return (
     <div>

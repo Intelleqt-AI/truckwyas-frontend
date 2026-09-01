@@ -7,6 +7,7 @@ import {
 } from "recharts";
 import { fetchData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
+import { Loader } from "@/components/Loader";
 
 const BAND_COLOR: Record<string, string> = {
   LOW: "var(--status-success)",
@@ -53,14 +54,7 @@ export default function CustomerRisk() {
   }, []);
 
   if (isLoading) {
-    return (
-      <div style={{ padding: 40 }}>
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ height: 16, background: "var(--bg-surface)", borderRadius: 4, marginBottom: 12, width: "40%" }} />
-          <div style={{ height: 32, background: "var(--bg-surface)", borderRadius: 4, width: "25%" }} />
-        </div>
-      </div>
-    );
+    return <Loader fullScreen />;
   }
 
   if (error || !data) {

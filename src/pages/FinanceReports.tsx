@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import { Loader } from '@/components/Loader';
 
 // Sentence-case a status/token for display: "FUNDED" → "Funded".
 const formatStatus = (s?: string) =>
@@ -154,13 +155,8 @@ export default function FinanceReports() {
   };
 
   const LoadingSkeleton = () => (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-      {[1, 2, 3, 4].map(i => (
-        <div key={i} className="card" style={{ padding: 20 }}>
-          <div style={{ height: 16, background: 'var(--bg-surface-hover)', borderRadius: 4, marginBottom: 12, width: '50%' }} />
-          <div style={{ height: 24, background: 'var(--bg-surface-hover)', borderRadius: 4, width: '70%' }} />
-        </div>
-      ))}
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+      <Loader size={32} />
     </div>
   );
 

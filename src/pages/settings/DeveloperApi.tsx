@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { Loader } from '@/components/Loader';
 
 interface ApiKey {
   id: number;
@@ -359,7 +360,7 @@ export function DeveloperApi() {
 
         {/* Key list */}
         {loading ? (
-          <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>Loading…</div>
+          <div style={{ padding: 30, display: 'flex', justifyContent: 'center' }}><Loader size={24} /></div>
         ) : keys.length === 0 ? (
           <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>No API keys yet. Create one to start scoring.</div>
         ) : keys.map((k, i) => {
@@ -428,7 +429,7 @@ export function DeveloperApi() {
                 <div style={{ background: 'var(--bg-deep)', borderTop: '1px solid var(--border-subtle)', padding: '10px 20px 14px' }}>
                   <div style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Call History (last 100)</div>
                   {logsLoading[k.id] ? (
-                    <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Loading…</div>
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0' }}><Loader size={16} /></div>
                   ) : !logs[k.id] || logs[k.id].length === 0 ? (
                     <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>No calls recorded yet.</div>
                   ) : (

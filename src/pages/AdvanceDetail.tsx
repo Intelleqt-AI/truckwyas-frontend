@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
+import { Loader } from "@/components/Loader";
 
 const TIER_META: Record<string, { color: string; label: string; feeRange: string; desc: string }> = {
   PRIME:    { color: 'var(--accent-primary)',   label: 'Prime',    feeRange: '1.5%–2.0%', desc: 'Low-risk customer with strong payment history.' },
@@ -52,17 +53,7 @@ export default function AdvanceDetail() {
   }, [id]);
 
   if (loading) {
-    return (
-      <div>
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Advance Detail</div>
-        </div>
-        <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-          <div style={{ color: 'var(--text-secondary)' }}>Loading advance details...</div>
-        </div>
-      </div>
-    );
+    return <Loader fullScreen />;
   }
 
   if (error || !advance) {

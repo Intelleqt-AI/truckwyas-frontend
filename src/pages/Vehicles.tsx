@@ -10,6 +10,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AddVehicleDrawer } from '@/components/AddVehicleDrawer';
 import { EditVehicleDrawer } from '@/components/EditVehicleDrawer';
+import { Loader } from '@/components/Loader';
 
 interface Vehicle {
   id: number;
@@ -237,22 +238,7 @@ export default function Vehicles() {
   };
 
   if (loading) {
-    return (
-      <div>
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ height: 12, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 8, width: '20%' }} />
-          <div style={{ height: 24, background: 'var(--bg-surface)', borderRadius: 4, width: '30%' }} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="card" style={{ padding: 20 }}>
-              <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
-              <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <Loader fullScreen />;
   }
 
   const tabStyle = (active: boolean): React.CSSProperties => ({

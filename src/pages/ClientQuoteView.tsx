@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { RouteMapView } from '@/components/RouteMapView';
+import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
+import { Loader } from '@/components/Loader';
 
 // Hardcoded light-theme tokens — this is a public page outside the app shell
 const C = {
@@ -109,9 +110,7 @@ export default function ClientQuoteView() {
   if (isLoading) {
     return (
       <PublicShell>
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 14, color: C.muted, fontFamily: C.mono }}>Loading quote...</div>
-        </div>
+        <Loader fullScreen label="Loading quote..." />
       </PublicShell>
     );
   }
@@ -223,14 +222,23 @@ export default function ClientQuoteView() {
               </span>
             )}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
             <div>
               <Label>Pickup</Label>
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
                 {quote.pickup_location || quote.origin || '—'}
               </div>
             </div>
-            <div style={{ fontSize: 20, color: C.faint }}>→</div>
+
+            {Array.isArray(quote.stops) && quote.stops.map((s: { location: string }, i: number) => (
+              <div key={i} style={{ borderLeft: `2px dashed ${C.border}`, marginLeft: 8, paddingLeft: 16 }}>
+                <div style={{ fontSize: 10, fontFamily: C.mono, color: C.faint, letterSpacing: '0.08em', marginBottom: 2 }}>
+                  STOP {i + 1}
+                </div>
+                <div style={{ fontSize: 13, color: C.text }}>{s.location}</div>
+              </div>
+            ))}
+
             <div>
               <Label>Delivery</Label>
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
@@ -239,27 +247,15 @@ export default function ClientQuoteView() {
             </div>
           </div>
 
-          {Array.isArray(quote.stops) && quote.stops.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <Label>{`Stops (${quote.stops.length})`}</Label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-                {quote.stops.map((s: { location: string }, i: number) => (
-                  <div key={i} style={{ fontSize: 13, color: C.text, display: 'flex', gap: 8 }}>
-                    <span style={{ fontFamily: C.mono, fontSize: 11, color: C.faint }}>{i + 1}</span>
-                    {s.location}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {(quote.pickup_location || quote.origin) && (quote.delivery_location || quote.destination) && (
-            <RouteMapView
+            <ExpandableRouteMap
               pickup={quote.pickup_location || quote.origin}
               delivery={quote.delivery_location || quote.destination}
               pickupCoords={quote.pickup_lat ? { lat: Number(quote.pickup_lat), lon: Number(quote.pickup_lng) } : undefined}
               deliveryCoords={quote.delivery_lat ? { lat: Number(quote.delivery_lat), lon: Number(quote.delivery_lng) } : undefined}
               stops={Array.isArray(quote.stops) ? quote.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
+              geometry={Array.isArray(quote.route_geometry) && quote.route_geometry.length > 1 ? quote.route_geometry.map((p: { lat: number; lon: number }) => [Number(p.lat), Number(p.lon)] as [number, number]) : undefined}
+              dialogStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, boxShadow: '0 24px 48px rgba(0,0,0,0.25)' }}
             />
           )}
         </Card>

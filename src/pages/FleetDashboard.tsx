@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
+import { Loader } from "@/components/Loader";
 
 const STATUS_COLOR: Record<string, string> = {
   IN_TRANSIT: 'var(--accent-primary)',
@@ -69,17 +70,7 @@ export default function FleetDashboard() {
   const activeDrivers = drivers.filter(d => d.status === 'ACTIVE').length;
 
   if (loading) {
-    return (
-      <div>
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
-        </div>
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
-          <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
-        </div>
-      </div>
-    );
+    return <Loader fullScreen />;
   }
 
   if (error) {

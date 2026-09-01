@@ -7,6 +7,7 @@ import { toast } from '@/lib/toast';
 import { QuotesList } from './QuotesList';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import { LiveBadge } from '@/components/LiveBadge';
+import { Loader } from '@/components/Loader';
 
 interface Load {
   id: number;
@@ -65,6 +66,10 @@ export default function LoadsList() {
   const [orderFilter, setOrderFilter] = useState('All');
   const [historyFilter, setHistoryFilter] = useState('All');
   const [historySearch, setHistorySearch] = useState('');
+  // Owned here (not inside QuotesList) so the search box + Board/List toggle
+  // can render inline with the Quotes/Orders/History tabs.
+  const [quoteSearch, setQuoteSearch] = useState('');
+  const [quoteView, setQuoteView] = useState<'board' | 'list'>('board');
   const navigate = useNavigate();
   const location = useLocation();
   const urlSegment = location.pathname.split('/').pop();
@@ -211,15 +216,7 @@ export default function LoadsList() {
   );
 
   if (loading) {
-    return (
-      <div style={{ padding: 40 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 20 }}>Bookings</div>
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
-          <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
-        </div>
-      </div>
-    );
+    return <Loader fullScreen />;
   }
 
   if (error) {
@@ -244,9 +241,9 @@ export default function LoadsList() {
   }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexShrink: 0 }}>
         <div>
           <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Bookings</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -266,42 +263,75 @@ export default function LoadsList() {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div style={{ display: 'flex', gap: 24, borderBottom: '1px solid var(--border-subtle)', marginBottom: 20 }}>
-        {([
-          { id: 'quotes' as BookingTab, label: 'Quotes' },
-          { id: 'orders' as BookingTab, label: 'Orders' },
-          { id: 'history' as BookingTab, label: 'History' },
-        ]).map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => navigate(`/bookings/${tab.id}`)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
-              color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-              padding: '12px 0',
-              fontSize: 14,
-              fontWeight: activeTab === tab.id ? 500 : 400,
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseEnter={(e) => {
-              if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--text-primary)';
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--text-secondary)';
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Tab Navigation — search + Board/List toggle sit inline on the right, only for Quotes */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', marginBottom: 20, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 24 }}>
+          {([
+            { id: 'quotes' as BookingTab, label: 'Quotes' },
+            { id: 'orders' as BookingTab, label: 'Orders' },
+            { id: 'history' as BookingTab, label: 'History' },
+          ]).map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => navigate(`/bookings/${tab.id}`)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                padding: '12px 0',
+                fontSize: 14,
+                fontWeight: activeTab === tab.id ? 500 : 400,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--text-primary)';
+              }}
+              onMouseLeave={(e) => {
+                if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--text-secondary)';
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'quotes' && (
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', paddingBottom: 12 }}>
+            <input
+              type="text"
+              placeholder="Search loads, customers, routes..."
+              value={quoteSearch}
+              onChange={e => setQuoteSearch(e.target.value)}
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 12, outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
+            />
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['board', 'list'] as const).map(v => (
+                <button key={v} onClick={() => setQuoteView(v)} style={{
+                  background: quoteView === v ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  color: quoteView === v ? 'var(--bg-deep)' : 'var(--text-secondary)',
+                  padding: '6px 12px',
+                  borderRadius: 2,
+                  fontSize: 11,
+                  fontFamily: 'var(--font-mono)',
+                  cursor: 'pointer',
+                  letterSpacing: '0.06em',
+                  fontWeight: quoteView === v ? 500 : 400,
+                  transition: 'all 0.2s ease',
+                }}>{v === 'board' ? 'Board' : 'List'}</button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* QUOTES TAB */}
+      {/* QUOTES TAB — fills remaining viewport height; QuotesList scrolls its own areas internally */}
       {activeTab === 'quotes' && (
-        <QuotesList embedded={true} />
+        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <QuotesList embedded={true} search={quoteSearch} onSearchChange={setQuoteSearch} view={quoteView} onViewChange={setQuoteView} />
+        </div>
       )}
 
       {/* ORDERS TAB */}

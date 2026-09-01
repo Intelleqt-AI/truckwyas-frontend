@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader } from '@/components/Loader';
 
 interface CompanyProfile {
   company_name: string;
@@ -232,8 +233,8 @@ export function Onboarding() {
             </div>
 
             {loadingCompany ? (
-              <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>
-                Loading...
+              <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+                <Loader size={32} />
               </div>
             ) : (
               <>
@@ -352,8 +353,8 @@ export function Onboarding() {
             </div>
 
             {loadingTypes ? (
-              <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>
-                Loading...
+              <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+                <Loader size={32} />
               </div>
             ) : (
               <>

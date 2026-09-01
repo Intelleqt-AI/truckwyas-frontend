@@ -7,6 +7,7 @@ import { usePost } from "@/hooks/usePost";
 import { fetchData } from "@/lib/Api";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Loader } from "@/components/Loader";
 import {
   CheckCircle2,
   XCircle,
@@ -171,7 +172,7 @@ export default function XeroIntegration() {
   if (isLoading) {
     return (
       <div className="p-6">
-        <div style={{ color: 'var(--text-secondary)' }}>Loading Xero integration status...</div>
+        <Loader fullScreen />
       </div>
     );
   }

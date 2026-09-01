@@ -8,7 +8,8 @@ import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
-import { RouteMapView } from "@/components/RouteMapView";
+import { ExpandableRouteMap } from "@/components/ExpandableRouteMap";
+import { Loader } from '@/components/Loader';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: 'var(--text-tertiary)',
@@ -42,11 +43,10 @@ export default function Bookings() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
+  const podModalFileRef = useRef<HTMLInputElement>(null);
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
 
-  const [converting, setConverting] = useState(false);
-  const [createdInvoiceId, setCreatedInvoiceId] = useState<string | null>(null);
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
@@ -55,6 +55,11 @@ export default function Bookings() {
   const [assignVehicleId, setAssignVehicleId] = useState('');
   const [assignSaving, setAssignSaving] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [podModalOpen, setPodModalOpen] = useState(false);
+  const [podUploading, setPodUploading] = useState(false);
+  const [podSkipping, setPodSkipping] = useState(false);
+  const [podButtonUploading, setPodButtonUploading] = useState(false);
+  const [podPreviewOpen, setPodPreviewOpen] = useState(false);
 
   const { data: load, isLoading } = useQuery({
     queryKey: ['load', id],
@@ -126,13 +131,21 @@ export default function Bookings() {
       return;
     }
 
-    // A load can't be marked Assigned without both a driver and a vehicle —
-    // rather than let the PATCH 400, open the assign flow right here so the
-    // user can pick them and land on Assigned in one step.
-    if (newStatus === 'ASSIGNED' && (!load?.driver || !load?.vehicle)) {
+    // A load can't be marked Assigned without a vehicle (driver is optional)
+    // — rather than let the PATCH 400, open the assign flow right here so
+    // the user can pick one and land on Assigned in one step.
+    if (newStatus === 'ASSIGNED' && !load?.vehicle) {
       setAssignDriverId(load?.driver ? String(load.driver) : '');
       setAssignVehicleId(load?.vehicle ? String(load.vehicle) : '');
       setAssignModalOpen(true);
+      return;
+    }
+
+    // Give the user a chance to attach the POD right at the point of
+    // delivery, since that's normally when it's in hand — but don't force
+    // it, since a PATCH straight to DELIVERED is still perfectly valid.
+    if (newStatus === 'DELIVERED') {
+      setPodModalOpen(true);
       return;
     }
 
@@ -164,28 +177,8 @@ export default function Bookings() {
     }
   };
 
-  const convertToInvoice = async () => {
-    setConverting(true);
-    try {
-      const result = await postData({ url: `api/v1/loads/${id}/convert_to_invoice/`, data: {} });
-      setCreatedInvoiceId(result.invoice_id);
-      invalidateLoad();
-      toast.success(`Invoice ${result.invoice_number} created`);
-    } catch (e: any) {
-      const existingId = (e as any)?.data?.invoice_id;
-      if (existingId) {
-        setCreatedInvoiceId(existingId);
-        toast.info('Invoice already exists for this load');
-      } else {
-        toast.error(e?.message || 'Failed to create invoice');
-      }
-    } finally {
-      setConverting(false);
-    }
-  };
-
   const uploadPOD = async (file: File) => {
-    toast.info('Uploading POD...');
+    setPodButtonUploading(true);
     const formData = new FormData();
     formData.append('pod_document', file);
     try {
@@ -194,6 +187,39 @@ export default function Bookings() {
       toast.success(`POD uploaded: ${data.filename}`);
     } catch (e: any) {
       toast.error(e?.message || 'Upload failed');
+    } finally {
+      setPodButtonUploading(false);
+    }
+  };
+
+  const uploadPODFromModal = async (file: File) => {
+    setPodUploading(true);
+    try {
+      const data = await postData({
+        url: `api/v1/loads/${id}/upload_pod/`,
+        data: (() => { const fd = new FormData(); fd.append('pod_document', file); return fd; })(),
+      });
+      invalidateLoad();
+      setPodModalOpen(false);
+      toast.success(`POD uploaded (${data.filename}) — status set to Delivered`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Upload failed');
+    } finally {
+      setPodUploading(false);
+    }
+  };
+
+  const skipPodMarkDelivered = async () => {
+    setPodSkipping(true);
+    try {
+      await patchData({ url: `api/v1/loads/${id}/`, data: { status: 'DELIVERED' } });
+      invalidateLoad();
+      setPodModalOpen(false);
+      toast.success('Status updated to Delivered');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update status');
+    } finally {
+      setPodSkipping(false);
     }
   };
 
@@ -223,8 +249,8 @@ export default function Bookings() {
 
   const submitAssignAndActivate = async () => {
     if (billingBlocked) return;
-    if (!assignDriverId || !assignVehicleId) {
-      toast.error('Select both a driver and a vehicle');
+    if (!assignVehicleId) {
+      toast.error('Select a vehicle');
       return;
     }
     setAssignSaving(true);
@@ -247,9 +273,7 @@ export default function Bookings() {
     }
   };
 
-  if (isLoading) return (
-    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading...</div>
-  );
+  if (isLoading) return <Loader fullScreen />;
 
   if (!load) return (
     <div style={{ padding: 40 }}>
@@ -259,7 +283,11 @@ export default function Bookings() {
   );
 
   const hasPOD = !!(load.pod_signature || load.pod_received_by);
-  const invoiceId = createdInvoiceId || load.invoice_id;
+  const invoiceId = load.invoice_id;
+  // Driver/vehicle are locked in once the load has moved past Assigned —
+  // editing them mid-transit (or after delivery/invoicing/cancellation)
+  // would rewrite history that's already in motion.
+  const assignmentLocked = !['PENDING', 'ASSIGNED'].includes(load.status);
   const hasInvoice = !!invoiceId;
   const allowedNextStatuses = VALID_TRANSITIONS[load.status] || [];
 
@@ -305,21 +333,33 @@ export default function Bookings() {
               {STEPS.map((step, stepIdx) => {
                 const isActive = stepIdx === currentIdx;
                 const isPast   = stepIdx <= currentIdx;
+                // Forward-only: a step is clickable when it's a valid next
+                // status from where the load is now — this also naturally
+                // blocks skipping ahead, since VALID_TRANSITIONS only ever
+                // lists the immediate next step(s).
+                const isClickable = !billingBlocked && allowedNextStatuses.includes(step);
                 return (
                   <div key={step} style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
                     <div style={{ flex: 1, height: 3, background: isPast ? 'var(--accent-primary)' : 'var(--border-subtle)', transition: 'background 0.3s' }} />
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '0 8px' }}>
+                    <div
+                      onClick={isClickable ? () => updateStatus(step) : undefined}
+                      title={isClickable ? `Mark as ${titleCase(step)}` : undefined}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '0 8px',
+                        cursor: isClickable ? 'pointer' : 'default',
+                      }}
+                    >
                       <div style={{
                         width: isActive ? 12 : 10,
                         height: isActive ? 12 : 10,
                         borderRadius: '50%',
                         background: isPast ? 'var(--accent-primary)' : 'var(--border-subtle)',
-                        boxShadow: isActive ? '0 0 0 3px rgba(77,158,255,0.25)' : 'none',
+                        boxShadow: isActive ? '0 0 0 3px rgba(77,158,255,0.25)' : (isClickable ? '0 0 0 3px rgba(77,158,255,0.12)' : 'none'),
                         transition: 'all 0.3s',
                       }} />
                       <div style={{
                         fontSize: 9, fontFamily: 'var(--font-mono)',
-                        color: isPast ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                        color: isPast ? 'var(--accent-primary)' : (isClickable ? 'var(--text-secondary)' : 'var(--text-tertiary)'),
                         fontWeight: isActive ? 600 : 400,
                         whiteSpace: 'nowrap',
                       }}>
@@ -384,12 +424,14 @@ export default function Bookings() {
 
           {/* Live map — pickup, delivery, and (if the assigned vehicle is CtrlFleet-linked) its last known position */}
           <div style={{ marginTop: 16 }}>
-            <RouteMapView
+            <ExpandableRouteMap
               pickup={`${load.pickup_location}, ${load.pickup_city}`}
               delivery={`${load.delivery_location}, ${load.delivery_city}`}
               pickupCoords={load.pickup_lat ? { lat: Number(load.pickup_lat), lon: Number(load.pickup_lng) } : undefined}
               deliveryCoords={load.delivery_lat ? { lat: Number(load.delivery_lat), lon: Number(load.delivery_lng) } : undefined}
               stops={Array.isArray(load.stops) ? load.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
+              geometry={Array.isArray(load.route_geometry) && load.route_geometry.length > 1 ? load.route_geometry.map((p: { lat: number; lon: number }) => [Number(p.lat), Number(p.lon)] as [number, number]) : undefined}
+              dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 4, boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
               currentLocation={
                 vehicleDetail?.latitude && vehicleDetail?.longitude
                   ? { lat: parseFloat(vehicleDetail.latitude), lon: parseFloat(vehicleDetail.longitude) }
@@ -444,75 +486,61 @@ export default function Bookings() {
             ))}
           </div>
 
-          {/* Actions */}
-          <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 16 }}>Actions</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {!hasInvoice ? (
-                billingBlocked ? (
-                  <div style={{ padding: '10px 12px', background: 'var(--status-warning-dim, rgba(230,160,60,0.1))', border: '1px solid var(--status-warning)', borderRadius: 2, fontSize: 11, color: 'var(--status-warning)', lineHeight: 1.5 }}>
-                    Manual invoice creation is unavailable — {subscriptionStatusDetail(authUser?.subscription_status)}{' '}
-                    <span
-                      onClick={() => navigate('/settings/billing')}
-                      style={{ textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
-                    >
-                      go to billing
-                    </span>
-                  </div>
-                ) : (
+          {/* Actions — nothing to do here before the load has a vehicle, so
+              hide the whole card until it's at least Assigned. Invoicing
+              itself is automatic on delivery (see convert_to_invoice from
+              the delivery signal) — no manual "create invoice" trigger. */}
+          {load.status !== 'PENDING' && (
+            <div className="card" style={{ padding: 20 }}>
+              <div className="card-title" style={{ marginBottom: 16 }}>Actions</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {hasInvoice && (
                   <button
                     className="btn-action"
-                    style={{ width: '100%', opacity: converting ? 0.6 : 1 }}
-                    onClick={convertToInvoice}
-                    disabled={converting}
+                    style={{ width: '100%', background: 'var(--status-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                    onClick={() => navigate(`/finance/invoices/${invoiceId}`)}
                   >
-                    {converting ? 'Creating invoice...' : '+ Create invoice'}
+                    <span>✓ Invoice created</span>
+                    <span style={{ opacity: 0.7, fontSize: 10 }}>—</span>
+                    <span>See invoice →</span>
                   </button>
-                )
-              ) : (
-                <button
-                  className="btn-action"
-                  style={{ width: '100%', background: 'var(--status-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                  onClick={() => navigate(`/finance/invoices/${invoiceId}`)}
-                >
-                  <span>✓ Invoice created</span>
-                  <span style={{ opacity: 0.7, fontSize: 10 }}>—</span>
-                  <span>See invoice →</span>
-                </button>
-              )}
+                )}
 
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                style={{ display: 'none' }}
-                onChange={e => { if (e.target.files?.[0]) uploadPOD(e.target.files[0]); }}
-              />
-              <button
-                onClick={() => fileRef.current?.click()}
-                style={{
-                  width: '100%',
-                  padding: '10px 16px',
-                  background: hasPOD ? 'var(--status-success-dim)' : 'var(--bg-surface)',
-                  border: `1px solid ${hasPOD ? 'var(--status-success)' : 'var(--border-subtle)'}`,
-                  color: hasPOD ? 'var(--status-success)' : 'var(--text-secondary)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  letterSpacing: '0.08em',
-                  cursor: 'pointer',
-                  borderRadius: 2,
-                }}
-              >
-                {hasPOD ? `✓ POD: ${load.pod_received_by || 'Uploaded'}` : '↑ Upload POD'}
-              </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  style={{ display: 'none' }}
+                  onChange={e => { if (e.target.files?.[0]) uploadPOD(e.target.files[0]); }}
+                />
+                <button
+                  onClick={() => (hasPOD ? setPodPreviewOpen(true) : fileRef.current?.click())}
+                  disabled={podButtonUploading}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    background: hasPOD ? 'var(--status-success-dim)' : 'var(--bg-surface)',
+                    border: `1px solid ${hasPOD ? 'var(--status-success)' : 'var(--border-subtle)'}`,
+                    color: hasPOD ? 'var(--status-success)' : 'var(--text-secondary)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    letterSpacing: '0.08em',
+                    cursor: podButtonUploading ? 'not-allowed' : 'pointer',
+                    opacity: podButtonUploading ? 0.6 : 1,
+                    borderRadius: 2,
+                  }}
+                >
+                  {podButtonUploading ? 'UPLOADING…' : hasPOD ? `✓ POD: ${load.pod_received_by || 'Uploaded'}` : '↑ Upload POD'}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Assignment */}
           <div className="card" style={{ padding: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div className="card-title">Assignment</div>
-              {!editingAssignment && !billingBlocked && (
+              {!editingAssignment && !billingBlocked && !assignmentLocked && (
                 <button
                   onClick={startEditAssignment}
                   style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', cursor: 'pointer', padding: 0 }}
@@ -530,10 +558,10 @@ export default function Bookings() {
               </div>
             )}
 
-            {!editingAssignment ? (
+            {!editingAssignment || assignmentLocked ? (
               [
-                { label: 'Driver', value: load.driver_name || '—' },
                 { label: 'Vehicle', value: load.vehicle_info || '—' },
+                { label: 'Driver', value: load.driver_name || '—' },
               ].map(r => (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
                   <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.label}</span>
@@ -543,19 +571,6 @@ export default function Bookings() {
             ) : (
               <>
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Driver</div>
-                  <Select value={assignDriverId} onValueChange={setAssignDriverId}>
-                    <SelectTrigger><SelectValue placeholder="— No driver —" /></SelectTrigger>
-                    <SelectContent>
-                      {assignableDrivers.map(d => (
-                        <SelectItem key={d.id} value={String(d.id)}>
-                          {d.user_details?.name || d.user_details?.username || `Driver #${d.id}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div style={{ marginBottom: 8 }}>
                   <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Vehicle</div>
                   <Select value={assignVehicleId} onValueChange={setAssignVehicleId}>
                     <SelectTrigger><SelectValue placeholder="— No vehicle —" /></SelectTrigger>
@@ -568,16 +583,29 @@ export default function Bookings() {
                     </SelectContent>
                   </Select>
                 </div>
-                {(!!assignDriverId !== !!assignVehicleId) && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Driver (optional)</div>
+                  <Select value={assignDriverId} onValueChange={setAssignDriverId}>
+                    <SelectTrigger><SelectValue placeholder="— No driver —" /></SelectTrigger>
+                    <SelectContent>
+                      {assignableDrivers.map(d => (
+                        <SelectItem key={d.id} value={String(d.id)}>
+                          {d.user_details?.name || d.user_details?.username || `Driver #${d.id}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {(!!assignDriverId && !assignVehicleId) && (
                   <div style={{ fontSize: 11, color: 'var(--status-warning)', marginBottom: 8 }}>
-                    Select both, or clear both to unassign.
+                    A driver needs a vehicle — select a vehicle too, or clear the driver.
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button
                     className="btn-action"
-                    style={{ flex: 1, opacity: assignSaving || (!!assignDriverId !== !!assignVehicleId) ? 0.6 : 1 }}
-                    disabled={assignSaving || (!!assignDriverId !== !!assignVehicleId)}
+                    style={{ flex: 1, opacity: assignSaving || (!!assignDriverId && !assignVehicleId) ? 0.6 : 1 }}
+                    disabled={assignSaving || (!!assignDriverId && !assignVehicleId)}
                     onClick={saveAssignment}
                   >
                     {assignSaving ? 'Saving…' : 'Save'}
@@ -618,27 +646,10 @@ export default function Bookings() {
         >
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>Assign Driver & Vehicle</div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
-            This order needs a driver and a vehicle before it can be marked <b>Assigned</b>.
+            This order needs a vehicle before it can be marked <b>Assigned</b>. A driver is optional.
           </div>
 
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Driver</div>
-            <Select value={assignDriverId} onValueChange={setAssignDriverId}>
-              <SelectTrigger><SelectValue placeholder="Select driver…" /></SelectTrigger>
-              <SelectContent>
-                {assignableDrivers.map(d => (
-                  <SelectItem key={d.id} value={String(d.id)}>
-                    {d.user_details?.name || d.user_details?.username || `Driver #${d.id}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {assignableDrivers.length === 0 && (
-              <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>No available drivers — check the Fleet page.</div>
-            )}
-          </div>
-
-          <div style={{ marginBottom: 8 }}>
             <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Vehicle</div>
             <Select value={assignVehicleId} onValueChange={setAssignVehicleId}>
               <SelectTrigger><SelectValue placeholder="Select vehicle…" /></SelectTrigger>
@@ -655,6 +666,23 @@ export default function Bookings() {
             )}
           </div>
 
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Driver (optional)</div>
+            <Select value={assignDriverId} onValueChange={setAssignDriverId}>
+              <SelectTrigger><SelectValue placeholder="Select driver…" /></SelectTrigger>
+              <SelectContent>
+                {assignableDrivers.map(d => (
+                  <SelectItem key={d.id} value={String(d.id)}>
+                    {d.user_details?.name || d.user_details?.username || `Driver #${d.id}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {assignableDrivers.length === 0 && (
+              <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>No available drivers — check the Fleet page.</div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
             <button
               onClick={() => setAssignModalOpen(false)}
@@ -664,15 +692,132 @@ export default function Bookings() {
             </button>
             <button
               onClick={submitAssignAndActivate}
-              disabled={assignSaving || !assignDriverId || !assignVehicleId}
+              disabled={assignSaving || !assignVehicleId}
               style={{
                 padding: '8px 18px', background: 'var(--accent-primary)', border: 'none', color: '#fff',
                 borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.06em',
-                cursor: (assignSaving || !assignDriverId || !assignVehicleId) ? 'not-allowed' : 'pointer',
-                opacity: (assignSaving || !assignDriverId || !assignVehicleId) ? 0.5 : 1,
+                cursor: (assignSaving || !assignVehicleId) ? 'not-allowed' : 'pointer',
+                opacity: (assignSaving || !assignVehicleId) ? 0.5 : 1,
               }}
             >
               {assignSaving ? 'ASSIGNING…' : 'ASSIGN & SET ASSIGNED'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {podModalOpen && (
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+        onClick={() => (!podUploading && !podSkipping) && setPodModalOpen(false)}
+      >
+        <div
+          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 4, padding: 28, maxWidth: 420, width: '100%', boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>Proof of Delivery</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
+            Attach a POD before marking this order <b>Delivered</b>, or skip and mark it delivered anyway.
+          </div>
+
+          <input
+            ref={podModalFileRef}
+            type="file"
+            accept="application/pdf,image/jpeg,image/png,image/webp"
+            style={{ display: 'none' }}
+            onChange={e => { if (e.target.files?.[0]) uploadPODFromModal(e.target.files[0]); }}
+          />
+          <button
+            onClick={() => podModalFileRef.current?.click()}
+            disabled={podUploading || podSkipping}
+            style={{
+              width: '100%', padding: '12px 16px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+              color: 'var(--text-primary)', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
+              cursor: (podUploading || podSkipping) ? 'not-allowed' : 'pointer', opacity: (podUploading || podSkipping) ? 0.6 : 1,
+              marginBottom: 20,
+            }}
+          >
+            {podUploading ? 'UPLOADING…' : '↑ UPLOAD POD & SET DELIVERED'}
+          </button>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setPodModalOpen(false)}
+              disabled={podUploading || podSkipping}
+              style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', cursor: (podUploading || podSkipping) ? 'not-allowed' : 'pointer' }}
+            >
+              CANCEL
+            </button>
+            <button
+              onClick={skipPodMarkDelivered}
+              disabled={podUploading || podSkipping}
+              style={{
+                padding: '8px 18px', background: 'var(--accent-primary)', border: 'none', color: '#fff',
+                borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.06em',
+                cursor: (podUploading || podSkipping) ? 'not-allowed' : 'pointer',
+                opacity: (podUploading || podSkipping) ? 0.5 : 1,
+              }}
+            >
+              {podSkipping ? 'UPDATING…' : 'SKIP & SET DELIVERED'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {podPreviewOpen && (
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+        onClick={() => setPodPreviewOpen(false)}
+      >
+        <div
+          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 4, padding: 24, maxWidth: 640, width: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Proof of Delivery</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                {load.pod_received_by || 'Received'}
+              </div>
+            </div>
+            <button
+              onClick={() => setPodPreviewOpen(false)}
+              style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}
+            >
+              ×
+            </button>
+          </div>
+
+          <div style={{ flex: 1, overflow: 'auto', background: 'var(--bg-canvas, #f4f4f5)', borderRadius: 2, border: '1px solid var(--border-subtle)' }}>
+            {load.pod_document ? (
+              /\.pdf($|\?)/i.test(load.pod_document) ? (
+                <iframe src={load.pod_document} title="POD document" style={{ width: '100%', height: '60vh', border: 'none' }} />
+              ) : (
+                <img src={load.pod_document} alt="Proof of delivery" style={{ width: '100%', height: 'auto', display: 'block' }} />
+              )
+            ) : (
+              <div style={{ padding: 24, fontSize: 12, color: 'var(--text-tertiary)' }}>No document file was attached — only a receipt name is on record.</div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+            {load.pod_document && (
+              <a
+                href={load.pod_document}
+                target="_blank"
+                rel="noreferrer"
+                style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textDecoration: 'none' }}
+              >
+                OPEN IN NEW TAB
+              </a>
+            )}
+            <button
+              onClick={() => { setPodPreviewOpen(false); fileRef.current?.click(); }}
+              style={{ padding: '8px 18px', background: 'var(--accent-primary)', border: 'none', color: '#fff', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.06em', cursor: 'pointer' }}
+            >
+              REPLACE
             </button>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
+import { Loader } from "@/components/Loader";
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed below) and survives navigation — revisiting
@@ -751,13 +752,8 @@ export default function Overview() {
             </button>
           </div>
           {loading ? (
-            <div
-              style={{
-                padding: 40,
-                textAlign: "center",
-                color: "var(--text-tertiary)",
-              }}>
-              Loading quotes...
+            <div style={{ padding: 40, display: "flex", justifyContent: "center" }}>
+              <Loader size={24} />
             </div>
           ) : recentQuotes.length > 0 ? (
             <table className="data-table">
@@ -849,13 +845,8 @@ export default function Overview() {
             </button>
           </div>
           {loading ? (
-            <div
-              style={{
-                padding: 40,
-                textAlign: "center",
-                color: "var(--text-tertiary)",
-              }}>
-              Loading bookings...
+            <div style={{ padding: 40, display: "flex", justifyContent: "center" }}>
+              <Loader size={24} />
             </div>
           ) : recentLoads.length > 0 ? (
             <table className="data-table">
@@ -1008,8 +999,8 @@ export default function Overview() {
             Recent Activity
           </div>
           {activityLoading ? (
-            <div style={{ color: "var(--text-tertiary)", fontSize: 12 }}>
-              Loading...
+            <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
+              <Loader size={20} />
             </div>
           ) : activity.length === 0 ? (
             <div
@@ -1068,12 +1059,8 @@ export default function Overview() {
         </div>
         <div className="agent-feed">
           {loading ? (
-            <div className="feed-item">
-              <div className="feed-meta">
-                <span>LOADING</span>
-                <span>...</span>
-              </div>
-              <div className="feed-content">Loading insights...</div>
+            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+              <Loader size={20} />
             </div>
           ) : insights.length > 0 ? (
             insights.slice(0, 5).map((insight: any, idx: number) => (

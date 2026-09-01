@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchData, postData, deleteData, patchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
+import { Loader } from "@/components/Loader";
 
 const cardStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -442,7 +443,7 @@ export function IntegrationsSettings() {
         </div>
 
         {loadingXero ? (
-          <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12 }} />
+          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><Loader size={20} /></div>
         ) : xeroStatus?.connected ? (
           <>
             <div style={{
@@ -505,7 +506,7 @@ export function IntegrationsSettings() {
         </div>
 
         {loadingCartrack ? (
-          <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12 }} />
+          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><Loader size={20} /></div>
         ) : cartrackStatus?.connected ? (
           <div style={{
             padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
@@ -603,7 +604,7 @@ export function IntegrationsSettings() {
         </div>
 
         {loadingCtrlfleet ? (
-          <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12 }} />
+          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><Loader size={20} /></div>
         ) : ctrlfleetStatus?.connected ? (
           <>
             <div style={{
@@ -685,7 +686,7 @@ export function IntegrationsSettings() {
                 maxHeight: 320, overflowY: 'auto',
               }}>
                 {loadingCtrlfleetVehicles ? (
-                  <div style={{ padding: 12, fontSize: 11, color: 'var(--text-tertiary)' }}>Loading...</div>
+                  <div style={{ padding: 12, display: 'flex', justifyContent: 'center' }}><Loader size={18} /></div>
                 ) : ctrlfleetVehicles.length === 0 ? (
                   <div style={{ padding: 12, fontSize: 11, color: 'var(--text-tertiary)' }}>No vehicles returned by CtrlFleet.</div>
                 ) : (
@@ -835,7 +836,7 @@ export function IntegrationsSettings() {
         )}
 
         {loadingKeys ? (
-          <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4 }} />
+          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : apiKeys.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)' }}>
             No API keys yet. Generate one to enable programmatic access.
@@ -931,7 +932,7 @@ export function IntegrationsSettings() {
         )}
 
         {loadingWebhooks ? (
-          <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4 }} />
+          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : webhooks.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)' }}>
             No webhooks configured. Add one to receive real-time event notifications.

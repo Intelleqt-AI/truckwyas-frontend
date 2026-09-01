@@ -563,6 +563,12 @@ export default function QuoteBuilder() {
       setPickup(q.pickup_location || ""); setDelivery(q.delivery_location || "");
       if (q.pickup_lat) setPickupCoords({ lat: Number(q.pickup_lat), lon: Number(q.pickup_lng) });
       if (q.delivery_lat) setDeliveryCoords({ lat: Number(q.delivery_lat), lon: Number(q.delivery_lng) });
+      if (Array.isArray(q.stops) && q.stops.length > 0) {
+        setStops(q.stops.map((s: { location: string; lat: number; lon: number }, i: number) => ({
+          id: `saved-${i}`, location: s.location, coords: { lat: s.lat, lon: s.lon },
+        })));
+        setStopsExpanded(true);
+      }
       setVehicleType(q.vehicle_type || ""); setWeight(String((Number(q.weight) || 0) / 1000));
       setCargo(q.cargo_description || ""); setNotes(q.notes || "");
       setDriverAllowanceInput(String(q.driver_allowance || 0));
@@ -686,6 +692,15 @@ export default function QuoteBuilder() {
     total_amount: round2(total), margin_percentage: marginPct, notes, status, confidence: "MEDIUM",
     sla_hours: Number(companyProfile?.default_sla_hours) || 48, valid_until: validUntil, trip_type: tripType,
     win_probability: opt?.win_probability_at_optimal != null ? Math.round(opt.win_probability_at_optimal * 100) : null,
+    // Only stops with a resolved location count — same rule the route-calc
+    // call already applies (see the routeData effect below). Previously
+    // these never made it into the save payload at all: used for live
+    // pricing, then silently discarded — nothing downstream (Quote Detail,
+    // the quotes table, the customer share link, the converted Order) could
+    // ever show them.
+    stops: stops.filter(s => s.coords).map(s => ({
+      location: s.location, lat: round6(s.coords!.lat), lon: round6(s.coords!.lon),
+    })),
   });
 
   // ---- auto-save DB draft once substantive (debounced) ----

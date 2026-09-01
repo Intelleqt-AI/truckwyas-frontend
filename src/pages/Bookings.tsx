@@ -360,6 +360,17 @@ export default function Bookings() {
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{load.pickup_city}, {load.pickup_state}</div>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>{fmt(load.pickup_date)}</div>
             </div>
+            {Array.isArray(load.stops) && load.stops.length > 0 && (
+              <div style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>STOPS ({load.stops.length})</div>
+                {load.stops.map((s: { location: string }, i: number) => (
+                  <div key={i} style={{ fontSize: 13, color: 'var(--text-primary)', display: 'flex', gap: 8 }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>{i + 1}</span>
+                    {s.location}
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16 }}>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{load.cargo_description}</div>
             </div>
@@ -376,6 +387,9 @@ export default function Bookings() {
             <RouteMapView
               pickup={`${load.pickup_location}, ${load.pickup_city}`}
               delivery={`${load.delivery_location}, ${load.delivery_city}`}
+              pickupCoords={load.pickup_lat ? { lat: Number(load.pickup_lat), lon: Number(load.pickup_lng) } : undefined}
+              deliveryCoords={load.delivery_lat ? { lat: Number(load.delivery_lat), lon: Number(load.delivery_lng) } : undefined}
+              stops={Array.isArray(load.stops) ? load.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
               currentLocation={
                 vehicleDetail?.latitude && vehicleDetail?.longitude
                   ? { lat: parseFloat(vehicleDetail.latitude), lon: parseFloat(vehicleDetail.longitude) }

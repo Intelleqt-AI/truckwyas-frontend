@@ -9,6 +9,7 @@ import { ConvertToBookingModal } from '@/components/ConvertToBookingModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
+import { RouteMapView } from '@/components/RouteMapView';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',
@@ -378,6 +379,33 @@ export default function QuoteDetail() {
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
               </div>
             </div>
+
+            {Array.isArray(quote.stops) && quote.stops.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                {label(`Stops (${quote.stops.length})`)}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                  {quote.stops.map((s: { location: string }, i: number) => (
+                    <div key={i} style={{ fontSize: 13, color: 'var(--text-primary)', display: 'flex', gap: 8 }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>{i + 1}</span>
+                      {s.location}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(quote.pickup_lat || quote.delivery_lat) && (
+              <div style={{ marginTop: 16 }}>
+                <RouteMapView
+                  pickup={quote.pickup_location}
+                  delivery={quote.delivery_location}
+                  pickupCoords={quote.pickup_lat ? { lat: Number(quote.pickup_lat), lon: Number(quote.pickup_lng) } : undefined}
+                  deliveryCoords={quote.delivery_lat ? { lat: Number(quote.delivery_lat), lon: Number(quote.delivery_lng) } : undefined}
+                  stops={Array.isArray(quote.stops) ? quote.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
+                  height={220}
+                />
+              </div>
+            )}
           </div>
 
           {/* Return Leg — visible only for ROUND_TRIP quotes */}

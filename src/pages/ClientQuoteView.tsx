@@ -238,10 +238,28 @@ export default function ClientQuoteView() {
               </div>
             </div>
           </div>
+
+          {Array.isArray(quote.stops) && quote.stops.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <Label>{`Stops (${quote.stops.length})`}</Label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                {quote.stops.map((s: { location: string }, i: number) => (
+                  <div key={i} style={{ fontSize: 13, color: C.text, display: 'flex', gap: 8 }}>
+                    <span style={{ fontFamily: C.mono, fontSize: 11, color: C.faint }}>{i + 1}</span>
+                    {s.location}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {(quote.pickup_location || quote.origin) && (quote.delivery_location || quote.destination) && (
             <RouteMapView
               pickup={quote.pickup_location || quote.origin}
               delivery={quote.delivery_location || quote.destination}
+              pickupCoords={quote.pickup_lat ? { lat: Number(quote.pickup_lat), lon: Number(quote.pickup_lng) } : undefined}
+              deliveryCoords={quote.delivery_lat ? { lat: Number(quote.delivery_lat), lon: Number(quote.delivery_lng) } : undefined}
+              stops={Array.isArray(quote.stops) ? quote.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
             />
           )}
         </Card>

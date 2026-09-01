@@ -47,8 +47,13 @@ const WON_GREEN_BG = 'rgba(34,197,94,0.12)';
 const confidenceColor = (c?: string) =>
   c === 'HIGH' ? WON_GREEN : c === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)';
 
-const routeOf = (q: any) =>
-  `${q.origin || q.pickup_location || '—'} → ${q.destination || q.delivery_location || '—'}`;
+// Full route chain, stops included — same data the quote and its map show
+// elsewhere, not just the pickup/delivery pair. Shared by every place this
+// page lists a quote's route (the table, the board card, the detail panel).
+const routeOf = (q: any) => {
+  const stopLabels = Array.isArray(q.stops) ? q.stops.map((s: { location: string }) => s.location).filter(Boolean) : [];
+  return [q.origin || q.pickup_location || '—', ...stopLabels, q.destination || q.delivery_location || '—'].join(' → ');
+};
 
 // Sentence-case a single-word token for display: "HIGH" → "High".
 const sentenceCase = (s?: string) =>

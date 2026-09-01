@@ -5,6 +5,7 @@ import { fetchData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
 import { DatePicker } from '@/components/ui/date-picker';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
+import { Loader } from '@/components/Loader';
 
 // ========== TYPES ==========
 
@@ -438,7 +439,7 @@ export default function Insights() {
 
       {/* Content */}
       {loading ? (
-        <div style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', textAlign: 'center', padding: 40 }}>—</div>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Loader size={32} /></div>
       ) : (
         <>
           {/* TAB 1: BRIEFING */}

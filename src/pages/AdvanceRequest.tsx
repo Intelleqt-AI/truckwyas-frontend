@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchData, postData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
+import { Loader } from "@/components/Loader";
 
 const TIER_COLOR: Record<string, string> = {
   prime: 'var(--accent-primary)', standard: 'var(--status-success)',
@@ -83,17 +84,7 @@ export default function AdvanceRequest() {
   };
 
   if (loading) {
-    return (
-      <div>
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Request Advance</div>
-        </div>
-        <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-          <div style={{ color: 'var(--text-secondary)' }}>Loading eligible invoices...</div>
-        </div>
-      </div>
-    );
+    return <Loader fullScreen />;
   }
 
   // Step 4 - Success screen

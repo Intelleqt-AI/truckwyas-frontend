@@ -24,6 +24,7 @@ function saveAppliedId(id: string, current: Set<string>): Set<string> {
 import { fetchData, postData, putData, deleteData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
+import { Loader } from "@/components/Loader";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select,
@@ -1036,34 +1037,8 @@ export default function Invoices() {
 
           {/* Expenses KPIs */}
           {expensesLoading ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: 16,
-                marginBottom: 24,
-              }}>
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="card" style={{ padding: 20 }}>
-                  <div
-                    style={{
-                      height: 16,
-                      background: "var(--bg-surface-hover)",
-                      borderRadius: 4,
-                      marginBottom: 12,
-                      width: "50%",
-                    }}
-                  />
-                  <div
-                    style={{
-                      height: 24,
-                      background: "var(--bg-surface-hover)",
-                      borderRadius: 4,
-                      width: "70%",
-                    }}
-                  />
-                </div>
-              ))}
+            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0", marginBottom: 24 }}>
+              <Loader size={28} />
             </div>
           ) : (
             <>
@@ -1510,34 +1485,8 @@ export default function Invoices() {
         <>
           {/* KPIs */}
           {loading ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: 16,
-                marginBottom: 24,
-              }}>
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="card" style={{ padding: 20 }}>
-                  <div
-                    style={{
-                      height: 16,
-                      background: "var(--bg-surface-hover)",
-                      borderRadius: 4,
-                      marginBottom: 12,
-                      width: "50%",
-                    }}
-                  />
-                  <div
-                    style={{
-                      height: 24,
-                      background: "var(--bg-surface-hover)",
-                      borderRadius: 4,
-                      width: "70%",
-                    }}
-                  />
-                </div>
-              ))}
+            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0", marginBottom: 24 }}>
+              <Loader size={28} />
             </div>
           ) : (
             <div

@@ -1,5 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { Loader } from '@/components/Loader';
 
 const BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/').replace(/\/$/, '');
 
@@ -94,8 +95,8 @@ export default function PublicInvoice() {
 
         {/* Body */}
         {isLoading && (
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: 48, textAlign: 'center', color: C.muted }}>
-            Loading invoice…
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: 48, display: 'flex', justifyContent: 'center' }}>
+            <Loader size={36} label="Loading invoice…" />
           </div>
         )}
 

@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/formatters";
 import { fetchData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
+import { Loader } from "@/components/Loader";
 
 const RISK_BAND_COLOR: Record<string, string> = {
   LOW: "var(--status-success)",
@@ -84,60 +85,7 @@ export default function Capital() {
   useAutoRefresh(refetch);
 
   if (loading) {
-    return (
-      <div>
-        <div style={{ marginBottom: 24 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontFamily: "var(--font-mono)",
-              color: "var(--text-tertiary)",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              marginBottom: 4,
-            }}>
-            Capital
-          </div>
-          <div
-            style={{
-              fontSize: 22,
-              fontWeight: 500,
-              color: "var(--text-primary)",
-            }}>
-            Fast Pay Facility
-          </div>
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 16,
-            marginBottom: 24,
-          }}>
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="card" style={{ padding: 20 }}>
-              <div
-                style={{
-                  height: 16,
-                  background: "var(--bg-surface)",
-                  borderRadius: 4,
-                  marginBottom: 12,
-                  width: "60%",
-                }}
-              />
-              <div
-                style={{
-                  height: 32,
-                  background: "var(--bg-surface)",
-                  borderRadius: 4,
-                  width: "40%",
-                }}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <Loader fullScreen />;
   }
 
   return (

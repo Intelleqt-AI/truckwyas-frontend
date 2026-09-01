@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
+import { Loader } from '@/components/Loader';
 
 const TIER_COLOR: Record<string, string> = {
   PRIME: 'var(--status-success)',
@@ -167,7 +168,7 @@ export default function RiskScoreView() {
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{customerScores.length} scored</div>
         </div>
         {isLoading ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading scores…</div>
+          <div style={{ padding: '40px 20px', display: 'flex', justifyContent: 'center' }}><Loader size={28} label="Loading scores…" /></div>
         ) : customerScores.length === 0 ? (
           <div style={{ padding: '40px 20px', textAlign: 'center' }}>
             <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 12 }}>No risk scores calculated yet.</div>

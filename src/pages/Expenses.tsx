@@ -6,6 +6,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency, formatDate } from '@/lib/formatters';
+import { Loader } from '@/components/Loader';
 
 interface Expense {
   id: number;
@@ -179,14 +180,7 @@ export default function Expenses() {
     window.URL.revokeObjectURL(url);
   };
 
-  if (loading) return (
-    <div>
-      <div className="card" style={{ padding: 20, marginBottom: 16 }}>
-        <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
-        <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
-      </div>
-    </div>
-  );
+  if (loading) return <Loader fullScreen />;
 
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
 

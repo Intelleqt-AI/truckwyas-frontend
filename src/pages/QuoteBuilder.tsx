@@ -9,7 +9,7 @@ import { RouteMapView } from "@/components/RouteMapView";
 import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Dialog, DialogTrigger, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogTrigger, DialogContent, DialogClose } from "@/components/ui/dialog";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { AIChatPanel, type ChatMessage } from "@/components/AIChatPanel";
 import { useAuth } from "@/lib/AuthContext";
@@ -18,6 +18,7 @@ import { MessageCircle, Map, Info, Sparkles, Maximize2, Mic, Square, X, Plus, Gr
 import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Loader } from "@/components/Loader";
 
 /**
  * QuoteBuilder — the redesigned single-page quote flow.
@@ -565,6 +566,12 @@ export default function QuoteBuilder() {
       setPickup(q.pickup_location || ""); setDelivery(q.delivery_location || "");
       if (q.pickup_lat) setPickupCoords({ lat: Number(q.pickup_lat), lon: Number(q.pickup_lng) });
       if (q.delivery_lat) setDeliveryCoords({ lat: Number(q.delivery_lat), lon: Number(q.delivery_lng) });
+      if (Array.isArray(q.stops) && q.stops.length > 0) {
+        setStops(q.stops.map((s: { location: string; lat: number; lon: number }, i: number) => ({
+          id: `saved-${i}`, location: s.location, coords: { lat: s.lat, lon: s.lon },
+        })));
+        setStopsExpanded(true);
+      }
       setVehicleType(q.vehicle_type || ""); setWeight(String((Number(q.weight) || 0) / 1000));
       setCargo(q.cargo_description || ""); setNotes(q.notes || "");
       setDriverAllowanceInput(String(q.driver_allowance || 0));
@@ -688,6 +695,20 @@ export default function QuoteBuilder() {
     total_amount: round2(total), margin_percentage: marginPct, notes, status, confidence: "MEDIUM",
     sla_hours: Number(companyProfile?.default_sla_hours) || 48, valid_until: validUntil, trip_type: tripType,
     win_probability: opt?.win_probability_at_optimal != null ? Math.round(opt.win_probability_at_optimal * 100) : null,
+    // Only stops with a resolved location count — same rule the route-calc
+    // call already applies (see the routeData effect below). Previously
+    // these never made it into the save payload at all: used for live
+    // pricing, then silently discarded — nothing downstream (Quote Detail,
+    // the quotes table, the customer share link, the converted Order) could
+    // ever show them.
+    stops: stops.filter(s => s.coords).map(s => ({
+      location: s.location, lat: round6(s.coords!.lat), lon: round6(s.coords!.lon),
+    })),
+    // The exact selected route's path — same "used live, never saved" gap
+    // stops had. Without this, any map showing this quote/order later has
+    // to run its own fresh routing call, which can return a materially
+    // different road path than the one actually priced and shown here.
+    route_geometry: (route?.geometry || []).map(p => ({ lat: round6(p.lat), lon: round6(p.lon) })),
   });
 
   // ---- auto-save DB draft once substantive (debounced) ----
@@ -784,14 +805,28 @@ export default function QuoteBuilder() {
   };
 
   // ---- map panel (shared between the inline card and the expanded modal) ----
-  const renderMapPanel = (height: number, expandButton?: React.ReactNode) => (
+  const renderMapPanel = (height: number, expandButton?: React.ReactNode, closeButton?: React.ReactNode) => (
     <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)" }}>
         <span style={{ fontSize: 12, color: "var(--text-tertiary)", display: "flex", alignItems: "center", gap: 6 }}>
           <Map size={13} />
-          {pickupCoords && deliveryCoords
-            ? "Double-click the map to move a pin, or search above"
-            : <>Double-click the map to set <b style={{ color: "var(--text-secondary)" }}>{pickMode === "pickup" ? "collection" : "delivery"}</b></>}
+          {(() => {
+            // pickMode is "pickup", "delivery", or a stop's id — resolve
+            // whichever one is currently selected to its display label and
+            // whether it already has a pin, so the hint always names the
+            // actual target instead of assuming pickup/delivery.
+            const activeStopIdx = stops.findIndex(s => s.id === pickMode);
+            const activeStop = activeStopIdx >= 0 ? stops[activeStopIdx] : null;
+            const activeLabel = pickMode === "pickup" ? "collection"
+              : pickMode === "delivery" ? "delivery"
+              : activeStop ? `stop ${activeStopIdx + 1}` : null;
+            const activeFilled = pickMode === "pickup" ? !!pickupCoords
+              : pickMode === "delivery" ? !!deliveryCoords
+              : !!activeStop?.coords;
+            return activeFilled || !activeLabel
+              ? "Double-click the map to move a pin, or search above"
+              : <>Double-click the map to set <b style={{ color: "var(--text-secondary)" }}>{activeLabel}</b></>;
+          })()}
         </span>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <button onClick={() => setPickMode("pickup")}
@@ -820,6 +855,7 @@ export default function QuoteBuilder() {
             Delivery
           </button>
           {expandButton}
+          {closeButton}
         </div>
       </div>
       <RouteMapView pickup={pickup} delivery={delivery} pickupCoords={pickupCoords} deliveryCoords={deliveryCoords} height={height}
@@ -951,9 +987,9 @@ export default function QuoteBuilder() {
   // landed; until then every field renders the same spinner.
   const aiLoading = optimizing || !analysis;
   const aiSpinner = (
-    <svg width="18" height="18" viewBox="0 0 16 16" style={{ animation: "spin 1s linear infinite", marginTop: 10, display: "block" }}>
-      <circle cx="8" cy="8" r="6" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
-    </svg>
+    <div style={{ marginTop: 10 }}>
+      <Loader size={18} />
+    </div>
   );
 
   const curveData = (opt?.curve || []).map((c: any) => {
@@ -1097,8 +1133,16 @@ export default function QuoteBuilder() {
                     <Maximize2 size={12} />
                   </button>
                 </DialogTrigger>
-                <DialogContent style={{ ...cardS, width: "min(1100px, 92vw)", padding: 0 }}>
-                  {renderMapPanel(560)}
+                <DialogContent style={{ ...cardS, width: "min(1400px, 95vw)", padding: 0 }} hideClose>
+                  {renderMapPanel(Math.round(Math.min(window.innerHeight * 0.78, 780)), undefined, (
+                    <DialogClose asChild>
+                      <button type="button" title="Close"
+                        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: 4, cursor: "pointer",
+                          border: "1px solid var(--border-subtle)", background: "var(--bg-surface)", color: "var(--text-secondary)" }}>
+                        <X size={13} />
+                      </button>
+                    </DialogClose>
+                  ))}
                 </DialogContent>
               </Dialog>
             ))}
@@ -1137,7 +1181,7 @@ export default function QuoteBuilder() {
                 <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{routeBlockedMessage}</div>
               </div>
             )}
-            {!billingBlocked && ready && !routeBlockedMessage && calculatingRoute && <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Calculating route…</div>}
+            {!billingBlocked && ready && !routeBlockedMessage && calculatingRoute && <Loader size={20} label="Calculating route…" />}
             {!billingBlocked && ready && !routeBlockedMessage && !calculatingRoute && (<>
               {[
                 { key: "fuel", l: `Fuel — ${fuelConsumption} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },

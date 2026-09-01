@@ -9,6 +9,8 @@ import { ConvertToBookingModal } from '@/components/ConvertToBookingModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
+import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
+import { Loader } from '@/components/Loader';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',
@@ -212,14 +214,7 @@ export default function QuoteDetail() {
   };
 
   if (isLoading) {
-    return (
-      <div style={{ padding: 40 }}>
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ height: 16, background: 'var(--bg-surface)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
-          <div style={{ height: 32, background: 'var(--bg-surface)', borderRadius: 4, width: '40%' }} />
-        </div>
-      </div>
-    );
+    return <Loader fullScreen />;
   }
 
   if (error || !quote) {
@@ -230,6 +225,18 @@ export default function QuoteDetail() {
       </div>
     );
   }
+
+  // The share link/email status persist even outside this mutation's own
+  // session — a quote can land on SENT via the status dropdown or a Kanban
+  // drag, not just this page's "Send to customer" button — so fall back to
+  // deriving them from the quote itself (its token + customer_email) once
+  // it's SENT, instead of only showing them right after clicking the button.
+  const effectiveShareUrl = shareUrl || (quote.status === 'SENT' && quote.token
+    ? `${window.location.origin}/quotes/view/${quote.id}/${quote.token}`
+    : null);
+  const effectiveEmailStatus = emailStatus || (quote.status === 'SENT'
+    ? { sent: !!quote.customer_email, address: quote.customer_email || null }
+    : null);
 
   const inputStyle: React.CSSProperties = {
     background: 'var(--bg-surface)',
@@ -368,16 +375,41 @@ export default function QuoteDetail() {
                 </span>
               )}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 {label('Pickup Location')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.pickup_location || '—'}</div>
               </div>
+
+              {Array.isArray(quote.stops) && quote.stops.map((s: { location: string }, i: number) => (
+                <div key={i} style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16 }}>
+                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 2 }}>
+                    Stop {i + 1}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{s.location}</div>
+                </div>
+              ))}
+
               <div>
                 {label('Delivery Location')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
               </div>
             </div>
+
+            {(quote.pickup_lat || quote.delivery_lat) && (
+              <div style={{ marginTop: 16 }}>
+                <ExpandableRouteMap
+                  pickup={quote.pickup_location}
+                  delivery={quote.delivery_location}
+                  pickupCoords={quote.pickup_lat ? { lat: Number(quote.pickup_lat), lon: Number(quote.pickup_lng) } : undefined}
+                  deliveryCoords={quote.delivery_lat ? { lat: Number(quote.delivery_lat), lon: Number(quote.delivery_lng) } : undefined}
+                  stops={Array.isArray(quote.stops) ? quote.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
+                  geometry={Array.isArray(quote.route_geometry) && quote.route_geometry.length > 1 ? quote.route_geometry.map((p: { lat: number; lon: number }) => [Number(p.lat), Number(p.lon)] as [number, number]) : undefined}
+                  height={220}
+                  dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 4, boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Return Leg — visible only for ROUND_TRIP quotes */}
@@ -606,13 +638,16 @@ export default function QuoteDetail() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                 <div style={{ flex: 1, height: 8, background: 'var(--bg-deep)', borderRadius: 4, overflow: 'hidden' }}>
                   <div style={{
-                    width: `${quote.win_probability * 100}%`,
+                    // quote.win_probability is already stored 0-100 (QuoteBuilder
+                    // converts the model's 0-1 fraction before saving) — do not
+                    // multiply by 100 again here.
+                    width: `${Math.min(Number(quote.win_probability), 100)}%`,
                     height: '100%',
-                    background: quote.win_probability >= 0.7 ? 'var(--status-success)' : quote.win_probability >= 0.4 ? 'var(--status-warning)' : 'var(--status-danger)',
+                    background: quote.win_probability >= 70 ? 'var(--status-success)' : quote.win_probability >= 40 ? 'var(--status-warning)' : 'var(--status-danger)',
                   }} />
                 </div>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {Math.round(quote.win_probability * 100)}%
+                  {Math.round(Number(quote.win_probability))}%
                 </span>
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
@@ -663,7 +698,10 @@ export default function QuoteDetail() {
                 Edit quote
               </button>
 
-              {/* Send to Customer */}
+              {/* Send to Customer — status SENT now sends automatically no
+                  matter how it got there (this button, a status-dropdown
+                  change, or a Kanban drag), so once a quote is already SENT
+                  this becomes an explicit resend rather than the first send. */}
               <button
                 className="btn-action"
                 onClick={() => sendToCustomerMutation.mutate()}
@@ -676,10 +714,12 @@ export default function QuoteDetail() {
                 }}
                 disabled={sendToCustomerMutation.isPending}
               >
-                {sendToCustomerMutation.isPending ? 'Generating…' : 'Send to customer'}
+                {sendToCustomerMutation.isPending
+                  ? (quote.status === 'SENT' ? 'Resending…' : 'Generating…')
+                  : (quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer')}
               </button>
 
-              {shareUrl && (
+              {effectiveShareUrl && (
                 <div style={{
                   padding: '12px 14px',
                   borderRadius: 2,
@@ -696,22 +736,22 @@ export default function QuoteDetail() {
                     marginBottom: 8,
                     fontSize: 10,
                   }}>
-                    {shareUrl}
+                    {effectiveShareUrl}
                   </div>
-                  {emailStatus && (
+                  {effectiveEmailStatus && (
                     <div style={{
-                      color: emailStatus.sent ? 'var(--status-success)' : 'var(--status-warning)',
+                      color: effectiveEmailStatus.sent ? 'var(--status-success)' : 'var(--status-warning)',
                       marginBottom: 8,
                       fontSize: 10,
                     }}>
-                      {emailStatus.sent
-                        ? `✓ Quote emailed to ${emailStatus.address}`
+                      {effectiveEmailStatus.sent
+                        ? `✓ Quote emailed to ${effectiveEmailStatus.address}`
                         : 'Could not email the customer — no email on file. Share the link below instead.'}
                     </div>
                   )}
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(shareUrl);
+                      navigator.clipboard.writeText(effectiveShareUrl);
                       toast.success('Link copied to clipboard');
                     }}
                     style={{
@@ -731,7 +771,7 @@ export default function QuoteDetail() {
                   <a
                     href={buildWhatsAppShareUrl(
                       quote.customer_phone,
-                      `Hi${quote.customer_name ? ` ${quote.customer_name}` : ''}, here's your freight quote${quote.quote_number ? ` (${quote.quote_number})` : ''} from TruckWys: ${shareUrl}`
+                      `Hi${quote.customer_name ? ` ${quote.customer_name}` : ''}, here's your freight quote${quote.quote_number ? ` (${quote.quote_number})` : ''} from TruckWys: ${effectiveShareUrl}`
                     )}
                     target="_blank"
                     rel="noopener noreferrer"

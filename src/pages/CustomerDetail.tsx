@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader } from '@/components/Loader';
 
 const formatZAR = (v: number) =>
   "R " + (v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -76,9 +77,7 @@ export default function CustomerDetail() {
     enabled: !!id,
   });
 
-  if (isLoading) return (
-    <div style={{ padding: 40, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 12 }}>Loading…</div>
-  );
+  if (isLoading) return <Loader fullScreen />;
 
   if (!customer) return (
     <div style={{ padding: 40 }}>

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmModal } from "@/components/ConfirmModal";
+import { Loader } from "@/components/Loader";
 
 interface Customer {
   id: number;
@@ -201,7 +202,7 @@ export function CustomersDirectory() {
 
         {/* Table */}
         {loading ? (
-          <div style={{ padding: 40, textAlign: 'center' as const, color: 'var(--text-tertiary)', fontSize: 13 }}>Loading...</div>
+          <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
             <thead>

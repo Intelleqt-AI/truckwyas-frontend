@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { fetchData } from '@/lib/Api';
+import { fetchData, postData } from '@/lib/Api';
 
 interface Suggestion {
   label: string;
@@ -8,6 +8,22 @@ interface Suggestion {
   country?: string;
   country_code?: string;
   cross_border?: boolean;
+  is_recent?: boolean;
+}
+
+// Fire-and-forget: record a picked location into the company's shared
+// history (core/views.py's LocationRecentView) so it surfaces first next
+// time anyone on the team searches or focuses an empty field. Never blocks
+// or fails the actual selection — errors are swallowed on purpose.
+function recordLocationPick(label: string, lat: number, lon: number) {
+  postData({ url: 'api/v1/location/recent/', data: { location_text: label, lat, lon } }).catch(() => {});
+}
+
+// Merge recent-history matches ahead of live geocoding results, deduped by
+// label (case-insensitive) so nothing shows twice.
+function mergeSuggestions(recent: Suggestion[], live: Suggestion[]): Suggestion[] {
+  const seen = new Set(recent.map(s => s.label.toLowerCase()));
+  return [...recent, ...live.filter(s => !seen.has(s.label.toLowerCase()))];
 }
 
 export interface LocationCoords {
@@ -49,14 +65,33 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
   const fetchSuggestions = useCallback((q: string) => {
     if (q.length < 2) { setSuggestions([]); setOpen(false); return; }
     setLoading(true);
-    fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(q)}`)
-      .then((data: Suggestion[]) => {
-        const results = data || [];
+    // Recent-history matches and live geocoding results are independent
+    // sources — fetch both in parallel and merge, so a slow/failed TomTom
+    // call never blocks the (usually much faster) history lookup.
+    Promise.all([
+      fetchData(`api/v1/location/recent/?q=${encodeURIComponent(q)}`).catch(() => []),
+      fetchData(`api/v1/location/suggest/?q=${encodeURIComponent(q)}`).catch(() => []),
+    ])
+      .then(([recent, live]: [Suggestion[], Suggestion[]]) => {
+        const results = mergeSuggestions(recent || [], live || []);
         setSuggestions(results);
         setOpen(results.length > 0);
       })
       .catch(() => setSuggestions([]))
       .finally(() => setLoading(false));
+  }, []);
+
+  // Empty field + focus: show the company's recent/frequent locations —
+  // today's LocationSuggestView never fires for a query this short, so
+  // without this an empty field's focus does nothing.
+  const fetchRecentOnFocus = useCallback(() => {
+    fetchData('api/v1/location/recent/')
+      .then((data: Suggestion[]) => {
+        const results = data || [];
+        setSuggestions(results);
+        setOpen(results.length > 0);
+      })
+      .catch(() => {});
   }, []);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,6 +102,7 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
 
   const handleSelect = (s: Suggestion) => {
     onChange(s.label, { lat: s.lat, lon: s.lon, country_code: s.country_code });
+    recordLocationPick(s.label, s.lat, s.lon);
     setSuggestions([]);
     setOpen(false);
   };
@@ -168,7 +204,11 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
         placeholder={placeholder}
         value={value}
         onChange={handleSearchChange}
-        onFocus={() => { suggestions.length > 0 && setOpen(true); onFocus?.(); }}
+        onFocus={() => {
+          if (suggestions.length > 0) setOpen(true);
+          else if (!value) fetchRecentOnFocus();
+          onFocus?.();
+        }}
         style={style}
         autoComplete="off"
       />
@@ -206,7 +246,8 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
-              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {s.is_recent && <span title="Used before" style={{ flexShrink: 0, opacity: 0.6 }}>🕘</span>}
                 {s.label}
               </span>
               {s.cross_border && (

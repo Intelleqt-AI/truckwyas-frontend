@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData } from "@/lib/Api";
 
 import { formatCurrency } from "@/lib/formatters";
+import { Loader } from "@/components/Loader";
 
 const MC_URL =
   "https://getstarted.merchantcapital.co.za?actiontype=C_C&channel=Part_Trad&who=IA_SP";
@@ -205,7 +206,7 @@ export default function InvoiceDetail() {
     }
   };
 
-  if (isLoading) return <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading...</div>;
+  if (isLoading) return <Loader fullScreen />;
   if (isError || !invoice) return <div style={{ padding: 40 }}><div style={{ color: 'var(--text-tertiary)' }}>Invoice not found.</div><button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/finance/invoices')}>← Back</button></div>;
 
   return (

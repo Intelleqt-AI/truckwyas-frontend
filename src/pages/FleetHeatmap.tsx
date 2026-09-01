@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
+import { Loader } from '@/components/Loader';
 
 // 7-day heatmap — Mon → Sun
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -162,7 +163,7 @@ export default function FleetHeatmap() {
           </div>
 
           {isLoading ? (
-            <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>LOADING...</div>
+            <div style={{ padding: '40px 0', display: 'flex', justifyContent: 'center' }}><Loader size={28} /></div>
           ) : (
             <div>
               {/* Hour labels */}

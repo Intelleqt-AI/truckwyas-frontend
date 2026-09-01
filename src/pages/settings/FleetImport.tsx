@@ -6,6 +6,7 @@ import useFetch from "@/hooks/useFetch";
 import { usePost } from "@/hooks/usePost";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Loader } from "@/components/Loader";
 import {
   Upload,
   FileSpreadsheet,
@@ -389,7 +390,7 @@ export default function FleetImport() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-sm text-muted-foreground">Loading history...</div>
+            <div className="flex justify-center py-6"><Loader size={20} /></div>
           ) : importHistory && importHistory.length > 0 ? (
             <div className="space-y-3">
               {importHistory.map((item) => (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchData, postData, deleteData, patchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
+import { Loader } from "@/components/Loader";
 
 const cardStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -32,6 +33,14 @@ interface CartrackStatus {
   base_url?: string;
   connected_at?: string;
   last_status_sync?: string;
+}
+
+interface CtrlFleetStatus {
+  configured: boolean;
+  connected: boolean;
+  connected_at?: string;
+  last_vehicle_sync?: string;
+  matched_vehicles?: number;
 }
 
 interface APIKey {
@@ -71,6 +80,20 @@ export function IntegrationsSettings() {
   const [cartrackBaseUrl, setCartrackBaseUrl] = useState('');
   const [connectingCartrack, setConnectingCartrack] = useState(false);
 
+  // CtrlFleet state
+  const [ctrlfleetStatus, setCtrlfleetStatus] = useState<CtrlFleetStatus | null>(null);
+  const [loadingCtrlfleet, setLoadingCtrlfleet] = useState(true);
+  const [showCtrlfleetForm, setShowCtrlfleetForm] = useState(false);
+  const [ctrlfleetApiKey, setCtrlfleetApiKey] = useState('');
+  const [connectingCtrlfleet, setConnectingCtrlfleet] = useState(false);
+  const [disconnectingCtrlfleet, setDisconnectingCtrlfleet] = useState(false);
+  const [showCtrlfleetVehicles, setShowCtrlfleetVehicles] = useState(false);
+  const [loadingCtrlfleetVehicles, setLoadingCtrlfleetVehicles] = useState(false);
+  const [ctrlfleetVehicles, setCtrlfleetVehicles] = useState<any[]>([]);
+  const [truckwysVehicles, setTruckwysVehicles] = useState<any[]>([]);
+  const [linkSelections, setLinkSelections] = useState<Record<string, string>>({});
+  const [linkingCode, setLinkingCode] = useState<string | null>(null);
+
   // API Keys state
   const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
   const [loadingKeys, setLoadingKeys] = useState(true);
@@ -88,6 +111,7 @@ export function IntegrationsSettings() {
   useEffect(() => {
     loadXeroStatus();
     loadCartrackStatus();
+    loadCtrlfleetStatus();
     loadAPIKeys();
     loadWebhooks();
   }, []);
@@ -127,6 +151,109 @@ export function IntegrationsSettings() {
       toast.error(err?.message || 'Could not connect to Cartrack — check your credentials and base URL');
     } finally {
       setConnectingCartrack(false);
+    }
+  };
+
+  const loadCtrlfleetStatus = () => {
+    fetchData('api/v1/integrations/ctrlfleet/status/')
+      .then((data) => setCtrlfleetStatus(data))
+      .catch(() => setCtrlfleetStatus({ configured: false, connected: false }))
+      .finally(() => setLoadingCtrlfleet(false));
+  };
+
+  const handleCtrlfleetConnect = async () => {
+    if (!ctrlfleetApiKey.trim()) {
+      toast.error('Please enter your CtrlFleet API key');
+      return;
+    }
+    setConnectingCtrlfleet(true);
+    try {
+      const result: any = await postData({
+        url: 'api/v1/integrations/ctrlfleet/connect/',
+        data: { api_key: ctrlfleetApiKey.trim() },
+      });
+      const matched = result?.sync?.matched ?? 0;
+      const total = result?.sync?.total ?? 0;
+      toast.success(`CtrlFleet connected — matched ${matched} of ${total} vehicles by plate`);
+      setCtrlfleetApiKey('');
+      setShowCtrlfleetForm(false);
+      loadCtrlfleetStatus();
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not connect to CtrlFleet — check your API key');
+    } finally {
+      setConnectingCtrlfleet(false);
+    }
+  };
+
+  const handleCtrlfleetDisconnect = async () => {
+    setDisconnectingCtrlfleet(true);
+    try {
+      await postData({ url: 'api/v1/integrations/ctrlfleet/disconnect/', data: {} });
+      toast.success('CtrlFleet disconnected');
+      loadCtrlfleetStatus();
+      setShowCtrlfleetVehicles(false);
+      setCtrlfleetVehicles([]);
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not disconnect CtrlFleet');
+    } finally {
+      setDisconnectingCtrlfleet(false);
+    }
+  };
+
+  const loadCtrlfleetVehicles = async () => {
+    setLoadingCtrlfleetVehicles(true);
+    try {
+      const data: any = await fetchData('api/v1/integrations/ctrlfleet/vehicles/');
+      setCtrlfleetVehicles(data?.ctrlfleet_vehicles || []);
+      setTruckwysVehicles(data?.truckwys_vehicles || []);
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not load CtrlFleet vehicles');
+    } finally {
+      setLoadingCtrlfleetVehicles(false);
+    }
+  };
+
+  const handleToggleCtrlfleetVehicles = () => {
+    const next = !showCtrlfleetVehicles;
+    setShowCtrlfleetVehicles(next);
+    if (next) {
+      loadCtrlfleetVehicles();
+    }
+  };
+
+  const handleLinkVehicle = async (vehicleCode: string) => {
+    const vehicleId = linkSelections[vehicleCode];
+    if (!vehicleId) {
+      toast.error('Select a vehicle to link first');
+      return;
+    }
+    setLinkingCode(vehicleCode);
+    try {
+      await postData({
+        url: 'api/v1/integrations/ctrlfleet/link-vehicle/',
+        data: { vehicle_id: Number(vehicleId), ctrlfleet_vehicle_code: vehicleCode },
+      });
+      toast.success('Vehicle linked');
+      loadCtrlfleetVehicles();
+      loadCtrlfleetStatus();
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not link vehicle');
+    } finally {
+      setLinkingCode(null);
+    }
+  };
+
+  const handleUnlinkVehicle = async (vehicleId: number) => {
+    try {
+      await postData({
+        url: 'api/v1/integrations/ctrlfleet/link-vehicle/',
+        data: { vehicle_id: vehicleId, ctrlfleet_vehicle_code: null },
+      });
+      toast.success('Vehicle unlinked');
+      loadCtrlfleetVehicles();
+      loadCtrlfleetStatus();
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not unlink vehicle');
     }
   };
 
@@ -297,9 +424,9 @@ export function IntegrationsSettings() {
             width: 48, height: 48, borderRadius: 4,
             background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)',
+            overflow: 'hidden',
           }}>
-            XR
+            <img src="/Xero_logo.jpg" alt="Xero" style={{ width: 48, height: 48, objectFit: 'contain' }} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
@@ -316,7 +443,7 @@ export function IntegrationsSettings() {
         </div>
 
         {loadingXero ? (
-          <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12 }} />
+          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><Loader size={20} /></div>
         ) : xeroStatus?.connected ? (
           <>
             <div style={{
@@ -360,9 +487,9 @@ export function IntegrationsSettings() {
             width: 48, height: 48, borderRadius: 4,
             background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)',
+            overflow: 'hidden',
           }}>
-            CT
+            <img src="/cartract-logo.png" alt="Cartrack" style={{ width: 48, height: 48, objectFit: 'contain' }} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
@@ -379,7 +506,7 @@ export function IntegrationsSettings() {
         </div>
 
         {loadingCartrack ? (
-          <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12 }} />
+          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><Loader size={20} /></div>
         ) : cartrackStatus?.connected ? (
           <div style={{
             padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
@@ -451,60 +578,222 @@ export function IntegrationsSettings() {
         )}
       </div>
 
-      {/* ControlFleet Card */}
+      {/* CtrlFleet Card */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{
             width: 48, height: 48, borderRadius: 4,
             background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)',
+            overflow: 'hidden',
           }}>
-            CF
+            <img src="/cntrfleet-logo.png" alt="CtrlFleet" style={{ width: 48, height: 48, objectFit: 'contain' }} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
-              ControlFleet
+              CtrlFleet
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-              Fleet management and telematics integration
+              Live vehicle location and points of interest
             </div>
           </div>
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 9, padding: '3px 8px',
-            background: 'var(--bg-surface-hover)', color: 'var(--status-warning)',
-            borderRadius: 2, textTransform: 'uppercase' as const, letterSpacing: '0.08em',
-          }}>
-            In Development
-          </span>
-        </div>
-        <div style={{
-          padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-          borderRadius: 4, marginBottom: 12,
-        }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6 }}>
-            WEBHOOK URL
-          </div>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '8px 12px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            borderRadius: 2, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-primary)',
-          }}>
-            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {import.meta.env.VITE_API_URL}/api/v1/fleet/webhooks/controlfleet/
-            </span>
-            <button
-              onClick={() => copyToClipboard(`${import.meta.env.VITE_API_URL}/api/v1/fleet/webhooks/controlfleet/`)}
-              style={{
-                background: 'none', border: '1px solid var(--border-subtle)',
-                color: 'var(--text-tertiary)', padding: '4px 8px',
-                fontFamily: 'var(--font-mono)', fontSize: 9, borderRadius: 2, cursor: 'pointer',
-              }}
-            >
-              COPY
-            </button>
-          </div>
+            width: 8, height: 8, borderRadius: '50%',
+            background: ctrlfleetStatus?.connected ? 'var(--status-success)' : 'var(--status-danger)',
+          }} />
         </div>
+
+        {loadingCtrlfleet ? (
+          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><Loader size={20} /></div>
+        ) : ctrlfleetStatus?.connected ? (
+          <>
+            <div style={{
+              padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
+              borderRadius: 4, marginBottom: 12, fontSize: 12, color: 'var(--text-secondary)',
+            }}>
+              <strong style={{ color: 'var(--text-primary)' }}>Connected</strong>
+              {typeof ctrlfleetStatus.matched_vehicles === 'number' && (
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
+                  {ctrlfleetStatus.matched_vehicles} vehicle{ctrlfleetStatus.matched_vehicles === 1 ? '' : 's'} matched by licence plate
+                </div>
+              )}
+              {ctrlfleetStatus.last_vehicle_sync && (
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                  Last vehicle sync: {new Date(ctrlfleetStatus.last_vehicle_sync).toLocaleString()}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={async () => {
+                  try {
+                    const result: any = await postData({ url: 'api/v1/integrations/ctrlfleet/sync-vehicles/', data: {} });
+                    toast.success(`Matched ${result?.sync?.matched ?? 0} of ${result?.sync?.total ?? 0} vehicles`);
+                    loadCtrlfleetStatus();
+                    if (showCtrlfleetVehicles) loadCtrlfleetVehicles();
+                  } catch (err: any) {
+                    toast.error(err?.message || 'Sync failed');
+                  }
+                }}
+                className="btn-action"
+                style={{ fontSize: 10 }}
+              >
+                RE-SYNC VEHICLES
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const result: any = await postData({ url: 'api/v1/integrations/ctrlfleet/sync-positions/', data: {} });
+                    toast.success(`Updated position for ${result?.sync?.updated ?? 0} of ${result?.sync?.checked ?? 0} linked vehicles`);
+                  } catch (err: any) {
+                    toast.error(err?.message || 'Position sync failed');
+                  }
+                }}
+                style={{
+                  background: 'none', border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)', padding: '6px 12px',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                }}
+              >
+                SYNC POSITIONS
+              </button>
+              <button
+                onClick={handleToggleCtrlfleetVehicles}
+                style={{
+                  background: 'none', border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)', padding: '6px 12px',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                }}
+              >
+                {showCtrlfleetVehicles ? 'HIDE VEHICLES' : 'VIEW VEHICLES'}
+              </button>
+              <button
+                onClick={handleCtrlfleetDisconnect}
+                disabled={disconnectingCtrlfleet}
+                style={{
+                  background: 'none', border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)', padding: '6px 12px',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                }}
+              >
+                {disconnectingCtrlfleet ? 'DISCONNECTING...' : 'DISCONNECT'}
+              </button>
+            </div>
+
+            {showCtrlfleetVehicles && (
+              <div style={{
+                marginTop: 12, border: '1px solid var(--border-subtle)', borderRadius: 4,
+                maxHeight: 320, overflowY: 'auto',
+              }}>
+                {loadingCtrlfleetVehicles ? (
+                  <div style={{ padding: 12, display: 'flex', justifyContent: 'center' }}><Loader size={18} /></div>
+                ) : ctrlfleetVehicles.length === 0 ? (
+                  <div style={{ padding: 12, fontSize: 11, color: 'var(--text-tertiary)' }}>No vehicles returned by CtrlFleet.</div>
+                ) : (
+                  ctrlfleetVehicles.map((cf, idx) => {
+                    const unlinkedOptions = truckwysVehicles.filter((v) => !v.ctrlfleet_vehicle_code);
+                    return (
+                      <div key={cf.vehicle_code || idx} style={{
+                        padding: '10px 12px', borderTop: idx === 0 ? 'none' : '1px solid var(--border-subtle)',
+                        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                      }}>
+                        <div style={{ flex: '1 1 160px', minWidth: 140 }}>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>
+                            {cf.licence_number || '(no plate)'}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                            {cf.vehicle_code}{cf.type ? ` · ${cf.type}` : ''}
+                          </div>
+                        </div>
+                        {cf.matched_vehicle_id ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{
+                              fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--status-success)',
+                            }}>
+                              LINKED → {cf.matched_vehicle_plate}
+                            </span>
+                            <button
+                              onClick={() => handleUnlinkVehicle(cf.matched_vehicle_id)}
+                              style={{
+                                background: 'none', border: '1px solid var(--border-subtle)',
+                                color: 'var(--text-tertiary)', padding: '3px 8px',
+                                fontFamily: 'var(--font-mono)', fontSize: 9, borderRadius: 2, cursor: 'pointer',
+                              }}
+                            >
+                              UNLINK
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <select
+                              value={linkSelections[cf.vehicle_code] || ''}
+                              onChange={(e) => setLinkSelections({ ...linkSelections, [cf.vehicle_code]: e.target.value })}
+                              style={{
+                                padding: '4px 8px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                                borderRadius: 2, color: 'var(--text-primary)', fontSize: 11, outline: 'none',
+                              }}
+                            >
+                              <option value="">Link to vehicle...</option>
+                              {unlinkedOptions.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {v.plate} {v.make ? `— ${v.make} ${v.model}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => handleLinkVehicle(cf.vehicle_code)}
+                              disabled={linkingCode === cf.vehicle_code}
+                              className="btn-action"
+                              style={{ fontSize: 9, padding: '4px 10px' }}
+                            >
+                              {linkingCode === cf.vehicle_code ? '...' : 'LINK'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </>
+        ) : showCtrlfleetForm ? (
+          <div style={{
+            padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4,
+          }}>
+            <input
+              value={ctrlfleetApiKey}
+              onChange={(e) => setCtrlfleetApiKey(e.target.value)}
+              type="password"
+              placeholder="CtrlFleet API key"
+              style={{
+                width: '100%', marginBottom: 8, padding: '8px 12px',
+                background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                borderRadius: 2, color: 'var(--text-primary)', fontSize: 12,
+                fontFamily: 'var(--font-mono)', outline: 'none',
+              }}
+            />
+            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 12 }}>
+              Get your API key from your CtrlFleet account. Connecting matches your vehicles to CtrlFleet's by licence plate.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={handleCtrlfleetConnect} disabled={connectingCtrlfleet} className="btn-action" style={{ fontSize: 10 }}>
+                {connectingCtrlfleet ? 'CONNECTING...' : 'CONNECT'}
+              </button>
+              <button onClick={() => setShowCtrlfleetForm(false)} style={{
+                background: 'none', border: '1px solid var(--border-subtle)',
+                color: 'var(--text-secondary)', padding: '6px 12px',
+                fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+              }}>
+                CANCEL
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setShowCtrlfleetForm(true)} className="btn-action">
+            CONNECT CTRLFLEET
+          </button>
+        )}
       </div>
 
       {/* Partner API Keys Card */}
@@ -547,7 +836,7 @@ export function IntegrationsSettings() {
         )}
 
         {loadingKeys ? (
-          <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4 }} />
+          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : apiKeys.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)' }}>
             No API keys yet. Generate one to enable programmatic access.
@@ -643,7 +932,7 @@ export function IntegrationsSettings() {
         )}
 
         {loadingWebhooks ? (
-          <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4 }} />
+          <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader size={20} /></div>
         ) : webhooks.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)' }}>
             No webhooks configured. Add one to receive real-time event notifications.

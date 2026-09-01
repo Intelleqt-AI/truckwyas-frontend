@@ -14,6 +14,7 @@
   --bg-deep: #060709;
   --bg-surface: #101215;
   --bg-surface-hover: #181B20;
+  --bg-panel: rgba(255, 255, 255, 0.035);
   --bg-sidebar: rgba(16, 18, 21, 0.5);
   --modal-backdrop: rgba(0, 0, 0, 0.6);
 
@@ -140,6 +141,7 @@
   --bg-deep: #F3F4F6;
   --bg-surface: #FFFFFF;
   --bg-surface-hover: #F9FAFB;
+  --bg-panel: rgba(0, 0, 0, 0.025);
   --bg-sidebar: #FFFFFF;
   --modal-backdrop: rgba(0, 0, 0, 0.5);
 
@@ -278,6 +280,39 @@ body {
   filter: blur(80px);
   pointer-events: none;
   z-index: 0;
+}
+
+/* ===========================
+   LOADER (reusable spinning brand mark)
+   =========================== */
+
+@keyframes tw-loader-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ===========================
+   THIN SCROLLBAR (kanban columns)
+   Native scrollbars (~15-17px on Windows) eat a big chunk of a narrow
+   kanban column and read as a dead gap next to the cards — slim it down.
+   =========================== */
+
+.kanban-col-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-active) transparent;
+}
+
+.kanban-col-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.kanban-col-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kanban-col-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-active);
+  border-radius: 3px;
 }
 
 /* ===========================

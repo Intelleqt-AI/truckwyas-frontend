@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
+import { Loader } from "@/components/Loader";
 
 const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] as const;
 
@@ -51,9 +52,7 @@ export default function DriverProfile() {
     enabled: !!driverId,
   });
 
-  if (isLoading) return (
-    <div style={{ padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>Loading…</div>
-  );
+  if (isLoading) return <Loader fullScreen />;
   if (!driver) return (
     <div style={{ padding: 40 }}>
       <div style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Driver not found.</div>

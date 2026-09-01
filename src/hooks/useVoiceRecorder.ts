@@ -10,8 +10,19 @@ const MIN_RECORDING_BYTES = 1000; // guards against a tap-and-release with ~noth
  * the clip to the Whisper-backed transcription endpoint and hands the text
  * back via onTranscribed — the caller runs it through the same extraction
  * path as typed text, so voice and text fill the form identically.
+ * `detectedLanguage` is simply whichever code was requested (see `language`
+ * below) — the endpoint no longer guesses the spoken language at all, after
+ * repeated real-world cases of English speech being confidently
+ * transliterated into the wrong script with no way to detect that reliably.
+ * `language`, when set, is sent as the ISO 639-1 code Whisper should assume
+ * (e.g. "af") — the caller only sets this from an explicit user choice (a
+ * language picker), never inferred; omitted/undefined defaults to English
+ * server-side.
  */
-export function useVoiceRecorder(onTranscribed: (text: string) => void) {
+export function useVoiceRecorder(
+  onTranscribed: (text: string, detectedLanguage: string | null) => void,
+  language?: string,
+) {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [levels, setLevels] = useState<number[]>(() => new Array(BAR_COUNT).fill(4));
@@ -23,6 +34,8 @@ export function useVoiceRecorder(onTranscribed: (text: string) => void) {
   const rafRef = useRef<number | null>(null);
   const onTranscribedRef = useRef(onTranscribed);
   useEffect(() => { onTranscribedRef.current = onTranscribed; }, [onTranscribed]);
+  const languageRef = useRef(language);
+  useEffect(() => { languageRef.current = language; }, [language]);
 
   // Stops tracks/analyser without touching React state — safe to call from
   // the unmount cleanup, where calling setState would warn.
@@ -46,9 +59,10 @@ export function useVoiceRecorder(onTranscribed: (text: string) => void) {
     try {
       const form = new FormData();
       form.append("audio", blob, "recording.webm");
+      if (languageRef.current) form.append("language", languageRef.current);
       const res = await postData({ url: "api/v1/ai/voice-quote/", data: form });
       if (res?.success && res.text?.trim()) {
-        onTranscribedRef.current(res.text.trim());
+        onTranscribedRef.current(res.text.trim(), res.detected_language ?? null);
       } else {
         toast.error(res?.error || "Couldn't transcribe that — try again");
       }

@@ -11,6 +11,8 @@ interface VehicleType {
   capacity?: string | number;
   max_distance?: string | number;
   base_rate?: string | number;
+  fuel_consumption_l_per_100km?: string | number;
+  fuel_consumption_sensitivity_pct?: string | number;
   fuel_type?: string;
   active: boolean;
 }
@@ -42,14 +44,14 @@ export function VehicleTypesDirectory() {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addErr, setAddErr] = useState('');
-  const [form, setForm] = useState({ name: '', description: '', capacity: '', base_rate: '', fuel_type: 'Diesel', active: 'true' });
+  const [form, setForm] = useState({ name: '', description: '', capacity: '', base_rate: '', fuel_consumption_l_per_100km: '', fuel_consumption_sensitivity_pct: '2.0', fuel_type: 'Diesel', active: 'true' });
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [editType, setEditType] = useState<VehicleType | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', description: '', capacity: '', base_rate: '', fuel_type: 'Diesel', active: 'true' });
+  const [editForm, setEditForm] = useState({ name: '', description: '', capacity: '', base_rate: '', fuel_consumption_l_per_100km: '', fuel_consumption_sensitivity_pct: '2.0', fuel_type: 'Diesel', active: 'true' });
   const [editSaving, setEditSaving] = useState(false);
   const [editErr, setEditErr] = useState('');
 
@@ -104,10 +106,12 @@ export function VehicleTypesDirectory() {
         description: form.description.trim(),
         capacity: form.capacity ? Number(form.capacity) : 0,
         base_rate: form.base_rate ? Number(form.base_rate) : 0,
+        fuel_consumption_l_per_100km: form.fuel_consumption_l_per_100km ? Number(form.fuel_consumption_l_per_100km) : 36,
+        fuel_consumption_sensitivity_pct: form.fuel_consumption_sensitivity_pct ? Number(form.fuel_consumption_sensitivity_pct) : 2,
         fuel_type: form.fuel_type,
         active: form.active === 'true',
       }});
-      setForm({ name: '', description: '', capacity: '', base_rate: '', fuel_type: 'Diesel', active: 'true' });
+      setForm({ name: '', description: '', capacity: '', base_rate: '', fuel_consumption_l_per_100km: '', fuel_consumption_sensitivity_pct: '2.0', fuel_type: 'Diesel', active: 'true' });
       setShowAdd(false);
       load();
     } catch (e: any) {
@@ -124,6 +128,8 @@ export function VehicleTypesDirectory() {
       description: t.description || '',
       capacity: t.capacity != null ? String(t.capacity) : '',
       base_rate: t.base_rate != null ? String(t.base_rate) : '',
+      fuel_consumption_l_per_100km: t.fuel_consumption_l_per_100km != null ? String(t.fuel_consumption_l_per_100km) : '',
+      fuel_consumption_sensitivity_pct: t.fuel_consumption_sensitivity_pct != null ? String(t.fuel_consumption_sensitivity_pct) : '2.0',
       fuel_type: t.fuel_type || 'Diesel',
       active: t.active ? 'true' : 'false',
     });
@@ -141,6 +147,8 @@ export function VehicleTypesDirectory() {
         description: editForm.description.trim(),
         capacity: editForm.capacity ? Number(editForm.capacity) : 0,
         base_rate: editForm.base_rate ? Number(editForm.base_rate) : 0,
+        fuel_consumption_l_per_100km: editForm.fuel_consumption_l_per_100km ? Number(editForm.fuel_consumption_l_per_100km) : 36,
+        fuel_consumption_sensitivity_pct: editForm.fuel_consumption_sensitivity_pct ? Number(editForm.fuel_consumption_sensitivity_pct) : 2,
         fuel_type: editForm.fuel_type,
         active: editForm.active === 'true',
       }});
@@ -317,6 +325,8 @@ export function VehicleTypesDirectory() {
               { key: 'description', label: 'Description', type: 'text', required: false },
               { key: 'capacity', label: 'Capacity (ton)', type: 'number', required: false },
               { key: 'base_rate', label: 'Base Rate (R/km)', type: 'number', required: false },
+              { key: 'fuel_consumption_l_per_100km', label: 'Fuel Consumption (L/100km)', type: 'number', required: false },
+              { key: 'fuel_consumption_sensitivity_pct', label: 'Fuel Sensitivity (%/ton over capacity)', type: 'number', required: false },
             ] as const).map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>
@@ -387,6 +397,8 @@ export function VehicleTypesDirectory() {
               { key: 'description', label: 'Description', type: 'text' },
               { key: 'capacity', label: 'Capacity (ton)', type: 'number' },
               { key: 'base_rate', label: 'Base Rate (R/km)', type: 'number' },
+              { key: 'fuel_consumption_l_per_100km', label: 'Fuel Consumption (L/100km)', type: 'number' },
+              { key: 'fuel_consumption_sensitivity_pct', label: 'Fuel Sensitivity (%/ton over capacity)', type: 'number' },
             ] as const).map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>{f.label}</label>

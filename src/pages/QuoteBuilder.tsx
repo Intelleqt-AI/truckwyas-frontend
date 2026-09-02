@@ -366,11 +366,22 @@ export default function QuoteBuilder() {
   const crossBorderCost = ((routeData?.additional_costs?.border_fees || 0) + (routeData?.additional_costs?.weighbridge_fees || 0) + (routeData?.additional_costs?.non_sa_tolls || 0)) * legs;
   const driverAllowance = Number(driverAllowanceInput) || 0;
   const weightKg = (Number(weight) || 0) * 1000;
-  const surchargeThreshold = Number(companyProfile?.weight_surcharge_threshold_kg) || 5000;
-  const surchargePct = Number(companyProfile?.weight_surcharge_pct) || 15;
-  const weightSurcharge = weightKg > surchargeThreshold ? Math.round((chargeDistance * Number(baseRatePerKm)) * (surchargePct / 100)) : 0;
+  // A load can't legally exceed the selected vehicle's rated capacity by more
+  // than the Road Traffic Act's 5% tolerance — past that it's an offence, and
+  // well past it it's not a chargeable "surcharge", it's a different kind of
+  // job (abnormal-load permits, escorts, route approval). No legitimate price
+  // bump exists below capacity, so this blocks the quote instead of pricing it.
+  const OVERLOAD_TOLERANCE = 1.05; // Road Traffic Act legal tolerance
+  const vehicleCapacityTons = Number(selectedVT?.capacity) || 0;
+  const weightBlockedMessage = (() => {
+    if (!vehicleCapacityTons || Number(weight) <= vehicleCapacityTons) return null;
+    if (Number(weight) <= vehicleCapacityTons * OVERLOAD_TOLERANCE) {
+      return `${weight}t exceeds the ${vehicleType}'s rated capacity of ${vehicleCapacityTons}t. Even within the legal 5% tolerance this is an overload — pick a larger vehicle or reduce the weight.`;
+    }
+    return `${weight}t is well beyond the ${vehicleType}'s ${vehicleCapacityTons}t capacity. This needs an abnormal-load permit (route approval, possibly escorts) and can't be priced through a standard quote.`;
+  })();
   const baseCost = Math.round(chargeDistance * Number(baseRatePerKm));
-  const total = baseCost + fuelCost + tollCost + crossBorderCost + driverAllowance + weightSurcharge + serviceCharge;
+  const total = baseCost + fuelCost + tollCost + crossBorderCost + driverAllowance + serviceCharge;
   // Every real cost component the carrier must recover — base rate included.
   // Excluding base rate here (as an earlier version did) let the AI optimiser
   // treat it as pure profit already banked, so it could recommend a price
@@ -689,9 +700,9 @@ export default function QuoteBuilder() {
   // Same class of bug as the coordinates above, different field: base_rate,
   // fuel_surcharge, toll_charges, driver_allowance, additional_charges and
   // total_amount are all DecimalField(max_digits=10, decimal_places=2) —
-  // summing floats (weightSurcharge + crossBorderCost + serviceCharge, etc.)
-  // can leave a trailing artifact like 2269.0000000000002, which fails
-  // "no more than 10 digits" before Django ever gets to round it to 2dp.
+  // summing floats (crossBorderCost + serviceCharge, etc.) can leave a
+  // trailing artifact like 2269.0000000000002, which fails "no more than
+  // 10 digits" before Django ever gets to round it to 2dp.
   const round2 = (n: number) => Math.round(n * 100) / 100;
 
   // ---- build the save payload (matches production) ----
@@ -703,7 +714,7 @@ export default function QuoteBuilder() {
     cargo_description: cargo || `${weight || 0}t ${vehicleType}`.trim(), weight: weightKg, distance,
     estimated_duration_minutes: route?.duration_min ? Math.round(route.duration_min) : (routeData?.duration_minutes || null),
     vehicle_type: vehicleType, base_rate: round2(baseCost), fuel_surcharge: round2(fuelCost), toll_charges: round2(tollCost),
-    driver_allowance: round2(driverAllowance), additional_charges: round2(weightSurcharge + crossBorderCost + serviceCharge),
+    driver_allowance: round2(driverAllowance), additional_charges: round2(crossBorderCost + serviceCharge),
     total_amount: round2(total), margin_percentage: marginPct, notes, status, confidence: "MEDIUM",
     sla_hours: Number(companyProfile?.default_sla_hours) || 48, valid_until: validUntil, trip_type: tripType,
     win_probability: opt?.win_probability_at_optimal != null ? Math.round(opt.win_probability_at_optimal * 100) : null,
@@ -799,6 +810,7 @@ export default function QuoteBuilder() {
     if (!customerId) { toast.error("Pick a client first"); return; }
     if (!ready) { toast.error("Add vehicle type, collection, delivery and weight"); return; }
     if (routeBlockedMessage) { toast.error(routeBlockedMessage); return; }
+    if (weightBlockedMessage) { toast.error(weightBlockedMessage); return; }
     setSaving(true);
     try {
       let quoteId = savedQuoteId || (isEditing ? Number(editId) : null);
@@ -1103,7 +1115,9 @@ export default function QuoteBuilder() {
           <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Vehicle type<Req /></span><span onClick={() => navigate("/fleet/vehicles")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span></div>
           <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS}>
             <option value="">Select…</option>
-            {vehicleTypes.map((v: any) => <option key={v.id || v.name} value={v.name}>{v.name}</option>)}
+            {vehicleTypes.map((v: any) => (
+              <option key={v.id || v.name} value={v.name}>{v.name}{Number(v.capacity) > 0 ? ` (${v.capacity}t)` : ""}</option>
+            ))}
           </select>
         </div>
         <div>
@@ -1206,14 +1220,19 @@ export default function QuoteBuilder() {
                 <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{routeBlockedMessage}</div>
               </div>
             )}
-            {!billingBlocked && ready && !routeBlockedMessage && calculatingRoute && <Loader size={20} label="Calculating route…" />}
-            {!billingBlocked && ready && !routeBlockedMessage && !calculatingRoute && (<>
+            {!billingBlocked && ready && !routeBlockedMessage && weightBlockedMessage && (
+              <div style={{ padding: "20px 4px" }}>
+                <div style={{ fontSize: 13, color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Overloaded for this vehicle</div>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{weightBlockedMessage}</div>
+              </div>
+            )}
+            {!billingBlocked && ready && !routeBlockedMessage && !weightBlockedMessage && calculatingRoute && <Loader size={20} label="Calculating route…" />}
+            {!billingBlocked && ready && !routeBlockedMessage && !weightBlockedMessage && !calculatingRoute && (<>
               {[
                 { key: "fuel", l: `Fuel — ${fuelConsumption.toFixed(1)} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
                 ...(crossBorderCost > 0 ? [{ key: "cb", l: "Cross-border / weighbridge", v: crossBorderCost, c: "#2BB6A6" }] : []),
                 { key: "driver", l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },
-                ...(weightSurcharge > 0 ? [{ key: "surcharge", l: `Weight surcharge (${surchargePct}%)`, v: weightSurcharge, c: "var(--text-tertiary)" }] : []),
                 { key: "base", l: `Base rate (${vehicleType || "—"} · R${baseRatePerKm}/km)`, v: baseCost, c: "var(--accent-primary)" },
               ].map((r, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border-row)", fontSize: 13 }}>
@@ -1305,7 +1324,7 @@ export default function QuoteBuilder() {
       </div>
 
       {/* 3 — AI quote */}
-      {!billingBlocked && ready && !routeBlockedMessage && total > 0 && (
+      {!billingBlocked && ready && !routeBlockedMessage && !weightBlockedMessage && total > 0 && (
         <div style={{ ...cardS, border: "1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-subtle))", marginBottom: 14 }}>
           {/* still learning — shown first, above the price block, while under the outcome threshold */}
           {aiLearning && (

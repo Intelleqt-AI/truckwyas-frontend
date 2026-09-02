@@ -15,7 +15,11 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      // z-[10000]: some pages (e.g. the public customer share link) wrap
+      // their whole content in a position:fixed, z-9999 shell to escape the
+      // app root's overflow:hidden — a dialog at the default z-50 would
+      // render behind that and just silently not be visible.
+      "fixed inset-0 z-[10000] bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
@@ -29,17 +33,19 @@ const DialogContent = React.forwardRef<
 >(({ className, style, children, hideClose, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
+    {/* Split in two: the outer Content element only does fixed, viewport-
+        centered positioning via a plain inline transform (guaranteed to
+        apply — this dialog previously relied on Tailwind's translate-x/y
+        utilities for centering and they silently didn't take effect in this
+        build). The zoom/fade animation classes live on the INNER wrapper
+        instead of here, driven off the outer's data-state via Tailwind's
+        group-data variant — that keeps the animation's own transform
+        (scale) from ever fighting the outer's centering transform, so the
+        dialog scales from its own center instead of jumping to a corner. */}
     <DialogPrimitive.Content
       ref={ref}
-      className={cn(
-        "z-50 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        className
-      )}
+      className={cn("group fixed z-[10000] outline-none", className)}
       style={{
-        // Centering done inline (not via Tailwind's translate-x-[-50%] utility)
-        // so it can't be thrown off by a transformed ancestor establishing a
-        // different containing block for `position: fixed`, and capped to the
-        // viewport so a tall modal never renders partly off-screen.
         position: "fixed",
         top: "50%",
         left: "50%",
@@ -47,17 +53,21 @@ const DialogContent = React.forwardRef<
         maxHeight: "90vh",
         maxWidth: "95vw",
         overflow: "auto",
-        ...style,
       }}
       {...props}
     >
-      {children}
-      {!hideClose && (
-        <DialogPrimitive.Close className="absolute right-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none">
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      )}
+      <div
+        style={{ position: "relative", ...style }}
+        className="origin-center group-data-[state=open]:animate-in group-data-[state=closed]:animate-out group-data-[state=closed]:fade-out-0 group-data-[state=open]:fade-in-0 group-data-[state=closed]:zoom-out-95 group-data-[state=open]:zoom-in-95"
+      >
+        {children}
+        {!hideClose && (
+          <DialogPrimitive.Close className="absolute right-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        )}
+      </div>
     </DialogPrimitive.Content>
   </DialogPortal>
 ))

@@ -97,7 +97,7 @@ function numberedIcon(L: LeafletModule, n: number) {
 interface PointCoords { lat: number; lon: number; }
 interface ClickedPoint extends PointCoords { label: string; }
 
-interface RouteMapViewProps {
+export interface RouteMapViewProps {
   pickup: string;
   delivery: string;
   /** Precise coords already known for each end (from search selection or a prior map click). Preferred over re-geocoding the text. */

@@ -24,3 +24,5 @@ npm run build               # production bundle
 ```
 
 The app expects the TruckWys backend (Django) running and reachable at `VITE_API_URL`.
+
+<!-- dummy change: verifying push pipeline -->

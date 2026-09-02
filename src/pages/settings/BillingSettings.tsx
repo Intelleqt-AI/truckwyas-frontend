@@ -33,6 +33,21 @@ interface FlatPlan {
   take_rate_pct: string;
 }
 
+interface FailedBillingItem {
+  kind: 'subscription' | 'delivery_fee';
+  label: string;
+  amount: string;
+  failed_at: string;
+}
+
+interface UpdateCardTotal {
+  total: string;
+  failed_delivery_fees_total: string;
+  failed_delivery_fees_count: number;
+  subscription_failed: boolean;
+  items: FailedBillingItem[];
+}
+
 interface CardOnFile {
   last4?: string;
   card_type?: string;
@@ -54,6 +69,7 @@ interface BillingStatus {
   amount?: string;
   item_name?: string;
   flat_plan?: FlatPlan | null;
+  update_card?: UpdateCardTotal | null;
   card?: CardOnFile | null;
   grace?: Grace | null;
   suspended?: boolean;
@@ -252,6 +268,54 @@ export function BillingSettings() {
     }
   };
 
+  // Swapping cards has no dedicated "verify-only" flow — Paystack's API has
+  // no zero-charge way to capture a new authorization, so this reuses the
+  // same checkout as a fresh Subscribe. What it actually charges depends on
+  // what's wrong (see amount_owed_for_card_update on the backend): only
+  // failed delivery-fee charges if the subscription itself is fine and
+  // already paid up (does NOT reset the cycle or re-charge it), the flat fee
+  // too if the subscription itself failed, or just the flat fee (starting a
+  // fresh cycle) if nothing at all has failed and this is a proactive swap.
+  // The confirm dialog states whichever of those is actually true — never a
+  // generic "resubscribe" message that would wrongly imply the healthy
+  // subscription is being touched.
+  const handleUpdateCard = () => {
+    const total = billingStatus?.update_card?.total ?? flatPlan?.amount;
+    const feesCount = billingStatus?.update_card?.failed_delivery_fees_count ?? 0;
+    const feesTotal = billingStatus?.update_card?.failed_delivery_fees_total;
+    const subscriptionFailed = !!billingStatus?.update_card?.subscription_failed;
+
+    let title: string;
+    let message: string;
+    let confirmLabel: string;
+
+    if (feesCount > 0 && !subscriptionFailed) {
+      // Subscription is active and already paid for this cycle — only the
+      // failed delivery fee(s) are being charged; the cycle is untouched.
+      title = 'Clear Failed Delivery Fees';
+      message = `This charges ${formatRand(total)} now to whichever card you enter next — covering ${feesCount} previously failed delivery fee charge${feesCount === 1 ? '' : 's'}. Your subscription is already paid up and is not re-charged or reset; the new card just becomes your card on file going forward.`;
+      confirmLabel = 'Charge & update card';
+    } else if (subscriptionFailed) {
+      title = 'Retry Payment With a Different Card';
+      message = feesCount > 0
+        ? `This charges ${formatRand(total)} now to whichever card you enter next — ${formatRand(flatPlan?.amount)} for the failed subscription payment plus ${formatRand(feesTotal)} across ${feesCount} previously failed delivery fee charge${feesCount === 1 ? '' : 's'} — clearing everything in one payment.`
+        : `This charges ${formatRand(total)} now to whichever card you enter next, clearing the failed payment and setting it as your card on file going forward.`;
+      confirmLabel = 'Continue to payment';
+    } else {
+      title = 'Update Payment Method';
+      message = `This charges ${formatRand(total)} now to whichever card you enter next, and starts a new billing cycle from today — it's a full resubscribe, not a free card swap, since your current cycle's charge already happened. It becomes your card on file for every future charge.`;
+      confirmLabel = 'Charge & update card';
+    }
+
+    setConfirmOpts({
+      title, message, confirmLabel,
+      onConfirm: () => {
+        setConfirmOpts(null);
+        handleSubscribe();
+      },
+    });
+  };
+
   const handleCancel = () => {
     setConfirmOpts({
       title: 'Cancel Subscription',
@@ -384,6 +448,16 @@ export function BillingSettings() {
                 )}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
+                {isPaid && (
+                  <button onClick={handleUpdateCard} disabled={subscribing} style={{
+                    background: 'none', border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-secondary)', padding: '7px 14px',
+                    fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                    opacity: subscribing ? 0.6 : 1,
+                  }}>
+                    {subscribing ? 'REDIRECTING...' : 'UPDATE PAYMENT METHOD'}
+                  </button>
+                )}
                 {isPaid && billingStatus?.cancel_at_period_end ? (
                   <button onClick={handleUndoCancel} disabled={cancelling} className="btn-action">
                     {cancelling ? 'RESTORING...' : 'KEEP SUBSCRIPTION'}
@@ -434,6 +508,42 @@ export function BillingSettings() {
                   {grace.days_remaining > 0
                     ? `${grace.days_remaining} day${grace.days_remaining === 1 ? '' : 's'} left to resolve this before your account is suspended.`
                     : 'Grace period has ended — a successful charge is needed to avoid suspension.'}
+                </div>
+              </div>
+            )}
+
+            {(billingStatus?.update_card?.items?.length ?? 0) > 0 && (
+              <div style={{
+                marginBottom: 16, border: '1px solid var(--border-subtle)', borderRadius: 2, overflow: 'hidden',
+              }}>
+                <div style={{
+                  padding: '10px 14px', background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase' as const,
+                  color: 'var(--text-tertiary)',
+                }}>
+                  Failed charges — cleared together when you update payment method
+                </div>
+                {billingStatus!.update_card!.items.map((item, i) => (
+                  <div key={i} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '10px 14px', fontSize: 13,
+                    borderBottom: i < billingStatus!.update_card!.items.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                  }}>
+                    <div>
+                      <div style={{ color: 'var(--text-primary)' }}>{item.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 1 }}>
+                        Failed {new Date(item.failed_at).toLocaleDateString('en-ZA')}
+                      </div>
+                    </div>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--status-warning)' }}>{formatRand(item.amount)}</span>
+                  </div>
+                ))}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '10px 14px', fontSize: 13, fontWeight: 600, background: 'var(--bg-deep)',
+                }}>
+                  <span>Total to clear everything</span>
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{formatRand(billingStatus?.update_card?.total)}</span>
                 </div>
               </div>
             )}

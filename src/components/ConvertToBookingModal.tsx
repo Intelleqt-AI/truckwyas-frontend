@@ -71,8 +71,8 @@ const fieldLabelStyle: React.CSSProperties = {
 // One confirmation modal. The driver/vehicle fields stay collapsed behind a
 // text toggle — most conversions don't need them right this second — and the
 // action button's label reflects whatever's chosen: nothing picked converts
-// and leaves the booking unassigned (pick it up later from Bookings), both
-// picked converts pre-assigned.
+// and leaves the booking unassigned (pick it up later from Bookings); a
+// vehicle picked (driver optional) converts pre-assigned.
 export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfirm, onCancel }: Props) {
   const [showAssign, setShowAssign] = useState(false);
   const [driverId, setDriverId] = useState('');
@@ -99,9 +99,11 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
   const drivers: DriverOption[] = driversData?.results || driversData || [];
   const vehicles: VehicleOption[] = vehiclesData?.results || vehiclesData || [];
 
-  const bothSelected = !!driverId && !!vehicleId;
-  const noneSelected = !driverId && !vehicleId;
-  const canProceed = (bothSelected || noneSelected) && !busy;
+  // Vehicle is required to assign now; driver is optional. A driver without
+  // a vehicle is ambiguous (a driver needs a truck) — same rule the backend
+  // enforces on convert_to_load.
+  const driverWithoutVehicle = !!driverId && !vehicleId;
+  const canProceed = !driverWithoutVehicle && !busy;
 
   return (
     <div style={overlayStyle} onClick={onCancel}>
@@ -122,23 +124,6 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
         ) : (
           <div style={{ marginBottom: 8 }}>
             <div style={{ marginBottom: 14 }}>
-              <div style={fieldLabelStyle}>Driver</div>
-              <select value={driverId} onChange={e => setDriverId(e.target.value)} style={selectStyle}>
-                <option value="">Select driver…</option>
-                {drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.user_details?.name || d.user_details?.username || `Driver #${d.id}`}
-                  </option>
-                ))}
-              </select>
-              {drivers.length === 0 && (
-                <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>
-                  No available drivers — check the Fleet page.
-                </div>
-              )}
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
               <div style={fieldLabelStyle}>Vehicle{vehicleType ? ` (${vehicleType})` : ''}</div>
               <select value={vehicleId} onChange={e => setVehicleId(e.target.value)} style={selectStyle}>
                 <option value="">Select vehicle…</option>
@@ -157,9 +142,26 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
               )}
             </div>
 
-            {!bothSelected && !noneSelected && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={fieldLabelStyle}>Driver (optional)</div>
+              <select value={driverId} onChange={e => setDriverId(e.target.value)} style={selectStyle}>
+                <option value="">Select driver…</option>
+                {drivers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.user_details?.name || d.user_details?.username || `Driver #${d.id}`}
+                  </option>
+                ))}
+              </select>
+              {drivers.length === 0 && (
+                <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>
+                  No available drivers — check the Fleet page.
+                </div>
+              )}
+            </div>
+
+            {driverWithoutVehicle && (
               <div style={{ fontSize: 11, color: 'var(--status-warning)', marginBottom: 12 }}>
-                Select both, or clear both to assign later.
+                A driver needs a vehicle — select a vehicle too, or clear the driver.
               </div>
             )}
           </div>
@@ -184,7 +186,7 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
               opacity: canProceed ? 1 : 0.5,
             }}
           >
-            {busy ? 'CONVERTING…' : bothSelected ? 'ASSIGN & CONFIRM' : 'CONFIRM — ASSIGN LATER'}
+            {busy ? 'CONVERTING…' : vehicleId ? 'ASSIGN & CONFIRM' : 'CONFIRM — ASSIGN LATER'}
           </button>
         </div>
       </div>

@@ -227,7 +227,11 @@ export default function QuoteBuilder() {
   const [pickMode, setPickMode] = useState<string>("pickup");
 
   // ---- pricing overrides ----
-  const [editableTollCost, setEditableTollCost] = useState<number | null>(null);
+  // Raw text, not a number — mirrors driverAllowanceInput below. Binding the
+  // input to a derived number instead means Number('') coerces to 0 the
+  // instant the field is cleared, so the box snaps straight back to showing
+  // "0" and the user can never see it empty while typing.
+  const [editableTollCost, setEditableTollCost] = useState("");
   // True only once the user has actually typed in the Tolls field this session.
   // A quote loaded for editing pre-fills editableTollCost from its last-saved
   // toll_charges so there's no flash of R0 before the route recalculates, but
@@ -270,16 +274,6 @@ export default function QuoteBuilder() {
   // An unsaved localStorage draft found on mount — offered via a banner, never
   // force-loaded (force-loading hijacked every "New quote" with the last one).
   const [resumable, setResumable] = useState<any>(null);
-  // True once THIS session created the DB draft. Lets us bind the URL to the new
-  // quote's id without the edit-loader clobbering in-progress fields, and keeps
-  // autosave running after that URL flip.
-  const createdRef = useRef(false);
-  // The draft's DB id, mirrored in a ref so the debounced autosave closure always
-  // sees the latest value (React state is async — reading it from the closure
-  // caused a POST race that created duplicate drafts). creatingRef locks out a
-  // second POST while the first create is still in flight.
-  const savedIdRef = useRef<number | null>(null);
-  const creatingRef = useRef(false);
 
   // ---- reference data ----
   const { data: companyProfile } = useQuery({ queryKey: ["company-profile"], queryFn: () => fetchData("api/v1/company/profile/") });
@@ -360,7 +354,7 @@ export default function QuoteBuilder() {
   const fuelCost = Math.round(chargeDistance * fuelConsumption * fuelPricePerL / 100);
   const tollRate = Number(companyProfile?.default_toll_rate_per_km) || 0.95;
   const autoToll = Math.round((route?.toll_cost_zar ?? routeData?.toll_cost_zar ?? distance * tollRate) * legs);
-  const tollCost = tollManuallyEdited && editableTollCost !== null ? editableTollCost : autoToll;
+  const tollCost = tollManuallyEdited ? (Number(editableTollCost) || 0) : autoToll;
   const tollBreakdown = route?.toll_breakdown ?? routeData?.toll_breakdown ?? [];
   const tollBreakdownOneWay = tollBreakdown.reduce((s, b) => s + Number(b.tariff), 0);
   const crossBorderCost = ((routeData?.additional_costs?.border_fees || 0) + (routeData?.additional_costs?.weighbridge_fees || 0) + (routeData?.additional_costs?.non_sa_tolls || 0)) * legs;
@@ -581,9 +575,6 @@ export default function QuoteBuilder() {
   // ---- edit mode: load existing quote ----
   useEffect(() => {
     if (!editId) return;
-    // We just created this draft and navigated to its URL — fields are already
-    // in state; don't refetch and overwrite them.
-    if (createdRef.current) return;
     fetchData(`api/v1/quotes/${editId}/`).then((q: any) => {
       setCustomerId(String(q.customer || ""));
       setPickup(q.pickup_location || ""); setDelivery(q.delivery_location || "");
@@ -598,7 +589,7 @@ export default function QuoteBuilder() {
       setVehicleType(q.vehicle_type || ""); setWeight(String((Number(q.weight) || 0) / 1000));
       setCargo(q.cargo_description || ""); setNotes(q.notes || "");
       setDriverAllowanceInput(String(q.driver_allowance || 0));
-      if (q.toll_charges != null) setEditableTollCost(Number(q.toll_charges));
+      if (q.toll_charges != null) setEditableTollCost(String(q.toll_charges));
       if (q.trip_type) setTripType(q.trip_type);
       // base_rate is the round-trip base (chargeDistance × rate); divide by
       // distance × legs to recover the per-km rate the way the live math computes it.
@@ -610,7 +601,6 @@ export default function QuoteBuilder() {
       if (q.pickup_date) setPickupDate(q.pickup_date);
       if (q.delivery_date) setDeliveryDate(q.delivery_date);
       setSavedQuoteId(Number(editId));
-      savedIdRef.current = Number(editId);
       if (q.distance) setRouteData({ distance_km: Number(q.distance), toll_cost_zar: Number(q.toll_charges) });
     }).catch(() => toast.error("Couldn't load that quote"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -645,18 +635,19 @@ export default function QuoteBuilder() {
 
   // Blank the form for a brand-new quote. React Router reuses this component
   // across /edit/:id ↔ /new (only the param changes, no remount), so we reset
-  // every field explicitly rather than relying on a remount. The quote being
-  // left is already saved (DB draft in the quotes list), so nothing is lost.
+  // every field explicitly rather than relying on a remount. Also the "Clear
+  // & New Quote" button's handler on a not-yet-saved quote — an explicit
+  // clear, so dropping the local draft here (like the Resume banner's
+  // Discard) is the intended behavior, not data loss.
   const startNew = () => {
     localStorage.removeItem(DRAFT_KEY);
-    createdRef.current = false; savedIdRef.current = null; creatingRef.current = false;
     setSavedQuoteId(null); setLastSavedAt(null); setResumable(null);
     setCustomerId(""); setVehicleType(""); setPickup(""); setDelivery("");
     setPickupCoords(null); setDeliveryCoords(null);
     setStops([]); setPickMode("pickup"); setStopsExpanded(false);
     setWeight(""); setCargo(""); setNotes(""); setTripType("ONE_WAY");
     setPickupDate(""); setDeliveryDate(""); setNlText("");
-    setEditableTollCost(null); setTollManuallyEdited(false); setDriverAllowanceInput("0"); setServiceCharge(0);
+    setEditableTollCost(""); setTollManuallyEdited(false); setDriverAllowanceInput("0"); setServiceCharge(0);
     setRouteData(null); setSelectedRouteIndex(0); setRouteBlockedMessage(null);
     setAnalysis(null); setGuard(null); setBenchmark(null);
     setChatMessages([]); setChatOpen(false); setPendingEntity(null); setDeclinedEntities([]);
@@ -677,7 +668,10 @@ export default function QuoteBuilder() {
     if (!(customerId || pickup || delivery)) return;
     if (draftRef.current) clearTimeout(draftRef.current);
     const doSave = () => {
-      try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType })); } catch { /* ignore */ }
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ customerId, vehicleType, pickup, delivery, pickupCoords, deliveryCoords, weight, cargo, notes, tripType }));
+        setLastSavedAt(new Date());
+      } catch { /* ignore */ }
     };
     draftFlushRef.current = doSave;
     draftRef.current = setTimeout(() => { draftFlushRef.current = null; doSave(); }, 800);
@@ -733,77 +727,6 @@ export default function QuoteBuilder() {
     // different road path than the one actually priced and shown here.
     route_geometry: (route?.geometry || []).map(p => ({ lat: round6(p.lat), lon: round6(p.lon) })),
   });
-
-  // ---- auto-save DB draft once substantive (debounced) ----
-  const dbRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Same "flush on real unmount" pattern as the localStorage draft above —
-  // without it, filling in the form and immediately navigating away (within
-  // the 1.5s debounce window) cancelled the pending save instead of firing
-  // it, so the quote was never actually written to the database at all.
-  const dbFlushRef = useRef<((isFlush: boolean) => void) | null>(null);
-  // The actual backend minimum for a valid Quote row is just customer +
-  // pickup_location + delivery_location (see core/models/quote.py) — every
-  // other field buildPayload sends already has a safe fallback (cargo
-  // defaults to a "{weight}t {vehicleType}" placeholder, weight/base_rate/
-  // total_amount default to 0). This used to require `ready` (every field,
-  // including vehicle type, resolved coordinates, and a computed non-zero
-  // price) before ever writing anything — so leaving mid-form, before
-  // finishing every field, saved NOTHING to the database; the only safety
-  // net was the easy-to-miss localStorage "Resume" banner, which only
-  // offers to restore if you happen to land back on a blank New Quote page.
-  // Saving as soon as the form is minimally valid means it's already sitting
-  // in the Quotes → Draft list — with a real, bookmarkable edit URL — the
-  // moment there's anything worth not losing.
-  const substantive = !!(customerId && pickup && delivery);
-  useEffect(() => {
-    // Autosave a brand-new quote, or one we created this session (createdRef).
-    // A pre-existing quote opened for editing saves explicitly, not on every keystroke.
-    if (isEditing && !createdRef.current) return;
-    if (!substantive) return;
-    // Billing blocked: POST/PATCH /quotes/ would just 402 anyway (matches
-    // PlanLimitsMiddleware) — don't fire it at all rather than fail silently
-    // in the background on every keystroke.
-    if (billingBlocked) return;
-    if (dbRef.current) clearTimeout(dbRef.current);
-    const doSave = async (isFlush: boolean) => {
-      const existingId = savedIdRef.current ?? savedQuoteId;
-      try {
-        if (existingId) {
-          await patchData({ url: `api/v1/quotes/${existingId}/`, data: buildPayload("DRAFT") });
-        } else {
-          if (creatingRef.current) return;      // a create is already in flight
-          creatingRef.current = true;
-          const res = await postData({ url: "api/v1/quotes/", data: buildPayload("DRAFT") });
-          if (res?.id) {
-            savedIdRef.current = res.id;
-            setSavedQuoteId(res.id);
-            createdRef.current = true;
-            // The DB now owns this draft — drop the local crash-recovery copy and
-            // bind the URL to the new quote so a refresh resumes it (no duplicate).
-            localStorage.removeItem(DRAFT_KEY);
-            setResumable(null);
-            queryClient.invalidateQueries({ queryKey: ["quotes"] });
-            // A flush-on-unmount save means the user is already navigating
-            // somewhere else on their own — redirecting them back to this
-            // quote's edit URL would fight that. Still save, just don't redirect.
-            if (!isFlush) navigate(`/bookings/quotes/${res.id}/edit`, { replace: true });
-          }
-          creatingRef.current = false;
-        }
-        setLastSavedAt(new Date());
-      } catch { creatingRef.current = false; /* silent — localStorage still holds it */ }
-    };
-    dbFlushRef.current = doSave;
-    dbRef.current = setTimeout(() => { dbFlushRef.current = null; doSave(false); }, 1500);
-    return () => { if (dbRef.current) clearTimeout(dbRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [substantive, total, customerId, vehicleType, pickup, delivery, tollCost, driverAllowance, serviceCharge, billingBlocked]);
-
-  // True unmount only (empty deps) — flushes whatever save is still pending
-  // the instant the user actually leaves the page.
-  useEffect(() => {
-    return () => { dbFlushRef.current?.(true); };
-  }, []);
 
   // ---- explicit save / send ----
   const save = async (send: boolean) => {
@@ -1040,11 +963,11 @@ export default function QuoteBuilder() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
         <div>
           <div style={labelS}>Operations</div>
-          <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)", marginTop: 4 }}>{isEditing && !createdRef.current ? "Edit quote" : "New quote"}</div>
+          <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)", marginTop: 4 }}>{isEditing ? "Edit quote" : "New quote"}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ fontSize: 12, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", display: "flex", alignItems: "center", gap: 6 }}>
-            {saving ? "Saving…" : lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Auto-saves as you work"}
+            {saving ? "Saving…" : lastSavedAt ? `Saved to browser ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Auto-saves to this browser as you work"}
             <span style={dot(saving ? "var(--status-warning)" : lastSavedAt ? "var(--status-success)" : "var(--text-tertiary)")} />
           </div>
           <button onClick={startNew} title="Clear every field and start a fresh quote (this one stays saved)"
@@ -1226,7 +1149,11 @@ export default function QuoteBuilder() {
                 <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{weightBlockedMessage}</div>
               </div>
             )}
-            {!billingBlocked && ready && !routeBlockedMessage && !weightBlockedMessage && calculatingRoute && <Loader size={20} label="Calculating route…" />}
+            {!billingBlocked && ready && !routeBlockedMessage && !weightBlockedMessage && calculatingRoute && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 220 }}>
+                <Loader size={44} label="Calculating route…" />
+              </div>
+            )}
             {!billingBlocked && ready && !routeBlockedMessage && !weightBlockedMessage && !calculatingRoute && (<>
               {[
                 { key: "fuel", l: `Fuel — ${fuelConsumption.toFixed(1)} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },
@@ -1315,7 +1242,7 @@ export default function QuoteBuilder() {
               </div>
               <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>{Math.round(distance)} km {legs === 2 ? `one way · ${Math.round(chargeDistance)} km round trip` : "one way"} · live diesel · your {vehicleType} settings{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
               <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Tolls</div><input type="number" value={tollCost} onChange={e => { setEditableTollCost(Number(e.target.value)); setTollManuallyEdited(true); }} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
+                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Tolls</div><input type="number" value={tollManuallyEdited ? editableTollCost : String(tollCost)} onChange={e => { setEditableTollCost(e.target.value); setTollManuallyEdited(true); }} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
                 <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Driver</div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
                 <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>R/km</div><input type="number" value={baseRatePerKm} onChange={e => setBaseRatePerKm(e.target.value)} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
               </div>

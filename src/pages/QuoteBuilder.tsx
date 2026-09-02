@@ -303,7 +303,19 @@ export default function QuoteBuilder() {
   // diesel price, and not always Diesel regardless of what's actually chosen.
   const companyFuelPriceField = (FUEL_PRICE_FIELD_BY_TYPE as Record<string, string>)[selectedVT?.fuel_type || 'Diesel'] || 'fuel_price_per_litre';
   const fuelPricePerL = Number(companyProfile?.[companyFuelPriceField]) || Number(companyProfile?.fuel_price_per_litre) || 21.7;
-  const fuelConsumption = Number(selectedVT?.fuel_consumption_l_per_100km) || FUEL_FALLBACK[vehicleType] || 32;
+  // A heavier load genuinely burns more fuel — consumption_ref (the type's
+  // configured L/100km) is scaled by how far the quote's own weight sits
+  // from the type's reference tonnage (its "capacity"), compounding at
+  // `sensitivity`%/tonne. See plan/fuel-consumption-by-weight.md. Skipped
+  // entirely (falls back to the flat rate, today's behavior) when the type
+  // has no capacity set — guessing a reference tonnage would be worse than
+  // no adjustment at all.
+  const fuelConsumptionRef = Number(selectedVT?.fuel_consumption_l_per_100km) || FUEL_FALLBACK[vehicleType] || 32;
+  const fuelRefCapacityTons = Number(selectedVT?.capacity) || 0;
+  const fuelSensitivity = (Number(selectedVT?.fuel_consumption_sensitivity_pct) || 2) / 100;
+  const fuelConsumption = fuelRefCapacityTons > 0
+    ? fuelConsumptionRef * Math.pow(1 + fuelSensitivity, (Number(weight) || 0) - fuelRefCapacityTons)
+    : fuelConsumptionRef;
 
   // Fallback only, for before any vehicle type is picked — once one is
   // selected, applyVehicleType() below takes over and uses that type's own
@@ -718,7 +730,20 @@ export default function QuoteBuilder() {
   // the 1.5s debounce window) cancelled the pending save instead of firing
   // it, so the quote was never actually written to the database at all.
   const dbFlushRef = useRef<((isFlush: boolean) => void) | null>(null);
-  const substantive = ready && total > 0;
+  // The actual backend minimum for a valid Quote row is just customer +
+  // pickup_location + delivery_location (see core/models/quote.py) — every
+  // other field buildPayload sends already has a safe fallback (cargo
+  // defaults to a "{weight}t {vehicleType}" placeholder, weight/base_rate/
+  // total_amount default to 0). This used to require `ready` (every field,
+  // including vehicle type, resolved coordinates, and a computed non-zero
+  // price) before ever writing anything — so leaving mid-form, before
+  // finishing every field, saved NOTHING to the database; the only safety
+  // net was the easy-to-miss localStorage "Resume" banner, which only
+  // offers to restore if you happen to land back on a blank New Quote page.
+  // Saving as soon as the form is minimally valid means it's already sitting
+  // in the Quotes → Draft list — with a real, bookmarkable edit URL — the
+  // moment there's anything worth not losing.
+  const substantive = !!(customerId && pickup && delivery);
   useEffect(() => {
     // Autosave a brand-new quote, or one we created this session (createdRef).
     // A pre-existing quote opened for editing saves explicitly, not on every keystroke.
@@ -1184,7 +1209,7 @@ export default function QuoteBuilder() {
             {!billingBlocked && ready && !routeBlockedMessage && calculatingRoute && <Loader size={20} label="Calculating route…" />}
             {!billingBlocked && ready && !routeBlockedMessage && !calculatingRoute && (<>
               {[
-                { key: "fuel", l: `Fuel — ${fuelConsumption} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },
+                { key: "fuel", l: `Fuel — ${fuelConsumption.toFixed(1)} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
                 ...(crossBorderCost > 0 ? [{ key: "cb", l: "Cross-border / weighbridge", v: crossBorderCost, c: "#2BB6A6" }] : []),
                 { key: "driver", l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },

@@ -135,8 +135,9 @@ export default function AdminDashboard() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             <div>
-              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>Quota used</div>
-              <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{demoStatus.demo_quota_used} / 1</div>
+              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>Quotes since last reset</div>
+              <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{demoStatus.demo_quota_used}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 2 }}>Each visitor's own session gets 1, independent of this total</div>
             </div>
             <div>
               <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>Last reset</div>

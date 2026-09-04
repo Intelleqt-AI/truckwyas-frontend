@@ -17,10 +17,13 @@ export interface AuthUser {
   // the only signal that a cancellation is scheduled.
   cancel_at_period_end?: boolean;
   // True for the single shared public demo company (see core/models/company.py) —
-  // it caps quote creation at demo_quota_used >= 1 (reset nightly) and blocks
-  // creating new clients/vehicles, both enforced server-side already.
+  // blocks creating new clients/vehicles, enforced server-side already.
   is_demo?: boolean;
-  demo_quota_used?: number;
+  // Per-session (not per-company): every demo visitor logs into the same
+  // shared demo@truckwys.com account, but each login gets its own
+  // UserSession row server-side, so this reflects THIS session's own one
+  // free quote — unaffected by what any other visitor has done.
+  demo_quote_used?: boolean;
   // Django's own superuser flag — a platform operator, unrelated to this
   // user's company-scoped `role` (e.g. 'ADMIN'). Gates the cross-tenant
   // admin dashboard only.

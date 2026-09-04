@@ -171,10 +171,11 @@ export default function QuoteBuilder() {
   // never disagrees with what the backend would actually allow.
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
-  // The single shared public demo company (core/models/company.py) caps quote
-  // creation at one quote, reset nightly — enforced server-side already, this
-  // just avoids the user filling out the whole form before finding out.
-  const isDemoQuotaExceeded = !!(authUser?.is_demo && Number(authUser?.demo_quota_used) >= 1);
+  // Every demo visitor logs into the same shared demo@truckwys.com account,
+  // but each login gets its own session-scoped quote allowance server-side
+  // (core/views.py QuoteViewSet.create) — this just avoids the visitor
+  // filling out the whole form before finding out THEIR session used it.
+  const isDemoQuotaExceeded = !!(authUser?.is_demo && authUser?.demo_quote_used);
 
   // ---- core inputs ----
   const [customerId, setCustomerId] = useState("");
@@ -738,7 +739,7 @@ export default function QuoteBuilder() {
     if (!ready) { toast.error("Add vehicle type, collection, delivery and weight"); return; }
     if (routeBlockedMessage) { toast.error(routeBlockedMessage); return; }
     if (weightBlockedMessage) { toast.error(weightBlockedMessage); return; }
-    if (isDemoQuotaExceeded) { toast.error("This demo allows one quote — it resets daily, come back tomorrow for a fresh one."); return; }
+    if (isDemoQuotaExceeded) { toast.error("You've used this demo session's one free quote. Log out and log back in (or click \"View Demo\" again) to start a fresh session."); return; }
     setSaving(true);
     try {
       let quoteId = savedQuoteId || (isEditing ? Number(editId) : null);
@@ -1145,7 +1146,7 @@ export default function QuoteBuilder() {
             {!billingBlocked && ready && isDemoQuotaExceeded && (
               <div style={{ padding: "20px 4px" }}>
                 <div style={{ fontSize: 13, color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Demo quota reached</div>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>This demo allows one quote — it resets daily, come back tomorrow for a fresh one.</div>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>You've used this demo session's one free quote. Log out and log back in (or click &quot;View Demo&quot; again) to start a fresh session.</div>
               </div>
             )}
             {!billingBlocked && ready && !isDemoQuotaExceeded && routeBlockedMessage && (

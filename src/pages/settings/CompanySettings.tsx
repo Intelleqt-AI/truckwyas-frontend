@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/lib/toast';
+import { useAuth } from '@/lib/AuthContext';
 
 const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 const resolveLogoUrl = (url?: string) => {
@@ -57,6 +58,10 @@ const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 
 const grid3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 };
 
 export function CompanySettings() {
+  const { user: authUser } = useAuth();
+  // Shared public demo account — every control that persists a change (logo
+  // upload, save) is fixed off; viewing/editing fields in memory stays live.
+  const isDemo = !!authUser?.is_demo;
   const [form, setForm] = useState({
     company_name: '', registration_number: '', vat_number: '',
     industry: '', website: '', description: '',
@@ -242,13 +247,15 @@ export function CompanySettings() {
               type="file"
               accept="image/png,image/jpeg,image/gif,image/webp"
               onChange={handleLogoSelect}
+              disabled={isDemo}
               style={{ display: 'none' }}
             />
             <button
               className="btn-action"
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingLogo}
-              style={{ opacity: uploadingLogo ? 0.6 : 1 }}
+              disabled={uploadingLogo || isDemo}
+              title={isDemo ? 'Fixed in demo mode' : undefined}
+              style={{ opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
             >
               {uploadingLogo ? 'UPLOADING...' : logoUrl ? 'REPLACE LOGO' : 'UPLOAD LOGO'}
             </button>
@@ -535,7 +542,13 @@ export function CompanySettings() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="btn-action" onClick={handleSave} disabled={saving} style={{ opacity: saving ? 0.6 : 1 }}>
+        <button
+          className="btn-action"
+          onClick={handleSave}
+          disabled={saving || isDemo}
+          title={isDemo ? 'Fixed in demo mode' : undefined}
+          style={{ opacity: isDemo ? 0.5 : saving ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+        >
           {saved ? 'SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
         </button>
       </div>

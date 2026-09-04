@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { fetchData, patchData } from "@/lib/Api";
 import { enablePush, disablePush, pushSupported, PushStatus } from "@/lib/push";
+import { useAuth } from "@/lib/AuthContext";
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -35,9 +36,10 @@ interface ToggleRowProps {
   checked: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
+  disabledTitle?: string;
 }
 
-function ToggleRow({ label, description, checked, onChange, disabled }: ToggleRowProps) {
+function ToggleRow({ label, description, checked, onChange, disabled, disabledTitle }: ToggleRowProps) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -52,6 +54,7 @@ function ToggleRow({ label, description, checked, onChange, disabled }: ToggleRo
       <button
         onClick={() => !disabled && onChange(!checked)}
         disabled={disabled}
+        title={disabled ? disabledTitle : undefined}
         style={{
           width: 36, height: 20, borderRadius: 10, border: 'none',
           cursor: disabled ? 'not-allowed' : 'pointer',
@@ -89,6 +92,8 @@ function mergeSettings(server: any): Settings {
 }
 
 export function NotificationSettings() {
+  const { user: authUser } = useAuth();
+  const isDemo = !!authUser?.is_demo;
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
   const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -113,6 +118,7 @@ export function NotificationSettings() {
   const anyPushOn = Object.values(settings.push).some(Boolean);
 
   const handleSave = async () => {
+    if (isDemo) return;
     setSaving(true);
     try {
       const result = await patchData({ url: '/api/v1/notifications/settings/', data: settings });
@@ -179,11 +185,11 @@ export function NotificationSettings() {
           <span style={sectionTitleStyle}>Email Notifications</span>
         </div>
         <div style={sectionBodyStyle}>
-          <ToggleRow label="Quote activity" description="New quotes, updates, and expirations" checked={settings.email.quotes} onChange={v => setChannel('email', 'quotes', v)} />
-          <ToggleRow label="Invoice updates" description="When invoices are created or become overdue" checked={settings.email.invoices} onChange={v => setChannel('email', 'invoices', v)} />
-          <ToggleRow label="Payment received" description="Confirmation when payments clear" checked={settings.email.payments} onChange={v => setChannel('email', 'payments', v)} />
-          <ToggleRow label="Fleet alerts" description="Maintenance due and vehicle issues" checked={settings.email.fleet_alerts} onChange={v => setChannel('email', 'fleet_alerts', v)} />
-          <ToggleRow label="Weekly summary" description="Performance digest every Monday" checked={settings.email.weekly_reports} onChange={v => setChannel('email', 'weekly_reports', v)} />
+          <ToggleRow label="Quote activity" description="New quotes, updates, and expirations" checked={settings.email.quotes} onChange={v => setChannel('email', 'quotes', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
+          <ToggleRow label="Invoice updates" description="When invoices are created or become overdue" checked={settings.email.invoices} onChange={v => setChannel('email', 'invoices', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
+          <ToggleRow label="Payment received" description="Confirmation when payments clear" checked={settings.email.payments} onChange={v => setChannel('email', 'payments', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
+          <ToggleRow label="Fleet alerts" description="Maintenance due and vehicle issues" checked={settings.email.fleet_alerts} onChange={v => setChannel('email', 'fleet_alerts', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
+          <ToggleRow label="Weekly summary" description="Performance digest every Monday" checked={settings.email.weekly_reports} onChange={v => setChannel('email', 'weekly_reports', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
         </div>
       </div>
 
@@ -193,10 +199,10 @@ export function NotificationSettings() {
           <span style={sectionTitleStyle}>Push Notifications</span>
         </div>
         <div style={sectionBodyStyle}>
-          <ToggleRow label="New bookings" checked={settings.push.new_bookings} onChange={v => setChannel('push', 'new_bookings', v)} />
-          <ToggleRow label="Payment received" checked={settings.push.payment_received} onChange={v => setChannel('push', 'payment_received', v)} />
-          <ToggleRow label="Maintenance due" checked={settings.push.maintenance_due} onChange={v => setChannel('push', 'maintenance_due', v)} />
-          <ToggleRow label="Driver status updates" checked={settings.push.driver_updates} onChange={v => setChannel('push', 'driver_updates', v)} />
+          <ToggleRow label="New bookings" checked={settings.push.new_bookings} onChange={v => setChannel('push', 'new_bookings', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
+          <ToggleRow label="Payment received" checked={settings.push.payment_received} onChange={v => setChannel('push', 'payment_received', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
+          <ToggleRow label="Maintenance due" checked={settings.push.maintenance_due} onChange={v => setChannel('push', 'maintenance_due', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
+          <ToggleRow label="Driver status updates" checked={settings.push.driver_updates} onChange={v => setChannel('push', 'driver_updates', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           {pushHint && (
             <div style={{ padding: '10px 20px', fontSize: 11, color: 'var(--text-tertiary)' }}>{pushHint}</div>
           )}
@@ -220,7 +226,13 @@ export function NotificationSettings() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="btn-action" onClick={handleSave} disabled={saving} style={{ opacity: saving ? 0.6 : 1 }}>
+        <button
+          className="btn-action"
+          onClick={handleSave}
+          disabled={saving || isDemo}
+          title={isDemo ? 'Fixed in demo mode' : undefined}
+          style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+        >
           {saved ? 'SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
         </button>
       </div>

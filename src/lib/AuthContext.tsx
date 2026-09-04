@@ -16,6 +16,15 @@ export interface AuthUser {
   // 'active'/'grace_period' until the paid period actually ends, so this is
   // the only signal that a cancellation is scheduled.
   cancel_at_period_end?: boolean;
+  // True for the single shared public demo company (see core/models/company.py) —
+  // it caps quote creation at demo_quota_used >= 1 (reset nightly) and blocks
+  // creating new clients/vehicles, both enforced server-side already.
+  is_demo?: boolean;
+  demo_quota_used?: number;
+  // Django's own superuser flag — a platform operator, unrelated to this
+  // user's company-scoped `role` (e.g. 'ADMIN'). Gates the cross-tenant
+  // admin dashboard only.
+  is_superuser?: boolean;
   [key: string]: any;
 }
 

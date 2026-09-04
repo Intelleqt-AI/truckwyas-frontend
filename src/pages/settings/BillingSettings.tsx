@@ -154,7 +154,10 @@ function NextPaymentCountdown({ nextBillingAt, mode = 'charge' }: { nextBillingA
 
 export function BillingSettings() {
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
+  const { user: authUser, refreshUser } = useAuth();
+  // Shared public demo account — subscribe/cancel/update-payment controls are
+  // fixed off (backend already 403s these); viewing plan/history stays live.
+  const isDemo = !!authUser?.is_demo;
   const [searchParams, setSearchParams] = useSearchParams();
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [billingHistory, setBillingHistory] = useState<BillingTransaction[]>([]);
@@ -449,31 +452,55 @@ export function BillingSettings() {
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 {isPaid && (
-                  <button onClick={handleUpdateCard} disabled={subscribing} style={{
-                    background: 'none', border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)', padding: '7px 14px',
-                    fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                    opacity: subscribing ? 0.6 : 1,
-                  }}>
+                  <button
+                    onClick={handleUpdateCard}
+                    disabled={subscribing || isDemo}
+                    title={isDemo ? 'Fixed in demo mode' : undefined}
+                    style={{
+                      background: 'none', border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-secondary)', padding: '7px 14px',
+                      fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                      cursor: isDemo ? 'not-allowed' : 'pointer',
+                      opacity: isDemo ? 0.5 : subscribing ? 0.6 : 1,
+                    }}
+                  >
                     {subscribing ? 'REDIRECTING...' : 'UPDATE PAYMENT METHOD'}
                   </button>
                 )}
                 {isPaid && billingStatus?.cancel_at_period_end ? (
-                  <button onClick={handleUndoCancel} disabled={cancelling} className="btn-action">
+                  <button
+                    onClick={handleUndoCancel}
+                    disabled={cancelling || isDemo}
+                    title={isDemo ? 'Fixed in demo mode' : undefined}
+                    className="btn-action"
+                    style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                  >
                     {cancelling ? 'RESTORING...' : 'KEEP SUBSCRIPTION'}
                   </button>
                 ) : isPaid ? (
-                  <button onClick={handleCancel} disabled={cancelling} style={{
-                    background: 'none', border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)', padding: '7px 14px',
-                    fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                    opacity: cancelling ? 0.6 : 1,
-                  }}>
+                  <button
+                    onClick={handleCancel}
+                    disabled={cancelling || isDemo}
+                    title={isDemo ? 'Fixed in demo mode' : undefined}
+                    style={{
+                      background: 'none', border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-secondary)', padding: '7px 14px',
+                      fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                      cursor: isDemo ? 'not-allowed' : 'pointer',
+                      opacity: isDemo ? 0.5 : cancelling ? 0.6 : 1,
+                    }}
+                  >
                     {cancelling ? 'CANCELLING...' : 'CANCEL PLAN'}
                   </button>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                    <button onClick={handleSubscribe} disabled={subscribing} className="btn-action">
+                    <button
+                      onClick={handleSubscribe}
+                      disabled={subscribing || isDemo}
+                      title={isDemo ? 'Fixed in demo mode' : undefined}
+                      className="btn-action"
+                      style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                    >
                       {subscribing ? 'REDIRECTING...' : isSuspended ? `REACTIVATE — ${formatRand(subscribeAmount)}/MO` : `SUBSCRIBE — ${formatRand(subscribeAmount)}/MO`}
                     </button>
                     <span style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' as const }}>

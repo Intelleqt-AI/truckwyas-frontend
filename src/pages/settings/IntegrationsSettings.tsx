@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { fetchData, postData, deleteData, patchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { Loader } from "@/components/Loader";
+import { useAuth } from "@/lib/AuthContext";
 
 const cardStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -65,6 +66,12 @@ const EVENT_OPTIONS = [
 ];
 
 export function IntegrationsSettings() {
+  const { user: authUser } = useAuth();
+  // Shared public demo account — every control that connects/disconnects an
+  // integration, syncs data, links vehicles, or creates/revokes keys and
+  // webhooks is fixed off; viewing status stays fully live.
+  const isDemo = !!authUser?.is_demo;
+
   // Xero state
   const [xeroStatus, setXeroStatus] = useState<XeroStatus | null>(null);
   const [loadingXero, setLoadingXero] = useState(true);
@@ -458,23 +465,46 @@ export function IntegrationsSettings() {
               )}
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button onClick={handleSyncInvoices} disabled={syncingInvoices} className="btn-action" style={{ fontSize: 10 }}>
+              <button
+                onClick={handleSyncInvoices}
+                disabled={syncingInvoices || isDemo}
+                title={isDemo ? 'Not available in the demo' : undefined}
+                className="btn-action"
+                style={{ fontSize: 10 }}
+              >
                 {syncingInvoices ? 'SYNCING...' : 'SYNC INVOICES'}
               </button>
-              <button onClick={handleSyncPayments} disabled={syncingPayments} className="btn-action" style={{ fontSize: 10 }}>
+              <button
+                onClick={handleSyncPayments}
+                disabled={syncingPayments || isDemo}
+                title={isDemo ? 'Not available in the demo' : undefined}
+                className="btn-action"
+                style={{ fontSize: 10 }}
+              >
                 {syncingPayments ? 'SYNCING...' : 'SYNC PAYMENTS'}
               </button>
-              <button onClick={handleXeroDisconnect} style={{
-                background: 'none', border: '1px solid var(--border-subtle)',
-                color: 'var(--text-tertiary)', padding: '6px 12px',
-                fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-              }}>
+              <button
+                onClick={handleXeroDisconnect}
+                disabled={isDemo}
+                title={isDemo ? 'Not available in the demo' : undefined}
+                style={{
+                  background: 'none', border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-tertiary)', padding: '6px 12px',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                  cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
+                }}>
                 DISCONNECT
               </button>
             </div>
           </>
         ) : (
-          <button onClick={handleXeroConnect} className="btn-action">
+          <button
+            onClick={handleXeroConnect}
+            disabled={isDemo}
+            title={isDemo ? 'Not available in the demo' : undefined}
+            className="btn-action"
+            style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+          >
             CONNECT XERO
           </button>
         )}
@@ -559,7 +589,13 @@ export function IntegrationsSettings() {
               Region-specific — get your base URL and credentials from Fleetweb &gt; Settings &gt; API Settings.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleCartrackConnect} disabled={connectingCartrack} className="btn-action" style={{ fontSize: 10 }}>
+              <button
+                onClick={handleCartrackConnect}
+                disabled={connectingCartrack || isDemo}
+                title={isDemo ? 'Not available in the demo' : undefined}
+                className="btn-action"
+                style={{ fontSize: 10 }}
+              >
                 {connectingCartrack ? 'CONNECTING...' : 'CONNECT'}
               </button>
               <button onClick={() => setShowCartrackForm(false)} style={{
@@ -572,7 +608,13 @@ export function IntegrationsSettings() {
             </div>
           </div>
         ) : (
-          <button onClick={() => setShowCartrackForm(true)} className="btn-action">
+          <button
+            onClick={() => setShowCartrackForm(true)}
+            disabled={isDemo}
+            title={isDemo ? 'Not available in the demo' : undefined}
+            className="btn-action"
+            style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+          >
             CONNECT CARTRACK
           </button>
         )}
@@ -635,6 +677,8 @@ export function IntegrationsSettings() {
                     toast.error(err?.message || 'Sync failed');
                   }
                 }}
+                disabled={isDemo}
+                title={isDemo ? 'Not available in the demo' : undefined}
                 className="btn-action"
                 style={{ fontSize: 10 }}
               >
@@ -649,10 +693,13 @@ export function IntegrationsSettings() {
                     toast.error(err?.message || 'Position sync failed');
                   }
                 }}
+                disabled={isDemo}
+                title={isDemo ? 'Not available in the demo' : undefined}
                 style={{
                   background: 'none', border: '1px solid var(--border-subtle)',
                   color: 'var(--text-secondary)', padding: '6px 12px',
-                  fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                  cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                 }}
               >
                 SYNC POSITIONS
@@ -669,11 +716,13 @@ export function IntegrationsSettings() {
               </button>
               <button
                 onClick={handleCtrlfleetDisconnect}
-                disabled={disconnectingCtrlfleet}
+                disabled={disconnectingCtrlfleet || isDemo}
+                title={isDemo ? 'Not available in the demo' : undefined}
                 style={{
                   background: 'none', border: '1px solid var(--border-subtle)',
                   color: 'var(--text-secondary)', padding: '6px 12px',
-                  fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                  cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                 }}
               >
                 {disconnectingCtrlfleet ? 'DISCONNECTING...' : 'DISCONNECT'}
@@ -714,10 +763,13 @@ export function IntegrationsSettings() {
                             </span>
                             <button
                               onClick={() => handleUnlinkVehicle(cf.matched_vehicle_id)}
+                              disabled={isDemo}
+                              title={isDemo ? 'Not available in the demo' : undefined}
                               style={{
                                 background: 'none', border: '1px solid var(--border-subtle)',
                                 color: 'var(--text-tertiary)', padding: '3px 8px',
-                                fontFamily: 'var(--font-mono)', fontSize: 9, borderRadius: 2, cursor: 'pointer',
+                                fontFamily: 'var(--font-mono)', fontSize: 9, borderRadius: 2,
+                                cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                               }}
                             >
                               UNLINK
@@ -742,7 +794,8 @@ export function IntegrationsSettings() {
                             </select>
                             <button
                               onClick={() => handleLinkVehicle(cf.vehicle_code)}
-                              disabled={linkingCode === cf.vehicle_code}
+                              disabled={linkingCode === cf.vehicle_code || isDemo}
+                              title={isDemo ? 'Not available in the demo' : undefined}
                               className="btn-action"
                               style={{ fontSize: 9, padding: '4px 10px' }}
                             >
@@ -777,7 +830,13 @@ export function IntegrationsSettings() {
               Get your API key from your CtrlFleet account. Connecting matches your vehicles to CtrlFleet's by licence plate.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleCtrlfleetConnect} disabled={connectingCtrlfleet} className="btn-action" style={{ fontSize: 10 }}>
+              <button
+                onClick={handleCtrlfleetConnect}
+                disabled={connectingCtrlfleet || isDemo}
+                title={isDemo ? 'Not available in the demo' : undefined}
+                className="btn-action"
+                style={{ fontSize: 10 }}
+              >
                 {connectingCtrlfleet ? 'CONNECTING...' : 'CONNECT'}
               </button>
               <button onClick={() => setShowCtrlfleetForm(false)} style={{
@@ -790,7 +849,13 @@ export function IntegrationsSettings() {
             </div>
           </div>
         ) : (
-          <button onClick={() => setShowCtrlfleetForm(true)} className="btn-action">
+          <button
+            onClick={() => setShowCtrlfleetForm(true)}
+            disabled={isDemo}
+            title={isDemo ? 'Not available in the demo' : undefined}
+            className="btn-action"
+            style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+          >
             CONNECT CTRLFLEET
           </button>
         )}
@@ -800,7 +865,13 @@ export function IntegrationsSettings() {
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div style={sectionTitleStyle}>Partner API Keys</div>
-          <button onClick={() => setShowAddKey(!showAddKey)} className="btn-action" style={{ fontSize: 9, padding: '4px 10px' }}>
+          <button
+            onClick={() => setShowAddKey(!showAddKey)}
+            disabled={isDemo}
+            title={isDemo ? 'Not available in the demo' : undefined}
+            className="btn-action"
+            style={{ fontSize: 9, padding: '4px 10px', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+          >
             + NEW KEY
           </button>
         </div>
@@ -821,7 +892,13 @@ export function IntegrationsSettings() {
               }}
             />
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleGenerateKey} className="btn-action" style={{ fontSize: 10 }}>
+              <button
+                onClick={handleGenerateKey}
+                disabled={isDemo}
+                title={isDemo ? 'Not available in the demo' : undefined}
+                className="btn-action"
+                style={{ fontSize: 10 }}
+              >
                 GENERATE
               </button>
               <button onClick={() => setShowAddKey(false)} style={{
@@ -857,11 +934,16 @@ export function IntegrationsSettings() {
                     {key.last_used && ` • Last used ${new Date(key.last_used).toLocaleDateString()}`}
                   </div>
                 </div>
-                <button onClick={() => handleRevokeKey(key.id)} style={{
-                  background: 'none', border: '1px solid var(--status-danger)',
-                  color: 'var(--status-danger)', padding: '4px 10px',
-                  fontFamily: 'var(--font-mono)', fontSize: 9, borderRadius: 2, cursor: 'pointer',
-                }}>
+                <button
+                  onClick={() => handleRevokeKey(key.id)}
+                  disabled={isDemo}
+                  title={isDemo ? 'Not available in the demo' : undefined}
+                  style={{
+                    background: 'none', border: '1px solid var(--status-danger)',
+                    color: 'var(--status-danger)', padding: '4px 10px',
+                    fontFamily: 'var(--font-mono)', fontSize: 9, borderRadius: 2,
+                    cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
+                  }}>
                   REVOKE
                 </button>
               </div>
@@ -874,7 +956,13 @@ export function IntegrationsSettings() {
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div style={sectionTitleStyle}>Webhooks</div>
-          <button onClick={() => setShowAddWebhook(!showAddWebhook)} className="btn-action" style={{ fontSize: 9, padding: '4px 10px' }}>
+          <button
+            onClick={() => setShowAddWebhook(!showAddWebhook)}
+            disabled={isDemo}
+            title={isDemo ? 'Not available in the demo' : undefined}
+            className="btn-action"
+            style={{ fontSize: 9, padding: '4px 10px', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+          >
             + ADD WEBHOOK
           </button>
         </div>
@@ -917,7 +1005,13 @@ export function IntegrationsSettings() {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleAddWebhook} className="btn-action" style={{ fontSize: 10 }}>
+              <button
+                onClick={handleAddWebhook}
+                disabled={isDemo}
+                title={isDemo ? 'Not available in the demo' : undefined}
+                className="btn-action"
+                style={{ fontSize: 10 }}
+              >
                 CREATE
               </button>
               <button onClick={() => setShowAddWebhook(false)} style={{
@@ -959,18 +1053,28 @@ export function IntegrationsSettings() {
                     ))}
                   </div>
                 </div>
-                <button onClick={() => handleTestWebhook(webhook.id)} style={{
-                  background: 'none', border: '1px solid var(--accent-primary)',
-                  color: 'var(--accent-primary)', padding: '4px 10px',
-                  fontFamily: 'var(--font-mono)', fontSize: 9, borderRadius: 2, cursor: 'pointer',
-                }}>
+                <button
+                  onClick={() => handleTestWebhook(webhook.id)}
+                  disabled={isDemo}
+                  title={isDemo ? 'Not available in the demo' : undefined}
+                  style={{
+                    background: 'none', border: '1px solid var(--accent-primary)',
+                    color: 'var(--accent-primary)', padding: '4px 10px',
+                    fontFamily: 'var(--font-mono)', fontSize: 9, borderRadius: 2,
+                    cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
+                  }}>
                   TEST
                 </button>
-                <button onClick={() => handleDeleteWebhook(webhook.id)} style={{
-                  background: 'none', border: '1px solid var(--status-danger)',
-                  color: 'var(--status-danger)', padding: '4px 10px',
-                  fontFamily: 'var(--font-mono)', fontSize: 9, borderRadius: 2, cursor: 'pointer',
-                }}>
+                <button
+                  onClick={() => handleDeleteWebhook(webhook.id)}
+                  disabled={isDemo}
+                  title={isDemo ? 'Not available in the demo' : undefined}
+                  style={{
+                    background: 'none', border: '1px solid var(--status-danger)',
+                    color: 'var(--status-danger)', padding: '4px 10px',
+                    fontFamily: 'var(--font-mono)', fontSize: 9, borderRadius: 2,
+                    cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
+                  }}>
                   DELETE
                 </button>
               </div>

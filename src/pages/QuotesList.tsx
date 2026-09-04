@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
 import { LiveBadge } from "@/components/LiveBadge";
+import { Loader } from "@/components/Loader";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { ConvertToBookingModal } from "@/components/ConvertToBookingModal";
@@ -191,6 +192,55 @@ function DroppableColumn({ columnId, items, children, isOver }: { columnId: stri
   );
 }
 
+const QUOTE_PAGE_SIZE = 10;
+
+interface QuotePage {
+  results: any[];
+  count: number;
+  next: string | null;
+  total_amount?: string | number;
+}
+
+// One pipeline column's data, fetched independently from the backend —
+// 10 at a time, with more pages pulled in on "Load more" rather than every
+// quote in the column being fetched up front. `status: null` fetches every
+// status (used by the List view's "All" tab). Every board column AND the
+// List view's per-status tabs share the exact same query (and thus cache)
+// keyed by status+search — switching between Board/List, or between List's
+// status tabs, doesn't lose "load more" progress or refetch redundantly.
+function useQuoteColumn(status: string | null, search: string, enabled: boolean = true) {
+  return useInfiniteQuery<QuotePage>({
+    queryKey: ['quotes-column', status, search],
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams();
+      if (status) params.set('status', status);
+      params.set('page', String(pageParam));
+      params.set('page_size', String(QUOTE_PAGE_SIZE));
+      if (search) params.set('search', search);
+      return fetchData(`api/v1/quotes/?${params.toString()}`);
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => (lastPage?.next ? allPages.length + 1 : undefined),
+    enabled,
+    retry: 1,
+  });
+}
+
+// Flattens an infinite query's pages into one items array, plus the
+// backend-computed count/total_amount (identical on every page, so the
+// first page's value is all that's needed) and load-more state.
+function flattenColumn(q: ReturnType<typeof useQuoteColumn>) {
+  return {
+    items: q.data?.pages.flatMap(p => p.results) ?? [],
+    count: q.data?.pages[0]?.count ?? 0,
+    totalAmount: Number(q.data?.pages[0]?.total_amount ?? 0),
+    hasNextPage: !!q.hasNextPage,
+    isLoading: q.isLoading,
+    isFetchingNextPage: q.isFetchingNextPage,
+    fetchNextPage: q.fetchNextPage,
+  };
+}
+
 interface QuotesListProps {
   embedded?: boolean;
   // Search + view are owned by the parent (Bookings tab nav) when embedded,
@@ -223,6 +273,15 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   const [confirmOpts, setConfirmOpts] = useState<{ title: string; message: string; confirmLabel?: string; onConfirm: () => void } | null>(null);
   const [pendingConvertQuote, setPendingConvertQuote] = useState<any>(null);
 
+  // Search is sent to the backend (it searches across every quote, not just
+  // whatever's already loaded on screen) — debounced so typing doesn't fire
+  // a request per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -236,15 +295,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     queryFn: () => fetchData('api/v1/loads/'),
     retry: 1,
   });
-
-  const { data: quotesData } = useQuery({
-    queryKey: ['quotes'],
-    queryFn: () => fetchData('api/v1/quotes/'),
-    retry: 1,
-  });
-
   const loads: any[] = loadsData?.results || loadsData || [];
-  const quotes: any[] = quotesData?.results || quotesData || [];
 
   // A quote converts to at most one load (convert_to_load blocks a second
   // conversion) — map quote id -> its load so the "Convert to booking"
@@ -254,12 +305,32 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     if (l.quote != null) loadByQuoteId.set(String(l.quote), l);
   });
 
-  // Live update: refetch when backend pushes any quote event over WebSocket
+  // Each pipeline column is its own backend-paginated query (10 at a time,
+  // "load more" — see useQuoteColumn) rather than one big "fetch every
+  // quote" request sliced into columns client-side, which silently dropped
+  // anything past the endpoint's default page size. These four run
+  // unconditionally (not just in board view) since the List view's per-
+  // status tabs reuse the exact same cached data. The 5th ("All") only runs
+  // when actually needed — List view, "All" tab.
+  const draftQ = useQuoteColumn('DRAFT', debouncedSearch);
+  const sentQ = useQuoteColumn('SENT', debouncedSearch);
+  const acceptedQ = useQuoteColumn('ACCEPTED', debouncedSearch);
+  const declinedQ = useQuoteColumn('DECLINED', debouncedSearch);
+  const allQ = useQuoteColumn(null, debouncedSearch, view === 'list' && statusFilter === 'ALL');
+  const columnQueries = useMemo(
+    () => ({ DRAFT: draftQ, SENT: sentQ, ACCEPTED: acceptedQ, DECLINED: declinedQ }),
+    [draftQ, sentQ, acceptedQ, declinedQ]
+  );
+  const totalQuotesCount = COLUMNS.reduce((sum, col) => sum + flattenColumn(columnQueries[col]).count, 0);
+
+  // Live update: refetch every column when the backend pushes any quote
+  // event over WebSocket — prefix match invalidates all of them (and the
+  // "All" list query) regardless of their search term.
   useEffect(() => {
     const handler = (e: Event) => {
       const { detail } = (e as CustomEvent);
       if (typeof detail?.event === 'string' && detail.event.startsWith('quote.')) {
-        queryClient.invalidateQueries({ queryKey: ['quotes'] });
+        queryClient.invalidateQueries({ queryKey: ['quotes-column'] });
       }
     };
     window.addEventListener('tw:live-event', handler);
@@ -269,26 +340,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       patchData({ url: `api/v1/quotes/${id}/`, data: { status } }),
-    // Optimistic: move the card in the cache immediately on drop, instead of
-    // waiting for the PATCH round-trip — otherwise the card snaps back to its
-    // old column the instant you let go, then jumps to the new one only once
-    // the network response arrives (very visible on a slow connection).
-    onMutate: async ({ id, status }) => {
-      await queryClient.cancelQueries({ queryKey: ['quotes'] });
-      const previous = queryClient.getQueryData(['quotes']);
-      queryClient.setQueryData(['quotes'], (old: any) => {
-        const list: any[] = old?.results || old || [];
-        const updated = list.map(q => String(q.id) === id ? { ...q, status } : q);
-        return old?.results ? { ...old, results: updated } : updated;
-      });
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(['quotes'], context.previous);
-      toast.error('Failed to update quote status — reverted.');
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+    onError: () => {
+      toast.error('Failed to update quote status.');
     },
   });
 
@@ -302,7 +355,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       // Invalidate both keys — QuotesList uses 'loads', LoadsList uses 'loads-list'
       queryClient.invalidateQueries({ queryKey: ['loads'] });
       queryClient.invalidateQueries({ queryKey: ['loads-list'] });
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['quotes-column'] });
       setPendingConvertQuote(null);
       toast.success(`Quote ${quote.quote_number} converted to load`);
     },
@@ -316,51 +369,17 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     setPendingConvertQuote(quote);
   };
 
-  const filteredLoads = loads.filter(l =>
-    !search ||
-    l.load_number?.toLowerCase().includes(search.toLowerCase()) ||
-    l.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
-    l.pickup_location?.toLowerCase().includes(search.toLowerCase()) ||
-    l.delivery_location?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const filteredQuotes = quotes.filter(q => {
-    const matchesSearch = !search ||
-      q.quote_number?.toLowerCase().includes(search.toLowerCase()) ||
-      q.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
-      q.pickup_location?.toLowerCase().includes(search.toLowerCase()) ||
-      q.delivery_location?.toLowerCase().includes(search.toLowerCase());
-
-    const matchesStatus = statusFilter === 'ALL' || q.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  const quotesByStatus = COLUMNS.reduce((acc, col) => {
-    acc[col] = filteredQuotes.filter(q => q.status === col);
-    return acc;
-  }, {} as Record<string, any[]>);
-
-  filteredQuotes.forEach(q => {
-    if (COLUMNS.includes(q.status)) return;
-    // Pre-existing quotes still carrying a legacy IT/COMPLETED status were
-    // already accepted and converted — show them with the other won quotes
-    // rather than lumping them in with brand-new drafts.
-    if (q.status === 'IT' || q.status === 'COMPLETED') {
-      quotesByStatus['ACCEPTED'].push(q);
-    } else {
-      quotesByStatus['DRAFT'].push(q);
-    }
-  });
-
   // Once a column is full (scrolled, no empty space below the last card),
   // the only place to drop is on top of another card — dnd-kit then reports
   // `over` as that card's id (each card is a sortable drop target too), not
-  // the column id. Map every card back to the column it's rendered in so a
-  // drop on a card resolves to that card's column, not just a bare column id.
+  // the column id. Map every LOADED card back to the column it's rendered
+  // in (the Accepted column's own query already folds legacy IT/COMPLETED
+  // quotes in server-side — see QuoteFilterSet on the backend — so this
+  // naturally maps those to 'ACCEPTED' too) so a drop on a card resolves to
+  // that card's column, not just a bare column id.
   const columnOfQuoteId: Record<string, string> = {};
   COLUMNS.forEach(col => {
-    (quotesByStatus[col] || []).forEach(q => { columnOfQuoteId[String(q.id)] = col; });
+    flattenColumn(columnQueries[col]).items.forEach((q: any) => { columnOfQuoteId[String(q.id)] = col; });
   });
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -391,13 +410,35 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
     const newStatus = COLUMNS.includes(overId) ? overId : columnOfQuoteId[overId];
     if (!newStatus) return;
 
-    const quote = quotes.find(q => String(q.id) === quoteId);
-    if (!quote || quote.status === newStatus) return;
+    const oldColumn = columnOfQuoteId[quoteId];
+    if (!oldColumn || oldColumn === newStatus) return;
 
-    statusMutation.mutate({ id: quoteId, status: newStatus });
+    // No optimistic cache splice here — each column is its own paginated
+    // query, so surgically moving a card between two independently-loaded
+    // page sets (and adjusting both counts) isn't practical the way it was
+    // when everything lived in one flat array. The card reappears in its
+    // new column (and disappears from the old) once these refetch, which
+    // the live WebSocket event above also triggers the moment the backend
+    // confirms the change.
+    statusMutation.mutate({ id: quoteId, status: newStatus }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['quotes-column', oldColumn] });
+        queryClient.invalidateQueries({ queryKey: ['quotes-column', newStatus] });
+        queryClient.invalidateQueries({ queryKey: ['quotes-column', null] });
+      },
+    });
   };
 
-  const activeQuote = activeQuoteId ? quotes.find(q => String(q.id) === activeQuoteId) : null;
+  const allLoadedBoardItems = COLUMNS.flatMap(col => flattenColumn(columnQueries[col]).items);
+  const activeQuote = activeQuoteId ? allLoadedBoardItems.find((q: any) => String(q.id) === activeQuoteId) : null;
+
+  // List view reuses a board column's query directly for a specific status,
+  // or the separate "All" query (no status filter) for the All tab.
+  const activeListQuery = statusFilter === 'ALL' ? allQ : columnQueries[statusFilter];
+  const {
+    items: listItems, hasNextPage: listHasNextPage, isLoading: listIsLoading,
+    isFetchingNextPage: listIsFetchingNextPage, fetchNextPage: listFetchNextPage,
+  } = flattenColumn(activeListQuery);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -449,7 +490,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
             ))}
           </div>
           <div style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
-            <span>{quotes.length} quotes</span>
+            <span>{totalQuotesCount} quotes</span>
           </div>
         </div>
       )}
@@ -483,40 +524,57 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexShrink: 0 }}>
               <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}>QUOTES PIPELINE — DRAG TO UPDATE STATUS</span>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{quotes.length} quotes</span>
+              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{totalQuotesCount} quotes</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: '1fr', gap: 16, flex: 1, minHeight: 0 }}>
               {COLUMNS.map(col => {
-                const colItems = quotesByStatus[col] || [];
-                const colTotal = colItems.reduce((s, q) => s + parseFloat(q.total_amount || '0'), 0);
+                const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading, isFetchingNextPage, fetchNextPage } = flattenColumn(columnQueries[col]);
                 return (
                 <div key={col} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, background: 'var(--bg-panel)', borderRadius: 6, padding: '8px 4px 8px 8px' }}>
                   <div style={{ borderTop: `2px solid ${STATUS_COLOR[col] || 'var(--border-subtle)'}`, paddingTop: 8, marginBottom: 10, marginRight: 4, flexShrink: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[col] || 'var(--text-secondary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{COLUMN_LABELS[col]}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-secondary)', background: 'var(--bg-surface-hover)', padding: '2px 7px', borderRadius: 10 }}>{colItems.length}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-secondary)', background: 'var(--bg-surface-hover)', padding: '2px 7px', borderRadius: 10 }}>{colCount}</span>
                     </div>
                     {colTotal > 0 && (
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', padding: '4px 2px 0' }}>{formatCurrency(colTotal)}</div>
                     )}
                   </div>
                   <div className="kanban-col-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
-                    <DroppableColumn columnId={col} items={colItems} isOver={overColumnId === col}>
-                      {colItems.map((q: any) => (
-                        <DraggableQuoteCard
-                          key={q.id}
-                          quote={q}
-                          onClick={() => navigate(`/bookings/quotes/${q.id}`)}
-                          onConvertToLoad={handleConvertToLoad}
-                          onViewBooking={(e, load) => { e.stopPropagation(); navigate(`/bookings/${load.id}`); }}
-                          convertedLoad={loadByQuoteId.get(String(q.id))}
-                          dragDisabled={billingBlocked}
-                        />
-                      ))}
-                      {colItems.length === 0 && (
-                        <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 11, border: '1px dashed var(--border-subtle)', borderRadius: 2 }}>Drop here</div>
-                      )}
-                    </DroppableColumn>
+                    {isLoading ? (
+                      <div style={{ padding: '28px 0', display: 'flex', justifyContent: 'center' }}><Loader size={22} /></div>
+                    ) : (
+                      <DroppableColumn columnId={col} items={colItems} isOver={overColumnId === col}>
+                        {colItems.map((q: any) => (
+                          <DraggableQuoteCard
+                            key={q.id}
+                            quote={q}
+                            onClick={() => navigate(`/bookings/quotes/${q.id}`)}
+                            onConvertToLoad={handleConvertToLoad}
+                            onViewBooking={(e, load) => { e.stopPropagation(); navigate(`/bookings/${load.id}`); }}
+                            convertedLoad={loadByQuoteId.get(String(q.id))}
+                            dragDisabled={billingBlocked}
+                          />
+                        ))}
+                        {colItems.length === 0 && (
+                          <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 11, border: '1px dashed var(--border-subtle)', borderRadius: 2 }}>Drop here</div>
+                        )}
+                        {hasNextPage && (
+                          <button
+                            onClick={() => fetchNextPage()}
+                            disabled={isFetchingNextPage}
+                            style={{
+                              width: '100%', padding: '8px', marginTop: 2, fontSize: 10, fontFamily: 'var(--font-mono)',
+                              letterSpacing: '0.05em', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                              color: 'var(--text-secondary)', borderRadius: 2, cursor: isFetchingNextPage ? 'default' : 'pointer',
+                              opacity: isFetchingNextPage ? 0.6 : 1,
+                            }}
+                          >
+                            {isFetchingNextPage ? 'LOADING…' : `LOAD 10 MORE (${colCount - colItems.length} LEFT)`}
+                          </button>
+                        )}
+                      </DroppableColumn>
+                    )}
                   </div>
                 </div>
                 );
@@ -547,7 +605,9 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           </DragOverlay>
         </DndContext>
       ) : (
-        /* List view — quotes table */
+        /* List view — quotes table, backed by the same per-status paginated
+           queries as the board (plus a 5th "All" query with no status
+           filter) — switching tabs reuses whatever's already loaded. */
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
           {/* Status filter tabs */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexShrink: 0 }}>
@@ -569,7 +629,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                   transition: 'all 0.2s ease',
                 }}
               >
-                {status === 'ALL' ? 'All' : COLUMN_LABELS[status]} ({status === 'ALL' ? quotes.length : quotesByStatus[status]?.length || 0})
+                {status === 'ALL' ? 'All' : COLUMN_LABELS[status]} ({status === 'ALL' ? totalQuotesCount : flattenColumn(columnQueries[status]).count})
               </button>
             ))}
           </div>
@@ -589,12 +649,12 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                 </tr>
               </thead>
               <tbody>
-                {filteredQuotes.map((quote: any, idx: number) => (
+                {listItems.map((quote: any, idx: number) => (
                   <tr
                     key={quote.id}
                     onClick={() => navigate(`/bookings/quotes/${quote.id}`)}
                     style={{
-                      borderBottom: idx < filteredQuotes.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                      borderBottom: idx < listItems.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                       cursor: 'pointer', transition: 'background 0.15s ease',
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface)'}
@@ -659,7 +719,27 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                 ))}
               </tbody>
             </table>
-            {filteredQuotes.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No quotes found</div>}
+            {listIsLoading && (
+              <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={24} /></div>
+            )}
+            {!listIsLoading && listItems.length === 0 && (
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No quotes found</div>
+            )}
+            {listHasNextPage && (
+              <div style={{ padding: 12, display: 'flex', justifyContent: 'center' }}>
+                <button
+                  onClick={() => listFetchNextPage()}
+                  disabled={listIsFetchingNextPage}
+                  style={{
+                    padding: '8px 20px', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em',
+                    background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
+                    borderRadius: 2, cursor: listIsFetchingNextPage ? 'default' : 'pointer', opacity: listIsFetchingNextPage ? 0.6 : 1,
+                  }}
+                >
+                  {listIsFetchingNextPage ? 'LOADING…' : 'LOAD 10 MORE'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

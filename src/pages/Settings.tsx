@@ -128,6 +128,35 @@ export default function Settings() {
             })}
           </div>
         ))}
+        {/* Platform-level, not a company setting — jumps to its own full
+            page rather than rendering inline like the sections above. */}
+        {user?.is_superuser && (
+          <div style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
+            <div style={{
+              fontSize: 10,
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--text-tertiary)',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              padding: '0 20px 6px',
+            }}>
+              Platform
+            </div>
+            <NavLink
+              to="/admin"
+              style={{
+                display: 'block',
+                padding: '8px 20px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                textDecoration: 'none',
+                color: 'var(--status-warning)',
+              }}
+            >
+              Admin Dashboard
+            </NavLink>
+          </div>
+        )}
       </div>
       </div>
 

@@ -8,6 +8,7 @@ import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
+import { useAuth } from '@/lib/AuthContext';
 
 interface Customer {
   id: number;
@@ -67,6 +68,10 @@ const EMPTY_FORM = {
 export default function Customers() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user: authUser } = useAuth();
+  // Shared public demo account — creation/edit/delete controls are fixed off,
+  // viewing/filtering/search stay fully live.
+  const isDemo = !!authUser?.is_demo;
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -157,7 +162,13 @@ export default function Customers() {
           <div style={{ fontSize: 22, fontWeight: 500, color: "var(--text-primary)" }}>Customers</div>
           <LiveBadge />
         </div>
-        <button className="btn-action" onClick={() => setShowAddForm(true)}>+ Add customer</button>
+        <button
+          className="btn-action"
+          onClick={() => setShowAddForm(true)}
+          disabled={isDemo}
+          title={isDemo ? 'Fixed in demo mode' : undefined}
+          style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+        >+ Add customer</button>
       </div>
 
       {/* KPI strip */}
@@ -226,7 +237,13 @@ export default function Customers() {
                       <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
                         Add your first customer to get started
                       </div>
-                      <button onClick={() => setShowAddForm(true)} className="btn-action">Add customer</button>
+                      <button
+                        onClick={() => setShowAddForm(true)}
+                        className="btn-action"
+                        disabled={isDemo}
+                        title={isDemo ? 'Fixed in demo mode' : undefined}
+                        style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                      >Add customer</button>
                     </div>
                   </td>
                 </tr>
@@ -273,7 +290,9 @@ export default function Customers() {
                     <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                       <button
                         onClick={e => { e.stopPropagation(); openEdit(c); }}
-                        style={{ background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", padding: "4px 10px", borderRadius: 2, cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em" }}
+                        disabled={isDemo}
+                        title={isDemo ? 'Fixed in demo mode' : undefined}
+                        style={{ background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", padding: "4px 10px", borderRadius: 2, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", opacity: isDemo ? 0.5 : 1 }}
                       >Edit</button>
                       <button
                         onClick={e => {
@@ -294,7 +313,9 @@ export default function Customers() {
                             },
                           });
                         }}
-                        style={{ background: "none", border: "1px solid var(--status-danger)", color: "var(--status-danger)", padding: "4px 10px", borderRadius: 2, cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em" }}
+                        disabled={isDemo}
+                        title={isDemo ? 'Fixed in demo mode' : undefined}
+                        style={{ background: "none", border: "1px solid var(--status-danger)", color: "var(--status-danger)", padding: "4px 10px", borderRadius: 2, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", opacity: isDemo ? 0.5 : 1 }}
                       >Del</button>
                     </div>
                   </td>

@@ -47,25 +47,22 @@ const Login = () => {
       errors.username = 'Invalid email format';
     }
 
-    // Password validation
+    // Password validation — just needs to be present. A minimum-length rule
+    // belongs on signup (where it does apply), not here: a login attempt
+    // should be checked against the real password, not a strength policy
+    // that may not even match what was true when the account was created.
     if (!formData.password) {
       errors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
     }
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
-
-    login(formData, {
+  // Shared by the real form submit and the demo button below — both just
+  // need to hand a set of credentials to the login mutation.
+  const submitLogin = (credentials: { username: string; password: string }) => {
+    login(credentials, {
       onSuccess: async (data: any) => {
         // 2FA enabled → no token yet; go collect the emailed sign-in code.
         if (data?.otp_required) {
@@ -85,6 +82,26 @@ const Login = () => {
         );
       }
     });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
+    submitLogin(formData);
+  };
+
+  const handleDemoLogin = () => {
+    const demoCredentials = { username: "demo@truckwys.com", password: "TruckDemo2026!" };
+    setError(null);
+    setValidationErrors({});
+    setFormData(demoCredentials);
+    // Use the literal credentials rather than the (not-yet-updated) formData
+    // state, since setFormData above won't have applied yet on this render.
+    submitLogin(demoCredentials);
   };
 
   const inputStyle: React.CSSProperties = {
@@ -293,6 +310,23 @@ const Login = () => {
             disabled={isPending}
           >
             {isPending ? "Signing in..." : "Sign in"}
+          </button>
+
+          <button
+            type="button"
+            className="btn-action btn-ghost"
+            onClick={handleDemoLogin}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              fontSize: 11,
+              letterSpacing: '0.08em',
+              cursor: isPending ? 'wait' : 'pointer',
+              opacity: isPending ? 0.6 : 1,
+            }}
+            disabled={isPending}
+          >
+            View Demo
           </button>
         </form>
 

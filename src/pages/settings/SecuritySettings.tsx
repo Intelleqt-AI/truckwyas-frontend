@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
 import { formatRelativeTime } from "@/lib/formatters";
 import { toast } from "@/lib/toast";
+import { useAuth } from "@/lib/AuthContext";
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -64,13 +65,15 @@ interface ToggleRowProps {
   onChange: (v: boolean) => void;
   badge?: string;
   badgeColor?: string;
+  disabled?: boolean;
 }
 
-function ToggleRow({ label, description, checked, onChange, badge, badgeColor }: ToggleRowProps) {
+function ToggleRow({ label, description, checked, onChange, badge, badgeColor, disabled }: ToggleRowProps) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '14px 20px', borderBottom: '1px solid var(--border-row)',
+      opacity: disabled ? 0.5 : 1,
     }}>
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: description ? 2 : 0 }}>
@@ -87,9 +90,12 @@ function ToggleRow({ label, description, checked, onChange, badge, badgeColor }:
         {description && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{description}</div>}
       </div>
       <button
-        onClick={() => onChange(!checked)}
+        onClick={() => !disabled && onChange(!checked)}
+        disabled={disabled}
+        title={disabled ? 'Fixed in demo mode' : undefined}
         style={{
-          width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer',
+          width: 36, height: 20, borderRadius: 10, border: 'none',
+          cursor: disabled ? 'not-allowed' : 'pointer',
           background: checked ? 'var(--accent-primary)' : 'var(--border-active)',
           position: 'relative', flexShrink: 0, transition: 'background 0.2s',
         }}
@@ -107,6 +113,8 @@ function ToggleRow({ label, description, checked, onChange, badge, badgeColor }:
 export function SecuritySettings() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user: authUser } = useAuth();
+  const isDemo = !!authUser?.is_demo;
   const [twoFactor, setTwoFactor] = useState(false);
   const [sessionTimeout, setSessionTimeout] = useState(false);
   const [loginAlerts, setLoginAlerts] = useState(true);
@@ -168,6 +176,7 @@ export function SecuritySettings() {
     value: boolean,
     setter: (v: boolean) => void,
   ) => {
+    if (isDemo) return;
     setter(value);
     try {
       await patchData({ url: 'api/v1/auth/security-settings/', data: { [key]: value } });
@@ -181,6 +190,7 @@ export function SecuritySettings() {
   };
 
   const handleRevokeSession = async (id: string) => {
+    if (isDemo) return;
     if (!window.confirm('Sign out this device? It will need to log in again.')) return;
     setRevokingId(id);
     try {
@@ -198,6 +208,7 @@ export function SecuritySettings() {
   const hasOthers = otherCount > 0;
 
   const handleBulkLogout = async () => {
+    if (isDemo) return;
     if (hasOthers) {
       if (!window.confirm(`Sign out ${otherCount} other session${otherCount === 1 ? '' : 's'}? Those devices will need to log in again.`)) return;
       setBulkBusy(true);
@@ -232,6 +243,7 @@ export function SecuritySettings() {
   };
 
   const handleChangePassword = async () => {
+    if (isDemo) return;
     if (!pwForm.current || !pwForm.new1) return;
     if (pwForm.new1 !== pwForm.new2) { alert('Passwords do not match'); return; }
     setSaving(true);
@@ -257,6 +269,7 @@ export function SecuritySettings() {
   };
 
   const handleDeleteAccount = async () => {
+    if (isDemo) return;
     if (!deletePassword) return;
     setDeleting(true);
     setDeleteError(null);
@@ -298,19 +311,25 @@ export function SecuritySettings() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
             <div>
               <label style={labelStyle}>Current Password</label>
-              <input style={inputStyle} type="password" value={pwForm.current} onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))} />
+              <input style={inputStyle} type="password" value={pwForm.current} onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))} disabled={isDemo} />
             </div>
             <div>
               <label style={labelStyle}>New Password</label>
-              <input style={inputStyle} type="password" value={pwForm.new1} onChange={e => setPwForm(p => ({ ...p, new1: e.target.value }))} />
+              <input style={inputStyle} type="password" value={pwForm.new1} onChange={e => setPwForm(p => ({ ...p, new1: e.target.value }))} disabled={isDemo} />
             </div>
             <div>
               <label style={labelStyle}>Confirm Password</label>
-              <input style={inputStyle} type="password" value={pwForm.new2} onChange={e => setPwForm(p => ({ ...p, new2: e.target.value }))} />
+              <input style={inputStyle} type="password" value={pwForm.new2} onChange={e => setPwForm(p => ({ ...p, new2: e.target.value }))} disabled={isDemo} />
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn-action" onClick={handleChangePassword} disabled={saving}>
+            <button
+              className="btn-action"
+              onClick={handleChangePassword}
+              disabled={saving || isDemo}
+              title={isDemo ? 'Fixed in demo mode' : undefined}
+              style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+            >
               {saving ? 'UPDATING...' : 'UPDATE PASSWORD'}
             </button>
           </div>
@@ -323,9 +342,9 @@ export function SecuritySettings() {
           <span style={sectionTitleStyle}>Security Options</span>
         </div>
         <div style={{ paddingBottom: 4 }}>
-          <ToggleRow label="Two-factor authentication" description="Require OTP on login in addition to password" checked={twoFactor} onChange={(v) => updateSecuritySetting('two_factor', v, setTwoFactor)} badge="Recommended" />
-          <ToggleRow label="Session timeout" description="Auto sign out after 30 minutes of inactivity" checked={sessionTimeout} onChange={(v) => updateSecuritySetting('session_timeout', v, setSessionTimeout)} />
-          <ToggleRow label="Login alerts" description="Email me when a new device signs in" checked={loginAlerts} onChange={(v) => updateSecuritySetting('login_alerts', v, setLoginAlerts)} />
+          <ToggleRow label="Two-factor authentication" description="Require OTP on login in addition to password" checked={twoFactor} onChange={(v) => updateSecuritySetting('two_factor', v, setTwoFactor)} badge="Recommended" disabled={isDemo} />
+          <ToggleRow label="Session timeout" description="Auto sign out after 30 minutes of inactivity" checked={sessionTimeout} onChange={(v) => updateSecuritySetting('session_timeout', v, setSessionTimeout)} disabled={isDemo} />
+          <ToggleRow label="Login alerts" description="Email me when a new device signs in" checked={loginAlerts} onChange={(v) => updateSecuritySetting('login_alerts', v, setLoginAlerts)} disabled={isDemo} />
         </div>
       </div>
 
@@ -361,13 +380,14 @@ export function SecuritySettings() {
               {!s.current && (
                 <button
                   onClick={() => handleRevokeSession(s.id)}
-                  disabled={revokingId === s.id}
+                  disabled={revokingId === s.id || isDemo}
+                  title={isDemo ? 'Fixed in demo mode' : undefined}
                   style={{
                     background: 'none', border: '1px solid var(--status-danger)',
                     color: 'var(--status-danger)', padding: '5px 10px',
                     fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
-                    cursor: revokingId === s.id ? 'default' : 'pointer',
-                    letterSpacing: '0.05em', opacity: revokingId === s.id ? 0.5 : 1,
+                    cursor: isDemo ? 'not-allowed' : revokingId === s.id ? 'default' : 'pointer',
+                    letterSpacing: '0.05em', opacity: (revokingId === s.id || isDemo) ? 0.5 : 1,
                   }}
                 >{revokingId === s.id ? 'REVOKING...' : 'REVOKE'}</button>
               )}
@@ -379,13 +399,14 @@ export function SecuritySettings() {
           }}>
             <button
               onClick={handleBulkLogout}
-              disabled={bulkBusy}
+              disabled={bulkBusy || isDemo}
+              title={isDemo ? 'Fixed in demo mode' : undefined}
               style={{
                 background: 'none', border: '1px solid var(--status-danger)',
                 color: 'var(--status-danger)', padding: '6px 12px',
                 fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
-                cursor: bulkBusy ? 'default' : 'pointer',
-                letterSpacing: '0.05em', opacity: bulkBusy ? 0.5 : 1,
+                cursor: isDemo ? 'not-allowed' : bulkBusy ? 'default' : 'pointer',
+                letterSpacing: '0.05em', opacity: (bulkBusy || isDemo) ? 0.5 : 1,
               }}
             >{bulkBusy ? 'WORKING...' : hasOthers ? 'LOG OUT OTHER SESSIONS' : 'LOG OUT ALL SESSIONS'}</button>
           </div>
@@ -445,12 +466,15 @@ export function SecuritySettings() {
             </div>
           </div>
           <button
-            onClick={() => setShowDeleteModal(true)}
+            onClick={() => !isDemo && setShowDeleteModal(true)}
+            disabled={isDemo}
+            title={isDemo ? 'Fixed in demo mode' : undefined}
             style={{
               background: 'none', border: '1px solid var(--status-danger)',
               color: 'var(--status-danger)', padding: '8px 16px',
               fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
-              cursor: 'pointer', letterSpacing: '0.06em', flexShrink: 0,
+              cursor: isDemo ? 'not-allowed' : 'pointer', letterSpacing: '0.06em', flexShrink: 0,
+              opacity: isDemo ? 0.5 : 1,
             }}
           >
             DELETE MY ACCOUNT

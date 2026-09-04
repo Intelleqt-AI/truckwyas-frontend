@@ -3,6 +3,7 @@ import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
+import { useAuth } from "@/lib/AuthContext";
 
 interface VehicleType {
   id: number;
@@ -38,6 +39,10 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function VehicleTypesDirectory() {
+  const { user: authUser } = useAuth();
+  // Shared public demo account — creation/edit/delete controls are fixed off,
+  // viewing/filtering/search stay fully live.
+  const isDemo = !!authUser?.is_demo;
   const [types, setTypes] = useState<VehicleType[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -182,10 +187,13 @@ export function VehicleTypesDirectory() {
             {selected.size > 0 && (
               <button
                 onClick={() => setShowBulkConfirm(true)}
+                disabled={isDemo}
+                title={isDemo ? 'Not available in the demo' : undefined}
                 style={{
                   background: 'var(--status-danger)', border: 'none', color: '#fff',
                   padding: '6px 12px', fontFamily: 'var(--font-mono)', fontSize: 10,
-                  borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em',
+                  borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer', letterSpacing: '0.06em',
+                  opacity: isDemo ? 0.5 : 1,
                 }}
               >
                 DELETE ({selected.size})
@@ -201,7 +209,13 @@ export function VehicleTypesDirectory() {
                 fontSize: 12, outline: 'none', width: 160,
               }}
             />
-            <button className="btn-action" onClick={() => { setShowAdd(true); setAddErr(''); }}>
+            <button
+              className="btn-action"
+              onClick={() => { setShowAdd(true); setAddErr(''); }}
+              disabled={isDemo}
+              title={isDemo ? 'Not available in the demo' : undefined}
+              style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+            >
               + ADD TYPE
             </button>
           </div>
@@ -257,20 +271,24 @@ export function VehicleTypesDirectory() {
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       <button
                         onClick={() => openEdit(t)}
+                        disabled={isDemo}
+                        title={isDemo ? 'Not available in the demo' : undefined}
                         style={{
                           background: 'none', border: '1px solid var(--border-subtle)',
                           color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                          letterSpacing: '0.06em',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
+                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
                         }}
                       >EDIT</button>
                       <button
                         onClick={() => setDeleteTarget({ id: t.id, name: t.name })}
+                        disabled={isDemo}
+                        title={isDemo ? 'Not available in the demo' : undefined}
                         style={{
                           background: 'none', border: '1px solid var(--status-danger)',
                           color: 'var(--status-danger)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                          letterSpacing: '0.06em',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
+                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
                         }}
                       >DELETE</button>
                     </div>
@@ -361,9 +379,10 @@ export function VehicleTypesDirectory() {
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
-                disabled={saving}
+                disabled={saving || isDemo}
                 onClick={handleAdd}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase' }}
+                title={isDemo ? 'Not available in the demo' : undefined}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: isDemo ? 'not-allowed' : saving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase', opacity: isDemo ? 0.5 : 1 }}
               >
                 {saving ? 'SAVING...' : 'SAVE TYPE'}
               </button>
@@ -431,9 +450,10 @@ export function VehicleTypesDirectory() {
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
-                disabled={editSaving}
+                disabled={editSaving || isDemo}
                 onClick={handleEditSave}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: editSaving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase' }}
+                title={isDemo ? 'Not available in the demo' : undefined}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: isDemo ? 'not-allowed' : editSaving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase', opacity: isDemo ? 0.5 : 1 }}
               >
                 {editSaving ? 'SAVING...' : 'SAVE CHANGES'}
               </button>

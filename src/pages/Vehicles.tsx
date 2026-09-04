@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AddVehicleDrawer } from '@/components/AddVehicleDrawer';
 import { EditVehicleDrawer } from '@/components/EditVehicleDrawer';
 import { Loader } from '@/components/Loader';
+import { useAuth } from '@/lib/AuthContext';
 
 interface Vehicle {
   id: number;
@@ -144,6 +145,10 @@ async function loadFleet(q: string) {
 export default function Vehicles() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user: authUser } = useAuth();
+  // Shared public demo account — creation/edit/delete controls are fixed off,
+  // viewing/filtering/search stay fully live.
+  const isDemo = !!authUser?.is_demo;
   const [statusFilter, setStatusFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -262,7 +267,13 @@ export default function Vehicles() {
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
             <button onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>Heatmap</button>
-            <button className="btn-action" onClick={() => setShowAddForm(true)}>+ Add vehicle</button>
+            <button
+              className="btn-action"
+              onClick={() => setShowAddForm(true)}
+              disabled={isDemo}
+              title={isDemo ? 'Fixed in demo mode' : undefined}
+              style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+            >+ Add vehicle</button>
           </div>
         </div>
       </div>
@@ -380,7 +391,13 @@ export default function Vehicles() {
                           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
                             Get started by adding your first vehicle to your fleet
                           </div>
-                          <button onClick={() => setShowAddForm(true)} className="btn-action">
+                          <button
+                            onClick={() => setShowAddForm(true)}
+                            className="btn-action"
+                            disabled={isDemo}
+                            title={isDemo ? 'Fixed in demo mode' : undefined}
+                            style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                          >
                             Add vehicle
                           </button>
                         </div>
@@ -441,7 +458,9 @@ export default function Vehicles() {
                               e.stopPropagation();
                               setEditVehicle(v);
                             }}
-                            style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
+                            disabled={isDemo}
+                            title={isDemo ? 'Fixed in demo mode' : undefined}
+                            style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1 }}
                           >EDIT</button>
                           <button
                             onClick={(e) => {
@@ -462,7 +481,9 @@ export default function Vehicles() {
                                 },
                               });
                             }}
-                            style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
+                            disabled={isDemo}
+                            title={isDemo ? 'Fixed in demo mode' : undefined}
+                            style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '4px 10px', borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1 }}
                           >DEL</button>
                         </div>
                       </td>

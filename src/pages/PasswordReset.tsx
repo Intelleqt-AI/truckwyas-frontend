@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Check } from 'lucide-react';
 import { postData } from '@/lib/Api';
 
@@ -26,6 +26,7 @@ function formatCountdown(s: number) {
 
 export default function PasswordReset() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState<'request' | 'confirm' | 'done'>('request');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -52,6 +53,19 @@ export default function PasswordReset() {
   };
 
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  // A "Set new password" link from the reset email lands here with the
+  // email prefilled and step=confirm — the code was already sent (this same
+  // email), so jump straight to code entry instead of requesting a new one.
+  useEffect(() => {
+    const paramEmail = searchParams.get('email');
+    if (paramEmail) setEmail(paramEmail);
+    if (searchParams.get('step') === 'confirm') {
+      setStep('confirm');
+      startCountdown();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const requestReset = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -59,6 +59,7 @@ interface PendingInvite {
 
 export function UsersPermissions() {
   const { user: currentUser } = useAuth();
+  const isDemo = !!currentUser?.is_demo;
   const [users, setUsers] = useState<User[]>([]);
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,6 +112,7 @@ export function UsersPermissions() {
   const roleColor = (role: string) => ROLE_COLORS[role?.toLowerCase()] || 'var(--text-tertiary)';
 
   const handleInvite = async () => {
+    if (isDemo) return;
     if (!inviteEmail) {
       toast.error('Please enter an email');
       return;
@@ -135,6 +137,7 @@ export function UsersPermissions() {
   };
 
   const handleRoleChange = async (userId: number, newRole: string) => {
+    if (isDemo) return;
     if (!isAdmin) {
       toast.error('Only admins can change roles');
       return;
@@ -153,6 +156,7 @@ export function UsersPermissions() {
   };
 
   const handleDeleteUser = async (userId: number) => {
+    if (isDemo) return;
     if (!isAdmin) {
       toast.error('Only admins can remove users');
       return;
@@ -169,6 +173,7 @@ export function UsersPermissions() {
   };
 
   const handleResendInvite = async (token: string) => {
+    if (isDemo) return;
     try {
       await postData({
         url: `api/v1/auth/invite/${token}/resend/`,
@@ -182,6 +187,7 @@ export function UsersPermissions() {
   };
 
   const handleRevokeInvite = async (token: string) => {
+    if (isDemo) return;
     if (!isAdmin) {
       toast.error('Only admins can revoke invites');
       return;
@@ -217,7 +223,15 @@ export function UsersPermissions() {
                 fontSize: 12, outline: 'none', width: 180,
               }}
             />
-            {isAdmin && <button className="btn-action" onClick={() => setShowInvite(!showInvite)}>+ INVITE</button>}
+            {isAdmin && (
+              <button
+                className="btn-action"
+                onClick={() => setShowInvite(!showInvite)}
+                disabled={isDemo}
+                title={isDemo ? 'Fixed in demo mode' : undefined}
+                style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              >+ INVITE</button>
+            )}
           </div>
         </div>
 
@@ -264,7 +278,13 @@ export function UsersPermissions() {
                 </SelectContent>
               </Select>
             </div>
-            <button className="btn-action" onClick={handleInvite} disabled={inviting}>
+            <button
+              className="btn-action"
+              onClick={handleInvite}
+              disabled={inviting || isDemo}
+              title={isDemo ? 'Fixed in demo mode' : undefined}
+              style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+            >
               {inviting ? 'SENDING...' : 'SEND INVITE'}
             </button>
           </div>
@@ -322,8 +342,11 @@ export function UsersPermissions() {
                 </td>
                 <td style={{ padding: '12px 20px' }}>
                   {isAdmin && u.id !== currentUser?.id ? (
-                    <Select value={u.role?.toLowerCase()} onValueChange={val => handleRoleChange(u.id, val)}>
-                      <SelectTrigger>
+                    <Select value={u.role?.toLowerCase()} onValueChange={val => handleRoleChange(u.id, val)} disabled={isDemo}>
+                      <SelectTrigger
+                        title={isDemo ? 'Fixed in demo mode' : undefined}
+                        style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -358,10 +381,13 @@ export function UsersPermissions() {
                   {isAdmin && (
                     <button
                       onClick={() => setDeleteConfirm(u.id)}
+                      disabled={isDemo}
+                      title={isDemo ? 'Fixed in demo mode' : undefined}
                       style={{
                         background: 'none', border: '1px solid var(--border-subtle)',
                         color: 'var(--status-danger)', padding: '4px 10px',
-                        fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                        fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                        cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                       }}
                     >REMOVE</button>
                   )}
@@ -414,19 +440,25 @@ export function UsersPermissions() {
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                       <button
                         onClick={() => handleResendInvite(inv.token)}
+                        disabled={isDemo}
+                        title={isDemo ? 'Fixed in demo mode' : undefined}
                         style={{
                           background: 'none', border: '1px solid var(--border-subtle)',
                           color: 'var(--text-tertiary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                          cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                         }}
                       >RESEND</button>
                       {isAdmin && (
                         <button
                           onClick={() => handleRevokeInvite(inv.token)}
+                          disabled={isDemo}
+                          title={isDemo ? 'Fixed in demo mode' : undefined}
                           style={{
                             background: 'none', border: '1px solid var(--border-subtle)',
                             color: 'var(--status-danger)', padding: '4px 10px',
-                            fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
+                            fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                            cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                           }}
                         >REVOKE</button>
                       )}
@@ -494,11 +526,17 @@ export function UsersPermissions() {
                 color: 'var(--text-secondary)', padding: '7px 14px',
                 fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
               }}>CANCEL</button>
-              <button onClick={() => handleDeleteUser(deleteConfirm)} style={{
-                background: 'var(--status-danger)', border: 'none',
-                color: 'white', padding: '7px 14px',
-                fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-              }}>REMOVE</button>
+              <button
+                onClick={() => handleDeleteUser(deleteConfirm)}
+                disabled={isDemo}
+                title={isDemo ? 'Fixed in demo mode' : undefined}
+                style={{
+                  background: 'var(--status-danger)', border: 'none',
+                  color: 'white', padding: '7px 14px',
+                  fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                  cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
+                }}
+              >REMOVE</button>
             </div>
           </div>
         </div>

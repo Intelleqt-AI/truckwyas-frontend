@@ -75,6 +75,7 @@ const Insights = lazy(() => import('./pages/Insights'));
 const Copilot = lazy(() => import('./pages/Copilot'));
 // PartnerDashboard removed — moved to standalone partner portal
 const Settings = lazy(() => import('./pages/Settings'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const XeroIntegration = lazy(() => import('./pages/settings/XeroIntegration'));
 const FleetImport = lazy(() => import('./pages/settings/FleetImport'));
 const BillingHistoryPage = lazy(() => import('./pages/settings/BillingHistoryPage'));
@@ -287,6 +288,7 @@ const App = () => (
                   <Route path="/settings/integrations/fleet" element={<FleetImport />} />
                   <Route path="/settings/billing/history" element={<BillingHistoryPage />} />
                   <Route path="/settings/:section?" element={<Settings />} />
+                  <Route path="/admin" element={<AdminDashboard />} />
                   <Route path="/fleet/vehicles/:id/financial" element={<VehicleFinancialProfile />} />
                 </Route>
 

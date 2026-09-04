@@ -21,6 +21,10 @@ export interface AuthUser {
   // creating new clients/vehicles, both enforced server-side already.
   is_demo?: boolean;
   demo_quota_used?: number;
+  // Django's own superuser flag — a platform operator, unrelated to this
+  // user's company-scoped `role` (e.g. 'ADMIN'). Gates the cross-tenant
+  // admin dashboard only.
+  is_superuser?: boolean;
   [key: string]: any;
 }
 

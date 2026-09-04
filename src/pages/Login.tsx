@@ -47,11 +47,12 @@ const Login = () => {
       errors.username = 'Invalid email format';
     }
 
-    // Password validation
+    // Password validation — just needs to be present. A minimum-length rule
+    // belongs on signup (where it does apply), not here: a login attempt
+    // should be checked against the real password, not a strength policy
+    // that may not even match what was true when the account was created.
     if (!formData.password) {
       errors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
     }
 
     setValidationErrors(errors);

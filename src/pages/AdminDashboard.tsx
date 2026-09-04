@@ -46,10 +46,11 @@ export default function AdminDashboard() {
   });
 
   const doReset = async () => {
+    const wasCreate = !demoStatus?.exists;
     setResetting(true);
     try {
       await postData({ url: 'api/v1/admin/demo-status/', data: {} });
-      toast.success('Demo company reset');
+      toast.success(wasCreate ? 'Demo company created' : 'Demo company reset');
       qc.invalidateQueries({ queryKey: ['admin-demo-status'] });
     } catch (e: any) {
       toast.error(e?.message || 'Failed to reset demo company');
@@ -101,7 +102,25 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Demo account */}
+      {/* Demo account — shown even before the demo company exists yet, so
+          there's always a way to create it from here rather than waiting on
+          Celery beat's first tick. */}
+      {demoStatus && !demoStatus.exists && (
+        <div className="card" style={{ ...cardStyle, marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={sectionTitleStyle}>Demo Account</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                No demo company exists yet — it normally self-creates on Celery beat's first run, or create it now.
+              </div>
+            </div>
+            <button className="btn-action" style={{ fontSize: 11 }} disabled={resetting} onClick={doReset}>
+              {resetting ? 'Creating…' : 'Create Demo Company'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {demoStatus?.exists && (
         <div className="card" style={{ ...cardStyle, marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>

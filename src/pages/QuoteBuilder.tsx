@@ -171,6 +171,10 @@ export default function QuoteBuilder() {
   // never disagrees with what the backend would actually allow.
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
+  // The single shared public demo company (core/models/company.py) caps quote
+  // creation at one quote, reset nightly — enforced server-side already, this
+  // just avoids the user filling out the whole form before finding out.
+  const isDemoQuotaExceeded = !!(authUser?.is_demo && Number(authUser?.demo_quota_used) >= 1);
 
   // ---- core inputs ----
   const [customerId, setCustomerId] = useState("");
@@ -734,6 +738,7 @@ export default function QuoteBuilder() {
     if (!ready) { toast.error("Add vehicle type, collection, delivery and weight"); return; }
     if (routeBlockedMessage) { toast.error(routeBlockedMessage); return; }
     if (weightBlockedMessage) { toast.error(weightBlockedMessage); return; }
+    if (isDemoQuotaExceeded) { toast.error("This demo allows one quote — it resets daily, come back tomorrow for a fresh one."); return; }
     setSaving(true);
     try {
       let quoteId = savedQuoteId || (isEditing ? Number(editId) : null);
@@ -1028,14 +1033,14 @@ export default function QuoteBuilder() {
       {/* 1 — inputs */}
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
         <div>
-          <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Client<Req /></span><span onClick={() => navigate("/customers")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span></div>
+          <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Client<Req /></span>{!authUser?.is_demo && <span onClick={() => navigate("/customers")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span>}</div>
           <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={inputS}>
             <option value="">Select client…</option>
             {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
         <div>
-          <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Vehicle type<Req /></span><span onClick={() => navigate("/fleet/vehicles")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span></div>
+          <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Vehicle type<Req /></span>{!authUser?.is_demo && <span onClick={() => navigate("/fleet/vehicles")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span>}</div>
           <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS}>
             <option value="">Select…</option>
             {vehicleTypes.map((v: any) => (
@@ -1137,24 +1142,30 @@ export default function QuoteBuilder() {
                 <div style={{ fontSize: 12, marginTop: 6 }}>Costs and the AI quote appear here automatically.</div>
               </div>
             )}
-            {!billingBlocked && ready && routeBlockedMessage && (
+            {!billingBlocked && ready && isDemoQuotaExceeded && (
+              <div style={{ padding: "20px 4px" }}>
+                <div style={{ fontSize: 13, color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Demo quota reached</div>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>This demo allows one quote — it resets daily, come back tomorrow for a fresh one.</div>
+              </div>
+            )}
+            {!billingBlocked && ready && !isDemoQuotaExceeded && routeBlockedMessage && (
               <div style={{ padding: "20px 4px" }}>
                 <div style={{ fontSize: 13, color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Route not allowed</div>
                 <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{routeBlockedMessage}</div>
               </div>
             )}
-            {!billingBlocked && ready && !routeBlockedMessage && weightBlockedMessage && (
+            {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && weightBlockedMessage && (
               <div style={{ padding: "20px 4px" }}>
                 <div style={{ fontSize: 13, color: "var(--status-danger)", fontWeight: 600, marginBottom: 6 }}>Overloaded for this vehicle</div>
                 <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{weightBlockedMessage}</div>
               </div>
             )}
-            {!billingBlocked && ready && !routeBlockedMessage && !weightBlockedMessage && calculatingRoute && (
+            {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && calculatingRoute && (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 220 }}>
                 <Loader size={44} label="Calculating route…" />
               </div>
             )}
-            {!billingBlocked && ready && !routeBlockedMessage && !weightBlockedMessage && !calculatingRoute && (<>
+            {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && !calculatingRoute && (<>
               {[
                 { key: "fuel", l: `Fuel — ${fuelConsumption.toFixed(1)} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
@@ -1251,7 +1262,7 @@ export default function QuoteBuilder() {
       </div>
 
       {/* 3 — AI quote */}
-      {!billingBlocked && ready && !routeBlockedMessage && !weightBlockedMessage && total > 0 && (
+      {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 && (
         <div style={{ ...cardS, border: "1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-subtle))", marginBottom: 14 }}>
           {/* still learning — shown first, above the price block, while under the outcome threshold */}
           {aiLearning && (

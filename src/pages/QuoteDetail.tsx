@@ -66,7 +66,7 @@ export default function QuoteDetail() {
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [emailStatus, setEmailStatus] = useState<{ sent: boolean; address: string | null } | null>(null);
+  const [emailStatus, setEmailStatus] = useState<{ sent: boolean; address: string | null; reason?: string | null } | null>(null);
 
   // Sprint 1 features
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
@@ -138,7 +138,10 @@ export default function QuoteDetail() {
       } catch {
         setShareUrl(data.share_url);
       }
-      setEmailStatus({ sent: !!data.email_sent, address: data.customer_email || null });
+      // email_skipped_reason isn't wired up on the backend yet everywhere, so
+      // this stays optional — the render below falls back to inferring "demo
+      // account" from authUser?.company?.is_demo when the reason is absent.
+      setEmailStatus({ sent: !!data.email_sent, address: data.customer_email || null, reason: data.email_skipped_reason || null });
       toast.success('Share link ready — copy and send to your customer');
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
       queryClient.setQueryData(['quotes'], (old: unknown) => {
@@ -235,8 +238,18 @@ export default function QuoteDetail() {
     ? `${window.location.origin}/quotes/view/${quote.id}/${quote.token}`
     : null);
   const effectiveEmailStatus = emailStatus || (quote.status === 'SENT'
-    ? { sent: !!quote.customer_email, address: quote.customer_email || null }
+    ? { sent: !!quote.customer_email, address: quote.customer_email || null, reason: null }
     : null);
+  // Backend may not send an explicit email_skipped_reason yet (a parallel
+  // task is wiring it up) — until it does, infer "demo account" from
+  // authUser.is_demo (see AuthContext.tsx) so the shared public demo doesn't
+  // show a misleading "no email on file" message for customers that DO have
+  // a real-looking email but are never actually emailed.
+  const isDemoEmailSkip = effectiveEmailStatus
+    ? effectiveEmailStatus.reason
+      ? effectiveEmailStatus.reason === 'demo_mode'
+      : !!authUser?.is_demo
+    : false;
 
   const inputStyle: React.CSSProperties = {
     background: 'var(--bg-surface)',
@@ -746,7 +759,9 @@ export default function QuoteDetail() {
                     }}>
                       {effectiveEmailStatus.sent
                         ? `✓ Quote emailed to ${effectiveEmailStatus.address}`
-                        : 'Could not email the customer — no email on file. Share the link below instead.'}
+                        : isDemoEmailSkip
+                          ? 'Demo mode — link generated, no real email is sent.'
+                          : 'Could not email the customer — no email on file. Share the link below instead.'}
                     </div>
                   )}
                   <button

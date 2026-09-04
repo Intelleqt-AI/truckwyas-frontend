@@ -229,6 +229,17 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
             }}
           />
         </div>
+        {/* Shared public demo account — always-visible reminder that this
+            isn't a real customer's data (emails aren't actually sent, etc). */}
+        {authUser?.is_demo && (
+          <div
+            className="status-badge warning"
+            style={{ cursor: 'default', fontWeight: 700, letterSpacing: '0.05em' }}
+            title="Shared public demo account — actions like emailing customers are simulated, not real."
+          >
+            DEMO
+          </div>
+        )}
         {/* The Copilot page is gated to INSIGHTS_ROLES (App.tsx). Only show the
             omnibox to roles that can actually reach it, so a DRIVER's query isn't
             silently swallowed by the route guard on Enter. */}

@@ -8,6 +8,7 @@ import { fetchData } from "@/lib/Api";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader } from "@/components/Loader";
+import { useAuth } from "@/lib/AuthContext";
 import {
   CheckCircle2,
   XCircle,
@@ -37,6 +38,10 @@ interface SyncLog {
 
 export default function XeroIntegration() {
   const queryClient = useQueryClient();
+  const { user: authUser } = useAuth();
+  // Shared public demo account — connect/disconnect and sync actions are
+  // fixed off; viewing connection status and sync history stays fully live.
+  const isDemo = !!authUser?.is_demo;
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
 
   // Fetch connection status
@@ -241,7 +246,8 @@ export default function XeroIntegration() {
                   <div className="space-y-2">
                     <Button
                       onClick={handleSyncInvoices}
-                      disabled={isSyncing === "invoices"}
+                      disabled={isSyncing === "invoices" || isDemo}
+                      title={isDemo ? "Not available in the demo" : undefined}
                       className="w-full"
                     >
                       <RefreshCw
@@ -260,7 +266,8 @@ export default function XeroIntegration() {
                   <div className="space-y-2">
                     <Button
                       onClick={handleSyncPayments}
-                      disabled={isSyncing === "payments"}
+                      disabled={isSyncing === "payments" || isDemo}
+                      title={isDemo ? "Not available in the demo" : undefined}
                       className="w-full"
                     >
                       <RefreshCw
@@ -281,6 +288,8 @@ export default function XeroIntegration() {
               <div className="border-t pt-6">
                 <Button
                   onClick={handleDisconnect}
+                  disabled={isDemo}
+                  title={isDemo ? "Not available in the demo" : undefined}
                   variant="destructive"
                   className=""
                 >
@@ -312,7 +321,8 @@ export default function XeroIntegration() {
                 )}
                 <Button
                   onClick={handleConnect}
-                  disabled={connection?.configured === false}
+                  disabled={connection?.configured === false || isDemo}
+                  title={isDemo ? "Not available in the demo" : undefined}
                   className=""
                 >
                   <CheckCircle2 className="w-4 h-4 mr-2" />

@@ -74,7 +74,8 @@ export function ProfileSettings() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { refreshUser } = useAuth();
+  const { user: authUser, refreshUser } = useAuth();
+  const isDemo = !!authUser?.is_demo;
 
   useEffect(() => {
     fetchData('api/auth/me/').then((d: any) => {
@@ -95,6 +96,7 @@ export function ProfileSettings() {
   }, []);
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isDemo) return;
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
@@ -117,6 +119,7 @@ export function ProfileSettings() {
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
   const handleSave = async () => {
+    if (isDemo) return;
     setSaving(true);
     try {
       await patchData({ url: 'api/auth/me/', data: form });
@@ -167,18 +170,20 @@ export function ProfileSettings() {
               accept="image/jpeg,image/png,image/gif"
               style={{ display: 'none' }}
               onChange={handleAvatarChange}
+              disabled={isDemo}
             />
             <button
               style={{
                 background: 'none', border: '1px solid var(--border-subtle)',
                 color: 'var(--text-secondary)', padding: '6px 12px',
                 fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
-                cursor: uploadingAvatar ? 'not-allowed' : 'pointer',
+                cursor: (uploadingAvatar || isDemo) ? 'not-allowed' : 'pointer',
                 letterSpacing: '0.05em',
-                opacity: uploadingAvatar ? 0.6 : 1,
+                opacity: (uploadingAvatar || isDemo) ? 0.6 : 1,
               }}
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingAvatar}
+              disabled={uploadingAvatar || isDemo}
+              title={isDemo ? 'Fixed in demo mode' : undefined}
             >
               {uploadingAvatar ? 'UPLOADING...' : 'CHANGE PICTURE'}
             </button>
@@ -276,8 +281,9 @@ export function ProfileSettings() {
             <button
               className="btn-action"
               onClick={handleSave}
-              disabled={saving}
-              style={{ opacity: saving ? 0.6 : 1 }}
+              disabled={saving || isDemo}
+              title={isDemo ? 'Fixed in demo mode' : undefined}
+              style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
             >
               {saved ? 'SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
             </button>

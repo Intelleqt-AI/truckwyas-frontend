@@ -3,6 +3,7 @@ import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
+import { useAuth } from "@/lib/AuthContext";
 
 interface Customer {
   id: number;
@@ -42,6 +43,10 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function CustomersDirectory() {
+  const { user: authUser } = useAuth();
+  // Shared public demo account — creation/edit/delete controls are fixed off,
+  // viewing/filtering/search stay fully live.
+  const isDemo = !!authUser?.is_demo;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -162,7 +167,13 @@ export function CustomersDirectory() {
                 fontSize: 12, outline: 'none', width: 180,
               }}
             />
-            <button className="btn-action" onClick={() => { setShowAdd(s => !s); setAddErr(''); }}>
+            <button
+              className="btn-action"
+              onClick={() => { setShowAdd(s => !s); setAddErr(''); }}
+              disabled={isDemo && !showAdd}
+              title={isDemo && !showAdd ? 'Not available in the demo' : undefined}
+              style={isDemo && !showAdd ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+            >
               {showAdd ? 'CLOSE' : '+ ADD CUSTOMER'}
             </button>
           </div>
@@ -193,7 +204,13 @@ export function CustomersDirectory() {
             </div>
             {addErr && <div style={{ color: 'var(--status-danger)', fontSize: 12, marginBottom: 10 }}>{addErr}</div>}
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="btn-action" onClick={handleAdd} disabled={saving}>
+              <button
+                className="btn-action"
+                onClick={handleAdd}
+                disabled={saving || isDemo}
+                title={isDemo ? 'Not available in the demo' : undefined}
+                style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              >
                 {saving ? 'SAVING...' : 'SAVE CUSTOMER'}
               </button>
             </div>
@@ -245,20 +262,24 @@ export function CustomersDirectory() {
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       <button
                         onClick={() => openEdit(c)}
+                        disabled={isDemo}
+                        title={isDemo ? 'Not available in the demo' : undefined}
                         style={{
                           background: 'none', border: '1px solid var(--border-subtle)',
                           color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                          letterSpacing: '0.06em',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
+                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
                         }}
                       >EDIT</button>
                       <button
                         onClick={() => setDeleteTarget({ id: c.id, name: c.name })}
+                        disabled={isDemo}
+                        title={isDemo ? 'Not available in the demo' : undefined}
                         style={{
                           background: 'none', border: '1px solid var(--status-danger)',
                           color: 'var(--status-danger)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                          letterSpacing: '0.06em',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
+                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
                         }}
                       >DELETE</button>
                     </div>
@@ -321,9 +342,10 @@ export function CustomersDirectory() {
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
               <button
-                disabled={editSaving}
+                disabled={editSaving || isDemo}
                 onClick={handleEditSave}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: editSaving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase' }}
+                title={isDemo ? 'Not available in the demo' : undefined}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: isDemo ? 'not-allowed' : editSaving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase', opacity: isDemo ? 0.5 : 1 }}
               >
                 {editSaving ? 'SAVING...' : 'SAVE CHANGES'}
               </button>

@@ -7,6 +7,7 @@ import { usePost } from "@/hooks/usePost";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader } from "@/components/Loader";
+import { useAuth } from "@/lib/AuthContext";
 import {
   Upload,
   FileSpreadsheet,
@@ -35,6 +36,12 @@ interface PreviewRow {
 
 export default function FleetImport() {
   const queryClient = useQueryClient();
+  const { user: authUser } = useAuth();
+  // Shared public demo account — this page imports real trip data into the
+  // fleet, so file selection (click-to-browse AND drag-and-drop) and the
+  // import trigger are all fixed off, not just styled as disabled; viewing
+  // import history stays fully live.
+  const isDemo = !!authUser?.is_demo;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -68,6 +75,7 @@ export default function FleetImport() {
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    if (isDemo) return;
     setIsDragging(true);
   };
 
@@ -76,8 +84,15 @@ export default function FleetImport() {
   };
 
   const handleDrop = (e: React.DragEvent) => {
+    // Always preventDefault so the browser doesn't navigate away to open the
+    // dropped file, even when the drop itself is blocked below.
     e.preventDefault();
     setIsDragging(false);
+
+    if (isDemo) {
+      toast.error("Not available in the demo");
+      return;
+    }
 
     const file = e.dataTransfer.files[0];
     if (file) {
@@ -86,10 +101,17 @@ export default function FleetImport() {
   };
 
   const handleFileInputClick = () => {
+    if (isDemo) {
+      toast.error("Not available in the demo");
+      return;
+    }
     fileInputRef.current?.click();
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Defense in depth — the input is also `disabled` when isDemo, but guard
+    // the handler too in case it's ever reached programmatically.
+    if (isDemo) return;
     const file = e.target.files?.[0];
     if (file) {
       handleFileSelect(file);
@@ -97,6 +119,9 @@ export default function FleetImport() {
   };
 
   const handleFileSelect = (file: File) => {
+    // Demo account never persists a real import — block file selection at
+    // its single entry point (covers both drag-and-drop and click-to-browse).
+    if (isDemo) return;
     // Validate file type
     const validTypes = [
       "text/csv",
@@ -154,6 +179,10 @@ export default function FleetImport() {
   };
 
   const handleImport = () => {
+    if (isDemo) {
+      toast.error("Not available in the demo");
+      return;
+    }
     if (!selectedFile) {
       toast.error("Please select a file to import");
       return;
@@ -250,13 +279,18 @@ export default function FleetImport() {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={handleFileInputClick}
+            title={isDemo ? "Not available in the demo" : undefined}
             className={`
-              border-2 border-dashed rounded-lg p-12 text-center cursor-pointer
+              border-2 border-dashed rounded-lg p-12 text-center
               transition-colors
               ${
-                isDragging
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary hover:bg-muted/30"
+                isDemo
+                  ? "cursor-not-allowed opacity-50 border-border"
+                  : `cursor-pointer ${
+                      isDragging
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary hover:bg-muted/30"
+                    }`
               }
             `}
           >
@@ -265,6 +299,7 @@ export default function FleetImport() {
               type="file"
               accept=".csv,.xlsx,.xls"
               onChange={handleFileInputChange}
+              disabled={isDemo}
               className="hidden"
             />
             <div className="flex flex-col items-center gap-3">
@@ -364,7 +399,8 @@ export default function FleetImport() {
           {selectedFile && (
             <Button
               onClick={handleImport}
-              disabled={isUploading}
+              disabled={isUploading || isDemo}
+              title={isDemo ? "Not available in the demo" : undefined}
               className="w-full"
             >
               {isUploading ? (

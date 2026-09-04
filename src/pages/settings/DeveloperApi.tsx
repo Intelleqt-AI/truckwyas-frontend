@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Loader } from '@/components/Loader';
+import { useAuth } from '@/lib/AuthContext';
 
 interface ApiKey {
   id: number;
@@ -92,6 +93,8 @@ function fmtDate(s?: string | null) {
 }
 
 export function DeveloperApi() {
+  const { user: authUser } = useAuth();
+  const isDemo = !!authUser?.is_demo;
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -147,7 +150,7 @@ export function DeveloperApi() {
   useEffect(() => { load(); }, []);
 
   const createKey = async () => {
-    if (!newName.trim()) return;
+    if (isDemo || !newName.trim()) return;
     setCreating(true);
     try {
       await postData({
@@ -166,6 +169,7 @@ export function DeveloperApi() {
   };
 
   const openEdit = (k: ApiKey) => {
+    if (isDemo) return;
     setEditKey(k);
     setEditForm({
       name: k.name,
@@ -177,7 +181,7 @@ export function DeveloperApi() {
   };
 
   const handleEditSave = async () => {
-    if (!editKey || !editForm.name.trim()) return;
+    if (isDemo || !editKey || !editForm.name.trim()) return;
     setEditSaving(true);
     setEditErr('');
     try {
@@ -198,6 +202,7 @@ export function DeveloperApi() {
   };
 
   const handleRevoke = async (id: number) => {
+    if (isDemo) return;
     await deleteData({ url: `api/v1/integrations/api-keys/${id}/` }).catch(() => {});
     setRevokeTarget(null);
     load();
@@ -340,7 +345,13 @@ export function DeveloperApi() {
             >
               {showAdvCreate ? '▲ LESS OPTIONS' : '▼ MORE OPTIONS'}
             </button>
-            <button className="btn-action" onClick={createKey} disabled={creating || !newName.trim()} style={{ whiteSpace: 'nowrap' }}>
+            <button
+              className="btn-action"
+              onClick={createKey}
+              disabled={creating || !newName.trim() || isDemo}
+              title={isDemo ? 'Fixed in demo mode' : undefined}
+              style={{ whiteSpace: 'nowrap', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            >
               {creating ? 'CREATING…' : '+ CREATE KEY'}
             </button>
           </div>
@@ -418,8 +429,18 @@ export function DeveloperApi() {
                     <button onClick={() => toggleLogs(k)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>
                       {logsOpen ? 'HIDE LOGS' : 'LOGS'}
                     </button>
-                    <button onClick={() => openEdit(k)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>EDIT</button>
-                    <button onClick={() => setRevokeTarget(k)} style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>REVOKE</button>
+                    <button
+                      onClick={() => openEdit(k)}
+                      disabled={isDemo}
+                      title={isDemo ? 'Fixed in demo mode' : undefined}
+                      style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+                    >EDIT</button>
+                    <button
+                      onClick={() => setRevokeTarget(k)}
+                      disabled={isDemo}
+                      title={isDemo ? 'Fixed in demo mode' : undefined}
+                      style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+                    >REVOKE</button>
                   </div>
                 </div>
               </div>
@@ -565,7 +586,13 @@ export function DeveloperApi() {
             {editErr && <div style={{ fontSize: 12, color: 'var(--status-danger)', padding: '8px 12px', background: 'var(--status-danger-bg)', borderRadius: 4 }}>{editErr}</div>}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 12 }}>
-              <button className="btn-action" style={{ flex: 1 }} onClick={handleEditSave} disabled={editSaving || !editForm.name.trim()}>
+              <button
+                className="btn-action"
+                style={{ flex: 1, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                onClick={handleEditSave}
+                disabled={editSaving || !editForm.name.trim() || isDemo}
+                title={isDemo ? 'Fixed in demo mode' : undefined}
+              >
                 {editSaving ? 'SAVING…' : 'SAVE CHANGES'}
               </button>
               <button onClick={() => setEditKey(null)} style={{ flex: 1, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer' }}>CANCEL</button>

@@ -4,6 +4,7 @@ import { AddVehicleDrawer } from "@/components/AddVehicleDrawer";
 import { EditVehicleDrawer } from "@/components/EditVehicleDrawer";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
+import { useAuth } from "@/lib/AuthContext";
 
 interface Vehicle {
   id: number;
@@ -41,6 +42,10 @@ const sectionStyle: React.CSSProperties = {
 };
 
 export function VehiclesDirectory() {
+  const { user: authUser } = useAuth();
+  // Shared public demo account — creation/edit/delete controls are fixed off,
+  // viewing/filtering/search stay fully live.
+  const isDemo = !!authUser?.is_demo;
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -96,7 +101,13 @@ export function VehiclesDirectory() {
                 fontSize: 12, outline: 'none', width: 180,
               }}
             />
-            <button className="btn-action" onClick={() => setShowAddDrawer(true)}>+ ADD VEHICLE</button>
+            <button
+              className="btn-action"
+              onClick={() => setShowAddDrawer(true)}
+              disabled={isDemo}
+              title={isDemo ? 'Not available in the demo' : undefined}
+              style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+            >+ ADD VEHICLE</button>
           </div>
         </div>
 
@@ -159,20 +170,24 @@ export function VehiclesDirectory() {
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       <button
                         onClick={() => setEditVehicle(v)}
+                        disabled={isDemo}
+                        title={isDemo ? 'Not available in the demo' : undefined}
                         style={{
                           background: 'none', border: '1px solid var(--border-subtle)',
                           color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                          letterSpacing: '0.06em',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
+                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
                         }}
                       >EDIT</button>
                       <button
                         onClick={() => setDeleteTarget({ id: v.id, name: v.plate || `Vehicle ${v.id}` })}
+                        disabled={isDemo}
+                        title={isDemo ? 'Not available in the demo' : undefined}
                         style={{
                           background: 'none', border: '1px solid var(--status-danger)',
                           color: 'var(--status-danger)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-                          letterSpacing: '0.06em',
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
+                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
                         }}
                       >DELETE</button>
                     </div>

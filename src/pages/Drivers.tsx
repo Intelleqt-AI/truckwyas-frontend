@@ -9,6 +9,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
+import { useAuth } from '@/lib/AuthContext';
 
 interface Driver {
   id: number;
@@ -73,6 +74,10 @@ const getDriverName = (d: Driver) => {
 export default function Drivers() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user: authUser } = useAuth();
+  // Shared public demo account — creation/edit/delete controls are fixed off,
+  // viewing/filtering/search stay fully live.
+  const isDemo = !!authUser?.is_demo;
   const [statusFilter, setStatusFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -220,7 +225,13 @@ export default function Drivers() {
             <LiveBadge />
           </div>
         </div>
-        <button className="btn-action" onClick={() => setShowAddForm(true)}>+ Add driver</button>
+        <button
+          className="btn-action"
+          onClick={() => setShowAddForm(true)}
+          disabled={isDemo}
+          title={isDemo ? 'Fixed in demo mode' : undefined}
+          style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+        >+ Add driver</button>
       </div>
 
       {/* Tabs */}
@@ -318,7 +329,13 @@ export default function Drivers() {
                       <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
                         Get started by adding your first driver to your team
                       </div>
-                      <button onClick={() => setShowAddForm(true)} className="btn-action">
+                      <button
+                        onClick={() => setShowAddForm(true)}
+                        className="btn-action"
+                        disabled={isDemo}
+                        title={isDemo ? 'Fixed in demo mode' : undefined}
+                        style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                      >
                         Add driver
                       </button>
                     </div>
@@ -412,7 +429,9 @@ export default function Drivers() {
                             vehicle: vehicles.find(v => v.driver_id === d.id)?.id?.toString() ?? '',
                           });
                         }}
-                        style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
+                        disabled={isDemo}
+                        title={isDemo ? 'Fixed in demo mode' : undefined}
+                        style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1 }}
                       >Edit</button>
                       <button
                         onClick={(e) => {
@@ -433,7 +452,9 @@ export default function Drivers() {
                             },
                           });
                         }}
-                        style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '4px 10px', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em' }}
+                        disabled={isDemo}
+                        title={isDemo ? 'Fixed in demo mode' : undefined}
+                        style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '4px 10px', borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1 }}
                       >Del</button>
                     </div>
                   </td>

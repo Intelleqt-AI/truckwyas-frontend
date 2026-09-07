@@ -251,7 +251,7 @@ export default function PasswordReset() {
       </div>
 
       <div style={{
-        marginTop: 24, padding: '10px 13px', border: '1px solid var(--border-subtle)',
+        marginTop: 18, padding: '10px 13px', border: '1px solid var(--border-subtle)',
         borderRadius: 'var(--card-radius)', background: 'var(--bg-surface-hover)',
         fontSize: 12, color: 'var(--text-secondary)',
       }}>
@@ -259,7 +259,7 @@ export default function PasswordReset() {
         charged automatically to the card on file on top of the monthly plan.
       </div>
 
-      <div style={{ marginTop: 20, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
+      <div style={{ marginTop: 16, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
         BUILT FOR SOUTH AFRICAN ROAD FREIGHT
       </div>
     </>

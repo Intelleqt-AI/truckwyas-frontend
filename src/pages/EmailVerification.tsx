@@ -173,7 +173,7 @@ export const EmailVerification = () => {
     <>
       <div style={{
         border: '1px solid var(--border-active)', borderRadius: 'var(--card-radius)',
-        padding: 24, marginBottom: 28, background: 'var(--bg-surface-hover)',
+        padding: 20, marginBottom: 20, background: 'var(--bg-surface-hover)',
       }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 34, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
@@ -189,7 +189,7 @@ export const EmailVerification = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 28 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
         {SIGNUP_STEPS.map((step, i) => (
           <div key={step.label} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <div style={{
@@ -218,7 +218,7 @@ export const EmailVerification = () => {
         ))}
       </div>
 
-      <div style={{ marginTop: 32, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
+      <div style={{ marginTop: 20, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
         PAYMENTS SECURED BY PAYSTACK
       </div>
     </>

@@ -35,7 +35,7 @@ export function MobileAuthLayout({ eyebrow, title, subtitle, children, footer }:
           background: var(--bg-deep);
           font-family: var(--font-sans);
           box-sizing: border-box;
-          padding: 28px 20px 40px;
+          padding: 24px 20px 32px;
         }
         .mobile-auth-layout__eyebrow {
           font-family: var(--font-mono);
@@ -43,25 +43,25 @@ export function MobileAuthLayout({ eyebrow, title, subtitle, children, footer }:
           letter-spacing: 0.1em;
           text-transform: uppercase;
           color: var(--accent-primary);
-          margin-bottom: 6px;
+          margin-bottom: 4px;
         }
         .mobile-auth-layout__title {
-          font-size: 20px;
+          font-size: 19px;
           font-weight: 600;
           color: var(--text-primary);
           line-height: 1.3;
           letter-spacing: -0.01em;
-          margin-bottom: 6px;
+          margin-bottom: 4px;
         }
         .mobile-auth-layout__subtitle {
           font-size: 13px;
           color: var(--text-secondary);
           line-height: 1.5;
-          margin-bottom: 24px;
+          margin-bottom: 18px;
         }
         .mobile-auth-layout__footer {
-          margin-top: 32px;
-          padding-top: 24px;
+          margin-top: 24px;
+          padding-top: 20px;
           border-top: 1px solid var(--border-subtle);
         }
       `}</style>
@@ -69,20 +69,25 @@ export function MobileAuthLayout({ eyebrow, title, subtitle, children, footer }:
       {/* Centered column, same 440px cap the desktop content panel uses —
           without it, a wider phone/small-tablet viewport (anything short of
           the 860px breakpoint) stretched the form and body text edge to
-          edge. Logo size is set inline, not via the CSS class above: the
+          edge. Logo size is set inline, not via a CSS class: the
           transparent PNG's own intrinsic box is much wider than its visible
           mark, and a plain `img` selector elsewhere in the app's global
           styles was overriding a same-specificity class rule and stretching
-          it — an inline style always wins that fight. */}
+          it — an inline style always wins that fight. Logo + header text
+          are centered as a block (the form/footer below stay left-aligned —
+          that's the normal, more readable way to present form fields and
+          body copy). */}
       <div style={{ maxWidth: 440, width: '100%', margin: '0 auto' }}>
-        <img
-          src="/brand/truckwys-logo-transparent.png"
-          alt="TruckWys"
-          style={{ display: 'block', maxHeight: 22, width: 'auto', marginBottom: 20 }}
-        />
-        {eyebrow && <div className="mobile-auth-layout__eyebrow">{eyebrow}</div>}
-        <div className="mobile-auth-layout__title">{title}</div>
-        {subtitle && <div className="mobile-auth-layout__subtitle">{subtitle}</div>}
+        <div style={{ textAlign: 'center', marginBottom: 14 }}>
+          <img
+            src="/brand/truckwys-logo-transparent.png"
+            alt="TruckWys"
+            style={{ display: 'inline-block', maxHeight: 20, width: 'auto', marginBottom: 14 }}
+          />
+          {eyebrow && <div className="mobile-auth-layout__eyebrow">{eyebrow}</div>}
+          <div className="mobile-auth-layout__title">{title}</div>
+          {subtitle && <div className="mobile-auth-layout__subtitle" style={{ marginBottom: 0 }}>{subtitle}</div>}
+        </div>
 
         {children}
 

@@ -151,6 +151,9 @@ const Login = () => {
         @media (max-width: 860px) {
           .login-split { flex-direction: column; }
           .login-split__content, .login-split__form { flex: none; padding: 32px 24px; }
+          /* Form first on mobile — a visitor should land on the thing they
+             came to do, not scroll past a marketing panel to reach it. */
+          .login-split__form { order: -1; }
         }
       `}</style>
 

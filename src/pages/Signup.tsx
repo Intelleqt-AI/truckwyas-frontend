@@ -169,6 +169,9 @@ const Signup = () => {
         @media (max-width: 860px) {
           .signup-split { flex-direction: column; }
           .signup-split__content, .signup-split__form { flex: none; padding: 32px 24px; }
+          /* Form first on mobile — a visitor should land on the thing they
+             came to do, not scroll past a marketing panel to reach it. */
+          .signup-split__form { order: -1; }
         }
       `}</style>
 

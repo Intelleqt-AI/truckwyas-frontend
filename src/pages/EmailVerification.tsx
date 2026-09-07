@@ -108,6 +108,9 @@ export const EmailVerification = () => {
         @media (max-width: 860px) {
           .verify-split { flex-direction: column; }
           .verify-split__content, .verify-split__form { flex: none; padding: 32px 24px; }
+          /* Form first on mobile — a visitor should land on the thing they
+             came to do, not scroll past a marketing panel to reach it. */
+          .verify-split__form { order: -1; }
         }
       `}</style>
 

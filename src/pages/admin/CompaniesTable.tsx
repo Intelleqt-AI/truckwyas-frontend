@@ -61,7 +61,11 @@ const fmtDate = (dateStr?: string | null) => {
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
   active: 'active',
-  grace_period: 'active',
+  // Same blue as 'active' made a company silently needing attention (a
+  // failed charge, days from suspension) indistinguishable at a glance from
+  // one that's perfectly healthy — amber matches the urgency without
+  // implying it's already broken the way suspended/cancelled's red would.
+  grace_period: 'warning',
   suspended: 'delayed',
   cancelled: 'delayed',
   trialing: 'warning',
@@ -384,6 +388,24 @@ function CompanyBillingPanel({ company }: { company: Company }) {
     <tr>
       <td style={{ ...tdStyle, background: 'var(--bg-panel)' }} colSpan={COLUMN_COUNT}>
         <div style={{ padding: '10px 4px', display: 'grid', gap: 20 }}>
+          {/* The subscription fee and each load's delivery fee are two
+              separate billing lanes — only a successful (or manually
+              recorded) SUBSCRIPTION charge clears grace_period; marking a
+              delivery-fee row "paid" below never touches it, by design. That
+              distinction isn't obvious from the billing history table alone,
+              so spell it out here whenever it's actually relevant. */}
+          {company.subscription_status === 'grace_period' && (
+            <div style={{
+              padding: '10px 14px', background: 'var(--status-warning-bg, rgba(245,158,11,0.1))',
+              border: '1px solid var(--status-warning)', borderRadius: 2, fontSize: 12,
+            }}>
+              <strong style={{ color: 'var(--status-warning)' }}>In grace period</strong>
+              {company.grace_period_expires_at && <> — expires {fmtDate(company.grace_period_expires_at)}</>}.
+              This is caused by a failed <em>subscription</em> charge, not a delivery-fee charge — use{' '}
+              <strong>Record Payment</strong> below to resolve it. Marking a delivery-fee row as paid in the
+              billing history won't clear this, even if one happens to be failed too.
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap' }}>
             <div>
               <div style={panelLabelStyle}>Next billing date</div>
@@ -482,6 +504,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                             <button
                               type="button"
                               style={linkButtonStyle}
+                              title="Only fixes this one invoice's delivery fee — doesn't affect the subscription or clear a grace period"
                               disabled={markPaidMutation.isPending}
                               onClick={() => markPaidMutation.mutate(ch.raw_id)}
                             >

@@ -1,13 +1,37 @@
 import type { NavigateFunction } from 'react-router-dom';
 import { fetchData } from '@/lib/Api';
+import { isMobileDevice } from '@/lib/isMobileDevice';
+
+interface PostLoginNavigateOptions {
+  /**
+   * Whether landing on mobile may route into the web -> app auth handoff
+   * (/open-app). Default true. OpenInApp's own "Continue in browser" action
+   * calls this with `false` so it doesn't just bounce straight back to itself.
+   */
+  allowAppHandoff?: boolean;
+}
 
 /**
  * Where to land after a successful login (token already stored).
- * Admins who haven't completed (or skipped) the onboarding wizard yet are
- * sent to onboarding; everyone else to the dashboard. Shared by the
- * password-only and 2FA (OTP-verify) login paths.
+ * On mobile, sends the user to /open-app to hand off into the native app
+ * instead — unless `allowAppHandoff` is false. Otherwise: admins who haven't
+ * completed (or skipped) the onboarding wizard yet are sent to onboarding;
+ * everyone else to the dashboard. Shared by the password-only and 2FA
+ * (OTP-verify) login paths, and by SignupComplete.
  */
-export async function postLoginNavigate(navigate: NavigateFunction) {
+export async function postLoginNavigate(
+  navigate: NavigateFunction,
+  { allowAppHandoff = true }: PostLoginNavigateOptions = {},
+) {
+  // Checked and navigated before any `await` below: the token is already in
+  // localStorage by the time callers reach this function, so PublicOnly (on
+  // /login, /login/verify-otp, /signup/complete) would redirect to "/" on its
+  // next render — this has to win that race by running synchronously first.
+  if (allowAppHandoff && isMobileDevice()) {
+    navigate('/open-app');
+    return;
+  }
+
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
   const isAdmin = storedUser?.role?.toUpperCase() === 'ADMIN';
 

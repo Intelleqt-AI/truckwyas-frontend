@@ -4,6 +4,9 @@ import { fetchData, postData, patchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import PaginationControls from '@/pages/admin/PaginationControls';
+
+const PAGE_SIZE = 20;
 
 // Fuller replacement for the inline companies table in AdminDashboard.tsx —
 // adds search + status filter + per-row actions (suspend/reactivate/delete),
@@ -124,6 +127,7 @@ export function CompaniesTable() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ company: Company; action: 'suspend' | 'delete' } | null>(null);
 
@@ -132,16 +136,23 @@ export function CompaniesTable() {
     return () => clearTimeout(t);
   }, [search]);
 
+  // A narrower search/filter can leave `page` pointing past the new result
+  // set's end — reset to page 1 whenever either changes.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
+
   const queryString = (() => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set('search', debouncedSearch);
     if (statusFilter) params.set('status', statusFilter);
-    const qs = params.toString();
-    return qs ? `?${qs}` : '';
+    params.set('page', String(page));
+    params.set('page_size', String(PAGE_SIZE));
+    return `?${params.toString()}`;
   })();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-companies-full', debouncedSearch, statusFilter],
+    queryKey: ['admin-companies-full', debouncedSearch, statusFilter, page],
     queryFn: () => fetchData(`api/v1/admin/companies/${queryString}`),
   });
 
@@ -259,6 +270,16 @@ export function CompaniesTable() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {data && (
+        <PaginationControls
+          page={data.page || 1}
+          numPages={data.num_pages || 1}
+          count={data.count || 0}
+          onPrev={() => setPage(p => Math.max(1, p - 1))}
+          onNext={() => setPage(p => p + 1)}
+        />
       )}
 
       {confirmAction && (

@@ -4,6 +4,9 @@ import { fetchData, postData, patchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import PaginationControls from '@/pages/admin/PaginationControls';
+
+const PAGE_SIZE = 20;
 
 // Fuller replacement for the inline users table on AdminDashboard.tsx — adds
 // a status filter, account creation, and per-row account actions (lock /
@@ -60,6 +63,7 @@ export default function UsersTable() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'' | 'active' | 'inactive'>('');
+  const [page, setPage] = useState(1);
 
   // Per-row in-flight action, so we can disable just the one row's controls
   // rather than freezing the whole table on any single click.
@@ -78,12 +82,18 @@ export default function UsersTable() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const queryKey = ['admin-users-table', debouncedSearch, statusFilter];
+  // A narrower search/filter can leave `page` pointing past the new result
+  // set's end — reset to page 1 whenever either changes.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
+
+  const queryKey = ['admin-users-table', debouncedSearch, statusFilter, page];
   const { data, isLoading, isFetching } = useQuery({
     queryKey,
     queryFn: () =>
       fetchData(
-        `api/v1/admin/users/?search=${encodeURIComponent(debouncedSearch)}${statusFilter ? `&status=${statusFilter}` : ''}`
+        `api/v1/admin/users/?search=${encodeURIComponent(debouncedSearch)}${statusFilter ? `&status=${statusFilter}` : ''}&page=${page}&page_size=${PAGE_SIZE}`
       ),
   });
 
@@ -316,6 +326,16 @@ export default function UsersTable() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {data && (
+        <PaginationControls
+          page={data.page || 1}
+          numPages={data.num_pages || 1}
+          count={data.count || 0}
+          onPrev={() => setPage(p => Math.max(1, p - 1))}
+          onNext={() => setPage(p => p + 1)}
+        />
       )}
 
       {lockTarget && (

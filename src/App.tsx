@@ -288,7 +288,7 @@ const App = () => (
                   <Route path="/settings/integrations/fleet" element={<FleetImport />} />
                   <Route path="/settings/billing/history" element={<BillingHistoryPage />} />
                   <Route path="/settings/:section?" element={<Settings />} />
-                  <Route path="/admin" element={<AdminDashboard />} />
+                  <Route path="/admin/:section?" element={<AdminDashboard />} />
                   <Route path="/fleet/vehicles/:id/financial" element={<VehicleFinancialProfile />} />
                 </Route>
 

@@ -89,7 +89,14 @@ export function MobileAuthLayout({ eyebrow, title, subtitle, children, footer }:
           {subtitle && <div className="mobile-auth-layout__subtitle" style={{ marginBottom: 0 }}>{subtitle}</div>}
         </div>
 
-        {children}
+        {/* flex-centered, not just a wrapping div: the form card each page
+            passes in sets its own fixed maxWidth (400px, narrower than this
+            440px column) with no auto margin of its own, so without this it
+            sat flush against the column's left edge instead of centering
+            under the header text above it. */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          {children}
+        </div>
 
         {footer && <div className="mobile-auth-layout__footer">{footer}</div>}
       </div>

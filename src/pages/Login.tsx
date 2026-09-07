@@ -312,22 +312,27 @@ const Login = () => {
             {isPending ? "Signing in..." : "Sign in"}
           </button>
 
-          <button
-            type="button"
-            className="btn-action btn-ghost"
-            onClick={handleDemoLogin}
-            style={{
-              width: '100%',
-              padding: '12px 16px',
-              fontSize: 11,
-              letterSpacing: '0.08em',
-              cursor: isPending ? 'wait' : 'pointer',
-              opacity: isPending ? 0.6 : 1,
-            }}
-            disabled={isPending}
-          >
-            View Demo
-          </button>
+          <div style={{ marginTop: 4, textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
+            Just exploring?{" "}
+            <button
+              type="button"
+              onClick={handleDemoLogin}
+              disabled={isPending}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                font: 'inherit',
+                color: 'var(--accent-primary)',
+                fontWeight: 500,
+                textDecoration: 'none',
+                cursor: isPending ? 'wait' : 'pointer',
+                opacity: isPending ? 0.6 : 1,
+              }}
+            >
+              View Demo
+            </button>
+          </div>
         </form>
 
         <div style={{

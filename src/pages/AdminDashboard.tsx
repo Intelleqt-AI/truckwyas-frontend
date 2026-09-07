@@ -1,194 +1,136 @@
-import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchData, postData } from '@/lib/Api';
+import { useParams, NavLink, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
-import { toast } from '@/lib/toast';
-import { Loader } from '@/components/Loader';
-import { ConfirmModal } from '@/components/ConfirmModal';
+
+import AdminHome from '@/pages/admin/AdminHome';
 import { CompaniesTable } from '@/pages/admin/CompaniesTable';
 import UsersTable from '@/pages/admin/UsersTable';
+import DemoAccountPanel from '@/pages/admin/DemoAccountPanel';
 import SearchPanel from '@/pages/admin/SearchPanel';
-import JobHealthPanel from '@/pages/admin/JobHealthPanel';
-import IntegrationsPanel from '@/pages/admin/IntegrationsPanel';
+import PlatformHealth from '@/pages/admin/PlatformHealth';
 import AuditLogPanel from '@/pages/admin/AuditLogPanel';
 
-const formatCurrency = (n: number) =>
-  new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 0 }).format(n);
+type SectionItem = { id: string; label: string; component: () => JSX.Element };
+type Section = { group: string; items: SectionItem[] };
 
-const fmt = (dateStr?: string | null) =>
-  dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+const SECTIONS: Section[] = [
+  {
+    group: 'Overview',
+    items: [
+      { id: 'home', label: 'Home', component: AdminHome },
+    ],
+  },
+  {
+    group: 'Tenants',
+    items: [
+      { id: 'companies', label: 'Companies', component: CompaniesTable },
+      { id: 'users', label: 'Users', component: UsersTable },
+    ],
+  },
+  {
+    group: 'Support',
+    items: [
+      { id: 'search', label: 'Search', component: SearchPanel },
+      { id: 'demo', label: 'Demo Account', component: DemoAccountPanel },
+    ],
+  },
+  {
+    group: 'Platform',
+    items: [
+      { id: 'health', label: 'Platform Health', component: PlatformHealth },
+      { id: 'audit-log', label: 'Audit Log', component: AuditLogPanel },
+    ],
+  },
+];
 
-const cardStyle: React.CSSProperties = { padding: 20 };
-const sectionTitleStyle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 };
+const ALL_ITEMS = SECTIONS.flatMap(s => s.items);
 
 export default function AdminDashboard() {
+  const { section } = useParams();
   const { user: authUser } = useAuth();
-  const qc = useQueryClient();
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [resetting, setResetting] = useState(false);
 
-  // Redirect anyone who isn't a Django superuser — same pattern Settings.tsx
-  // already uses for its own adminOnly sections. The real enforcement is
-  // server-side (every /api/v1/admin/ endpoint requires IsSuperUser); this
-  // is just so a non-superuser never lands on a dead/empty page.
+  // Real enforcement is server-side (every /api/v1/admin/ endpoint requires
+  // IsSuperUser) — this is just so a non-superuser never lands on a dead page.
   if (!authUser?.is_superuser) return <Navigate to="/" replace />;
 
-  const { data: overview, isLoading: overviewLoading } = useQuery({
-    queryKey: ['admin-overview'],
-    queryFn: () => fetchData('api/v1/admin/overview/'),
-  });
+  if (!section) return <Navigate to="/admin/home" replace />;
 
-  const { data: demoStatus } = useQuery({
-    queryKey: ['admin-demo-status'],
-    queryFn: () => fetchData('api/v1/admin/demo-status/'),
-    refetchInterval: 60_000,
-  });
+  const current = ALL_ITEMS.find(i => i.id === section);
+  if (!current) return <Navigate to="/admin/home" replace />;
 
-  const doReset = async () => {
-    const wasCreate = !demoStatus?.exists;
-    setResetting(true);
-    try {
-      await postData({ url: 'api/v1/admin/demo-status/', data: {} });
-      toast.success(wasCreate ? 'Demo company created' : 'Demo company reset');
-      qc.invalidateQueries({ queryKey: ['admin-demo-status'] });
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to reset demo company');
-    } finally {
-      setResetting(false);
-      setConfirmReset(false);
-    }
-  };
+  const CurrentComponent = current.component;
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 0 60px' }}>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
-          Platform
-        </div>
-        <div style={{ fontSize: 22, fontWeight: 600, color: 'var(--text-primary)' }}>Admin Dashboard</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-          Cross-tenant visibility and controls, superuser only. Every write action below is recorded in the audit log.
-        </div>
-      </div>
-
-      {/* Overview */}
-      {overviewLoading ? <Loader size={28} /> : overview && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-          <div className="card metric-card"><div className="card-header"><span className="card-title">Companies</span></div>
-            <div className="metric-value" style={{ fontSize: 20 }}>{overview.total_companies}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
-              {overview.companies_by_status.active} active · {overview.companies_by_status.suspended} suspended · {overview.companies_by_status.cancelled} cancelled
+    <div style={{ display: 'flex', minHeight: '100%', gap: 0 }}>
+      {/* Sidebar — same shape as Settings.tsx's own section nav, so the two
+          "many sub-pages under one prefix" areas of the app feel consistent. */}
+      <div style={{
+        width: 220,
+        flexShrink: 0,
+        borderRight: '1px solid var(--border-subtle)',
+      }}>
+        <div style={{
+          position: 'sticky',
+          top: 0,
+          maxHeight: '100vh',
+          overflowY: 'auto',
+          paddingTop: 8,
+          paddingBottom: 24,
+        }}>
+          <div style={{ padding: '4px 20px 16px' }}>
+            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+              Platform
             </div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>Admin Dashboard</div>
           </div>
-          <div className="card metric-card"><div className="card-header"><span className="card-title">Users</span></div>
-            <div className="metric-value" style={{ fontSize: 20 }}>{overview.total_users}</div>
-          </div>
-          <div className="card metric-card"><div className="card-header"><span className="card-title">Quotes</span></div>
-            <div className="metric-value" style={{ fontSize: 20 }}>{overview.total_quotes}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{overview.quotes_this_month} this month</div>
-          </div>
-          <div className="card metric-card"><div className="card-header"><span className="card-title">Orders</span></div>
-            <div className="metric-value" style={{ fontSize: 20 }}>{overview.total_loads}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{overview.loads_this_month} this month</div>
-          </div>
-          <div className="card metric-card" style={{ gridColumn: 'span 4' }}>
-            <div className="card-header"><span className="card-title">Estimated MRR</span></div>
-            <div className="metric-value" style={{ fontSize: 20, color: 'var(--accent-primary)' }}>{formatCurrency(overview.mrr_estimate)}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
-              Active + grace-period companies × flat monthly fee — an estimate, not reconciled against actual Paystack charges.
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Demo account — shown even before the demo company exists yet, so
-          there's always a way to create it from here rather than waiting on
-          Celery beat's first tick. */}
-      {demoStatus && !demoStatus.exists && (
-        <div className="card" style={{ ...cardStyle, marginBottom: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={sectionTitleStyle}>Demo Account</div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                No demo company exists yet — it normally self-creates on Celery beat's first run, or create it now.
+          {SECTIONS.map((s, idx) => (
+            <div key={s.group} style={{ marginBottom: idx < SECTIONS.length - 1 ? 20 : 0 }}>
+              <div style={{
+                fontSize: 10,
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--text-tertiary)',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                padding: '12px 20px 6px',
+              }}>
+                {s.group}
               </div>
+              {s.items.map(item => {
+                const active = section === item.id;
+                return (
+                  <NavLink
+                    key={item.id}
+                    to={`/admin/${item.id}`}
+                    style={{
+                      display: 'block',
+                      padding: '8px 20px',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                      textDecoration: 'none',
+                      color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      background: active ? 'rgba(var(--accent-primary-rgb, 37,99,235), 0.08)' : 'transparent',
+                      borderLeft: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                      transition: 'color 0.15s, background 0.15s',
+                    }}
+                  >
+                    {item.label}
+                  </NavLink>
+                );
+              })}
             </div>
-            <button className="btn-action" style={{ fontSize: 11 }} disabled={resetting} onClick={doReset}>
-              {resetting ? 'Creating…' : 'Create Demo Company'}
-            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, padding: '0 0 60px 32px', minWidth: 0 }}>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>{current.label}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+            Cross-tenant visibility and controls, superuser only. Every write action is recorded in the audit log.
           </div>
         </div>
-      )}
-
-      {demoStatus?.exists && (
-        <div className="card" style={{ ...cardStyle, marginBottom: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div style={sectionTitleStyle}>Demo Account</div>
-            <button
-              className="btn-action"
-              style={{ fontSize: 11 }}
-              onClick={() => setConfirmReset(true)}
-            >
-              Force Reset Now
-            </button>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <div>
-              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>Quotes since last reset</div>
-              <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{demoStatus.demo_quota_used}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 2 }}>Each visitor's own session gets 1, independent of this total</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>Last reset</div>
-              <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{fmt(demoStatus.demo_last_reset_at)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 4 }}>Idle-eligible for auto-reset</div>
-              <div style={{ fontSize: 13, color: demoStatus.idle_eligible_for_auto_reset ? 'var(--status-warning)' : 'var(--text-primary)' }}>
-                {demoStatus.idle_eligible_for_auto_reset ? 'Yes — next 15-min check will reset it' : 'No'}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Companies */}
-      <div style={{ marginBottom: 24 }}>
-        <CompaniesTable />
+        <CurrentComponent />
       </div>
-
-      {/* Users */}
-      <div style={{ marginBottom: 24 }}>
-        <UsersTable />
-      </div>
-
-      {/* Support search */}
-      <div style={{ marginBottom: 24 }}>
-        <SearchPanel />
-      </div>
-
-      {/* Platform health */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-        <JobHealthPanel />
-        <IntegrationsPanel />
-      </div>
-
-      {/* Audit log */}
-      <div style={{ marginBottom: 24 }}>
-        <AuditLogPanel />
-      </div>
-
-      {confirmReset && (
-        <ConfirmModal
-          title="Reset demo company"
-          message="This immediately wipes and reseeds the shared demo company's fleet, quotes and orders back to the default dataset — anyone using it right now loses their in-progress quote. This can't be undone."
-          confirmLabel={resetting ? 'Resetting…' : 'Reset now'}
-          danger
-          onConfirm={doReset}
-          onCancel={() => setConfirmReset(false)}
-        />
-      )}
     </div>
   );
 }

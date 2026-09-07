@@ -1,9 +1,12 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import PaginationControls from '@/pages/admin/PaginationControls';
+
+const PAGE_SIZE = 20;
 
 // Fuller replacement for the inline companies table in AdminDashboard.tsx —
 // adds search + status filter + per-row actions (suspend/reactivate/delete),
@@ -14,6 +17,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 interface Company {
   id: number;
   company_name: string;
+  owner_email: string | null;
   subscription_status: string;
   is_demo: boolean;
   is_deleted: boolean;
@@ -27,6 +31,7 @@ interface Company {
 
 interface BillingChargeRow {
   id: number | string;
+  raw_id: number;
   kind: string;
   label: string;
   amount: number;
@@ -124,6 +129,7 @@ export function CompaniesTable() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ company: Company; action: 'suspend' | 'delete' } | null>(null);
 
@@ -132,16 +138,23 @@ export function CompaniesTable() {
     return () => clearTimeout(t);
   }, [search]);
 
+  // A narrower search/filter can leave `page` pointing past the new result
+  // set's end — reset to page 1 whenever either changes.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
+
   const queryString = (() => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set('search', debouncedSearch);
     if (statusFilter) params.set('status', statusFilter);
-    const qs = params.toString();
-    return qs ? `?${qs}` : '';
+    params.set('page', String(page));
+    params.set('page_size', String(PAGE_SIZE));
+    return `?${params.toString()}`;
   })();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-companies-full', debouncedSearch, statusFilter],
+    queryKey: ['admin-companies-full', debouncedSearch, statusFilter, page],
     queryFn: () => fetchData(`api/v1/admin/companies/${queryString}`),
   });
 
@@ -170,7 +183,7 @@ export function CompaniesTable() {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-          <input style={inputStyle} placeholder="Search companies…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input style={inputStyle} placeholder="Search company or owner email…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
@@ -197,9 +210,23 @@ export function CompaniesTable() {
                   <Fragment key={c.id}>
                     <tr>
                       <td style={tdStyle}>
-                        {c.company_name}
-                        {c.is_demo && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--status-warning)' }}>DEMO</span>}
-                        {c.is_deleted && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--status-danger)' }}>DELETED</span>}
+                        <div>
+                          {c.company_name}
+                          {c.is_demo && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--status-warning)' }}>DEMO</span>}
+                          {c.is_deleted && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--status-danger)' }}>DELETED</span>}
+                        </div>
+                        {/* company_name alone is rarely unique — self-service signup
+                            defaults it to "<first name>'s Transport", so the owner's
+                            email is what actually tells rows apart. A 'deleted-'
+                            prefix means every user this company ever had deleted
+                            their own account — an abandoned signup, not a real tenant. */}
+                        {c.owner_email && (
+                          c.owner_email.startsWith('deleted-') ? (
+                            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No active user (account deleted)</div>
+                          ) : (
+                            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{c.owner_email}</div>
+                          )
+                        )}
                       </td>
                       <td style={tdStyle}>
                         <span className={`status-badge ${STATUS_BADGE_CLASS[c.subscription_status] || ''}`}>{c.subscription_status}</span>
@@ -261,6 +288,16 @@ export function CompaniesTable() {
         </div>
       )}
 
+      {data && (
+        <PaginationControls
+          page={data.page || 1}
+          numPages={data.num_pages || 1}
+          count={data.count || 0}
+          onPrev={() => setPage(p => Math.max(1, p - 1))}
+          onNext={() => setPage(p => p + 1)}
+        />
+      )}
+
       {confirmAction && (
         <ConfirmModal
           title={confirmAction.action === 'delete' ? 'Delete company' : 'Suspend company'}
@@ -288,6 +325,13 @@ function CompanyBillingPanel({ company }: { company: Company }) {
   const [nextBillingDate, setNextBillingDate] = useState(company.next_billing_date ? company.next_billing_date.slice(0, 10) : '');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const amountInputRef = useRef<HTMLInputElement | null>(null);
+
+  const useAmountFor = (ch: BillingChargeRow) => {
+    setAmount(String(ch.amount));
+    setNote(`Manual payment for ${ch.label} (${fmtDateTime(ch.created_at)})`);
+    amountInputRef.current?.focus();
+  };
 
   const { data: billingData, isLoading: billingLoading } = useQuery({
     queryKey: ['admin-company-billing', company.id],
@@ -318,6 +362,20 @@ function CompanyBillingPanel({ company }: { company: Company }) {
       qc.invalidateQueries({ queryKey: ['admin-company-billing', company.id] });
     },
     onError: (e: any) => toast.error(e?.message || 'Failed to record payment'),
+  });
+
+  // Only for delivery-fee charges — a DeliveryFeeCharge is a single mutable
+  // row per invoice (already rewritten in place by the automatic retry), not
+  // a ledger entry, so correcting it directly here doesn't erase any history
+  // the way editing a subscription BillingTransaction would.
+  const markPaidMutation = useMutation({
+    mutationFn: (chargeId: number) =>
+      postData({ url: `api/v1/admin/delivery-fee-charges/${chargeId}/mark-paid/`, data: {} }),
+    onSuccess: () => {
+      toast.success('Delivery fee marked as paid');
+      qc.invalidateQueries({ queryKey: ['admin-company-billing', company.id] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'Failed to mark as paid'),
   });
 
   const charges: BillingChargeRow[] = billingData?.results || [];
@@ -357,6 +415,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
               <div style={panelLabelStyle}>Record payment</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <input
+                  ref={amountInputRef}
                   type="number"
                   min="0"
                   step="0.01"
@@ -404,6 +463,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                       <th style={thStyle}>Amount</th>
                       <th style={thStyle}>Status</th>
                       <th style={thStyle}>Reference</th>
+                      <th style={thStyle}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -417,6 +477,23 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                           <span className={`status-badge ${chargeStatusClass(ch.status)}`}>{ch.status}</span>
                         </td>
                         <td style={tdStyle}>{ch.reference || '—'}</td>
+                        <td style={tdStyle}>
+                          {ch.status === 'failed' && ch.kind === 'delivery_fee' && (
+                            <button
+                              type="button"
+                              style={linkButtonStyle}
+                              disabled={markPaidMutation.isPending}
+                              onClick={() => markPaidMutation.mutate(ch.raw_id)}
+                            >
+                              {markPaidMutation.isPending ? 'Marking…' : 'Mark as paid'}
+                            </button>
+                          )}
+                          {ch.status === 'failed' && ch.kind === 'subscription' && (
+                            <button type="button" style={linkButtonStyle} onClick={() => useAmountFor(ch)}>
+                              Use this amount ↑
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -237,19 +237,23 @@ export default function Overview() {
   };
 
   return (
-    <div style={{ display: "flex", gap: 24, alignItems: "start" }}>
-      {/* MAIN WORKSPACE */}
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        // "dense": the default (sparse) packing advances a one-way cursor —
+        // once a 2-wide card (e.g. Recent Bookings) can't fit in a single
+        // leftover column, the algorithm moves on and never backfills that
+        // gap with a later, smaller card. Dense packing fills those gaps
+        // instead — the actual cause of the empty column-3 strip between
+        // Fleet Utilization and Recent Activity. Doesn't affect DOM/reading
+        // order, only visual position.
+        gridAutoFlow: "dense",
+        gap: 16,
+        alignContent: "start",
+      }}>
+      {/* Command bar — compact clock + actionable live pulse */}
       <div
-        style={{
-          flex: 1,
-          minWidth: 0,
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 16,
-          alignContent: "start",
-        }}>
-        {/* Command bar — compact clock + actionable live pulse */}
-        <div
           className="card"
           style={{
             gridColumn: "span 3",
@@ -352,6 +356,82 @@ export default function Overview() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Quick Actions — moved up from the bottom of the page so the most
+            common next steps are reachable without scrolling past every
+            chart/table first. A slim horizontal bar (not a 2x2 box) keeps it
+            from eating much vertical space up here. */}
+        <div
+          className="card"
+          style={{
+            gridColumn: "span 3",
+            padding: "14px 20px",
+          }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              flexWrap: "wrap",
+            }}>
+            <span className="card-title" style={{ marginRight: 4 }}>
+              Quick Actions
+            </span>
+            <button
+              onClick={() => navigate("/finance/invoices/new")}
+              className="btn-action"
+              style={{
+                padding: "8px 16px",
+                fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.05em",
+              }}>
+              Create Invoice
+            </button>
+            <button
+              onClick={() => navigate("/capital")}
+              className="btn-action"
+              style={{
+                padding: "8px 16px",
+                fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.05em",
+                background: "transparent",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-secondary)",
+              }}>
+              Request Advance
+            </button>
+            <button
+              onClick={() => navigate("/finance/expenses")}
+              className="btn-action"
+              style={{
+                padding: "8px 16px",
+                fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.05em",
+                background: "transparent",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-secondary)",
+              }}>
+              Add Expense
+            </button>
+            <button
+              onClick={() => navigate("/finance/reports")}
+              className="btn-action"
+              style={{
+                padding: "8px 16px",
+                fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.05em",
+                background: "transparent",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-secondary)",
+              }}>
+              View Reports
+            </button>
           </div>
         </div>
 
@@ -918,81 +998,6 @@ export default function Overview() {
           )}
         </div>
 
-        {/* Quick Actions */}
-        <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>
-            Quick Actions
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-            }}>
-            <button
-              onClick={() => navigate("/finance/invoices/new")}
-              className="btn-action"
-              style={{
-                width: "100%",
-                justifyContent: "center",
-                padding: "10px 12px",
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
-              }}>
-              Create Invoice
-            </button>
-            <button
-              onClick={() => navigate("/capital")}
-              className="btn-action"
-              style={{
-                width: "100%",
-                justifyContent: "center",
-                padding: "10px 12px",
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              Request Advance
-            </button>
-            <button
-              onClick={() => navigate("/finance/expenses")}
-              className="btn-action"
-              style={{
-                width: "100%",
-                justifyContent: "center",
-                padding: "10px 12px",
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              Add Expense
-            </button>
-            <button
-              onClick={() => navigate("/finance/reports")}
-              className="btn-action"
-              style={{
-                width: "100%",
-                justifyContent: "center",
-                padding: "10px 12px",
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              View Reports
-            </button>
-          </div>
-        </div>
-
         {/* Recent Activity */}
         <div className="card" style={{ padding: 20 }}>
           <div className="card-title" style={{ marginBottom: 16 }}>
@@ -1040,19 +1045,13 @@ export default function Overview() {
             </div>
           )}
         </div>
-      </div>
 
-      {/* AGENT SIDEBAR */}
-      <aside
-        style={{
-          width: 260,
-          flexShrink: 0,
-          border: "1px solid var(--border-subtle)",
-          borderRadius: "var(--card-radius)",
-          background: "var(--bg-sidebar)",
-          display: "flex",
-          flexDirection: "column",
-        }}>
+      {/* Agent Activity Stream — a regular grid card now, not a separate
+          full-height rail: that layout reserved a fixed-width column that
+          stayed mostly blank whenever there were only a couple of insights,
+          leaving a large empty strip down the right side of the page. As a
+          grid card it's only as tall as its own content. */}
+      <div className="card" style={{ padding: 0, background: "var(--bg-sidebar)" }}>
         <div className="agent-header">
           <div className="live-dot" />
           Agent Activity Stream
@@ -1108,7 +1107,7 @@ export default function Overview() {
             </div>
           )}
         </div>
-      </aside>
+      </div>
     </div>
   );
 }

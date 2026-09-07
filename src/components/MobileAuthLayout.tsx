@@ -29,8 +29,12 @@ export function MobileAuthLayout({ eyebrow, title, subtitle, children, footer }:
           /* html/body/#root are pinned to height:100vh + overflow:hidden
              app-wide — same reasoning as the desktop split's own scroll
              container (see Login.tsx etc.), just column-oriented here since
-             there's only ever one column on mobile. */
-          min-height: 100vh;
+             there's only ever one column on mobile. Must be height, not
+             min-height: min-height lets this div grow taller than the
+             viewport to fit all its content, which means IT never overflows
+             (nothing to scroll) while the hidden-overflow ancestor silently
+             clips everything past the first screen instead. */
+          height: 100vh;
           overflow-y: auto;
           background: var(--bg-deep);
           font-family: var(--font-sans);

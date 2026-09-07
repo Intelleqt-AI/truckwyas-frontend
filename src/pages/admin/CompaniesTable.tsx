@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
@@ -30,6 +30,7 @@ interface Company {
 
 interface BillingChargeRow {
   id: number | string;
+  raw_id: number;
   kind: string;
   label: string;
   amount: number;
@@ -309,6 +310,13 @@ function CompanyBillingPanel({ company }: { company: Company }) {
   const [nextBillingDate, setNextBillingDate] = useState(company.next_billing_date ? company.next_billing_date.slice(0, 10) : '');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const amountInputRef = useRef<HTMLInputElement | null>(null);
+
+  const useAmountFor = (ch: BillingChargeRow) => {
+    setAmount(String(ch.amount));
+    setNote(`Manual payment for ${ch.label} (${fmtDateTime(ch.created_at)})`);
+    amountInputRef.current?.focus();
+  };
 
   const { data: billingData, isLoading: billingLoading } = useQuery({
     queryKey: ['admin-company-billing', company.id],
@@ -339,6 +347,20 @@ function CompanyBillingPanel({ company }: { company: Company }) {
       qc.invalidateQueries({ queryKey: ['admin-company-billing', company.id] });
     },
     onError: (e: any) => toast.error(e?.message || 'Failed to record payment'),
+  });
+
+  // Only for delivery-fee charges — a DeliveryFeeCharge is a single mutable
+  // row per invoice (already rewritten in place by the automatic retry), not
+  // a ledger entry, so correcting it directly here doesn't erase any history
+  // the way editing a subscription BillingTransaction would.
+  const markPaidMutation = useMutation({
+    mutationFn: (chargeId: number) =>
+      postData({ url: `api/v1/admin/delivery-fee-charges/${chargeId}/mark-paid/`, data: {} }),
+    onSuccess: () => {
+      toast.success('Delivery fee marked as paid');
+      qc.invalidateQueries({ queryKey: ['admin-company-billing', company.id] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'Failed to mark as paid'),
   });
 
   const charges: BillingChargeRow[] = billingData?.results || [];
@@ -378,6 +400,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
               <div style={panelLabelStyle}>Record payment</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <input
+                  ref={amountInputRef}
                   type="number"
                   min="0"
                   step="0.01"
@@ -425,6 +448,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                       <th style={thStyle}>Amount</th>
                       <th style={thStyle}>Status</th>
                       <th style={thStyle}>Reference</th>
+                      <th style={thStyle}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -438,6 +462,23 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                           <span className={`status-badge ${chargeStatusClass(ch.status)}`}>{ch.status}</span>
                         </td>
                         <td style={tdStyle}>{ch.reference || '—'}</td>
+                        <td style={tdStyle}>
+                          {ch.status === 'failed' && ch.kind === 'delivery_fee' && (
+                            <button
+                              type="button"
+                              style={linkButtonStyle}
+                              disabled={markPaidMutation.isPending}
+                              onClick={() => markPaidMutation.mutate(ch.raw_id)}
+                            >
+                              {markPaidMutation.isPending ? 'Marking…' : 'Mark as paid'}
+                            </button>
+                          )}
+                          {ch.status === 'failed' && ch.kind === 'subscription' && (
+                            <button type="button" style={linkButtonStyle} onClick={() => useAmountFor(ch)}>
+                              Use this amount ↑
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -86,7 +86,7 @@ export function MobileAuthLayout({ eyebrow, title, subtitle, children, footer }:
           <img
             src="/brand/truckwys-logo-transparent.png"
             alt="TruckWys"
-            style={{ display: 'inline-block', maxHeight: 20, width: 'auto', marginBottom: 14 }}
+            style={{ display: 'inline-block', maxHeight: 30, width: 'auto', marginBottom: 16 }}
           />
           {eyebrow && <div className="mobile-auth-layout__eyebrow">{eyebrow}</div>}
           <div className="mobile-auth-layout__title">{title}</div>

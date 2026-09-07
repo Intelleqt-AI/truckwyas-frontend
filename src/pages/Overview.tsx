@@ -355,6 +355,82 @@ export default function Overview() {
           </div>
         </div>
 
+        {/* Quick Actions — moved up from the bottom of the page so the most
+            common next steps are reachable without scrolling past every
+            chart/table first. A slim horizontal bar (not a 2x2 box) keeps it
+            from eating much vertical space up here. */}
+        <div
+          className="card"
+          style={{
+            gridColumn: "span 3",
+            padding: "14px 20px",
+          }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              flexWrap: "wrap",
+            }}>
+            <span className="card-title" style={{ marginRight: 4 }}>
+              Quick Actions
+            </span>
+            <button
+              onClick={() => navigate("/finance/invoices/new")}
+              className="btn-action"
+              style={{
+                padding: "8px 16px",
+                fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.05em",
+              }}>
+              Create Invoice
+            </button>
+            <button
+              onClick={() => navigate("/capital")}
+              className="btn-action"
+              style={{
+                padding: "8px 16px",
+                fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.05em",
+                background: "transparent",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-secondary)",
+              }}>
+              Request Advance
+            </button>
+            <button
+              onClick={() => navigate("/finance/expenses")}
+              className="btn-action"
+              style={{
+                padding: "8px 16px",
+                fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.05em",
+                background: "transparent",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-secondary)",
+              }}>
+              Add Expense
+            </button>
+            <button
+              onClick={() => navigate("/finance/reports")}
+              className="btn-action"
+              style={{
+                padding: "8px 16px",
+                fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.05em",
+                background: "transparent",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-secondary)",
+              }}>
+              View Reports
+            </button>
+          </div>
+        </div>
+
         {/* Metric cards */}
         <div className="card metric-card">
           <div className="card-header">
@@ -916,81 +992,6 @@ export default function Overview() {
               No recent bookings
             </div>
           )}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>
-            Quick Actions
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-            }}>
-            <button
-              onClick={() => navigate("/finance/invoices/new")}
-              className="btn-action"
-              style={{
-                width: "100%",
-                justifyContent: "center",
-                padding: "10px 12px",
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
-              }}>
-              Create Invoice
-            </button>
-            <button
-              onClick={() => navigate("/capital")}
-              className="btn-action"
-              style={{
-                width: "100%",
-                justifyContent: "center",
-                padding: "10px 12px",
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              Request Advance
-            </button>
-            <button
-              onClick={() => navigate("/finance/expenses")}
-              className="btn-action"
-              style={{
-                width: "100%",
-                justifyContent: "center",
-                padding: "10px 12px",
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              Add Expense
-            </button>
-            <button
-              onClick={() => navigate("/finance/reports")}
-              className="btn-action"
-              style={{
-                width: "100%",
-                justifyContent: "center",
-                padding: "10px 12px",
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              View Reports
-            </button>
-          </div>
         </div>
 
         {/* Recent Activity */}

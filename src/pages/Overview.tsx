@@ -237,19 +237,15 @@ export default function Overview() {
   };
 
   return (
-    <div style={{ display: "flex", gap: 24, alignItems: "start" }}>
-      {/* MAIN WORKSPACE */}
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: 16,
+        alignContent: "start",
+      }}>
+      {/* Command bar — compact clock + actionable live pulse */}
       <div
-        style={{
-          flex: 1,
-          minWidth: 0,
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 16,
-          alignContent: "start",
-        }}>
-        {/* Command bar — compact clock + actionable live pulse */}
-        <div
           className="card"
           style={{
             gridColumn: "span 3",
@@ -1041,19 +1037,13 @@ export default function Overview() {
             </div>
           )}
         </div>
-      </div>
 
-      {/* AGENT SIDEBAR */}
-      <aside
-        style={{
-          width: 260,
-          flexShrink: 0,
-          border: "1px solid var(--border-subtle)",
-          borderRadius: "var(--card-radius)",
-          background: "var(--bg-sidebar)",
-          display: "flex",
-          flexDirection: "column",
-        }}>
+      {/* Agent Activity Stream — a regular grid card now, not a separate
+          full-height rail: that layout reserved a fixed-width column that
+          stayed mostly blank whenever there were only a couple of insights,
+          leaving a large empty strip down the right side of the page. As a
+          grid card it's only as tall as its own content. */}
+      <div className="card" style={{ padding: 0, background: "var(--bg-sidebar)" }}>
         <div className="agent-header">
           <div className="live-dot" />
           Agent Activity Stream
@@ -1109,7 +1099,7 @@ export default function Overview() {
             </div>
           )}
         </div>
-      </aside>
+      </div>
     </div>
   );
 }

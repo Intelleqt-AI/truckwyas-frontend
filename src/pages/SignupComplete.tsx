@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { postData } from '@/lib/Api';
 import { useAuth } from '@/lib/AuthContext';
+import { isMobileDevice } from '@/lib/isMobileDevice';
 
 // Lands here when Paystack redirects back from the mandatory signup checkout
 // (EmailVerification started it). No account exists yet — this is where
@@ -35,7 +36,13 @@ export const SignupComplete = () => {
         localStorage.setItem('user', JSON.stringify(data.user));
         setUser(data.user);
         sessionStorage.removeItem('signup_email');
-        navigate('/onboarding');
+        // On mobile, hand off into the native app instead of the web onboarding
+        // wizard — see /open-app. Desktop keeps today's behaviour exactly.
+        if (isMobileDevice()) {
+          navigate('/open-app', { replace: true });
+        } else {
+          navigate('/onboarding');
+        }
       } catch (err: any) {
         setStatus('failed');
         setError(err?.data?.detail || 'Payment could not be confirmed.');

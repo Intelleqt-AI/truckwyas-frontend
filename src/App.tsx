@@ -97,6 +97,7 @@ const SignupComplete = lazy(() =>
   })),
 );
 const Onboarding = lazy(() => import('./pages/Onboarding').then(m => ({ default: m.Onboarding })));
+const OpenInApp = lazy(() => import('./pages/OpenInApp').then(m => ({ default: m.OpenInApp })));
 const VehicleFinancialProfile = lazy(() => import('./pages/VehicleFinancialProfile'));
 const RiskScoreView = lazy(() => import('./pages/RiskScoreView'));
 const FleetHeatmap = lazy(() => import('./pages/FleetHeatmap'));
@@ -219,6 +220,18 @@ const App = () => (
                 element={
                   <RequireAuth>
                     <Onboarding />
+                  </RequireAuth>
+                }
+              />
+              {/* Web -> app auth handoff entry point. Not PublicOnly (the user
+                  arriving here is already authenticated — that's the whole point),
+                  and RequireAuth rather than a plain route so a stray unauthenticated
+                  visit redirects cleanly to /login instead of the mint 401ing. */}
+              <Route
+                path="/open-app"
+                element={
+                  <RequireAuth>
+                    <OpenInApp />
                   </RequireAuth>
                 }
               />

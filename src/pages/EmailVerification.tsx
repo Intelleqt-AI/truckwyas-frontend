@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { postData } from '@/lib/Api';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { MobileAuthLayout } from '@/components/MobileAuthLayout';
 
 // Kept in sync with Signup.tsx / core/services/paystack.py — this is step 2
 // of that same 3-step flow, so it shows the identical price/steps rather than
@@ -28,6 +30,7 @@ const PLAN_FEATURES = [
 
 export const EmailVerification = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
   const email = searchParams.get('email') || '';
 
@@ -83,6 +86,158 @@ export const EmailVerification = () => {
     }
   };
 
+  // Shared between the desktop card (which shows its own text logo) and the
+  // mobile card (which doesn't need one — MobileAuthLayout already puts the
+  // real image logo at the top of the page).
+  const formBody = (
+    <>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Verify your email</div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+          We sent a 6-digit verification code to{' '}
+          <strong style={{ color: 'var(--text-primary)' }}>{email || 'your email'}</strong>.
+          Enter it below to continue to payment and activate your account.
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 4, fontSize: 12, color: 'var(--status-danger)' }}>
+          {error}
+        </div>
+      )}
+      {resentMsg && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-success-bg, rgba(34,197,94,0.1))', border: '1px solid var(--status-success)', borderRadius: 4, fontSize: 12, color: 'var(--status-success)' }}>
+          {resentMsg}
+        </div>
+      )}
+
+      <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div>
+          <label style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, letterSpacing: '0.08em' }}>
+            VERIFICATION CODE
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={6}
+            required
+            value={code}
+            onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="000000"
+            autoFocus
+            style={{
+              width: '100%', padding: '14px 16px', background: 'var(--bg-base)',
+              border: '1px solid var(--border-subtle)', borderRadius: 4,
+              color: 'var(--text-primary)', fontSize: 26, outline: 'none',
+              boxSizing: 'border-box', letterSpacing: '0.3em', fontFamily: 'var(--font-mono)',
+              textAlign: 'center',
+            }}
+          />
+        </div>
+
+        <button type="submit" className="btn-action" style={{ width: '100%' }} disabled={loading || code.length !== 6}>
+          {loading ? 'Verifying...' : 'Verify email'}
+        </button>
+      </form>
+
+      <div style={{ marginTop: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-secondary)' }}>
+        Didn't receive the code?{' '}
+        <button onClick={handleResend} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: 12, padding: 0, fontFamily: 'var(--font-sans)' }}>
+          Resend code
+        </button>
+      </div>
+
+      <div style={{ marginTop: 16, textAlign: 'center' }}>
+        <button onClick={() => navigate('/login')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>
+          ← Back to login
+        </button>
+      </div>
+    </>
+  );
+
+  const desktopFormCard = (
+    <div style={{ width: '100%', maxWidth: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxSizing: 'border-box' }}>
+      <div style={{ marginBottom: 32, textAlign: 'center' }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>TRUCKWYS</div>
+        <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>ROAD FREIGHT INTELLIGENCE</div>
+      </div>
+      {formBody}
+    </div>
+  );
+
+  // Everything the desktop content panel shows besides its own logo/eyebrow/
+  // title (those become MobileAuthLayout's own header props on mobile) —
+  // demoted to a footer below the form there.
+  const extraContent = (
+    <>
+      <div style={{
+        border: '1px solid var(--border-active)', borderRadius: 'var(--card-radius)',
+        padding: 24, marginBottom: 28, background: 'var(--bg-surface-hover)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 34, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+            R{MONTHLY_FEE}
+          </span>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>/ month</span>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+          + {TAKE_RATE_PCT}% of every delivered load's value
+        </div>
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}>
+          THIS IS WHAT STEP 3 WILL CHARGE — NOTHING YET
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 28 }}>
+        {SIGNUP_STEPS.map((step, i) => (
+          <div key={step.label} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <div style={{
+              flex: 'none', width: 22, height: 22, borderRadius: '50%',
+              border: `1px solid ${i <= 1 ? 'var(--accent-primary)' : 'var(--border-active)'}`,
+              color: i <= 1 ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, marginTop: 1,
+            }}>
+              {i < 1 ? '✓' : i + 1}
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: i <= 1 ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{step.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 1 }}>{step.detail}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+        {PLAN_FEATURES.map(f => (
+          <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+            <Check size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+            {f}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 32, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
+        PAYMENTS SECURED BY PAYSTACK
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <MobileAuthLayout
+        eyebrow="Step 2 of 3"
+        title={<>Almost there — <span style={{ color: 'var(--accent-primary)' }}>just confirm it's you</span>.</>}
+        footer={extraContent}
+      >
+        <div style={{ width: '100%', maxWidth: 420, padding: 32, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxSizing: 'border-box' }}>
+          {formBody}
+        </div>
+      </MobileAuthLayout>
+    );
+  }
+
   return (
     <div className="verify-split">
       <style>{`
@@ -105,10 +260,6 @@ export const EmailVerification = () => {
           justify-content: center;
         }
         .verify-split__form { align-items: center; }
-        @media (max-width: 860px) {
-          .verify-split { flex-direction: column; }
-          .verify-split__content, .verify-split__form { flex: none; padding: 32px 24px; }
-        }
       `}</style>
 
       {/* Content side — the same steps/price Signup showed, step 2 now active */}
@@ -127,131 +278,13 @@ export const EmailVerification = () => {
             Almost there — <span style={{ color: 'var(--accent-primary)' }}>just confirm it's you</span>.
           </div>
 
-          <div style={{
-            border: '1px solid var(--border-active)', borderRadius: 'var(--card-radius)',
-            padding: 24, marginBottom: 28, background: 'var(--bg-surface-hover)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 34, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-                R{MONTHLY_FEE}
-              </span>
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>/ month</span>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              + {TAKE_RATE_PCT}% of every delivered load's value
-            </div>
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}>
-              THIS IS WHAT STEP 3 WILL CHARGE — NOTHING YET
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 28 }}>
-            {SIGNUP_STEPS.map((step, i) => (
-              <div key={step.label} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                <div style={{
-                  flex: 'none', width: 22, height: 22, borderRadius: '50%',
-                  border: `1px solid ${i <= 1 ? 'var(--accent-primary)' : 'var(--border-active)'}`,
-                  color: i <= 1 ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, marginTop: 1,
-                }}>
-                  {i < 1 ? '✓' : i + 1}
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: i <= 1 ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{step.label}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 1 }}>{step.detail}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
-            {PLAN_FEATURES.map(f => (
-              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-                <Check size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-                {f}
-              </div>
-            ))}
-          </div>
-
-          <div style={{ marginTop: 32, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
-            PAYMENTS SECURED BY PAYSTACK
-          </div>
+          {extraContent}
         </div>
       </div>
 
       {/* Form side */}
       <div className="verify-split__form">
-      <div style={{ width: '100%', maxWidth: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
-        {/* Logo */}
-        <div style={{ marginBottom: 32, textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>TRUCKWYS</div>
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>ROAD FREIGHT INTELLIGENCE</div>
-        </div>
-
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Verify your email</div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            We sent a 6-digit verification code to{' '}
-            <strong style={{ color: 'var(--text-primary)' }}>{email || 'your email'}</strong>.
-            Enter it below to continue to payment and activate your account.
-          </div>
-        </div>
-
-        {error && (
-          <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 4, fontSize: 12, color: 'var(--status-danger)' }}>
-            {error}
-          </div>
-        )}
-        {resentMsg && (
-          <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-success-bg, rgba(34,197,94,0.1))', border: '1px solid var(--status-success)', borderRadius: 4, fontSize: 12, color: 'var(--status-success)' }}>
-            {resentMsg}
-          </div>
-        )}
-
-        <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <label style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, letterSpacing: '0.08em' }}>
-              VERIFICATION CODE
-            </label>
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={6}
-              required
-              value={code}
-              onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="000000"
-              autoFocus
-              style={{
-                width: '100%', padding: '14px 16px', background: 'var(--bg-base)',
-                border: '1px solid var(--border-subtle)', borderRadius: 4,
-                color: 'var(--text-primary)', fontSize: 26, outline: 'none',
-                boxSizing: 'border-box', letterSpacing: '0.3em', fontFamily: 'var(--font-mono)',
-                textAlign: 'center',
-              }}
-            />
-          </div>
-
-          <button type="submit" className="btn-action" style={{ width: '100%' }} disabled={loading || code.length !== 6}>
-            {loading ? 'Verifying...' : 'Verify email'}
-          </button>
-        </form>
-
-        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-secondary)' }}>
-          Didn't receive the code?{' '}
-          <button onClick={handleResend} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: 12, padding: 0, fontFamily: 'var(--font-sans)' }}>
-            Resend code
-          </button>
-        </div>
-
-        <div style={{ marginTop: 16, textAlign: 'center' }}>
-          <button onClick={() => navigate('/login')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>
-            ← Back to login
-          </button>
-        </div>
-      </div>
+        {desktopFormCard}
       </div>
     </div>
   );

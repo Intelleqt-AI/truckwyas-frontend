@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Check } from "lucide-react";
 import { useLogin } from "@/hooks/useLogin";
 import { postLoginNavigate } from "@/lib/postLogin";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { MobileAuthLayout } from "@/components/MobileAuthLayout";
 
 // Same list Signup.tsx and BillingSettings.tsx show — kept identical across
 // every page that mentions the plan, so returning users see the same promise
@@ -20,6 +22,7 @@ const PLAN_FEATURES = [
 
 const Login = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { mutate: login, isPending } = useLogin();
   const [formData, setFormData] = useState({
     username: "",
@@ -126,6 +129,201 @@ const Login = () => {
     textTransform: 'uppercase',
   };
 
+  const formCard = (
+    <div style={{
+      width: '100%',
+      maxWidth: 400,
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border-subtle)',
+      borderRadius: 2,
+      padding: 40,
+      boxSizing: 'border-box',
+    }}>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
+          Sign in to your account
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          Enter your credentials to access the dashboard
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div>
+          <label htmlFor="username" style={labelStyle}>Email</label>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            placeholder="name@example.com"
+            required
+            value={formData.username}
+            onChange={handleChange}
+            style={{
+              ...inputStyle,
+              borderColor: validationErrors.username ? 'var(--status-danger)' : 'var(--border-subtle)',
+            }}
+          />
+          {validationErrors.username && (
+            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
+              {validationErrors.username}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <label htmlFor="password" style={{ ...labelStyle, marginBottom: 0 }}>Password</label>
+            <Link
+              to="/password-reset"
+              style={{
+                fontSize: 11,
+                color: 'var(--accent-primary)',
+                textDecoration: 'none',
+              }}
+            >
+              Forgot password?
+            </Link>
+          </div>
+          <div style={{ position: 'relative' }}>
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              required
+              value={formData.password}
+              onChange={handleChange}
+              style={{
+                ...inputStyle,
+                borderColor: validationErrors.password ? 'var(--status-danger)' : 'var(--border-subtle)',
+                paddingRight: 40,
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(v => !v)}
+              style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          {validationErrors.password && (
+            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
+              {validationErrors.password}
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div style={{
+            padding: '12px 16px',
+            background: 'var(--status-danger-bg)',
+            border: '1px solid var(--status-danger)',
+            borderRadius: 2,
+            color: 'var(--status-danger)',
+            fontSize: 12,
+          }}>
+            {error}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          className="btn-action"
+          style={{
+            width: '100%',
+            padding: '12px 16px',
+            fontSize: 11,
+            letterSpacing: '0.08em',
+            cursor: isPending ? 'wait' : 'pointer',
+            opacity: isPending ? 0.6 : 1,
+          }}
+          disabled={isPending}
+        >
+          {isPending ? "Signing in..." : "Sign in"}
+        </button>
+
+        <div style={{ marginTop: 4, textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
+          Just exploring?{" "}
+          <button
+            type="button"
+            onClick={handleDemoLogin}
+            disabled={isPending}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              font: 'inherit',
+              color: 'var(--accent-primary)',
+              fontWeight: 500,
+              textDecoration: 'none',
+              cursor: isPending ? 'wait' : 'pointer',
+              opacity: isPending ? 0.6 : 1,
+            }}
+          >
+            View Demo
+          </button>
+        </div>
+      </form>
+
+      <div style={{
+        marginTop: 24,
+        textAlign: 'center',
+        fontSize: 13,
+        color: 'var(--text-secondary)'
+      }}>
+        Don't have an account?{" "}
+        <Link to="/signup" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+          Sign up
+        </Link>
+      </div>
+    </div>
+  );
+
+  // Everything the desktop content panel shows besides its own logo/eyebrow/
+  // title/subtitle (those become MobileAuthLayout's own header props on
+  // mobile) — demoted to a footer below the form there, since none of it
+  // blocks completing the form above it.
+  const extraContent = (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+        {PLAN_FEATURES.map(f => (
+          <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+            <Check size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+            {f}
+          </div>
+        ))}
+      </div>
+
+      <div style={{
+        marginTop: 24, padding: '10px 13px', border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--card-radius)', background: 'var(--bg-surface-hover)',
+        fontSize: 12, color: 'var(--text-secondary)',
+      }}>
+        Reminder: every completed load also carries a <strong style={{ color: 'var(--text-primary)' }}>0.25% platform fee</strong>,
+        charged automatically to the card on file on top of the monthly plan.
+      </div>
+
+      <div style={{ marginTop: 20, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
+        BUILT FOR SOUTH AFRICAN ROAD FREIGHT
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <MobileAuthLayout
+        eyebrow="Welcome back"
+        title={<>Your fleet, right where <span style={{ color: 'var(--accent-primary)' }}>you left it</span>.</>}
+        subtitle="Loads, quotes, invoices, and fleet intelligence — all in one dashboard, updated in real time."
+        footer={extraContent}
+      >
+        {formCard}
+      </MobileAuthLayout>
+    );
+  }
+
   return (
     <div className="login-split">
       <style>{`
@@ -148,10 +346,6 @@ const Login = () => {
           justify-content: center;
         }
         .login-split__form { align-items: center; }
-        @media (max-width: 860px) {
-          .login-split { flex-direction: column; }
-          .login-split__content, .login-split__form { flex: none; padding: 32px 24px; }
-        }
       `}</style>
 
       {/* Content side — a reminder of what's waiting, not a sales pitch */}
@@ -173,180 +367,13 @@ const Login = () => {
             Loads, quotes, invoices, and fleet intelligence — all in one dashboard, updated in real time.
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
-            {PLAN_FEATURES.map(f => (
-              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-                <Check size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
-                {f}
-              </div>
-            ))}
-          </div>
-
-          <div style={{
-            marginTop: 24, padding: '10px 13px', border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--card-radius)', background: 'var(--bg-surface-hover)',
-            fontSize: 12, color: 'var(--text-secondary)',
-          }}>
-            Reminder: every completed load also carries a <strong style={{ color: 'var(--text-primary)' }}>0.25% platform fee</strong>,
-            charged automatically to the card on file on top of the monthly plan.
-          </div>
-
-          <div style={{ marginTop: 20, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
-            BUILT FOR SOUTH AFRICAN ROAD FREIGHT
-          </div>
+          {extraContent}
         </div>
       </div>
 
       {/* Form side */}
       <div className="login-split__form">
-      <div style={{
-        width: '100%',
-        maxWidth: 400,
-        background: 'var(--bg-surface)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 2,
-        padding: 40,
-      }}>
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
-            Sign in to your account
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            Enter your credentials to access the dashboard
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div>
-            <label htmlFor="username" style={labelStyle}>Email</label>
-            <input
-              id="username"
-              name="username"
-              type="text"
-              placeholder="name@example.com"
-              required
-              value={formData.username}
-              onChange={handleChange}
-              style={{
-                ...inputStyle,
-                borderColor: validationErrors.username ? 'var(--status-danger)' : 'var(--border-subtle)',
-              }}
-            />
-            {validationErrors.username && (
-              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
-                {validationErrors.username}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <label htmlFor="password" style={{ ...labelStyle, marginBottom: 0 }}>Password</label>
-              <Link
-                to="/password-reset"
-                style={{
-                  fontSize: 11,
-                  color: 'var(--accent-primary)',
-                  textDecoration: 'none',
-                }}
-              >
-                Forgot password?
-              </Link>
-            </div>
-            <div style={{ position: 'relative' }}>
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                required
-                value={formData.password}
-                onChange={handleChange}
-                style={{
-                  ...inputStyle,
-                  borderColor: validationErrors.password ? 'var(--status-danger)' : 'var(--border-subtle)',
-                  paddingRight: 40,
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(v => !v)}
-                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}
-                tabIndex={-1}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-            {validationErrors.password && (
-              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger)' }}>
-                {validationErrors.password}
-              </div>
-            )}
-          </div>
-
-          {error && (
-            <div style={{
-              padding: '12px 16px',
-              background: 'var(--status-danger-bg)',
-              border: '1px solid var(--status-danger)',
-              borderRadius: 2,
-              color: 'var(--status-danger)',
-              fontSize: 12,
-            }}>
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="btn-action"
-            style={{
-              width: '100%',
-              padding: '12px 16px',
-              fontSize: 11,
-              letterSpacing: '0.08em',
-              cursor: isPending ? 'wait' : 'pointer',
-              opacity: isPending ? 0.6 : 1,
-            }}
-            disabled={isPending}
-          >
-            {isPending ? "Signing in..." : "Sign in"}
-          </button>
-
-          <div style={{ marginTop: 4, textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
-            Just exploring?{" "}
-            <button
-              type="button"
-              onClick={handleDemoLogin}
-              disabled={isPending}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                font: 'inherit',
-                color: 'var(--accent-primary)',
-                fontWeight: 500,
-                textDecoration: 'none',
-                cursor: isPending ? 'wait' : 'pointer',
-                opacity: isPending ? 0.6 : 1,
-              }}
-            >
-              View Demo
-            </button>
-          </div>
-        </form>
-
-        <div style={{
-          marginTop: 24,
-          textAlign: 'center',
-          fontSize: 13,
-          color: 'var(--text-secondary)'
-        }}>
-          Don't have an account?{" "}
-          <Link to="/signup" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
-            Sign up
-          </Link>
-        </div>
-      </div>
+        {formCard}
       </div>
     </div>
   );

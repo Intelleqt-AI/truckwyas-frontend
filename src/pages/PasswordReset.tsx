@@ -139,9 +139,6 @@ export default function PasswordReset() {
         @media (max-width: 860px) {
           .pwreset-split { flex-direction: column; }
           .pwreset-split__content, .pwreset-split__form { flex: none; padding: 32px 24px; }
-          /* Form first on mobile — a visitor should land on the thing they
-             came to do, not scroll past a marketing panel to reach it. */
-          .pwreset-split__form { order: -1; }
         }
       `}</style>
 

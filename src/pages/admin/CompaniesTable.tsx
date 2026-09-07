@@ -17,6 +17,7 @@ const PAGE_SIZE = 20;
 interface Company {
   id: number;
   company_name: string;
+  owner_email: string | null;
   subscription_status: string;
   is_demo: boolean;
   is_deleted: boolean;
@@ -182,7 +183,7 @@ export function CompaniesTable() {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-          <input style={inputStyle} placeholder="Search companies…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input style={inputStyle} placeholder="Search company or owner email…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
@@ -209,9 +210,23 @@ export function CompaniesTable() {
                   <Fragment key={c.id}>
                     <tr>
                       <td style={tdStyle}>
-                        {c.company_name}
-                        {c.is_demo && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--status-warning)' }}>DEMO</span>}
-                        {c.is_deleted && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--status-danger)' }}>DELETED</span>}
+                        <div>
+                          {c.company_name}
+                          {c.is_demo && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--status-warning)' }}>DEMO</span>}
+                          {c.is_deleted && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--status-danger)' }}>DELETED</span>}
+                        </div>
+                        {/* company_name alone is rarely unique — self-service signup
+                            defaults it to "<first name>'s Transport", so the owner's
+                            email is what actually tells rows apart. A 'deleted-'
+                            prefix means every user this company ever had deleted
+                            their own account — an abandoned signup, not a real tenant. */}
+                        {c.owner_email && (
+                          c.owner_email.startsWith('deleted-') ? (
+                            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No active user (account deleted)</div>
+                          ) : (
+                            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{c.owner_email}</div>
+                          )
+                        )}
                       </td>
                       <td style={tdStyle}>
                         <span className={`status-badge ${STATUS_BADGE_CLASS[c.subscription_status] || ''}`}>{c.subscription_status}</span>

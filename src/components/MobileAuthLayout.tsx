@@ -34,15 +34,8 @@ export function MobileAuthLayout({ eyebrow, title, subtitle, children, footer }:
           overflow-y: auto;
           background: var(--bg-deep);
           font-family: var(--font-sans);
-          display: flex;
-          flex-direction: column;
-          padding: 28px 20px 40px;
           box-sizing: border-box;
-        }
-        .mobile-auth-layout__logo {
-          height: 22px;
-          width: auto;
-          margin-bottom: 20px;
+          padding: 28px 20px 40px;
         }
         .mobile-auth-layout__eyebrow {
           font-family: var(--font-mono);
@@ -73,14 +66,28 @@ export function MobileAuthLayout({ eyebrow, title, subtitle, children, footer }:
         }
       `}</style>
 
-      <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" className="mobile-auth-layout__logo" />
-      {eyebrow && <div className="mobile-auth-layout__eyebrow">{eyebrow}</div>}
-      <div className="mobile-auth-layout__title">{title}</div>
-      {subtitle && <div className="mobile-auth-layout__subtitle">{subtitle}</div>}
+      {/* Centered column, same 440px cap the desktop content panel uses —
+          without it, a wider phone/small-tablet viewport (anything short of
+          the 860px breakpoint) stretched the form and body text edge to
+          edge. Logo size is set inline, not via the CSS class above: the
+          transparent PNG's own intrinsic box is much wider than its visible
+          mark, and a plain `img` selector elsewhere in the app's global
+          styles was overriding a same-specificity class rule and stretching
+          it — an inline style always wins that fight. */}
+      <div style={{ maxWidth: 440, width: '100%', margin: '0 auto' }}>
+        <img
+          src="/brand/truckwys-logo-transparent.png"
+          alt="TruckWys"
+          style={{ display: 'block', maxHeight: 22, width: 'auto', marginBottom: 20 }}
+        />
+        {eyebrow && <div className="mobile-auth-layout__eyebrow">{eyebrow}</div>}
+        <div className="mobile-auth-layout__title">{title}</div>
+        {subtitle && <div className="mobile-auth-layout__subtitle">{subtitle}</div>}
 
-      {children}
+        {children}
 
-      {footer && <div className="mobile-auth-layout__footer">{footer}</div>}
+        {footer && <div className="mobile-auth-layout__footer">{footer}</div>}
+      </div>
     </div>
   );
 }

@@ -241,6 +241,14 @@ export default function Overview() {
       style={{
         display: "grid",
         gridTemplateColumns: "repeat(3, 1fr)",
+        // "dense": the default (sparse) packing advances a one-way cursor —
+        // once a 2-wide card (e.g. Recent Bookings) can't fit in a single
+        // leftover column, the algorithm moves on and never backfills that
+        // gap with a later, smaller card. Dense packing fills those gaps
+        // instead — the actual cause of the empty column-3 strip between
+        // Fleet Utilization and Recent Activity. Doesn't affect DOM/reading
+        // order, only visual position.
+        gridAutoFlow: "dense",
         gap: 16,
         alignContent: "start",
       }}>

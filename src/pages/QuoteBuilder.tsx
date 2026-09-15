@@ -34,6 +34,19 @@ const DRAFT_KEY = "truckwyas_newquote_draft";
 const FUEL_FALLBACK: Record<string, number> = {
   Flatbed: 32, Tautliner: 33, Refrigerated: 38, Tanker: 35, "Box Truck": 28, "Danger Load": 34,
 };
+// VehicleType.capacity is *documented* as tonnes but real rows are a mix —
+// only the seeded defaults were unit-fixed, so hand-added and imported rows
+// can still be kilograms. Same >999 => kg heuristic the backend uses
+// (core/services/vehicle_types.py capacity_tonnes), so a 20000 kg row doesn't
+// get read as a 20,000-tonne truck when we pick a reference for the load.
+const KG_SCALE_THRESHOLD = 999;
+const MIN_PLAUSIBLE_T = 0.3, MAX_PLAUSIBLE_T = 80;
+function capacityTons(raw: any): number | null {
+  const v = Number(raw);
+  if (!Number.isFinite(v) || v <= 0) return null;
+  const t = v > KG_SCALE_THRESHOLD ? v / 1000 : v;
+  return t >= MIN_PLAUSIBLE_T && t <= MAX_PLAUSIBLE_T ? t : null;
+}
 // Which company-level default price applies, keyed by a vehicle type's own
 // fuel_type — Company stores one default per fuel type (fuel_price_per_litre
 // doubles as the Diesel default, since it predates the other three).
@@ -293,6 +306,14 @@ export default function QuoteBuilder() {
       .filter((v: any) => (v.available_vehicle_count ?? 1) > 0)
       .reduce((acc: Record<string, any>, v: any) => { if (!acc[v.name]) acc[v.name] = v; return acc; }, {})
   );
+  // Every type the company has on file, de-duplicated by name and NOT filtered
+  // by what happens to be free today. `vehicleTypes` above is the dropdown's
+  // list (availability-gated); this one exists purely to price a load, where a
+  // truck that is on the road right now is still the truck that will run it.
+  const allVehicleTypes: any[] = Object.values(
+    (vehicleTypesRaw?.results || vehicleTypesRaw || [])
+      .reduce((acc: Record<string, any>, v: any) => { if (!acc[v.name]) acc[v.name] = v; return acc; }, {})
+  );
   // Two-tier progress: {user: {outcomes_collected, outcomes_needed, ...}, global: {...}}
   // -- see core.services.win_prediction.model_progress. Used only for the
   // "still learning" banner's numbers; availability of the AI panel itself
@@ -305,19 +326,62 @@ export default function QuoteBuilder() {
   // diesel price, and not always Diesel regardless of what's actually chosen.
   const companyFuelPriceField = (FUEL_PRICE_FIELD_BY_TYPE as Record<string, string>)[selectedVT?.fuel_type || 'Diesel'] || 'fuel_price_per_litre';
   const fuelPricePerL = Number(companyProfile?.[companyFuelPriceField]) || Number(companyProfile?.fuel_price_per_litre) || 21.7;
+  // With no vehicle type picked there is no reference tonnage to scale fuel
+  // from, and a flat figure would price a 5t load and a 30t load identically.
+  // So infer the truck the load will run on from the load itself: of the types
+  // that can legally carry this weight, the one that burns LEAST at it.
+  //
+  // Picking the smallest type that fits (the obvious rule) is wrong: base
+  // consumption isn't ordered by capacity. A 17t reefer burns 42 L/100km — it
+  // runs a fridge — against 36 for a 20t flatbed, so a 15t load came out
+  // pricier than a 20t one. Across this fleet that rule reversed at six
+  // different weights. Choosing the minimum can't reverse: as weight rises
+  // each candidate burns more and the candidate set only shrinks, so the
+  // result is non-decreasing by construction.
+  //
+  // Nothing big enough (an abnormal load) extrapolates the largest type rather
+  // than dropping to the flat rate, so heavier still means dearer.
+  const inferredVT = useMemo(() => {
+    if (vehicleType) return null;              // an explicit choice always wins
+    const t = Number(weight) || 0;
+    if (t <= 0) return null;
+    const rated = allVehicleTypes
+      .map((v: any) => ({ vt: v, cap: capacityTons(v.capacity) }))
+      .filter((x): x is { vt: any; cap: number } => x.cap != null);
+    if (!rated.length) return null;
+    const burn = (x: { vt: any; cap: number }) =>
+      (Number(x.vt.fuel_consumption_l_per_100km) || 32) *
+      Math.pow(1 + (Number(x.vt.fuel_consumption_sensitivity_pct) || 2) / 100, t - x.cap);
+    const canCarry = rated.filter((x) => x.cap >= t);
+    if (!canCarry.length) {
+      return rated.sort((a, b) => b.cap - a.cap)[0].vt;   // biggest truck, extrapolated up
+    }
+    return canCarry.sort((a, b) => burn(a) - burn(b))[0].vt;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleType, weight, vehicleTypesRaw]);
+
+  // The type the fuel maths is actually based on: the one picked, else the one
+  // inferred from the load. Everything else on the quote still treats "no type
+  // picked" as exactly that — this only supplies a reference for consumption.
+  const fuelBasisVT = selectedVT || inferredVT;
+
   // A heavier load genuinely burns more fuel — consumption_ref (the type's
   // configured L/100km) is scaled by how far the quote's own weight sits
   // from the type's reference tonnage (its "capacity"), compounding at
   // `sensitivity`%/tonne. See plan/fuel-consumption-by-weight.md. Skipped
-  // entirely (falls back to the flat rate, today's behavior) when the type
-  // has no capacity set — guessing a reference tonnage would be worse than
-  // no adjustment at all.
-  const fuelConsumptionRef = Number(selectedVT?.fuel_consumption_l_per_100km) || FUEL_FALLBACK[vehicleType] || 32;
-  const fuelRefCapacityTons = Number(selectedVT?.capacity) || 0;
-  const fuelSensitivity = (Number(selectedVT?.fuel_consumption_sensitivity_pct) || 2) / 100;
+  // entirely (falls back to the flat rate) when there is no reference tonnage
+  // to scale from — guessing one would be worse than no adjustment at all.
+  const fuelConsumptionRef = Number(fuelBasisVT?.fuel_consumption_l_per_100km) || FUEL_FALLBACK[vehicleType] || 32;
+  const fuelRefCapacityTons = capacityTons(fuelBasisVT?.capacity) ?? 0;
+  const fuelSensitivity = (Number(fuelBasisVT?.fuel_consumption_sensitivity_pct) || 2) / 100;
   const fuelConsumption = fuelRefCapacityTons > 0
     ? fuelConsumptionRef * Math.pow(1 + fuelSensitivity, (Number(weight) || 0) - fuelRefCapacityTons)
     : fuelConsumptionRef;
+  // Shown next to the fuel line so the figure is never unexplained: says which
+  // truck class it came from when nobody picked one.
+  const fuelBasisNote = !vehicleType && inferredVT && fuelRefCapacityTons > 0
+    ? " · est. from your fleet"
+    : "";
 
   // Fallback only, for before any vehicle type is picked — once one is
   // selected, applyVehicleType() below takes over and uses that type's own
@@ -325,7 +389,9 @@ export default function QuoteBuilder() {
   // the more specific, more correct source once it's available).
   useEffect(() => {
     if (companyProfile && !vehicleType) {
-      if (companyProfile.default_base_rate_per_km) setBaseRatePerKm(String(companyProfile.default_base_rate_per_km));
+      if (Number(companyProfile.default_base_rate_per_km) > 0) {
+        setBaseRatePerKm(String(companyProfile.default_base_rate_per_km));
+      }
     }
   }, [companyProfile, vehicleType]);
 
@@ -341,14 +407,26 @@ export default function QuoteBuilder() {
   const applyVehicleType = (name: string) => {
     setVehicleType(name);
     const vt = vehicleTypes.find((v: any) => v.name === name);
-    if (vt?.base_rate) {
+    // Compared numerically, not by truthiness: DRF serialises DecimalField to
+    // a string, so a type with no rate configured arrives as "0.00" — truthy
+    // in JS. Testing the raw value would price the load at R0/km instead of
+    // falling back to the company default.
+    if (Number(vt?.base_rate) > 0) {
       setBaseRatePerKm(String(vt.base_rate));
-    } else if (companyProfile?.default_base_rate_per_km) {
+    } else if (Number(companyProfile?.default_base_rate_per_km) > 0) {
       setBaseRatePerKm(String(companyProfile.default_base_rate_per_km));
     }
   };
 
-  const ready = !!(customerId && vehicleType && pickup && delivery && pickupCoords && deliveryCoords && Number(weight) > 0);
+  // Vehicle type is deliberately NOT required. A fleet quoting a load a month
+  // out often doesn't know yet which truck will be free, and the owner picks a
+  // truck that fits the load when the time comes. Without a type the quote
+  // prices on the company defaults (base rate per km, standard consumption)
+  // and the capacity check below stays off — see `weightBlockedMessage`.
+  const ready = !!(customerId && pickup && delivery && pickupCoords && deliveryCoords && Number(weight) > 0);
+  // True only when a specific type was chosen, so the UI can say what a number
+  // was actually based on rather than implying a truck that isn't picked.
+  const hasVehicleType = !!vehicleType;
 
   // ---- derived costs ----
   const route = routeData?.routes?.[selectedRouteIndex] || null;
@@ -373,6 +451,10 @@ export default function QuoteBuilder() {
   // well past it it's not a chargeable "surcharge", it's a different kind of
   // job (abnormal-load permits, escorts, route approval). No legitimate price
   // bump exists below capacity, so this blocks the quote instead of pricing it.
+  // Runs ONLY when a vehicle type is selected: with no type there is no rated
+  // capacity to measure against, so there is nothing to enforce. The owner
+  // assigns a truck that fits the load later, and the check applies again the
+  // moment a type is on the quote.
   const OVERLOAD_TOLERANCE = 1.05; // Road Traffic Act legal tolerance
   const vehicleCapacityTons = Number(selectedVT?.capacity) || 0;
   const weightBlockedMessage = (() => {
@@ -381,6 +463,13 @@ export default function QuoteBuilder() {
       return `${weight}t exceeds the ${vehicleType}'s rated capacity of ${vehicleCapacityTons}t. Even within the legal 5% tolerance this is an overload — pick a larger vehicle or reduce the weight.`;
     }
     return `${weight}t is well beyond the ${vehicleType}'s ${vehicleCapacityTons}t capacity. This needs an abnormal-load permit (route approval, possibly escorts) and can't be priced through a standard quote.`;
+  })();
+  const baseRateSource = (() => {
+    const v = Number(baseRatePerKm);
+    if (!(v > 0)) return null;
+    if (hasVehicleType && Number(selectedVT?.base_rate) === v) return `From ${vehicleType}`;
+    if (Number(companyProfile?.default_base_rate_per_km) === v) return "From company settings";
+    return "Custom rate";
   })();
   const baseCost = Math.round(chargeDistance * Number(baseRatePerKm));
   const total = baseCost + fuelCost + tollCost + crossBorderCost + driverAllowance + serviceCharge;
@@ -504,10 +593,13 @@ export default function QuoteBuilder() {
   // benchmark on lane resolve
   useEffect(() => {
     if (!routeData || billingBlocked) return;
+    // The endpoint requires a vehicle type; with none picked there is no lane
+    // benchmark to fetch, so skip the call instead of sending an empty one.
+    if (!vehicleType) { setBenchmark(null); return; }
     fetchData(`/api/v1/quotes/benchmark/?origin=${extractCode(pickup)}&destination=${extractCode(delivery)}&vehicle_type=${vehicleType.toLowerCase()}`)
       .then(b => { if (b?.success !== false) setBenchmark(b); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeData, billingBlocked]);
+  }, [routeData, billingBlocked, vehicleType]);
 
   const opt = analysis?.price_optimization;
   // ai_prediction is the ONLY field that means "a real trained model (user's
@@ -756,7 +848,7 @@ export default function QuoteBuilder() {
   // ---- explicit save / send ----
   const save = async (send: boolean) => {
     if (!customerId) { toast.error("Pick a client first"); return; }
-    if (!ready) { toast.error("Add vehicle type, collection, delivery and weight"); return; }
+    if (!ready) { toast.error("Add collection, delivery and weight"); return; }
     if (routeBlockedMessage) { toast.error(routeBlockedMessage); return; }
     if (weightBlockedMessage) { toast.error(weightBlockedMessage); return; }
     if (isDemoQuotaExceeded) { toast.error("You've used this demo session's one free quote. Log out and log back in (or click \"View Demo\" again) to start a fresh session."); return; }
@@ -1061,13 +1153,8 @@ export default function QuoteBuilder() {
           </select>
         </div>
         <div>
-          <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Vehicle type<Req /></span>{!authUser?.is_demo && <span onClick={() => navigate("/fleet/vehicles")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span>}</div>
-          <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS}>
-            <option value="">Select…</option>
-            {vehicleTypes.map((v: any) => (
-              <option key={v.id || v.name} value={v.name}>{v.name}{Number(v.capacity) > 0 ? ` (${v.capacity}t)` : ""}</option>
-            ))}
-          </select>
+          <div style={{ ...labelS, marginBottom: 5 }}>Weight (t)<Req /></div>
+          <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} />
         </div>
         <div>
           <div style={{ ...labelS, marginBottom: 5 }}>Collection<Req /></div>
@@ -1096,7 +1183,15 @@ export default function QuoteBuilder() {
       {/* details */}
       <div style={{ marginBottom: 18 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-          <div><div style={{ ...labelS, marginBottom: 5 }}>Weight (t)<Req /></div><input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 15" style={inputS} /></div>
+          <div>
+            <div style={{ ...labelS, marginBottom: 5, display: "flex", justifyContent: "space-between" }}><span>Vehicle type</span>{!authUser?.is_demo && <span onClick={() => navigate("/fleet/vehicles")} style={{ color: "var(--accent-primary)", cursor: "pointer" }}>+ New</span>}</div>
+            <select value={vehicleType} onChange={e => applyVehicleType(e.target.value)} style={inputS}>
+              <option value="">Not decided yet</option>
+              {vehicleTypes.map((v: any) => (
+                <option key={v.id || v.name} value={v.name}>{v.name}{Number(v.capacity) > 0 ? ` (${v.capacity}t)` : ""}</option>
+              ))}
+            </select>
+          </div>
           <div><div style={{ ...labelS, marginBottom: 5 }}>Pickup date</div><input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} style={inputS} /></div>
           <div><div style={{ ...labelS, marginBottom: 5 }}>Delivery date</div><input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} style={inputS} /></div>
           <div><div style={{ ...labelS, marginBottom: 5 }}>Valid until</div><input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputS} /></div>
@@ -1136,7 +1231,7 @@ export default function QuoteBuilder() {
             ))}
           </div>
           <div style={{ ...cardS, padding: "14px 16px" }}>
-            <div style={{ ...labelS, marginBottom: 8 }}>Cost breakdown · {vehicleType || "—"}</div>
+            <div style={{ ...labelS, marginBottom: 8 }}>Cost breakdown · {vehicleType || "no truck picked"}</div>
             {billingBlocked && (
               <div style={{
                 padding: 14, marginBottom: ready ? 14 : 0, borderRadius: 6,
@@ -1159,7 +1254,7 @@ export default function QuoteBuilder() {
             )}
             {!billingBlocked && !ready && (
               <div style={{ padding: "30px 4px", textAlign: "center", color: "var(--text-tertiary)" }}>
-                <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Add a client, vehicle type, collection, delivery and weight</div>
+                <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Add a client, collection, delivery and weight</div>
                 <div style={{ fontSize: 12, marginTop: 6 }}>Costs and the AI quote appear here automatically.</div>
               </div>
             )}
@@ -1188,15 +1283,77 @@ export default function QuoteBuilder() {
             )}
             {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && !calculatingRoute && (<>
               {[
-                { key: "fuel", l: `Fuel — ${fuelConsumption.toFixed(1)} L/100km @ R${fuelPricePerL}`, v: fuelCost, c: "var(--status-danger)" },
+                { key: "fuel", l: `Fuel — ${fuelConsumption.toFixed(1)} L/100km @ R${Number(fuelPricePerL).toFixed(2)}${fuelBasisNote}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
                 ...(crossBorderCost > 0 ? [{ key: "cb", l: "Cross-border / weighbridge", v: crossBorderCost, c: "#2BB6A6" }] : []),
                 { key: "driver", l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },
-                { key: "base", l: `Base rate (${vehicleType || "—"} · R${baseRatePerKm}/km)`, v: baseCost, c: "var(--accent-primary)" },
+                { key: "base", l: `Base rate (${hasVehicleType ? vehicleType : "company default"} · R${baseRatePerKm}/km)`, v: baseCost, c: "var(--accent-primary)" },
               ].map((r, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border-row)", fontSize: 13 }}>
                   <span style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={dot(r.c)} />{r.l}
+                    {r.key === "fuel" && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button type="button" title="How this fuel figure was worked out"
+                            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1 }}>
+                            <Info size={11} />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" style={{ width: 280, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                          <div style={{ ...labelS, marginBottom: 8 }}>How this fuel figure is worked out</div>
+                          {fuelRefCapacityTons > 0 ? (<>
+                            <div style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 10 }}>
+                              {hasVehicleType
+                                ? `Your ${vehicleType}'s own consumption, adjusted for this load.`
+                                : `No truck is picked, so this uses ${fuelBasisVT?.name} — the most economical type in your fleet that can carry ${weight}t.`}
+                            </div>
+                            {[
+                              ["Truck used", `${fuelBasisVT?.name ?? "—"} (${fuelRefCapacityTons}t)`],
+                              ["Its rated burn", `${fuelConsumptionRef.toFixed(1)} L/100km at ${fuelRefCapacityTons}t`],
+                              ["This load", `${weight || 0}t`],
+                              ["Weight effect", `${(fuelSensitivity * 100).toFixed(1)}% per tonne`],
+                            ].map(([k, v]) => (
+                              <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0" }}>
+                                <span style={{ color: "var(--text-tertiary)" }}>{k}</span>
+                                <span style={{ fontFamily: "var(--font-mono)", textAlign: "right" }}>{v}</span>
+                              </div>
+                            ))}
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border-subtle)", fontWeight: 600 }}>
+                              <span>Burn for this load</span>
+                              <span style={{ fontFamily: "var(--font-mono)" }}>{fuelConsumption.toFixed(1)} L/100km</span>
+                            </div>
+                          </>) : (
+                            <div style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 10 }}>
+                              Nothing in your fleet has a rated capacity to work from, so this uses a
+                              standard {fuelConsumption.toFixed(1)} L/100km with no adjustment for weight.
+                              Set a capacity on your vehicle types to price this properly.
+                            </div>
+                          )}
+                          <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border-row)" }}>
+                            {[
+                              ["Distance", `${Math.round(chargeDistance)} km${legs === 2 ? " (round trip)" : ""}`],
+                              ["Diesel used", `${Math.round(chargeDistance * fuelConsumption / 100)} L`],
+                              ["Diesel price", `R${Number(fuelPricePerL).toFixed(2)}/L`],
+                            ].map(([k, v]) => (
+                              <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0" }}>
+                                <span style={{ color: "var(--text-tertiary)" }}>{k}</span>
+                                <span style={{ fontFamily: "var(--font-mono)", textAlign: "right" }}>{v}</span>
+                              </div>
+                            ))}
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border-subtle)", fontWeight: 600 }}>
+                              <span>Fuel cost</span>
+                              <span style={{ fontFamily: "var(--font-mono)" }}>{formatCurrency(fuelCost)}</span>
+                            </div>
+                          </div>
+                          {!hasVehicleType && fuelRefCapacityTons > 0 && (
+                            <div style={{ color: "var(--text-tertiary)", marginTop: 10, lineHeight: 1.5 }}>
+                              Pick a vehicle type to price on that truck exactly.
+                            </div>
+                          )}
+                        </PopoverContent>
+                      </Popover>
+                    )}
                     {r.key === "tolls" && (
                       <Popover>
                         <PopoverTrigger asChild>
@@ -1272,11 +1429,67 @@ export default function QuoteBuilder() {
                 <span style={labelS}>Quote total</span>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 22, fontWeight: 600, color: "var(--text-primary)" }}>{formatCurrency(total)}</span>
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>{Math.round(distance)} km {legs === 2 ? `one way · ${Math.round(chargeDistance)} km round trip` : "one way"} · live diesel · your {vehicleType} settings{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>{Math.round(distance)} km {legs === 2 ? `one way · ${Math.round(chargeDistance)} km round trip` : "one way"} · live diesel · {hasVehicleType ? `your ${vehicleType} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
               <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
                 <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Tolls</div><input type="number" value={tollManuallyEdited ? editableTollCost : String(tollCost)} onChange={e => { setEditableTollCost(e.target.value); setTollManuallyEdited(true); }} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
                 <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Driver</div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
-                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>R/km</div><input type="number" value={baseRatePerKm} onChange={e => setBaseRatePerKm(e.target.value)} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ ...labelS, marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                    <span>R/km</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button type="button" title="Where this rate comes from"
+                          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>
+                          <Info size={11} />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                        <div style={{ ...labelS, marginBottom: 8 }}>Base rate per km</div>
+                        <div style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                          What this quote charges per kilometre, before fuel, tolls and allowances.
+                        </div>
+                        <div style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginTop: 8 }}>
+                          A vehicle type's own rate is used whenever one is picked. With no type &mdash;
+                          or a type that has no rate of its own &mdash; the quote falls back to your
+                          company default.
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border-row)" }}>
+                          <span style={{ color: "var(--text-tertiary)" }}>Company default</span>
+                          <span style={{ fontFamily: "var(--font-mono)", flexShrink: 0 }}>
+                            {Number(companyProfile?.default_base_rate_per_km) > 0
+                              ? `R${Number(companyProfile.default_base_rate_per_km).toFixed(2)}`
+                              : "not set"}
+                          </span>
+                        </div>
+                        {hasVehicleType && (
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, paddingTop: 5 }}>
+                            <span style={{ color: "var(--text-tertiary)" }}>{vehicleType}</span>
+                            <span style={{ fontFamily: "var(--font-mono)", flexShrink: 0 }}>
+                              {Number(selectedVT?.base_rate) > 0
+                                ? `R${Number(selectedVT.base_rate).toFixed(2)}`
+                                : "not set"}
+                            </span>
+                          </div>
+                        )}
+                        <div style={{ color: "var(--text-tertiary)", marginTop: 10, lineHeight: 1.5 }}>
+                          Change them in Settings &rarr; Company Details, or Settings &rarr; Vehicle Types.
+                          Editing the box here only affects this quote.
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <input
+                    type="number"
+                    value={baseRatePerKm}
+                    onChange={e => setBaseRatePerKm(e.target.value)}
+                    style={{ ...inputS, fontSize: 13, padding: "6px 8px" }}
+                  />
+                  {baseRateSource && (
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 4, lineHeight: 1.3 }}>
+                      {baseRateSource}
+                    </div>
+                  )}
+                </div>
               </div>
             </>)}
           </div>
@@ -1294,7 +1507,7 @@ export default function QuoteBuilder() {
                 <Sparkles size={16} color="var(--status-warning)" style={{ flexShrink: 0 }} />
                 <div>
                   <b>{aiPrediction?.reason === "optimizer_error" ? "AI pricing hit a snag." : "AI pricing isn't ready yet."}</b>
-                  <span style={{ color: "var(--text-secondary)" }}> Priced on true cost + your {vehicleType} base rate for now.{aiPrediction?.reason !== "optimizer_error" && " Every quote you close sharpens it."}</span>
+                  <span style={{ color: "var(--text-secondary)" }}> Priced on true cost + {hasVehicleType ? `your ${vehicleType} base rate` : "your company default base rate"} for now.{aiPrediction?.reason !== "optimizer_error" && " Every quote you close sharpens it."}</span>
                 </div>
               </div>
               {winModel && (

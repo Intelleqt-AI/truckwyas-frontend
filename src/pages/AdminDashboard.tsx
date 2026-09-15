@@ -8,6 +8,8 @@ import DemoAccountPanel from '@/pages/admin/DemoAccountPanel';
 import SearchPanel from '@/pages/admin/SearchPanel';
 import PlatformHealth from '@/pages/admin/PlatformHealth';
 import AuditLogPanel from '@/pages/admin/AuditLogPanel';
+import VehicleTypesPanel from '@/pages/admin/VehicleTypesPanel';
+import CrossBorderRatesPanel from '@/pages/admin/CrossBorderRatesPanel';
 
 type SectionItem = { id: string; label: string; component: () => JSX.Element };
 type Section = { group: string; items: SectionItem[] };
@@ -31,6 +33,13 @@ const SECTIONS: Section[] = [
     items: [
       { id: 'search', label: 'Search', component: SearchPanel },
       { id: 'demo', label: 'Demo Account', component: DemoAccountPanel },
+    ],
+  },
+  {
+    group: 'Catalog',
+    items: [
+      { id: 'vehicle-types', label: 'Truck Types', component: VehicleTypesPanel },
+      { id: 'cross-border-rates', label: 'Cross-Border Rates', component: CrossBorderRatesPanel },
     ],
   },
   {

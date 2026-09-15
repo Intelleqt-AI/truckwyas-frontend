@@ -69,6 +69,7 @@ export function CompanySettings() {
     phone: '', email: '', support_email: '',
     default_quote_validity_days: '7',
     allow_cross_border: 'yes',
+    default_base_rate_per_km: '', default_toll_rate_per_km: '', default_sla_hours: '',
     fuel_price_per_litre: '', fuel_price_petrol: '', fuel_price_electric: '', fuel_price_hybrid: '',
   });
   const [logoUrl, setLogoUrl] = useState('');
@@ -130,6 +131,11 @@ export function CompanySettings() {
           default_quote_validity_days:
             d.default_quote_validity_days != null ? String(d.default_quote_validity_days) : '7',
           allow_cross_border: d.allow_cross_border === false ? 'no' : 'yes',
+          default_base_rate_per_km:
+            d.default_base_rate_per_km != null ? String(d.default_base_rate_per_km) : '',
+          default_toll_rate_per_km:
+            d.default_toll_rate_per_km != null ? String(d.default_toll_rate_per_km) : '',
+          default_sla_hours: d.default_sla_hours != null ? String(d.default_sla_hours) : '',
           fuel_price_per_litre: d.fuel_price_per_litre != null ? String(d.fuel_price_per_litre) : '',
           fuel_price_petrol: d.fuel_price_petrol != null ? String(d.fuel_price_petrol) : '',
           fuel_price_electric: d.fuel_price_electric != null ? String(d.fuel_price_electric) : '',
@@ -185,6 +191,22 @@ export function CompanySettings() {
         return;
       }
     }
+    for (const [key, label] of [
+      ['default_base_rate_per_km', 'Base rate'], ['default_toll_rate_per_km', 'Toll rate'],
+    ] as const) {
+      const raw = (form as any)[key];
+      if (raw && (isNaN(parseFloat(raw)) || parseFloat(raw) < 0)) {
+        toast.error(`${label} must be a positive number`);
+        return;
+      }
+    }
+    // Blank is allowed (falls back to the model default on save); a value that
+    // is present must be a sane whole number of hours.
+    const slaHours = form.default_sla_hours ? parseInt(form.default_sla_hours, 10) : null;
+    if (slaHours !== null && (isNaN(slaHours) || slaHours < 1 || slaHours > 720)) {
+      toast.error('Default SLA must be between 1 and 720 hours');
+      return;
+    }
     setSaving(true);
     try {
       await patchData({ url: '/api/v1/company/profile/', data: {
@@ -198,6 +220,11 @@ export function CompanySettings() {
         contact: { phone: form.phone, email: form.email, support_email: form.support_email },
         default_quote_validity_days: validityDays,
         allow_cross_border: form.allow_cross_border === 'yes',
+        default_base_rate_per_km: form.default_base_rate_per_km
+          ? parseFloat(form.default_base_rate_per_km) : 10.00,
+        default_toll_rate_per_km: form.default_toll_rate_per_km
+          ? parseFloat(form.default_toll_rate_per_km) : 0.50,
+        default_sla_hours: slaHours ?? 48,
         fuel_price_per_litre: form.fuel_price_per_litre ? parseFloat(form.fuel_price_per_litre) : 23.50,
         fuel_price_petrol: form.fuel_price_petrol ? parseFloat(form.fuel_price_petrol) : null,
         fuel_price_electric: form.fuel_price_electric ? parseFloat(form.fuel_price_electric) : null,
@@ -409,6 +436,59 @@ export function CompanySettings() {
                 Whether your fleet is set up to run loads that cross into neighbouring
                 countries. When set to "No", any quote whose route actually crosses a
                 border is refused rather than priced.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ ...grid2, marginTop: 16 }}>
+            <div>
+              <label style={labelStyle}>Default Base Rate (R/km)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min={0}
+                step={0.01}
+                placeholder="e.g. 33.00"
+                value={form.default_base_rate_per_km}
+                onChange={e => set('default_base_rate_per_km', e.target.value)}
+              />
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                Used when the vehicle type on a quote has no rate of its own
+                (Settings &gt; Vehicle Types). A type's own rate always wins.
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Default Toll Rate (R/km)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min={0}
+                step={0.001}
+                placeholder="e.g. 0.50"
+                value={form.default_toll_rate_per_km}
+                onChange={e => set('default_toll_rate_per_km', e.target.value)}
+              />
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                Fallback only &mdash; used when the routing service can't itemise the
+                toll plazas on a route.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ ...grid2, marginTop: 16 }}>
+            <div>
+              <label style={labelStyle}>Default SLA (Hours)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min={1}
+                max={720}
+                placeholder="e.g. 48"
+                value={form.default_sla_hours}
+                onChange={e => set('default_sla_hours', e.target.value)}
+              />
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                Delivery time promised on a new quote. Can be overridden per quote.
               </div>
             </div>
           </div>

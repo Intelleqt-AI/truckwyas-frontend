@@ -16,6 +16,16 @@ interface VehicleType {
   fuel_consumption_sensitivity_pct?: string | number;
   fuel_type?: string;
   active: boolean;
+  // null = still the shared platform default (company=None) — same row
+  // every company without their own override sees. Editing one of these
+  // clones it into this company's own row (see the backend's
+  // VehicleTypeViewSet.update) rather than changing it in place, so it never
+  // affects any other company.
+  company?: number | null;
+  // True only for a company-owned row that shadows a shared default of the
+  // same name — i.e. the result of editing one. Lets the UI offer "Reset to
+  // shared default" instead of "Delete" for these specifically.
+  overrides_shared_default?: boolean;
 }
 
 const FUEL_TYPE_OPTIONS = ['Diesel', 'Petrol', 'Electric', 'Hybrid'];
@@ -54,7 +64,7 @@ export function VehicleTypesDirectory() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string; isReset: boolean } | null>(null);
   const [editType, setEditType] = useState<VehicleType | null>(null);
   const [editForm, setEditForm] = useState({ name: '', description: '', capacity: '', base_rate: '', fuel_consumption_l_per_100km: '', fuel_consumption_sensitivity_pct: '2.0', fuel_type: 'Diesel', active: 'true' });
   const [editSaving, setEditSaving] = useState(false);
@@ -98,8 +108,10 @@ export function VehicleTypesDirectory() {
     return next;
   });
 
-  const allSelected = filtered.length > 0 && filtered.every(t => selected.has(t.id));
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(filtered.map(t => t.id)));
+  // Shared (company=null) types can't be bulk-selected — they're read-only here.
+  const selectableFiltered = filtered.filter(t => t.company != null);
+  const allSelected = selectableFiltered.length > 0 && selectableFiltered.every(t => selected.has(t.id));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(selectableFiltered.map(t => t.id)));
 
   const handleAdd = async () => {
     if (!form.name.trim()) { setAddErr('Name is required'); return; }
@@ -230,7 +242,7 @@ export function VehicleTypesDirectory() {
                 <th style={{ padding: '10px 20px', borderBottom: '1px solid var(--border-subtle)', width: 36 }}>
                   <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ cursor: 'pointer' }} />
                 </th>
-                {['Name', 'Description', 'Capacity', 'Base Rate', 'Status', ''].map(h => (
+                {['Name', 'Description', 'Payload (t)', 'Base Rate', 'Status', ''].map(h => (
                   <th key={h} style={{
                     padding: '10px 20px', textAlign: 'left' as const,
                     fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
@@ -243,19 +255,48 @@ export function VehicleTypesDirectory() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr><td colSpan={7} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No vehicle types found</td></tr>
-              ) : filtered.map((t, i) => (
+              ) : filtered.map((t, i) => {
+                // Three states: still on the shared default (editable —
+                // saving clones it into this company's own row), a company's
+                // own override of a shared default (editable in place,
+                // "Reset" instead of "Delete"), or a fully custom type
+                // (editable and deletable as always).
+                const isShared = t.company == null;
+                const isOverride = !isShared && !!t.overrides_shared_default;
+                const badgeTitle = isShared
+                  ? 'TruckWys platform default — editing it creates your own copy, used only by your company'
+                  : isOverride
+                    ? "Your company's own version of a shared default — Reset drops back to TruckWys's current version"
+                    : undefined;
+                const editDisabled = isDemo;
+                const deleteDisabled = isDemo || isShared; // nothing to delete/reset until this company has diverged
+                return (
                 <tr key={t.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-row)' : 'none', background: selected.has(t.id) ? 'var(--bg-elevated)' : 'transparent' }}>
                   <td style={{ padding: '12px 20px' }}>
-                    <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggleSelect(t.id)} style={{ cursor: 'pointer' }} />
+                    <input
+                      type="checkbox"
+                      checked={selected.has(t.id)}
+                      disabled={isShared}
+                      title={isShared ? badgeTitle : undefined}
+                      onChange={() => toggleSelect(t.id)}
+                      style={{ cursor: isShared ? 'not-allowed' : 'pointer' }}
+                    />
                   </td>
                   <td style={{ padding: '12px 20px', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
                     {t.name}
+                    {(isShared || isOverride) && (
+                      <span style={{
+                        marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.06em',
+                        color: 'var(--text-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: 2,
+                        padding: '1px 5px', textTransform: 'uppercase' as const,
+                      }} title={badgeTitle}>{isShared ? 'Platform Default' : 'Customized'}</span>
+                    )}
                   </td>
                   <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)', maxWidth: 220 }}>
                     {t.description || '—'}
                   </td>
                   <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)' }}>
-                    {t.capacity ? `${t.capacity} ton` : '—'}
+                    {t.capacity ? `${t.capacity}t` : '—'}
                   </td>
                   <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>
                     {formatRate(t.base_rate)}<span style={{ color: 'var(--text-tertiary)', fontSize: 10 }}>/km</span>
@@ -271,30 +312,31 @@ export function VehicleTypesDirectory() {
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                       <button
                         onClick={() => openEdit(t)}
-                        disabled={isDemo}
-                        title={isDemo ? 'Not available in the demo' : undefined}
+                        disabled={editDisabled}
+                        title={isDemo ? 'Not available in the demo' : (isShared ? badgeTitle : undefined)}
                         style={{
                           background: 'none', border: '1px solid var(--border-subtle)',
                           color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
-                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: editDisabled ? 'not-allowed' : 'pointer',
+                          letterSpacing: '0.06em', opacity: editDisabled ? 0.5 : 1,
                         }}
                       >EDIT</button>
                       <button
-                        onClick={() => setDeleteTarget({ id: t.id, name: t.name })}
-                        disabled={isDemo}
-                        title={isDemo ? 'Not available in the demo' : undefined}
+                        onClick={() => setDeleteTarget({ id: t.id, name: t.name, isReset: isOverride })}
+                        disabled={deleteDisabled}
+                        title={isDemo ? 'Not available in the demo' : (isShared ? badgeTitle : undefined)}
                         style={{
                           background: 'none', border: '1px solid var(--status-danger)',
                           color: 'var(--status-danger)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
-                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
+                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: deleteDisabled ? 'not-allowed' : 'pointer',
+                          letterSpacing: '0.06em', opacity: deleteDisabled ? 0.5 : 1,
                         }}
-                      >DELETE</button>
+                      >{isOverride ? 'RESET' : 'DELETE'}</button>
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -302,9 +344,13 @@ export function VehicleTypesDirectory() {
 
       {deleteTarget && (
         <ConfirmModal
-          title="Delete Vehicle Type"
-          message={`Are you sure you want to delete "${deleteTarget.name}"? This cannot be undone.`}
-          confirmLabel="Delete"
+          title={deleteTarget.isReset ? 'Reset to Shared Default' : 'Delete Vehicle Type'}
+          message={
+            deleteTarget.isReset
+              ? `Discard your company's customized "${deleteTarget.name}" and go back to using TruckWys's current shared version? This can't be undone, but you can always customize it again later.`
+              : `Are you sure you want to delete "${deleteTarget.name}"? This cannot be undone.`
+          }
+          confirmLabel={deleteTarget.isReset ? 'Reset' : 'Delete'}
           danger
           onConfirm={() => handleDelete(deleteTarget.id)}
           onCancel={() => setDeleteTarget(null)}
@@ -341,7 +387,7 @@ export function VehicleTypesDirectory() {
             {([
               { key: 'name', label: 'Name', type: 'text', required: true },
               { key: 'description', label: 'Description', type: 'text', required: false },
-              { key: 'capacity', label: 'Capacity (ton)', type: 'number', required: false },
+              { key: 'capacity', label: 'Payload (tonnes)', type: 'number', required: false },
               { key: 'base_rate', label: 'Base Rate (R/km)', type: 'number', required: false },
               { key: 'fuel_consumption_l_per_100km', label: 'Fuel Consumption (L/100km)', type: 'number', required: false },
               { key: 'fuel_consumption_sensitivity_pct', label: 'Fuel Sensitivity (%/ton over capacity)', type: 'number', required: false },
@@ -414,7 +460,7 @@ export function VehicleTypesDirectory() {
             {([
               { key: 'name', label: 'Name', type: 'text' },
               { key: 'description', label: 'Description', type: 'text' },
-              { key: 'capacity', label: 'Capacity (ton)', type: 'number' },
+              { key: 'capacity', label: 'Payload (tonnes)', type: 'number' },
               { key: 'base_rate', label: 'Base Rate (R/km)', type: 'number' },
               { key: 'fuel_consumption_l_per_100km', label: 'Fuel Consumption (L/100km)', type: 'number' },
               { key: 'fuel_consumption_sensitivity_pct', label: 'Fuel Sensitivity (%/ton over capacity)', type: 'number' },

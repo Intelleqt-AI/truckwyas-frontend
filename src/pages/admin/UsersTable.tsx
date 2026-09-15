@@ -5,6 +5,7 @@ import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import PaginationControls from '@/pages/admin/PaginationControls';
+import UserActivityDrawer from '@/pages/admin/UserActivityDrawer';
 
 const PAGE_SIZE = 20;
 
@@ -70,6 +71,7 @@ export default function UsersTable() {
   const [pending, setPending] = useState<{ id: AdminUserRow['id']; kind: PendingAction } | null>(null);
   const [lockTarget, setLockTarget] = useState<AdminUserRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
+  const [activityTarget, setActivityTarget] = useState<AdminUserRow | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -282,6 +284,12 @@ export default function UsersTable() {
                     <td style={tdStyle}>{fmt(u.last_login)}</td>
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <button
+                          style={secondaryBtnStyle}
+                          onClick={() => setActivityTarget(u)}
+                        >
+                          Activity
+                        </button>
                         {u.is_active ? (
                           <button
                             style={{ ...secondaryBtnStyle, color: 'var(--status-danger)' }}
@@ -357,6 +365,14 @@ export default function UsersTable() {
           danger
           onConfirm={() => runAction(deleteTarget, 'delete')}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {activityTarget && (
+        <UserActivityDrawer
+          userId={activityTarget.id}
+          userLabel={activityTarget.name ? `${activityTarget.name} · ${activityTarget.email}` : activityTarget.email}
+          onClose={() => setActivityTarget(null)}
         />
       )}
     </div>

@@ -293,8 +293,11 @@ export default function QuoteBuilder() {
       .filter((v: any) => (v.available_vehicle_count ?? 1) > 0)
       .reduce((acc: Record<string, any>, v: any) => { if (!acc[v.name]) acc[v.name] = v; return acc; }, {})
   );
+  // Two-tier progress: {user: {outcomes_collected, outcomes_needed, ...}, global: {...}}
+  // -- see core.services.win_prediction.model_progress. Used only for the
+  // "still learning" banner's numbers; availability of the AI panel itself
+  // is driven by ai_prediction.available below, not by this.
   const winModel = modelStats?.win_model;
-  const aiLearning = winModel && winModel.mode === "heuristic";
 
   const selectedVT = useMemo(() => vehicleTypes.find((v: any) => v.name === vehicleType), [vehicleTypes, vehicleType]);
   // Fuel price comes from the company's own per-fuel-type defaults, keyed by
@@ -459,7 +462,12 @@ export default function QuoteBuilder() {
           quote_total: total, direct_cost: directCost, distance_km: chargeDistance, origin: extractCode(pickup), destination: extractCode(delivery),
           vehicle_type: vehicleType, weight: weightKg, fuel_cost: fuelCost, toll_cost: tollCost, driver_cost: driverAllowance,
           fuel_usage_litres: Math.round(chargeDistance * fuelConsumption / 100), fuel_price_used: fuelPricePerL,
-          market_rate: benchmark?.market_avg_rate || 0, client_tier: "standard",
+          market_rate: benchmark?.market_avg_rate || 0,
+          // The server derives the real tier/history once customer_id is known
+          // (AIQuoteAnalyzeView._derive_client_features); "standard" is only the
+          // pre-selection placeholder for a not-yet-chosen customer.
+          client_tier: "standard",
+          customer_id: customerId ? parseInt(customerId, 10) : null,
           // This panel never renders the LLM narrative — skipping it server-side
           // cuts the analyze round-trip from seconds to near-instant.
           skip_narrative: true,
@@ -487,8 +495,11 @@ export default function QuoteBuilder() {
     return () => { if (analyzeRef.current) clearTimeout(analyzeRef.current); };
     // selectedRouteIndex/legs are folded into `total`, but list them so an
     // alternate-route pick (or trip-type flip) always re-runs the AI explicitly.
+    // customerId is included so switching customers alone (no cost change)
+    // re-derives client_tier/historical_acceptance_rate server-side instead of
+    // silently reusing the previous customer's analysis.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeData, total, selectedRouteIndex, legs, billingBlocked]);
+  }, [routeData, total, selectedRouteIndex, legs, billingBlocked, customerId]);
 
   // benchmark on lane resolve
   useEffect(() => {
@@ -499,13 +510,22 @@ export default function QuoteBuilder() {
   }, [routeData, billingBlocked]);
 
   const opt = analysis?.price_optimization;
+  // ai_prediction is the ONLY field that means "a real trained model (user's
+  // own, or the platform-wide fallback) produced this" -- price_optimization
+  // above may be heuristic-driven and stays populated either way, so the
+  // manual/learning flow below never breaks. model_scope === 'global' is a
+  // FULLY FUNCTIONAL AI recommendation, not a degraded state -- only
+  // available === false means "still learning, no AI yet".
+  const aiPrediction = analysis?.ai_prediction;
+  const aiAvailable = aiPrediction?.available === true;
+  const aiAwaitingData = analysis != null && !aiAvailable;
   // Single source of truth for "the AI-recommended price" — used for the
   // on-screen number AND the apply target, so clicking Apply always sets the
-  // total to the exact figure the user just saw. In learning mode this is
-  // "true cost + 25%" based on directCost (never on `total`, which may
-  // already include a previously-applied markup — using `total` here would
-  // make the suggestion compound upward on every apply).
-  const suggestedPrice = aiLearning
+  // total to the exact figure the user just saw. While still awaiting data
+  // this is "true cost + 25%" based on directCost (never on `total`, which
+  // may already include a previously-applied markup — using `total` here
+  // would make the suggestion compound upward on every apply).
+  const suggestedPrice = aiAwaitingData
     ? Math.round(directCost * 1.25)
     : (opt?.optimal_price || analysis?.suggested_price || null);
   // Once the total already matches the suggestion (within a rand), there's
@@ -1265,35 +1285,66 @@ export default function QuoteBuilder() {
       {/* 3 — AI quote */}
       {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 && (
         <div style={{ ...cardS, border: "1px solid color-mix(in srgb, var(--accent-primary) 35%, var(--border-subtle))", marginBottom: 14 }}>
-          {/* still learning — shown first, above the price block, while under the outcome threshold */}
-          {aiLearning && (
+          {/* still learning — shown first, above the price block, while there's no
+              qualifying model at either tier. Shows both tiers' progress so the
+              user can see whether it's THEIR data or the platform's that's short. */}
+          {aiAwaitingData && (
             <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-row)", background: "var(--status-warning-bg)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, fontSize: 13 }}>
               <div style={{ display: "flex", gap: 10 }}>
                 <Sparkles size={16} color="var(--status-warning)" style={{ flexShrink: 0 }} />
-                <div><b>AI pricing is still learning your fleet.</b><span style={{ color: "var(--text-secondary)" }}> Priced on true cost + your {vehicleType} base rate for now. Every quote you close sharpens it.</span></div>
-              </div>
-              <div style={{ flexShrink: 0, textAlign: "right" }}>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
-                  {winModel.outcomes_collected}/{winModel.outcomes_needed} <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>logged</span>
-                </div>
-                <div style={{ marginTop: 4, width: 110, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${Math.min(100, Math.round((winModel.outcomes_collected / winModel.outcomes_needed) * 100))}%`, background: "var(--status-warning)" }} />
+                <div>
+                  <b>{aiPrediction?.reason === "optimizer_error" ? "AI pricing hit a snag." : "AI pricing isn't ready yet."}</b>
+                  <span style={{ color: "var(--text-secondary)" }}> Priced on true cost + your {vehicleType} base rate for now.{aiPrediction?.reason !== "optimizer_error" && " Every quote you close sharpens it."}</span>
                 </div>
               </div>
+              {winModel && (
+                <div style={{ flexShrink: 0, textAlign: "right", display: "flex", gap: 16 }}>
+                  <div>
+                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
+                      {winModel.user.outcomes_collected}/{winModel.user.outcomes_needed} <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>your quotes</span>
+                    </div>
+                    <div style={{ marginTop: 4, width: 90, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${Math.min(100, Math.round((winModel.user.outcomes_collected / winModel.user.outcomes_needed) * 100))}%`, background: "var(--status-warning)" }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
+                      {winModel.global.outcomes_collected}/{winModel.global.outcomes_needed} <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>platform</span>
+                    </div>
+                    <div style={{ marginTop: 4, width: 90, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${Math.min(100, Math.round((winModel.global.outcomes_collected / winModel.global.outcomes_needed) * 100))}%`, background: "var(--status-warning)" }} />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.4fr" }}>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
-              <div style={labelS}>{aiLearning ? "Suggested price" : "Recommended price"}</div>
+              <div style={{ ...labelS, display: "flex", alignItems: "center", gap: 6 }}>
+                {aiAwaitingData ? "Suggested price" : "Recommended price"}
+                {aiAvailable && (
+                  <span
+                    title={`Trained on ${aiPrediction.training_samples?.toLocaleString?.() ?? aiPrediction.training_samples} ${aiPrediction.model_scope === "user" ? "of your own" : "platform-wide"} closed quotes`}
+                    style={{
+                      fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 10, textTransform: "none", letterSpacing: 0,
+                      background: aiPrediction.model_scope === "user" ? "color-mix(in srgb, var(--accent-primary) 18%, transparent)" : "var(--bg-surface-hover)",
+                      color: aiPrediction.model_scope === "user" ? "var(--accent-primary)" : "var(--text-tertiary)",
+                    }}
+                  >
+                    {aiPrediction.model_scope === "user" ? "Personal AI" : "Platform AI"}
+                  </span>
+                )}
+              </div>
               {aiLoading ? aiSpinner : (<>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, color: aiLearning ? undefined : "var(--accent-primary)", marginTop: 4 }}>{suggestedPrice ? formatCurrency(suggestedPrice) : formatCurrency(total)}</div>
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>{aiLearning ? "true cost + 25%" : "to this client"}</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, color: aiAwaitingData ? undefined : "var(--accent-primary)", marginTop: 4 }}>{suggestedPrice ? formatCurrency(suggestedPrice) : formatCurrency(total)}</div>
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>{aiAwaitingData ? "true cost + 25%" : "to this client"}</div>
               </>)}
             </div>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={labelS}>Margin</div>
-              {aiLoading ? aiSpinner : aiLearning ? (
+              {aiLoading ? aiSpinner : aiAwaitingData ? (
                 <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
               ) : (<>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{opt?.optimal_margin_pct ? `${Math.round(opt.optimal_margin_pct)}%` : `${marginPct}%`}</div>
@@ -1302,7 +1353,7 @@ export default function QuoteBuilder() {
             </div>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={labelS}>Win probability</div>
-              {aiLoading ? aiSpinner : aiLearning ? (
+              {aiLoading ? aiSpinner : aiAwaitingData ? (
                 <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
               ) : (<>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{opt?.win_probability_at_optimal != null ? `${Math.round(opt.win_probability_at_optimal * 100)}%` : "—"}</div>
@@ -1311,7 +1362,7 @@ export default function QuoteBuilder() {
             </div>
             <div style={{ padding: "16px 18px" }}>
               <div style={labelS}>Profit sweet-spot</div>
-              {aiLoading ? aiSpinner : aiLearning ? (
+              {aiLoading ? aiSpinner : aiAwaitingData ? (
                 <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
               ) : curveData.length > 1 ? (
                 <ResponsiveContainer width="100%" height={62}>

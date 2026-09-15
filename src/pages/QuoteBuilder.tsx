@@ -634,6 +634,16 @@ export default function QuoteBuilder() {
   const awaitingCopy = ((): { title: string; detail: string } => {
     if (aiPrediction?.reason === "optimizer_error")
       return { title: "AI pricing hit a snag.", detail: "" };
+    // The trained model's own curve was too flat/degenerate for the
+    // optimizer to trust — same underlying model, this particular price
+    // point just could not be optimised against, so the backend fell
+    // back to the heuristic rather than let it masquerade as "Personal
+    // AI"/"Platform AI" (quote_analysis._build_ai_prediction).
+    if (aiPrediction?.reason === "model_curve_unusable")
+      return {
+        title: "AI pricing needs a bit more data at this price point.",
+        detail: "Priced on your company rate for now — try a nearby price and the AI should pick back up.",
+      };
     switch (winBlocker) {
       case "needs_lost_quotes":
         // Deliberately NOT "every quote you close sharpens it" — closing more

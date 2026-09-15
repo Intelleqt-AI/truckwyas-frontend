@@ -6,7 +6,6 @@ import { toast } from "@/lib/toast";
 import { formatCurrency } from "@/lib/formatters";
 import { LocationInput, type LocationCoords } from "@/components/LocationInput";
 import { RouteMapView } from "@/components/RouteMapView";
-import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip as ChartTooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from "@/components/ui/dialog";
@@ -480,6 +479,16 @@ export default function QuoteBuilder() {
   // charge (the markup layered on top) is excluded from the cost floor.
   const directCost = total - serviceCharge;
   const marginPct = total > 0 ? Math.round(((total - directCost) / total) * 100) : 0;
+  // True operating cost for the Revenue Guard ONLY — deliberately excludes
+  // base rate, unlike directCost above. directCost counts base rate as cost
+  // on purpose (see its own comment: excluding it once let the AI optimizer
+  // recommend below the carrier's own base rate). But that same inclusion
+  // makes directCost identically equal to total - serviceCharge, so the
+  // margin_pct sent to /quotes/guard/ was always exactly 0% no matter what
+  // the base rate was set to. Only this POST body's total_cost field uses
+  // this — analyze's direct_cost, the awaiting-data fallback price, and the
+  // Margin/Profit tiles all keep reading directCost unchanged.
+  const guardTrueCost = fuelCost + tollCost + crossBorderCost + driverAllowance;
 
   // ---- route calculation (debounced auto-run) ----
   const calcRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -562,7 +571,7 @@ export default function QuoteBuilder() {
           skip_narrative: true,
         }}).catch(() => null),
         postData({ url: "/api/v1/quotes/guard/", data: {
-          total_cost: directCost, quote_price: total, distance_km: chargeDistance, fuel_cost: fuelCost, toll_cost: tollCost,
+          total_cost: guardTrueCost, quote_price: total, distance_km: chargeDistance, fuel_cost: fuelCost, toll_cost: tollCost,
         }}).catch(() => null),
       ]);
       if (reqId !== aiReqRef.current) return; // a newer request has since started — this result is stale
@@ -1111,11 +1120,6 @@ export default function QuoteBuilder() {
     </div>
   );
 
-  const curveData = (opt?.curve || []).map((c: any) => {
-    const marginRaw = c.margin_pct != null ? c.margin_pct : (c.margin || 0) * 100;
-    return { margin: Math.round(marginRaw), win: Math.round((c.win_probability || 0) * 100), profit: Math.round(c.expected_profit || 0) };
-  });
-
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto" }}>
       {/* header */}
@@ -1577,7 +1581,7 @@ export default function QuoteBuilder() {
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.4fr" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
             <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
               <div style={{ ...labelS, display: "flex", alignItems: "center", gap: 6 }}>
                 {aiAwaitingData ? "Suggested price" : "Recommended price"}
@@ -1608,7 +1612,7 @@ export default function QuoteBuilder() {
                 <div style={{ fontSize: 12, color: "var(--status-success)", marginTop: 2 }}>{formatCurrency(opt?.expected_profit ?? ((suggestedPrice || total) - directCost))} profit</div>
               </>)}
             </div>
-            <div style={{ padding: "16px 18px", borderRight: "1px solid var(--border-row)" }}>
+            <div style={{ padding: "16px 18px" }}>
               <div style={labelS}>Win probability</div>
               {aiLoading ? aiSpinner : aiAwaitingData ? (
                 <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
@@ -1616,22 +1620,6 @@ export default function QuoteBuilder() {
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 600, marginTop: 4 }}>{opt?.win_probability_at_optimal != null ? `${Math.round(opt.win_probability_at_optimal * 100)}%` : "—"}</div>
                 <div style={{ marginTop: 6, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.round((opt?.win_probability_at_optimal || 0) * 100)}%`, background: "var(--accent-primary)" }} /></div>
               </>)}
-            </div>
-            <div style={{ padding: "16px 18px" }}>
-              <div style={labelS}>Profit sweet-spot</div>
-              {aiLoading ? aiSpinner : aiAwaitingData ? (
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 10 }}>Unlocks after training</div>
-              ) : curveData.length > 1 ? (
-                <ResponsiveContainer width="100%" height={62}>
-                  <ComposedChart data={curveData} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
-                    <defs><linearGradient id="qg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="var(--status-success)" stopOpacity={0.35} /><stop offset="95%" stopColor="var(--status-success)" stopOpacity={0} /></linearGradient></defs>
-                    <XAxis dataKey="margin" hide /><YAxis hide />
-                    <ChartTooltip contentStyle={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", borderRadius: 4, fontSize: 11 }} formatter={(v: any, n: any) => n === "profit" ? [formatCurrency(Number(v)), "Exp. profit"] : [`${v}%`, "Win"]} labelFormatter={(v: any) => `Margin ${v}%`} />
-                    <Area type="monotone" dataKey="profit" stroke="var(--status-success)" strokeWidth={2} fill="url(#qg)" />
-                    {opt?.optimal_margin_pct != null && <ReferenceLine x={Math.round(opt.optimal_margin_pct)} stroke="var(--accent-primary)" strokeDasharray="3 3" />}
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 8 }}>—</div>}
             </div>
           </div>
 

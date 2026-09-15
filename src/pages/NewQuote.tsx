@@ -129,20 +129,33 @@ interface RevenueGuard {
   recommended_surcharge_zar?: number;
 }
 
+interface WinModelTier {
+  outcomes_collected: number;
+  outcomes_needed: number;
+  progress_pct: number;
+  qualifies: boolean;
+  accepted: number;
+  rejected: number;
+  ready: boolean;
+  // null when nothing is in the way; otherwise 'insufficient_data' |
+  // 'needs_lost_quotes' | 'needs_won_quotes' | 'awaiting_retrain' | 'ml_unavailable'
+  blocker: string | null;
+  blocker_detail?: string | null;
+}
+
 interface ModelStats {
   training_data_count: number;
   real_quotes_count: number;
   synthetic_count: number;
   last_trained: string;
   model_version: string;
+  // Two-tier: {user: {...}, global: {...}} — see win_prediction.model_progress.
+  // This was declared flat (mode/outcomes_collected/auc) long after the backend
+  // moved to the tiered shape, so every field read below was undefined and the
+  // chip rendered "heuristic · undefined/undefined outcomes to learn".
   win_model?: {
-    mode: "learned" | "heuristic";
-    trained: boolean;
-    outcomes_collected: number;
-    outcomes_needed: number;
-    progress_pct: number;
-    auc?: number | null;
-    last_trained?: string | null;
+    user: WinModelTier;
+    global: WinModelTier;
   } | null;
 }
 
@@ -4590,15 +4603,18 @@ export default function NewQuote() {
                                   width: 6,
                                   height: 6,
                                   borderRadius: 6,
-                                  background:
-                                    modelStats.win_model.mode === "learned"
-                                      ? "var(--status-success)"
-                                      : "var(--status-warning)",
+                                  background: modelStats.win_model.global.ready
+                                    ? "var(--status-success)"
+                                    : "var(--status-warning)",
                                 }}
                               />
-                              {modelStats.win_model.mode === "learned"
-                                ? `Win model: learned${modelStats.win_model.auc != null ? ` · AUC ${modelStats.win_model.auc.toFixed(2)}` : ""} · ${modelStats.win_model.outcomes_collected} outcomes`
-                                : `Win model: heuristic · ${modelStats.win_model.outcomes_collected}/${modelStats.win_model.outcomes_needed} outcomes to learn`}
+                              {/* This curve is platform-wide, so it reports the
+                                  global tier. Won/lost rather than a count
+                                  against the floor: past 40 the count stops
+                                  being what's holding training back. */}
+                              {modelStats.win_model.global.ready
+                                ? `Win model: learned · ${modelStats.win_model.global.outcomes_collected} outcomes`
+                                : `Win model: heuristic · ${modelStats.win_model.global.accepted} won · ${modelStats.win_model.global.rejected} lost`}
                             </div>
                           )}
                           <ResponsiveContainer width="100%" height={150}>

@@ -611,6 +611,47 @@ export default function QuoteBuilder() {
   const aiPrediction = analysis?.ai_prediction;
   const aiAvailable = aiPrediction?.available === true;
   const aiAwaitingData = analysis != null && !aiAvailable;
+  // WHY there's no AI yet. The banner used to show only outcome counts, which
+  // made it contradict itself the moment a tier passed 40: full bars reading
+  // "45/40 your quotes · 73/40 platform" directly beside "AI pricing isn't
+  // ready yet". The count is one gate of several — `blocker` (backend:
+  // win_prediction.model_progress) names the one actually in the way.
+  // Prediction resolves user tier first, then global, so the tier that will
+  // deliver the AI is the one whose blocker matters here.
+  const winTier = winModel?.user?.blocker == null || winModel?.user?.qualifies
+    ? winModel?.user
+    : winModel?.global;
+  const winBlocker: string | undefined = winTier?.blocker ?? winModel?.global?.blocker;
+  const awaitingCopy = ((): { title: string; detail: string } => {
+    if (aiPrediction?.reason === "optimizer_error")
+      return { title: "AI pricing hit a snag.", detail: "" };
+    switch (winBlocker) {
+      case "needs_lost_quotes":
+        // Deliberately NOT "every quote you close sharpens it" — closing more
+        // won quotes is exactly what will not help from here.
+        return {
+          title: "AI pricing needs some lost quotes too.",
+          detail: "A model can't learn what loses a deal until some quotes are marked lost — or left to expire.",
+        };
+      case "needs_won_quotes":
+        return {
+          title: "AI pricing needs some won quotes too.",
+          detail: "A model needs deals that landed as well as ones that didn't.",
+        };
+      case "awaiting_retrain":
+        return {
+          title: "AI pricing is training tonight.",
+          detail: "Enough quotes have closed — the model builds on the next nightly run.",
+        };
+      case "ml_unavailable":
+        return {
+          title: "AI pricing is unavailable.",
+          detail: "The prediction libraries aren't installed on this server.",
+        };
+      default:
+        return { title: "AI pricing isn't ready yet.", detail: "Every quote you close sharpens it." };
+    }
+  })();
   // Single source of truth for "the AI-recommended price" — used for the
   // on-screen number AND the apply target, so clicking Apply always sets the
   // total to the exact figure the user just saw. While still awaiting data
@@ -1506,28 +1547,31 @@ export default function QuoteBuilder() {
               <div style={{ display: "flex", gap: 10 }}>
                 <Sparkles size={16} color="var(--status-warning)" style={{ flexShrink: 0 }} />
                 <div>
-                  <b>{aiPrediction?.reason === "optimizer_error" ? "AI pricing hit a snag." : "AI pricing isn't ready yet."}</b>
-                  <span style={{ color: "var(--text-secondary)" }}> Priced on true cost + {hasVehicleType ? `your ${vehicleType} base rate` : "your company default base rate"} for now.{aiPrediction?.reason !== "optimizer_error" && " Every quote you close sharpens it."}</span>
+                  <b>{awaitingCopy.title}</b>
+                  <span style={{ color: "var(--text-secondary)" }}> Priced on true cost + {hasVehicleType ? `your ${vehicleType} base rate` : "your company default base rate"} for now.{awaitingCopy.detail && ` ${awaitingCopy.detail}`}</span>
                 </div>
               </div>
               {winModel && (
                 <div style={{ flexShrink: 0, textAlign: "right", display: "flex", gap: 16 }}>
-                  <div>
-                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
-                      {winModel.user.outcomes_collected}/{winModel.user.outcomes_needed} <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>your quotes</span>
+                  {/* Won/lost, not "collected/needed" — the split IS the gate, and
+                      showing a count against 40 is what made a satisfied count
+                      gate look like the reason nothing had trained. Progress
+                      against the floor only matters while that floor is the
+                      blocker, so it appears only then. */}
+                  {([["your quotes", winModel.user], ["platform", winModel.global]] as const).map(([label, tier]) => (
+                    <div key={label}>
+                      <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
+                        {tier.accepted ?? tier.outcomes_collected} won
+                        <span style={{ color: "var(--text-tertiary)" }}> · </span>
+                        <span style={{ color: (tier.rejected ?? 0) === 0 ? "var(--status-warning)" : undefined }}>{tier.rejected ?? 0} lost</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2, whiteSpace: "nowrap" }}>
+                        {tier.blocker === "insufficient_data"
+                          ? `${label} · ${tier.outcomes_collected}/${tier.outcomes_needed}`
+                          : label}
+                      </div>
                     </div>
-                    <div style={{ marginTop: 4, width: 90, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${Math.min(100, Math.round((winModel.user.outcomes_collected / winModel.user.outcomes_needed) * 100))}%`, background: "var(--status-warning)" }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
-                      {winModel.global.outcomes_collected}/{winModel.global.outcomes_needed} <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>platform</span>
-                    </div>
-                    <div style={{ marginTop: 4, width: 90, height: 5, borderRadius: 3, background: "var(--bg-surface-hover)", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${Math.min(100, Math.round((winModel.global.outcomes_collected / winModel.global.outcomes_needed) * 100))}%`, background: "var(--status-warning)" }} />
-                    </div>
-                  </div>
+                  ))}
                 </div>
               )}
             </div>

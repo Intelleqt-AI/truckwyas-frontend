@@ -39,6 +39,34 @@ const FUEL_FALLBACK: Record<string, number> = {
 // can still be kilograms. Same >999 => kg heuristic the backend uses
 // (core/services/vehicle_types.py capacity_tonnes), so a 20000 kg row doesn't
 // get read as a 20,000-tonne truck when we pick a reference for the load.
+const CARGO_CLASSES: { key: string; label: string; typeRe: RegExp; cargoRe: RegExp }[] = [
+  { key: "tanker", label: "liquid and bulk",
+    typeRe: /tanker|bowser|bulk/i,
+    cargoRe: /fuel|diesel|petrol|oil|chemical|liquid|milk|water|acid|lpg|gas|slurry|molasses/i },
+  { key: "reefer", label: "temperature-controlled",
+    typeRe: /reefer|refriger|chill|frozen|cold/i,
+    cargoRe: /frozen|chilled|refrigerat|perishable|fresh|meat|dairy|produce|vaccine|ice ?cream/i },
+  { key: "livestock", label: "livestock",
+    typeRe: /livestock|cattle|animal/i,
+    cargoRe: /livestock|cattle|sheep|goat|pig|poultry|animal/i },
+  { key: "car", label: "vehicles",
+    typeRe: /car ?carrier|vehicle ?carrier|transporter/i,
+    cargoRe: /cars?|vehicles?|bakkies?|tractors?/i },
+  { key: "hazmat", label: "dangerous goods",
+    typeRe: /danger|hazmat|explosive/i,
+    cargoRe: /danger|hazard|explosive|flammable|toxic|corrosive/i },
+];
+/** Which cargo class a vehicle type is built for; "general" = carries anything. */
+function typeCargoClass(name: string) {
+  return CARGO_CLASSES.find((c) => c.typeRe.test(name || ""))?.key ?? "general";
+}
+/** What the user typed in Cargo, read as a class; "general" when it says nothing specific. */
+function describedCargoClass(text: string) {
+  return CARGO_CLASSES.find((c) => c.cargoRe.test(text || ""))?.key ?? "general";
+}
+function cargoClassLabel(key: string) {
+  return CARGO_CLASSES.find((c) => c.key === key)?.label ?? "general freight";
+}
 const KG_SCALE_THRESHOLD = 999;
 const MIN_PLAUSIBLE_T = 0.3, MAX_PLAUSIBLE_T = 80;
 function capacityTons(raw: any): number | null {
@@ -362,6 +390,77 @@ export default function QuoteBuilder() {
   // picked" as exactly that — this only supplies a reference for consumption.
   const fuelBasisVT = selectedVT || inferredVT;
 
+  // What to OFFER the user when they haven't picked a truck: the smallest
+  // general-freight type that can carry the load — the one an owner would
+  // actually send. Deliberately a different rule from `inferredVT` above,
+  // because the two answer different questions. `inferredVT` only estimates
+  // fuel and is chosen to never step backwards as the weight changes; this one
+  // sets the RATE the moment it's accepted, and "cheapest to run" would put an
+  // 8t load on a 28t semi at R30/km instead of a rigid at R18/km.
+  //
+  // Up to three trucks worth offering for this load, best first.
+  //
+  // Only types the fleet actually OWNS a vehicle of (owned_vehicle_count), and
+  // deliberately NOT `vehicleTypes` (the dropdown's options): those are filtered
+  // to a vehicle free *today*, the wrong test for a load running next month.
+  //
+  // Ranked on cargo suitability first, then tightest capacity. When Cargo names
+  // something specific ("diesel", "frozen chicken") the truck built for it wins;
+  // when it says nothing, general freight wins because it carries anything and
+  // a tanker carries almost nothing. Capacity only breaks ties within a rank,
+  // so a 25t tanker never beats a 34t interlink for unspecified cargo.
+  const suggestions = useMemo(() => {
+    if (vehicleType) return [];                // never second-guess a choice
+    const t = Number(weight) || 0;
+    if (t <= 0) return [];
+    const wanted = describedCargoClass(cargo);
+    return allVehicleTypes
+      .filter((v: any) => Number(v.owned_vehicle_count) > 0)
+      .map((v: any) => ({ vt: v, cap: capacityTons(v.capacity) }))
+      .filter((x): x is { vt: any; cap: number } => x.cap != null && x.cap >= t)
+      .map((x) => {
+        const cls = typeCargoClass(x.vt.name);
+        // 0 best. A truck built for the named cargo wins outright; otherwise
+        // general freight; a truck built for some *other* cargo ranks last.
+        const rank = wanted !== "general"
+          ? (cls === wanted ? 0 : cls === "general" ? 1 : 2)
+          : (cls === "general" ? 0 : 1);
+        return { ...x, cls, rank };
+      })
+      .sort((a, b) => a.rank - b.rank || a.cap - b.cap)
+      .slice(0, 3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleType, weight, cargo, vehicleTypesRaw]);
+
+  /** Why this truck is being offered — plain sentences for its info popover. */
+  const suggestionReasons = (x: { vt: any; cap: number; cls: string }) => {
+    const t = Number(weight) || 0;
+    const spare = Math.round((x.cap - t) * 10) / 10;
+    const wanted = describedCargoClass(cargo);
+    const owned = Number(x.vt.owned_vehicle_count) || 0;
+    const burn = (Number(x.vt.fuel_consumption_l_per_100km) || 32) *
+      Math.pow(1 + (Number(x.vt.fuel_consumption_sensitivity_pct) || 2) / 100, t - x.cap);
+    const out: string[] = [
+      spare <= 0
+        ? `Rated for ${x.cap}t — an exact fit for this ${t}t load.`
+        : `Rated for ${x.cap}t, so it carries this ${t}t load with ${spare}t to spare.`,
+    ];
+    if (wanted !== "general") {
+      out.push(x.cls === wanted
+        ? `Built for ${cargoClassLabel(wanted)}, which is what your cargo describes.`
+        : x.cls === "general"
+          ? `General freight. Your cargo reads as ${cargoClassLabel(wanted)}, so a purpose-built truck would suit it better if you have one.`
+          : `Built for ${cargoClassLabel(x.cls)}, not the ${cargoClassLabel(wanted)} your cargo describes — check before using it.`);
+    } else {
+      out.push(x.cls === "general"
+        ? "General freight, so it carries most cargo."
+        : `Built for ${cargoClassLabel(x.cls)}. Describe the cargo above and the ranking will take that into account.`);
+    }
+    out.push(`You own ${owned} of these.`);
+    out.push(`Picking it prices at R${Number(x.vt.base_rate) > 0 ? Number(x.vt.base_rate).toFixed(2) : "—"}/km and about ${burn.toFixed(1)} L/100km for this weight.`);
+    return out;
+  };
+
   // A heavier load genuinely burns more fuel — consumption_ref (the type's
   // configured L/100km) is scaled by how far the quote's own weight sits
   // from the type's reference tonnage (its "capacity"), compounding at
@@ -403,7 +502,8 @@ export default function QuoteBuilder() {
   // value is restored separately).
   const applyVehicleType = (name: string) => {
     setVehicleType(name);
-    const vt = vehicleTypes.find((v: any) => v.name === name);
+    const vt = allVehicleTypes.find((v: any) => v.name === name)
+      || vehicleTypes.find((v: any) => v.name === name);
     // Compared numerically, not by truthiness: DRF serialises DecimalField to
     // a string, so a type with no rate configured arrives as "0.00" — truthy
     // in JS. Testing the raw value would price the load at R0/km instead of
@@ -1170,11 +1270,63 @@ export default function QuoteBuilder() {
               {vehicleTypes.map((v: any) => (
                 <option key={v.id || v.name} value={v.name}>{v.name}{Number(v.capacity) > 0 ? ` (${v.capacity}t)` : ""}</option>
               ))}
+              {/* The options above only cover types with a vehicle free today.
+                  A suggested or already-saved type outside that set still has to
+                  be selectable, or the field renders blank. */}
+              {[...suggestions.map((x) => x.vt.name as string), vehicleType]
+                .filter((n): n is string => !!n && !vehicleTypes.some((v: any) => v.name === n))
+                .filter((n, i, a) => a.indexOf(n) === i)
+                .map((n) => {
+                  const v = allVehicleTypes.find((x: any) => x.name === n);
+                  return <option key={n} value={n}>{n}{Number(v?.capacity) > 0 ? ` (${v.capacity}t)` : ""}</option>;
+                })}
             </select>
           </div>
           <div><div style={{ ...labelS, marginBottom: 5 }}>Pickup date</div><input type="date" value={pickupDate} onChange={e => setPickupDate(e.target.value)} style={inputS} /></div>
           <div><div style={{ ...labelS, marginBottom: 5 }}>Delivery date</div><input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} style={inputS} /></div>
           <div><div style={{ ...labelS, marginBottom: 5 }}>Valid until</div><input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputS} /></div>
+          {/* Spans the grid: sits directly under the Vehicle type field but
+              gets the full form width, so the options stay on one line. */}
+          <div style={{ gridColumn: "1 / -1" }}>
+          {/* Offered, not applied. Accepting one is a real selection, so the
+              rate, the capacity check and the lane benchmark all switch on
+              together — the same as picking it from the list by hand. */}
+          {suggestions.length > 0 && (
+            <div style={{ marginTop: 2, display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 14px", fontSize: 11, lineHeight: 1.6 }}>
+              <span style={{ color: "var(--text-tertiary)" }}>
+                {weight}t needs at least a {weight}t truck:
+              </span>
+              {suggestions.map((x) => (
+                <span key={x.vt.id || x.vt.name} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <button
+                    type="button"
+                    onClick={() => applyVehicleType(x.vt.name)}
+                    style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "var(--accent-primary)", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2, textAlign: "left" }}
+                  >
+                    {x.vt.name} ({x.cap}t)
+                  </button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" title={`Why ${x.vt.name} suits this load`}
+                        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: "50%", border: "1px solid var(--border-subtle)", background: "var(--bg-surface-hover)", color: "var(--text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1, flexShrink: 0 }}>
+                        <Info size={9} />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" style={{ width: 270, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                      <div style={{ ...labelS, marginBottom: 8 }}>{x.vt.name}</div>
+                      {suggestionReasons(x).map((reason, ri) => (
+                        <div key={ri} style={{ display: "flex", gap: 7, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 6 }}>
+                          <span style={{ color: "var(--text-tertiary)", flexShrink: 0 }}>&middot;</span>
+                          <span>{reason}</span>
+                        </div>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                </span>
+              ))}
+            </div>
+          )}
+          </div>
           <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Cargo</div><input value={cargo} onChange={e => setCargo(e.target.value)} placeholder="e.g. palletised steel" style={inputS} /></div>
           <div style={{ gridColumn: "span 2" }}><div style={{ ...labelS, marginBottom: 5 }}>Trip</div>
             <div style={{ display: "flex", gap: 6 }}>
@@ -1328,7 +1480,8 @@ export default function QuoteBuilder() {
                           </div>
                           {!hasVehicleType && fuelRefCapacityTons > 0 && (
                             <div style={{ color: "var(--text-tertiary)", marginTop: 10, lineHeight: 1.5 }}>
-                              Pick a vehicle type to price on that truck exactly.
+                              This is a fleet-wide estimate, picked so the figure doesn't jump
+                              around as you change the weight.{suggestions.length ? ` Choose ${suggestions[0].vt.name} above to price on the truck you'd actually send.` : " Pick a vehicle type to price on that truck exactly."}
                             </div>
                           )}
                         </PopoverContent>

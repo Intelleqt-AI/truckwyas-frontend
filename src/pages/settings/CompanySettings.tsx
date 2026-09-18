@@ -70,6 +70,7 @@ export function CompanySettings() {
     default_quote_validity_days: '7',
     allow_cross_border: 'yes',
     default_base_rate_per_km: '', default_toll_rate_per_km: '', default_sla_hours: '',
+    cross_border_crossings_per_year: '',
     fuel_price_per_litre: '', fuel_price_petrol: '', fuel_price_electric: '', fuel_price_hybrid: '',
   });
   const [logoUrl, setLogoUrl] = useState('');
@@ -136,6 +137,8 @@ export function CompanySettings() {
           default_toll_rate_per_km:
             d.default_toll_rate_per_km != null ? String(d.default_toll_rate_per_km) : '',
           default_sla_hours: d.default_sla_hours != null ? String(d.default_sla_hours) : '',
+          cross_border_crossings_per_year:
+            d.cross_border_crossings_per_year != null ? String(d.cross_border_crossings_per_year) : '',
           fuel_price_per_litre: d.fuel_price_per_litre != null ? String(d.fuel_price_per_litre) : '',
           fuel_price_petrol: d.fuel_price_petrol != null ? String(d.fuel_price_petrol) : '',
           fuel_price_electric: d.fuel_price_electric != null ? String(d.fuel_price_electric) : '',
@@ -207,6 +210,12 @@ export function CompanySettings() {
       toast.error('Default SLA must be between 1 and 720 hours');
       return;
     }
+    const crossings = form.cross_border_crossings_per_year
+      ? parseInt(form.cross_border_crossings_per_year, 10) : null;
+    if (crossings !== null && (isNaN(crossings) || crossings < 1 || crossings > 5000)) {
+      toast.error('Border crossings per year must be between 1 and 5000');
+      return;
+    }
     setSaving(true);
     try {
       await patchData({ url: '/api/v1/company/profile/', data: {
@@ -225,6 +234,7 @@ export function CompanySettings() {
         default_toll_rate_per_km: form.default_toll_rate_per_km
           ? parseFloat(form.default_toll_rate_per_km) : 0.50,
         default_sla_hours: slaHours ?? 48,
+        cross_border_crossings_per_year: crossings ?? 24,
         fuel_price_per_litre: form.fuel_price_per_litre ? parseFloat(form.fuel_price_per_litre) : 23.50,
         fuel_price_petrol: form.fuel_price_petrol ? parseFloat(form.fuel_price_petrol) : null,
         fuel_price_electric: form.fuel_price_electric ? parseFloat(form.fuel_price_electric) : null,
@@ -489,6 +499,23 @@ export function CompanySettings() {
               />
               <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
                 Delivery time promised on a new quote. Can be overridden per quote.
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Border Crossings Per Year</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min={1}
+                max={5000}
+                placeholder="e.g. 24"
+                value={form.cross_border_crossings_per_year}
+                onChange={e => set('cross_border_crossings_per_year', e.target.value)}
+              />
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                Count each leg separately &mdash; a return trip is two. A C-BRTA permit is
+                bought for a year, so a quote charges its share of one crossing: the more
+                you cross, the less each load carries.
               </div>
             </div>
           </div>

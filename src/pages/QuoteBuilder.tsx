@@ -193,6 +193,11 @@ interface RouteData {
   fuel_usage_litres?: number; fuel_price_used?: number; routes?: RouteOption[]; best_index?: number;
   cross_border?: boolean; countries?: string[];
   additional_costs?: { border_fees?: number; weighbridge_fees?: number; non_sa_tolls?: number };
+  // Named line items — each border charge, the amortised SA permit, each
+  // country's weighbridge and tolls. A sibling of additional_costs, not a key
+  // inside it: that dict is summed server-side, so a list in there breaks the
+  // whole route calculation. Absent on route responses cached before this.
+  cross_border_breakdown?: { type: string; description: string; amount: number }[];
   toll_breakdown?: TollBreakdownItem[]; warnings?: string[];
   origin_resolved?: string; dest_resolved?: string;
   stops_count?: number;
@@ -1367,9 +1372,11 @@ export default function QuoteBuilder() {
               rate, the capacity check and the lane benchmark all switch on
               together — the same as picking it from the list by hand. */}
           {suggestions.length > 0 && (
-            <div style={{ marginTop: 2, display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 14px", fontSize: 11, lineHeight: 1.6 }}>
-              <span style={{ color: "var(--text-tertiary)" }}>
-                {weight}t needs at least a {weight}t truck:
+            <div style={{ marginTop: 3, display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 14px", fontSize: 11, lineHeight: 1.6 }}>
+              {/* Label sits on the same line as the options: it's a lead-in, not
+                  a field heading, so it keeps the form's spacing tight. */}
+              <span style={{ ...labelS, textTransform: "none", letterSpacing: "normal" }}>
+                Suggested for this {weight}t load:
               </span>
               {suggestions.map((x) => (
                 <span key={x.vt.id || x.vt.name} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -1593,11 +1600,20 @@ export default function QuoteBuilder() {
                       const border = routeData?.additional_costs?.border_fees || 0;
                       const weighbridge = routeData?.additional_costs?.weighbridge_fees || 0;
                       const nonSaTolls = routeData?.additional_costs?.non_sa_tolls || 0;
-                      const cbRows = [
-                        { label: "Border fees", v: border },
-                        { label: "Weighbridge fees", v: weighbridge },
-                        { label: "Non-SA tolls", v: nonSaTolls },
-                      ].filter(row => row.v > 0);
+                      // Prefer the itemised breakdown — it names the actual
+                      // charge ("SA C-BRTA Class 2 permit (R8,761/yr over 24
+                      // crossings)") instead of a bucket total, which is what
+                      // lets an operator check a quote against a real invoice.
+                      // Falls back to the three totals for route responses
+                      // cached before the backend started sending it.
+                      const items = routeData?.cross_border_breakdown || [];
+                      const cbRows = items.length
+                        ? items.filter(i => i.amount > 0).map(i => ({ label: i.description, v: i.amount }))
+                        : [
+                            { label: "Border fees", v: border },
+                            { label: "Weighbridge fees", v: weighbridge },
+                            { label: "Non-SA tolls", v: nonSaTolls },
+                          ].filter(row => row.v > 0);
                       const cbOneWayTotal = border + weighbridge + nonSaTolls;
                       return (
                         <Popover>

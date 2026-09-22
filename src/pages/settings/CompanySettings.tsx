@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useQueryClient } from '@tanstack/react-query';
+import { Loader } from '@/components/Loader';
 import { toast } from '@/lib/toast';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -59,6 +61,7 @@ const grid3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 
 
 export function CompanySettings() {
   const { user: authUser } = useAuth();
+  const queryClient = useQueryClient();
   // Shared public demo account — every control that persists a change (logo
   // upload, save) is fixed off; viewing/editing fields in memory stays live.
   const isDemo = !!authUser?.is_demo;
@@ -71,6 +74,7 @@ export function CompanySettings() {
     allow_cross_border: 'yes',
     default_base_rate_per_km: '', default_toll_rate_per_km: '', default_sla_hours: '',
     cross_border_crossings_per_year: '',
+    fuel_zone: 'INLAND',
     fuel_price_per_litre: '', fuel_price_petrol: '', fuel_price_electric: '', fuel_price_hybrid: '',
   });
   const [logoUrl, setLogoUrl] = useState('');
@@ -81,7 +85,11 @@ export function CompanySettings() {
   const [livePrice, setLivePrice] = useState<any>(null);
   const [fetchingLivePrice, setFetchingLivePrice] = useState(false);
 
-  const loadLivePrice = (force: boolean) => {
+  /** `zoneOverride` is passed when the zone selector triggers this, so the
+   *  fetch uses the zone just chosen rather than whatever is still in state.
+   *  `dieselOnly` keeps a zone switch off the petrol field — petrol has no
+   *  coastal/inland split, so a zone change has no business rewriting it. */
+  const loadLivePrice = (force: boolean, zoneOverride?: string, dieselOnly = false) => {
     setFetchingLivePrice(true);
     fetchData(`api/v1/fuel-prices/current/${force ? '?force=true' : ''}`).then((d: any) => {
       setLivePrice(d);
@@ -92,19 +100,31 @@ export function CompanySettings() {
         // has a real factory default (23.50) to compare against; Petrol has
         // no forced default, so "untouched" just means blank. Never silently
         // overwrite a price a company deliberately set.
-        if (d?.inland_price != null) {
+        // Diesel is gazetted per zone: it lands at the coastal ports and the
+        // DMRE adds a transport differential to move it inland, so Gauteng runs
+        // roughly R0.87/L above Cape Town or Durban. Take the figure for this
+        // fleet's zone — reading `inland_price` unconditionally over-charged
+        // every coastal fleet by that gap on every quote.
+        const zone = zoneOverride ?? prev.fuel_zone;
+        const zonePrice = zone === 'COASTAL'
+          ? (d?.coastal_price ?? d?.inland_price)
+          : d?.inland_price;
+        if (zonePrice != null) {
           const current = parseFloat(prev.fuel_price_per_litre);
           const dieselUntouched = !prev.fuel_price_per_litre || Math.abs(current - 23.5) < 0.001;
-          if (force || dieselUntouched) next.fuel_price_per_litre = String(d.inland_price);
+          if (force || dieselUntouched) next.fuel_price_per_litre = String(zonePrice);
         }
-        if (d?.petrol_95) {
+        if (d?.petrol_95 && !dieselOnly) {
           if (force || !prev.fuel_price_petrol) next.fuel_price_petrol = String(d.petrol_95);
         }
         return next;
       });
       if (force) {
+        const zone = zoneOverride ?? form.fuel_zone;
+        const zoneLabel = zone === 'COASTAL' ? 'coastal' : 'inland';
         if (d?.success === false) toast.error(d?.error || 'Could not fetch live fuel prices');
         else if (d?.inland_price == null) toast.error(d?.stale_warning || "Couldn't reach a live fuel-price source");
+        else if (dieselOnly) toast.success(`Diesel updated to the ${zoneLabel} price`);
         else toast.success('Fuel prices refreshed');
       }
     }).catch(() => { if (force) toast.error('Could not fetch live fuel prices'); })
@@ -139,6 +159,7 @@ export function CompanySettings() {
           default_sla_hours: d.default_sla_hours != null ? String(d.default_sla_hours) : '',
           cross_border_crossings_per_year:
             d.cross_border_crossings_per_year != null ? String(d.cross_border_crossings_per_year) : '',
+          fuel_zone: d.fuel_zone === 'COASTAL' ? 'COASTAL' : 'INLAND',
           fuel_price_per_litre: d.fuel_price_per_litre != null ? String(d.fuel_price_per_litre) : '',
           fuel_price_petrol: d.fuel_price_petrol != null ? String(d.fuel_price_petrol) : '',
           fuel_price_electric: d.fuel_price_electric != null ? String(d.fuel_price_electric) : '',
@@ -235,11 +256,17 @@ export function CompanySettings() {
           ? parseFloat(form.default_toll_rate_per_km) : 0.50,
         default_sla_hours: slaHours ?? 48,
         cross_border_crossings_per_year: crossings ?? 24,
+        fuel_zone: form.fuel_zone,
         fuel_price_per_litre: form.fuel_price_per_litre ? parseFloat(form.fuel_price_per_litre) : 23.50,
         fuel_price_petrol: form.fuel_price_petrol ? parseFloat(form.fuel_price_petrol) : null,
         fuel_price_electric: form.fuel_price_electric ? parseFloat(form.fuel_price_electric) : null,
         fuel_price_hybrid: form.fuel_price_hybrid ? parseFloat(form.fuel_price_hybrid) : null,
       } });
+      // The quote builder reads these defaults through the shared
+      // ["company-profile"] query, which has a 5 minute staleTime — so without
+      // this a saved diesel price, base rate or toll rate did not reach an
+      // already-open quote until the page was reloaded.
+      await queryClient.invalidateQueries({ queryKey: ['company-profile'] });
       setSaved(true);
       toast.success('Company details saved');
       setTimeout(() => setSaved(false), 2000);
@@ -532,6 +559,30 @@ export function CompanySettings() {
             to the live national price if left blank; the other three have no such feed,
             so they stay unset until you add one.
           </div>
+          <div style={{ marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>Fuel Pricing Zone</label>
+              <Select
+                value={form.fuel_zone}
+                onValueChange={val => { set('fuel_zone', val); loadLivePrice(true, val, true); }}
+                disabled={fetchingLivePrice}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="INLAND">Inland &mdash; Gauteng and the interior</SelectItem>
+                  <SelectItem value="COASTAL">Coastal &mdash; Cape Town, Durban, Gqeberha, East London</SelectItem>
+                </SelectContent>
+              </Select>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                Diesel is gazetted at two prices: it arrives at the coastal ports and costs
+                more inland once the transport differential is added &mdash; about R0.87/L
+                at the moment. Changing this fetches the current price for the zone and
+                updates Diesel below.
+              </div>
+            </div>
+          </div>
           <div style={grid2}>
             <div>
               <label style={labelStyle}>Diesel (R/L)</label>
@@ -555,7 +606,11 @@ export function CompanySettings() {
                     cursor: fetchingLivePrice ? 'wait' : 'pointer', letterSpacing: '0.04em',
                   }}
                 >
-                  {fetchingLivePrice ? '...' : 'FETCH NOW'}
+                  {fetchingLivePrice
+                    ? <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 62 }}>
+                        <Loader size={12} color="currentColor" />
+                      </span>
+                    : 'FETCH NOW'}
                 </button>
               </div>
               {livePrice?.success !== false && (livePrice?.inland_price != null || livePrice?.stale_warning) && (
@@ -598,7 +653,11 @@ export function CompanySettings() {
                     cursor: fetchingLivePrice ? 'wait' : 'pointer', letterSpacing: '0.04em',
                   }}
                 >
-                  {fetchingLivePrice ? '...' : 'FETCH NOW'}
+                  {fetchingLivePrice
+                    ? <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 62 }}>
+                        <Loader size={12} color="currentColor" />
+                      </span>
+                    : 'FETCH NOW'}
                 </button>
               </div>
               {livePrice?.success !== false && (livePrice?.petrol_95 != null || livePrice?.stale_warning) && (

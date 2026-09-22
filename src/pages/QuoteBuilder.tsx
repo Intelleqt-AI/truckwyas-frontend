@@ -358,6 +358,12 @@ export default function QuoteBuilder() {
   // diesel price, and not always Diesel regardless of what's actually chosen.
   const companyFuelPriceField = (FUEL_PRICE_FIELD_BY_TYPE as Record<string, string>)[selectedVT?.fuel_type || 'Diesel'] || 'fuel_price_per_litre';
   const fuelPricePerL = Number(companyProfile?.[companyFuelPriceField]) || Number(companyProfile?.fuel_price_per_litre) || 21.7;
+  // Diesel is gazetted per zone (coastal ports vs inland, ~R0.87/L apart), so
+  // say which one this price is. Only diesel is split that way, so the note is
+  // omitted for the other fuel types.
+  const fuelZoneNote = companyFuelPriceField === 'fuel_price_per_litre'
+    ? (companyProfile?.fuel_zone === 'COASTAL' ? ' · coastal' : ' · inland')
+    : '';
   // With no vehicle type picked there is no reference tonnage to scale fuel
   // from, and a flat figure would price a 5t load and a 30t load identically.
   // So infer the truck the load will run on from the load itself: of the types
@@ -1497,7 +1503,7 @@ export default function QuoteBuilder() {
             )}
             {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && !calculatingRoute && (<>
               {[
-                { key: "fuel", l: `Fuel — ${fuelConsumption.toFixed(1)} L/100km @ R${Number(fuelPricePerL).toFixed(2)}${fuelBasisNote}`, v: fuelCost, c: "var(--status-danger)" },
+                { key: "fuel", l: `Fuel — ${fuelConsumption.toFixed(1)} L/100km @ R${Number(fuelPricePerL).toFixed(2)}${fuelZoneNote}${fuelBasisNote}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
                 ...(crossBorderCost > 0 ? [{ key: "cb", l: "Cross-border / weighbridge", v: crossBorderCost, c: "#2BB6A6" }] : []),
                 { key: "driver", l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },
@@ -1548,7 +1554,7 @@ export default function QuoteBuilder() {
                             {[
                               ["Distance", `${Math.round(chargeDistance)} km${legs === 2 ? " (round trip)" : ""}`],
                               ["Diesel used", `${Math.round(chargeDistance * fuelConsumption / 100)} L`],
-                              ["Diesel price", `R${Number(fuelPricePerL).toFixed(2)}/L`],
+                              ["Diesel price", `R${Number(fuelPricePerL).toFixed(2)}/L${fuelZoneNote.replace(' · ', ' ')}`],
                             ].map(([k, v]) => (
                               <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0" }}>
                                 <span style={{ color: "var(--text-tertiary)" }}>{k}</span>

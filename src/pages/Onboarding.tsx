@@ -150,12 +150,24 @@ export function Onboarding() {
             <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
               STEP {step} OF 4
             </span>
-            <button onClick={handleSkip} style={{
-              background: 'none', border: 'none', color: 'var(--text-tertiary)',
-              fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer',
-            }}>
-              Skip →
-            </button>
+            <div style={{ display: 'flex', gap: 16 }}>
+              {/* Nothing to go back to on the first step, and a dead control
+                  reads as a fault. */}
+              {step > 1 && step < 4 && (
+                <button onClick={() => setStep(step - 1)} style={{
+                  background: 'none', border: 'none', color: 'var(--text-tertiary)',
+                  fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', padding: 0,
+                }}>
+                  ← Back
+                </button>
+              )}
+              <button onClick={handleSkip} style={{
+                background: 'none', border: 'none', color: 'var(--text-tertiary)',
+                fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', padding: 0,
+              }}>
+                Skip →
+              </button>
+            </div>
           </div>
           <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
             <div style={{

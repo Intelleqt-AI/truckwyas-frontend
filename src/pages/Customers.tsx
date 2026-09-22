@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
 import { fetchData, postData, patchData, deleteData } from "../lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -80,6 +81,7 @@ export default function Customers() {
   const [sortBy, setSortBy] = useState("name_asc");
 
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [addForm, setAddForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
 
@@ -162,13 +164,26 @@ export default function Customers() {
           <div style={{ fontSize: 22, fontWeight: 500, color: "var(--text-primary)" }}>Customers</div>
           <LiveBadge />
         </div>
-        <button
-          className="btn-action"
-          onClick={() => setShowAddForm(true)}
-          disabled={isDemo}
-          title={isDemo ? 'Fixed in demo mode' : undefined}
-          style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-        >+ Add customer</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setShowImport(true)}
+            disabled={isDemo}
+            title={isDemo ? 'Fixed in demo mode' : 'Paste a list from Excel'}
+            style={{
+              background: 'none', border: '1px solid var(--border-subtle)',
+              color: 'var(--text-secondary)', padding: '0 14px', borderRadius: 4,
+              fontSize: 12, cursor: isDemo ? 'not-allowed' : 'pointer',
+              opacity: isDemo ? 0.5 : 1,
+            }}
+          >Import from Excel</button>
+          <button
+            className="btn-action"
+            onClick={() => setShowAddForm(true)}
+            disabled={isDemo}
+            title={isDemo ? 'Fixed in demo mode' : undefined}
+            style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+          >+ Add customer</button>
+        </div>
       </div>
 
       {/* KPI strip */}
@@ -235,15 +250,28 @@ export default function Customers() {
                       <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🏢</div>
                       <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", marginBottom: 8 }}>No customers yet</div>
                       <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
-                        Add your first customer to get started
+                        Already have them in a spreadsheet? Paste the list straight in.
                       </div>
-                      <button
-                        onClick={() => setShowAddForm(true)}
-                        className="btn-action"
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-                      >Add customer</button>
+                      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                        <button
+                          onClick={() => setShowImport(true)}
+                          className="btn-action"
+                          disabled={isDemo}
+                          title={isDemo ? 'Fixed in demo mode' : undefined}
+                          style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                        >Paste from Excel</button>
+                        <button
+                          onClick={() => setShowAddForm(true)}
+                          disabled={isDemo}
+                          title={isDemo ? 'Fixed in demo mode' : undefined}
+                          style={{
+                            background: 'none', border: '1px solid var(--border-subtle)',
+                            color: 'var(--text-secondary)', padding: '0 14px', borderRadius: 4,
+                            fontSize: 12, cursor: isDemo ? 'not-allowed' : 'pointer',
+                            opacity: isDemo ? 0.5 : 1,
+                          }}
+                        >Add one at a time</button>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -325,6 +353,13 @@ export default function Customers() {
           </tbody>
         </table>
       </div>
+
+      <PasteImportDrawer
+        entity="customers"
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={() => refetch()}
+      />
 
       {/* Add Customer slide-out */}
       {showAddForm && (

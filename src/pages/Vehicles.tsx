@@ -9,6 +9,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AddVehicleDrawer } from '@/components/AddVehicleDrawer';
+import { PasteImportDrawer } from '@/components/import/PasteImportDrawer';
 import { EditVehicleDrawer } from '@/components/EditVehicleDrawer';
 import { Loader } from '@/components/Loader';
 import { useAuth } from '@/lib/AuthContext';
@@ -20,6 +21,7 @@ interface Vehicle {
   model?: string;
   vehicle_type?: string;
   vehicle_type_name?: string;
+  vehicle_type_capacity?: string | number | null;
   year?: number;
   capacity?: number;
   status: string;
@@ -155,6 +157,7 @@ export default function Vehicles() {
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
   const [sortBy, setSortBy] = useState('revenue');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
@@ -267,6 +270,17 @@ export default function Vehicles() {
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
             <button onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>Heatmap</button>
+            <button
+              onClick={() => setShowImport(true)}
+              disabled={isDemo}
+              title={isDemo ? 'Fixed in demo mode' : 'Paste a fleet list from Excel'}
+              style={{
+                fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none',
+                border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
+                padding: '8px 14px', borderRadius: 2, letterSpacing: '0.06em',
+                cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
+              }}
+            >Import from Excel</button>
             <button
               className="btn-action"
               onClick={() => setShowAddForm(true)}
@@ -389,16 +403,29 @@ export default function Vehicles() {
                             No vehicles yet
                           </div>
                           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
-                            Get started by adding your first vehicle to your fleet
+                            Already have your fleet in a spreadsheet? Paste the list straight in.
                           </div>
                           <button
-                            onClick={() => setShowAddForm(true)}
+                            onClick={() => setShowImport(true)}
                             className="btn-action"
                             disabled={isDemo}
                             title={isDemo ? 'Fixed in demo mode' : undefined}
-                            style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                            style={{ ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}), marginRight: 8 }}
                           >
-                            Add vehicle
+                            Paste from Excel
+                          </button>
+                          <button
+                            onClick={() => setShowAddForm(true)}
+                            disabled={isDemo}
+                            title={isDemo ? 'Fixed in demo mode' : undefined}
+                            style={{
+                              background: 'none', border: '1px solid var(--border-subtle)',
+                              color: 'var(--text-secondary)', padding: '0 14px', borderRadius: 4,
+                              fontSize: 12, cursor: isDemo ? 'not-allowed' : 'pointer',
+                              opacity: isDemo ? 0.5 : 1,
+                            }}
+                          >
+                            Add one at a time
                           </button>
                         </div>
                       </td>
@@ -427,6 +454,11 @@ export default function Vehicles() {
                       </td>
                       <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.vehicle_type_name || '—'}
+                        {v.vehicle_type_capacity != null && (
+                          <span style={{ marginLeft: 6, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                            · {v.vehicle_type_capacity}t
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '12px 20px 12px 32px' }}>{getStatusBadge(v.status)}</td>
                       <td style={{ padding: '12px 20px 12px 32px' }}>
@@ -496,6 +528,13 @@ export default function Vehicles() {
         </div>
 
       </div>
+
+      <PasteImportDrawer
+        entity="vehicles"
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={() => refetch()}
+      />
 
       <AddVehicleDrawer
         open={showAddForm}

@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
+import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
+import { BulkDeleteBar, RowCheckbox } from "@/components/BulkDeleteBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
@@ -51,6 +53,10 @@ export function CustomersDirectory() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
+  const toggleOne = (id: number, on: boolean) =>
+    setSelected(prev => (on ? [...prev, id] : prev.filter(x => x !== id)));
   const [saving, setSaving] = useState(false);
   const [addErr, setAddErr] = useState('');
   const [form, setForm] = useState({ name: '', email: '', phone: '', city: '' });
@@ -168,6 +174,16 @@ export function CustomersDirectory() {
               }}
             />
             <button
+              onClick={() => setShowImport(true)}
+              disabled={isDemo}
+              title={isDemo ? 'Not available in the demo' : 'Paste or upload a list'}
+              style={{
+                background: 'none', border: '1px solid var(--border-subtle)',
+                color: 'var(--text-secondary)', borderRadius: 2, padding: '6px 12px',
+                fontSize: 12, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
+              }}
+            >IMPORT</button>
+            <button
               className="btn-action"
               onClick={() => { setShowAdd(s => !s); setAddErr(''); }}
               disabled={isDemo && !showAdd}
@@ -217,6 +233,13 @@ export function CustomersDirectory() {
           </div>
         )}
 
+        <BulkDeleteBar
+          entity="customers"
+          selected={selected}
+          onClear={() => setSelected([])}
+          onDeleted={() => { setSelected([]); load(); }}
+        />
+
         {/* Table */}
         {loading ? (
           <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
@@ -224,6 +247,15 @@ export function CustomersDirectory() {
           <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
             <thead>
               <tr>
+                <th style={{ padding: '10px 0 10px 16px', width: 32, borderBottom: '1px solid var(--border-subtle)' }}>
+                  {filtered.length > 0 && (
+                    <RowCheckbox
+                      title="Select everything shown"
+                      checked={selected.length > 0 && filtered.every((c: any) => selected.includes(c.id))}
+                      onChange={on => setSelected(on ? filtered.map((c: any) => c.id) : [])}
+                    />
+                  )}
+                </th>
                 {['Customer', 'Contact', 'City', 'Payment Terms', 'Status', ''].map(h => (
                   <th key={h} style={{
                     padding: '10px 20px', textAlign: 'left' as const,
@@ -236,9 +268,12 @@ export function CustomersDirectory() {
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No customers found</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No customers found</td></tr>
               ) : filtered.map((c, i) => (
                 <tr key={c.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
+                  <td style={{ padding: '12px 0 12px 16px', width: 32 }}>
+                    <RowCheckbox checked={selected.includes(c.id)} onChange={on => toggleOne(c.id, on)} />
+                  </td>
                   <td style={{ padding: '12px 20px' }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 1 }}>{c.name}</div>
                     {c.company_name && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{c.company_name}</div>}
@@ -359,6 +394,13 @@ export function CustomersDirectory() {
           </div>
         </div>
       )}
+
+      <PasteImportDrawer
+        entity="customers"
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={() => load()}
+      />
     </div>
   );
 }

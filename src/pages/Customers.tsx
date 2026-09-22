@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
-import { BulkDeleteBar, RowCheckbox } from "@/components/BulkDeleteBar";
+import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
 import { fetchData, postData, patchData, deleteData } from "../lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -173,12 +173,7 @@ export default function Customers() {
             onClick={() => setShowImport(true)}
             disabled={isDemo}
             title={isDemo ? 'Fixed in demo mode' : 'Paste a list from Excel'}
-            style={{
-              background: 'none', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-secondary)', padding: '0 14px', borderRadius: 4,
-              fontSize: 12, cursor: isDemo ? 'not-allowed' : 'pointer',
-              opacity: isDemo ? 0.5 : 1,
-            }}
+            style={{ ...secondaryButtonStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
           >Import from Excel</button>
           <button
             className="btn-action"
@@ -290,12 +285,7 @@ export default function Customers() {
                           onClick={() => setShowAddForm(true)}
                           disabled={isDemo}
                           title={isDemo ? 'Fixed in demo mode' : undefined}
-                          style={{
-                            background: 'none', border: '1px solid var(--border-subtle)',
-                            color: 'var(--text-secondary)', padding: '0 14px', borderRadius: 4,
-                            fontSize: 12, cursor: isDemo ? 'not-allowed' : 'pointer',
-                            opacity: isDemo ? 0.5 : 1,
-                          }}
+                          style={{ ...secondaryButtonStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
                         >Add one at a time</button>
                       </div>
                     </div>

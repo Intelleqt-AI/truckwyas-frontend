@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
-import { BulkDeleteBar, RowCheckbox } from "@/components/BulkDeleteBar";
+import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
@@ -177,11 +177,7 @@ export function CustomersDirectory() {
               onClick={() => setShowImport(true)}
               disabled={isDemo}
               title={isDemo ? 'Not available in the demo' : 'Paste or upload a list'}
-              style={{
-                background: 'none', border: '1px solid var(--border-subtle)',
-                color: 'var(--text-secondary)', borderRadius: 2, padding: '6px 12px',
-                fontSize: 12, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-              }}
+              style={{ ...secondaryButtonStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
             >IMPORT</button>
             <button
               className="btn-action"

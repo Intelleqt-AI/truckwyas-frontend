@@ -3,6 +3,23 @@ import { postData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 
+/** The app's secondary button: mono, 11px, square-ish corners — matches the
+ *  Heatmap/Reset buttons the rest of the pages already use. Defined once here
+ *  because the import and delete controls were each re-inventing it slightly
+ *  differently, and the 0-vertical-padding version sat visibly short beside a
+ *  primary button. */
+export const secondaryButtonStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  letterSpacing: '0.06em',
+  background: 'none',
+  border: '1px solid var(--border-subtle)',
+  color: 'var(--text-secondary)',
+  padding: '8px 14px',
+  borderRadius: 2,
+  cursor: 'pointer',
+};
+
 /**
  * The bar that appears once rows are ticked.
  *
@@ -73,16 +90,15 @@ export function BulkDeleteBar({ entity, selected, onClear, onDeleted }: Props) {
           <button
             onClick={() => setConfirming(true)}
             style={{
-              background: 'none', border: '1px solid var(--status-danger)',
-              color: 'var(--status-danger)', padding: '5px 14px', borderRadius: 4,
-              fontSize: 12, cursor: 'pointer',
+              ...secondaryButtonStyle,
+              borderColor: 'var(--status-danger)', color: 'var(--status-danger)',
             }}
           >Delete</button>
           <button
             onClick={onClear}
             style={{
-              background: 'none', border: 'none', color: 'var(--text-tertiary)',
-              fontSize: 12, cursor: 'pointer', padding: '5px 4px',
+              ...secondaryButtonStyle, border: 'none',
+              color: 'var(--text-tertiary)', padding: '8px 4px',
             }}
           >Clear selection</button>
         </>
@@ -95,20 +111,16 @@ export function BulkDeleteBar({ entity, selected, onClear, onDeleted }: Props) {
             onClick={run}
             disabled={busy}
             style={{
-              background: 'var(--status-danger)', border: '1px solid var(--status-danger)',
-              color: '#fff', padding: '5px 14px', borderRadius: 4, fontSize: 12,
-              cursor: busy ? 'wait' : 'pointer', minWidth: 96,
+              ...secondaryButtonStyle,
+              background: 'var(--status-danger)', borderColor: 'var(--status-danger)',
+              color: '#fff', cursor: busy ? 'wait' : 'pointer', minWidth: 96,
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             }}
           >{busy ? <Loader size={12} color="currentColor" /> : 'Yes, delete'}</button>
           <button
             onClick={() => setConfirming(false)}
             disabled={busy}
-            style={{
-              background: 'none', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-secondary)', padding: '5px 14px', borderRadius: 4,
-              fontSize: 12, cursor: 'pointer',
-            }}
+            style={secondaryButtonStyle}
           >Cancel</button>
         </>
       )}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchData, deleteData } from "@/lib/Api";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
-import { BulkDeleteBar, RowCheckbox } from "@/components/BulkDeleteBar";
+import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
 import { AddVehicleDrawer } from "@/components/AddVehicleDrawer";
 import { EditVehicleDrawer } from "@/components/EditVehicleDrawer";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -112,11 +112,7 @@ export function VehiclesDirectory() {
               onClick={() => setShowImport(true)}
               disabled={isDemo}
               title={isDemo ? 'Not available in the demo' : 'Paste or upload a fleet list'}
-              style={{
-                background: 'none', border: '1px solid var(--border-subtle)',
-                color: 'var(--text-secondary)', borderRadius: 2, padding: '6px 12px',
-                fontSize: 12, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-              }}
+              style={{ ...secondaryButtonStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
             >IMPORT</button>
             <button
               className="btn-action"

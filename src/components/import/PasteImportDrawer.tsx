@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { postData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
+import { secondaryButtonStyle } from '@/components/BulkDeleteBar';
 import * as XLSX from 'xlsx';
 
 /** Spreadsheet formats SheetJS reads reliably. Everything becomes the same
@@ -244,7 +245,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
               </button>
               {onClose && (
                 <button onClick={close}
-                  style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '0 14px', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}>
+                  style={secondaryButtonStyle}>
                   Cancel
                 </button>
               )}
@@ -322,7 +323,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
                 {busy ? <Loader size={12} color="currentColor" /> : `IMPORT ${preview.ready}`}
               </button>
               <button onClick={() => setPreview(null)} disabled={busy}
-                style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '0 14px', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}>
+                style={secondaryButtonStyle}>
                 Change list
               </button>
             </div>

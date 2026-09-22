@@ -252,11 +252,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
 
         {preview && (
           <>
-            {preview.unmapped_columns?.length > 0 && (
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 12 }}>
-                Ignored, because there is nowhere to put them: {preview.unmapped_columns.join(', ')}
-              </div>
-            )}
+
 
             <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
               <div style={{ maxHeight: 380, overflowY: 'auto' }}>
@@ -308,11 +304,16 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
               )}
             </div>
 
-            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6, lineHeight: 1.6 }}>
-              {preview.needs_attention > 0
-                ? `Rows needing attention are skipped — the other ${preview.ready} still import. Fix them in your spreadsheet and paste again.`
-                : 'Everything checks out.'}
-            </div>
+            {preview.needs_attention > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6, lineHeight: 1.6 }}>
+                Rows needing attention are skipped &mdash; the other {preview.ready} still
+                import. Fix them in your spreadsheet and paste again.
+                {preview.unmapped_columns?.length > 0 && (
+                  <> These columns were ignored because there is nowhere to put
+                  them: {preview.unmapped_columns.join(', ')}.</>
+                )}
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
               <button className="btn-action" onClick={commit} disabled={busy || preview.ready === 0}>
@@ -320,7 +321,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
               </button>
               <button onClick={() => setPreview(null)} disabled={busy}
                 style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '0 14px', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}>
-                Back
+                Change list
               </button>
             </div>
           </>

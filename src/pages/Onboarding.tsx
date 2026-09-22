@@ -167,16 +167,20 @@ export function Onboarding() {
             <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
               STEP {step} OF 4
             </span>
-            <button
-              onClick={() => (step === 2 || step === 3 ? setStep(step + 1) : handleSkip())}
-              title={step === 2 || step === 3 ? 'Move on without importing' : 'Finish setup later'}
-              style={{
-              justifySelf: 'end',
-              background: 'none', border: 'none', color: 'var(--text-tertiary)',
-              fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', padding: 0,
-            }}>
-              {step === 2 || step === 3 ? 'Skip this →' : 'Skip →'}
-            </button>
+            {/* Nothing left to skip on the final screen — setup is already
+                done and "Go to dashboard" is the way out. */}
+            {step < 4 && (
+              <button
+                onClick={() => (step === 2 || step === 3 ? setStep(step + 1) : handleSkip())}
+                title={step === 2 || step === 3 ? 'Move on without importing' : 'Finish setup later'}
+                style={{
+                  justifySelf: 'end',
+                  background: 'none', border: 'none', color: 'var(--text-tertiary)',
+                  fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', padding: 0,
+                }}>
+                {step === 2 || step === 3 ? 'Skip this →' : 'Skip →'}
+              </button>
+            )}
           </div>
           <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
             <div style={{

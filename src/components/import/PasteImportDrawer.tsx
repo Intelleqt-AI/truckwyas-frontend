@@ -1,7 +1,24 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { postData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
+import * as XLSX from 'xlsx';
+
+/** Spreadsheet formats SheetJS reads reliably. Everything becomes the same
+ *  tab-separated text a paste produces, so a file and a paste follow one code
+ *  path and get the same preview. */
+const FILE_TYPES = '.xlsx,.xls,.xlsm,.ods,.csv,.tsv,.txt';
+
+/** A sheet -> the TSV the paste box would have contained.
+ *  Reads the first sheet: a fleet list is one sheet, and silently merging
+ *  several would import rows nobody chose. */
+async function fileToText(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  const book = XLSX.read(buf, { type: 'array', cellDates: false, raw: false });
+  const first = book.SheetNames[0];
+  if (!first) throw new Error('That file has no sheets in it');
+  return XLSX.utils.sheet_to_csv(book.Sheets[first], { FS: '	', blankrows: false });
+}
 
 /**
  * Paste a list straight out of a spreadsheet.
@@ -69,11 +86,29 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: Props) 
   const [text, setText] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
   const sample = SAMPLES[entity];
 
-  const reset = () => { setText(''); setPreview(null); setBusy(false); };
+  const reset = () => { setText(''); setPreview(null); setBusy(false); setFileName(''); };
+
+  const takeFile = async (file?: File | null) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const asText = await fileToText(file);
+      if (!asText.trim()) throw new Error('That sheet looks empty');
+      setText(asText);
+      setFileName(file.name);
+      toast.success(`Read ${file.name}`);
+    } catch (e: any) {
+      toast.error(e?.message || "Couldn't read that file — try saving it as CSV or Excel");
+    }
+    setBusy(false);
+    if (fileRef.current) fileRef.current.value = '';
+  };
   const close = () => { reset(); onClose(); };
 
   const check = async () => {
@@ -129,7 +164,7 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: Props) 
           <div>
             <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>{sample.title}</div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-              Copy the rows out of Excel, Google Sheets or your current system and paste them below.
+              Paste the rows straight out of Excel or Google Sheets, or drop the file in.
             </div>
           </div>
           <button onClick={close}
@@ -140,7 +175,34 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: Props) 
 
         {!preview && (
           <>
-            <div style={{ ...labelS, marginBottom: 6 }}>Paste here</div>
+            {/* A file is just another way to fill the same box: it is converted
+                to the tab-separated text a paste produces, so both go through
+                one validation and one preview. */}
+            <div
+              onDragOver={e => { e.preventDefault(); }}
+              onDrop={e => { e.preventDefault(); takeFile(e.dataTransfer.files?.[0]); }}
+              onClick={() => fileRef.current?.click()}
+              style={{
+                border: '1px dashed var(--border-subtle)', borderRadius: 4,
+                padding: '14px 16px', marginBottom: 14, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+              }}>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                {fileName
+                  ? <>Loaded <b>{fileName}</b> — check it below, or drop another file.</>
+                  : <>Drop an Excel or CSV file here, or <span style={{ color: 'var(--accent-primary)' }}>browse</span></>}
+              </div>
+              <span style={{ ...labelS, flexShrink: 0 }}>xlsx · xls · ods · csv</span>
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept={FILE_TYPES}
+              onChange={e => takeFile(e.target.files?.[0])}
+              style={{ display: 'none' }}
+            />
+
+            <div style={{ ...labelS, marginBottom: 6 }}>{fileName ? 'From your file' : 'Paste here'}</div>
             <textarea
               value={text}
               onChange={e => setText(e.target.value)}

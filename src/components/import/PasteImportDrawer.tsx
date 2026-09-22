@@ -287,7 +287,28 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
               </div>
             </div>
 
-            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 10, lineHeight: 1.6 }}>
+            {/* Under the table, not above it: by the time it is worth counting
+                them you have already read the rows. */}
+            <div style={{
+              fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
+              marginTop: 10, display: 'flex', gap: 10, flexWrap: 'wrap',
+            }}>
+              <span>{preview.total} found</span>
+              <span>·</span>
+              <span style={{ color: preview.ready ? 'var(--status-success)' : undefined }}>
+                {preview.ready} ready
+              </span>
+              {preview.needs_attention > 0 && (
+                <>
+                  <span>·</span>
+                  <span style={{ color: 'var(--status-warning)' }}>
+                    {preview.needs_attention} need attention
+                  </span>
+                </>
+              )}
+            </div>
+
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6, lineHeight: 1.6 }}>
               {preview.needs_attention > 0
                 ? `Rows needing attention are skipped — the other ${preview.ready} still import. Fix them in your spreadsheet and paste again.`
                 : 'Everything checks out.'}

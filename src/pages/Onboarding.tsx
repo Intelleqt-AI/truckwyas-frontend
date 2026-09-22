@@ -4,6 +4,7 @@ import { fetchData, patchData, postData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
+import { PasteImportDrawer, type ImportEntity } from '@/components/import/PasteImportDrawer';
 
 interface CompanyProfile {
   company_name: string;
@@ -35,17 +36,10 @@ export function Onboarding() {
   const [phone, setPhone] = useState('');
   const [loadingCompany, setLoadingCompany] = useState(true);
 
-  // Step 2: First vehicle
-  const [plate, setPlate] = useState('');
-  const [make, setMake] = useState('');
-  const [model, setModel] = useState('');
-  const [year, setYear] = useState(new Date().getFullYear().toString());
-  const [vehicleTypeId, setVehicleTypeId] = useState('');
-  const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
-  const [loadingTypes, setLoadingTypes] = useState(true);
-  const [capacity, setCapacity] = useState('');
-  const [fuelType, setFuelType] = useState('DIESEL');
-  const [vin, setVin] = useState('');
+  // Steps 2 and 3 are imports; both are skippable, so all they track is how
+  // many landed, to confirm it on screen and on the final step.
+  const [customersImported, setCustomersImported] = useState(0);
+  const [vehiclesImported, setVehiclesImported] = useState(0);
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -62,17 +56,6 @@ export function Onboarding() {
       })
       .finally(() => setLoadingCompany(false));
 
-    // Load vehicle types
-    fetchData('api/v1/vehicle-types/')
-      .then((data: any) => {
-        const arr = Array.isArray(data) ? data : (data?.results || []);
-        setVehicleTypes(arr);
-        if (arr.length > 0) setVehicleTypeId(arr[0].id.toString());
-      })
-      .catch(() => {
-        setVehicleTypes([]);
-      })
-      .finally(() => setLoadingTypes(false));
   }, []);
 
   const handleSkip = () => {
@@ -105,43 +88,6 @@ export function Onboarding() {
     }
   };
 
-  const handleStep2Submit = async () => {
-    if (!plate.trim()) { toast.error('Registration plate is required'); return; }
-    if (!make.trim())  { toast.error('Make is required'); return; }
-    if (!model.trim()) { toast.error('Model is required'); return; }
-    const yearNum = parseInt(year);
-    const curYear = new Date().getFullYear();
-    if (!year || yearNum < 1990 || yearNum > curYear + 1) {
-      toast.error('Enter a valid year (1990–present)');
-      return;
-    }
-    if (!capacity || parseFloat(capacity) <= 0) { toast.error('Capacity is required'); return; }
-    if (!vehicleTypeId) { toast.error('Vehicle type is required'); return; }
-
-    setSubmitting(true);
-    try {
-      await postData({
-        url: 'api/v1/vehicles/',
-        data: {
-          plate: plate.trim().toUpperCase(),
-          make,
-          model,
-          year: yearNum,
-          vehicle_type: vehicleTypeId,
-          capacity: parseFloat(capacity),
-          fuel_type: fuelType,
-          type: 'TRUCK',
-          ...(vin.trim() ? { vin: vin.trim().toUpperCase() } : {}),
-        },
-      });
-      toast.success('Vehicle added');
-      setStep(3);
-    } catch {
-      toast.error('Failed to add vehicle');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleComplete = () => {
     localStorage.setItem('onboarding_done', 'true');
@@ -200,7 +146,7 @@ export function Onboarding() {
         <div style={{ marginBottom: 32 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-              STEP {step} OF 2
+              STEP {step} OF 4
             </span>
             <button onClick={handleSkip} style={{
               background: 'none', border: 'none', color: 'var(--text-tertiary)',
@@ -212,7 +158,7 @@ export function Onboarding() {
           <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
             <div style={{
               height: '100%',
-              width: `${(step / 2) * 100}%`,
+              width: `${(step / 4) * 100}%`,
               background: 'var(--accent-primary)',
               borderRadius: 2,
               transition: 'width 0.3s ease',
@@ -339,185 +285,53 @@ export function Onboarding() {
           </div>
         )}
 
-        {/* Vehicle step removed from onboarding — vehicles are optional and
-            added later from Fleet (the full vehicle form lives there). */}
-        {false && (
-          <div>
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-                Add Your First Vehicle
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                Start building your fleet
-              </div>
-            </div>
-
-            {loadingTypes ? (
-              <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
-                <Loader size={32} />
-              </div>
-            ) : (
-              <>
-                {/* Registration Plate */}
-                <div style={{ marginBottom: 16 }}>
-                  <label style={lblSt}>Registration Plate *</label>
-                  <input
-                    type="text"
-                    value={plate}
-                    onChange={(e) => setPlate(e.target.value.toUpperCase())}
-                    placeholder="ABC 123 GP"
-                    autoFocus
-                    style={{ ...inSt, fontFamily: 'var(--font-mono)' }}
-                  />
-                </div>
-
-                {/* Make + Model */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                  <div>
-                    <label style={lblSt}>Make *</label>
-                    <input
-                      list="truck-makes"
-                      type="text"
-                      value={make}
-                      onChange={(e) => setMake(e.target.value)}
-                      placeholder="Mercedes-Benz"
-                      style={inSt}
-                    />
-                    <datalist id="truck-makes">
-                      {['Mercedes-Benz','Volvo','MAN','Scania','DAF','Iveco',
-                        'UD Trucks','Hino','Isuzu','Ford','Toyota']
-                        .map(m => <option key={m} value={m} />)}
-                    </datalist>
-                  </div>
-                  <div>
-                    <label style={lblSt}>Model *</label>
-                    <input
-                      type="text"
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      placeholder="Actros"
-                      style={inSt}
-                    />
-                  </div>
-                </div>
-
-                {/* Year + Vehicle Type */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                  <div>
-                    <label style={lblSt}>Year *</label>
-                    <input
-                      type="number"
-                      min={1990}
-                      max={new Date().getFullYear() + 1}
-                      value={year}
-                      onChange={(e) => setYear(e.target.value)}
-                      placeholder={new Date().getFullYear().toString()}
-                      style={inSt}
-                    />
-                  </div>
-                  <div>
-                    <label style={lblSt}>Vehicle Type *</label>
-                    <Select value={vehicleTypeId} onValueChange={setVehicleTypeId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {vehicleTypes.map((vt) => (
-                          <SelectItem key={vt.id} value={String(vt.id)}>{vt.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Capacity + Fuel Type */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                  <div>
-                    <label style={lblSt}>Capacity (tonnes) *</label>
-                    <input
-                      type="number"
-                      min={0.5}
-                      max={200}
-                      step={0.5}
-                      value={capacity}
-                      onChange={(e) => setCapacity(e.target.value)}
-                      placeholder="30"
-                      style={inSt}
-                    />
-                  </div>
-                  <div>
-                    <label style={lblSt}>Fuel Type *</label>
-                    <Select value={fuelType} onValueChange={setFuelType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="DIESEL">Diesel</SelectItem>
-                        <SelectItem value="PETROL">Petrol</SelectItem>
-                        <SelectItem value="ELECTRIC">Electric</SelectItem>
-                        <SelectItem value="HYBRID">Hybrid</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* VIN optional */}
-                <div style={{ marginBottom: 24 }}>
-                  <label style={lblSt}>
-                    VIN{' '}
-                    <span style={{ color: 'var(--text-tertiary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
-                      — optional
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={vin}
-                    onChange={(e) => setVin(e.target.value.toUpperCase())}
-                    placeholder="WDB9340321L123456"
-                    style={{ ...inSt, fontFamily: 'var(--font-mono)' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <button
-                    onClick={() => setStep(1)}
-                    style={{
-                      background: 'none',
-                      border: '1px solid var(--border-subtle)',
-                      color: 'var(--text-secondary)',
-                      padding: '10px 20px',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 11,
-                      borderRadius: 2,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    BACK
-                  </button>
-                  <button
-                    onClick={handleStep2Submit}
-                    disabled={submitting}
-                    className="btn-action"
-                    style={{ flex: 1 }}
-                  >
-                    {submitting ? 'ADDING...' : 'ADD VEHICLE'}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+        {/* Step 2: Customers — bring the list they already have */}
+        {step === 2 && (
+          <ImportStep
+            title="Import your customers"
+            blurb="Already have them in a spreadsheet? Paste the list straight in — we work out which column is which. You can always add them later instead."
+            entity="customers"
+            imported={customersImported}
+            onImported={setCustomersImported}
+            onNext={() => setStep(3)}
+            onBack={() => setStep(1)}
+          />
         )}
 
-        {/* Step 2: You're all set */}
-        {step === 2 && (
+        {/* Step 3: Vehicles */}
+        {step === 3 && (
+          <ImportStep
+            title="Import your fleet"
+            blurb="Paste your vehicle list the same way. Registration, type and capacity are what a quote needs; anything else you have is a bonus."
+            entity="vehicles"
+            imported={vehiclesImported}
+            onImported={setVehiclesImported}
+            onNext={() => setStep(4)}
+            onBack={() => setStep(2)}
+          />
+        )}
+
+        {/* Step 4: You're all set */}
+        {step === 4 && (
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>🚛</div>
             <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
               You're all set!
             </div>
             <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 32, lineHeight: 1.6 }}>
-              Your business is ready. Jump in and create your first quote — you can add
-              vehicles, drivers and staff any time from the app.
+              {customersImported > 0 || vehiclesImported > 0 ? (
+                <>
+                  {[customersImported > 0 ? `${customersImported} customers` : null,
+                    vehiclesImported > 0 ? `${vehiclesImported} vehicles` : null]
+                    .filter(Boolean).join(' and ')} imported. Jump in and price your first
+                  load — you can add more any time from the app.
+                </>
+              ) : (
+                <>
+                  Your business is ready. Jump in and create your first quote — you can
+                  import your customers and fleet any time from the app.
+                </>
+              )}
             </div>
 
             <button
@@ -555,6 +369,83 @@ export function Onboarding() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * One onboarding step that offers a paste import and lets the fleet move on
+ * without it. Skippable by design: plenty of people sign up on a phone, away
+ * from the spreadsheet, and a wizard that traps them there is worse than one
+ * they finish in ten seconds.
+ */
+function ImportStep({
+  title, blurb, entity, imported, onImported, onNext, onBack,
+}: {
+  title: string;
+  blurb: string;
+  entity: ImportEntity;
+  imported: number;
+  onImported: (n: number) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const noun = entity === 'customers' ? 'customers' : 'vehicles';
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+          {title}
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+          {blurb}
+        </div>
+      </div>
+
+      {imported > 0 ? (
+        <div style={{
+          border: '1px solid var(--status-success)', borderRadius: 4, padding: '16px 18px',
+          marginBottom: 20, fontSize: 13, color: 'var(--text-secondary)',
+        }}>
+          <span style={{ color: 'var(--status-success)', fontWeight: 500 }}>
+            {imported} {noun} imported.
+          </span>{' '}
+          You can paste more, or carry on.
+        </div>
+      ) : (
+        <div style={{
+          border: '1px dashed var(--border-subtle)', borderRadius: 4, padding: '28px 18px',
+          marginBottom: 20, textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 14 }}>
+            Copy the rows out of Excel or Google Sheets
+          </div>
+          <button className="btn-action" onClick={() => setOpen(true)}>Paste from Excel</button>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button
+          onClick={onBack}
+          style={{
+            background: 'none', border: '1px solid var(--border-subtle)',
+            color: 'var(--text-secondary)', padding: '0 16px', borderRadius: 4,
+            fontSize: 12, cursor: 'pointer',
+          }}
+        >Back</button>
+        <button className="btn-action" onClick={onNext} style={{ flex: 1 }}>
+          {imported > 0 ? 'Continue' : 'Skip for now'}
+        </button>
+      </div>
+
+      <PasteImportDrawer
+        entity={entity}
+        open={open}
+        onClose={() => setOpen(false)}
+        onImported={n => onImported(imported + n)}
+      />
     </div>
   );
 }

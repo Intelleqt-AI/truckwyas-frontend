@@ -73,6 +73,7 @@ const AdvanceRequest = lazy(() => import('./pages/AdvanceRequest'));
 const AdvanceDetail = lazy(() => import('./pages/AdvanceDetail'));
 const Insights = lazy(() => import('./pages/Insights'));
 const Copilot = lazy(() => import('./pages/Copilot'));
+const Insurance = lazy(() => import('./pages/Insurance'));
 // PartnerDashboard removed — moved to standalone partner portal
 const Settings = lazy(() => import('./pages/Settings'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
@@ -308,6 +309,7 @@ const App = () => (
                 {/* Insights-role gated */}
                 <Route element={<RoleRoute roles={INSIGHTS_ROLES} />}>
                   <Route path="/insights" element={<Insights />} />
+                  <Route path="/insurance" element={<Insurance />} />
                   <Route path="/copilot" element={<Copilot />} />
                 </Route>
 

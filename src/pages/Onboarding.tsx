@@ -167,12 +167,15 @@ export function Onboarding() {
             <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
               STEP {step} OF 4
             </span>
-            <button onClick={handleSkip} style={{
+            <button
+              onClick={() => (step === 2 || step === 3 ? setStep(step + 1) : handleSkip())}
+              title={step === 2 || step === 3 ? 'Move on without importing' : 'Finish setup later'}
+              style={{
               justifySelf: 'end',
               background: 'none', border: 'none', color: 'var(--text-tertiary)',
               fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', padding: 0,
             }}>
-              Skip →
+              {step === 2 || step === 3 ? 'Skip this →' : 'Skip →'}
             </button>
           </div>
           <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
@@ -314,7 +317,6 @@ export function Onboarding() {
             imported={customersImported}
             onImported={setCustomersImported}
             onNext={() => setStep(3)}
-            onBack={() => setStep(1)}
           />
         )}
 
@@ -327,7 +329,6 @@ export function Onboarding() {
             imported={vehiclesImported}
             onImported={setVehiclesImported}
             onNext={() => setStep(4)}
-            onBack={() => setStep(2)}
           />
         )}
 
@@ -405,15 +406,15 @@ export function Onboarding() {
  * in ten seconds.
  */
 function ImportStep({
-  title, blurb, entity, imported, onImported, onNext, onBack,
+  title, blurb, entity, imported, onImported, onNext,
 }: {
   title: string;
   blurb: string;
   entity: ImportEntity;
   imported: number;
   onImported: (n: number) => void;
+  /** Called once something lands, so the wizard can offer the way forward. */
   onNext: () => void;
-  onBack: () => void;
 }) {
   const noun = entity === 'customers' ? 'customers' : 'vehicles';
 
@@ -432,11 +433,18 @@ function ImportStep({
         <div style={{
           border: '1px solid var(--status-success)', borderRadius: 4, padding: '12px 16px',
           marginBottom: 16, fontSize: 13, color: 'var(--text-secondary)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
         }}>
-          <span style={{ color: 'var(--status-success)', fontWeight: 500 }}>
-            {imported} {noun} imported.
-          </span>{' '}
-          Paste more below, or carry on.
+          <div>
+            <span style={{ color: 'var(--status-success)', fontWeight: 500 }}>
+              {imported} {noun} imported.
+            </span>{' '}
+            Paste more below, or carry on.
+          </div>
+          {/* The way forward appears once there is something to move on from. */}
+          <button className="btn-action" onClick={onNext} style={{ flexShrink: 0 }}>
+            CONTINUE →
+          </button>
         </div>
       )}
 
@@ -447,19 +455,6 @@ function ImportStep({
         onImported={n => onImported(imported + n)}
       />
 
-      <div style={{ display: 'flex', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
-        <button
-          onClick={onBack}
-          style={{
-            background: 'none', border: '1px solid var(--border-subtle)',
-            color: 'var(--text-secondary)', padding: '0 16px', borderRadius: 4,
-            fontSize: 12, cursor: 'pointer',
-          }}
-        >Back</button>
-        <button className="btn-action" onClick={onNext} style={{ flex: 1 }}>
-          {imported > 0 ? 'Continue' : 'Skip for now'}
-        </button>
-      </div>
     </div>
   );
 }

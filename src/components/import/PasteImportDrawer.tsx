@@ -242,10 +242,12 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
               <button className="btn-action" onClick={check} disabled={busy}>
                 {busy ? <Loader size={12} color="currentColor" /> : 'CHECK LIST'}
               </button>
-              <button onClick={close}
-                style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '0 14px', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}>
-                Cancel
-              </button>
+              {onClose && (
+                <button onClick={close}
+                  style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '0 14px', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              )}
             </div>
           </>
         )}

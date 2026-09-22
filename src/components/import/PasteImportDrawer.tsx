@@ -239,7 +239,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
               Columns we recognise: {sample.columns}
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-              <button className="btn-action" onClick={check} disabled={busy}>
+              <button className="btn-action" onClick={check} disabled={busy} style={{ flex: 1 }}>
                 {busy ? <Loader size={12} color="currentColor" /> : 'CHECK LIST'}
               </button>
               {onClose && (
@@ -318,7 +318,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
             )}
 
             <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-              <button className="btn-action" onClick={commit} disabled={busy || preview.ready === 0}>
+              <button className="btn-action" onClick={commit} disabled={busy || preview.ready === 0} style={{ flex: 1 }}>
                 {busy ? <Loader size={12} color="currentColor" /> : `IMPORT ${preview.ready}`}
               </button>
               <button onClick={() => setPreview(null)} disabled={busy}

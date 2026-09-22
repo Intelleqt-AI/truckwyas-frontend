@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
+import { BulkDeleteBar, RowCheckbox } from "@/components/BulkDeleteBar";
 import { fetchData, postData, patchData, deleteData } from "../lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
@@ -82,6 +83,9 @@ export default function Customers() {
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
+  const toggleOne = (id: number, on: boolean) =>
+    setSelected(prev => (on ? [...prev, id] : prev.filter(x => x !== id)));
   const [addForm, setAddForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
 
@@ -203,6 +207,16 @@ export default function Customers() {
 
       {/* Table */}
       <div className="card" style={{ padding: 0, overflowX: "auto" }}>
+        {/* Sits above the toolbar so it never covers the rows being chosen. */}
+        <div style={{ padding: selected.length ? "12px 20px 0 32px" : 0 }}>
+          <BulkDeleteBar
+            entity="customers"
+            selected={selected}
+            onClear={() => setSelected([])}
+            onDeleted={() => { setSelected([]); refetch(); }}
+          />
+        </div>
+
         {/* Table toolbar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px 12px 32px", borderBottom: "1px solid var(--border-subtle)" }}>
           <input
@@ -231,9 +245,21 @@ export default function Customers() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
+              <th style={{
+                padding: "12px 0 12px 20px", width: 32,
+                borderBottom: "1px solid var(--border-subtle)",
+              }}>
+                {filtered.length > 0 && (
+                  <RowCheckbox
+                    title="Select everything shown"
+                    checked={selected.length > 0 && filtered.every((c: any) => selected.includes(c.id))}
+                    onChange={on => setSelected(on ? filtered.map((c: any) => c.id) : [])}
+                  />
+                )}
+              </th>
               {["Name", "Company", "Email", "Phone", "City", "Payment Terms", ""].map(h => (
                 <th key={h} style={{
-                  padding: "12px 20px 12px 32px", textAlign: "left",
+                  padding: "12px 20px 12px 12px", textAlign: "left",
                   fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase",
                   letterSpacing: "0.08em", color: "var(--text-tertiary)",
                   borderBottom: "1px solid var(--border-subtle)", fontWeight: 500, whiteSpace: "nowrap",
@@ -245,7 +271,7 @@ export default function Customers() {
             {filtered.length === 0 ? (
               customers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: 0 }}>
+                  <td colSpan={8} style={{ padding: 0 }}>
                     <div style={{ padding: "60px 20px", textAlign: "center" }}>
                       <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🏢</div>
                       <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", marginBottom: 8 }}>No customers yet</div>
@@ -277,7 +303,7 @@ export default function Customers() {
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", color: "var(--text-tertiary)", padding: 40, fontSize: 13 }}>
+                  <td colSpan={8} style={{ textAlign: "center", color: "var(--text-tertiary)", padding: 40, fontSize: 13 }}>
                     No customers match your filters
                   </td>
                 </tr>
@@ -293,7 +319,13 @@ export default function Customers() {
                   onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-surface-hover)")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
-                  <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
+                  <td style={{ padding: "12px 0 12px 20px", width: 32 }}>
+                    <RowCheckbox
+                      checked={selected.includes(c.id)}
+                      onChange={on => toggleOne(c.id, on)}
+                    />
+                  </td>
+                  <td style={{ padding: "12px 20px 12px 12px", fontSize: 13, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
                       {c.name}

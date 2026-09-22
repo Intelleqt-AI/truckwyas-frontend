@@ -10,6 +10,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AddVehicleDrawer } from '@/components/AddVehicleDrawer';
 import { PasteImportDrawer } from '@/components/import/PasteImportDrawer';
+import { BulkDeleteBar, RowCheckbox } from '@/components/BulkDeleteBar';
 import { EditVehicleDrawer } from '@/components/EditVehicleDrawer';
 import { Loader } from '@/components/Loader';
 import { useAuth } from '@/lib/AuthContext';
@@ -158,6 +159,9 @@ export default function Vehicles() {
   const [sortBy, setSortBy] = useState('revenue');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
+  const toggleOne = (id: number, on: boolean) =>
+    setSelected(prev => (on ? [...prev, id] : prev.filter(x => x !== id)));
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
@@ -377,14 +381,31 @@ export default function Vehicles() {
             </div>
           </div>
 
+          {/* Above the table so it never covers the rows being chosen. */}
+          <BulkDeleteBar
+            entity="vehicles"
+            selected={selected}
+            onClear={() => setSelected([])}
+            onDeleted={() => { setSelected([]); refetch(); }}
+          />
+
           {/* Table */}
           <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
+                  <th style={{ padding: '12px 0 12px 20px', width: 32, borderBottom: '1px solid var(--border-subtle)' }}>
+                    {sorted.length > 0 && (
+                      <RowCheckbox
+                        title="Select everything shown"
+                        checked={selected.length > 0 && sorted.every((v: any) => selected.includes(v.id))}
+                        onChange={on => setSelected(on ? sorted.map((v: any) => v.id) : [])}
+                      />
+                    )}
+                  </th>
                   {['Registration', 'Make / Model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency', ''].map(h => (
                     <th key={h} style={{
-                      padding: '12px 20px 12px 32px', textAlign: 'left',
+                      padding: '12px 20px 12px 12px', textAlign: 'left',
                       fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
                       letterSpacing: '0.08em', color: 'var(--text-tertiary)',
                       borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
@@ -396,7 +417,7 @@ export default function Vehicles() {
                 {sorted.length === 0 ? (
                   vehicles.length === 0 ? (
                     <tr>
-                      <td colSpan={9} style={{ padding: 0 }}>
+                      <td colSpan={10} style={{ padding: 0 }}>
                         <div style={{ padding: '60px 20px', textAlign: 'center' }}>
                           <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🚛</div>
                           <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>
@@ -431,7 +452,7 @@ export default function Vehicles() {
                       </td>
                     </tr>
                   ) : (
-                    <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles match your filters</td></tr>
+                    <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles match your filters</td></tr>
                   )
                 ) : sorted.map((v, idx) => {
                   const utilizationPercent = ((v.total_trips || 0) / 20) * 100;
@@ -445,7 +466,13 @@ export default function Vehicles() {
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
-                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 0 12px 20px', width: 32 }}>
+                        <RowCheckbox
+                          checked={selected.includes(v.id)}
+                          onChange={on => toggleOne(v.id, on)}
+                        />
+                      </td>
+                      <td style={{ padding: '12px 20px 12px 12px', fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                         <div>{v.plate || v.registration || '—'}</div>
                         {formatLastSeen(v)}
                       </td>

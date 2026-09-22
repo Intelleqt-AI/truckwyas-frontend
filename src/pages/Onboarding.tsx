@@ -401,12 +401,36 @@ function ImportStep({
 
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-          {title}
+      <div style={{
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+        gap: 16, marginBottom: 20,
+      }}>
+        <div>
+          <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+            {title}
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            {blurb}
+          </div>
         </div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          {blurb}
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button
+            onClick={onBack}
+            style={{
+              background: 'none', border: '1px solid var(--border-subtle)',
+              color: 'var(--text-secondary)', padding: '7px 14px', borderRadius: 4,
+              fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >Back</button>
+          <button
+            onClick={onNext}
+            style={{
+              background: 'none', border: '1px solid var(--border-subtle)',
+              color: imported > 0 ? 'var(--accent-primary)' : 'var(--text-secondary)',
+              padding: '7px 14px', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >{imported > 0 ? 'Continue →' : 'Skip for now →'}</button>
         </div>
       </div>
 
@@ -429,19 +453,6 @@ function ImportStep({
         onImported={n => onImported(imported + n)}
       />
 
-      <div style={{ display: 'flex', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
-        <button
-          onClick={onBack}
-          style={{
-            background: 'none', border: '1px solid var(--border-subtle)',
-            color: 'var(--text-secondary)', padding: '0 16px', borderRadius: 4,
-            fontSize: 12, cursor: 'pointer',
-          }}
-        >Back</button>
-        <button className="btn-action" onClick={onNext} style={{ flex: 1 }}>
-          {imported > 0 ? 'Continue' : 'Skip for now'}
-        </button>
-      </div>
     </div>
   );
 }

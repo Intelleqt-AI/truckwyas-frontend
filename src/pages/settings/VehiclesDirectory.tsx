@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchData, deleteData } from "@/lib/Api";
+import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
+import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
 import { AddVehicleDrawer } from "@/components/AddVehicleDrawer";
 import { EditVehicleDrawer } from "@/components/EditVehicleDrawer";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -19,6 +21,7 @@ interface Vehicle {
   status: string;
   vehicle_type?: number;
   vehicle_type_name?: string;
+  vehicle_type_capacity?: string | number | null;
   driver?: number | null;
   driver_name?: string;
   last_maintenance_date?: string;
@@ -50,6 +53,10 @@ export function VehiclesDirectory() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showAddDrawer, setShowAddDrawer] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
+  const toggleOne = (id: number, on: boolean) =>
+    setSelected(prev => (on ? [...prev, id] : prev.filter(x => x !== id)));
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
@@ -102,6 +109,12 @@ export function VehiclesDirectory() {
               }}
             />
             <button
+              onClick={() => setShowImport(true)}
+              disabled={isDemo}
+              title={isDemo ? 'Not available in the demo' : 'Paste or upload a fleet list'}
+              style={{ ...secondaryButtonStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+            >IMPORT</button>
+            <button
               className="btn-action"
               onClick={() => setShowAddDrawer(true)}
               disabled={isDemo}
@@ -111,12 +124,28 @@ export function VehiclesDirectory() {
           </div>
         </div>
 
+        <BulkDeleteBar
+          entity="vehicles"
+          selected={selected}
+          onClear={() => setSelected([])}
+          onDeleted={() => { setSelected([]); load(); }}
+        />
+
         {loading ? (
           <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
             <thead>
               <tr>
+                <th style={{ padding: '10px 0 10px 16px', width: 32, borderBottom: '1px solid var(--border-subtle)' }}>
+                  {filtered.length > 0 && (
+                    <RowCheckbox
+                      title="Select everything shown"
+                      checked={selected.length > 0 && filtered.every((v: any) => selected.includes(v.id))}
+                      onChange={on => setSelected(on ? filtered.map((v: any) => v.id) : [])}
+                    />
+                  )}
+                </th>
                 {['Plate', 'Make / Model', 'Type', 'Status', 'Driver', 'Last Service', ''].map(h => (
                   <th key={h} style={{
                     padding: '10px 20px', textAlign: 'left' as const,
@@ -129,9 +158,12 @@ export function VehiclesDirectory() {
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No vehicles found</td></tr>
+                <tr><td colSpan={8} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No vehicles found</td></tr>
               ) : filtered.map((v, i) => (
                 <tr key={v.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
+                  <td style={{ padding: '12px 0 12px 16px', width: 32 }}>
+                    <RowCheckbox checked={selected.includes(v.id)} onChange={on => toggleOne(v.id, on)} />
+                  </td>
                   <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>
                     {v.plate || '—'}
                   </td>
@@ -140,6 +172,11 @@ export function VehiclesDirectory() {
                   </td>
                   <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
                     {v.vehicle_type_name || v.vehicle_type || '—'}
+                    {v.vehicle_type_capacity != null && (
+                      <span style={{ marginLeft: 6, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                        · {v.vehicle_type_capacity}t
+                      </span>
+                    )}
                   </td>
                   <td style={{ padding: '12px 20px' }}>
                     <span style={{
@@ -215,6 +252,13 @@ export function VehiclesDirectory() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+
+      <PasteImportDrawer
+        entity="vehicles"
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={() => load()}
+      />
 
       <EditVehicleDrawer
         open={!!editVehicle}

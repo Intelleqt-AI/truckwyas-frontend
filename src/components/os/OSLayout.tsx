@@ -103,11 +103,11 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
 
   // Role-based nav access control
   const NAV_ACCESS: Record<string, string[]> = {
-    ADMIN: ['/', '/bookings', '/fleet', '/customers', '/invoices', '/capital', '/insights', '/copilot', '/settings'],
-    MANAGER: ['/', '/bookings', '/fleet', '/customers', '/invoices', '/capital', '/insights', '/copilot', '/settings'],
-    OPERATOR: ['/', '/bookings', '/fleet', '/customers', '/invoices', '/capital', '/insights', '/copilot'],
-    DISPATCHER: ['/', '/bookings', '/fleet', '/customers', '/invoices', '/capital', '/insights', '/copilot'],
-    VIEWER: ['/', '/bookings', '/fleet', '/customers', '/insights', '/copilot'],
+    ADMIN: ['/', '/bookings', '/fleet', '/customers', '/invoices', '/capital', '/insights', '/insurance', '/copilot', '/settings'],
+    MANAGER: ['/', '/bookings', '/fleet', '/customers', '/invoices', '/capital', '/insights', '/insurance', '/copilot', '/settings'],
+    OPERATOR: ['/', '/bookings', '/fleet', '/customers', '/invoices', '/capital', '/insights', '/insurance', '/copilot'],
+    DISPATCHER: ['/', '/bookings', '/fleet', '/customers', '/invoices', '/capital', '/insights', '/insurance', '/copilot'],
+    VIEWER: ['/', '/bookings', '/fleet', '/customers', '/insights', '/insurance', '/copilot'],
     DRIVER: ['/', '/bookings'],
   };
 
@@ -189,6 +189,16 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
         </svg>
       ),
       label: 'Insights',
+    },
+    {
+      path: '/insurance',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M12 2l8 4v6c0 5-3.4 9.2-8 10-4.6-.8-8-5-8-10V6l8-4z" />
+          <polyline points="9 12 11 14 15 10" />
+        </svg>
+      ),
+      label: 'Insurance',
     },
     {
       path: '/copilot',

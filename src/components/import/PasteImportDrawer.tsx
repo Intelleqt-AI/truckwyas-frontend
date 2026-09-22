@@ -252,14 +252,6 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
 
         {preview && (
           <>
-            <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
-              <Stat value={preview.total} label="found" />
-              <Stat value={preview.ready} label="ready to import" color="var(--status-success)" />
-              {preview.needs_attention > 0 && (
-                <Stat value={preview.needs_attention} label="need attention" color="var(--status-warning)" />
-              )}
-            </div>
-
             {preview.unmapped_columns?.length > 0 && (
               <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 12 }}>
                 Ignored, because there is nowhere to put them: {preview.unmapped_columns.join(', ')}
@@ -356,11 +348,3 @@ const tdS: React.CSSProperties = {
   color: 'var(--text-secondary)', verticalAlign: 'top',
 };
 
-function Stat({ value, label, color }: { value: number; label: string; color?: string }) {
-  return (
-    <div>
-      <div style={{ fontSize: 22, fontWeight: 500, color: color || 'var(--text-primary)' }}>{value}</div>
-      <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{label}</div>
-    </div>
-  );
-}

@@ -7,12 +7,21 @@ import * as XLSX from 'xlsx';
 /** Spreadsheet formats SheetJS reads reliably. Everything becomes the same
  *  tab-separated text a paste produces, so a file and a paste follow one code
  *  path and get the same preview. */
-const FILE_TYPES = '.xlsx,.xls,.xlsm,.ods,.csv,.tsv,.txt';
+const FILE_TYPES = '.xlsx,.xls,.xlsm,.ods,.csv,.tsv,.txt,.pdf';
 
 /** A sheet -> the TSV the paste box would have contained.
  *  Reads the first sheet: a fleet list is one sheet, and silently merging
  *  several would import rows nobody chose. */
 async function fileToText(file: File): Promise<string> {
+  // A PDF holds no table, only positioned text, so the columns are inferred
+  // from the layout — loaded into the box for checking rather than imported
+  // straight off. See pdfToRows.
+  if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+    // Loaded on demand: pdf.js is about a megabyte, and most fleets never drop
+    // a PDF. No reason to ship it to everyone who opens the Customers page.
+    const { pdfToRows } = await import('./pdfToRows');
+    return pdfToRows(file);
+  }
   const buf = await file.arrayBuffer();
   const book = XLSX.read(buf, { type: 'array', cellDates: false, raw: false });
   const first = book.SheetNames[0];
@@ -87,12 +96,13 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: Props) 
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
   const [fileName, setFileName] = useState('');
+  const [fromPdf, setFromPdf] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
   const sample = SAMPLES[entity];
 
-  const reset = () => { setText(''); setPreview(null); setBusy(false); setFileName(''); };
+  const reset = () => { setText(''); setPreview(null); setBusy(false); setFileName(''); setFromPdf(false); };
 
   const takeFile = async (file?: File | null) => {
     if (!file) return;
@@ -102,7 +112,10 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: Props) 
       if (!asText.trim()) throw new Error('That sheet looks empty');
       setText(asText);
       setFileName(file.name);
-      toast.success(`Read ${file.name}`);
+      const isPdf = /\.pdf$/i.test(file.name);
+      setFromPdf(isPdf);
+      if (isPdf) toast.success(`Read ${file.name} — check the columns below before importing`);
+      else toast.success(`Read ${file.name}`);
     } catch (e: any) {
       toast.error(e?.message || "Couldn't read that file — try saving it as CSV or Excel");
     }
@@ -190,9 +203,9 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: Props) 
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                 {fileName
                   ? <>Loaded <b>{fileName}</b> — check it below, or drop another file.</>
-                  : <>Drop an Excel or CSV file here, or <span style={{ color: 'var(--accent-primary)' }}>browse</span></>}
+                  : <>Drop an Excel, CSV or PDF file here, or <span style={{ color: 'var(--accent-primary)' }}>browse</span></>}
               </div>
-              <span style={{ ...labelS, flexShrink: 0 }}>xlsx · xls · ods · csv</span>
+              <span style={{ ...labelS, flexShrink: 0 }}>xlsx · csv · ods · pdf</span>
             </div>
             <input
               ref={fileRef}
@@ -202,6 +215,17 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: Props) 
               style={{ display: 'none' }}
             />
 
+            {fromPdf && (
+              <div style={{
+                border: '1px solid var(--status-warning)', background: 'var(--status-warning-bg)',
+                borderRadius: 4, padding: '10px 14px', marginBottom: 12,
+                fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6,
+              }}>
+                A PDF stores text and its position, not a table, so the columns below were
+                worked out from the layout. Check them — and fix any that ran together —
+                before importing.
+              </div>
+            )}
             <div style={{ ...labelS, marginBottom: 6 }}>{fileName ? 'From your file' : 'Paste here'}</div>
             <textarea
               value={text}

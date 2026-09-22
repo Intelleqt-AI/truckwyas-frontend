@@ -83,15 +83,17 @@ const PREVIEW_FIELDS: Record<ImportEntity, string[]> = {
   vehicles: ['plate', 'type', 'make', 'capacity', 'base_rate'],
 };
 
-interface Props {
+interface PanelProps {
   entity: ImportEntity;
-  open: boolean;
-  onClose: () => void;
   /** Called after a successful commit so the caller can refetch its list. */
   onImported: (count: number) => void;
+  /** Rendered in the drawer, redundant inline where the page already has one. */
+  showHeading?: boolean;
+  /** Present in the drawer; absent inline, where the wizard owns navigation. */
+  onClose?: () => void;
 }
 
-export function PasteImportDrawer({ entity, open, onClose, onImported }: Props) {
+export function PasteImportPanel({ entity, onImported, showHeading = true, onClose }: PanelProps) {
   const [text, setText] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -99,7 +101,6 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: Props) 
   const [fromPdf, setFromPdf] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  if (!open) return null;
   const sample = SAMPLES[entity];
 
   const reset = () => { setText(''); setPreview(null); setBusy(false); setFileName(''); setFromPdf(false); };
@@ -122,7 +123,7 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: Props) 
     setBusy(false);
     if (fileRef.current) fileRef.current.value = '';
   };
-  const close = () => { reset(); onClose(); };
+  const close = () => { reset(); onClose?.(); };
 
   const check = async () => {
     if (!text.trim()) { toast.error('Paste your list first'); return; }
@@ -161,30 +162,23 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: Props) 
   };
 
   return (
-    <div
-      onClick={close}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200,
-        display: 'flex', justifyContent: 'flex-end',
-      }}>
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          width: 'min(760px, 100%)', background: 'var(--bg-surface)', height: '100%',
-          overflowY: 'auto', padding: 24, borderLeft: '1px solid var(--border-subtle)',
-        }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>{sample.title}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-              Paste the rows straight out of Excel or Google Sheets, or drop the file in.
+    <div>
+        {showHeading && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>{sample.title}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                Paste the rows straight out of Excel or Google Sheets, or drop the file in.
+              </div>
             </div>
+            {onClose && (
+              <button onClick={close}
+                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>
+                &times;
+              </button>
+            )}
           </div>
-          <button onClick={close}
-            style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>
-            &times;
-          </button>
-        </div>
+        )}
 
         {!preview && (
           <>
@@ -318,6 +312,33 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: Props) 
             </div>
           </>
         )}
+    </div>
+  );
+}
+
+/** The same panel, slid in over the page. Used everywhere except onboarding,
+ *  where the step itself is the container. */
+export function PasteImportDrawer({ entity, open, onClose, onImported }: {
+  entity: ImportEntity;
+  open: boolean;
+  onClose: () => void;
+  onImported: (count: number) => void;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200,
+        display: 'flex', justifyContent: 'flex-end',
+      }}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: 'min(760px, 100%)', background: 'var(--bg-surface)', height: '100%',
+          overflowY: 'auto', padding: 24, borderLeft: '1px solid var(--border-subtle)',
+        }}>
+        <PasteImportPanel entity={entity} onImported={onImported} onClose={onClose} />
       </div>
     </div>
   );

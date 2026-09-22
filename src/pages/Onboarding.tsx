@@ -4,7 +4,7 @@ import { fetchData, patchData, postData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
-import { PasteImportDrawer, type ImportEntity } from '@/components/import/PasteImportDrawer';
+import { PasteImportPanel, type ImportEntity } from '@/components/import/PasteImportDrawer';
 
 interface CompanyProfile {
   company_name: string;
@@ -136,7 +136,9 @@ export function Onboarding() {
     }}>
       <div style={{
         width: '100%',
-        maxWidth: 520,
+        // The import steps carry a preview table; 520 is right for a form but
+        // squeezes nine columns into nothing.
+        maxWidth: step === 2 || step === 3 ? 820 : 520,
         background: 'var(--bg-surface)',
         border: '1px solid var(--border-subtle)',
         borderRadius: 'var(--card-radius)',
@@ -374,10 +376,15 @@ export function Onboarding() {
 }
 
 /**
- * One onboarding step that offers a paste import and lets the fleet move on
- * without it. Skippable by design: plenty of people sign up on a phone, away
- * from the spreadsheet, and a wizard that traps them there is worse than one
- * they finish in ten seconds.
+ * One onboarding step that imports a list.
+ *
+ * The panel sits in the step itself rather than sliding a drawer over it: this
+ * IS the step, and covering the wizard to do the one thing the wizard is asking
+ * for hides the progress bar and the way past it.
+ *
+ * Skippable by design — plenty of people sign up on a phone, nowhere near the
+ * spreadsheet, and a wizard that traps them there is worse than one they finish
+ * in ten seconds.
  */
 function ImportStep({
   title, blurb, entity, imported, onImported, onNext, onBack,
@@ -390,12 +397,11 @@ function ImportStep({
   onNext: () => void;
   onBack: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const noun = entity === 'customers' ? 'customers' : 'vehicles';
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
           {title}
         </div>
@@ -404,29 +410,26 @@ function ImportStep({
         </div>
       </div>
 
-      {imported > 0 ? (
+      {imported > 0 && (
         <div style={{
-          border: '1px solid var(--status-success)', borderRadius: 4, padding: '16px 18px',
-          marginBottom: 20, fontSize: 13, color: 'var(--text-secondary)',
+          border: '1px solid var(--status-success)', borderRadius: 4, padding: '12px 16px',
+          marginBottom: 16, fontSize: 13, color: 'var(--text-secondary)',
         }}>
           <span style={{ color: 'var(--status-success)', fontWeight: 500 }}>
             {imported} {noun} imported.
           </span>{' '}
-          You can paste more, or carry on.
-        </div>
-      ) : (
-        <div style={{
-          border: '1px dashed var(--border-subtle)', borderRadius: 4, padding: '28px 18px',
-          marginBottom: 20, textAlign: 'center',
-        }}>
-          <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 14 }}>
-            Copy the rows out of Excel or Google Sheets
-          </div>
-          <button className="btn-action" onClick={() => setOpen(true)}>Paste from Excel</button>
+          Paste more below, or carry on.
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 10 }}>
+      {/* The wizard already has the heading, so the panel does without one. */}
+      <PasteImportPanel
+        entity={entity}
+        showHeading={false}
+        onImported={n => onImported(imported + n)}
+      />
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
         <button
           onClick={onBack}
           style={{
@@ -439,13 +442,6 @@ function ImportStep({
           {imported > 0 ? 'Continue' : 'Skip for now'}
         </button>
       </div>
-
-      <PasteImportDrawer
-        entity={entity}
-        open={open}
-        onClose={() => setOpen(false)}
-        onImported={n => onImported(imported + n)}
-      />
     </div>
   );
 }

@@ -363,30 +363,20 @@ export function Onboarding() {
               Go to dashboard
             </button>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12 }}>
-              <a href="/bookings/quotes/new" style={{
-                padding: '10px',
-                background: 'var(--bg-deep)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 2,
-                color: 'var(--text-secondary)',
-                textDecoration: 'none',
-                display: 'block',
-              }}>
-                + Create a quote
-              </a>
-              <a href="/fleet" style={{
-                padding: '10px',
-                background: 'var(--bg-deep)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 2,
-                color: 'var(--text-secondary)',
-                textDecoration: 'none',
-                display: 'block',
-              }}>
-                + Add a vehicle
-              </a>
-            </div>
+            {/* Vehicles were just offered as their own step, so pointing back
+                at Fleet here asked again for something already answered. */}
+            <a href="/bookings/quotes/new" style={{
+              padding: '10px',
+              background: 'var(--bg-deep)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 2,
+              color: 'var(--text-secondary)',
+              textDecoration: 'none',
+              display: 'block',
+              fontSize: 12,
+            }}>
+              + Create a quote
+            </a>
           </div>
         )}
       </div>

@@ -416,8 +416,6 @@ function ImportStep({
   /** Called once something lands, so the wizard can offer the way forward. */
   onNext: () => void;
 }) {
-  const noun = entity === 'customers' ? 'customers' : 'vehicles';
-
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
@@ -429,30 +427,11 @@ function ImportStep({
         </div>
       </div>
 
-      {imported > 0 && (
-        <div style={{
-          border: '1px solid var(--status-success)', borderRadius: 4, padding: '12px 16px',
-          marginBottom: 16, fontSize: 13, color: 'var(--text-secondary)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-        }}>
-          <div>
-            <span style={{ color: 'var(--status-success)', fontWeight: 500 }}>
-              {imported} {noun} imported.
-            </span>{' '}
-            Paste more below, or carry on.
-          </div>
-          {/* The way forward appears once there is something to move on from. */}
-          <button className="btn-action" onClick={onNext} style={{ flexShrink: 0 }}>
-            CONTINUE →
-          </button>
-        </div>
-      )}
-
       {/* The wizard already has the heading, so the panel does without one. */}
       <PasteImportPanel
         entity={entity}
         showHeading={false}
-        onImported={n => onImported(imported + n)}
+        onImported={n => { onImported(imported + n); onNext(); }}
       />
 
     </div>

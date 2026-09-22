@@ -146,11 +146,13 @@ export function Onboarding() {
       }}>
         {/* Progress bar */}
         <div style={{ marginBottom: 32 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-              STEP {step} OF 4
-            </span>
-            <div style={{ display: 'flex', gap: 16 }}>
+          {/* A grid, not space-between: the step count stays centred whether or
+              not Back is showing, instead of shifting as it appears. */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr auto 1fr',
+            alignItems: 'center', marginBottom: 8,
+          }}>
+            <div style={{ justifySelf: 'start' }}>
               {/* Nothing to go back to on the first step, and a dead control
                   reads as a fault. */}
               {step > 1 && step < 4 && (
@@ -161,13 +163,17 @@ export function Onboarding() {
                   ← Back
                 </button>
               )}
-              <button onClick={handleSkip} style={{
-                background: 'none', border: 'none', color: 'var(--text-tertiary)',
-                fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', padding: 0,
-              }}>
-                Skip →
-              </button>
             </div>
+            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+              STEP {step} OF 4
+            </span>
+            <button onClick={handleSkip} style={{
+              justifySelf: 'end',
+              background: 'none', border: 'none', color: 'var(--text-tertiary)',
+              fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', padding: 0,
+            }}>
+              Skip →
+            </button>
           </div>
           <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
             <div style={{

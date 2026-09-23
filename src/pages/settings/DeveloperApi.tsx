@@ -1,3 +1,5 @@
+import '@/pages/table-heading-roles.css';
+import '@/pages/settings/settings-brand.css';
 import { useState, useEffect } from 'react';
 import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -31,25 +33,41 @@ interface CallLog {
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-  borderRadius: 'var(--card-radius)', marginBottom: 16,
+  borderRadius: 8, marginBottom: 16,
 };
 const sectionHeader: React.CSSProperties = {
   padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)',
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
 };
 const sectionTitle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase',
-  letterSpacing: '0.08em', color: 'var(--text-secondary)', fontWeight: 600,
+  fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px',
+  color: 'var(--text-primary)', fontWeight: 600, margin: 0,
 };
-const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 12 };
+const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px' };
+
+const rowActionStyle: React.CSSProperties = {
+  background: 'none', border: '1px solid var(--border-subtle)',
+  color: 'var(--text-secondary)', padding: '8px 12px', minHeight: 40,
+  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
+  borderRadius: 6,
+};
+
+/* Compact inline chips beside the key string — deliberate legacy-size
+   exception (a 40px control inline with a mono key string breaks the row);
+   still sans, sentence case and keyboard-focusable. */
+const keyChipStyle: React.CSSProperties = {
+  cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12, lineHeight: '16px',
+  fontWeight: 500, padding: '4px 8px', borderRadius: 4,
+};
 const inputStyle: React.CSSProperties = {
   background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-  borderRadius: 2, padding: '8px 10px', color: 'var(--text-primary)',
-  fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box',
+  borderRadius: 6, padding: '8px 12px', minHeight: 40, color: 'var(--text-primary)',
+  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px',
+  width: '100%', boxSizing: 'border-box',
 };
 const labelStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)',
-  marginBottom: 5, textTransform: 'uppercase' as const, display: 'block',
+  fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  color: 'var(--text-primary)', marginBottom: 6, display: 'block',
 };
 
 const SAMPLE = {
@@ -255,8 +273,8 @@ export function DeveloperApi() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Risk-Scoring API</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Risk-scoring API</h2>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
           Score any invoice with the same 7-pillar underwriting engine your Capital product uses.
           Partners authenticate with an API key and are metered per call.
         </div>
@@ -264,10 +282,10 @@ export function DeveloperApi() {
 
       {/* ── Endpoint reference ── */}
       <div style={sectionStyle}>
-        <div style={sectionHeader}><span style={sectionTitle}>Endpoint</span></div>
+        <div style={sectionHeader}><h3 style={sectionTitle}>Endpoint</h3></div>
         <div style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <span style={{ ...mono, fontWeight: 700, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 2 }}>POST</span>
+            <span style={{ ...mono, fontWeight: 700, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 4 }}>POST</span>
             <span style={{ ...mono, color: 'var(--text-primary)' }}>/api/v1/risk/underwrite/</span>
           </div>
           <div style={{ ...mono, color: 'var(--text-tertiary)', marginBottom: 4 }}>
@@ -287,25 +305,25 @@ export function DeveloperApi() {
 
       {/* ── Request body schema ── */}
       <div style={sectionStyle}>
-        <div style={sectionHeader}><span style={sectionTitle}>Request Body Schema</span></div>
+        <div style={sectionHeader}><h3 style={sectionTitle}>Request body schema</h3></div>
         <div style={{ overflowY: 'auto', maxHeight: 320 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, lineHeight: '20px' }}>
             <thead>
               <tr style={{ background: 'var(--bg-deep)' }}>
                 {['Object', 'Field', 'Type', 'Required', 'Description'].map(h => (
-                  <th key={h} style={{ position: 'sticky', top: 0, zIndex: 1, padding: '8px 14px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid var(--border-subtle)', whiteSpace: 'nowrap', background: 'var(--bg-deep)' }}>{h}</th>
+                  <th key={h} style={{ position: 'sticky', top: 0, zIndex: 1, padding: '8px 14px', textAlign: 'left', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-subtle)', whiteSpace: 'nowrap', background: 'var(--bg-deep)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {SCHEMA_FIELDS.map((f, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid var(--border-row)' }}>
-                  <td style={{ padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--accent-primary)' }}>{f.obj}</td>
-                  <td style={{ padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-primary)', fontWeight: 600 }}>{f.field}</td>
-                  <td style={{ padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>{f.type}</td>
+                  <td style={{ padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--accent-primary)' }}>{f.obj}</td>
+                  <td style={{ padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{f.field}</td>
+                  <td style={{ padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)' }}>{f.type}</td>
                   <td style={{ padding: '7px 14px' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', borderRadius: 2, background: f.required ? 'rgba(239,68,68,0.12)' : 'var(--bg-deep)', color: f.required ? 'var(--status-danger)' : 'var(--text-tertiary)' }}>
-                      {f.required ? 'YES' : 'no'}
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', fontWeight: 500, padding: '2px 6px', borderRadius: 4, background: f.required ? 'rgba(239,68,68,0.12)' : 'var(--bg-deep)', color: f.required ? 'var(--status-danger)' : 'var(--text-tertiary)' }}>
+                      {f.required ? 'Yes' : 'No'}
                     </span>
                   </td>
                   <td style={{ padding: '7px 14px', color: 'var(--text-secondary)' }}>{f.desc}</td>
@@ -318,52 +336,54 @@ export function DeveloperApi() {
 
       {/* ── API keys ── */}
       <div style={sectionStyle}>
-        <div style={sectionHeader}><span style={sectionTitle}>API Keys</span></div>
+        <div style={sectionHeader}><h3 style={sectionTitle}>API keys</h3></div>
 
         {/* Create row */}
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: showAdvCreate ? 12 : 0 }}>
             <div style={{ flex: 2 }}>
               <label style={labelStyle}>Key name</label>
-              <input style={inputStyle} placeholder="e.g. ABSA Business Finance" value={newName} onChange={e => setNewName(e.target.value)} />
+              <input className="settings-control" style={inputStyle} placeholder="e.g. ABSA Business Finance" value={newName} onChange={e => setNewName(e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
               <label style={labelStyle}>Monthly quota (0 = ∞)</label>
-              <input style={inputStyle} type="number" placeholder="0" value={newQuota} onChange={e => setNewQuota(e.target.value)} />
+              <input className="settings-control" style={inputStyle} type="number" placeholder="0" value={newQuota} onChange={e => setNewQuota(e.target.value)} />
             </div>
             <button
               onClick={() => setShowAdvCreate(p => !p)}
+              className="settings-control"
+              aria-expanded={showAdvCreate}
               style={{
                 background: showAdvCreate ? 'rgba(var(--accent-primary-rgb,37,99,235),0.08)' : 'var(--bg-deep)',
                 border: '1px solid var(--border-subtle)',
                 color: showAdvCreate ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                fontFamily: 'var(--font-mono)', fontSize: 10, cursor: 'pointer',
-                whiteSpace: 'nowrap', padding: '0 12px', borderRadius: 2,
-                alignSelf: 'flex-end', height: 34, letterSpacing: '0.06em',
+                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
+                cursor: 'pointer', whiteSpace: 'nowrap', padding: '8px 12px', borderRadius: 6,
+                alignSelf: 'flex-end', minHeight: 40,
                 transition: 'all 0.15s',
               }}
             >
-              {showAdvCreate ? '▲ LESS OPTIONS' : '▼ MORE OPTIONS'}
+              {showAdvCreate ? 'Fewer options' : 'More options'}
             </button>
             <button
-              className="btn-action"
+              className="btn-action settings-control"
               onClick={createKey}
               disabled={creating || !newName.trim() || isDemo}
               title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ whiteSpace: 'nowrap', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+              style={{ whiteSpace: 'nowrap', minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
             >
-              {creating ? 'CREATING…' : '+ CREATE KEY'}
+              {creating ? 'Creating…' : 'Create key'}
             </button>
           </div>
           {showAdvCreate && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
                 <label style={labelStyle}>Allowed IPs (comma-separated, empty = all)</label>
-                <input style={inputStyle} placeholder="e.g. 41.13.0.1, 196.25.0.0" value={newIPs} onChange={e => setNewIPs(e.target.value)} />
+                <input className="settings-control" style={inputStyle} placeholder="e.g. 41.13.0.1, 196.25.0.0" value={newIPs} onChange={e => setNewIPs(e.target.value)} />
               </div>
               <div>
                 <label style={labelStyle}>Webhook URL (POST results here after each score)</label>
-                <input style={inputStyle} placeholder="https://partner.example.com/hooks/risk" value={newWebhook} onChange={e => setNewWebhook(e.target.value)} />
+                <input className="settings-control" style={inputStyle} placeholder="https://partner.example.com/hooks/risk" value={newWebhook} onChange={e => setNewWebhook(e.target.value)} />
               </div>
             </div>
           )}
@@ -373,7 +393,7 @@ export function DeveloperApi() {
         {loading ? (
           <div style={{ padding: 30, display: 'flex', justifyContent: 'center' }}><Loader size={24} /></div>
         ) : keys.length === 0 ? (
-          <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>No API keys yet. Create one to start scoring.</div>
+          <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No API keys yet. Create one to start scoring.</div>
         ) : keys.map((k, i) => {
           const pct = k.monthly_quota ? Math.min(100, Math.round(((k.quota_used || 0) / k.monthly_quota) * 100)) : 0;
           const logsOpen = expandedLogs[k.id];
@@ -383,64 +403,67 @@ export function DeveloperApi() {
               <div style={{ padding: '14px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{k.name}</div>
-                    <div style={{ ...mono, fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 6, wordBreak: 'break-all', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{k.name}</div>
+                    <div style={{ ...mono, fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 6, wordBreak: 'break-all', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ letterSpacing: revealed[k.id] ? '0.04em' : 'normal' }}>
                         {revealed[k.id] ? k.key : `${k.key.slice(0, 12)}••••••••••••`}
                       </span>
                       <button
                         onClick={() => setRevealed(r => ({ ...r, [k.id]: !r[k.id] }))}
-                        style={{ background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 7px', borderRadius: 2, letterSpacing: '0.06em' }}
+                        className="settings-control"
+                        style={{ ...keyChipStyle, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
                       >
-                        {revealed[k.id] ? '● HIDE' : '○ SHOW'}
+                        {revealed[k.id] ? 'Hide' : 'Show'}
                       </button>
                       <button
                         onClick={() => copyKey(k)}
+                        className="settings-control"
                         style={{
+                          ...keyChipStyle,
                           background: copied === k.id ? 'rgba(34,197,94,0.12)' : 'var(--bg-deep)',
                           border: `1px solid ${copied === k.id ? 'var(--status-success)' : 'var(--border-subtle)'}`,
                           color: copied === k.id ? 'var(--status-success)' : 'var(--text-secondary)',
-                          cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 9,
-                          padding: '2px 7px', borderRadius: 2, letterSpacing: '0.06em',
                           transition: 'all 0.2s',
                         }}
                       >
-                        {copied === k.id ? '✓ COPIED!' : '⎘ COPY'}
+                        {copied === k.id ? 'Copied' : 'Copy'}
                       </button>
                     </div>
                     <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ ...mono, fontSize: 11, color: 'var(--text-secondary)' }}>{(k.usage_count || 0).toLocaleString()} total calls</span>
-                      <span style={{ ...mono, fontSize: 11, color: 'var(--text-tertiary)' }}>last used: {fmtDate(k.last_used_at)}</span>
+                      <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{(k.usage_count || 0).toLocaleString()} total calls</span>
+                      <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>Last used: {fmtDate(k.last_used_at)}</span>
                       {k.monthly_quota ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <div style={{ width: 120, height: 5, background: 'var(--bg-deep)', borderRadius: 3, overflow: 'hidden' }}>
                             <div style={{ width: `${pct}%`, height: '100%', background: pct > 90 ? 'var(--status-danger)' : 'var(--accent-primary)' }} />
                           </div>
-                          <span style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)' }}>{k.quota_used || 0}/{k.monthly_quota} this month</span>
+                          <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{k.quota_used || 0}/{k.monthly_quota} this month</span>
                         </div>
                       ) : (
-                        <span style={{ ...mono, fontSize: 11, color: 'var(--text-tertiary)' }}>unlimited quota</span>
+                        <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>Unlimited quota</span>
                       )}
-                      {k.allowed_ips && <span style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)' }}>IPs: {k.allowed_ips}</span>}
-                      {k.webhook_url && <span style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>webhook: {k.webhook_url}</span>}
+                      {k.allowed_ips && <span style={{ ...mono, fontSize: 12, color: 'var(--text-tertiary)' }}>IPs: {k.allowed_ips}</span>}
+                      {k.webhook_url && <span style={{ ...mono, fontSize: 12, color: 'var(--text-tertiary)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>webhook: {k.webhook_url}</span>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
-                    <button onClick={() => toggleLogs(k)} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer' }}>
-                      {logsOpen ? 'HIDE LOGS' : 'LOGS'}
+                    <button className="settings-control" onClick={() => toggleLogs(k)} style={{ ...rowActionStyle, cursor: 'pointer' }}>
+                      {logsOpen ? 'Hide logs' : 'Logs'}
                     </button>
                     <button
                       onClick={() => openEdit(k)}
                       disabled={isDemo}
                       title={isDemo ? 'Fixed in demo mode' : undefined}
-                      style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
-                    >EDIT</button>
+                      className="settings-control"
+                      style={{ ...rowActionStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+                    >Edit</button>
                     <button
                       onClick={() => setRevokeTarget(k)}
                       disabled={isDemo}
                       title={isDemo ? 'Fixed in demo mode' : undefined}
-                      style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
-                    >REVOKE</button>
+                      className="settings-control"
+                      style={{ ...rowActionStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger)', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+                    >Revoke</button>
                   </div>
                 </div>
               </div>
@@ -448,17 +471,18 @@ export function DeveloperApi() {
               {/* Call history panel */}
               {logsOpen && (
                 <div style={{ background: 'var(--bg-deep)', borderTop: '1px solid var(--border-subtle)', padding: '10px 20px 14px' }}>
-                  <div style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Call History (last 100)</div>
+                  <h4 style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', margin: 0, marginBottom: 8 }}>Call history (last 100)</h4>
                   {logsLoading[k.id] ? (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0' }}><Loader size={16} /></div>
                   ) : !logs[k.id] || logs[k.id].length === 0 ? (
-                    <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>No calls recorded yet.</div>
+                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No calls recorded yet.</div>
                   ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                    <div className="settings-scroll-region" role="region" aria-label={`Call history for ${k.name}`} tabIndex={0} style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, lineHeight: '20px' }}>
                       <thead>
                         <tr>
-                          {['Time', 'Invoice Amt', 'Tier', 'Score', 'Eligible', 'IP'].map(h => (
-                            <th key={h} style={{ padding: '4px 10px', textAlign: 'left', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
+                          {['Time', 'Invoice amount', 'Tier', 'Score', 'Eligible', 'IP'].map(h => (
+                            <th key={h} style={{ padding: '4px 10px', textAlign: 'left', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -466,7 +490,7 @@ export function DeveloperApi() {
                         {logs[k.id].map(log => (
                           <tr key={log.id} style={{ borderBottom: '1px solid var(--border-row)' }}>
                             <td style={{ padding: '5px 10px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmtDate(log.scored_at)}</td>
-                            <td style={{ padding: '5px 10px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                            <td style={{ padding: '5px 10px', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                               {log.invoice_amount ? `R${parseFloat(log.invoice_amount).toLocaleString('en-ZA', { maximumFractionDigits: 0 })}` : '—'}
                             </td>
                             <td style={{ padding: '5px 10px' }}>
@@ -474,18 +498,19 @@ export function DeveloperApi() {
                                 {log.risk_tier || '—'}
                               </span>
                             </td>
-                            <td style={{ padding: '5px 10px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{log.score ?? '—'}</td>
+                            <td style={{ padding: '5px 10px', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{log.score ?? '—'}</td>
                             <td style={{ padding: '5px 10px' }}>
                               {log.eligible === null ? <span style={{ color: 'var(--text-tertiary)' }}>—</span>
                                 : log.eligible
-                                  ? <span style={{ color: 'var(--status-success)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>YES</span>
-                                  : <span style={{ color: 'var(--status-danger)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>NO</span>}
+                                  ? <span style={{ color: 'var(--status-success)', fontSize: 13, fontWeight: 500 }}>Yes</span>
+                                  : <span style={{ color: 'var(--status-danger)', fontSize: 13, fontWeight: 500 }}>No</span>}
                             </td>
                             <td style={{ padding: '5px 10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{log.caller_ip || '—'}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   )}
                 </div>
               )}
@@ -497,32 +522,34 @@ export function DeveloperApi() {
       {/* ── Try it console ── */}
       <div style={sectionStyle}>
         <div style={sectionHeader}>
-          <span style={sectionTitle}>Try it</span>
+          <h3 style={sectionTitle}>Try it</h3>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div>
-              <label style={{ ...labelStyle, marginBottom: 0, marginRight: 6, display: 'inline' }}>Auth as:</label>
+              <label style={{ ...labelStyle, marginBottom: 0, marginRight: 6, display: 'inline' }}>Auth as</label>
               <select
+                className="settings-control"
                 value={tryKeyId}
                 onChange={e => setTryKeyId(e.target.value === '' ? '' : Number(e.target.value))}
-                style={{ ...inputStyle, width: 'auto', padding: '5px 8px', fontSize: 11 }}
+                style={{ ...inputStyle, width: 'auto' }}
               >
                 <option value="">Bearer (in-app / internal)</option>
                 {keys.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
               </select>
             </div>
-            <button className="btn-action" onClick={runTry} disabled={running}>{running ? 'SCORING…' : 'RUN ▸'}</button>
+            <button className="btn-action settings-control" style={{ minHeight: 40, borderRadius: 6 }} onClick={runTry} disabled={running}>{running ? 'Scoring…' : 'Run'}</button>
           </div>
         </div>
         <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div>
-            <div style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6, textTransform: 'uppercase' }}>Request body</div>
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>Request body</div>
             <textarea value={body} onChange={e => setBody(e.target.value)} spellCheck={false}
-              style={{ ...inputStyle, ...mono, height: 300, resize: 'vertical', lineHeight: 1.5, whiteSpace: 'pre' }} />
+              className="settings-control"
+              style={{ ...inputStyle, ...mono, fontSize: 12, height: 300, resize: 'vertical', lineHeight: 1.5, whiteSpace: 'pre' }} />
           </div>
           <div>
-            <div style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 6, textTransform: 'uppercase' }}>Response</div>
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>Response</div>
             {tryErr ? (
-              <div style={{ ...mono, color: 'var(--status-danger)', fontSize: 12 }}>{tryErr}</div>
+              <div style={{ color: 'var(--status-danger)', fontSize: 13, lineHeight: '20px' }}>{tryErr}</div>
             ) : result ? (
               <div>
                 <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -533,19 +560,19 @@ export function DeveloperApi() {
                   <Stat label="Net" value={result.net_advance != null ? `R${Math.round(result.net_advance).toLocaleString()}` : '—'} color="var(--status-success)" />
                 </div>
                 {result._meta && (
-                  <div style={{ ...mono, fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 10, padding: '6px 10px', background: 'var(--bg-deep)', borderRadius: 2, display: 'flex', gap: 16 }}>
+                  <div style={{ ...mono, fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10, padding: '6px 10px', background: 'var(--bg-deep)', borderRadius: 4, display: 'flex', gap: 16 }}>
                     <span>key: <b style={{ color: 'var(--text-secondary)' }}>{result._meta.key}</b></span>
                     <span>quota: <b style={{ color: 'var(--text-secondary)' }}>{result._meta.quota_used}/{result._meta.monthly_quota || '∞'}</b></span>
                     <span>lifetime: <b style={{ color: 'var(--text-secondary)' }}>{result._meta.usage_count}</b></span>
                   </div>
                 )}
-                <pre style={{ ...mono, fontSize: 11, color: 'var(--text-secondary)', background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 2, padding: 12, maxHeight: 220, overflow: 'auto', margin: 0 }}>
+                <pre style={{ ...mono, fontSize: 11, color: 'var(--text-secondary)', background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: 12, maxHeight: 220, overflow: 'auto', margin: 0 }}>
                   {JSON.stringify(result, null, 2)}
                 </pre>
               </div>
             ) : (
-              <div style={{ ...mono, color: 'var(--text-tertiary)', fontSize: 12 }}>
-                Select a key (or use Bearer) and hit RUN to score the sample invoice.
+              <div style={{ color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>
+                Select a key (or use Bearer) and press Run to score the sample invoice.
               </div>
             )}
           </div>
@@ -557,45 +584,45 @@ export function DeveloperApi() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }} onClick={() => setEditKey(null)}>
           <div style={{ width: 440, background: 'var(--bg-surface)', height: '100%', overflowY: 'auto', padding: 28, boxShadow: '-4px 0 24px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: 18 }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Edit API Key</div>
-              <button onClick={() => setEditKey(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+              <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit API key</h2>
+              <button className="settings-control" aria-label="Close" onClick={() => setEditKey(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 20, cursor: 'pointer', lineHeight: 1, minWidth: 44, minHeight: 44 }}>×</button>
             </div>
 
             <div>
               <label style={labelStyle}>Key name *</label>
-              <input style={inputStyle} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+              <input className="settings-control" style={inputStyle} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
             </div>
 
             <div>
               <label style={labelStyle}>Monthly quota (0 = unlimited)</label>
-              <input style={inputStyle} type="number" value={editForm.monthly_quota} onChange={e => setEditForm(f => ({ ...f, monthly_quota: e.target.value }))} />
+              <input className="settings-control" style={inputStyle} type="number" value={editForm.monthly_quota} onChange={e => setEditForm(f => ({ ...f, monthly_quota: e.target.value }))} />
             </div>
 
             <div>
               <label style={labelStyle}>Allowed IPs (comma-separated, empty = all)</label>
-              <input style={inputStyle} placeholder="e.g. 41.13.0.1, 196.25.0.0" value={editForm.allowed_ips} onChange={e => setEditForm(f => ({ ...f, allowed_ips: e.target.value }))} />
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>Leave empty to allow all IPs.</div>
+              <input className="settings-control" style={inputStyle} placeholder="e.g. 41.13.0.1, 196.25.0.0" value={editForm.allowed_ips} onChange={e => setEditForm(f => ({ ...f, allowed_ips: e.target.value }))} />
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>Leave empty to allow all IPs.</div>
             </div>
 
             <div>
               <label style={labelStyle}>Webhook URL</label>
-              <input style={inputStyle} placeholder="https://partner.example.com/hooks/risk" value={editForm.webhook_url} onChange={e => setEditForm(f => ({ ...f, webhook_url: e.target.value }))} />
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>Truckwys will POST the full scoring result here after every call.</div>
+              <input className="settings-control" style={inputStyle} placeholder="https://partner.example.com/hooks/risk" value={editForm.webhook_url} onChange={e => setEditForm(f => ({ ...f, webhook_url: e.target.value }))} />
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>TruckWys will POST the full scoring result here after every call.</div>
             </div>
 
-            {editErr && <div style={{ fontSize: 12, color: 'var(--status-danger)', padding: '8px 12px', background: 'var(--status-danger-bg)', borderRadius: 4 }}>{editErr}</div>}
+            {editErr && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger)', padding: '8px 12px', background: 'var(--status-danger-bg)', borderRadius: 6 }}>{editErr}</div>}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 12 }}>
               <button
-                className="btn-action"
-                style={{ flex: 1, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                className="btn-action settings-control"
+                style={{ flex: 1, minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
                 onClick={handleEditSave}
                 disabled={editSaving || !editForm.name.trim() || isDemo}
                 title={isDemo ? 'Fixed in demo mode' : undefined}
               >
-                {editSaving ? 'SAVING…' : 'SAVE CHANGES'}
+                {editSaving ? 'Saving…' : 'Save changes'}
               </button>
-              <button onClick={() => setEditKey(null)} style={{ flex: 1, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2, cursor: 'pointer' }}>CANCEL</button>
+              <button className="settings-control" onClick={() => setEditKey(null)} style={{ flex: 1, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 6, cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -604,9 +631,9 @@ export function DeveloperApi() {
       {/* ── Revoke confirm ── */}
       {revokeTarget && (
         <ConfirmModal
-          title="Revoke API Key"
+          title="Revoke API key"
           message={`Revoke "${revokeTarget.name}"? Any partner currently using this key will immediately lose access.`}
-          confirmLabel="REVOKE"
+          confirmLabel="Revoke"
           onConfirm={() => handleRevoke(revokeTarget.id)}
           onCancel={() => setRevokeTarget(null)}
         />
@@ -618,8 +645,8 @@ export function DeveloperApi() {
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>{label}</div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, color: color || 'var(--text-primary)' }}>{value}</div>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, lineHeight: '16px', fontWeight: 500, color: 'var(--text-tertiary)', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px', fontWeight: 600, color: color || 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
     </div>
   );
 }

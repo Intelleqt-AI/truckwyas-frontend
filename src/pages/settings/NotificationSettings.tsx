@@ -206,7 +206,7 @@ export function NotificationSettings() {
           <ToggleRow label="Maintenance due" checked={settings.push.maintenance_due} onChange={v => setChannel('push', 'maintenance_due', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           <ToggleRow label="Driver status updates" checked={settings.push.driver_updates} onChange={v => setChannel('push', 'driver_updates', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           {pushHint && (
-            <div style={{ padding: '10px 20px', fontSize: 11, color: 'var(--text-tertiary)' }}>{pushHint}</div>
+            <div style={{ padding: '10px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
           )}
         </div>
       </div>
@@ -216,8 +216,8 @@ export function NotificationSettings() {
         <div style={sectionHeaderStyle}>
           <h2 style={sectionTitleStyle}>SMS notifications</h2>
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase' as const,
-            letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+            fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', fontWeight: 500,
+            color: 'var(--text-tertiary)',
             border: '1px solid var(--border-subtle)', borderRadius: 4, padding: '2px 6px',
           }}>Coming soon</span>
         </div>
@@ -233,9 +233,9 @@ export function NotificationSettings() {
           onClick={handleSave}
           disabled={saving || isDemo}
           title={isDemo ? 'Fixed in demo mode' : undefined}
-          style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+          style={{ minHeight: 40, borderRadius: 6, opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
         >
-          {saved ? 'SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
+          {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
         </button>
       </div>
     </div>

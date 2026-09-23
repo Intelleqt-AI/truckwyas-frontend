@@ -9,14 +9,16 @@ import { Loader } from '@/components/Loader';
  *  differently, and the 0-vertical-padding version sat visibly short beside a
  *  primary button. */
 export const secondaryButtonStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  letterSpacing: '0.06em',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 14,
+  lineHeight: '20px',
+  fontWeight: 500,
   background: 'none',
   border: '1px solid var(--border-subtle)',
   color: 'var(--text-secondary)',
   padding: '8px 14px',
-  borderRadius: 2,
+  borderRadius: 6,
+  minHeight: 40,
   cursor: 'pointer',
 };
 

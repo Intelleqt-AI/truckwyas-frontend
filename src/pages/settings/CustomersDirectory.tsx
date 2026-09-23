@@ -1,3 +1,4 @@
+import './customers-directory-controls.css';
 import { useState, useEffect } from "react";
 import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
@@ -20,6 +21,8 @@ interface Customer {
   status: string;
 }
 
+const STATUS_LABEL: Record<string, string> = { ACTIVE: 'Active', INACTIVE: 'Inactive', PENDING: 'Pending' };
+
 const STATUS_COLOR: Record<string, string> = {
   ACTIVE: 'var(--accent-primary)',
   INACTIVE: 'var(--status-danger)',
@@ -40,7 +43,7 @@ const labelStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2,
+  color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 6,
   fontSize: 16, fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box',
 };
 
@@ -148,7 +151,7 @@ export function CustomersDirectory() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div className="customer-directory-controls" style={{ maxWidth: 960, minWidth: 0, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Customers</div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Your customer directory</div>
@@ -157,28 +160,28 @@ export function CustomersDirectory() {
       <div style={sectionStyle}>
         <div style={{
           padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between',
         }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-secondary)', fontWeight: 600 }}>
             Customers ({customers.length})
           </span>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', minWidth: 0, gap: 10 }}>
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search..."
               style={{
                 background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                borderRadius: 2, padding: '6px 10px', color: 'var(--text-primary)',
-                fontSize: 16, fontFamily: 'var(--font-sans)', outline: 'none', width: 180,
+                borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)',
+                fontSize: 16, fontFamily: 'var(--font-sans)', outline: 'none', width: 180, maxWidth: '100%',
               }}
             />
             <button
               onClick={() => setShowImport(true)}
               disabled={isDemo}
               title={isDemo ? 'Not available in the demo' : 'Paste or upload a list'}
-              style={{ ...secondaryButtonStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
-            >IMPORT</button>
+              style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', textTransform: 'none', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+            >Import</button>
             <button
               className="btn-action"
               onClick={() => { setShowAdd(s => !s); setAddErr(''); }}
@@ -194,7 +197,7 @@ export function CustomersDirectory() {
         {/* Add form */}
         {showAdd && (
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-deep)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12 }}>
+            <div className="customer-directory-add-grid" style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
               {([
                 { k: 'name', ph: 'Name *' },
                 { k: 'email', ph: 'Email *' },
@@ -208,7 +211,7 @@ export function CustomersDirectory() {
                   placeholder={f.ph}
                   style={{
                     background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                    borderRadius: 2, padding: '8px 10px', color: 'var(--text-primary)',
+                    borderRadius: 6, padding: '8px 10px', color: 'var(--text-primary)',
                     fontSize: 16, fontFamily: 'var(--font-sans)', outline: 'none', width: '100%', boxSizing: 'border-box',
                   }}
                 />
@@ -240,7 +243,8 @@ export function CustomersDirectory() {
         {loading ? (
           <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+          <div role="region" aria-label="Customer directory table" tabIndex={0} style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: 830, borderCollapse: 'collapse' as const, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
             <thead>
               <tr>
                 <th style={{ padding: '10px 0 10px 16px', width: 32, borderBottom: '1px solid var(--border-subtle)' }}>
@@ -252,12 +256,12 @@ export function CustomersDirectory() {
                     />
                   )}
                 </th>
-                {['Customer', 'Contact', 'City', 'Payment Terms', 'Status', ''].map(h => (
+                {['Customer', 'Contact', 'City', 'Payment terms', 'Status', 'Actions'].map(h => (
                   <th key={h} style={{
                     padding: '10px 20px', textAlign: 'left' as const,
-                    fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em', color: 'var(--text-tertiary)',
-                    borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                    fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', textTransform: 'none' as const,
+                    letterSpacing: 'normal', color: 'var(--text-tertiary)',
+                    borderBottom: '1px solid var(--border-subtle)', fontWeight: 500,
                   }}>{h}</th>
                 ))}
               </tr>
@@ -272,22 +276,22 @@ export function CustomersDirectory() {
                   </td>
                   <td style={{ padding: '12px 20px' }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 1 }}>{c.name}</div>
-                    {c.company_name && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{c.company_name}</div>}
+                    {c.company_name && <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{c.company_name}</div>}
                   </td>
                   <td style={{ padding: '12px 20px' }}>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 1 }}>{c.email}</div>
-                    {c.phone && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{c.phone}</div>}
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 1 }}>{c.email}</div>
+                    {c.phone && <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{c.phone}</div>}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>{c.city || '—'}</td>
-                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>{c.city || '—'}</td>
+                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--text-secondary)' }}>
                     {c.payment_terms || '30 days'}
                   </td>
                   <td style={{ padding: '12px 20px' }}>
                     <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 10,
-                      color: STATUS_COLOR[c.status] || 'var(--text-tertiary)',
-                      textTransform: 'uppercase' as const,
-                    }}>{c.status}</span>
+                      fontFamily: 'var(--font-sans)', fontSize: 13,
+                      color: Object.prototype.hasOwnProperty.call(STATUS_COLOR, c.status) ? STATUS_COLOR[c.status] : 'var(--text-tertiary)',
+                      textTransform: 'none' as const,
+                    }}>{Object.prototype.hasOwnProperty.call(STATUS_LABEL, c.status) ? STATUS_LABEL[c.status] : c.status}</span>
                   </td>
                   <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
@@ -298,7 +302,7 @@ export function CustomersDirectory() {
                         style={{
                           background: 'none', border: '1px solid var(--border-subtle)',
                           color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
+                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer',
                           letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1,
                         }}
                       >Edit</button>
@@ -309,7 +313,7 @@ export function CustomersDirectory() {
                         style={{
                           background: 'none', border: '1px solid var(--status-danger)',
                           color: 'var(--status-danger)', padding: '4px 10px',
-                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
+                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer',
                           letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1,
                         }}
                       >Delete</button>
@@ -319,6 +323,7 @@ export function CustomersDirectory() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -337,7 +342,7 @@ export function CustomersDirectory() {
       {editCustomer && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditCustomer(null)} />
-          <div style={{ position: 'relative', width: 420, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+          <div style={{ position: 'relative', width: 'min(420px, 100vw)', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit customer</div>
               <button onClick={() => setEditCustomer(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
@@ -367,22 +372,22 @@ export function CustomersDirectory() {
               <Select value={editForm.status} onValueChange={val => setEditForm(prev => ({ ...prev, status: val }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {['ACTIVE', 'INACTIVE', 'PENDING'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {['ACTIVE', 'INACTIVE', 'PENDING'].map(s => <SelectItem key={s} value={s}>{STATUS_LABEL[s] || s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 24 }}>
               <button
                 disabled={editSaving || isDemo}
                 onClick={handleEditSave}
                 title={isDemo ? 'Not available in the demo' : undefined}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: isDemo ? 'not-allowed' : editSaving ? 'wait' : 'pointer', fontWeight: 500, textTransform: 'none', opacity: isDemo ? 0.5 : 1 }}
+                style={{ flex: '1 1 140px', padding: '10px 0', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 6, cursor: isDemo ? 'not-allowed' : editSaving ? 'wait' : 'pointer', fontWeight: 500, textTransform: 'none', opacity: isDemo ? 0.5 : 1 }}
               >
                 {editSaving ? 'Saving...' : 'Save changes'}
               </button>
               <button
                 onClick={() => setEditCustomer(null)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'none' }}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer', textTransform: 'none' }}
               >
                 Cancel
               </button>

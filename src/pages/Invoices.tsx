@@ -1,3 +1,5 @@
+import "./table-heading-roles.css";
+import "./expense-row-actions.css";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +35,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+// Brand text roles (styling only): labels 13/20/500, support 13/20,
+// controls 14/20 sans with 48px minimum, financial metrics 28/36/600 tabular.
+const invoiceLabelText = { fontFamily: "var(--font-sans)", fontSize: 13, lineHeight: "20px", fontWeight: 500, letterSpacing: "normal", textTransform: "none" as const };
+const invoiceSupportText = { fontFamily: "var(--font-sans)", fontSize: 13, lineHeight: "20px", letterSpacing: "normal", textTransform: "none" as const };
+const invoiceControlText = { minHeight: 48, fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", letterSpacing: "normal", textTransform: "none" as const };
+const invoiceMetricText = { fontFamily: "var(--font-sans)", fontSize: 28, lineHeight: "36px", fontWeight: 600, letterSpacing: "normal", fontVariantNumeric: "tabular-nums" as const, whiteSpace: "normal" as const, overflowWrap: "anywhere" as const };
 
 const TIER_COLOR: Record<string, string> = {
   prime: "var(--status-success)",
@@ -107,6 +116,7 @@ export default function Invoices() {
   );
   const [toast, setToast] = useState<string | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [openExpenseMenuId, setOpenExpenseMenuId] = useState<string | null>(null);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
   const statuses = ["All", "SENT", "OVERDUE", "PAID", "DRAFT"];
 
@@ -444,6 +454,7 @@ export default function Invoices() {
       {toast && (
         <div
           style={{
+            ...invoiceSupportText,
             position: "fixed",
             top: 80,
             right: 24,
@@ -452,8 +463,6 @@ export default function Invoices() {
             color: "black",
             padding: "12px 20px",
             borderRadius: 2,
-            fontSize: 12,
-            fontFamily: "var(--font-mono)",
             fontWeight: 500,
           }}>
           {toast}
@@ -462,11 +471,8 @@ export default function Invoices() {
       <div style={{ marginBottom: 24 }}>
         <div
           style={{
-            fontSize: 11,
-            fontFamily: "var(--font-mono)",
+            ...invoiceLabelText,
             color: "var(--text-tertiary)",
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
             marginBottom: 4,
           }}>
           Finance
@@ -478,14 +484,17 @@ export default function Invoices() {
             alignItems: "center",
           }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
+            <h1
               style={{
                 fontSize: 22,
-                fontWeight: 500,
+                fontWeight: 600,
+                fontFamily: "var(--font-sans)",
+                lineHeight: "28px",
+                margin: 0,
                 color: "var(--text-primary)",
               }}>
               {activeTab === "invoices" ? "Invoices" : "Expenses"}
-            </div>
+            </h1>
             <LiveBadge />
           </div>
           {activeTab === "invoices" && (
@@ -526,6 +535,7 @@ export default function Invoices() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             style={{
+              ...invoiceControlText,
               background: "transparent",
               border: "none",
               borderBottom:
@@ -538,12 +548,9 @@ export default function Invoices() {
                   : "var(--text-secondary)",
               padding: "12px 0",
               marginBottom: -1,
-              fontSize: 13,
               fontWeight: activeTab === tab.id ? 500 : 400,
               cursor: "pointer",
               transition: "all 0.2s ease",
-              fontFamily: "var(--font-mono)",
-              letterSpacing: "0.05em",
             }}
             onMouseEnter={(e) => {
               if (activeTab !== tab.id) {
@@ -561,18 +568,16 @@ export default function Invoices() {
         <button
           onClick={() => navigate("/finance/reports")}
           style={{
+            ...invoiceControlText,
             background: "transparent",
             border: "none",
             borderBottom: "2px solid transparent",
             color: "var(--text-secondary)",
             padding: "12px 0",
             marginBottom: -1,
-            fontSize: 13,
             fontWeight: 400,
             cursor: "pointer",
             transition: "all 0.2s ease",
-            fontFamily: "var(--font-mono)",
-            letterSpacing: "0.05em",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; }}>
@@ -615,14 +620,17 @@ export default function Invoices() {
                     alignItems: "center",
                     marginBottom: 24,
                   }}>
-                  <div
+                  <h2
                     style={{
-                      fontSize: 18,
-                      fontWeight: 500,
+                      fontSize: 16,
+                      lineHeight: "24px",
+                      fontFamily: "var(--font-sans)",
+                      margin: 0,
+                      fontWeight: 600,
                       color: "var(--text-primary)",
                     }}>
                     {editingExpense ? "Edit expense" : "Add expense"}
-                  </div>
+                  </h2>
                   <button
                     onClick={() => {
                       setShowExpenseForm(false);
@@ -646,13 +654,10 @@ export default function Invoices() {
                   <div>
                     <label
                       style={{
+                        ...invoiceLabelText,
                         display: "block",
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
                         color: "var(--text-secondary)",
                         marginBottom: 6,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
                       }}>
                       Category *
                     </label>
@@ -661,14 +666,14 @@ export default function Invoices() {
                       onValueChange={(val) =>
                         handleExpenseFormChange("category", val)
                       }>
-                      <SelectTrigger>
+                      <SelectTrigger style={invoiceControlText}>
                         <SelectValue placeholder="Select category..." />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="FUEL">Fuel</SelectItem>
                         <SelectItem value="TOLLS">Tolls</SelectItem>
                         <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                        <SelectItem value="DRIVER_COST">Driver Cost</SelectItem>
+                        <SelectItem value="DRIVER_COST">Driver cost</SelectItem>
                         <SelectItem value="INSURANCE">Insurance</SelectItem>
                         <SelectItem value="OVERHEAD">Overhead</SelectItem>
                         <SelectItem value="OTHER">Other</SelectItem>
@@ -679,13 +684,10 @@ export default function Invoices() {
                   <div>
                     <label
                       style={{
+                        ...invoiceLabelText,
                         display: "block",
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
                         color: "var(--text-secondary)",
                         marginBottom: 6,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
                       }}>
                       Description *
                     </label>
@@ -697,14 +699,13 @@ export default function Invoices() {
                       }
                       placeholder="e.g. Fuel refill at Shell"
                       style={{
+                        ...invoiceControlText,
                         width: "100%",
                         background: "var(--bg-surface)",
                         border: "1px solid var(--border-subtle)",
                         padding: "10px 12px",
                         color: "var(--text-primary)",
                         borderRadius: 2,
-                        fontSize: 13,
-                        fontFamily: "var(--font-sans)",
                       }}
                     />
                   </div>
@@ -720,13 +721,10 @@ export default function Invoices() {
                         <div>
                           <label
                             style={{
+                              ...invoiceLabelText,
                               display: "block",
-                              fontSize: 11,
-                              fontFamily: "var(--font-mono)",
                               color: "var(--text-secondary)",
                               marginBottom: 6,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
                             }}>
                             Litres
                           </label>
@@ -739,29 +737,25 @@ export default function Invoices() {
                             }
                             placeholder="0.00"
                             style={{
+                              ...invoiceControlText,
                               width: "100%",
                               background: "var(--bg-surface)",
                               border: "1px solid var(--border-subtle)",
                               padding: "10px 12px",
                               color: "var(--text-primary)",
                               borderRadius: 2,
-                              fontSize: 13,
-                              fontFamily: "var(--font-mono)",
                             }}
                           />
                         </div>
                         <div>
                           <label
                             style={{
+                              ...invoiceLabelText,
                               display: "block",
-                              fontSize: 11,
-                              fontFamily: "var(--font-mono)",
                               color: "var(--text-secondary)",
                               marginBottom: 6,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
                             }}>
-                            Price/Litre
+                            Price/litre
                           </label>
                           <input
                             type="number"
@@ -775,14 +769,13 @@ export default function Invoices() {
                             }
                             placeholder="0.00"
                             style={{
+                              ...invoiceControlText,
                               width: "100%",
                               background: "var(--bg-surface)",
                               border: "1px solid var(--border-subtle)",
                               padding: "10px 12px",
                               color: "var(--text-primary)",
                               borderRadius: 2,
-                              fontSize: 13,
-                              fontFamily: "var(--font-mono)",
                             }}
                           />
                         </div>
@@ -793,13 +786,10 @@ export default function Invoices() {
                   <div>
                     <label
                       style={{
+                        ...invoiceLabelText,
                         display: "block",
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
                         color: "var(--text-secondary)",
                         marginBottom: 6,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
                       }}>
                       Amount (ZAR) *
                     </label>
@@ -817,14 +807,13 @@ export default function Invoices() {
                         expenseForm.price_per_litre,
                       )}
                       style={{
+                        ...invoiceControlText,
                         width: "100%",
                         background: "var(--bg-surface)",
                         border: "1px solid var(--border-subtle)",
                         padding: "10px 12px",
                         color: "var(--text-primary)",
                         borderRadius: 2,
-                        fontSize: 13,
-                        fontFamily: "var(--font-mono)",
                       }}
                     />
                   </div>
@@ -838,13 +827,10 @@ export default function Invoices() {
                     <div>
                       <label
                         style={{
+                          ...invoiceLabelText,
                           display: "block",
-                          fontSize: 11,
-                          fontFamily: "var(--font-mono)",
                           color: "var(--text-secondary)",
                           marginBottom: 6,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
                         }}>
                         Date *
                       </label>
@@ -858,13 +844,10 @@ export default function Invoices() {
                     <div>
                       <label
                         style={{
+                          ...invoiceLabelText,
                           display: "block",
-                          fontSize: 11,
-                          fontFamily: "var(--font-mono)",
                           color: "var(--text-secondary)",
                           marginBottom: 6,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
                         }}>
                         Vehicle
                       </label>
@@ -873,7 +856,7 @@ export default function Invoices() {
                         onValueChange={(val) =>
                           handleExpenseFormChange("vehicle", val)
                         }>
-                        <SelectTrigger>
+                        <SelectTrigger style={invoiceControlText}>
                           <SelectValue placeholder="Select vehicle..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -896,13 +879,10 @@ export default function Invoices() {
                     <div>
                       <label
                         style={{
+                          ...invoiceLabelText,
                           display: "block",
-                          fontSize: 11,
-                          fontFamily: "var(--font-mono)",
                           color: "var(--text-secondary)",
                           marginBottom: 6,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
                         }}>
                         Vendor
                       </label>
@@ -914,27 +894,23 @@ export default function Invoices() {
                         }
                         placeholder="e.g. Shell, BP"
                         style={{
+                          ...invoiceControlText,
                           width: "100%",
                           background: "var(--bg-surface)",
                           border: "1px solid var(--border-subtle)",
                           padding: "10px 12px",
                           color: "var(--text-primary)",
                           borderRadius: 2,
-                          fontSize: 13,
-                          fontFamily: "var(--font-sans)",
                         }}
                       />
                     </div>
                     <div>
                       <label
                         style={{
+                          ...invoiceLabelText,
                           display: "block",
-                          fontSize: 11,
-                          fontFamily: "var(--font-mono)",
                           color: "var(--text-secondary)",
                           marginBottom: 6,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
                         }}>
                         Receipt #
                       </label>
@@ -949,14 +925,13 @@ export default function Invoices() {
                         }
                         placeholder="Receipt number"
                         style={{
+                          ...invoiceControlText,
                           width: "100%",
                           background: "var(--bg-surface)",
                           border: "1px solid var(--border-subtle)",
                           padding: "10px 12px",
                           color: "var(--text-primary)",
                           borderRadius: 2,
-                          fontSize: 13,
-                          fontFamily: "var(--font-mono)",
                         }}
                       />
                     </div>
@@ -965,13 +940,10 @@ export default function Invoices() {
                   <div>
                     <label
                       style={{
+                        ...invoiceLabelText,
                         display: "block",
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
                         color: "var(--text-secondary)",
                         marginBottom: 6,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
                       }}>
                       Notes
                     </label>
@@ -983,14 +955,13 @@ export default function Invoices() {
                       placeholder="Additional notes..."
                       rows={3}
                       style={{
+                        ...invoiceControlText,
                         width: "100%",
                         background: "var(--bg-surface)",
                         border: "1px solid var(--border-subtle)",
                         padding: "10px 12px",
                         color: "var(--text-primary)",
                         borderRadius: 2,
-                        fontSize: 13,
-                        fontFamily: "var(--font-sans)",
                         resize: "vertical",
                       }}
                     />
@@ -1006,7 +977,10 @@ export default function Invoices() {
                         !expenseForm.amount ||
                         !expenseForm.expense_date
                       }
-                      style={{ flex: 1 }}>
+                      style={{
+                        ...invoiceControlText,
+                        flex: 1,
+                      }}>
                       {editingExpense ? "Update expense" : "Add expense"}
                     </button>
                     <button
@@ -1015,17 +989,15 @@ export default function Invoices() {
                         setEditingExpense(null);
                       }}
                       style={{
+                        ...invoiceControlText,
                         flex: 1,
                         background: "transparent",
                         border: "1px solid var(--border-subtle)",
                         color: "var(--text-secondary)",
                         padding: "10px 16px",
                         borderRadius: 2,
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
                         cursor: "pointer",
                         fontWeight: 500,
-                        letterSpacing: "0.05em",
                       }}>
                       Cancel
                     </button>
@@ -1098,34 +1070,34 @@ export default function Invoices() {
                     }}>
                     {[
                       {
-                        label: "Total Expenses MTD",
+                        label: "Total expenses MTD",
                         value: formatCurrency(totalMtd),
                         color: "var(--text-primary)",
                       },
                       {
-                        label: "Pending Approval",
+                        label: "Pending approval",
                         value: `${pendingExpenses.length} / ${formatCurrency(pendingAmount)}`,
                         color: "var(--status-warning)",
                       },
                       {
-                        label: "Fuel Costs MTD",
+                        label: "Fuel costs MTD",
                         value: formatCurrency(fuelCosts),
                         color: "var(--accent-primary)",
                       },
                       {
-                        label: "Top Category",
-                        value: `${topCategory}\n${formatCurrency(topCategoryAmount)}`,
+                        label: "Top category",
+                        value: `${topCategory === "N/A" ? topCategory : formatStatus(topCategory)}\n${formatCurrency(topCategoryAmount)}`,
                         color: "var(--text-primary)",
                       },
                     ].map((m) => (
                       <div key={m.label} className="card metric-card">
                         <div className="card-header">
-                          <span className="card-title">{m.label}</span>
+                          <span className="card-title" style={invoiceLabelText}>{m.label}</span>
                         </div>
                         <div
                           className="metric-value"
                           style={{
-                            fontSize: 20,
+                            ...invoiceMetricText,
                             color: m.color,
                             whiteSpace: "pre-line",
                           }}>
@@ -1143,6 +1115,7 @@ export default function Invoices() {
           <div
             style={{
               display: "flex",
+              flexWrap: "wrap",
               flexDirection: "row",
               gap: 8,
               marginBottom: 20,
@@ -1157,15 +1130,14 @@ export default function Invoices() {
                 setExpensePage(1);
               }}
               style={{
+                ...invoiceControlText,
                 background: "var(--bg-surface)",
                 border: "1px solid var(--border-subtle)",
                 padding: "6px 10px",
                 color: "var(--text-primary)",
                 borderRadius: 2,
-                fontSize: 12,
                 outline: "none",
                 width: 220,
-                fontFamily: "var(--font-sans)",
               }}
             />
             <select
@@ -1175,15 +1147,14 @@ export default function Invoices() {
                 setExpensePage(1);
               }}
               style={{
+                ...invoiceControlText,
                 background: "var(--bg-surface)",
                 border: "1px solid var(--border-subtle)",
                 padding: "6px 10px",
                 color: "var(--text-primary)",
                 borderRadius: 2,
-                fontSize: 12,
                 width: 160,
                 cursor: "pointer",
-                fontFamily: "var(--font-sans)",
               }}>
               {expenseCategories.map((c) => (
                 <option key={c} value={c}>
@@ -1199,6 +1170,7 @@ export default function Invoices() {
                   setExpensePage(1);
                 }}
                 style={{
+                  ...invoiceControlText,
                   background:
                     expenseStatusFilter === s
                       ? "var(--accent-primary)"
@@ -1209,11 +1181,8 @@ export default function Invoices() {
                       ? "var(--bg-deep)"
                       : "var(--text-secondary)",
                   padding: "6px 12px",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
                   borderRadius: 2,
                   cursor: "pointer",
-                  letterSpacing: "0.06em",
                   fontWeight: expenseStatusFilter === s ? 500 : 400,
                   whiteSpace: "nowrap",
                 }}>
@@ -1222,9 +1191,8 @@ export default function Invoices() {
             ))}
             <span
               style={{
+                ...invoiceSupportText,
                 marginLeft: "auto",
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
                 color: "var(--text-tertiary)",
               }}>
               {filteredExpenses.length} expenses
@@ -1245,7 +1213,7 @@ export default function Invoices() {
             return (
               <>
                 <div className="card table-card">
-                  <table className="data-table">
+                  <table className="data-table table-heading-roles">
                     <thead>
                       <tr>
                         <th>Date</th>
@@ -1286,7 +1254,7 @@ export default function Invoices() {
                                 </div>
                                 <div
                                   style={{
-                                    fontSize: 13,
+                                    ...invoiceSupportText,
                                     color: "var(--text-secondary)",
                                     marginBottom: 20,
                                   }}>
@@ -1306,10 +1274,10 @@ export default function Invoices() {
                             <td
                               colSpan={7}
                               style={{
+                                ...invoiceSupportText,
                                 textAlign: "center",
                                 padding: "32px 0",
                                 color: "var(--text-tertiary)",
-                                fontSize: 13,
                               }}>
                               No expenses match your filters
                             </td>
@@ -1328,16 +1296,16 @@ export default function Invoices() {
 
                           return (
                             <tr key={exp.id}>
-                              <td className="mono" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+                              <td className="mono" style={{ ...invoiceSupportText, whiteSpace: "nowrap" }}>
                                 {formatDate(exp.expense_date)}
                               </td>
-                              <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+                              <td style={{ ...invoiceSupportText, whiteSpace: "nowrap" }}>
                                 <span
                                   style={{ fontFamily: "var(--font-sans)" }}>
                                   {formatStatus(exp.category)}
                                 </span>
                               </td>
-                              <td style={{ fontSize: 12, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={exp.description}>
+                              <td style={{ ...invoiceSupportText, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={exp.description}>
                                 {exp.description}
                               </td>
                               <td
@@ -1350,14 +1318,13 @@ export default function Invoices() {
                               </td>
                               <td
                                 className="mono"
-                                style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap" }}>
+                                style={{ ...invoiceSupportText, fontVariantNumeric: "tabular-nums", fontWeight: 500, whiteSpace: "nowrap" }}>
                                 {formatCurrency(exp.amount)}
                               </td>
                               <td>
                                 <span
                                   style={{
-                                    fontFamily: "var(--font-mono)",
-                                    fontSize: 10,
+                                    ...invoiceSupportText,
                                     color:
                                       EXPENSE_STATUS_COLOR[exp.status] ||
                                       "var(--text-secondary)",
@@ -1370,62 +1337,82 @@ export default function Invoices() {
                                   {formatStatus(exp.status)}
                                 </span>
                               </td>
-                              <td>
-                                <div style={{ display: "flex", gap: 8 }}>
-                                  {exp.status === "PENDING" && (
+                              <td
+                                onKeyDown={(e) => {
+                                  if (e.key === "Escape") setOpenExpenseMenuId(null);
+                                }}>
+                                <div className="expense-row-actions">
+                                  <button
+                                    type="button"
+                                    className="expense-menu-trigger"
+                                    aria-label={`Expense actions for ${exp.description || exp.id}`}
+                                    aria-haspopup="menu"
+                                    aria-expanded={openExpenseMenuId === exp.id}
+                                    onClick={() =>
+                                      setOpenExpenseMenuId(
+                                        openExpenseMenuId === exp.id ? null : exp.id,
+                                      )
+                                    }>
+                                    <Ellipsis size={16} aria-hidden="true" />
+                                  </button>
+                                  {openExpenseMenuId === exp.id && (
                                     <>
-                                      <button
-                                        className="btn-action"
-                                        style={{
-                                          fontSize: 10,
-                                          padding: "4px 12px",
-                                          background: "var(--status-success)",
-                                          border: "none",
-                                        }}
-                                        onClick={() =>
-                                          handleApproveExpense(exp.id)
-                                        }>
-                                        Approve
-                                      </button>
-                                      <button
-                                        className="btn-action"
-                                        style={{
-                                          fontSize: 10,
-                                          padding: "4px 12px",
-                                          background: "var(--status-danger)",
-                                          border: "none",
-                                        }}
-                                        onClick={() =>
-                                          handleRejectExpense(exp.id)
-                                        }>
-                                        Reject
-                                      </button>
+                                      {/* click-away overlay */}
+                                      <div
+                                        style={{ position: "fixed", inset: 0, zIndex: 99 }}
+                                        onClick={() => setOpenExpenseMenuId(null)}
+                                      />
+                                      <div className="expense-menu" role="menu">
+                                        {exp.status === "PENDING" && (
+                                          <>
+                                            <button
+                                              type="button"
+                                              role="menuitem"
+                                              className="expense-menu-item"
+                                              style={{ color: "var(--status-success)" }}
+                                              onClick={() => {
+                                                setOpenExpenseMenuId(null);
+                                                handleApproveExpense(exp.id);
+                                              }}>
+                                              Approve
+                                            </button>
+                                            <button
+                                              type="button"
+                                              role="menuitem"
+                                              className="expense-menu-item"
+                                              style={{ color: "var(--status-danger)" }}
+                                              onClick={() => {
+                                                setOpenExpenseMenuId(null);
+                                                handleRejectExpense(exp.id);
+                                              }}>
+                                              Reject
+                                            </button>
+                                          </>
+                                        )}
+                                        <button
+                                          type="button"
+                                          role="menuitem"
+                                          className="expense-menu-item"
+                                          onClick={() => {
+                                            setOpenExpenseMenuId(null);
+                                            handleEditExpense(exp);
+                                          }}>
+                                          Edit
+                                        </button>
+                                        <button
+                                          type="button"
+                                          role="menuitem"
+                                          className="expense-menu-item"
+                                          style={{ color: "var(--status-danger)" }}
+                                          onClick={() => {
+                                            setOpenExpenseMenuId(null);
+                                            handleDeleteExpense(exp.id);
+                                          }}>
+                                          Delete
+                                        </button>
+                                      </div>
                                     </>
                                   )}
-                                  <button
-                                    className="btn-action"
-                                    style={{
-                                      fontSize: 10,
-                                      padding: "4px 10px",
-                                      background: "transparent",
-                                      border: "1px solid var(--border-subtle)",
-                                      color: "var(--text-secondary)",
-                                    }}
-                                    onClick={() => handleEditExpense(exp)}>
-                                    Edit
-                                  </button>
-                                  <button
-                                    className="btn-action"
-                                    style={{
-                                      fontSize: 10,
-                                      padding: "4px 10px",
-                                      background: "transparent",
-                                      border: "1px solid var(--status-danger)",
-                                      color: "var(--status-danger)",
-                                    }}
-                                    onClick={() => handleDeleteExpense(exp.id)}>
-                                    Del
-                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -1447,8 +1434,7 @@ export default function Invoices() {
                       }}>
                       <span
                         style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 11,
+                          ...invoiceSupportText,
                           color: "var(--text-tertiary)",
                         }}>
                         Page {expensePage} of {totalPages} · showing{" "}
@@ -1498,7 +1484,7 @@ export default function Invoices() {
               }}>
               {[
                 {
-                  label: "Total Invoiced MTD",
+                  label: "Total invoiced MTD",
                   value: formatCurrency(
                     stats?.total_invoiced_mtd ?? outstanding,
                   ),
@@ -1515,18 +1501,18 @@ export default function Invoices() {
                   color: "var(--status-danger)",
                 },
                 {
-                  label: "Collection Rate",
+                  label: "Collection rate",
                   value: `${Math.round((stats?.collection_rate ?? 0) * 100)}%`,
                   color: "var(--accent-primary)",
                 },
               ].map((m) => (
                 <div key={m.label} className="card metric-card">
                   <div className="card-header">
-                    <span className="card-title">{m.label}</span>
+                    <span className="card-title" style={invoiceLabelText}>{m.label}</span>
                   </div>
                   <div
                     className="metric-value"
-                    style={{ fontSize: 20, color: m.color }}>
+                    style={{ ...invoiceMetricText, color: m.color }}>
                     {m.value}
                   </div>
                 </div>
@@ -1538,6 +1524,7 @@ export default function Invoices() {
           <div
             style={{
               display: "flex",
+              flexWrap: "wrap",
               gap: 8,
               marginBottom: 20,
               alignItems: "center",
@@ -1551,18 +1538,17 @@ export default function Invoices() {
                 setPage(1);
               }}
               style={{
+                ...invoiceControlText,
                 background: "var(--bg-surface)",
                 border: "1px solid var(--border-subtle)",
                 padding: "6px 10px",
                 color: "var(--text-primary)",
                 borderRadius: 2,
-                fontSize: 12,
                 outline: "none",
                 width: 220,
-                fontFamily: "var(--font-sans)",
               }}
             />
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {statuses.map((s) => (
                 <button
                   key={s}
@@ -1571,6 +1557,7 @@ export default function Invoices() {
                     setPage(1);
                   }}
                   style={{
+                    ...invoiceControlText,
                     background:
                       statusFilter === s
                         ? "var(--accent-primary)"
@@ -1581,11 +1568,8 @@ export default function Invoices() {
                         ? "var(--bg-deep)"
                         : "var(--text-secondary)",
                     padding: "6px 12px",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11,
                     borderRadius: 2,
                     cursor: "pointer",
-                    letterSpacing: "0.06em",
                     fontWeight: statusFilter === s ? 500 : 400,
                     transition: "all 0.2s ease",
                   }}>
@@ -1595,9 +1579,8 @@ export default function Invoices() {
             </div>
             <span
               style={{
+                ...invoiceSupportText,
                 marginLeft: "auto",
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
                 color: "var(--text-tertiary)",
               }}>
               {filtered.length} invoices
@@ -1606,7 +1589,7 @@ export default function Invoices() {
 
           {/* Table — 10 per page, clickable */}
           <div className="card table-card">
-            <table className="data-table">
+            <table className="data-table table-heading-roles">
               <colgroup>
                 <col style={{ width: "160px" }} />
                 <col />
@@ -1621,7 +1604,7 @@ export default function Invoices() {
                   <th>Customer</th>
                   <th>Amount</th>
                   <th>Status</th>
-                  <th>Due Date</th>
+                  <th>Due date</th>
                   <th style={{ textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
@@ -1651,7 +1634,7 @@ export default function Invoices() {
                           </div>
                           <div
                             style={{
-                              fontSize: 13,
+                              ...invoiceSupportText,
                               color: "var(--text-secondary)",
                               marginBottom: 20,
                             }}>
@@ -1670,10 +1653,10 @@ export default function Invoices() {
                       <td
                         colSpan={6}
                         style={{
+                          ...invoiceSupportText,
                           textAlign: "center",
                           padding: "32px 0",
                           color: "var(--text-tertiary)",
-                          fontSize: 13,
                         }}>
                         No invoices match your filters
                       </td>
@@ -1723,7 +1706,7 @@ export default function Invoices() {
                         onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
                         <td className="mono" style={{ whiteSpace: "nowrap" }}>{invNumber}</td>
                         <td style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={custName}>{custName}</td>
-                        <td className="mono" style={{ whiteSpace: "nowrap" }}>{formatCurrency(amount)}</td>
+                        <td className="mono" style={{ ...invoiceSupportText, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{formatCurrency(amount)}</td>
                         <td>
                           <div
                             style={{
@@ -1733,8 +1716,7 @@ export default function Invoices() {
                             }}>
                             <span
                               style={{
-                                fontFamily: "var(--font-mono)",
-                                fontSize: 10,
+                                ...invoiceSupportText,
                                 color:
                                   STATUS_COLOR[invStatus] ||
                                   "var(--text-secondary)",
@@ -1749,8 +1731,7 @@ export default function Invoices() {
                             {capitalEntry && tier && (
                               <span
                                 style={{
-                                  fontFamily: "var(--font-mono)",
-                                  fontSize: 9,
+                                  ...invoiceSupportText,
                                   color:
                                     TIER_COLOR[tier] || "var(--text-tertiary)",
                                   padding: "1px 5px",
@@ -1773,20 +1754,18 @@ export default function Invoices() {
                             }}>
                             <span
                               style={{
+                                ...invoiceSupportText,
                                 color:
                                   invStatus === "OVERDUE"
                                     ? "var(--status-danger)"
                                     : "var(--text-secondary)",
-                                fontFamily: "var(--font-mono)",
-                                fontSize: 11,
                               }}>
                               {dueDate}
                             </span>
                             {invStatus !== "PAID" && dueDate && (
                               <span
                                 style={{
-                                  fontSize: 9,
-                                  fontFamily: "var(--font-mono)",
+                                  ...invoiceSupportText,
                                   color: agingColor,
                                   padding: "1px 5px",
                                   border: `1px solid ${agingColor}`,
@@ -1809,18 +1788,23 @@ export default function Invoices() {
                                 openDropdownId === inv.id ? null : inv.id,
                               );
                             }}
+                            aria-label={`Invoice actions for ${invNumber}`}
+                            aria-haspopup="menu"
+                            aria-expanded={openDropdownId === inv.id}
                             style={{
+                              ...invoiceControlText,
+                              minWidth: 44,
                               background: "transparent",
                               border: "1px solid var(--border-subtle)",
                               color: "var(--text-secondary)",
                               borderRadius: 2,
                               cursor: "pointer",
                               padding: "3px 8px",
-                              lineHeight: 0,
                               display: "inline-flex",
                               alignItems: "center",
+                              justifyContent: "center",
                             }}>
-                            <Ellipsis size={14} />
+                            <Ellipsis size={14} aria-hidden="true" />
                           </button>
 
                           {/* Dropdown */}
@@ -1844,7 +1828,7 @@ export default function Invoices() {
                                   right: 0,
                                   top: "calc(100% + 4px)",
                                   zIndex: 100,
-                                  background: "#ffffff",
+                                  background: "var(--bg-surface)",
                                   border: "1px solid var(--border-subtle)",
                                   borderRadius: 4,
                                   minWidth: 200,
@@ -1862,9 +1846,10 @@ export default function Invoices() {
                                       borderBottom:
                                         "1px solid var(--border-subtle)",
                                       color: "var(--accent-primary)",
-                                      fontFamily: "var(--font-mono)",
-                                      fontSize: 11,
-                                      letterSpacing: "0.05em",
+                                      fontFamily: "var(--font-sans)",
+                                      fontSize: 14,
+                                      lineHeight: "20px",
+                                      letterSpacing: "normal",
                                       padding: "10px 14px",
                                       cursor: "pointer",
                                       transition: "background 0.15s",
@@ -1892,9 +1877,10 @@ export default function Invoices() {
                                       borderBottom:
                                         "1px solid var(--border-subtle)",
                                       color: "var(--status-warning)",
-                                      fontFamily: "var(--font-mono)",
-                                      fontSize: 11,
-                                      letterSpacing: "0.05em",
+                                      fontFamily: "var(--font-sans)",
+                                      fontSize: 14,
+                                      lineHeight: "20px",
+                                      letterSpacing: "normal",
                                       padding: "10px 14px",
                                       cursor: "pointer",
                                       transition: "background 0.15s",
@@ -1922,9 +1908,10 @@ export default function Invoices() {
                                       borderBottom:
                                         "1px solid var(--border-subtle)",
                                       color: "var(--text-secondary)",
-                                      fontFamily: "var(--font-mono)",
-                                      fontSize: 11,
-                                      letterSpacing: "0.05em",
+                                      fontFamily: "var(--font-sans)",
+                                      fontSize: 14,
+                                      lineHeight: "20px",
+                                      letterSpacing: "normal",
                                       padding: "10px 14px",
                                       cursor: "pointer",
                                       transition: "background 0.15s",
@@ -1958,9 +1945,10 @@ export default function Invoices() {
                                       color: appliedIds.has(String(inv.id))
                                         ? "var(--status-success)"
                                         : TIER_COLOR[tier || ""] || "var(--accent-primary)",
-                                      fontFamily: "var(--font-mono)",
-                                      fontSize: 11,
-                                      letterSpacing: "0.05em",
+                                      fontFamily: "var(--font-sans)",
+                                      fontSize: 14,
+                                      lineHeight: "20px",
+                                      letterSpacing: "normal",
                                       padding: "10px 14px",
                                       cursor: "pointer",
                                       textDecoration: "none",
@@ -1973,19 +1961,16 @@ export default function Invoices() {
                                 {ineligibleEntry && (
                                   <div
                                     style={{
+                                      ...invoiceSupportText,
                                       padding: "10px 14px",
-                                      fontFamily: "var(--font-mono)",
-                                      fontSize: 10,
                                       color: "var(--text-tertiary)",
-                                      lineHeight: 1.4,
                                     }}>
                                     <div
                                       style={{
+                                        ...invoiceSupportText,
                                         color: "var(--status-danger)",
                                         fontWeight: 500,
                                         marginBottom: 2,
-                                        fontSize: 9,
-                                        letterSpacing: "0.05em",
                                       }}>
                                       Not eligible for capital
                                     </div>
@@ -2015,8 +2000,7 @@ export default function Invoices() {
                 }}>
                 <span
                   style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11,
+                    ...invoiceSupportText,
                     color: "var(--text-tertiary)",
                   }}>
                   Page {page} of {totalPages} · showing {rows.length} of{" "}

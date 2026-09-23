@@ -1,0 +1,10 @@
+/* Explicit opt-in for reviewed finance and bookings tables. */
+table.table-heading-roles th {
+  font-family:var(--font-sans);
+  font-size:13px;
+  line-height:20px;
+  font-weight:500;
+  letter-spacing:normal;
+  text-transform:none;
+  color:var(--text-secondary);
+}

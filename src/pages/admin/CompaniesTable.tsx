@@ -1,4 +1,5 @@
 import '@/pages/table-heading-roles.css';
+import '@/pages/admin/admin-brand.css';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData } from '@/lib/Api';
@@ -87,41 +88,76 @@ const chargeStatusClass = (status: string) => {
 const STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: 'All' },
   { value: 'active', label: 'Active' },
-  { value: 'grace_period', label: 'Grace Period' },
+  { value: 'grace_period', label: 'Grace period' },
   { value: 'suspended', label: 'Suspended' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'trialing', label: 'Trialing' },
 ];
 
-const cardStyle: React.CSSProperties = { padding: 20 };
-const sectionTitleStyle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 };
+// Presentation-only display labels for known payload values — unknown
+// strings render verbatim (own-property lookup; never restyles user data).
+const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+  active: 'Active',
+  grace_period: 'Grace period',
+  suspended: 'Suspended',
+  cancelled: 'Cancelled',
+  trialing: 'Trialing',
+  none: 'None',
+};
+const subscriptionStatusLabel = (s: string) =>
+  Object.prototype.hasOwnProperty.call(SUBSCRIPTION_STATUS_LABELS, s) ? SUBSCRIPTION_STATUS_LABELS[s] : s;
+
+const CHARGE_KIND_LABELS: Record<string, string> = {
+  subscription: 'Subscription',
+  delivery_fee: 'Delivery fee',
+};
+const chargeKindLabel = (k: string) =>
+  Object.prototype.hasOwnProperty.call(CHARGE_KIND_LABELS, k) ? CHARGE_KIND_LABELS[k] : k;
+
+const CHARGE_STATUS_LABELS: Record<string, string> = {
+  paid: 'Paid',
+  failed: 'Failed',
+  pending: 'Pending',
+  success: 'Success',
+  refunded: 'Refunded',
+};
+const chargeStatusLabel = (s: string) =>
+  Object.prototype.hasOwnProperty.call(CHARGE_STATUS_LABELS, s) ? CHARGE_STATUS_LABELS[s] : s;
+
+const cardStyle: React.CSSProperties = { padding: 24 };
+const sectionTitleStyle: React.CSSProperties = {
+  fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0,
+};
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', width: 240,
+  padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  fontFamily: 'var(--font-sans)', minHeight: 40, width: 240,
 };
 const selectStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none',
+  padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  fontFamily: 'var(--font-sans)', minHeight: 40, cursor: 'pointer',
 };
 const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
-  padding: '10px 12px', fontSize: 12.5, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
-  padding: '6px 14px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', cursor: 'pointer', whiteSpace: 'nowrap',
+  padding: '8px 12px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
+  borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)',
+  minHeight: 40, cursor: 'pointer', whiteSpace: 'nowrap',
 };
 const linkButtonStyle: React.CSSProperties = {
-  background: 'none', border: 'none', padding: 0, color: 'var(--accent-primary)', fontSize: 11.5,
-  fontFamily: 'var(--font-mono)', letterSpacing: '0.03em', cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap',
+  background: 'none', border: 'none', padding: 0, color: 'var(--accent-primary)', fontSize: 13, lineHeight: '20px',
+  fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap',
 };
 const smallInputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '6px 10px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none',
+  padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  fontFamily: 'var(--font-sans)', minHeight: 40,
 };
 const panelLabelStyle: React.CSSProperties = {
-  fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.06em',
-  textTransform: 'uppercase', marginBottom: 6,
+  fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6,
 };
 
 const COLUMN_COUNT = 8;
@@ -177,20 +213,20 @@ export function CompaniesTable() {
 
   return (
     <div className="card" style={cardStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
-        <div style={sectionTitleStyle}>Companies {data ? `(${data.count})` : ''}</div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={selectStyle}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+        <h2 style={sectionTitleStyle}>Companies {data ? `(${data.count})` : ''}</h2>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <select className="admin-control" aria-label="Filter by status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={selectStyle}>
             {STATUS_FILTER_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-          <input style={inputStyle} placeholder="Search company or owner email…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="admin-control" aria-label="Search companies" style={inputStyle} placeholder="Search company or owner email…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
       {isLoading ? <Loader size={24} /> : (
-        <div style={{ overflowX: 'auto' }}>
+        <div className="admin-scroll-region" role="region" aria-label="Companies" tabIndex={0} style={{ overflowX: 'auto' }}>
           <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -214,8 +250,8 @@ export function CompaniesTable() {
                       <td style={tdStyle}>
                         <div>
                           {c.company_name}
-                          {c.is_demo && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--status-warning)' }}>DEMO</span>}
-                          {c.is_deleted && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--status-danger)' }}>DELETED</span>}
+                          {c.is_demo && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-warning)' }}>Demo</span>}
+                          {c.is_deleted && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-danger)' }}>Deleted</span>}
                         </div>
                         {/* company_name alone is rarely unique — self-service signup
                             defaults it to "<first name>'s Transport", so the owner's
@@ -224,14 +260,14 @@ export function CompaniesTable() {
                             their own account — an abandoned signup, not a real tenant. */}
                         {c.owner_email && (
                           c.owner_email.startsWith('deleted-') ? (
-                            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No active user (account deleted)</div>
+                            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No active user (account deleted)</div>
                           ) : (
-                            <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{c.owner_email}</div>
+                            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{c.owner_email}</div>
                           )
                         )}
                       </td>
                       <td style={tdStyle}>
-                        <span className={`status-badge ${STATUS_BADGE_CLASS[c.subscription_status] || ''}`}>{c.subscription_status}</span>
+                        <span className={`status-badge ${STATUS_BADGE_CLASS[c.subscription_status] || ''}`}>{subscriptionStatusLabel(c.subscription_status)}</span>
                       </td>
                       <td style={tdStyle}>{fmtDate(c.next_billing_date)}</td>
                       <td style={tdStyle}>{c.user_count}</td>
@@ -239,16 +275,16 @@ export function CompaniesTable() {
                       <td style={tdStyle}>{c.load_count}</td>
                       <td style={tdStyle}>{fmtDateTime(c.created_at)}</td>
                       <td style={tdStyle}>
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                          <button type="button" style={linkButtonStyle} onClick={() => setExpandedId(isExpanded ? null : c.id)}>
+                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <button type="button" className="admin-control" style={linkButtonStyle} onClick={() => setExpandedId(isExpanded ? null : c.id)}>
                             {isExpanded ? 'Hide billing' : 'Billing history'}
                           </button>
                           {!c.is_deleted && (
                             isDownState ? (
                               <button
                                 type="button"
-                                className="btn-action"
-                                style={{ fontSize: 11 }}
+                                className="btn-action admin-control"
+                                style={{ minHeight: 40, borderRadius: 6 }}
                                 disabled={actionMutation.isPending}
                                 onClick={() => runAction(c.id, 'reactivate')}
                               >
@@ -257,6 +293,7 @@ export function CompaniesTable() {
                             ) : (
                               <button
                                 type="button"
+                                className="admin-control"
                                 style={secondaryBtnStyle}
                                 disabled={actionMutation.isPending}
                                 onClick={() => setConfirmAction({ company: c, action: 'suspend' })}
@@ -268,6 +305,7 @@ export function CompaniesTable() {
                           {!c.is_deleted && (
                             <button
                               type="button"
+                              className="admin-control"
                               style={{ ...secondaryBtnStyle, color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
                               disabled={actionMutation.isPending}
                               onClick={() => setConfirmAction({ company: c, action: 'delete' })}
@@ -385,7 +423,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
   return (
     <tr>
       <td style={{ ...tdStyle, background: 'var(--bg-panel)' }} colSpan={COLUMN_COUNT}>
-        <div style={{ padding: '10px 4px', display: 'grid', gap: 20 }}>
+        <div style={{ padding: '12px 4px', display: 'grid', gap: 20 }}>
           {/* The subscription fee and each load's delivery fee are two
               separate billing lanes — only a successful (or manually
               recorded) SUBSCRIPTION charge clears grace_period; marking a
@@ -394,30 +432,32 @@ function CompanyBillingPanel({ company }: { company: Company }) {
               so spell it out here whenever it's actually relevant. */}
           {company.subscription_status === 'grace_period' && (
             <div style={{
-              padding: '10px 14px', background: 'var(--status-warning-bg, rgba(245,158,11,0.1))',
-              border: '1px solid var(--status-warning)', borderRadius: 2, fontSize: 12,
+              padding: 16, background: 'var(--status-warning-bg, rgba(245,158,11,0.1))',
+              border: '1px solid var(--status-warning)', borderRadius: 8, fontSize: 14, lineHeight: '20px',
             }}>
               <strong style={{ color: 'var(--status-warning)' }}>In grace period</strong>
               {company.grace_period_expires_at && <> — expires {fmtDate(company.grace_period_expires_at)}</>}.
               This is caused by a failed <em>subscription</em> charge, not a delivery-fee charge — use{' '}
-              <strong>Record Payment</strong> below to resolve it. Marking a delivery-fee row as paid in the
+              <strong>Record payment</strong> below to resolve it. Marking a delivery-fee row as paid in the
               billing history won't clear this, even if one happens to be failed too.
             </div>
           )}
           <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap' }}>
             <div>
-              <div style={panelLabelStyle}>Next billing date</div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <label htmlFor={`next-billing-date-${company.id}`} style={{ ...panelLabelStyle, display: 'block' }}>Next billing date</label>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
                 <input
+                  id={`next-billing-date-${company.id}`}
+                  className="admin-control"
                   type="date"
                   value={nextBillingDate}
                   onChange={e => setNextBillingDate(e.target.value)}
-                  style={{ ...smallInputStyle, width: 150 }}
+                  style={{ ...smallInputStyle, width: 170 }}
                 />
                 <button
                   type="button"
-                  className="btn-action"
-                  style={{ fontSize: 11 }}
+                  className="btn-action admin-control"
+                  style={{ minHeight: 40, borderRadius: 6 }}
                   disabled={!nextBillingDate || dateMutation.isPending}
                   onClick={() => dateMutation.mutate(nextBillingDate)}
                 >
@@ -425,43 +465,50 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                 </button>
               </div>
               {company.grace_period_expires_at && (
-                <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 6 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning)', marginTop: 6 }}>
                   Grace period expires {fmtDate(company.grace_period_expires_at)}
                 </div>
               )}
             </div>
 
             <div>
-              <div style={panelLabelStyle}>Record payment</div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <input
-                  ref={amountInputRef}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Amount"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
-                  style={{ ...smallInputStyle, width: 100 }}
-                />
-                <input
-                  type="text"
-                  placeholder="Note (optional)"
-                  value={note}
-                  onChange={e => setNote(e.target.value)}
-                  style={{ ...smallInputStyle, width: 200 }}
-                />
+              <h3 style={{ ...panelLabelStyle, margin: 0, marginBottom: 6 }}>Record payment</h3>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <label>
+                  <span style={{ ...panelLabelStyle, display: 'block' }}>Amount</span>
+                  <input
+                    ref={amountInputRef}
+                    className="admin-control"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                    style={{ ...smallInputStyle, width: 120 }}
+                  />
+                </label>
+                <label>
+                  <span style={{ ...panelLabelStyle, display: 'block' }}>Note (optional)</span>
+                  <input
+                    className="admin-control"
+                    type="text"
+                    value={note}
+                    onChange={e => setNote(e.target.value)}
+                    style={{ ...smallInputStyle, width: 200 }}
+                  />
+                </label>
                 <button
                   type="button"
-                  className="btn-action"
-                  style={{ fontSize: 11 }}
+                  className="btn-action admin-control"
+                  style={{ minHeight: 40, borderRadius: 6 }}
                   disabled={amount === '' || paymentMutation.isPending}
                   onClick={() => paymentMutation.mutate()}
                 >
-                  {paymentMutation.isPending ? 'Recording…' : 'Record Payment'}
+                  {paymentMutation.isPending ? 'Recording…' : 'Record payment'}
                 </button>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6, maxWidth: 340 }}>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 6, maxWidth: 340 }}>
                 Reactivates the company immediately, even from suspended/cancelled — this is how a payment taken
                 outside Paystack unlocks an account. Use amount 0 with a note to record a waiver.
               </div>
@@ -469,11 +516,11 @@ function CompanyBillingPanel({ company }: { company: Company }) {
           </div>
 
           <div>
-            <div style={panelLabelStyle}>Billing history</div>
+            <h3 style={{ ...panelLabelStyle, margin: 0, marginBottom: 6 }}>Billing history</h3>
             {billingLoading ? <Loader size={20} /> : charges.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>No charges recorded.</div>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No charges recorded.</div>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
+              <div className="admin-scroll-region" role="region" aria-label={`Billing history for ${company.company_name}`} tabIndex={0} style={{ overflowX: 'auto' }}>
                 <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
@@ -490,17 +537,18 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                     {charges.map(ch => (
                       <tr key={`${ch.kind}-${ch.id}`}>
                         <td style={tdStyle}>{fmtDateTime(ch.created_at)}</td>
-                        <td style={tdStyle}>{ch.kind}</td>
+                        <td style={tdStyle}>{chargeKindLabel(ch.kind)}</td>
                         <td style={tdStyle}>{ch.label}</td>
-                        <td style={tdStyle}>{formatCurrency(ch.amount)}</td>
+                        <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(ch.amount)}</td>
                         <td style={tdStyle}>
-                          <span className={`status-badge ${chargeStatusClass(ch.status)}`}>{ch.status}</span>
+                          <span className={`status-badge ${chargeStatusClass(ch.status)}`}>{chargeStatusLabel(ch.status)}</span>
                         </td>
-                        <td style={tdStyle}>{ch.reference || '—'}</td>
+                        <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)' }}>{ch.reference || '—'}</td>
                         <td style={tdStyle}>
                           {ch.status === 'failed' && ch.kind === 'delivery_fee' && (
                             <button
                               type="button"
+                              className="admin-control"
                               style={linkButtonStyle}
                               title="Only fixes this one invoice's delivery fee — doesn't affect the subscription or clear a grace period"
                               disabled={markPaidMutation.isPending}
@@ -510,7 +558,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                             </button>
                           )}
                           {ch.status === 'failed' && ch.kind === 'subscription' && (
-                            <button type="button" style={linkButtonStyle} onClick={() => useAmountFor(ch)}>
+                            <button type="button" className="admin-control" style={linkButtonStyle} onClick={() => useAmountFor(ch)}>
                               Use this amount ↑
                             </button>
                           )}

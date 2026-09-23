@@ -1,0 +1,14 @@
+/* Settings brand roles — scoped, opt-in (see docs/brand/BRAND-GUIDELINES.md).
+   Controls keep a visible 2px keyboard focus ring at 3px offset instead of
+   inline `outline: none`. Table scroll wrappers are keyboard-focusable
+   labelled regions, so the ring draws inside their own box. */
+
+.settings-control:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+
+.settings-scroll-region:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}

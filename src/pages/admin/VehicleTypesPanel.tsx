@@ -1,3 +1,4 @@
+import '@/pages/admin/admin-brand.css';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
@@ -16,25 +17,27 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 // can actually be changed.
 
 const cardStyle: React.CSSProperties = { padding: 20 };
-const sectionTitleStyle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 };
+const sectionTitleStyle: React.CSSProperties = { fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16 };
 const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 12px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-subtle)',
+  textAlign: 'left', padding: '8px 12px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)',
+  borderBottom: '1px solid var(--border-subtle)',
 };
 const tdStyle: React.CSSProperties = {
-  padding: '10px 12px', fontSize: 12.5, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
-  padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 2, fontSize: 10.5, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', cursor: 'pointer',
+  padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
+  borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer',
 };
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase',
+  display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', marginBottom: 6,
 };
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', width: '100%', boxSizing: 'border-box',
+  padding: '8px 12px', borderRadius: 6, minHeight: 40, fontSize: 14, lineHeight: '20px',
+  fontFamily: 'var(--font-sans)', width: '100%', boxSizing: 'border-box',
 };
 
 interface AdminVehicleType {
@@ -284,7 +287,7 @@ export default function VehicleTypesPanel() {
               <button onClick={() => setEditTarget(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {formErr && (
-              <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>
+              <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', borderRadius: 8, marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
                 {formErr}
               </div>
             )}
@@ -293,13 +296,13 @@ export default function VehicleTypesPanel() {
               <button
                 disabled={saving}
                 onClick={handleEditSave}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: saving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase' }}
+                style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
               >
-                {saving ? 'Saving…' : 'Save Changes'}
+                {saving ? 'Saving…' : 'Save changes'}
               </button>
               <button
                 onClick={() => setEditTarget(null)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase' }}
+                style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}
               >
                 Cancel
               </button>

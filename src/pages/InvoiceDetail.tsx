@@ -224,7 +224,7 @@ export default function InvoiceDetail() {
         </div>
       )}
       <div style={{ marginBottom: 24 }}>
-        <button onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, minHeight: 40, marginBottom: 8, padding: 0 }}>← Back to invoices</button>
+        <button onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, minHeight: 48, marginBottom: 8, padding: 0 }}>← Back to invoices</button>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 0, marginBottom: 4 }}>Invoice</div>
@@ -375,20 +375,20 @@ export default function InvoiceDetail() {
           <h2 className="card-title" style={{ fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px', fontWeight: 600, textTransform: 'none', letterSpacing: 0, margin: 0, marginBottom: 16 }}>Actions</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {(invoice.status === 'DRAFT' || invoice.status === 'SENT' || invoice.status === 'VIEWED') && (
-              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 40, background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }} onClick={handleSendInvoice} disabled={sending}>
+              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 48, background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }} onClick={handleSendInvoice} disabled={sending}>
                 {sending ? 'Sending...' : invoice.status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
               </button>
             )}
-            <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={handleDownloadPDF} disabled={downloading}>
+            <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 48, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={handleDownloadPDF} disabled={downloading}>
               {downloading ? 'Downloading...' : 'Download PDF'}
             </button>
             {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE') && (
-              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', fontWeight: 500, minHeight: 40, fontFamily: 'var(--font-sans)', letterSpacing: 0, background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={handleSendReminder} disabled={sendingReminder}>
+              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', fontWeight: 500, minHeight: 48, fontFamily: 'var(--font-sans)', letterSpacing: 0, background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={handleSendReminder} disabled={sendingReminder}>
                 {sendingReminder ? 'Sending...' : 'Send reminder'}
               </button>
             )}
             {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE' || invoice.status === 'PARTIALLY_PAID') && !showPaymentForm && (
-              <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 40, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>Record payment</button>
+              <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 48, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>Record payment</button>
             )}
             {capitalEntry && (
               <a
@@ -398,7 +398,7 @@ export default function InvoiceDetail() {
                 className="btn-action"
                 onClick={() => setAppliedIds((prev) => saveAppliedId(String(id), prev))}
                 style={{
-                  width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 40,
+                  width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 48,
                   background: 'transparent',
                   border: `1px solid ${appliedIds.has(String(id)) ? 'var(--status-success)' : 'var(--accent-primary)'}`,
                   color: appliedIds.has(String(id)) ? 'var(--status-success)' : 'var(--accent-primary)',

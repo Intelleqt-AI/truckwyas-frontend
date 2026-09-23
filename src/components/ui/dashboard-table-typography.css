@@ -1,0 +1,42 @@
+/* Explicit desktop text roles for adopted results tables; no panel geometry changes. */
+@media (min-width: 768px) {
+  .os-app-shell .dashboard-results-table .dashboard-table-body,
+  .os-app-shell .dashboard-results-table .dashboard-table-id,
+  .os-app-shell .dashboard-results-table .dashboard-table-support,
+  .os-app-shell .dashboard-results-table .dashboard-table-heading {
+    --table-text-size: 14px;
+    --table-text-font: var(--font-sans);
+    --table-text-weight: 400;
+    --table-text-line: 20px;
+    --table-text-tracking: normal;
+    --table-text-case: none;
+    --table-text-success: var(--status-success-text, var(--status-success));
+    --table-text-warning: var(--status-warning-text, var(--status-warning));
+    --table-text-danger: var(--status-danger-text, var(--status-danger));
+    font-family: var(--table-text-font);
+    font-size: var(--table-text-size);
+    font-weight: var(--table-text-weight);
+    line-height: 20px;
+    letter-spacing: normal;
+    text-transform: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .os-app-shell .dashboard-results-table .dashboard-table-heading {
+    --table-text-size: 13px;
+    --table-text-weight: 500;
+  }
+  .os-app-shell .dashboard-results-table .dashboard-table-id {
+    --table-text-size: 13px;
+    --table-text-font: var(--font-mono);
+  }
+  .os-app-shell .dashboard-results-table .dashboard-table-support {
+    --table-text-size: 13px;
+  }
+  /* Markdown is an embedded data table; its cellStyle body14 must not override the heading13 role. */
+  .os-app-shell .cp-md th {
+    --table-heading-size: 13px;
+    --table-heading-weight: 500;
+    --table-heading-line: 20px;
+    --table-heading-font: var(--font-sans);
+  }
+}

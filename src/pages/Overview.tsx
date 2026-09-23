@@ -1,3 +1,5 @@
+import "@/components/ui/dashboard-kpi.css";
+import './overview-typography.css';
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -6,6 +8,7 @@ import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { LiveBadge } from "@/components/LiveBadge";
 import { Loader } from "@/components/Loader";
+import { DashboardMetricIcon } from "@/components/ui/DashboardMetricIcon";
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed below) and survives navigation — revisiting
@@ -121,18 +124,18 @@ async function loadOverview() {
 
 const CARD_MENUS: Record<string, { label: string; route: string }[]> = {
   revenue: [
-    { label: "View Revenue Report", route: "/finance/reports" },
-    { label: "View All Invoices",   route: "/finance/invoices" },
-    { label: "New Invoice",         route: "/finance/invoices/new" },
+    { label: "View revenue report", route: "/finance/reports" },
+    { label: "View all invoices",   route: "/finance/invoices" },
+    { label: "New invoice",         route: "/finance/invoices/new" },
   ],
   margin: [
-    { label: "View Finance Reports", route: "/finance/reports" },
-    { label: "View Expenses",        route: "/finance/expenses" },
+    { label: "View finance reports", route: "/finance/reports" },
+    { label: "View expenses",        route: "/finance/expenses" },
   ],
   outstanding: [
-    { label: "View Outstanding Invoices", route: "/finance/invoices?status=OVERDUE" },
-    { label: "View All Invoices",         route: "/finance/invoices" },
-    { label: "Request Capital Advance",   route: "/capital" },
+    { label: "View outstanding invoices", route: "/finance/invoices?status=OVERDUE" },
+    { label: "View all invoices",         route: "/finance/invoices" },
+    { label: "Request capital advance",   route: "/capital" },
   ],
 };
 
@@ -240,6 +243,7 @@ export default function Overview() {
 
   return (
     <div
+      className="overview-typography"
       style={{
         display: "grid",
         gridTemplateColumns: "repeat(3, 1fr)",
@@ -275,11 +279,11 @@ export default function Overview() {
               <div>
                 <div
                   style={{
-                    fontSize: 10,
-                    fontFamily: "var(--font-mono)",
+                    fontSize: 13, lineHeight: "20px",
+                    fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
                     color: "var(--text-tertiary)",
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
+                    letterSpacing: "normal",
+                    textTransform: "none",
                   }}>
                   {formatDate(currentTime)}
                 </div>
@@ -288,13 +292,13 @@ export default function Overview() {
                     fontSize: 18,
                     fontWeight: 600,
                     color: "var(--text-primary)",
-                    fontFamily: "var(--font-mono)",
+                    fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
                     marginTop: 1,
                   }}>
                   {formatTime(currentTime)}{" "}
                   <span
                     style={{
-                      fontSize: 11,
+                      fontSize: 13, lineHeight: "20px",
                       color: "var(--text-tertiary)",
                       marginLeft: 4,
                     }}>
@@ -335,11 +339,11 @@ export default function Overview() {
                   style={{ cursor: "pointer", textAlign: "right" }}>
                   <div
                     style={{
-                      fontSize: 9,
-                      fontFamily: "var(--font-mono)",
+                      fontSize: 13, lineHeight: "20px",
+                      fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
                       color: "var(--text-tertiary)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
+                      textTransform: "none",
+                      letterSpacing: "normal",
                       marginBottom: 2,
                     }}>
                     {s.label}
@@ -348,7 +352,7 @@ export default function Overview() {
                     style={{
                       fontSize: 17,
                       fontWeight: 700,
-                      fontFamily: "var(--font-mono)",
+                      fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
                       color: s.warn
                         ? "var(--status-warning)"
                         : "var(--text-primary)",
@@ -426,11 +430,11 @@ export default function Overview() {
         </div>
 
         {/* Metric cards */}
-        <div className="card metric-card">
-          <div className="card-header">
-            <span className="card-title">
-              {loading ? "Loading..." : "Total Revenue"}
-            </span>
+        <div className="card metric-card dashboard-kpi-card">
+          <div className="card-header dashboard-kpi-label">
+            <span className="card-title dashboard-kpi-label"><span className="dashboard-metric-label-content"><DashboardMetricIcon kind="money" /><span className="dashboard-metric-label-text">
+              {loading ? "Loading..." : "Total revenue"}
+            </span></span></span>
             <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 className="card-action"
@@ -441,7 +445,7 @@ export default function Overview() {
                 <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 200, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
                   {CARD_MENUS.revenue.map(item => (
                     <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
-                      style={{ padding: "9px 14px", fontSize: 12, fontFamily: "var(--font-mono)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
+                      style={{ padding: "9px 14px", fontSize: 13, lineHeight: "20px", fontFamily: "var(--font-sans)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
                       onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
                       onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
                       {item.label}
@@ -451,12 +455,12 @@ export default function Overview() {
               )}
             </div>
           </div>
-          <div className="metric-value">
+          <div className="metric-value dashboard-kpi-value">
             {loading ? "..." : formatCurrency(financeData?.total_revenue || 0)}
           </div>
           {typeof financeData?.revenue_change_pct === "number" ? (
             <div
-              className={`metric-delta ${financeData.revenue_change_pct >= 0 ? "delta-up" : "delta-down"}`}>
+              className={`dashboard-kpi-context metric-delta ${financeData.revenue_change_pct >= 0 ? "delta-up" : "delta-down"}`}>
               <svg
                 width="12"
                 height="12"
@@ -478,17 +482,17 @@ export default function Overview() {
               </span>
             </div>
           ) : (
-            <div className="metric-delta delta-neutral">
+            <div className="metric-delta delta-neutral dashboard-kpi-context">
               <span>last 30 days</span>
             </div>
           )}
         </div>
 
-        <div className="card metric-card">
-          <div className="card-header">
-            <span className="card-title">
-              {loading ? "Loading..." : "Net Margin"}
-            </span>
+        <div className="card metric-card dashboard-kpi-card">
+          <div className="card-header dashboard-kpi-label">
+            <span className="card-title dashboard-kpi-label"><span className="dashboard-metric-label-content"><DashboardMetricIcon kind="percent" /><span className="dashboard-metric-label-text">
+              {loading ? "Loading..." : "Net margin"}
+            </span></span></span>
             <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 className="card-action"
@@ -499,7 +503,7 @@ export default function Overview() {
                 <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 200, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
                   {CARD_MENUS.margin.map(item => (
                     <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
-                      style={{ padding: "9px 14px", fontSize: 12, fontFamily: "var(--font-mono)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
+                      style={{ padding: "9px 14px", fontSize: 13, lineHeight: "20px", fontFamily: "var(--font-sans)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
                       onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
                       onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
                       {item.label}
@@ -510,7 +514,7 @@ export default function Overview() {
             </div>
           </div>
           <div
-            className="metric-value"
+            className="metric-value dashboard-kpi-value"
             style={{ color: "var(--accent-primary)" }}>
             {loading
               ? "..."
@@ -518,7 +522,7 @@ export default function Overview() {
           </div>
           {typeof financeData?.margin_change_pts === "number" ? (
             <div
-              className={`metric-delta ${financeData.margin_change_pts >= 0 ? "delta-up" : "delta-down"}`}>
+              className={`dashboard-kpi-context metric-delta ${financeData.margin_change_pts >= 0 ? "delta-up" : "delta-down"}`}>
               <svg
                 width="12"
                 height="12"
@@ -540,17 +544,17 @@ export default function Overview() {
               </span>
             </div>
           ) : (
-            <div className="metric-delta delta-neutral">
+            <div className="metric-delta delta-neutral dashboard-kpi-context">
               <span>last 30 days</span>
             </div>
           )}
         </div>
 
-        <div className="card metric-card">
-          <div className="card-header">
-            <span className="card-title">
+        <div className="card metric-card dashboard-kpi-card">
+          <div className="card-header dashboard-kpi-label">
+            <span className="card-title dashboard-kpi-label"><span className="dashboard-metric-label-content"><DashboardMetricIcon kind="overdue" /><span className="dashboard-metric-label-text">
               {loading ? "Loading..." : "Outstanding"}
-            </span>
+            </span></span></span>
             <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 className="card-action"
@@ -561,7 +565,7 @@ export default function Overview() {
                 <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 220, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
                   {CARD_MENUS.outstanding.map(item => (
                     <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
-                      style={{ padding: "9px 14px", fontSize: 12, fontFamily: "var(--font-mono)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
+                      style={{ padding: "9px 14px", fontSize: 13, lineHeight: "20px", fontFamily: "var(--font-sans)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
                       onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
                       onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
                       {item.label}
@@ -572,13 +576,13 @@ export default function Overview() {
             </div>
           </div>
           <div
-            className="metric-value"
+            className="metric-value dashboard-kpi-value"
             style={{ color: "var(--status-warning)" }}>
             {loading
               ? "..."
               : formatCurrency(financeData?.outstanding_invoices_total || 0)}
           </div>
-          <div className="metric-delta delta-neutral">
+          <div className="metric-delta delta-neutral dashboard-kpi-context">
             <span>
               DSO: {loading ? "—" : Math.round(financeData?.dso || 0)} days
             </span>
@@ -589,13 +593,13 @@ export default function Overview() {
         <div className="card chart-card">
           <div className="card-header">
             <span className="card-title">
-              Revenue vs Fuel Cost (Last 30 Days)
+              Revenue vs fuel cost (last 30 days)
             </span>
             <div
               style={{
                 display: "flex",
                 gap: 12,
-                fontSize: 10,
+                fontSize: 13, lineHeight: "20px",
                 color: "var(--text-secondary)",
               }}>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -689,8 +693,8 @@ export default function Overview() {
                     display: "flex",
                     justifyContent: "space-between",
                     marginTop: 4,
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 10,
+                    fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
+                    fontSize: 13, lineHeight: "20px",
                     color: "var(--text-tertiary)",
                   }}>
                   {labels.slice(-4).map((l: string, i: number) => (
@@ -705,11 +709,11 @@ export default function Overview() {
               display: "flex",
               gap: 20,
               marginTop: 8,
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
+              fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
+              fontSize: 13, lineHeight: "20px",
             }}>
             <span>
-              Net Margin{" "}
+              Net margin{" "}
               <span style={{ color: "var(--accent-primary)" }}>
                 {financeData?.net_margin_percent != null
                   ? `${(financeData.net_margin_percent || 0).toFixed(1)}%`
@@ -736,7 +740,7 @@ export default function Overview() {
         {/* Utilization card */}
         <div className="card utilization-card">
           <div className="card-header">
-            <span className="card-title">Fleet Utilization (Last 28 Days)</span>
+            <span className="card-title">Fleet utilization (last 28 days)</span>
           </div>
           <div
             style={{
@@ -758,7 +762,7 @@ export default function Overview() {
               </div>
               <div
                 style={{
-                  fontSize: 11,
+                  fontSize: 13, lineHeight: "20px",
                   color: "var(--text-secondary)",
                   marginTop: 2,
                 }}>
@@ -766,15 +770,15 @@ export default function Overview() {
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                Active Loads
+              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)" }}>
+                Active loads
               </div>
               <div
                 style={{
                   fontSize: 18,
                   fontWeight: 600,
                   color: "var(--accent-primary)",
-                  fontFamily: "var(--font-mono)",
+                  fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
                 }}>
                 {activeLoadsCount}
               </div>
@@ -794,7 +798,7 @@ export default function Overview() {
           <div
             style={{
               marginTop: 12,
-              fontSize: 11,
+              fontSize: 13, lineHeight: "20px",
               color: "var(--text-tertiary)",
             }}>
             {data
@@ -803,10 +807,10 @@ export default function Overview() {
           </div>
         </div>
 
-        {/* Recent Quotes */}
+        {/* Recent quotes */}
         <div className="card table-card">
           <div className="card-header">
-            <span className="card-title">Recent Quotes</span>
+            <span className="card-title">Recent quotes</span>
             <button
               onClick={() => navigate("/bookings/quotes")}
               style={{
@@ -814,7 +818,7 @@ export default function Overview() {
                 border: "1px solid var(--border-subtle)",
                 color: "var(--text-secondary)",
                 padding: "4px 8px",
-                fontSize: 10,
+                fontSize: 13, lineHeight: "20px",
                 borderRadius: 2,
                 cursor: "pointer",
               }}>
@@ -856,15 +860,15 @@ export default function Overview() {
                     <td
                       style={{
                         color: "var(--accent-primary)",
-                        fontFamily: "var(--font-mono)",
+                        fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
                       }}>
                       {formatCurrency(parseFloat(quote.total_amount || "0"))}
                     </td>
                     <td>
                       <span
                         style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 10,
+                          fontFamily: "var(--font-sans)",
+                          fontSize: 13, lineHeight: "20px",
                           color:
                             quote.status === "ACCEPTED"
                               ? "var(--status-success)"
@@ -896,10 +900,10 @@ export default function Overview() {
           )}
         </div>
 
-        {/* Recent Bookings */}
+        {/* Recent bookings */}
         <div className="card table-card">
           <div className="card-header">
-            <span className="card-title">Recent Bookings</span>
+            <span className="card-title">Recent bookings</span>
             <button
               onClick={() => navigate("/bookings")}
               style={{
@@ -907,7 +911,7 @@ export default function Overview() {
                 border: "1px solid var(--border-subtle)",
                 color: "var(--text-secondary)",
                 padding: "4px 8px",
-                fontSize: 10,
+                fontSize: 13, lineHeight: "20px",
                 borderRadius: 2,
                 cursor: "pointer",
               }}>
@@ -955,8 +959,8 @@ export default function Overview() {
                     <td>
                       <span
                         style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 10,
+                          fontFamily: "var(--font-sans)",
+                          fontSize: 13, lineHeight: "20px",
                           color:
                             load.status === "DELIVERED"
                               ? "var(--status-success)"
@@ -988,10 +992,10 @@ export default function Overview() {
           )}
         </div>
 
-        {/* Recent Activity */}
+        {/* Recent activity */}
         <div className="card" style={{ padding: 20 }}>
           <div className="card-title" style={{ marginBottom: 16 }}>
-            Recent Activity
+            Recent activity
           </div>
           {activityLoading ? (
             <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
@@ -1023,7 +1027,7 @@ export default function Overview() {
                   </div>
                   <div
                     style={{
-                      fontSize: 11,
+                      fontSize: 13, lineHeight: "20px",
                       color: "var(--text-tertiary)",
                       whiteSpace: "nowrap",
                       marginLeft: 16,
@@ -1044,7 +1048,7 @@ export default function Overview() {
       <div className="card" style={{ padding: 0, background: "var(--bg-sidebar)" }}>
         <div className="agent-header">
           <div className="live-dot" />
-          Agent Activity Stream
+          Agent activity stream
         </div>
         <div className="agent-feed">
           {loading ? (
@@ -1062,9 +1066,9 @@ export default function Overview() {
                           ? "var(--accent-primary)"
                           : "inherit",
                     }}>
-                    {insight.category?.toUpperCase() || "INSIGHT"}
+                    {insight.category || "Insight"}
                   </span>
-                  <span>{insight.time_ago || "NOW"}</span>
+                  <span>{insight.time_ago || "Now"}</span>
                 </div>
                 <div className="feed-content">
                   <span className="highlight-text">
@@ -1081,7 +1085,7 @@ export default function Overview() {
             // returned "no such record". Show nothing invented instead.
             <div className="feed-item">
               <div className="feed-meta">
-                <span>AGENT</span>
+                <span>Agent</span>
                 <span>—</span>
               </div>
               <div className="feed-content">
@@ -1091,7 +1095,7 @@ export default function Overview() {
                   className="btn-action"
                   style={{ marginTop: 10 }}
                   onClick={() => navigate("/copilot")}>
-                  ASK COPILOT
+                  Ask Copilot
                 </button>
               </div>
             </div>

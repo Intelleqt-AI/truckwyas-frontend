@@ -134,7 +134,7 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
                 ))}
               </select>
               {vehicles.length === 0 && (
-                <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>
+                <div style={{ fontSize: 11, color: 'var(--status-warning-text, var(--status-warning))', marginTop: 5 }}>
                   {vehicleType
                     ? `No available ${vehicleType} vehicles — check the Fleet page.`
                     : 'No available vehicles — check the Fleet page.'}
@@ -153,14 +153,14 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
                 ))}
               </select>
               {drivers.length === 0 && (
-                <div style={{ fontSize: 11, color: 'var(--status-warning)', marginTop: 5 }}>
+                <div style={{ fontSize: 11, color: 'var(--status-warning-text, var(--status-warning))', marginTop: 5 }}>
                   No available drivers — check the Fleet page.
                 </div>
               )}
             </div>
 
             {driverWithoutVehicle && (
-              <div style={{ fontSize: 11, color: 'var(--status-warning)', marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: 'var(--status-warning-text, var(--status-warning))', marginBottom: 12 }}>
                 A driver needs a vehicle — select a vehicle too, or clear the driver.
               </div>
             )}

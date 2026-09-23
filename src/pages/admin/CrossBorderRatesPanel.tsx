@@ -1,3 +1,4 @@
+import '@/pages/admin/admin-brand.css';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
@@ -15,25 +16,27 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 // immediately, same reasoning as the Truck Types page.
 
 const cardStyle: React.CSSProperties = { padding: 20, marginBottom: 20 };
-const sectionTitleStyle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 };
+const sectionTitleStyle: React.CSSProperties = { fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 };
 const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 12px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-subtle)',
+  textAlign: 'left', padding: '8px 12px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)',
+  borderBottom: '1px solid var(--border-subtle)',
 };
 const tdStyle: React.CSSProperties = {
-  padding: '10px 12px', fontSize: 12.5, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
-  padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 2, fontSize: 10.5, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', cursor: 'pointer',
+  padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
+  borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer',
 };
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', marginBottom: 6, textTransform: 'uppercase',
+  display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', marginBottom: 6,
 };
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', width: '100%', boxSizing: 'border-box',
+  padding: '8px 12px', borderRadius: 6, minHeight: 40, fontSize: 14, lineHeight: '20px',
+  fontFamily: 'var(--font-sans)', width: '100%', boxSizing: 'border-box',
 };
 
 interface BorderFee {
@@ -349,8 +352,8 @@ export default function CrossBorderRatesPanel() {
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Fee (R)</label><input type="number" style={inputStyle} value={editFeeForm.fee_zar} onChange={e => setEditFeeForm(p => ({ ...p, fee_zar: e.target.value }))} /></div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Notes</label><input style={inputStyle} value={editFeeForm.notes} onChange={e => setEditFeeForm(p => ({ ...p, notes: e.target.value }))} /></div>
             <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-              <button disabled={feeSaving} onClick={handleEditFeeSave} style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: feeSaving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase' }}>{feeSaving ? 'Saving…' : 'Save Changes'}</button>
-              <button onClick={() => setEditFee(null)} style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase' }}>Cancel</button>
+              <button disabled={feeSaving} onClick={handleEditFeeSave} style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: feeSaving ? 'wait' : 'pointer', fontWeight: 500 }}>{feeSaving ? 'Saving…' : 'Save changes'}</button>
+              <button onClick={() => setEditFee(null)} style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -370,8 +373,8 @@ export default function CrossBorderRatesPanel() {
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Toll Rate (R/km)</label><input type="number" style={inputStyle} value={editRateForm.toll_rate_per_km} onChange={e => setEditRateForm(p => ({ ...p, toll_rate_per_km: e.target.value }))} /></div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Border Distance (km)</label><input type="number" style={inputStyle} value={editRateForm.sa_border_distance_km} onChange={e => setEditRateForm(p => ({ ...p, sa_border_distance_km: e.target.value }))} /></div>
             <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-              <button disabled={rateSaving} onClick={handleEditRateSave} style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: rateSaving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase' }}>{rateSaving ? 'Saving…' : 'Save Changes'}</button>
-              <button onClick={() => setEditRate(null)} style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase' }}>Cancel</button>
+              <button disabled={rateSaving} onClick={handleEditRateSave} style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: rateSaving ? 'wait' : 'pointer', fontWeight: 500 }}>{rateSaving ? 'Saving…' : 'Save changes'}</button>
+              <button onClick={() => setEditRate(null)} style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>
         </div>

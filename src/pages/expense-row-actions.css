@@ -1,0 +1,78 @@
+/* Compact expense row actions: one icon trigger sized for real targets,
+   with the approve/reject/edit/delete actions in a menu. */
+.expense-row-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+.expense-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Icon-only control: 44px minimum target per brand guidelines. */
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.expense-menu-trigger:hover {
+  background: var(--bg-surface-hover);
+}
+.expense-menu-trigger:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+.expense-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 100;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  min-width: 180px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.expense-menu-item {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: normal;
+  text-transform: none;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.expense-menu-item:last-child {
+  border-bottom: none;
+}
+.expense-menu-item:hover,
+.expense-menu-item:focus-visible {
+  background: var(--bg-surface-hover);
+}
+.expense-menu-item:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+@media (max-width: 767px), (pointer: coarse) {
+  .expense-menu-trigger {
+    min-width: 48px;
+    min-height: 48px;
+  }
+  .expense-menu-item {
+    min-height: 48px;
+  }
+}

@@ -199,7 +199,7 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
         {TEXT_FIELDS.filter(f => f.required).map(f => (
           <div key={f.key} style={{ marginBottom: 16 }}>
             <label style={labelStyle}>
-              {f.label}{f.required && <span style={{ color: 'var(--status-danger)' }}> *</span>}
+              {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
             </label>
             <input
               type={f.type || 'text'}
@@ -213,7 +213,7 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
 
         <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>
-            Vehicle Type<span style={{ color: 'var(--status-danger)' }}> *</span>
+            Vehicle Type<span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>
           </label>
           <Select value={form.type ?? ''} onValueChange={handleTypeChange}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -225,7 +225,7 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
 
         <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>
-            Capacity (ton)<span style={{ color: 'var(--status-danger)' }}> *</span>
+            Capacity (ton)<span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>
           </label>
           <input
             type="number"
@@ -240,7 +240,7 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
           <div key={f.key} style={{ marginBottom: 16 }}>
             <label style={labelStyle}>{f.label}</label>
             {f.type === 'date' ? (
-              <DatePicker
+              <DatePicker dashboard
                 value={form[f.key] ?? ''}
                 onChange={val => set(f.key, val)}
               />

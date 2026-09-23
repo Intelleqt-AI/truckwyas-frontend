@@ -1,4 +1,5 @@
 import '@/pages/table-heading-roles.css';
+import '@/pages/admin/admin-brand.css';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { Loader } from '@/components/Loader';
@@ -7,11 +8,13 @@ import { Loader } from '@/components/Loader';
 // integration — a quick "who's on Xero / CtrlFleet" for support, not a
 // per-company detail view.
 
-const cardStyle: React.CSSProperties = { padding: 20 };
-const sectionTitleStyle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 };
+const cardStyle: React.CSSProperties = { padding: 24 };
+const sectionTitleStyle: React.CSSProperties = {
+  fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16,
+};
 const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
-  padding: '10px 12px', fontSize: 12.5, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 
 const fmt = (dateStr?: string | null) =>
@@ -33,15 +36,15 @@ function IntegrationTable({ title, count, companies, dateKey }: {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <h3 style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', margin: 0 }}>
           {title}
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{count}</div>
+        </h3>
+        <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{count}</div>
       </div>
       {companies.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)' }}>No companies connected.</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No companies connected.</div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
+        <div className="admin-scroll-region" role="region" aria-label={`${title} connected companies`} tabIndex={0} style={{ overflowX: 'auto' }}>
           <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -72,7 +75,7 @@ export default function IntegrationsPanel() {
 
   return (
     <div className="card" style={cardStyle}>
-      <div style={sectionTitleStyle}>Integrations</div>
+      <h2 style={sectionTitleStyle}>Integrations</h2>
       {isLoading ? (
         <Loader size={24} />
       ) : (

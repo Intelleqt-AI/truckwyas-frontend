@@ -1,0 +1,6 @@
+const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const cp=require('node:child_process');const path=require('node:path');const ts=require('typescript');
+const root=path.resolve(__dirname,'..');const file='src/pages/Insights.tsx';const baseline=cp.execFileSync('git',['show','594b64c:'+file],{cwd:root,encoding:'utf8'});const source=process.env.BASELINE?baseline:fs.readFileSync(path.join(root,file),'utf8');
+const disclosure='<p style={{ fontSize: 13, lineHeight: \'20px\', color: \'var(--text-secondary)\' }}>Percentages show revenue less the recorded fuel surcharge. All other costs are excluded; this is not net margin.</p>';
+test('both percentage sections disclose excluded costs',()=>assert.equal(source.split(disclosure).length-1,2));
+test('lane column names actual subtraction',()=>assert.ok(source.includes("['Route', 'Trips', 'Revenue', 'Rev/km', 'After fuel (%)']")));
+test('entire component is unchanged after reversing only copy additions',()=>{const restored=source.replaceAll('\n                '+disclosure,'').replace("['Route', 'Trips', 'Revenue', 'Rev/km', 'After fuel (%)']","['Route', 'Trips', 'Revenue', 'Rev/km', 'Margin']");assert.equal(restored,baseline);});

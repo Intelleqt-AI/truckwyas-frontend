@@ -1,0 +1,31 @@
+/* Header notification presentation only; feed/read/navigation behavior is unchanged. */
+@media (min-width: 768px) {
+  .os-app-shell .dashboard-notifications {
+    --note-font: var(--font-sans); --note-line: 20px; --note-tracking: normal; --note-case: none;
+    --note-title-size: 16px; --note-body-size: 14px; --note-support-size: 13px;
+    --note-label-weight: 500; --note-unread-weight: 500; --note-read-weight: 400;
+    --note-trigger-padding: 8px; --note-count-size: 20px; --note-count-padding: 0 4px;
+    --note-panel-top: calc(100% + 12px); --note-panel-radius: 8px;
+    --note-header-padding: 16px 24px; --note-empty-padding: 32px 24px;
+    --note-row-padding: 16px 24px; --note-row-gap: 12px; --note-copy-gap: 4px;
+    --note-dot-size: 8px; --note-dot-offset: 4px;
+    --note-danger-surface: #321919; --note-danger-text: #FCA5A5;
+    --note-unread-surface: #152A45;
+    font: 400 14px/20px var(--font-sans);
+  }
+  [data-theme="light"] .os-app-shell:not([data-theme]) .dashboard-notifications,
+  .os-app-shell[data-theme="light"] .dashboard-notifications {
+    --note-danger-surface: #FEF2F2; --note-danger-text: #B91C1C;
+    --note-unread-surface: #EFF6FF;
+  }
+  .os-app-shell .dashboard-notification-trigger { min-width: 44px; min-height: 44px; border-radius: 6px; }
+  .os-app-shell .dashboard-notification-icon { width: 24px; height: 24px; }
+  .os-app-shell .dashboard-notification-count { font-variant-numeric: tabular-nums; }
+  .os-app-shell .dashboard-notification-header { gap: 12px; flex-wrap: wrap; flex-shrink: 0; }
+  .os-app-shell .dashboard-notification-title { font: 600 16px/24px var(--font-sans); letter-spacing: normal; }
+  .os-app-shell .dashboard-notification-mark-read { min-height: 40px; padding: 8px 0; border-radius: 6px; font-weight: 500; line-height: 20px; }
+  .os-app-shell .dashboard-notification-list { min-height: 0; }
+  .os-app-shell .dashboard-notification-row { overflow-wrap: anywhere; }
+  .os-app-shell .dashboard-notification-trigger:focus-visible,
+  .os-app-shell .dashboard-notification-mark-read:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+}

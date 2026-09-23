@@ -1,3 +1,4 @@
+import '@/pages/table-heading-roles.css';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -50,11 +51,11 @@ const components = {
   hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '10px 0' }} />,
   table: ({ children }: any) => (
     <div style={{ overflowX: 'auto', margin: '0 0 8px' }}>
-      <table style={{ borderCollapse: 'collapse', border: '1px solid var(--border-subtle)', fontSize: 12.5 }}>{children}</table>
+      <table className="table-heading-roles" style={{ borderCollapse: 'collapse', border: '1px solid var(--border-subtle)', fontSize: 12.5 }}>{children}</table>
     </div>
   ),
   th: ({ children }: any) => (
-    <th style={{ ...cellStyle, fontFamily: 'var(--font-mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)', background: 'var(--bg-base)', fontWeight: 600 }}>
+    <th style={{ ...cellStyle, fontSize: undefined, background: 'var(--bg-base)' }}>
       {children}
     </th>
   ),

@@ -841,10 +841,12 @@ body {
   border: none;
   padding: 8px 16px;
   border-radius: 2px;
-  font-size: 11px;
-  font-family: var(--font-mono);
-  letter-spacing: 0.05em;
-  font-weight: 600;
+  font-size: 14px;
+  line-height: 20px;
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+  text-transform: none;
+  font-weight: 500;
   cursor: pointer;
   width: fit-content;
   min-width: 120px;
@@ -1046,4 +1048,50 @@ body {
 .theme-toggle:hover {
   color: var(--text-primary);
   border-color: var(--border-active);
+}
+
+/* Authenticated dashboard text roles. Public/auth defaults remain unchanged.
+   Explicit page-level and inline roles take precedence and are reviewed separately. */
+.os-app-shell {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: normal;
+}
+
+.os-app-shell .card-title {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.os-app-shell .metric-card .card-title,
+.os-app-shell .ui-label {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.os-app-shell .metric-value {
+  font-family: var(--font-sans);
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+}
+
+.os-app-shell .metric-delta {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
 }

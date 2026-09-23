@@ -1,3 +1,4 @@
+import './quote-detail-responsive.css';
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -263,9 +264,17 @@ export default function QuoteDetail() {
     fontFamily: 'var(--font-sans)',
   };
 
+  const fieldLabelStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px',
+    fontWeight: 500, letterSpacing: 'normal', color: 'var(--text-secondary)',
+  };
+  const sectionHeadingStyle: React.CSSProperties = {
+    margin: 0, fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px',
+    fontWeight: 600, letterSpacing: 'normal', color: 'var(--text-primary)',
+  };
   const label = (text: string) => (
-    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>
-      {text.toUpperCase()}
+    <div style={{ ...fieldLabelStyle, marginBottom: 6 }}>
+      {text}
     </div>
   );
 
@@ -288,12 +297,12 @@ export default function QuoteDetail() {
         >
           ← Back to quotes
         </button>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
-          Quote Detail
+        <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>
+          Quote detail
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{quote.quote_number}</div>
+            <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>{quote.quote_number}</h1>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{quote.customer_name}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -338,38 +347,38 @@ export default function QuoteDetail() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
+      <div className="quote-detail-grid">
         {/* LEFT — Quote Details */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Customer */}
           <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 14 }}>Customer</div>
+            <h2 style={{ ...sectionHeadingStyle, marginBottom: 14 }}>Customer</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>NAME</div>
+                <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Name</div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{quote.customer_name || '—'}</div>
               </div>
               {quote.customer_company && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>COMPANY</div>
+                  <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Company</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_company}</div>
                 </div>
               )}
               {quote.customer_email && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>EMAIL</div>
+                  <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Email</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_email}</div>
                 </div>
               )}
               {quote.customer_phone && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>PHONE</div>
+                  <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Phone</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_phone}</div>
                 </div>
               )}
               {quote.customer_city && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>CITY</div>
+                  <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>City</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_city}</div>
                 </div>
               )}
@@ -379,9 +388,9 @@ export default function QuoteDetail() {
           {/* Route */}
           <div className="card" style={{ padding: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <div className="card-title" style={{ marginBottom: 0 }}>
-                {quote.trip_type === 'ROUND_TRIP' ? 'Leg 1 — Outbound Route' : 'Route'}
-              </div>
+              <h2 style={{ ...sectionHeadingStyle, marginBottom: 0 }}>
+                {quote.trip_type === 'ROUND_TRIP' ? 'Leg 1 — Outbound route' : 'Route'}
+              </h2>
               {quote.trip_type === 'ROUND_TRIP' && (
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 4, fontWeight: 500, whiteSpace: 'nowrap', display: 'inline-block' }}>
                   Round trip
@@ -390,13 +399,13 @@ export default function QuoteDetail() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                {label('Pickup Location')}
+                {label('Pickup location')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.pickup_location || '—'}</div>
               </div>
 
               {Array.isArray(quote.stops) && quote.stops.map((s: { location: string }, i: number) => (
                 <div key={i} style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16 }}>
-                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 2 }}>
+                  <div style={{ ...fieldLabelStyle, marginBottom: 2 }}>
                     Stop {i + 1}
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{s.location}</div>
@@ -404,7 +413,7 @@ export default function QuoteDetail() {
               ))}
 
               <div>
-                {label('Delivery Location')}
+                {label('Delivery location')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
               </div>
             </div>
@@ -428,27 +437,27 @@ export default function QuoteDetail() {
           {/* Return Leg — visible only for ROUND_TRIP quotes */}
           {quote.trip_type === 'ROUND_TRIP' && (
             <div className="card" style={{ padding: 20, border: '1px solid var(--accent-primary)', borderLeft: '3px solid var(--accent-primary)' }}>
-              <div className="card-title" style={{ marginBottom: 16, color: 'var(--accent-primary)' }}>
-                Leg 2 — Return Route
-              </div>
+              <h2 style={{ ...sectionHeadingStyle, marginBottom: 16, color: 'var(--accent-primary)' }}>
+                Leg 2 — Return route
+              </h2>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  {label('Returns From')}
+                  {label('Returns from')}
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
                 </div>
                 <div>
-                  {label('Return Destination')}
+                  {label('Return destination')}
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.return_location || '—'}</div>
                 </div>
                 <div>
-                  {label('Return Cargo')}
+                  {label('Return cargo')}
                   <div style={{ fontSize: 13, color: quote.return_cargo ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
                     {quote.return_cargo || 'Empty return'}
                   </div>
                 </div>
                 {quote.return_date && (
                   <div>
-                    {label('Return Date')}
+                    {label('Return date')}
                     <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
                       {new Date(quote.return_date).toLocaleDateString('en-ZA')}
                     </div>
@@ -456,7 +465,7 @@ export default function QuoteDetail() {
                 )}
                 {quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
                   <div>
-                    {label('Return Rate')}
+                    {label('Return rate')}
                     <div style={{ fontSize: 13, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                       {formatCurrency(parseFloat(quote.return_base_rate))}
                     </div>
@@ -464,7 +473,7 @@ export default function QuoteDetail() {
                 )}
                 {quote.return_notes && (
                   <div style={{ gridColumn: '1 / -1' }}>
-                    {label('Return Notes')}
+                    {label('Return notes')}
                     <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{quote.return_notes}</div>
                   </div>
                 )}
@@ -474,14 +483,14 @@ export default function QuoteDetail() {
 
           {/* Cargo Details */}
           <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 16 }}>Cargo Details</div>
+            <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Cargo details</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 {label('Description')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.cargo_description || '—'}</div>
               </div>
               <div>
-                {label('Vehicle Type')}
+                {label('Vehicle type')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.vehicle_type || '—'}</div>
               </div>
               <div>
@@ -494,13 +503,13 @@ export default function QuoteDetail() {
               </div>
               {quote.vehicle_display && (
                 <div>
-                  {label('Assigned Vehicle')}
+                  {label('Assigned vehicle')}
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.vehicle_display}</div>
                 </div>
               )}
               {quote.driver_display && (
                 <div>
-                  {label('Assigned Driver')}
+                  {label('Assigned driver')}
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.driver_display}</div>
                 </div>
               )}
@@ -509,7 +518,7 @@ export default function QuoteDetail() {
 
           {/* Cost Breakdown */}
           <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 16 }}>Cost Breakdown</div>
+            <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Cost breakdown</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {(() => {
                 const fuel = parseFloat(quote.fuel_surcharge || '0');
@@ -565,7 +574,7 @@ export default function QuoteDetail() {
           {/* Notes */}
           {quote.notes && (
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 12 }}>Notes</div>
+              <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Notes</h2>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{quote.notes}</div>
             </div>
           )}
@@ -575,10 +584,10 @@ export default function QuoteDetail() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Metadata */}
           <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 12 }}>Quote Info</div>
+            <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Quote info</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                {label('Quote Number')}
+                {label('Quote number')}
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>{quote.quote_number}</div>
               </div>
               <div>
@@ -622,7 +631,7 @@ export default function QuoteDetail() {
               </div>
               {quote.valid_until && (
                 <div>
-                  {label('Valid Until')}
+                  {label('Valid until')}
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                     {new Date(quote.valid_until).toLocaleDateString('en-ZA')}
                     {new Date(quote.valid_until).getTime() - Date.now() < 48 * 60 * 60 * 1000 && (
@@ -647,7 +656,7 @@ export default function QuoteDetail() {
           {/* UPGRADE 3: Win Probability Display */}
           {quote.win_probability && (quote.status === 'DRAFT' || quote.status === 'SENT') && (
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 12 }}>Win Probability</div>
+              <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Win probability</h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                 <div style={{ flex: 1, height: 8, background: 'var(--bg-deep)', borderRadius: 4, overflow: 'hidden' }}>
                   <div style={{
@@ -672,7 +681,7 @@ export default function QuoteDetail() {
           {/* UPGRADE 1: Outcome Buttons */}
           {(quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome && (
             <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 12 }}>Mark Outcome</div>
+              <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Mark outcome</h2>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={() => {
@@ -701,7 +710,7 @@ export default function QuoteDetail() {
 
           {/* Actions */}
           <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 12 }}>Actions</div>
+            <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Actions</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button
                 className="btn-action"
@@ -910,7 +919,7 @@ export default function QuoteDetail() {
 
             {outcomeType === 'accepted' && (
               <div style={{ marginBottom: 16 }}>
-                {label('Final Price Agreed (Optional)')}
+                {label('Final price agreed (optional)')}
                 <input
                   type="number"
                   value={finalPrice}
@@ -926,7 +935,7 @@ export default function QuoteDetail() {
 
             {outcomeType === 'rejected' && (
               <div style={{ marginBottom: 16 }}>
-                {label('Rejection Reason')}
+                {label('Rejection reason')}
                 <Select value={rejectionReason} onValueChange={setRejectionReason}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select reason..." />

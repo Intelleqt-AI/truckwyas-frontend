@@ -1,0 +1,11 @@
+/* Keep the quote and its actions visible without changing their order or behavior. */
+.quote-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+}
+.quote-detail-grid > * { min-width: 0; }
+.quote-detail-grid .card { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .quote-detail-grid { grid-template-columns: minmax(0, 1fr); }
+}

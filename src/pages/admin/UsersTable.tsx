@@ -1,3 +1,4 @@
+import '@/pages/table-heading-roles.css';
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData } from '@/lib/Api';
@@ -25,10 +26,7 @@ const selectStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
   padding: '8px 10px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', cursor: 'pointer',
 };
-const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 12px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-subtle)',
-};
+const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
   padding: '10px 12px', fontSize: 12.5, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
@@ -242,7 +240,7 @@ export default function UsersTable() {
         <Loader size={24} />
       ) : (
         <div style={{ overflowX: 'auto', opacity: isFetching ? 0.7 : 1 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Name</th>

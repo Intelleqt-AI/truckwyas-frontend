@@ -1,3 +1,4 @@
+import '@/pages/table-heading-roles.css';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { Loader } from '@/components/Loader';
@@ -8,10 +9,7 @@ import { Loader } from '@/components/Loader';
 
 const cardStyle: React.CSSProperties = { padding: 20 };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 };
-const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 12px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-subtle)',
-};
+const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
   padding: '10px 12px', fontSize: 12.5, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
@@ -44,7 +42,7 @@ function IntegrationTable({ title, count, companies, dateKey }: {
         <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)' }}>No companies connected.</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Company</th>

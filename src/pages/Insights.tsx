@@ -827,6 +827,7 @@ export default function Insights() {
               {/* SECTION 2: ROUTE PROFITABILITY RANKING */}
               <div>
                 <SectionHeader>ROUTE EFFICIENCY RANKING — Revenue per km driven</SectionHeader>
+                <p style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Percentages show revenue less the recorded fuel surcharge. All other costs are excluded; this is not net margin.</p>
                 <div className="card" style={{ padding: 20 }}>
                   {(() => {
                     const routeMap = new Map<string, {
@@ -1736,6 +1737,7 @@ export default function Insights() {
               {/* SECTION 1: CORRIDOR EFFICIENCY */}
               <div>
                 <SectionHeader>CORRIDOR EFFICIENCY — Revenue per km driven</SectionHeader>
+                <p style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Percentages show revenue less the recorded fuel surcharge. All other costs are excluded; this is not net margin.</p>
                 <div className="card" style={{ padding: 20 }}>
                   {(() => {
                     const routeMap = new Map<string, { trips: number; total_revenue: number; total_distance: number; total_fuel: number }>();
@@ -1765,7 +1767,7 @@ export default function Insights() {
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         {/* Header row */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 80px 80px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>
-                          {['Route', 'Trips', 'Revenue', 'Rev/km', 'Margin'].map(h => (
+                          {['Route', 'Trips', 'Revenue', 'Rev/km', 'After fuel (%)'].map(h => (
                             <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
                           ))}
                         </div>

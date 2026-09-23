@@ -20,10 +20,12 @@ const sectionHeaderStyle: React.CSSProperties = {
 };
 
 const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.08em',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 16,
+  lineHeight: '24px',
+  textTransform: 'none' as const,
+  letterSpacing: 'normal',
+  margin: 0,
   color: 'var(--text-secondary)',
   fontWeight: 600,
 };
@@ -182,7 +184,7 @@ export function NotificationSettings() {
       {/* Email */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>Email Notifications</span>
+          <h2 style={sectionTitleStyle}>Email notifications</h2>
         </div>
         <div style={sectionBodyStyle}>
           <ToggleRow label="Quote activity" description="New quotes, updates, and expirations" checked={settings.email.quotes} onChange={v => setChannel('email', 'quotes', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
@@ -196,7 +198,7 @@ export function NotificationSettings() {
       {/* Push */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>Push Notifications</span>
+          <h2 style={sectionTitleStyle}>Push notifications</h2>
         </div>
         <div style={sectionBodyStyle}>
           <ToggleRow label="New bookings" checked={settings.push.new_bookings} onChange={v => setChannel('push', 'new_bookings', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
@@ -212,7 +214,7 @@ export function NotificationSettings() {
       {/* SMS — no provider wired up yet; visible but disabled */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>SMS Notifications</span>
+          <h2 style={sectionTitleStyle}>SMS notifications</h2>
           <span style={{
             fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase' as const,
             letterSpacing: '0.08em', color: 'var(--text-tertiary)',

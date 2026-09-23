@@ -13,10 +13,12 @@ const cardStyle: React.CSSProperties = {
 };
 
 const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.08em',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 16,
+  lineHeight: '24px',
+  textTransform: 'none' as const,
+  letterSpacing: 'normal',
+  margin: 0,
   color: 'var(--text-secondary)',
   fontWeight: 600,
   marginBottom: 16,
@@ -864,7 +866,7 @@ export function IntegrationsSettings() {
       {/* Partner API Keys Card */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={sectionTitleStyle}>Partner API Keys</div>
+          <h2 style={sectionTitleStyle}>Partner API keys</h2>
           <button
             onClick={() => setShowAddKey(!showAddKey)}
             disabled={isDemo}
@@ -955,7 +957,7 @@ export function IntegrationsSettings() {
       {/* Webhook Manager Card */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={sectionTitleStyle}>Webhooks</div>
+          <h2 style={sectionTitleStyle}>Webhooks</h2>
           <button
             onClick={() => setShowAddWebhook(!showAddWebhook)}
             disabled={isDemo}

@@ -368,7 +368,7 @@ export default function FleetImport() {
                         {Object.keys(previewData[0]).map((header) => (
                           <th
                             key={header}
-                            className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase"
+                            className="px-4 py-3 text-left font-sans text-[13px] leading-5 font-medium tracking-normal text-muted-foreground"
                           >
                             {header}
                           </th>

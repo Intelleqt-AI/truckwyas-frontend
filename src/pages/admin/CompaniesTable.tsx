@@ -1,3 +1,4 @@
+import '@/pages/table-heading-roles.css';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData } from '@/lib/Api';
@@ -102,10 +103,7 @@ const selectStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
   padding: '8px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none',
 };
-const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 12px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-subtle)',
-};
+const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
   padding: '10px 12px', fontSize: 12.5, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
@@ -193,12 +191,12 @@ export function CompaniesTable() {
 
       {isLoading ? <Loader size={24} /> : (
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Company</th>
                 <th style={thStyle}>Status</th>
-                <th style={thStyle}>Next Billing</th>
+                <th style={thStyle}>Next billing</th>
                 <th style={thStyle}>Users</th>
                 <th style={thStyle}>Quotes</th>
                 <th style={thStyle}>Orders</th>
@@ -476,7 +474,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
               <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>No charges recorded.</div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
                       <th style={thStyle}>Date</th>

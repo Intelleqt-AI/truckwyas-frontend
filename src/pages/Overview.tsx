@@ -78,11 +78,11 @@ async function loadOverview() {
   const vehicles = vehiclesData?.results || vehiclesData || [];
   const totalVehicles = vehicles.length;
   const activeVehicles =
-    fleetData?.active_vehicles ||
+    fleetData?.active_vehicles ??
     vehicles.filter(
-      (v: any) => v.status === "AVAILABLE" || v.status === "IN_USE",
-    ).length ||
-    0;
+      (v: any) => ["AVAILABLE", "IN_USE", "ACTIVE"].includes(v.status),
+    ).length;
+  const availableVehicles = vehicles.filter((v: any) => v.status === "AVAILABLE").length;
 
   // Generate heatmap data from last 28 days of load activity
   const heatmapData = new Array(28).fill(0);
@@ -113,6 +113,7 @@ async function loadOverview() {
     activeLoadsCount,
     totalVehicles,
     activeVehicles,
+    availableVehicles,
     activity,
     heatmapData,
   };
@@ -179,6 +180,7 @@ export default function Overview() {
   const activeLoadsCount = data?.activeLoadsCount ?? 0;
   const totalVehicles = data?.totalVehicles ?? 0;
   const activeVehicles = data?.activeVehicles ?? 0;
+  const availableVehicles = data?.availableVehicles ?? 0;
   const activity = data?.activity ?? [];
   const heatmapData = data?.heatmapData ?? [];
   const activityLoading = loading;
@@ -314,7 +316,7 @@ export default function Overview() {
                     warn: false,
                   },
                   {
-                    label: "Fleet ready",
+                    label: "Active vehicles",
                     value: `${activeVehicles}/${totalVehicles}`,
                     route: "/fleet",
                     warn: false,
@@ -377,60 +379,48 @@ export default function Overview() {
               flexWrap: "wrap",
             }}>
             <span className="card-title" style={{ marginRight: 4 }}>
-              Quick Actions
+              Quick actions
             </span>
             <button
               onClick={() => navigate("/finance/invoices/new")}
               className="btn-action"
               style={{
                 padding: "8px 16px",
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
               }}>
-              Create Invoice
+              Create invoice
             </button>
             <button
               onClick={() => navigate("/capital")}
               className="btn-action"
               style={{
                 padding: "8px 16px",
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
                 background: "transparent",
                 border: "1px solid var(--border-subtle)",
                 color: "var(--text-secondary)",
               }}>
-              Request Advance
+              Request advance
             </button>
             <button
               onClick={() => navigate("/finance/expenses")}
               className="btn-action"
               style={{
                 padding: "8px 16px",
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
                 background: "transparent",
                 border: "1px solid var(--border-subtle)",
                 color: "var(--text-secondary)",
               }}>
-              Add Expense
+              Add expense
             </button>
             <button
               onClick={() => navigate("/finance/reports")}
               className="btn-action"
               style={{
                 padding: "8px 16px",
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.05em",
                 background: "transparent",
                 border: "1px solid var(--border-subtle)",
                 color: "var(--text-secondary)",
               }}>
-              View Reports
+              View reports
             </button>
           </div>
         </div>
@@ -807,8 +797,8 @@ export default function Overview() {
               fontSize: 11,
               color: "var(--text-tertiary)",
             }}>
-            {totalVehicles > 0
-              ? `${totalVehicles - activeVehicles} vehicle${totalVehicles - activeVehicles !== 1 ? "s" : ""} available`
+            {data
+              ? `${availableVehicles} vehicle${availableVehicles !== 1 ? "s" : ""} available`
               : "Loading..."}
           </div>
         </div>

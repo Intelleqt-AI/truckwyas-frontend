@@ -1,3 +1,4 @@
+import './table-heading-roles.css';
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -226,15 +227,15 @@ export default function CustomerRisk() {
             No invoices for this customer yet.
           </div>
         ) : (
-          <table className="data-table">
+          <table className="data-table table-heading-roles">
             <thead>
               <tr>
                 <th>Invoice #</th>
-                <th>Invoice Date</th>
-                <th>Due Date</th>
-                <th>Payment Date</th>
-                <th>Days to Pay</th>
-                <th>Days Late</th>
+                <th>Invoice date</th>
+                <th>Due date</th>
+                <th>Payment date</th>
+                <th>Days to pay</th>
+                <th>Days late</th>
                 <th>Amount</th>
                 <th>Status</th>
               </tr>

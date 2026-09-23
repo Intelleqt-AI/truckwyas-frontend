@@ -33,15 +33,15 @@ const sectionStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 11, fontFamily: 'var(--font-mono)',
-  color: 'var(--text-tertiary)', letterSpacing: '0.06em',
-  marginBottom: 6, textTransform: 'uppercase',
+  display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)',
+  color: 'var(--text-tertiary)', letterSpacing: 'normal',
+  marginBottom: 6, textTransform: 'none',
 };
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
   color: 'var(--text-primary)', padding: '10px 12px', borderRadius: 2,
-  fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', boxSizing: 'border-box',
+  fontSize: 16, fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box',
 };
 
 export function CustomersDirectory() {
@@ -170,7 +170,7 @@ export function CustomersDirectory() {
               style={{
                 background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
                 borderRadius: 2, padding: '6px 10px', color: 'var(--text-primary)',
-                fontSize: 12, outline: 'none', width: 180,
+                fontSize: 16, fontFamily: 'var(--font-sans)', outline: 'none', width: 180,
               }}
             />
             <button
@@ -184,9 +184,9 @@ export function CustomersDirectory() {
               onClick={() => { setShowAdd(s => !s); setAddErr(''); }}
               disabled={isDemo && !showAdd}
               title={isDemo && !showAdd ? 'Not available in the demo' : undefined}
-              style={isDemo && !showAdd ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              style={{ fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', ...(isDemo && !showAdd ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
             >
-              {showAdd ? 'CLOSE' : '+ ADD CUSTOMER'}
+              {showAdd ? 'Close' : '+ Add customer'}
             </button>
           </div>
         </div>
@@ -209,7 +209,7 @@ export function CustomersDirectory() {
                   style={{
                     background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
                     borderRadius: 2, padding: '8px 10px', color: 'var(--text-primary)',
-                    fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box',
+                    fontSize: 16, fontFamily: 'var(--font-sans)', outline: 'none', width: '100%', boxSizing: 'border-box',
                   }}
                 />
               ))}
@@ -221,9 +221,9 @@ export function CustomersDirectory() {
                 onClick={handleAdd}
                 disabled={saving || isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
-                style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                style={{ fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
               >
-                {saving ? 'SAVING...' : 'SAVE CUSTOMER'}
+                {saving ? 'Saving...' : 'Save customer'}
               </button>
             </div>
           </div>
@@ -298,10 +298,10 @@ export function CustomersDirectory() {
                         style={{
                           background: 'none', border: '1px solid var(--border-subtle)',
                           color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
-                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
+                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
+                          letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1,
                         }}
-                      >EDIT</button>
+                      >Edit</button>
                       <button
                         onClick={() => setDeleteTarget({ id: c.id, name: c.name })}
                         disabled={isDemo}
@@ -309,10 +309,10 @@ export function CustomersDirectory() {
                         style={{
                           background: 'none', border: '1px solid var(--status-danger)',
                           color: 'var(--status-danger)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
-                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
+                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
+                          letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1,
                         }}
-                      >DELETE</button>
+                      >Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -324,7 +324,7 @@ export function CustomersDirectory() {
 
       {deleteTarget && (
         <ConfirmModal
-          title="Delete Customer"
+          title="Delete customer"
           message={`Are you sure you want to delete "${deleteTarget.name}"? This cannot be undone.`}
           confirmLabel="Delete"
           danger
@@ -339,7 +339,7 @@ export function CustomersDirectory() {
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditCustomer(null)} />
           <div style={{ position: 'relative', width: 420, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Customer</div>
+              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit customer</div>
               <button onClick={() => setEditCustomer(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {editErr && (
@@ -376,15 +376,15 @@ export function CustomersDirectory() {
                 disabled={editSaving || isDemo}
                 onClick={handleEditSave}
                 title={isDemo ? 'Not available in the demo' : undefined}
-                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: isDemo ? 'not-allowed' : editSaving ? 'wait' : 'pointer', fontWeight: 600, textTransform: 'uppercase', opacity: isDemo ? 0.5 : 1 }}
+                style={{ flex: 1, padding: '10px 0', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--bg-deep)', border: 'none', borderRadius: 2, cursor: isDemo ? 'not-allowed' : editSaving ? 'wait' : 'pointer', fontWeight: 500, textTransform: 'none', opacity: isDemo ? 0.5 : 1 }}
               >
-                {editSaving ? 'SAVING...' : 'SAVE CHANGES'}
+                {editSaving ? 'Saving...' : 'Save changes'}
               </button>
               <button
                 onClick={() => setEditCustomer(null)}
-                style={{ padding: '10px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase' }}
+                style={{ padding: '10px 20px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, cursor: 'pointer', textTransform: 'none' }}
               >
-                CANCEL
+                Cancel
               </button>
             </div>
           </div>

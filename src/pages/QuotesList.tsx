@@ -1,3 +1,4 @@
+import './table-heading-roles.css';
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
@@ -635,15 +636,14 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           </div>
 
           <div className="card" style={{ padding: 0, overflow: 'auto', flex: 1, minHeight: 0 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)', position: 'sticky', top: 0, zIndex: 1 }}>
-                  {['QUOTE #', 'CUSTOMER', 'ROUTE', 'STATUS', 'OUTCOME', 'CREATED', 'AMOUNT', 'ACTION'].map(h => (
+                  {['Quote #', 'Customer', 'Route', 'Status', 'Outcome', 'Created', 'Amount', 'Action'].map(h => (
                     <th key={h} style={{
                       padding: '12px 16px',
-                      textAlign: h === 'AMOUNT' ? 'right' : h === 'ACTION' ? 'center' : 'left',
-                      fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-                      fontWeight: 500, letterSpacing: '0.08em', whiteSpace: 'nowrap',
+                      textAlign: h === 'Amount' ? 'right' : h === 'Action' ? 'center' : 'left',
+                      whiteSpace: 'nowrap',
                     }}>{h}</th>
                   ))}
                 </tr>

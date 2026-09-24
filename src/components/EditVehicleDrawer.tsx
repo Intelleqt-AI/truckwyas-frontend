@@ -161,9 +161,12 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
 
   if (!open || !vehicle) return null;
 
+  // Kept as {name, capacity} rather than collapsed to plain name strings —
+  // the dropdown shows capacity alongside the name (matches AddVehicleDrawer)
+  // while the SELECT VALUE stays the bare name for handleTypeChange's lookup.
   const typeOptions = vehicleTypes.length > 0
-    ? vehicleTypes.map(vt => vt.name)
-    : ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck', 'Tautliner', 'Box Truck'];
+    ? vehicleTypes
+    : ['Rigid Truck', 'Semi-Trailer Truck', 'Flatbed Truck', 'Tanker', 'Refrigerated Truck', 'Tautliner', 'Box Truck'].map(name => ({ id: 0, name, capacity: undefined as number | string | undefined }));
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
@@ -218,7 +221,12 @@ export function EditVehicleDrawer({ open, vehicle, onClose, onUpdated }: Props) 
           <Select value={form.type ?? ''} onValueChange={handleTypeChange}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {typeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+              {typeOptions.map(o => (
+                <SelectItem key={o.name} value={o.name}>
+                  {o.name}
+                  {o.capacity != null && <span style={{ color: 'var(--text-tertiary)' }}> · {o.capacity}t</span>}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

@@ -386,6 +386,17 @@ export default function Overview() {
               Quick actions
             </span>
             <button
+              onClick={() => navigate("/bookings/quotes/new")}
+              className="btn-action"
+              style={{
+                padding: "8px 16px",
+                background: "transparent",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-secondary)",
+              }}>
+              New quote
+            </button>
+            <button
               onClick={() => navigate("/finance/invoices/new")}
               className="btn-action"
               style={{

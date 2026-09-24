@@ -1,16 +1,41 @@
 import * as React from "react"
 import { useState, useEffect } from "react"
 import { format, parse, isValid } from "date-fns"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
+import "./date-picker-dashboard.css"
 
 interface DatePickerProps {
+  dashboard?: boolean
   value: string
   onChange: (value: string) => void
   placeholder?: string
   style?: React.CSSProperties
   maxDate?: Date
+}
+
+// Presentation-only opt-in: retain DayPicker's selection and keyboard behavior.
+const DASHBOARD_CALENDAR_CLASSES = {
+  months: "dashboard-date-months",
+  month: "dashboard-date-month",
+  caption: "dashboard-date-caption",
+  caption_label: "dashboard-date-caption-label",
+  nav: "dashboard-date-nav",
+  nav_button: "dashboard-date-nav-button",
+  nav_button_previous: "dashboard-date-previous",
+  nav_button_next: "dashboard-date-next",
+  table: "dashboard-date-table",
+  head_row: "dashboard-date-head-row",
+  head_cell: "dashboard-date-head-cell",
+  row: "dashboard-date-row",
+  cell: "dashboard-date-cell",
+  day: "dashboard-date-day",
+  day_selected: "dashboard-date-selected",
+  day_today: "dashboard-date-today",
+  day_outside: "dashboard-date-outside",
+  day_disabled: "dashboard-date-disabled",
+  day_hidden: "dashboard-date-hidden",
 }
 
 // Formats tried in order when parsing typed input
@@ -24,7 +49,7 @@ function tryParse(raw: string): Date | null {
   return null
 }
 
-export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style, maxDate }: DatePickerProps) {
+export function DatePicker({ dashboard = false, value, onChange, placeholder = "DD/MM/YYYY", style, maxDate }: DatePickerProps) {
   const [open, setOpen] = useState(false)
   const [inputVal, setInputVal] = useState('')
   const [month, setMonth] = useState<Date>(new Date())
@@ -81,17 +106,19 @@ export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style,
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <div
+        className={dashboard ? "dashboard-date-picker" : undefined}
         style={{
           display: 'flex',
           alignItems: 'center',
           width: '100%',
           background: 'var(--bg-surface)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 2,
+          border: dashboard ? '1px solid var(--date-picker-control-border)' : '1px solid var(--border-subtle)',
+          borderRadius: dashboard ? 6 : 2,
           ...style,
         }}
       >
         <input
+          className={dashboard ? "dashboard-date-input" : undefined}
           type="text"
           value={inputVal}
           onChange={handleInputChange}
@@ -102,9 +129,9 @@ export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style,
             background: 'transparent',
             border: 'none',
             color: inputVal ? 'var(--text-primary)' : 'var(--text-tertiary)',
-            padding: '10px 12px',
-            fontSize: 12,
-            fontFamily: 'var(--font-mono)',
+            padding: dashboard ? '8px 12px' : '10px 12px',
+            fontSize: dashboard ? 'var(--date-picker-input-font)' : 12,
+            fontFamily: dashboard ? 'var(--font-sans)' : 'var(--font-mono)',
             outline: 'none',
             minWidth: 0,
             width: '100%',
@@ -112,12 +139,14 @@ export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style,
         />
         <PopoverTrigger asChild>
           <button
+            className={dashboard ? "dashboard-date-trigger" : undefined}
             type="button"
+            aria-label="Open calendar"
             style={{
               background: 'none',
               border: 'none',
               borderLeft: '1px solid var(--border-subtle)',
-              padding: '10px 10px',
+              padding: dashboard ? 8 : '10px 10px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -125,22 +154,31 @@ export function DatePicker({ value, onChange, placeholder = "DD/MM/YYYY", style,
               flexShrink: 0,
             }}
           >
-            <CalendarIcon size={13} />
+            <CalendarIcon size={dashboard ? 20 : 13} />
           </button>
         </PopoverTrigger>
       </div>
       <PopoverContent
-        className="w-auto p-0"
+        {...(dashboard ? { collisionPadding: 8 } : {})}
+        className={dashboard ? "dashboard-date-popover" : "w-auto p-0"}
         align="start"
         style={{
           background: 'var(--bg-surface)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 4,
+          border: dashboard ? '1px solid var(--border-active)' : '1px solid var(--border-subtle)',
+          borderRadius: dashboard ? 8 : 4,
           boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
           color: 'var(--text-primary)',
         }}
       >
         <Calendar
+          {...(dashboard ? {
+            className: "dashboard-date-calendar",
+            classNames: DASHBOARD_CALENDAR_CLASSES,
+            components: {
+              IconLeft: () => <ChevronLeft size={20} />,
+              IconRight: () => <ChevronRight size={20} />,
+            },
+          } : {})}
           mode="single"
           selected={selected}
           month={month}

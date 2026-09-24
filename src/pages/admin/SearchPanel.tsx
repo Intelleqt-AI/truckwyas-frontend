@@ -1,3 +1,5 @@
+import '@/pages/table-heading-roles.css';
+import '@/pages/admin/admin-brand.css';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
@@ -7,18 +9,18 @@ import { Loader } from '@/components/Loader';
 // it" — no navigation, this app has no cross-tenant deep-links from an admin
 // session, so the rows are just read-off info for the person on the call.
 
-const cardStyle: React.CSSProperties = { padding: 20 };
-const sectionTitleStyle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 };
+const cardStyle: React.CSSProperties = { padding: 24 };
+const sectionTitleStyle: React.CSSProperties = {
+  fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16,
+};
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', width: '100%', maxWidth: 360,
+  padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  fontFamily: 'var(--font-sans)', minHeight: 40, width: '100%', maxWidth: 360,
 };
-const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 12px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-subtle)',
-};
+const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
-  padding: '10px 12px', fontSize: 12.5, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
@@ -33,14 +35,14 @@ const STATUS_BADGE_CLASS: Record<string, string> = {
 function ResultTable({ title, rows, numberKey }: { title: string; rows: any[]; numberKey: 'quote_number' | 'load_number' }) {
   return (
     <div>
-      <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+      <h3 style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', margin: 0, marginBottom: 8 }}>
         {title} {rows.length > 0 ? `(${rows.length})` : ''}
-      </div>
+      </h3>
       {rows.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)' }}>No matches.</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No matches.</div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="admin-scroll-region" role="region" aria-label={title} tabIndex={0} style={{ overflowX: 'auto' }}>
+          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Number</th>
@@ -51,7 +53,7 @@ function ResultTable({ title, rows, numberKey }: { title: string; rows: any[]; n
             <tbody>
               {rows.map(r => (
                 <tr key={r.id}>
-                  <td style={tdStyle}>{r[numberKey]}</td>
+                  <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)' }}>{r[numberKey]}</td>
                   <td style={tdStyle}>
                     <span className={`status-badge ${STATUS_BADGE_CLASS[String(r.status).toLowerCase()] || ''}`}>{r.status}</span>
                   </td>
@@ -87,16 +89,18 @@ export default function SearchPanel() {
 
   return (
     <div className="card" style={cardStyle}>
-      <div style={sectionTitleStyle}>Quote / Order Lookup</div>
+      <h2 style={sectionTitleStyle}>Quote and order lookup</h2>
       <input
+        className="admin-control"
         style={{ ...inputStyle, marginBottom: 16 }}
+        aria-label="Search quote or order number"
         placeholder="Search quote/order number…"
         value={query}
         onChange={e => setQuery(e.target.value)}
       />
 
       {!hasSearched ? (
-        <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)' }}>Enter a quote or order number to search across every company.</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>Enter a quote or order number to search across every company.</div>
       ) : isLoading ? (
         <Loader size={24} />
       ) : (

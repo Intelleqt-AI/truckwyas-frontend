@@ -1,3 +1,6 @@
+import './capital-typography.css';
+import './table-heading-roles.css';
+import { CheckCircle2 } from 'lucide-react';
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchData, postData } from "@/lib/Api";
@@ -90,25 +93,25 @@ export default function AdvanceRequest() {
   // Step 4 - Success screen
   if (step === 4) {
     return (
-      <div>
+      <div className="capital-typography">
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Request Submitted</div>
+          <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal', textTransform: 'none', marginBottom: 4 }}>Capital</div>
+          <h1 style={{ fontSize: 22, lineHeight: '28px', fontFamily: 'var(--font-sans)', margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>Request submitted</h1>
         </div>
         <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>✓</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--status-success)', marginBottom: 8 }}>
+          <CheckCircle2 size={48} aria-hidden="true" style={{ margin: '0 auto 16px', color: 'var(--status-success)' }} />
+          <div style={{ fontSize: 18, lineHeight: '28px', fontWeight: 600, color: 'var(--status-success)', marginBottom: 8, fontVariantNumeric: 'tabular-nums' }}>
             Your {formatCurrency(netReceived)} is being processed
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24 }}>
+          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 24 }}>
             Estimated disbursement: <strong>4 hours</strong>
           </div>
           <button
             className="btn-action"
-            style={{ padding: '10px 24px', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 12 }}
+            style={{ padding: '10px 24px', minHeight: 40, background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 14, lineHeight: '20px' }}
             onClick={() => navigate('/capital')}
           >
-            Back to Capital
+            Back to capital
           </button>
         </div>
       </div>
@@ -116,12 +119,12 @@ export default function AdvanceRequest() {
   }
 
   return (
-    <div>
+    <div className="capital-typography">
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Request Advance</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Fast payment on eligible invoices — 3 steps.</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal', textTransform: 'none', marginBottom: 4 }}>Capital</div>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontFamily: 'var(--font-sans)', margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>Request advance</h1>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>Fast payment on eligible invoices — 3 steps.</div>
       </div>
 
       {/* Step counter */}
@@ -133,12 +136,12 @@ export default function AdvanceRequest() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: step >= s ? 'var(--accent-primary)' : 'var(--bg-surface)',
               color: step >= s ? 'white' : 'var(--text-tertiary)',
-              fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600,
+              fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600,
               border: step === s ? '2px solid var(--accent-primary)' : 'none'
             }}>
               {s}
             </div>
-            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: step >= s ? 'var(--text-primary)' : 'var(--text-tertiary)', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: step >= s ? 'var(--text-primary)' : 'var(--text-tertiary)', textTransform: 'none' }}>
               {s === 1 ? 'Select' : s === 2 ? 'Review' : 'Confirm'}
             </span>
             {s < 3 && <div style={{ width: 40, height: 2, background: step > s ? 'var(--accent-primary)' : 'var(--border-subtle)' }} />}
@@ -147,7 +150,7 @@ export default function AdvanceRequest() {
       </div>
 
       {error && (
-        <div className="card" style={{ padding: '12px 16px', marginBottom: 16, background: 'var(--status-danger)', color: 'white', fontSize: 13 }}>
+        <div className="card" style={{ padding: '12px 16px', marginBottom: 16, background: 'var(--status-danger)', color: 'white', fontSize: 13, lineHeight: '20px' }}>
           {error}
         </div>
       )}
@@ -156,8 +159,8 @@ export default function AdvanceRequest() {
       {step === 1 && (
         <div className="card table-card">
           <div className="card-header" style={{ marginBottom: 16 }}>
-            <span className="card-title">Step 1: Select Invoice</span>
-            <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{invoices.length} ELIGIBLE</span>
+            <h2 className="card-title" style={{ margin: 0 }}>Step 1: Select invoice</h2>
+            <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>{invoices.length} eligible</span>
           </div>
           {invoices.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>
@@ -165,7 +168,7 @@ export default function AdvanceRequest() {
             </div>
           ) : (
             <>
-              <table className="data-table">
+              <table className="data-table table-heading-roles">
                 <thead>
                   <tr>
                     <th style={{ width: 40 }}></th>
@@ -189,10 +192,10 @@ export default function AdvanceRequest() {
                       </td>
                       <td className="mono">{inv.invoice_number || inv.invoiceNumber}</td>
                       <td>{inv.customer_name || inv.customerName}</td>
-                      <td className="mono">{formatCurrency(inv.total_amount || inv.amount)}</td>
+                      <td className="mono capital-amount">{formatCurrency(inv.total_amount || inv.amount)}</td>
                       <td>
                         <span style={{
-                          fontFamily: 'var(--font-mono)', fontSize: 10,
+                          fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px',
                           color: TIER_COLOR[inv.risk_tier || inv.tier || 'standard'],
                           background: 'var(--bg-surface-hover)', padding: '2px 6px', borderRadius: 4,
                           display: 'inline-block', whiteSpace: 'nowrap'
@@ -207,7 +210,7 @@ export default function AdvanceRequest() {
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 0 0' }}>
                 <button
                   className="btn-action"
-                  style={{ padding: '8px 16px', background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11 }}
+                  style={{ padding: '8px 16px', minHeight: 40, background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px' }}
                   onClick={() => navigate('/capital')}
                 >
                   Cancel
@@ -221,7 +224,8 @@ export default function AdvanceRequest() {
                     color: selectedInvoiceId ? 'white' : 'var(--text-tertiary)',
                     border: 'none', borderRadius: 2,
                     cursor: selectedInvoiceId ? 'pointer' : 'not-allowed',
-                    fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600
+                    minHeight: 40,
+                    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 600
                   }}
                   onClick={() => selectedInvoiceId && setStep(2)}
                 >
@@ -237,23 +241,23 @@ export default function AdvanceRequest() {
       {step === 2 && selectedInvoice && (
         <div className="card" style={{ padding: 20 }}>
           <div className="card-header" style={{ marginBottom: 16 }}>
-            <span className="card-title">Step 2: Fee Breakdown</span>
+            <h2 className="card-title" style={{ margin: 0 }}>Step 2: Fee breakdown</h2>
           </div>
           <div style={{ marginBottom: 24, padding: 16, background: 'var(--bg-surface-hover)', borderRadius: 2 }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>SELECTED INVOICE</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedInvoice.invoice_number}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{selectedInvoice.customer_name}</div>
+            <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Selected invoice</div>
+            <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedInvoice.invoice_number}</div>
+            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 2 }}>{selectedInvoice.customer_name}</div>
           </div>
 
           <div style={{ display: 'grid', gap: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Invoice Amount</span>
-              <span style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(amount)}</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Invoice amount</span>
+              <span style={{ fontSize: 16, lineHeight: '24px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(amount)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Risk Tier</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Risk tier</span>
               <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 11,
+                fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px',
                 color: TIER_COLOR[tier],
                 background: 'var(--bg-surface-hover)', padding: '4px 8px', borderRadius: 4,
                 display: 'inline-block', whiteSpace: 'nowrap', fontWeight: 500
@@ -262,37 +266,37 @@ export default function AdvanceRequest() {
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Fee ({(feeRate * 100).toFixed(1)}%)</span>
-              <span style={{ fontSize: 16, fontFamily: 'var(--font-mono)', color: 'var(--status-danger)' }}>-{formatCurrency(feeAmount)}</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Fee ({(feeRate * 100).toFixed(1)}%)</span>
+              <span style={{ fontSize: 16, lineHeight: '24px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', color: 'var(--status-danger)' }}>-{formatCurrency(feeAmount)}</span>
             </div>
             <div style={{ height: 1, background: 'var(--border-subtle)' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>You Receive</span>
-              <span style={{ fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--status-success)' }}>{formatCurrency(netReceived)}</span>
+              <span style={{ fontSize: 15, lineHeight: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>You receive</span>
+              <span style={{ fontSize: 28, lineHeight: '36px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--status-success)' }}>{formatCurrency(netReceived)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Estimated Repayment Date</span>
-              <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Estimated repayment date</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>
                 {selectedInvoice.due_date ? new Date(selectedInvoice.due_date).toLocaleDateString() : 'On invoice due date'}
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Bank Account</span>
-              <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Default account on file</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Bank account</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>Default account on file</span>
             </div>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 24 }}>
             <button
               className="btn-action"
-              style={{ padding: '10px 20px', background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11 }}
+              style={{ padding: '10px 20px', minHeight: 40, background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px' }}
               onClick={() => setStep(1)}
             >
               ← Back
             </button>
             <button
               className="btn-action"
-              style={{ padding: '10px 20px', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600 }}
+              style={{ padding: '10px 20px', minHeight: 40, background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 600 }}
               onClick={() => setStep(3)}
             >
               Continue →
@@ -305,16 +309,16 @@ export default function AdvanceRequest() {
       {step === 3 && selectedInvoice && (
         <div className="card" style={{ padding: 20 }}>
           <div className="card-header" style={{ marginBottom: 16 }}>
-            <span className="card-title">Step 3: Confirm Request</span>
+            <h2 className="card-title" style={{ margin: 0 }}>Step 3: Confirm request</h2>
           </div>
 
           <div style={{ padding: 20, background: 'var(--bg-surface-hover)', borderRadius: 2, marginBottom: 24 }}>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>You are requesting an advance of:</div>
-            <div style={{ fontSize: 32, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: 8 }}>{formatCurrency(netReceived)}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>on invoice <strong>{selectedInvoice.invoice_number}</strong></div>
+            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 12 }}>You are requesting an advance of:</div>
+            <div style={{ fontSize: 28, lineHeight: '36px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--accent-primary)', marginBottom: 8 }}>{formatCurrency(netReceived)}</div>
+            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>on invoice <strong>{selectedInvoice.invoice_number}</strong></div>
           </div>
 
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 24, padding: 16, background: 'var(--bg-surface)', borderRadius: 2 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 24, padding: 16, background: 'var(--bg-surface)', borderRadius: 2 }}>
             By confirming, you authorize Truckwys to advance the net amount to your registered bank account.
             The advance will be repaid automatically when the customer pays the invoice.
             <strong style={{ color: 'var(--text-primary)' }}> Estimated disbursement: 4 hours.</strong>
@@ -331,7 +335,8 @@ export default function AdvanceRequest() {
                 border: '1px solid var(--border-subtle)',
                 borderRadius: 2,
                 cursor: submitting ? 'not-allowed' : 'pointer',
-                fontFamily: 'var(--font-mono)', fontSize: 11
+                minHeight: 40,
+                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px'
               }}
               onClick={() => !submitting && setStep(2)}
             >
@@ -346,11 +351,12 @@ export default function AdvanceRequest() {
                 color: submitting ? 'var(--text-tertiary)' : 'white',
                 border: 'none', borderRadius: 2,
                 cursor: submitting ? 'not-allowed' : 'pointer',
-                fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600
+                minHeight: 40,
+                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 600
               }}
               onClick={handleSubmit}
             >
-              {submitting ? 'Submitting…' : 'Confirm request ✓'}
+              {submitting ? 'Submitting…' : 'Confirm request'}
             </button>
           </div>
         </div>

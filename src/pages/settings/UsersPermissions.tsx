@@ -1,3 +1,5 @@
+import '@/pages/table-heading-roles.css';
+import '@/pages/settings/settings-brand.css';
 import { useState, useEffect } from "react";
 import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
@@ -7,7 +9,7 @@ import { useAuth } from '@/lib/AuthContext';
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
   border: '1px solid var(--border-subtle)',
-  borderRadius: 'var(--card-radius)',
+  borderRadius: 8,
   marginBottom: 16,
 };
 
@@ -20,12 +22,34 @@ const sectionHeaderStyle: React.CSSProperties = {
 };
 
 const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.08em',
-  color: 'var(--text-secondary)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 16,
+  lineHeight: '24px',
   fontWeight: 600,
+  color: 'var(--text-primary)',
+  margin: 0,
+};
+
+const fieldLabelStyle: React.CSSProperties = {
+  display: 'block',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 13,
+  lineHeight: '20px',
+  fontWeight: 500,
+  color: 'var(--text-primary)',
+  marginBottom: 6,
+};
+
+const rowActionStyle: React.CSSProperties = {
+  background: 'none', border: '1px solid var(--border-subtle)',
+  color: 'var(--text-secondary)', padding: '8px 12px',
+  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
+  borderRadius: 6, minHeight: 40,
+};
+
+const roleBadgeStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-sans)', fontSize: 12, lineHeight: '16px', fontWeight: 500,
+  padding: '3px 8px', borderRadius: 4, display: 'inline-block',
 };
 
 const ROLE_COLORS: Record<string, string> = {
@@ -36,6 +60,25 @@ const ROLE_COLORS: Record<string, string> = {
   viewer: '#9CA3AF',
   driver: 'var(--status-success)',
   customer: 'var(--text-tertiary)',
+};
+
+// Presentation-only labels for known payload values — unknown strings render
+// verbatim (own-property lookup; never restyles user data).
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin', manager: 'Manager', operator: 'Operator', dispatcher: 'Dispatcher',
+  viewer: 'Viewer', driver: 'Driver', customer: 'Customer', partner: 'Partner',
+};
+const roleDisplay = (role: string) => {
+  const key = role?.toLowerCase();
+  return Object.prototype.hasOwnProperty.call(ROLE_LABELS, key) ? ROLE_LABELS[key] : role;
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  active: 'Active', invited: 'Invited', inactive: 'Inactive', pending: 'Pending',
+};
+const statusDisplay = (status: string) => {
+  const key = status?.toLowerCase();
+  return Object.prototype.hasOwnProperty.call(STATUS_LABELS, key) ? STATUS_LABELS[key] : status;
 };
 
 interface User {
@@ -205,32 +248,35 @@ export function UsersPermissions() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Users & Permissions</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Manage team access and roles</div>
+        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Users & permissions</h2>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Manage team access and roles</div>
       </div>
 
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>Team Members</span>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <h3 style={sectionTitleStyle}>Team members</h3>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <input
+              className="settings-control"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search users..."
+              placeholder="Search users…"
+              aria-label="Search users"
               style={{
                 background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                borderRadius: 2, padding: '6px 10px', color: 'var(--text-primary)',
-                fontSize: 12, outline: 'none', width: 180,
+                borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)',
+                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px',
+                minHeight: 40, width: 180,
               }}
             />
             {isAdmin && (
               <button
-                className="btn-action"
+                className="btn-action settings-control"
                 onClick={() => setShowInvite(!showInvite)}
                 disabled={isDemo}
                 title={isDemo ? 'Fixed in demo mode' : undefined}
-                style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-              >+ INVITE</button>
+                style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+              >Invite user</button>
             )}
           </div>
         </div>
@@ -244,14 +290,14 @@ export function UsersPermissions() {
             display: 'flex', gap: 12, alignItems: 'flex-end',
           }}>
             <div style={{ flex: 1 }}>
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: 6,
-              }}>Email</div>
+              <label htmlFor="invite-email" style={fieldLabelStyle}>Email</label>
               <input
+                id="invite-email"
+                className="settings-control"
                 style={{
                   width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                  borderRadius: 2, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 13, outline: 'none',
+                  borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)',
+                  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', minHeight: 40,
                 }}
                 type="email"
                 value={inviteEmail}
@@ -260,12 +306,9 @@ export function UsersPermissions() {
               />
             </div>
             <div>
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                letterSpacing: '0.08em', color: 'var(--text-tertiary)', marginBottom: 6,
-              }}>Role</div>
+              <span style={fieldLabelStyle}>Role</span>
               <Select value={inviteRole} onValueChange={setInviteRole}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Role for invited user">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -279,13 +322,13 @@ export function UsersPermissions() {
               </Select>
             </div>
             <button
-              className="btn-action"
+              className="btn-action settings-control"
               onClick={handleInvite}
               disabled={inviting || isDemo}
               title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
             >
-              {inviting ? 'SENDING...' : 'SEND INVITE'}
+              {inviting ? 'Sending…' : 'Send invite'}
             </button>
           </div>
         )}
@@ -298,15 +341,14 @@ export function UsersPermissions() {
             <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, width: '40%' }} />
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+          <div className="settings-scroll-region" role="region" aria-label="Team members" tabIndex={0} style={{ overflowX: 'auto' }}>
+          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' as const }}>
             <thead>
               <tr>
-                {['User', 'Role', 'Status', 'Last Active', ''].map(h => (
+                {['User', 'Role', 'Status', 'Last active', ''].map(h => (
                   <th key={h} style={{
                     padding: '10px 20px', textAlign: 'left' as const,
-                    fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em', color: 'var(--text-tertiary)',
-                    borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                    borderBottom: '1px solid var(--border-subtle)',
                   }}>{h}</th>
                 ))}
               </tr>
@@ -335,8 +377,8 @@ export function UsersPermissions() {
                       </div>
                     )}
                     <div>
-                      <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{u.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{u.email}</div>
+                      <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{u.name}</div>
+                      <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{u.email}</div>
                     </div>
                   </div>
                 </td>
@@ -350,52 +392,50 @@ export function UsersPermissions() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="admin">ADMIN</SelectItem>
-                        <SelectItem value="manager">MANAGER</SelectItem>
-                        <SelectItem value="operator">OPERATOR</SelectItem>
-                        <SelectItem value="dispatcher">DISPATCHER</SelectItem>
-                        <SelectItem value="viewer">VIEWER</SelectItem>
-                        <SelectItem value="driver">DRIVER</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="operator">Operator</SelectItem>
+                        <SelectItem value="dispatcher">Dispatcher</SelectItem>
+                        <SelectItem value="viewer">Viewer</SelectItem>
+                        <SelectItem value="driver">Driver</SelectItem>
                       </SelectContent>
                     </Select>
                   ) : (
                     <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 7px',
+                      ...roleBadgeStyle,
                       border: `1px solid ${roleColor(u.role)}`,
-                      color: roleColor(u.role), borderRadius: 2,
-                      textTransform: 'uppercase' as const, letterSpacing: '0.06em',
-                    }}>{u.role}</span>
+                      color: roleColor(u.role),
+                    }}>{roleDisplay(u.role)}</span>
                   )}
                 </td>
                 <td style={{ padding: '12px 20px' }}>
                   <span style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 10,
+                    fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
                     color: u.status?.toLowerCase() === 'active' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                    textTransform: 'uppercase' as const,
-                  }}>{u.status}</span>
+                  }}>{statusDisplay(u.status)}</span>
                 </td>
-                <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-tertiary)' }}>
+                <td style={{ padding: '12px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                   {u.last_active || '—'}
                 </td>
                 <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
                   {isAdmin && (
                     <button
+                      className="settings-control"
                       onClick={() => setDeleteConfirm(u.id)}
                       disabled={isDemo}
                       title={isDemo ? 'Fixed in demo mode' : undefined}
                       style={{
-                        background: 'none', border: '1px solid var(--border-subtle)',
-                        color: 'var(--status-danger)', padding: '4px 10px',
-                        fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                        ...rowActionStyle, color: 'var(--status-danger)',
                         cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                       }}
-                    >REMOVE</button>
+                    >Remove</button>
                   )}
                 </td>
               </tr>
             ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -403,17 +443,16 @@ export function UsersPermissions() {
       {!loadingInvites && pendingInvites.length > 0 && (
         <div style={sectionStyle}>
           <div style={sectionHeaderStyle}>
-            <span style={sectionTitleStyle}>Pending Invites</span>
+            <h3 style={sectionTitleStyle}>Pending invites</h3>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+          <div className="settings-scroll-region" role="region" aria-label="Pending invites" tabIndex={0} style={{ overflowX: 'auto' }}>
+          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' as const }}>
             <thead>
               <tr>
                 {['Email', 'Role', 'Invited', 'Expires', ''].map(h => (
                   <th key={h} style={{
                     padding: '10px 20px', textAlign: 'left' as const,
-                    fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em', color: 'var(--text-tertiary)',
-                    borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                    borderBottom: '1px solid var(--border-subtle)',
                   }}>{h}</th>
                 ))}
               </tr>
@@ -421,46 +460,43 @@ export function UsersPermissions() {
             <tbody>
               {pendingInvites.map((inv, i) => (
                 <tr key={inv.id} style={{ borderBottom: i < pendingInvites.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                  <td style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-primary)' }}>{inv.email}</td>
+                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{inv.email}</td>
                   <td style={{ padding: '12px 20px' }}>
                     <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 7px',
+                      ...roleBadgeStyle,
                       border: `1px solid ${roleColor(inv.role)}`,
-                      color: roleColor(inv.role), borderRadius: 2,
-                      textTransform: 'uppercase' as const, letterSpacing: '0.06em',
-                    }}>{inv.role}</span>
+                      color: roleColor(inv.role),
+                    }}>{roleDisplay(inv.role)}</span>
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-tertiary)' }}>
+                  <td style={{ padding: '12px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                     {new Date(inv.invited_at).toLocaleDateString()}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-tertiary)' }}>
+                  <td style={{ padding: '12px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                     {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '—'}
                   </td>
                   <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                       <button
+                        className="settings-control"
                         onClick={() => handleResendInvite(inv.token)}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
                         style={{
-                          background: 'none', border: '1px solid var(--border-subtle)',
-                          color: 'var(--text-tertiary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                          ...rowActionStyle,
                           cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                         }}
-                      >RESEND</button>
+                      >Resend</button>
                       {isAdmin && (
                         <button
+                          className="settings-control"
                           onClick={() => handleRevokeInvite(inv.token)}
                           disabled={isDemo}
                           title={isDemo ? 'Fixed in demo mode' : undefined}
                           style={{
-                            background: 'none', border: '1px solid var(--border-subtle)',
-                            color: 'var(--status-danger)', padding: '4px 10px',
-                            fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                            ...rowActionStyle, color: 'var(--status-danger)',
                             cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                           }}
-                        >REVOKE</button>
+                        >Revoke</button>
                       )}
                     </div>
                   </td>
@@ -468,13 +504,14 @@ export function UsersPermissions() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
       {/* Roles Reference */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>Role Permissions</span>
+          <h3 style={sectionTitleStyle}>Role permissions</h3>
         </div>
         <div style={{ padding: '8px 0 4px' }}>
           {[
@@ -490,11 +527,11 @@ export function UsersPermissions() {
               borderBottom: i < arr.length - 1 ? '1px solid var(--border-row)' : 'none',
             }}>
               <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 10, padding: '3px 8px',
+                ...roleBadgeStyle,
                 border: `1px solid ${r.color}`, color: r.color,
-                borderRadius: 2, textTransform: 'uppercase' as const, width: 80, textAlign: 'center' as const,
+                width: 80, textAlign: 'center' as const,
               }}>{r.role}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.desc}</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{r.desc}</span>
             </div>
           ))}
         </div>
@@ -510,33 +547,36 @@ export function UsersPermissions() {
           <div style={{
             background: 'var(--bg-surface)',
             border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--card-radius)',
-            padding: 32,
+            borderRadius: 12,
+            padding: 24,
             maxWidth: 420,
           }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-              Remove User?
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24, lineHeight: 1.5 }}>
+            <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 8 }}>
+              Remove user?
+            </h2>
+            <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 24 }}>
               This will permanently remove this user's access. They will no longer be able to log in.
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button onClick={() => setDeleteConfirm(null)} style={{
+              <button className="settings-control" onClick={() => setDeleteConfirm(null)} style={{
                 background: 'none', border: '1px solid var(--border-subtle)',
-                color: 'var(--text-secondary)', padding: '7px 14px',
-                fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: 'pointer',
-              }}>CANCEL</button>
+                color: 'var(--text-secondary)', padding: '8px 12px', minHeight: 40,
+                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
+                borderRadius: 6, cursor: 'pointer',
+              }}>Cancel</button>
               <button
+                className="settings-control"
                 onClick={() => handleDeleteUser(deleteConfirm)}
                 disabled={isDemo}
                 title={isDemo ? 'Fixed in demo mode' : undefined}
                 style={{
                   background: 'var(--status-danger)', border: 'none',
-                  color: 'white', padding: '7px 14px',
-                  fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
+                  color: '#fff', padding: '8px 12px', minHeight: 40,
+                  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
+                  borderRadius: 6,
                   cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                 }}
-              >REMOVE</button>
+              >Remove</button>
             </div>
           </div>
         </div>

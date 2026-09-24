@@ -1,3 +1,5 @@
+import './insights-page-brand.css';
+import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -6,6 +8,25 @@ import { formatCurrency } from '@/lib/formatters';
 import { DatePicker } from '@/components/ui/date-picker';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 import { Loader } from '@/components/Loader';
+
+// Brand text roles (presentation only — every value and calculation is untouched).
+const metricLabelTypography = { fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', textTransform: 'none' as const };
+const metricValueTypography = { fontFamily: 'var(--font-sans)', fontSize: 28, lineHeight: '36px', fontWeight: 600, fontVariantNumeric: 'tabular-nums' as const };
+
+// Map chart/status swatches to readable text colours (page-scoped tokens with a
+// safe fallback). Chart fills, bars and severity dots keep the original variables.
+const statusTextColor = (value: string) => {
+  if (value === 'var(--status-success)') return 'var(--status-success-text, var(--status-success))';
+  if (value === 'var(--status-warning)') return 'var(--status-warning-text, var(--status-warning))';
+  if (value === 'var(--status-danger)') return 'var(--status-danger-text, var(--status-danger))';
+  return value;
+};
+const statusSurfaceColor = (value: string) => {
+  if (value === 'var(--status-success)') return 'var(--insights-success-surface)';
+  if (value === 'var(--status-warning)') return 'var(--insights-warning-surface)';
+  if (value === 'var(--status-danger)') return 'var(--insights-danger-surface)';
+  return 'var(--bg-surface-hover)';
+};
 
 // ========== TYPES ==========
 
@@ -307,15 +328,15 @@ export default function Insights() {
 
   // Helper functions
   const getMarginColor = (pct: number) => {
-    if (pct > 50) return 'var(--status-success)';
-    if (pct >= 30) return 'var(--status-warning)';
-    return 'var(--status-danger)';
+    if (pct > 50) return 'var(--status-success-text, var(--status-success))';
+    if (pct >= 30) return 'var(--status-warning-text, var(--status-warning))';
+    return 'var(--status-danger-text, var(--status-danger))';
   };
 
   const getDSOColor = (dso: number) => {
-    if (dso < 30) return 'var(--status-success)';
-    if (dso <= 60) return 'var(--status-warning)';
-    return 'var(--status-danger)';
+    if (dso < 30) return 'var(--status-success-text, var(--status-success))';
+    if (dso <= 60) return 'var(--status-warning-text, var(--status-warning))';
+    return 'var(--status-danger-text, var(--status-danger))';
   };
 
   const getSeverityDot = (severity: string) => {
@@ -325,23 +346,26 @@ export default function Insights() {
   };
 
   const SectionHeader = ({ children }: { children: string }) => (
-    <div style={{
-      fontSize: 11,
-      fontFamily: 'var(--font-mono)',
-      color: 'var(--text-tertiary)',
-      letterSpacing: '0.08em',
-      textTransform: 'uppercase',
-      marginBottom: 16,
+    <h2 style={{
+      margin: '0 0 16px',
+      fontSize: 16,
+      lineHeight: '24px',
+      fontWeight: 600,
+      fontFamily: 'var(--font-sans)',
+      letterSpacing: 'normal',
+      color: 'var(--text-primary)',
     }}>
       {children}
-    </div>
+    </h2>
   );
 
   const StatusBadge = ({ children }: { children: string }) => (
     <div style={{
-      fontSize: 10,
-      fontFamily: 'var(--font-mono)',
-      padding: '2px 8px',
+      fontSize: 13,
+      lineHeight: '20px',
+      fontWeight: 500,
+      fontFamily: 'var(--font-sans)',
+      padding: '4px 8px',
       borderRadius: 4,
       background: 'var(--bg-surface-hover)',
       color: 'var(--text-secondary)',
@@ -353,20 +377,20 @@ export default function Insights() {
   );
 
   return (
-    <div>
+    <div className="insights-page-brand">
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <div style={{
-          fontSize: 11,
-          fontFamily: 'var(--font-mono)',
-          color: 'var(--text-tertiary)',
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
+          fontSize: 13,
+          lineHeight: '20px',
+          fontFamily: 'var(--font-sans)',
+          color: 'var(--text-secondary)',
+          letterSpacing: 'normal',
           marginBottom: 4
         }}>
           Intelligence
         </div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Insights</div>
+        <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>Insights</h1>
       </div>
 
       {/* Period filters */}
@@ -375,18 +399,8 @@ export default function Insights() {
           <button
             key={p.id}
             onClick={() => setPeriod(p.id)}
-            style={{
-              background: period === p.id ? 'var(--accent-primary)' : 'transparent',
-              border: `1px solid ${period === p.id ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-              color: period === p.id ? 'var(--bg-deep)' : 'var(--text-secondary)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              letterSpacing: '0.05em',
-              padding: '6px 12px',
-              cursor: 'pointer',
-              borderRadius: 2,
-              whiteSpace: 'nowrap',
-            }}
+            className="insights-period-control"
+            aria-pressed={period === p.id}
           >
             {p.label}
           </button>
@@ -397,14 +411,14 @@ export default function Insights() {
               value={customFrom}
               onChange={setCustomFrom}
               placeholder="From"
-              style={{ width: 130, padding: '6px 10px', fontSize: 11 }}
+              style={{ width: 160, maxWidth: '100%', padding: 0, fontSize: 14, lineHeight: '20px' }}
             />
-            <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>to</span>
+            <span style={{ color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>to</span>
             <DatePicker
               value={customTo}
               onChange={setCustomTo}
               placeholder="To"
-              style={{ width: 130, padding: '6px 10px', fontSize: 11 }}
+              style={{ width: 160, maxWidth: '100%', padding: 0, fontSize: 14, lineHeight: '20px' }}
             />
           </>
         )}
@@ -415,15 +429,17 @@ export default function Insights() {
         {TABS.map(t => (
           <button
             key={t.id}
+            className="insights-brand-tab"
             onClick={() => setTab(t.id)}
             style={{
               background: 'none',
               border: 'none',
               borderBottom: tab === t.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
               color: tab === t.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 13,
-              letterSpacing: '0.05em',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 14,
+              lineHeight: '20px',
+              letterSpacing: 'normal',
               fontWeight: tab === t.id ? 500 : 400,
               padding: '12px 0',
               marginRight: 24,
@@ -447,23 +463,18 @@ export default function Insights() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* AI EXECUTIVE BRIEFING */}
               {briefing?.narrative && (
-                <div style={{
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 4,
-                  padding: 20,
-                  background: 'var(--bg-surface)',
-                }}>
+                <div className="card">
                   <div style={{
-                    fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
-                    textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 10,
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', letterSpacing: 'normal',
+                    color: 'var(--text-secondary)', marginBottom: 12,
+                    display: 'flex', minWidth: 0, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
                   }}>
-                    <span>AI Executive Briefing</span>
+                    <h2 style={{ margin: 0, fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>AI executive briefing</h2>
                     <span style={{ color: briefing.ai_available ? 'var(--accent-primary)' : 'var(--text-tertiary)' }}>
-                      {briefing.ai_available ? 'CLAUDE' : 'SUMMARY'}
+                      {briefing.ai_available ? 'Claude' : 'Summary'}
                     </span>
                   </div>
-                  <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
                     {briefing.narrative}
                   </div>
                 </div>
@@ -471,95 +482,87 @@ export default function Insights() {
 
               {/* SECTION 1: BUSINESS PULSE */}
               <div>
-                <SectionHeader>BUSINESS PULSE</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
+                <SectionHeader>Business pulse</SectionHeader>
+                <div className="insights-business-pulse">
                   {/* Revenue MTD */}
-                  <div className="card" style={{ padding: 20 }}>
-                    <div style={{ fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                  <div className="card">
+                    <div style={{ ...metricValueTypography, color: 'var(--text-primary)', marginBottom: 4 }}>
                       {formatCurrency(kpiData?.revenue_mtd || 0)}
                     </div>
                     {kpiData?.revenue_change_pct !== undefined && (
                       <div style={{
-                        fontSize: 12,
-                        fontFamily: 'var(--font-mono)',
-                        color: kpiData.revenue_change_pct >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                        fontSize: 13,
+                        fontFamily: 'var(--font-sans)',
+                        color: kpiData.revenue_change_pct >= 0 ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))',
                         marginBottom: 8,
                       }}>
                         {kpiData.revenue_change_pct >= 0 ? '+' : ''}{kpiData.revenue_change_pct.toFixed(1)}%
                       </div>
                     )}
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
                       Revenue MTD
                     </div>
                   </div>
 
                   {/* Net Margin */}
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div style={{
-                      fontSize: 24,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: getMarginColor(kpiData?.net_margin_pct || 0),
                       marginBottom: 12,
                     }}>
                       {(kpiData?.net_margin_pct || 0).toFixed(1)}%
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
-                      Net Margin
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
+                      Net margin
                     </div>
                   </div>
 
                   {/* DSO */}
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div style={{
-                      fontSize: 24,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: getDSOColor(kpiData?.dso || 0),
                       marginBottom: 4,
                     }}>
                       {Math.round(kpiData?.dso || 0)}d
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 8 }}>
+                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 8 }}>
                       avg days to collect
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
                       DSO
                     </div>
                   </div>
 
                   {/* Fleet Utilisation */}
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div style={{
-                      fontSize: 24,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: 'var(--text-primary)',
                       marginBottom: 4,
                     }}>
                       {(kpiData?.fleet_utilization_pct || 0).toFixed(1)}%
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 8 }}>
+                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 8 }}>
                       of fleet active
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
-                      Fleet Utilisation
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
+                      Fleet utilisation
                     </div>
                   </div>
 
                   {/* Cash in 30 Days */}
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div style={{
-                      fontSize: 24,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: 'var(--status-success)',
                       marginBottom: 12,
                     }}>
                       {formatCurrency(kpiData?.total_advance_amount || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
-                      Cash Available
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
+                      Cash available
                     </div>
                   </div>
                 </div>
@@ -567,8 +570,8 @@ export default function Insights() {
 
               {/* SECTION 2: ACTION REQUIRED */}
               <div>
-                <SectionHeader>ACTION REQUIRED</SectionHeader>
-                <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>Action required</SectionHeader>
+                <div className="card">
                   {insightsData?.recommendations && insightsData.recommendations.length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {[...insightsData.recommendations]
@@ -584,7 +587,7 @@ export default function Insights() {
                             gap: 12,
                             padding: 12,
                             background: 'var(--bg-surface)',
-                            borderRadius: 2,
+                            borderRadius: 8,
                           }}>
                             <div style={{
                               width: 8,
@@ -594,9 +597,10 @@ export default function Insights() {
                               flexShrink: 0,
                             }} />
                             <div style={{
-                              fontSize: 10,
-                              fontFamily: 'var(--font-mono)',
-                              padding: '2px 8px',
+                              fontSize: 13,
+                              lineHeight: '20px',
+                              fontFamily: 'var(--font-sans)',
+                              padding: '4px 8px',
                               borderRadius: 4,
                               background: 'var(--bg-surface-hover)',
                               color: 'var(--text-secondary)',
@@ -610,8 +614,8 @@ export default function Insights() {
                             </div>
                             {rec.amount && (
                               <div style={{
-                                fontSize: 12,
-                                fontFamily: 'var(--font-mono)',
+                                fontSize: 13,
+                                fontFamily: 'var(--font-sans)',
                                 fontWeight: 600,
                                 color: 'var(--text-primary)',
                               }}>
@@ -620,24 +624,26 @@ export default function Insights() {
                             )}
                             {rec.days_overdue && (
                               <div style={{
-                                fontSize: 12,
-                                fontFamily: 'var(--font-mono)',
+                                fontSize: 13,
+                                fontFamily: 'var(--font-sans)',
                                 color: 'var(--text-secondary)',
                               }}>
                                 {rec.days_overdue}d
                               </div>
                             )}
                             {rec.link && (
-                              <div
+                              <button
+                                type="button"
+                                className="insights-recommendation-action"
+                                aria-label="Open recommendation"
                                 onClick={() => navigate(rec.link || '')}
                                 style={{
-                                  fontSize: 18,
                                   color: 'var(--accent-primary)',
                                   cursor: 'pointer',
                                 }}
                               >
-                                →
-                              </div>
+                                <ArrowRight size={20} aria-hidden="true" />
+                              </button>
                             )}
                           </div>
                         ))}
@@ -665,8 +671,8 @@ export default function Insights() {
 
               {/* SECTION 3: LIVE OPERATIONS */}
               <div>
-                <SectionHeader>LIVE OPERATIONS</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                <SectionHeader>Live operations</SectionHeader>
+                <div className="insights-brand-grid insights-brand-grid--3">
                   {(() => {
                     const inTransit = loads.filter(l => ['IN_TRANSIT', 'ASSIGNED'].includes(l.status.toUpperCase().replace(' ', '_')));
                     const inTransitRevenue = inTransit.reduce((sum, l) => sum + l.total_amount, 0);
@@ -683,11 +689,9 @@ export default function Insights() {
 
                     return (
                       <>
-                        <div className="card" style={{ padding: 20, borderLeft: '3px solid var(--accent-primary)' }}>
+                        <div className="card" style={{ borderLeft: '3px solid var(--accent-primary)' }}>
                           <div style={{
-                            fontSize: 24,
-                            fontFamily: 'var(--font-mono)',
-                            fontWeight: 600,
+                            ...metricValueTypography,
                             color: 'var(--text-primary)',
                             marginBottom: 4,
                           }}>
@@ -697,19 +701,17 @@ export default function Insights() {
                             loads in motion
                           </div>
                           <div style={{
-                            fontSize: 12,
-                            fontFamily: 'var(--font-mono)',
+                            fontSize: 13,
+                            fontFamily: 'var(--font-sans)',
                             color: 'var(--accent-primary)',
                           }}>
                             {formatCurrency(inTransitRevenue)} revenue in transit
                           </div>
                         </div>
 
-                        <div className="card" style={{ padding: 20, borderLeft: '3px solid var(--status-success)' }}>
+                        <div className="card" style={{ borderLeft: '3px solid var(--status-success)' }}>
                           <div style={{
-                            fontSize: 24,
-                            fontFamily: 'var(--font-mono)',
-                            fontWeight: 600,
+                            ...metricValueTypography,
                             color: 'var(--text-primary)',
                             marginBottom: 4,
                           }}>
@@ -719,15 +721,16 @@ export default function Insights() {
                             loads completed
                           </div>
                           <div style={{
-                            fontSize: 12,
-                            fontFamily: 'var(--font-mono)',
-                            color: 'var(--status-success)',
+                            fontSize: 13,
+                            lineHeight: '20px',
+                            fontFamily: 'var(--font-sans)',
+                            color: 'var(--status-success-text, var(--status-success))',
                           }}>
                             {formatCurrency(deliveredRevenue)} revenue realised
                           </div>
                         </div>
 
-                        <div className="card" style={{ padding: 20, borderLeft: '3px solid var(--text-secondary)' }}>
+                        <div className="card" style={{ borderLeft: '3px solid var(--text-secondary)' }}>
                           <div style={{
                             fontSize: 16,
                             fontWeight: 500,
@@ -740,8 +743,8 @@ export default function Insights() {
                             most active route
                           </div>
                           <div style={{
-                            fontSize: 12,
-                            fontFamily: 'var(--font-mono)',
+                            fontSize: 13,
+                            fontFamily: 'var(--font-sans)',
                             color: 'var(--text-tertiary)',
                           }}>
                             {topRoute ? `${topRoute[1]} trips this period` : ''}
@@ -760,65 +763,57 @@ export default function Insights() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* SECTION 1: P&L SUMMARY */}
               <div>
-                <SectionHeader>P&L SUMMARY</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-                  <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>P&L summary</SectionHeader>
+                <div className="insights-brand-grid insights-brand-grid--4">
+                  <div className="card">
                     <div style={{
-                      fontSize: 24,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: 'var(--text-primary)',
                       marginBottom: 12,
                     }}>
                       {formatCurrency(financeData?.revenue_period || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
-                      Revenue Period
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
+                      Revenue period
                     </div>
                   </div>
 
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div style={{
-                      fontSize: 24,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: 'var(--status-danger)',
                       marginBottom: 12,
                     }}>
                       {formatCurrency(financeData?.expenses_period || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
-                      Total Costs
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
+                      Total costs
                     </div>
                   </div>
 
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div style={{
-                      fontSize: 24,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
-                      color: (financeData?.net_margin_period || 0) >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                      ...metricValueTypography,
+                      color: (financeData?.net_margin_period || 0) >= 0 ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))',
                       marginBottom: 12,
                     }}>
                       {formatCurrency(financeData?.net_margin_period || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
-                      Net Margin R
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
+                      Net margin R
                     </div>
                   </div>
 
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div style={{
-                      fontSize: 24,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: getMarginColor(financeData?.net_margin_percent_period || 0),
                       marginBottom: 12,
                     }}>
                       {(financeData?.net_margin_percent_period || 0).toFixed(1)}%
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
-                      Net Margin %
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
+                      Net margin %
                     </div>
                   </div>
                 </div>
@@ -826,8 +821,9 @@ export default function Insights() {
 
               {/* SECTION 2: ROUTE PROFITABILITY RANKING */}
               <div>
-                <SectionHeader>ROUTE EFFICIENCY RANKING — Revenue per km driven</SectionHeader>
-                <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>Route efficiency ranking — revenue per km driven</SectionHeader>
+                <p style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Percentages show revenue less the recorded fuel surcharge. All other costs are excluded; this is not net margin.</p>
+                <div className="card insights-brand-region" role="region" aria-label="Route efficiency ranking" tabIndex={0}>
                   {(() => {
                     const routeMap = new Map<string, {
                       trips: number;
@@ -869,7 +865,7 @@ export default function Insights() {
                     const maxRevPerKm = Math.max(...routes.map(r => r.rev_per_km), 1);
 
                     return routes.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 900 }}>
                         {routes.map((r, idx) => {
                           const isTop3 = idx < 3;
                           const isBottom2 = idx >= routes.length - 2 && routes.length >= 5;
@@ -883,13 +879,13 @@ export default function Insights() {
                                 gap: 12,
                                 padding: 12,
                                 background: 'var(--bg-surface)',
-                                borderRadius: 2,
+                                borderRadius: 8,
                                 borderLeft: `3px solid ${isTop3 ? 'var(--status-success)' : isBottom2 ? 'var(--status-danger)' : 'transparent'}`,
                               }}
                             >
                               <div style={{
-                                fontSize: 10,
-                                fontFamily: 'var(--font-mono)',
+                                fontSize: 13,
+                                fontFamily: 'var(--font-sans)',
                                 fontWeight: 600,
                                 color: 'var(--text-tertiary)',
                                 minWidth: 20,
@@ -900,16 +896,16 @@ export default function Insights() {
                                 {r.route}
                               </div>
                               <div style={{
-                                fontSize: 11,
-                                fontFamily: 'var(--font-mono)',
+                                fontSize: 13,
+                                fontFamily: 'var(--font-sans)',
                                 color: 'var(--text-secondary)',
                                 minWidth: 60,
                               }}>
                                 {r.trips} trips
                               </div>
                               <div style={{
-                                fontSize: 12,
-                                fontFamily: 'var(--font-mono)',
+                                fontSize: 13,
+                                fontFamily: 'var(--font-sans)',
                                 color: 'var(--text-primary)',
                                 minWidth: 100,
                               }}>
@@ -917,7 +913,7 @@ export default function Insights() {
                               </div>
                               <div style={{
                                 fontSize: 14,
-                                fontFamily: 'var(--font-mono)',
+                                fontFamily: 'var(--font-sans)',
                                 fontWeight: 600,
                                 color: 'var(--accent-primary)',
                                 minWidth: 100,
@@ -940,8 +936,8 @@ export default function Insights() {
                                   }} />
                                 </div>
                                 <div style={{
-                                  fontSize: 12,
-                                  fontFamily: 'var(--font-mono)',
+                                  fontSize: 13,
+                                  fontFamily: 'var(--font-sans)',
                                   color: 'var(--text-secondary)',
                                   minWidth: 50,
                                 }}>
@@ -953,7 +949,7 @@ export default function Insights() {
                         })}
                       </div>
                     ) : (
-                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
                         No data for this period
                       </div>
                     );
@@ -964,15 +960,15 @@ export default function Insights() {
               {/* SECTION 3: MONTHLY P&L TREND */}
               {financeData?.monthly_trend && financeData.monthly_trend.length > 0 && (
                 <div>
-                  <SectionHeader>MONTHLY P&L TREND</SectionHeader>
-                  <div className="card" style={{ padding: 20 }}>
+                  <SectionHeader>Monthly P&L trend</SectionHeader>
+                  <div className="card insights-brand-region" role="region" aria-label="Monthly P&L trend" tabIndex={0}>
                     {(() => {
                       const trend = [...financeData.monthly_trend].sort((a, b) => a.month.localeCompare(b.month)).slice(-6);
                       const maxValue = Math.max(...trend.map(m => Math.max(m.revenue, m.expenses)));
                       const isImproving = trend.length >= 2 && trend[trend.length - 1].margin > trend[trend.length - 2].margin;
 
                       return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 520 }}>
                           {trend.map((m, idx) => {
                             const revWidth = maxValue > 0 ? (m.revenue / maxValue) * 100 : 0;
                             const expWidth = maxValue > 0 ? (m.expenses / maxValue) * 100 : 0;
@@ -981,12 +977,12 @@ export default function Insights() {
                               <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                 <div style={{
                                   width: 40,
-                                  fontSize: 11,
-                                  fontFamily: 'var(--font-mono)',
+                                  fontSize: 13,
+                                  lineHeight: '20px',
+                                  fontFamily: 'var(--font-sans)',
                                   color: 'var(--text-tertiary)',
-                                  textTransform: 'uppercase',
                                 }}>
-                                  {new Date(m.month + '-01').toLocaleString('en-ZA', { month: 'short' }).toUpperCase()}
+                                  {new Date(m.month + '-01').toLocaleString('en-ZA', { month: 'short' })}
                                 </div>
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
                                   <div style={{
@@ -1005,9 +1001,9 @@ export default function Insights() {
                                 </div>
                                 <div style={{
                                   fontSize: 13,
-                                  fontFamily: 'var(--font-mono)',
+                                  fontFamily: 'var(--font-sans)',
                                   fontWeight: 600,
-                                  color: m.margin > 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                                  color: m.margin > 0 ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))',
                                   minWidth: 100,
                                   textAlign: 'right',
                                 }}>
@@ -1019,7 +1015,7 @@ export default function Insights() {
                           <div style={{
                             marginTop: 8,
                             fontSize: 13,
-                            color: isImproving ? 'var(--status-success)' : 'var(--status-danger)',
+                            color: isImproving ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))',
                           }}>
                             {isImproving ? '↑ Margin improving' : '↓ Margin declining'}
                           </div>
@@ -1039,7 +1035,7 @@ export default function Insights() {
                     const largestPct = revenue > 0 ? (largest.amount / revenue) * 100 : 0;
                     return (
                       <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-surface-hover)', borderRadius: 4, borderLeft: '3px solid var(--accent-primary)' }}>
-                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                           <strong style={{ color: 'var(--text-primary)' }}>{largest.category.replace('_', ' ').charAt(0).toUpperCase() + largest.category.replace('_', ' ').slice(1)}</strong> is your largest cost at <strong style={{ color: 'var(--accent-primary)' }}>{largestPct.toFixed(1)}%</strong> of revenue ({formatCurrency(largest.amount)}).
                         </div>
                       </div>
@@ -1050,8 +1046,8 @@ export default function Insights() {
 
               {/* SECTION 4: COST BREAKDOWN */}
               <div>
-                <SectionHeader>COST BREAKDOWN</SectionHeader>
-                <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>Cost breakdown</SectionHeader>
+                <div className="card insights-brand-region" role="region" aria-label="Cost breakdown" tabIndex={0}>
                   {(() => {
                     const categoryMap = new Map<string, number>();
                     expenses.forEach(exp => {
@@ -1068,7 +1064,7 @@ export default function Insights() {
                     const maxAmount = Math.max(...categories.map(c => c.amount), 1);
 
                     return categories.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 560 }}>
                         {categories.map((cat, idx) => {
                           const widthPct = (cat.amount / maxAmount) * 100;
                           const pct = totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0;
@@ -1077,8 +1073,8 @@ export default function Insights() {
                             <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                               <div style={{
                                 minWidth: 120,
-                                fontSize: 12,
-                                fontFamily: 'var(--font-mono)',
+                                fontSize: 13,
+                                fontFamily: 'var(--font-sans)',
                                 color: 'var(--text-secondary)',
                               }}>
                                 {titleCase(cat.category)}
@@ -1099,7 +1095,7 @@ export default function Insights() {
                               </div>
                               <div style={{
                                 fontSize: 13,
-                                fontFamily: 'var(--font-mono)',
+                                fontFamily: 'var(--font-sans)',
                                 fontWeight: 600,
                                 color: 'var(--text-primary)',
                                 minWidth: 100,
@@ -1108,8 +1104,8 @@ export default function Insights() {
                                 {formatCurrency(cat.amount)}
                               </div>
                               <div style={{
-                                fontSize: 12,
-                                fontFamily: 'var(--font-mono)',
+                                fontSize: 13,
+                                fontFamily: 'var(--font-sans)',
                                 color: 'var(--text-secondary)',
                                 minWidth: 50,
                                 textAlign: 'right',
@@ -1127,14 +1123,14 @@ export default function Insights() {
                           color: 'var(--text-secondary)',
                         }}>
                           Total expenses this period: <span style={{
-                            fontFamily: 'var(--font-mono)',
+                            fontFamily: 'var(--font-sans)',
                             fontWeight: 600,
                             color: 'var(--text-primary)',
                           }}>{formatCurrency(totalExpenses)}</span>
                         </div>
                       </div>
                     ) : (
-                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
                         No data for this period
                       </div>
                     );
@@ -1149,59 +1145,53 @@ export default function Insights() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* SECTION 1: CASH POSITION */}
               <div>
-                <SectionHeader>CASH POSITION</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                  <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>Cash position</SectionHeader>
+                <div className="insights-brand-grid insights-brand-grid--3">
+                  <div className="card">
                     <div style={{
-                      fontSize: 28,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
-                      color: (financeData?.cash_flow_forecast?.next_30_days || 0) >= 0 ? 'var(--status-success)' : 'var(--status-danger)',
+                      ...metricValueTypography,
+                      color: (financeData?.cash_flow_forecast?.next_30_days || 0) >= 0 ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))',
                       marginBottom: 8,
                     }}>
                       {formatCurrency(financeData?.cash_flow_forecast?.next_30_days || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                      Next 30 Days
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                      Next 30 days
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-                      Expected Net Cash
+                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+                      Expected net cash
                     </div>
                   </div>
 
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div style={{
-                      fontSize: 28,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: 'var(--text-primary)',
                       marginBottom: 8,
                     }}>
                       {formatCurrency(financeData?.cash_flow_forecast?.next_60_days || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                      Next 60 Days
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                      Next 60 days
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-                      Expected Net Cash
+                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+                      Expected net cash
                     </div>
                   </div>
 
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div style={{
-                      fontSize: 28,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: 'var(--text-primary)',
                       marginBottom: 8,
                     }}>
                       {formatCurrency(financeData?.cash_flow_forecast?.next_90_days || 0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                      Next 90 Days
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                      Next 90 days
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-                      Expected Net Cash
+                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+                      Expected net cash
                     </div>
                   </div>
                 </div>
@@ -1209,8 +1199,8 @@ export default function Insights() {
 
               {/* SECTION 2: CUSTOMER PAYMENT INTELLIGENCE */}
               <div>
-                <SectionHeader>WHO OWES YOU AND HOW LONG</SectionHeader>
-                <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>Who owes you and how long</SectionHeader>
+                <div className="card insights-brand-region" role="region" aria-label="Outstanding invoice aging" tabIndex={0}>
                   {(() => {
                     const customerMap = new Map<string, {
                       total_outstanding: number;
@@ -1251,7 +1241,7 @@ export default function Insights() {
                     const top3sum = customers.slice(0, 3).reduce((sum, c) => sum + c.total_outstanding, 0);
 
                     return customers.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 720 }}>
                         {customers.map((c, idx) => {
                           const risk = c.oldest_invoice_days > 60 ? 'High risk' : c.oldest_invoice_days > 30 ? 'Medium' : 'Current';
                           const riskColor = c.oldest_invoice_days > 60 ? 'var(--status-danger)' : c.oldest_invoice_days > 30 ? 'var(--status-warning)' : 'var(--status-success)';
@@ -1263,14 +1253,14 @@ export default function Insights() {
                               gap: 12,
                               padding: 12,
                               background: 'var(--bg-surface)',
-                              borderRadius: 2,
+                              borderRadius: 8,
                             }}>
                               <div style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
                                 {c.customer_name}
                               </div>
                               <div style={{
                                 fontSize: 13,
-                                fontFamily: 'var(--font-mono)',
+                                fontFamily: 'var(--font-sans)',
                                 fontWeight: 600,
                                 color: 'var(--text-primary)',
                                 minWidth: 100,
@@ -1278,28 +1268,29 @@ export default function Insights() {
                                 {formatCurrency(c.total_outstanding)}
                               </div>
                               <div style={{
-                                fontSize: 11,
-                                fontFamily: 'var(--font-mono)',
+                                fontSize: 13,
+                                fontFamily: 'var(--font-sans)',
                                 color: 'var(--text-secondary)',
                                 minWidth: 100,
                               }}>
                                 Oldest: {c.oldest_invoice_days}d
                               </div>
                               <div style={{
-                                fontSize: 11,
-                                fontFamily: 'var(--font-mono)',
+                                fontSize: 13,
+                                fontFamily: 'var(--font-sans)',
                                 color: 'var(--text-secondary)',
                                 minWidth: 80,
                               }}>
                                 {c.invoice_count} invoices
                               </div>
                               <div style={{
-                                fontSize: 10,
-                                fontFamily: 'var(--font-mono)',
-                                padding: '2px 8px',
+                                fontSize: 13,
+                                lineHeight: '20px',
+                                fontFamily: 'var(--font-sans)',
+                                padding: '4px 8px',
                                 borderRadius: 4,
-                                background: riskColor,
-                                color: 'white',
+                                background: statusSurfaceColor(riskColor),
+                                color: statusTextColor(riskColor),
                                 display: 'inline-block',
                                 whiteSpace: 'nowrap',
                               }}>
@@ -1312,19 +1303,19 @@ export default function Insights() {
                           marginTop: 8,
                           padding: 12,
                           background: 'var(--bg-surface)',
-                          borderRadius: 2,
+                          borderRadius: 8,
                           fontSize: 13,
                           color: 'var(--text-secondary)',
                         }}>
                           Collecting these 3 accounts would unlock <span style={{
-                            fontFamily: 'var(--font-mono)',
+                            fontFamily: 'var(--font-sans)',
                             fontWeight: 600,
                             color: 'var(--accent-primary)',
                           }}>{formatCurrency(top3sum)}</span> in cash
                         </div>
                       </div>
                     ) : (
-                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
                         No outstanding invoices
                       </div>
                     );
@@ -1334,8 +1325,8 @@ export default function Insights() {
 
               {/* SECTION 3: WEEKLY CASH FORECAST */}
               <div>
-                <SectionHeader>WEEKLY CASH FORECAST — Next 8 weeks net position</SectionHeader>
-                <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>Weekly cash forecast — next 8 weeks net position</SectionHeader>
+                <div className="card">
                   {cashflowData?.forecast && cashflowData.forecast.length > 0 ? (() => {
                     const data = cashflowData.forecast.slice(0, 8).map(f => ({
                       week: f.period.replace('2026-', ''),
@@ -1349,10 +1340,10 @@ export default function Insights() {
                         <ResponsiveContainer width="100%" height={240}>
                           <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
-                            <XAxis dataKey="week" tick={{ fontFamily: 'var(--font-mono)', fontSize: 10, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontFamily: 'var(--font-mono)', fontSize: 10, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R${Math.abs(v/1000).toFixed(0)}k`} />
+                            <XAxis dataKey="week" tick={{ fontFamily: 'var(--font-sans)', fontSize: 13, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontFamily: 'var(--font-sans)', fontSize: 13, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R${Math.abs(v/1000).toFixed(0)}k`} />
                             <Tooltip
-                              contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, fontFamily: 'var(--font-mono)', fontSize: 11 }}
+                              contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}
                               formatter={(value: number) => [formatCurrency(value), '']}
                               labelStyle={{ color: 'var(--text-secondary)', marginBottom: 4 }}
                             />
@@ -1364,24 +1355,24 @@ export default function Insights() {
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
+                        <div className="insights-brand-grid insights-brand-grid--3" style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
                           <div>
-                            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>8-Week Net</div>
-                            <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600, color: runningBalance >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>{formatCurrency(runningBalance)}</div>
+                            <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 8 }}>8-week net</div>
+                            <div style={{ ...metricValueTypography, color: runningBalance >= 0 ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))' }}>{formatCurrency(runningBalance)}</div>
                           </div>
                           <div>
-                            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Positive Weeks</div>
-                            <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--status-success)' }}>{data.filter(d => d.net >= 0).length} of {data.length}</div>
+                            <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 8 }}>Positive weeks</div>
+                            <div style={{ ...metricValueTypography, color: 'var(--status-success-text, var(--status-success))' }}>{data.filter(d => d.net >= 0).length} of {data.length}</div>
                           </div>
                           <div>
-                            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Peak Week</div>
-                            <div style={{ fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent-primary)' }}>{formatCurrency(Math.max(...data.map(d => d.net)))}</div>
+                            <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 8 }}>Peak week</div>
+                            <div style={{ ...metricValueTypography, color: 'var(--accent-primary)' }}>{formatCurrency(Math.max(...data.map(d => d.net)))}</div>
                           </div>
                         </div>
                       </div>
                     );
                   })() : (
-                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No forecast data available</div>
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>No forecast data available</div>
                   )}
                 </div>
               </div>
@@ -1392,65 +1383,57 @@ export default function Insights() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* SECTION 1: FLEET HEALTH SUMMARY */}
               <div>
-                <SectionHeader>FLEET HEALTH SUMMARY</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-                  <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>Fleet health summary</SectionHeader>
+                <div className="insights-brand-grid insights-brand-grid--4">
+                  <div className="card">
                     <div style={{
-                      fontSize: 28,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: 'var(--text-primary)',
                       marginBottom: 12,
                     }}>
                       {vehicles.filter(v => ['IN_USE', 'AVAILABLE'].includes(v.status.toUpperCase())).length}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
-                      Active Vehicles
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
+                      Active vehicles
                     </div>
                   </div>
 
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div style={{
-                      fontSize: 28,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: 'var(--text-primary)',
                       marginBottom: 12,
                     }}>
                       {vehicles.length > 0 ? (vehicles.reduce((sum, v) => sum + (v.ai_health_score || 0), 0) / vehicles.length).toFixed(0) : 0}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
-                      Avg Health Score
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
+                      Avg health score
                     </div>
                   </div>
 
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div style={{
-                      fontSize: 28,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: 'var(--status-danger)',
                       marginBottom: 12,
                     }}>
                       {vehicles.filter(v => (v.ai_health_score || 100) < 60).length}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
-                      Vehicles at Risk
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
+                      Vehicles at risk
                     </div>
                   </div>
 
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div style={{
-                      fontSize: 28,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
+                      ...metricValueTypography,
                       color: 'var(--text-primary)',
                       marginBottom: 12,
                     }}>
                       {vehicles.length > 0 ? formatCurrency(vehicles.reduce((sum, v) => sum + (v.cost_per_km || 0), 0) / vehicles.length) : formatCurrency(0)}
                     </div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>
-                      Avg Cost/km
+                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
+                      Avg cost/km
                     </div>
                   </div>
                 </div>
@@ -1458,10 +1441,10 @@ export default function Insights() {
 
               {/* SECTION 2: VEHICLE EFFICIENCY RANKING */}
               <div>
-                <SectionHeader>VEHICLE PERFORMANCE — Revenue earned vs operational cost</SectionHeader>
-                <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>Vehicle performance — revenue earned vs operational cost</SectionHeader>
+                <div className="card insights-brand-region" role="region" aria-label="Vehicle performance" tabIndex={0}>
                   {vehicles.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 980 }}>
                       {[...vehicles]
                         .sort((a, b) => b.revenue_generated - a.revenue_generated)
                         .map((v, idx) => {
@@ -1477,13 +1460,13 @@ export default function Insights() {
                                 gap: 12,
                                 padding: 12,
                                 background: 'var(--bg-surface)',
-                                borderRadius: 2,
+                                borderRadius: 8,
                                 cursor: 'pointer',
                               }}
                             >
                               <div style={{
-                                fontSize: 11,
-                                fontFamily: 'var(--font-mono)',
+                                fontSize: 13,
+                                fontFamily: 'var(--font-sans)',
                                 fontWeight: 600,
                                 color: 'var(--text-tertiary)',
                                 minWidth: 30,
@@ -1492,15 +1475,16 @@ export default function Insights() {
                               </div>
                               <div style={{
                                 fontSize: 13,
+                                lineHeight: '20px',
                                 fontFamily: 'var(--font-mono)',
-                                fontWeight: 600,
+                                fontWeight: 400,
                                 color: 'var(--text-primary)',
                                 minWidth: 100,
                               }}>
                                 {v.plate}
                               </div>
                               <div style={{
-                                fontSize: 12,
+                                fontSize: 13,
                                 color: 'var(--text-secondary)',
                                 minWidth: 150,
                               }}>
@@ -1510,7 +1494,7 @@ export default function Insights() {
                               <div style={{ flex: 1 }} />
                               <div style={{
                                 fontSize: 13,
-                                fontFamily: 'var(--font-mono)',
+                                fontFamily: 'var(--font-sans)',
                                 fontWeight: 600,
                                 color: 'var(--accent-primary)',
                                 minWidth: 100,
@@ -1518,8 +1502,8 @@ export default function Insights() {
                                 {v.revenue_generated > 0 ? formatCurrency(v.revenue_generated) : 'No revenue data'}
                               </div>
                               <div style={{
-                                fontSize: 12,
-                                fontFamily: 'var(--font-mono)',
+                                fontSize: 13,
+                                fontFamily: 'var(--font-sans)',
                                 color: 'var(--text-secondary)',
                                 minWidth: 80,
                               }}>
@@ -1545,16 +1529,17 @@ export default function Insights() {
                                   }} />
                                 </div>
                                 <div style={{
-                                  fontSize: 11,
-                                  fontFamily: 'var(--font-mono)',
-                                  color: healthColor,
+                                  fontSize: 13,
+                                  lineHeight: '20px',
+                                  fontFamily: 'var(--font-sans)',
+                                  color: statusTextColor(healthColor),
                                 }}>
                                   {v.ai_health_score}
                                 </div>
                               </div>
                               <div style={{
-                                fontSize: 11,
-                                fontFamily: 'var(--font-mono)',
+                                fontSize: 13,
+                                fontFamily: 'var(--font-sans)',
                                 color: 'var(--text-secondary)',
                                 minWidth: 60,
                               }}>
@@ -1565,7 +1550,7 @@ export default function Insights() {
                         })}
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
                       No data for this period
                     </div>
                   )}
@@ -1574,10 +1559,10 @@ export default function Insights() {
 
               {/* SECTION 3: DRIVER EFFICIENCY MATRIX */}
               <div>
-                <SectionHeader>DRIVER PERFORMANCE — Revenue generated and risk profile</SectionHeader>
-                <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>Driver performance — revenue generated and risk profile</SectionHeader>
+                <div className="card insights-brand-region" role="region" aria-label="Driver performance" tabIndex={0}>
                   {drivers.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 860 }}>
                       {[...drivers]
                         .sort((a, b) => b.revenue_generated - a.revenue_generated)
                         .map((d, idx) => (
@@ -1590,13 +1575,13 @@ export default function Insights() {
                               gap: 12,
                               padding: 12,
                               background: 'var(--bg-surface)',
-                              borderRadius: 2,
+                              borderRadius: 8,
                               cursor: 'pointer',
                             }}
                           >
                             <div style={{
-                              fontSize: 11,
-                              fontFamily: 'var(--font-mono)',
+                              fontSize: 13,
+                              fontFamily: 'var(--font-sans)',
                               fontWeight: 600,
                               color: 'var(--text-tertiary)',
                               minWidth: 30,
@@ -1615,7 +1600,7 @@ export default function Insights() {
                             <div style={{ flex: 1 }} />
                             <div style={{
                               fontSize: 13,
-                              fontFamily: 'var(--font-mono)',
+                              fontFamily: 'var(--font-sans)',
                               fontWeight: 600,
                               color: 'var(--accent-primary)',
                               minWidth: 100,
@@ -1623,16 +1608,16 @@ export default function Insights() {
                               {formatCurrency(d.revenue_generated)}
                             </div>
                             <div style={{
-                              fontSize: 12,
-                              fontFamily: 'var(--font-mono)',
+                              fontSize: 13,
+                              fontFamily: 'var(--font-sans)',
                               color: 'var(--text-secondary)',
                               minWidth: 60,
                             }}>
                               {d.total_trips} trips
                             </div>
                             <div style={{
-                              fontSize: 12,
-                              fontFamily: 'var(--font-mono)',
+                              fontSize: 13,
+                              fontFamily: 'var(--font-sans)',
                               color: 'var(--text-secondary)',
                               minWidth: 100,
                             }}>
@@ -1640,8 +1625,9 @@ export default function Insights() {
                             </div>
                             {(d.violation_count > 0 || d.accident_history > 0) && (
                               <div style={{
-                                fontSize: 11,
-                                color: 'var(--status-danger)',
+                                fontSize: 13,
+                                lineHeight: '20px',
+                                color: 'var(--status-danger-text, var(--status-danger))',
                               }}>
                                 {d.violation_count > 0 && `⚠ ${d.violation_count} violations`}
                                 {d.violation_count > 0 && d.accident_history > 0 && ', '}
@@ -1652,7 +1638,7 @@ export default function Insights() {
                         ))}
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
                       No data for this period
                     </div>
                   )}
@@ -1661,13 +1647,13 @@ export default function Insights() {
 
               {/* SECTION 4: MAINTENANCE RISK ALERT */}
               <div>
-                <SectionHeader>MAINTENANCE RISK ALERT</SectionHeader>
-                <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>Maintenance risk alert</SectionHeader>
+                <div className="card insights-brand-region" role="region" aria-label="Maintenance risk alerts" tabIndex={0}>
                   {(() => {
                     const atRisk = vehicles.filter(v => (v.ai_health_score || 100) < 70).sort((a, b) => a.ai_health_score - b.ai_health_score);
 
                     return atRisk.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 720 }}>
                         {atRisk.map((v, idx) => {
                           const recommendation = v.ai_health_score < 50 ? '⚠ High maintenance risk — schedule immediately' : 'Monitor closely';
 
@@ -1678,19 +1664,20 @@ export default function Insights() {
                               gap: 12,
                               padding: 12,
                               background: 'var(--bg-surface)',
-                              borderRadius: 2,
+                              borderRadius: 8,
                             }}>
                               <div style={{
                                 fontSize: 13,
+                                lineHeight: '20px',
                                 fontFamily: 'var(--font-mono)',
-                                fontWeight: 600,
+                                fontWeight: 400,
                                 color: 'var(--text-primary)',
                                 minWidth: 100,
                               }}>
                                 {v.plate}
                               </div>
                               <div style={{
-                                fontSize: 12,
+                                fontSize: 13,
                                 color: 'var(--text-secondary)',
                                 minWidth: 120,
                               }}>
@@ -1698,15 +1685,15 @@ export default function Insights() {
                               </div>
                               <div style={{
                                 fontSize: 13,
-                                fontFamily: 'var(--font-mono)',
+                                fontFamily: 'var(--font-sans)',
                                 fontWeight: 600,
-                                color: v.ai_health_score < 50 ? 'var(--status-danger)' : 'var(--status-warning)',
+                                color: v.ai_health_score < 50 ? 'var(--status-danger-text, var(--status-danger))' : 'var(--status-warning-text, var(--status-warning))',
                                 minWidth: 60,
                               }}>
                                 {v.ai_health_score}
                               </div>
                               <StatusBadge>{v.status}</StatusBadge>
-                              <div style={{ flex: 1, fontSize: 12, color: 'var(--status-danger)' }}>
+                              <div style={{ flex: 1, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
                                 {recommendation}
                               </div>
                             </div>
@@ -1717,8 +1704,9 @@ export default function Insights() {
                       <div style={{
                         padding: 20,
                         textAlign: 'center',
-                        color: 'var(--status-success)',
+                        color: 'var(--status-success-text, var(--status-success))',
                         fontSize: 13,
+                        lineHeight: '20px',
                       }}>
                         All vehicles within healthy operating range
                       </div>
@@ -1735,8 +1723,9 @@ export default function Insights() {
 
               {/* SECTION 1: CORRIDOR EFFICIENCY */}
               <div>
-                <SectionHeader>CORRIDOR EFFICIENCY — Revenue per km driven</SectionHeader>
-                <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>Corridor efficiency — revenue per km driven</SectionHeader>
+                <p style={{ margin: '0 0 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Percentages show revenue less the recorded fuel surcharge. All other costs are excluded; this is not net margin.</p>
+                <div className="card insights-lanes-panel">
                   {(() => {
                     const routeMap = new Map<string, { trips: number; total_revenue: number; total_distance: number; total_fuel: number }>();
                     loads.forEach(load => {
@@ -1760,33 +1749,35 @@ export default function Insights() {
                       .filter(r => r.rev_per_km > 0)
                       .sort((a, b) => b.rev_per_km - a.rev_per_km)
                       .slice(0, 8);
-                    if (routes.length === 0) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No route data for this period</div>;
+                    if (routes.length === 0) return <div className="insights-lanes-empty">No route data for this period</div>;
                     return (
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        {/* Header row */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 80px 80px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>
-                          {['Route', 'Trips', 'Revenue', 'Rev/km', 'Margin'].map(h => (
-                            <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
-                          ))}
+                      <>
+                        <div className="insights-lanes-scroll" role="region" aria-label="Route performance table" tabIndex={0}>
+                          <table className="insights-lanes-table">
+                            <thead>
+                              <tr>
+                                {['Route', 'Trips', 'Revenue', 'Revenue/km', 'After fuel (%)'].map((h, hIdx) => (
+                                  <th key={h} scope="col" data-align={hIdx === 0 ? undefined : 'numeric'}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {routes.map((r, idx) => (
+                                <tr key={idx}>
+                                  <td style={{ borderLeft: idx < 2 ? '3px solid var(--status-success)' : idx >= routes.length - 2 ? '3px solid var(--status-danger)' : '3px solid transparent' }}>{r.route}</td>
+                                  <td data-align="numeric" style={{ color: 'var(--text-secondary)' }}>{r.trips}</td>
+                                  <td data-align="numeric">{formatCurrency(r.total_revenue)}</td>
+                                  <td data-align="numeric" style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{formatCurrency(r.rev_per_km)}</td>
+                                  <td data-align="numeric" style={{ color: r.margin_pct > 50 ? 'var(--status-success-text, var(--status-success))' : r.margin_pct > 30 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))' }}>{r.margin_pct.toFixed(1)}%</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                        {routes.map((r, idx) => (
-                          <div key={idx} style={{
-                            display: 'grid', gridTemplateColumns: '1fr 80px 100px 80px 80px', gap: 12,
-                            padding: '10px 12px',
-                            borderBottom: '1px solid var(--border-row)',
-                            borderLeft: idx < 2 ? '3px solid var(--status-success)' : idx >= routes.length - 2 ? '3px solid var(--status-danger)' : '3px solid transparent',
-                          }}>
-                            <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)' }}>{r.route}</div>
-                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{r.trips}</div>
-                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{formatCurrency(r.total_revenue)}</div>
-                            <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent-primary)' }}>{formatCurrency(r.rev_per_km)}</div>
-                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: r.margin_pct > 50 ? 'var(--status-success)' : r.margin_pct > 30 ? 'var(--status-warning)' : 'var(--status-danger)' }}>{r.margin_pct.toFixed(1)}%</div>
-                          </div>
-                        ))}
-                        <div style={{ padding: '12px 12px 0', fontSize: 12, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                        <div className="insights-lanes-legend">
                           Green = most efficient corridors · Red = least efficient
                         </div>
-                      </div>
+                      </>
                     );
                   })()}
                 </div>
@@ -1794,8 +1785,8 @@ export default function Insights() {
 
               {/* SECTION 2: CARGO PERFORMANCE */}
               <div>
-                <SectionHeader>CARGO PERFORMANCE — Avg revenue per trip by cargo type</SectionHeader>
-                <div className="card" style={{ padding: 20 }}>
+                <SectionHeader>Cargo performance — avg revenue per trip by cargo type</SectionHeader>
+                <div className="card insights-lanes-panel">
                   {(() => {
                     const cargoMap = new Map<string, { count: number; total: number }>();
                     loads.forEach(load => {
@@ -1807,22 +1798,28 @@ export default function Insights() {
                     const types = Array.from(cargoMap.entries())
                       .map(([cargo, d]) => ({ cargo, trips: d.count, avg: d.total / d.count, total: d.total }))
                       .sort((a, b) => b.avg - a.avg);
-                    if (types.length === 0) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No cargo data</div>;
+                    if (types.length === 0) return <div className="insights-lanes-empty">No cargo data</div>;
                     return (
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 60px 100px', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', marginBottom: 4 }}>
-                          {['Cargo Type', 'Avg/Trip', 'Trips', 'Total'].map(h => (
-                            <div key={h} style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</div>
-                          ))}
-                        </div>
-                        {types.map((c, idx) => (
-                          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 60px 100px', gap: 12, padding: '10px 12px', borderBottom: '1px solid var(--border-row)' }}>
-                            <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{c.cargo}</div>
-                            <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: idx === 0 ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{formatCurrency(c.avg)}</div>
-                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{c.trips}</div>
-                            <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{formatCurrency(c.total)}</div>
-                          </div>
-                        ))}
+                      <div className="insights-lanes-scroll" role="region" aria-label="Cargo performance table" tabIndex={0}>
+                        <table className="insights-lanes-table">
+                          <thead>
+                            <tr>
+                              {['Cargo type', 'Avg/trip', 'Trips', 'Total'].map((h, hIdx) => (
+                                <th key={h} scope="col" data-align={hIdx === 0 ? undefined : 'numeric'}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {types.map((c, idx) => (
+                              <tr key={idx}>
+                                <td>{c.cargo}</td>
+                                <td data-align="numeric" style={{ fontWeight: 600, color: idx === 0 ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{formatCurrency(c.avg)}</td>
+                                <td data-align="numeric" style={{ color: 'var(--text-secondary)' }}>{c.trips}</td>
+                                <td data-align="numeric" style={{ color: 'var(--text-secondary)' }}>{formatCurrency(c.total)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     );
                   })()}
@@ -1831,8 +1828,8 @@ export default function Insights() {
 
               {/* SECTION 3: LOAD STATUS */}
               <div>
-                <SectionHeader>LOAD PIPELINE STATUS</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                <SectionHeader>Load pipeline status</SectionHeader>
+                <div className="insights-brand-grid insights-brand-grid--3">
                   {(() => {
                     const pending = loads.filter(l => ['PENDING', 'ASSIGNED'].includes((l.status || '').toUpperCase()));
                     const inMotion = loads.filter(l => ['IN_TRANSIT'].includes((l.status || '').toUpperCase().replace(' ', '_')));
@@ -1842,14 +1839,14 @@ export default function Insights() {
                     const cRev = completed.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
                     return [
                       { label: 'Pipeline', count: pending.length, rev: pRev, sub: 'pending dispatch', color: 'var(--text-secondary)' },
-                      { label: 'In Motion', count: inMotion.length, rev: mRev, sub: 'revenue in transit', color: 'var(--accent-primary)' },
+                      { label: 'In motion', count: inMotion.length, rev: mRev, sub: 'revenue in transit', color: 'var(--accent-primary)' },
                       { label: 'Completed', count: completed.length, rev: cRev, sub: 'revenue realised', color: 'var(--status-success)' },
                     ].map((item, idx) => (
-                      <div key={idx} className="card" style={{ padding: 20 }}>
-                        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 12 }}>{item.label}</div>
-                        <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 600, color: item.color, marginBottom: 6 }}>{item.count}</div>
-                        <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginBottom: 4 }}>{formatCurrency(item.rev)}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.sub}</div>
+                      <div key={idx} className="card">
+                        <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 12 }}>{item.label}</div>
+                        <div style={{ ...metricValueTypography, color: statusTextColor(item.color), marginBottom: 6 }}>{item.count}</div>
+                        <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', marginBottom: 4 }}>{formatCurrency(item.rev)}</div>
+                        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{item.sub}</div>
                       </div>
                     ));
                   })()}
@@ -1858,8 +1855,8 @@ export default function Insights() {
 
               {/* SECTION 4: WEIGHT CLASS */}
               <div>
-                <SectionHeader>WEIGHT CLASS ANALYSIS — Avg revenue per trip by load size</SectionHeader>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                <SectionHeader>Weight class analysis — avg revenue per trip by load size</SectionHeader>
+                <div className="insights-brand-grid insights-brand-grid--4">
                   {(() => {
                     const bins = [
                       { label: 'Under 5t', filter: (w: number) => w < 5000 },
@@ -1873,10 +1870,10 @@ export default function Insights() {
                     });
                     const maxAvg = Math.max(...bins.map(b => b.avg), 1);
                     return bins.map((b, idx) => (
-                      <div key={idx} className="card" style={{ padding: 20, borderLeft: b.avg === maxAvg && b.avg > 0 ? '3px solid var(--accent-primary)' : '3px solid transparent' }}>
-                        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.06em', marginBottom: 12 }}>{b.label}</div>
-                        <div style={{ fontSize: 22, fontFamily: 'var(--font-mono)', fontWeight: 600, color: b.avg === maxAvg && b.avg > 0 ? 'var(--accent-primary)' : 'var(--text-primary)', marginBottom: 6 }}>{b.avg > 0 ? formatCurrency(b.avg) : '—'}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>avg/trip · {b.count} loads</div>
+                      <div key={idx} className="card" style={{ borderLeft: b.avg === maxAvg && b.avg > 0 ? '3px solid var(--accent-primary)' : '3px solid transparent' }}>
+                        <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 12 }}>{b.label}</div>
+                        <div style={{ ...metricValueTypography, color: b.avg === maxAvg && b.avg > 0 ? 'var(--accent-primary)' : 'var(--text-primary)', marginBottom: 6 }}>{b.avg > 0 ? formatCurrency(b.avg) : '—'}</div>
+                        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>avg/trip · {b.count} loads</div>
                       </div>
                     ));
                   })()}

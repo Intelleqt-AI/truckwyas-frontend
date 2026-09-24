@@ -1,0 +1,95 @@
+/* Fleet Vehicles / Drivers pages only (fleet-vehicles-brand packet).
+   Presentation only — shared shell classes are overridden inside this scope,
+   never globally. Both fleet list pages share the scope class so switching
+   the Vehicles/Drivers tabs never changes the surrounding chrome. */
+.fleet-page { min-width: 0; }
+
+.fleet-page { --fleet-input-font: 14px; --fleet-card-inset: 24px; }
+
+.fleet-page .fleet-page-title {
+  margin: 0;
+  font: 600 22px/28px var(--font-sans);
+  color: var(--text-primary);
+  letter-spacing: normal;
+}
+
+.fleet-page .fleet-header-row,
+.fleet-page .fleet-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.fleet-page .fleet-toolbar { margin-bottom: 16px; }
+
+.fleet-page .fleet-summary {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.fleet-page .fleet-summary--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.fleet-page .fleet-summary--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.fleet-page .fleet-summary--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.fleet-page .fleet-summary > .card { min-width: 0; padding: 24px; border-radius: 8px; }
+
+/* Shared metric classes carry legacy mono/uppercase — corrected inside this page only. */
+.fleet-page .fleet-summary .card-title {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.fleet-page .fleet-summary .metric-value {
+  font-family: var(--font-sans);
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+}
+
+.fleet-page button[data-fleet-control],
+.fleet-page input[data-fleet-control] {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  min-height: 40px;
+  border-radius: 6px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.fleet-page button[data-fleet-control] { flex-shrink: 0; }
+.fleet-page input[data-fleet-control] { font-size: var(--fleet-input-font); }
+
+.fleet-page button[data-fleet-control]:focus-visible,
+.fleet-page input[data-fleet-control]:focus-visible,
+.fleet-page [role="region"]:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+
+/* Table card: intentional zero outer padding + local scroll region. */
+.fleet-page .fleet-table-region { border-radius: 8px; }
+.fleet-page td { font-variant-numeric: tabular-nums; }
+/* Row actions must not inherit the primary-control width. */
+.fleet-page td button[data-fleet-control] { min-width: 0; width: auto; }
+
+@media (max-width: 1100px) {
+  .fleet-page .fleet-summary--4,
+  .fleet-page .fleet-summary--5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fleet-page .fleet-summary--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .fleet-page { --fleet-input-font: 16px; --fleet-card-inset: 16px; }
+  .fleet-page .fleet-summary > .card { padding: 16px; }
+  .fleet-page button[data-fleet-control],
+  .fleet-page input[data-fleet-control] { min-height: 48px; }
+}
+@media (max-width: 480px) {
+  .fleet-page .fleet-summary--4,
+  .fleet-page .fleet-summary--5,
+  .fleet-page .fleet-summary--3 { grid-template-columns: minmax(0, 1fr); }
+}

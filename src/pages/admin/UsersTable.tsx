@@ -1,3 +1,5 @@
+import '@/pages/table-heading-roles.css';
+import '@/pages/admin/admin-brand.css';
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData } from '@/lib/Api';
@@ -15,30 +17,43 @@ const PAGE_SIZE = 20;
 // query, so it can be dropped into AdminDashboard (or anywhere else) with no
 // required props.
 
-const cardStyle: React.CSSProperties = { padding: 20 };
-const sectionTitleStyle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 };
+const cardStyle: React.CSSProperties = { padding: 24 };
+const sectionTitleStyle: React.CSSProperties = {
+  fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16,
+};
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', width: 240,
+  padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  fontFamily: 'var(--font-sans)', minHeight: 40, width: 240,
 };
 const selectStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 10px', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', cursor: 'pointer',
+  padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  fontFamily: 'var(--font-sans)', minHeight: 40, cursor: 'pointer',
 };
-const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 12px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-subtle)',
-};
+const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
-  padding: '10px 12px', fontSize: 12.5, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
-  padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 2, fontSize: 10.5, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', cursor: 'pointer',
+  padding: '8px 12px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
+  borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)',
+  minHeight: 40, cursor: 'pointer',
+};
+const fieldLabelStyle: React.CSSProperties = {
+  display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6,
 };
 
 const ROLES = ['ADMIN', 'MANAGER', 'OPERATOR', 'DISPATCHER', 'VIEWER', 'DRIVER', 'CUSTOMER', 'PARTNER'] as const;
 type Role = typeof ROLES[number];
+
+// Presentation only — option *values* and the role payload stay the raw enum.
+const ROLE_LABELS: Record<Role, string> = {
+  ADMIN: 'Admin', MANAGER: 'Manager', OPERATOR: 'Operator', DISPATCHER: 'Dispatcher',
+  VIEWER: 'Viewer', DRIVER: 'Driver', CUSTOMER: 'Customer', PARTNER: 'Partner',
+};
+const roleLabel = (role: string) =>
+  Object.prototype.hasOwnProperty.call(ROLE_LABELS, role) ? ROLE_LABELS[role as Role] : role;
 
 const fmt = (dateStr?: string | null) =>
   dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
@@ -183,22 +198,30 @@ export default function UsersTable() {
 
   return (
     <div className="card" style={cardStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-        <div style={{ ...sectionTitleStyle, marginBottom: 0 }}>Users {data ? `(${data.count})` : ''}</div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Users {data ? `(${data.count})` : ''}</h2>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
+            className="admin-control"
             style={inputStyle}
+            aria-label="Search users"
             placeholder="Search name, email, company…"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          <select style={selectStyle} value={statusFilter} onChange={e => setStatusFilter(e.target.value as '' | 'active' | 'inactive')}>
+          <select
+            className="admin-control"
+            style={selectStyle}
+            aria-label="Filter by status"
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as '' | 'active' | 'inactive')}
+          >
             <option value="">All statuses</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <button className="btn-action" style={{ fontSize: 11 }} onClick={() => setShowCreate(s => !s)}>
-            {showCreate ? 'Cancel' : '+ Create User'}
+          <button className="btn-action admin-control" style={{ minHeight: 40, borderRadius: 6 }} onClick={() => setShowCreate(s => !s)}>
+            {showCreate ? 'Cancel' : 'New user'}
           </button>
         </div>
       </div>
@@ -208,31 +231,25 @@ export default function UsersTable() {
           style={{
             display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap',
             padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))',
-            border: '1px solid var(--border-subtle)', borderRadius: 2,
+            border: '1px solid var(--border-subtle)', borderRadius: 8,
           }}
         >
-          <div>
-            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-              Email *
-            </div>
-            <input style={{ ...inputStyle, width: 240 }} type="email" placeholder="user@company.com" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
-          </div>
-          <div>
-            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-              First name
-            </div>
-            <input style={{ ...inputStyle, width: 160 }} placeholder="Optional" value={newFirstName} onChange={e => setNewFirstName(e.target.value)} />
-          </div>
-          <div>
-            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
-              Last name
-            </div>
-            <input style={{ ...inputStyle, width: 160 }} placeholder="Optional" value={newLastName} onChange={e => setNewLastName(e.target.value)} />
-          </div>
-          <button className="btn-action" style={{ fontSize: 11 }} disabled={creating} onClick={handleCreate}>
+          <label>
+            <span style={fieldLabelStyle}>Email *</span>
+            <input className="admin-control" style={{ ...inputStyle, width: 240 }} type="email" placeholder="user@company.com" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
+          </label>
+          <label>
+            <span style={fieldLabelStyle}>First name</span>
+            <input className="admin-control" style={{ ...inputStyle, width: 160 }} placeholder="Optional" value={newFirstName} onChange={e => setNewFirstName(e.target.value)} />
+          </label>
+          <label>
+            <span style={fieldLabelStyle}>Last name</span>
+            <input className="admin-control" style={{ ...inputStyle, width: 160 }} placeholder="Optional" value={newLastName} onChange={e => setNewLastName(e.target.value)} />
+          </label>
+          <button className="btn-action admin-control" style={{ minHeight: 40, borderRadius: 6 }} disabled={creating} onClick={handleCreate}>
             {creating ? 'Creating…' : 'Create'}
           </button>
-          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', flexBasis: '100%' }}>
+          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', flexBasis: '100%' }}>
             Creates a bare account with no company. They'll get an email to set their password and can then onboard their own company.
           </div>
         </div>
@@ -241,8 +258,8 @@ export default function UsersTable() {
       {isLoading ? (
         <Loader size={24} />
       ) : (
-        <div style={{ overflowX: 'auto', opacity: isFetching ? 0.7 : 1 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="admin-scroll-region" role="region" aria-label="Users" tabIndex={0} style={{ overflowX: 'auto', opacity: isFetching ? 0.7 : 1 }}>
+          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Name</th>
@@ -261,19 +278,21 @@ export default function UsersTable() {
                   <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.55 }}>
                     <td style={tdStyle}>
                       {u.name || '—'}
-                      {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--status-warning)' }}>SUPERUSER</span>}
+                      {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-warning)' }}>Superuser</span>}
                     </td>
                     <td style={tdStyle}>{u.email}</td>
                     <td style={tdStyle}>{u.company_name || '—'}</td>
                     <td style={tdStyle}>
                       <select
-                        style={{ ...selectStyle, padding: '4px 8px', fontSize: 11 }}
+                        className="admin-control"
+                        style={{ ...selectStyle, padding: '8px 12px' }}
+                        aria-label={`Role for ${u.name || u.email}`}
                         value={u.role}
                         disabled={rowPending === 'role'}
                         onChange={e => handleRoleChange(u, e.target.value)}
                       >
                         {ROLES.map(r => (
-                          <option key={r} value={r}>{r}</option>
+                          <option key={r} value={r}>{roleLabel(r)}</option>
                         ))}
                         {!ROLES.includes(u.role as Role) && <option value={u.role}>{u.role}</option>}
                       </select>
@@ -283,8 +302,9 @@ export default function UsersTable() {
                     </td>
                     <td style={tdStyle}>{fmt(u.last_login)}</td>
                     <td style={tdStyle}>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button
+                          className="admin-control"
                           style={secondaryBtnStyle}
                           onClick={() => setActivityTarget(u)}
                         >
@@ -292,6 +312,7 @@ export default function UsersTable() {
                         </button>
                         {u.is_active ? (
                           <button
+                            className="admin-control"
                             style={{ ...secondaryBtnStyle, color: 'var(--status-danger)' }}
                             disabled={!!rowPending}
                             onClick={() => setLockTarget(u)}
@@ -300,6 +321,7 @@ export default function UsersTable() {
                           </button>
                         ) : (
                           <button
+                            className="admin-control"
                             style={secondaryBtnStyle}
                             disabled={!!rowPending}
                             onClick={() => runAction(u, 'unlock')}
@@ -308,6 +330,7 @@ export default function UsersTable() {
                           </button>
                         )}
                         <button
+                          className="admin-control"
                           style={secondaryBtnStyle}
                           disabled={!!rowPending}
                           onClick={() => runAction(u, 'reset_password')}
@@ -316,6 +339,7 @@ export default function UsersTable() {
                         </button>
                         {!u.is_superuser && (
                           <button
+                            className="admin-control"
                             style={{ ...secondaryBtnStyle, color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
                             disabled={!!rowPending}
                             onClick={() => setDeleteTarget(u)}

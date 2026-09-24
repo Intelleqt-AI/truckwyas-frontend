@@ -1,5 +1,7 @@
+import './customers-typography.css';
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { Building2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
 import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
@@ -31,9 +33,9 @@ interface Customer {
 }
 
 const PAYMENT_TERMS = [
-  { value: "NET30", label: "Net 30 Days" },
-  { value: "NET60", label: "Net 60 Days" },
-  { value: "NET90", label: "Net 90 Days" },
+  { value: "NET30", label: "Net 30 days" },
+  { value: "NET60", label: "Net 60 days" },
+  { value: "NET90", label: "Net 90 days" },
 ];
 
 
@@ -44,20 +46,23 @@ const fieldStyle: React.CSSProperties = {
   color: "var(--text-primary)",
   padding: "10px 12px",
   borderRadius: 2,
-  fontSize: 12,
-  fontFamily: "var(--font-mono)",
+  fontSize: 14,
+  lineHeight: "20px",
+  fontFamily: "var(--font-sans)",
   outline: "none",
   boxSizing: "border-box",
 };
 
 const labelStyle: React.CSSProperties = {
   display: "block",
-  fontSize: 11,
-  fontFamily: "var(--font-mono)",
+  fontSize: 13,
+  lineHeight: "20px",
+  fontWeight: 500,
+  fontFamily: "var(--font-sans)",
   color: "var(--text-tertiary)",
-  letterSpacing: "0.06em",
+  letterSpacing: "normal",
   marginBottom: 6,
-  textTransform: "uppercase",
+  textTransform: "none",
 };
 
 const EMPTY_FORM = {
@@ -161,11 +166,11 @@ export default function Customers() {
   if (loading) return <Loader fullScreen />;
 
   return (
-    <div>
+    <div className="customers-typography">
       {/* Header */}
       <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: "var(--text-primary)" }}>Customers</div>
+          <h1 style={{ margin: 0, fontSize: 22, lineHeight: "28px", fontWeight: 600, color: "var(--text-primary)" }}>Customers</h1>
           <LiveBadge />
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -173,7 +178,7 @@ export default function Customers() {
             onClick={() => setShowImport(true)}
             disabled={isDemo}
             title={isDemo ? 'Fixed in demo mode' : 'Paste a list from Excel'}
-            style={{ ...secondaryButtonStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+            style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', textTransform: 'none', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
           >Import from Excel</button>
           <button
             className="btn-action"
@@ -188,10 +193,10 @@ export default function Customers() {
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
         {[
-          { label: "Total Customers", value: customers.length, color: "var(--text-primary)" },
-          { label: "With Credit Limit", value: customers.filter(c => c.credit_limit != null && Number(c.credit_limit) > 0).length, color: "var(--accent-primary)" },
-          { label: "Cities Covered", value: new Set(customers.map(c => c.city).filter(Boolean)).size, color: "var(--text-primary)" },
-          { label: "NET30 Clients", value: customers.filter(c => (c.payment_terms_default || "NET30") === "NET30").length, color: "var(--text-primary)" },
+          { label: "Total customers", value: customers.length, color: "var(--text-primary)" },
+          { label: "With credit limit", value: customers.filter(c => c.credit_limit != null && Number(c.credit_limit) > 0).length, color: "var(--accent-primary)" },
+          { label: "Cities covered", value: new Set(customers.map(c => c.city).filter(Boolean)).size, color: "var(--text-primary)" },
+          { label: "Net 30 clients", value: customers.filter(c => (c.payment_terms_default || "NET30") === "NET30").length, color: "var(--text-primary)" },
         ].map(k => (
           <div key={k.label} className="card metric-card">
             <div className="card-header"><span className="card-title">{k.label}</span></div>
@@ -222,7 +227,7 @@ export default function Customers() {
             style={{ ...fieldStyle, width: 280 }}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Sort</span>
+            <span style={{ fontSize: 13, lineHeight: "20px", fontWeight: 500, fontFamily: "var(--font-sans)", color: "var(--text-tertiary)", letterSpacing: 0 }}>Sort</span>
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger>
                 <SelectValue />
@@ -231,8 +236,8 @@ export default function Customers() {
                 <SelectItem value="name_asc">Name A–Z</SelectItem>
                 <SelectItem value="name_desc">Name Z–A</SelectItem>
                 <SelectItem value="city">City A–Z</SelectItem>
-                <SelectItem value="newest">Newest First</SelectItem>
-                <SelectItem value="oldest">Oldest First</SelectItem>
+                <SelectItem value="newest">Newest first</SelectItem>
+                <SelectItem value="oldest">Oldest first</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -252,11 +257,11 @@ export default function Customers() {
                   />
                 )}
               </th>
-              {["Name", "Company", "Email", "Phone", "City", "Payment Terms", ""].map(h => (
+              {["Name", "Company", "Email", "Phone", "City", "Payment terms", ""].map(h => (
                 <th key={h} style={{
                   padding: "12px 20px 12px 12px", textAlign: "left",
-                  fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase",
-                  letterSpacing: "0.08em", color: "var(--text-tertiary)",
+                  fontFamily: "var(--font-sans)", fontSize: 13, lineHeight: "20px",
+                  letterSpacing: 0, textTransform: "none", color: "var(--text-secondary)",
                   borderBottom: "1px solid var(--border-subtle)", fontWeight: 500, whiteSpace: "nowrap",
                 }}>{h}</th>
               ))}
@@ -268,7 +273,7 @@ export default function Customers() {
                 <tr>
                   <td colSpan={8} style={{ padding: 0 }}>
                     <div style={{ padding: "60px 20px", textAlign: "center" }}>
-                      <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🏢</div>
+                      <div style={{ marginBottom: 16, opacity: 0.3, color: "var(--text-secondary)" }}><Building2 size={48} strokeWidth={1.5} aria-hidden="true" /></div>
                       <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", marginBottom: 8 }}>No customers yet</div>
                       <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
                         Already have them in a spreadsheet? Paste the list straight in.
@@ -285,7 +290,7 @@ export default function Customers() {
                           onClick={() => setShowAddForm(true)}
                           disabled={isDemo}
                           title={isDemo ? 'Fixed in demo mode' : undefined}
-                          style={{ ...secondaryButtonStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+                          style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', textTransform: 'none', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
                         >Add one at a time</button>
                       </div>
                     </div>
@@ -324,16 +329,16 @@ export default function Customers() {
                   <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, color: "var(--text-secondary)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.company_name || ""}>
                     {c.company_name || "—"}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.email}>
+                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-sans)", fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.email}>
                     {c.email}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-sans)", fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                     {c.phone || "—"}
                   </td>
                   <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                     {c.city || "—"}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-sans)", fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                     {c.payment_terms_default || "NET30"}
                   </td>
                   <td style={{ padding: "12px 20px", textAlign: "right" }}>
@@ -342,13 +347,13 @@ export default function Customers() {
                         onClick={e => { e.stopPropagation(); openEdit(c); }}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", padding: "4px 10px", borderRadius: 2, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", opacity: isDemo ? 0.5 : 1 }}
+                        style={{ background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", padding: "4px 10px", borderRadius: 2, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", fontWeight: 500, letterSpacing: "normal", opacity: isDemo ? 0.5 : 1 }}
                       >Edit</button>
                       <button
                         onClick={e => {
                           e.stopPropagation();
                           setConfirmOpts({
-                            title: "Delete Customer",
+                            title: "Delete customer",
                             message: `Remove "${c.name}"? This cannot be undone.`,
                             confirmLabel: "Delete",
                             danger: true,
@@ -365,8 +370,8 @@ export default function Customers() {
                         }}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: "none", border: "1px solid var(--status-danger)", color: "var(--status-danger)", padding: "4px 10px", borderRadius: 2, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.06em", opacity: isDemo ? 0.5 : 1 }}
-                      >Del</button>
+                        style={{ background: "none", border: "1px solid var(--status-danger)", color: "var(--status-danger)", padding: "4px 10px", borderRadius: 2, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", fontWeight: 500, letterSpacing: "normal", opacity: isDemo ? 0.5 : 1 }}
+                      >Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -383,26 +388,26 @@ export default function Customers() {
         onImported={() => refetch()}
       />
 
-      {/* Add Customer slide-out */}
+      {/* Add customer slide-out */}
       {showAddForm && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", justifyContent: "flex-end" }}>
           <div style={{ position: "absolute", inset: 0, background: "var(--modal-backdrop)" }} onClick={() => { setShowAddForm(false); if (location.pathname === "/customers/new") navigate("/customers", { replace: true }); }} />
           <div style={{ position: "relative", width: 440, background: "var(--bg-deep)", borderLeft: "1px solid var(--border-subtle)", padding: 28, overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>Add Customer</div>
+              <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>Add customer</div>
               <button onClick={() => setShowAddForm(false)} style={{ background: "none", border: "none", color: "var(--text-tertiary)", cursor: "pointer", fontSize: 18 }}>✕</button>
             </div>
 
             {[
-              { key: "name", label: "Full Name", placeholder: "e.g. John Doe", required: true },
-              { key: "company_name", label: "Company Name", placeholder: "e.g. Acme Logistics" },
+              { key: "name", label: "Full name", placeholder: "e.g. John Doe", required: true },
+              { key: "company_name", label: "Company name", placeholder: "e.g. Acme Logistics" },
               { key: "email", label: "Email", placeholder: "e.g. john@company.com", type: "email", required: true },
               { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000", required: true },
               { key: "city", label: "City", placeholder: "e.g. Johannesburg", required: true },
-              { key: "state", label: "Province / State", placeholder: "e.g. Gauteng" },
-              { key: "zip_code", label: "Zip Code", placeholder: "e.g. 2000" },
+              { key: "state", label: "Province / state", placeholder: "e.g. Gauteng" },
+              { key: "zip_code", label: "Zip code", placeholder: "e.g. 2000" },
               { key: "address", label: "Address", placeholder: "Street address" },
-              { key: "billing_address", label: "Billing Address", placeholder: "Leave blank if same as address" },
+              { key: "billing_address", label: "Billing address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>}</label>
@@ -417,7 +422,7 @@ export default function Customers() {
             ))}
 
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Payment Terms</label>
+              <label style={labelStyle}>Payment terms</label>
               <Select value={addForm.payment_terms_default} onValueChange={val => setAddForm(prev => ({ ...prev, payment_terms_default: val }))}>
                 <SelectTrigger>
                   <SelectValue />
@@ -429,7 +434,7 @@ export default function Customers() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Credit Limit (R)</label>
+              <label style={labelStyle}>Credit limit (R)</label>
               <input
                 type="number"
                 placeholder="e.g. 50000"
@@ -462,13 +467,13 @@ export default function Customers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.06em", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
+                style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", letterSpacing: "normal", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
               >
                 {saving ? "Saving…" : "Create customer"}
               </button>
               <button
                 onClick={() => setShowAddForm(false)}
-                style={{ padding: "10px 20px", fontFamily: "var(--font-mono)", fontSize: 11, background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
+                style={{ padding: "10px 20px", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
               >
                 Cancel
               </button>
@@ -477,26 +482,26 @@ export default function Customers() {
         </div>
       )}
 
-      {/* Edit Customer slide-out */}
+      {/* Edit customer slide-out */}
       {editCustomer && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", justifyContent: "flex-end" }}>
           <div style={{ position: "absolute", inset: 0, background: "var(--modal-backdrop)" }} onClick={() => setEditCustomer(null)} />
           <div style={{ position: "relative", width: 440, background: "var(--bg-deep)", borderLeft: "1px solid var(--border-subtle)", padding: 28, overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>Edit Customer</div>
+              <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>Edit customer</div>
               <button onClick={() => setEditCustomer(null)} style={{ background: "none", border: "none", color: "var(--text-tertiary)", cursor: "pointer", fontSize: 18 }}>✕</button>
             </div>
 
             {[
-              { key: "name", label: "Full Name", placeholder: "e.g. John Doe", required: true },
-              { key: "company_name", label: "Company Name", placeholder: "e.g. Acme Logistics" },
+              { key: "name", label: "Full name", placeholder: "e.g. John Doe", required: true },
+              { key: "company_name", label: "Company name", placeholder: "e.g. Acme Logistics" },
               { key: "email", label: "Email", placeholder: "e.g. john@company.com", type: "email", required: true },
               { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000", required: true },
               { key: "city", label: "City", placeholder: "e.g. Johannesburg", required: true },
-              { key: "state", label: "Province / State", placeholder: "e.g. Gauteng" },
-              { key: "zip_code", label: "Zip Code", placeholder: "e.g. 2000" },
+              { key: "state", label: "Province / state", placeholder: "e.g. Gauteng" },
+              { key: "zip_code", label: "Zip code", placeholder: "e.g. 2000" },
               { key: "address", label: "Address", placeholder: "Street address" },
-              { key: "billing_address", label: "Billing Address", placeholder: "Leave blank if same as address" },
+              { key: "billing_address", label: "Billing address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger)", marginLeft: 2 }}>*</span>}</label>
@@ -511,7 +516,7 @@ export default function Customers() {
             ))}
 
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Payment Terms</label>
+              <label style={labelStyle}>Payment terms</label>
               <Select value={editForm.payment_terms_default ?? "NET30"} onValueChange={val => setEditForm((prev: any) => ({ ...prev, payment_terms_default: val }))}>
                 <SelectTrigger>
                   <SelectValue />
@@ -523,7 +528,7 @@ export default function Customers() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Credit Limit (R)</label>
+              <label style={labelStyle}>Credit limit (R)</label>
               <input
                 type="number"
                 placeholder="e.g. 50000"
@@ -565,13 +570,13 @@ export default function Customers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.06em", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
+                style={{ flex: 1, padding: "10px 0", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", letterSpacing: "normal", background: "var(--accent-primary)", color: "var(--bg-deep)", border: "none", borderRadius: 2, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
               >
                 {saving ? "Saving…" : "Update customer"}
               </button>
               <button
                 onClick={() => setEditCustomer(null)}
-                style={{ padding: "10px 20px", fontFamily: "var(--font-mono)", fontSize: 11, background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
+                style={{ padding: "10px 20px", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 2, cursor: "pointer" }}
               >
                 Cancel
               </button>

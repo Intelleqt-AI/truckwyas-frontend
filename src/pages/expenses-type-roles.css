@@ -1,0 +1,11 @@
+/* Complete Expenses presentation scope; values and identifiers are untouched. */
+.expenses-type-roles { --expense-input-size:14px; font-family:var(--font-sans); }
+.expenses-type-roles .card-title {font:500 13px/20px var(--font-sans);letter-spacing:normal;text-transform:none;}
+.expenses-type-roles .metric-value {font:600 28px/36px var(--font-sans);font-variant-numeric:tabular-nums;letter-spacing:normal;overflow-wrap:anywhere;}
+.expenses-type-roles .metric-card {min-width:0;}
+.expenses-type-roles .btn-action {font:500 14px/20px var(--font-sans);letter-spacing:normal;text-transform:none;min-height:40px;border-radius:6px;}
+.expenses-type-roles .expenses-filter-bar :is(button,input,select) {min-height:40px;}
+@media (max-width:767px), (pointer:coarse) {
+ .expenses-type-roles {--expense-input-size:16px;}
+ .expenses-type-roles .btn-action,.expenses-type-roles .expenses-filter-bar :is(button,input,select) {min-height:48px;}
+}

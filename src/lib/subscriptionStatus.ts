@@ -8,13 +8,13 @@ export function isSubscriptionBlocked(status?: string | null): boolean {
 }
 
 export function subscriptionStatusLabel(status?: string | null, cancelAtPeriodEnd?: boolean): string {
-  if (cancelAtPeriodEnd) return 'CANCELLING';
+  if (cancelAtPeriodEnd) return 'Cancelling';
   switch (status) {
-    case 'trialing': return 'TRIAL';
-    case 'grace_period': return 'OVERDUE';
-    case 'suspended': return 'SUSPENDED';
-    case 'cancelled': return 'CANCELLED';
-    default: return 'ONLINE'; // 'active', 'none', or not yet loaded
+    case 'trialing': return 'Trial';
+    case 'grace_period': return 'Overdue';
+    case 'suspended': return 'Suspended';
+    case 'cancelled': return 'Cancelled';
+    default: return 'Online'; // 'active', 'none', or not yet loaded
   }
 }
 

@@ -1,3 +1,4 @@
+import './table-heading-roles.css';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
@@ -175,11 +176,11 @@ export default function RiskScoreView() {
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>Run: python manage.py calculate_risk_scores</div>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--bg-surface-hover)' }}>
-                {['CUSTOMER', 'SCORE', 'TIER', 'PAYMENT HIST', 'INVOICE AGE', 'POD', 'FAST PAY FEE', 'ELIGIBLE'].map(h => (
-                  <th key={h} style={{ padding: '12px 16px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textAlign: 'left', letterSpacing: '0.08em', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
+                {['Customer', 'Score', 'Tier', 'Payment history', 'Invoice age', 'POD', 'Fast pay fee', 'Eligible'].map(h => (
+                  <th key={h} style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
                 ))}
               </tr>
             </thead>

@@ -1,0 +1,36 @@
+/* Explicit Capital and Advance Request roles; no global theme overrides. */
+.capital-typography .card-title {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.capital-typography .metric-card .card-title {
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.capital-typography .metric-value,
+.capital-typography .capital-amount,
+.capital-typography .capital-facility-values {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.capital-typography .metric-value {
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: normal;
+  overflow-wrap: anywhere;
+}
+.capital-typography .metric-card { min-width: 0; }
+.capital-typography .btn-action {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}

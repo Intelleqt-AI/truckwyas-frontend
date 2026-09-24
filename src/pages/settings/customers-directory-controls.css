@@ -1,0 +1,20 @@
+.customer-directory-controls button,
+.customer-directory-controls input,
+.customer-directory-controls [role="combobox"] {
+  min-height: 40px;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+.customer-directory-controls button { min-width: 40px; }
+.customer-directory-controls input { min-width: 0; max-width: 100%; }
+.customer-directory-controls .customer-directory-add-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 768px) {
+  .customer-directory-controls .customer-directory-add-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .customer-directory-controls button,
+  .customer-directory-controls input,
+  .customer-directory-controls [role="combobox"] { min-height: 48px; }
+  .customer-directory-controls button { min-width: 48px; }
+  .customer-directory-controls .customer-directory-add-grid { grid-template-columns: minmax(0, 1fr); }
+}

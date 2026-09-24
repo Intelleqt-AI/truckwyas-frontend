@@ -1,3 +1,5 @@
+import '@/pages/table-heading-roles.css';
+import '@/pages/settings/settings-brand.css';
 import { useState, useEffect } from "react";
 import { fetchData, deleteData } from "@/lib/Api";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
@@ -38,10 +40,31 @@ const STATUS_COLOR: Record<string, string> = {
   OUT_OF_SERVICE: 'var(--status-danger)',
 };
 
+// Presentation-only labels for known status payload values — unknown strings
+// render verbatim (own-property lookup), and unknown keys keep neutral text.
+const STATUS_LABELS: Record<string, string> = {
+  AVAILABLE: 'Available',
+  MAINTENANCE: 'Maintenance',
+  IN_USE: 'In use',
+  IN_TRANSIT: 'In transit',
+  OUT_OF_SERVICE: 'Out of service',
+};
+const statusLabel = (s: string) =>
+  Object.prototype.hasOwnProperty.call(STATUS_LABELS, s) ? STATUS_LABELS[s] : s;
+const statusColor = (s: string) =>
+  Object.prototype.hasOwnProperty.call(STATUS_COLOR, s) ? STATUS_COLOR[s] : 'var(--text-secondary)';
+
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
   border: '1px solid var(--border-subtle)',
-  borderRadius: 'var(--card-radius)',
+  borderRadius: 8,
+};
+
+const rowActionStyle: React.CSSProperties = {
+  background: 'none', border: '1px solid var(--border-subtle)',
+  color: 'var(--text-secondary)', padding: '8px 12px',
+  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
+  borderRadius: 6, minHeight: 40,
 };
 
 export function VehiclesDirectory() {
@@ -85,8 +108,8 @@ export function VehiclesDirectory() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Vehicles</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Fleet vehicle directory</div>
+        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Vehicles</h2>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Fleet vehicle directory</div>
       </div>
 
       <div style={sectionStyle}>
@@ -94,33 +117,42 @@ export function VehiclesDirectory() {
           padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-secondary)', fontWeight: 600 }}>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontWeight: 500 }}>
             Vehicles ({vehicles.length})
           </span>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 12 }}>
             <input
+              className="settings-control"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search..."
+              placeholder="Search…"
+              aria-label="Search vehicles"
               style={{
                 background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                borderRadius: 2, padding: '6px 10px', color: 'var(--text-primary)',
-                fontSize: 12, outline: 'none', width: 180,
+                borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)',
+                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px',
+                minHeight: 40, width: 180,
               }}
             />
             <button
+              className="settings-control"
               onClick={() => setShowImport(true)}
               disabled={isDemo}
               title={isDemo ? 'Not available in the demo' : 'Paste or upload a fleet list'}
-              style={{ ...secondaryButtonStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
-            >IMPORT</button>
+              style={{
+                ...secondaryButtonStyle,
+                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
+                letterSpacing: 'normal', borderRadius: 6, minHeight: 40, padding: '8px 12px',
+                cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
+              }}
+            >Import</button>
             <button
-              className="btn-action"
+              className="btn-action settings-control"
               onClick={() => setShowAddDrawer(true)}
               disabled={isDemo}
               title={isDemo ? 'Not available in the demo' : undefined}
-              style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-            >+ ADD VEHICLE</button>
+              style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+            >Add vehicle</button>
           </div>
         </div>
 
@@ -134,7 +166,8 @@ export function VehiclesDirectory() {
         {loading ? (
           <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+          <div className="settings-scroll-region" role="region" aria-label="Vehicles" tabIndex={0} style={{ overflowX: 'auto' }}>
+          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' as const }}>
             <thead>
               <tr>
                 <th style={{ padding: '10px 0 10px 16px', width: 32, borderBottom: '1px solid var(--border-subtle)' }}>
@@ -146,12 +179,10 @@ export function VehiclesDirectory() {
                     />
                   )}
                 </th>
-                {['Plate', 'Make / Model', 'Type', 'Status', 'Driver', 'Last Service', ''].map(h => (
+                {['Plate', 'Make and model', 'Type', 'Status', 'Driver', 'Last service', ''].map(h => (
                   <th key={h} style={{
                     padding: '10px 20px', textAlign: 'left' as const,
-                    fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em', color: 'var(--text-tertiary)',
-                    borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                    borderBottom: '1px solid var(--border-subtle)',
                   }}>{h}</th>
                 ))}
               </tr>
@@ -164,38 +195,37 @@ export function VehiclesDirectory() {
                   <td style={{ padding: '12px 0 12px 16px', width: 32 }}>
                     <RowCheckbox checked={selected.includes(v.id)} onChange={on => toggleOne(v.id, on)} />
                   </td>
-                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>
+                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', fontWeight: 400, color: 'var(--text-primary)' }}>
                     {v.plate || '—'}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {[v.make, v.model].filter(Boolean).join(' ') || '—'}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {v.vehicle_type_name || v.vehicle_type || '—'}
                     {v.vehicle_type_capacity != null && (
-                      <span style={{ marginLeft: 6, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                      <span style={{ marginLeft: 6, color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums' }}>
                         · {v.vehicle_type_capacity}t
                       </span>
                     )}
                   </td>
                   <td style={{ padding: '12px 20px' }}>
                     <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 10,
-                      color: STATUS_COLOR[v.status] || 'var(--text-tertiary)',
-                      textTransform: 'uppercase' as const,
-                    }}>{v.status?.replace('_', ' ')}</span>
+                      fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+                      color: statusColor(v.status),
+                    }}>{statusLabel(v.status)}</span>
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {v.driver_name || '—'}
                   </td>
-                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
+                  <td style={{ padding: '12px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
                     {(() => {
                       if (v.service_interval_km && v.last_service_mileage && v.mileage) {
                         const nextAt = parseFloat(String(v.last_service_mileage)) + Number(v.service_interval_km);
                         const remaining = nextAt - parseFloat(String(v.mileage));
                         return remaining > 0
                           ? `${Math.round(remaining).toLocaleString('en-ZA')} km left`
-                          : 'OVERDUE';
+                          : 'Overdue';
                       }
                       if (v.last_service_mileage) {
                         return `At ${parseFloat(String(v.last_service_mileage)).toLocaleString('en-ZA')} km`;
@@ -204,35 +234,35 @@ export function VehiclesDirectory() {
                     })()}
                   </td>
                   <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                       <button
+                        className="settings-control"
                         onClick={() => setEditVehicle(v)}
                         disabled={isDemo}
                         title={isDemo ? 'Not available in the demo' : undefined}
                         style={{
-                          background: 'none', border: '1px solid var(--border-subtle)',
-                          color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
-                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
+                          ...rowActionStyle,
+                          cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                         }}
-                      >EDIT</button>
+                      >Edit</button>
                       <button
+                        className="settings-control"
                         onClick={() => setDeleteTarget({ id: v.id, name: v.plate || `Vehicle ${v.id}` })}
                         disabled={isDemo}
                         title={isDemo ? 'Not available in the demo' : undefined}
                         style={{
-                          background: 'none', border: '1px solid var(--status-danger)',
-                          color: 'var(--status-danger)', padding: '4px 10px',
-                          fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer',
-                          letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1,
+                          ...rowActionStyle,
+                          border: '1px solid var(--status-danger)', color: 'var(--status-danger)',
+                          cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                         }}
-                      >DELETE</button>
+                      >Delete</button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -244,7 +274,7 @@ export function VehiclesDirectory() {
 
       {deleteTarget && (
         <ConfirmModal
-          title="Delete Vehicle"
+          title="Delete vehicle"
           message={`Are you sure you want to delete vehicle "${deleteTarget.name}"? This cannot be undone.`}
           confirmLabel="Delete"
           danger

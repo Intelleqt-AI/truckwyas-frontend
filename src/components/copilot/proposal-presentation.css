@@ -1,0 +1,47 @@
+/* Embedded proposal preview: retain its fields/actions and adopt desktop roles only.
+   Below 768px the --cpp-* variables are unset so the inline fallbacks reproduce the
+   previous presentation exactly. */
+@media (min-width: 768px) {
+  .copilot-proposal {
+    --cpp-chip-display: inline-flex;
+    --cpp-font: var(--font-sans);
+    --cpp-body-size: 14px;
+    --cpp-support-size: 13px;
+    --cpp-section-size: 16px;
+    --cpp-section-line: 24px;
+    --cpp-line: 20px;
+    --cpp-tracking: normal;
+    --cpp-case: none;
+    --cpp-label-weight: 500;
+    --cpp-card-radius: 8px;
+    --cpp-card-inset: 24px;
+    --cpp-badge-inset: 4px 8px;
+    --cpp-badge-radius: 4px;
+    --cpp-space: 12px;
+    --cpp-error-gap: 6px;
+    --cpp-callout-inset: 12px;
+    --cpp-label-inset: 8px 16px 8px 0;
+    --cpp-value-inset: 8px 0;
+    --cpp-change-gap: 0 8px;
+    --cpp-label-wrap: normal;
+    --cpp-on-accent: var(--btn-action-color);
+    --cpp-success: var(--status-success-text, var(--status-success));
+    --cpp-warning: var(--status-warning-text, var(--status-warning));
+    --cpp-danger: var(--status-danger-text, var(--status-danger));
+    font: 400 14px/20px var(--font-sans);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .copilot-proposal .btn-action {
+    min-height: 40px;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font: 500 14px/20px var(--font-sans);
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .copilot-proposal .btn-action:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 3px;
+  }
+}

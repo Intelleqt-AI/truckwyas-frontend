@@ -1,3 +1,4 @@
+import '@/pages/settings/settings-brand.css';
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -16,7 +17,7 @@ const resolveLogoUrl = (url?: string) => {
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
   border: '1px solid var(--border-subtle)',
-  borderRadius: 'var(--card-radius)',
+  borderRadius: 8,
   marginBottom: 16,
 };
 
@@ -26,21 +27,21 @@ const sectionHeaderStyle: React.CSSProperties = {
 };
 
 const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.08em',
-  color: 'var(--text-secondary)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 16,
+  lineHeight: '24px',
   fontWeight: 600,
+  color: 'var(--text-primary)',
+  margin: 0,
 };
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
-  fontFamily: 'var(--font-mono)',
-  fontSize: 10,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.08em',
-  color: 'var(--text-tertiary)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 13,
+  lineHeight: '20px',
+  fontWeight: 500,
+  color: 'var(--text-primary)',
   marginBottom: 6,
 };
 
@@ -48,12 +49,17 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
   background: 'var(--input-bg)',
   border: '1px solid var(--border-subtle)',
-  borderRadius: 2,
+  borderRadius: 6,
   padding: '8px 12px',
+  minHeight: 40,
   color: 'var(--text-primary)',
   fontFamily: 'var(--font-sans)',
-  fontSize: 13,
-  outline: 'none',
+  fontSize: 14,
+  lineHeight: '20px',
+};
+
+const helpTextStyle: React.CSSProperties = {
+  fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 6,
 };
 
 const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 };
@@ -279,13 +285,13 @@ export function CompanySettings() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Company Details</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Your business information and branding</div>
+        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Company details</h2>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Your business information and branding</div>
       </div>
 
       {/* Company Logo */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Company Logo</span></div>
+        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Company logo</h3></div>
         <div style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 20 }}>
           <div style={{
             width: 96, height: 96, flexShrink: 0,
@@ -300,10 +306,10 @@ export function CompanySettings() {
             )}
           </div>
           <div>
-            <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>
+            <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', marginBottom: 4 }}>
               This logo appears on quotes and invoices sent to your customers.
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 12 }}>
+            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 12 }}>
               PNG, JPG, GIF or WebP · max 2MB
             </div>
             <input
@@ -315,13 +321,13 @@ export function CompanySettings() {
               style={{ display: 'none' }}
             />
             <button
-              className="btn-action"
+              className="btn-action settings-control"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingLogo || isDemo}
               title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+              style={{ minHeight: 40, borderRadius: 6, opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
             >
-              {uploadingLogo ? 'UPLOADING...' : logoUrl ? 'REPLACE LOGO' : 'UPLOAD LOGO'}
+              {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace logo' : 'Upload logo'}
             </button>
           </div>
         </div>
@@ -329,12 +335,12 @@ export function CompanySettings() {
 
       {/* Business Info */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Business Information</span></div>
+        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Business information</h3></div>
         <div style={{ padding: 20 }}>
           <div style={{ ...grid2, marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>Company Name</label>
-              <input style={inputStyle} value={form.company_name} onChange={e => set('company_name', e.target.value)} />
+              <label style={labelStyle}>Company name</label>
+              <input className="settings-control" style={inputStyle} value={form.company_name} onChange={e => set('company_name', e.target.value)} />
             </div>
             <div>
               <label style={labelStyle}>Industry</label>
@@ -343,10 +349,10 @@ export function CompanySettings() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="general_freight">General Freight</SelectItem>
-                  <SelectItem value="refrigerated">Refrigerated Transport</SelectItem>
-                  <SelectItem value="hazmat">Hazmat / Dangerous Goods</SelectItem>
-                  <SelectItem value="construction">Construction Materials</SelectItem>
+                  <SelectItem value="general_freight">General freight</SelectItem>
+                  <SelectItem value="refrigerated">Refrigerated transport</SelectItem>
+                  <SelectItem value="hazmat">Hazmat / dangerous goods</SelectItem>
+                  <SelectItem value="construction">Construction materials</SelectItem>
                   <SelectItem value="agriculture">Agriculture</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
@@ -355,21 +361,22 @@ export function CompanySettings() {
           </div>
           <div style={{ ...grid2, marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>Registration Number</label>
-              <input style={inputStyle} value={form.registration_number} onChange={e => set('registration_number', e.target.value)} placeholder="YYYY/XXXXXX/XX" />
+              <label style={labelStyle}>Registration number</label>
+              <input className="settings-control" style={inputStyle} value={form.registration_number} onChange={e => set('registration_number', e.target.value)} placeholder="YYYY/XXXXXX/XX" />
             </div>
             <div>
-              <label style={labelStyle}>VAT Number</label>
-              <input style={inputStyle} value={form.vat_number} onChange={e => set('vat_number', e.target.value)} placeholder="4XXXXXXXXX" />
+              <label style={labelStyle}>VAT number</label>
+              <input className="settings-control" style={inputStyle} value={form.vat_number} onChange={e => set('vat_number', e.target.value)} placeholder="4XXXXXXXXX" />
             </div>
           </div>
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>Website</label>
-            <input style={inputStyle} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://" />
+            <input className="settings-control" style={inputStyle} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://" />
           </div>
           <div>
             <label style={labelStyle}>Description</label>
             <textarea
+              className="settings-control"
               style={{ ...inputStyle, minHeight: 72, resize: 'vertical' as const }}
               value={form.description}
               onChange={e => set('description', e.target.value)}
@@ -380,16 +387,16 @@ export function CompanySettings() {
 
       {/* Address */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Business Address</span></div>
+        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Business address</h3></div>
         <div style={{ padding: 20 }}>
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Street Address</label>
-            <input style={inputStyle} value={form.street} onChange={e => set('street', e.target.value)} />
+            <label style={labelStyle}>Street address</label>
+            <input className="settings-control" style={inputStyle} value={form.street} onChange={e => set('street', e.target.value)} />
           </div>
           <div style={{ ...grid3, marginBottom: 16 }}>
             <div>
               <label style={labelStyle}>City</label>
-              <input style={inputStyle} value={form.city} onChange={e => set('city', e.target.value)} />
+              <input className="settings-control" style={inputStyle} value={form.city} onChange={e => set('city', e.target.value)} />
             </div>
             <div>
               <label style={labelStyle}>Province</label>
@@ -411,8 +418,8 @@ export function CompanySettings() {
               </Select>
             </div>
             <div>
-              <label style={labelStyle}>Postal Code</label>
-              <input style={inputStyle} value={form.postal_code} onChange={e => set('postal_code', e.target.value)} />
+              <label style={labelStyle}>Postal code</label>
+              <input className="settings-control" style={inputStyle} value={form.postal_code} onChange={e => set('postal_code', e.target.value)} />
             </div>
           </div>
         </div>
@@ -420,20 +427,20 @@ export function CompanySettings() {
 
       {/* Contact */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Contact Details</span></div>
+        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Contact details</h3></div>
         <div style={{ padding: 20 }}>
           <div style={{ ...grid3 }}>
             <div>
               <label style={labelStyle}>Phone</label>
-              <input style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
+              <input className="settings-control" style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Business Email</label>
-              <input style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+              <label style={labelStyle}>Business email</label>
+              <input className="settings-control" style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Support Email</label>
-              <input style={inputStyle} type="email" value={form.support_email} onChange={e => set('support_email', e.target.value)} />
+              <label style={labelStyle}>Support email</label>
+              <input className="settings-control" style={inputStyle} type="email" value={form.support_email} onChange={e => set('support_email', e.target.value)} />
             </div>
           </div>
         </div>
@@ -441,12 +448,13 @@ export function CompanySettings() {
 
       {/* Quote Defaults */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Quote Defaults</span></div>
+        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Quote defaults</h3></div>
         <div style={{ padding: 20 }}>
           <div style={grid2}>
             <div>
-              <label style={labelStyle}>Default Quote Validity (Days)</label>
+              <label style={labelStyle}>Default quote validity (days)</label>
               <input
+                className="settings-control"
                 style={inputStyle}
                 type="number"
                 min={1}
@@ -454,12 +462,12 @@ export function CompanySettings() {
                 value={form.default_quote_validity_days}
                 onChange={e => set('default_quote_validity_days', e.target.value)}
               />
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+              <div style={helpTextStyle}>
                 New quotes will default to expire this many days after creation. Can be overridden per quote.
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Cross-Border Routes</label>
+              <label style={labelStyle}>Cross-border routes</label>
               <Select value={form.allow_cross_border} onValueChange={val => set('allow_cross_border', val)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -469,7 +477,7 @@ export function CompanySettings() {
                   <SelectItem value="no">No</SelectItem>
                 </SelectContent>
               </Select>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+              <div style={helpTextStyle}>
                 Whether your fleet is set up to run loads that cross into neighbouring
                 countries. When set to "No", any quote whose route actually crosses a
                 border is refused rather than priced.
@@ -479,8 +487,9 @@ export function CompanySettings() {
 
           <div style={{ ...grid2, marginTop: 16 }}>
             <div>
-              <label style={labelStyle}>Default Base Rate (R/km)</label>
+              <label style={labelStyle}>Default base rate (R/km)</label>
               <input
+                className="settings-control"
                 style={inputStyle}
                 type="number"
                 min={0}
@@ -489,14 +498,15 @@ export function CompanySettings() {
                 value={form.default_base_rate_per_km}
                 onChange={e => set('default_base_rate_per_km', e.target.value)}
               />
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+              <div style={helpTextStyle}>
                 Used when the vehicle type on a quote has no rate of its own
-                (Settings &gt; Vehicle Types). A type's own rate always wins.
+                (Settings &gt; Vehicle types). A type's own rate always wins.
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Default Toll Rate (R/km)</label>
+              <label style={labelStyle}>Default toll rate (R/km)</label>
               <input
+                className="settings-control"
                 style={inputStyle}
                 type="number"
                 min={0}
@@ -505,7 +515,7 @@ export function CompanySettings() {
                 value={form.default_toll_rate_per_km}
                 onChange={e => set('default_toll_rate_per_km', e.target.value)}
               />
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+              <div style={helpTextStyle}>
                 Fallback only &mdash; used when the routing service can't itemise the
                 toll plazas on a route.
               </div>
@@ -514,8 +524,9 @@ export function CompanySettings() {
 
           <div style={{ ...grid2, marginTop: 16 }}>
             <div>
-              <label style={labelStyle}>Default SLA (Hours)</label>
+              <label style={labelStyle}>Default SLA (hours)</label>
               <input
+                className="settings-control"
                 style={inputStyle}
                 type="number"
                 min={1}
@@ -524,13 +535,14 @@ export function CompanySettings() {
                 value={form.default_sla_hours}
                 onChange={e => set('default_sla_hours', e.target.value)}
               />
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+              <div style={helpTextStyle}>
                 Delivery time promised on a new quote. Can be overridden per quote.
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Border Crossings Per Year</label>
+              <label style={labelStyle}>Border crossings per year</label>
               <input
+                className="settings-control"
                 style={inputStyle}
                 type="number"
                 min={1}
@@ -539,7 +551,7 @@ export function CompanySettings() {
                 value={form.cross_border_crossings_per_year}
                 onChange={e => set('cross_border_crossings_per_year', e.target.value)}
               />
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+              <div style={helpTextStyle}>
                 Count each leg separately &mdash; a return trip is two. A C-BRTA permit is
                 bought for a year, so a quote charges its share of one crossing: the more
                 you cross, the less each load carries.
@@ -551,17 +563,17 @@ export function CompanySettings() {
 
       {/* Fuel Price Defaults */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><span style={sectionTitleStyle}>Fuel Price Defaults</span></div>
+        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Fuel price defaults</h3></div>
         <div style={{ padding: 20 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 16 }}>
+          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
             Used as the default price when a vehicle type of that fuel type doesn't have
-            its own fuel price set (Settings &gt; Vehicle Types). Diesel already falls back
+            its own fuel price set (Settings &gt; Vehicle types). Diesel already falls back
             to the live national price if left blank; the other three have no such feed,
             so they stay unset until you add one.
           </div>
           <div style={{ marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>Fuel Pricing Zone</label>
+              <label style={labelStyle}>Fuel pricing zone</label>
               <Select
                 value={form.fuel_zone}
                 onValueChange={val => { set('fuel_zone', val); loadLivePrice(true, val, true); }}
@@ -575,7 +587,7 @@ export function CompanySettings() {
                   <SelectItem value="COASTAL">Coastal &mdash; Cape Town, Durban, Gqeberha, East London</SelectItem>
                 </SelectContent>
               </Select>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+              <div style={helpTextStyle}>
                 Diesel is gazetted at two prices: it arrives at the coastal ports and costs
                 more inland once the transport differential is added &mdash; about R0.87/L
                 at the moment. Changing this fetches the current price for the zone and
@@ -599,22 +611,23 @@ export function CompanySettings() {
                 <button
                   onClick={() => loadLivePrice(true)}
                   disabled={fetchingLivePrice}
+                  className="settings-control"
                   style={{
                     flexShrink: 0, background: 'none', border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)', padding: '0 12px',
-                    fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
-                    cursor: fetchingLivePrice ? 'wait' : 'pointer', letterSpacing: '0.04em',
+                    color: 'var(--text-secondary)', padding: '0 12px', minHeight: 40,
+                    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
+                    borderRadius: 6, cursor: fetchingLivePrice ? 'wait' : 'pointer',
                   }}
                 >
                   {fetchingLivePrice
                     ? <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 62 }}>
                         <Loader size={12} color="currentColor" />
                       </span>
-                    : 'FETCH NOW'}
+                    : 'Fetch now'}
                 </button>
               </div>
               {livePrice?.success !== false && (livePrice?.inland_price != null || livePrice?.stale_warning) && (
-                <div style={{ fontSize: 11, color: livePrice.is_stale ? 'var(--status-warning)' : 'var(--text-tertiary)', marginTop: 6 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: livePrice.is_stale ? 'var(--status-warning)' : 'var(--text-tertiary)', marginTop: 6 }}>
                   {livePrice.inland_price != null ? (
                     <>
                       Live national price: R{Number(livePrice.inland_price).toFixed(2)}/L
@@ -646,22 +659,23 @@ export function CompanySettings() {
                 <button
                   onClick={() => loadLivePrice(true)}
                   disabled={fetchingLivePrice}
+                  className="settings-control"
                   style={{
                     flexShrink: 0, background: 'none', border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)', padding: '0 12px',
-                    fontFamily: 'var(--font-mono)', fontSize: 10, borderRadius: 2,
-                    cursor: fetchingLivePrice ? 'wait' : 'pointer', letterSpacing: '0.04em',
+                    color: 'var(--text-secondary)', padding: '0 12px', minHeight: 40,
+                    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
+                    borderRadius: 6, cursor: fetchingLivePrice ? 'wait' : 'pointer',
                   }}
                 >
                   {fetchingLivePrice
                     ? <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 62 }}>
                         <Loader size={12} color="currentColor" />
                       </span>
-                    : 'FETCH NOW'}
+                    : 'Fetch now'}
                 </button>
               </div>
               {livePrice?.success !== false && (livePrice?.petrol_95 != null || livePrice?.stale_warning) && (
-                <div style={{ fontSize: 11, color: livePrice.is_stale ? 'var(--status-warning)' : 'var(--text-tertiary)', marginTop: 6 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: livePrice.is_stale ? 'var(--status-warning)' : 'var(--text-tertiary)', marginTop: 6 }}>
                   {livePrice.petrol_95 != null ? (
                     <>
                       Live national price (95 unleaded): R{Number(livePrice.petrol_95).toFixed(2)}/L
@@ -682,6 +696,7 @@ export function CompanySettings() {
             <div>
               <label style={labelStyle}>Electric (R/kWh)</label>
               <input
+                className="settings-control"
                 style={inputStyle}
                 type="number"
                 min={0}
@@ -694,6 +709,7 @@ export function CompanySettings() {
             <div>
               <label style={labelStyle}>Hybrid (R/L)</label>
               <input
+                className="settings-control"
                 style={inputStyle}
                 type="number"
                 min={0}
@@ -709,13 +725,13 @@ export function CompanySettings() {
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button
-          className="btn-action"
+          className="btn-action settings-control"
           onClick={handleSave}
           disabled={saving || isDemo}
           title={isDemo ? 'Fixed in demo mode' : undefined}
-          style={{ opacity: isDemo ? 0.5 : saving ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+          style={{ minHeight: 40, borderRadius: 6, opacity: isDemo ? 0.5 : saving ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
         >
-          {saved ? 'SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
+          {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
         </button>
       </div>
     </div>

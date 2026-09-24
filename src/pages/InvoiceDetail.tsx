@@ -224,14 +224,14 @@ export default function InvoiceDetail() {
         </div>
       )}
       <div style={{ marginBottom: 24 }}>
-        <button onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← Back to invoices</button>
+        <button onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, minHeight: 48, marginBottom: 8, padding: 0 }}>← Back to invoices</button>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Invoice</div>
+            <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 0, marginBottom: 4 }}>Invoice</div>
             <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{invoice.invoice_number}</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{invoice.customer_name}</div>
           </div>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: STATUS_COLOR[invoice.status] || 'var(--text-secondary)', padding: '6px 12px', border: `1px solid ${STATUS_COLOR[invoice.status] || 'var(--border-subtle)'}`, borderRadius: 4, display: 'inline-block', whiteSpace: 'nowrap' }}>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: STATUS_COLOR[invoice.status] || 'var(--text-secondary)', padding: '6px 12px', border: `1px solid ${STATUS_COLOR[invoice.status] || 'var(--border-subtle)'}`, borderRadius: 4, display: 'inline-block', whiteSpace: 'nowrap' }}>
             {formatStatus(invoice.status)}
           </span>
         </div>
@@ -240,32 +240,32 @@ export default function InvoiceDetail() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
           { label: 'Amount', value: formatCurrency(parseFloat(invoice.total_amount || invoice.amount || '0')), color: 'var(--accent-primary)' },
-          { label: 'Due Date', value: invoice.due_date?.slice(0, 10) || '—', color: 'var(--text-primary)' },
+          { label: 'Due date', value: invoice.due_date?.slice(0, 10) || '—', color: 'var(--text-primary)' },
           { label: 'Issued', value: invoice.created_at?.slice(0, 10) || '—', color: 'var(--text-primary)' },
         ].map(m => (
           <div key={m.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{m.label}</span></div>
+            <div className="card-header"><span className="card-title" style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>{m.label}</span></div>
             <div className="metric-value" style={{ fontSize: 18, color: m.color }}>{m.value}</div>
           </div>
         ))}
       </div>
 
-      {/* Line Items */}
+      {/* Line items */}
       {invoice.line_items && invoice.line_items.length > 0 && (
         <div className="card table-card" style={{ marginBottom: 24 }}>
           <div className="card-header" style={{ marginBottom: 16 }}>
-            <span className="card-title">Line Items</span>
-            <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+            <h2 className="card-title" style={{ fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px', fontWeight: 600, textTransform: 'none', letterSpacing: 0, margin: 0 }}>Line items</h2>
+            <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>
               {invoice.line_items.length} item{invoice.line_items.length !== 1 ? 's' : ''}
             </span>
           </div>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Description</th>
-                <th className="text-right">Quantity</th>
-                <th className="text-right">Unit Price</th>
-                <th className="text-right">Total</th>
+                <th style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>Description</th>
+                <th className="text-right" style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>Quantity</th>
+                <th className="text-right" style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>Unit price</th>
+                <th className="text-right" style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>Total</th>
               </tr>
             </thead>
             <tbody>
@@ -292,22 +292,22 @@ export default function InvoiceDetail() {
         </div>
       )}
 
-      {/* Payment History */}
+      {/* Payment history */}
       {payments && payments.length > 0 && (
         <div className="card table-card" style={{ marginBottom: 24 }}>
           <div className="card-header" style={{ marginBottom: 16 }}>
-            <span className="card-title">Payment History</span>
-            <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+            <h2 className="card-title" style={{ fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px', fontWeight: 600, textTransform: 'none', letterSpacing: 0, margin: 0 }}>Payment history</h2>
+            <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>
               {payments.length} payment{payments.length !== 1 ? 's' : ''}
             </span>
           </div>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Method</th>
-                <th>Reference</th>
-                <th className="text-right">Amount</th>
+                <th style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>Date</th>
+                <th style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>Method</th>
+                <th style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>Reference</th>
+                <th className="text-right" style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -337,7 +337,7 @@ export default function InvoiceDetail() {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: '2px solid var(--border-subtle)' }}>
-                <td colSpan={3} style={{ textAlign: 'right', fontWeight: 600, padding: '12px 0', fontSize: 13 }}>Total Paid:</td>
+                <td colSpan={3} style={{ textAlign: 'right', fontWeight: 600, padding: '12px 0', fontSize: 13 }}>Total paid:</td>
                 <td className="mono text-right" style={{ color: 'var(--status-success)', fontWeight: 700, fontSize: 16, padding: '12px 0' }}>
                   {formatCurrency(payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0))}
                 </td>
@@ -349,16 +349,16 @@ export default function InvoiceDetail() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>Invoice Details</div>
+          <h2 className="card-title" style={{ fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px', fontWeight: 600, textTransform: 'none', letterSpacing: 0, margin: 0, marginBottom: 16 }}>Invoice details</h2>
           {[
-            { label: 'Invoice Number', value: invoice.invoice_number },
+            { label: 'Invoice number', value: invoice.invoice_number },
             { label: 'Customer', value: invoice.customer_name },
             { label: 'Status', value: formatStatus(invoice.status) },
             { label: 'Amount', value: formatCurrency(parseFloat(invoice.total_amount || invoice.amount || '0')) },
-            { label: 'Due Date', value: invoice.due_date?.slice(0, 10) || '—' },
+            { label: 'Due date', value: invoice.due_date?.slice(0, 10) || '—' },
             { label: 'Created', value: invoice.created_at?.slice(0, 10) || '—' },
             {
-              label: 'Reminders Sent',
+              label: 'Reminders sent',
               value: invoice.reminder_count
                 ? `${invoice.reminder_count} — last ${new Date(invoice.last_reminder_at).toLocaleDateString('en-ZA')}`
                 : 'None sent',
@@ -366,29 +366,29 @@ export default function InvoiceDetail() {
           ].map(r => (
             <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
               <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.label}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)', fontFamily: r.label === 'Invoice number' ? 'var(--font-mono)' : 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>{r.value}</span>
             </div>
           ))}
         </div>
 
         <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>Actions</div>
+          <h2 className="card-title" style={{ fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px', fontWeight: 600, textTransform: 'none', letterSpacing: 0, margin: 0, marginBottom: 16 }}>Actions</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {(invoice.status === 'DRAFT' || invoice.status === 'SENT' || invoice.status === 'VIEWED') && (
-              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }} onClick={handleSendInvoice} disabled={sending}>
+              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 48, background: 'transparent', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }} onClick={handleSendInvoice} disabled={sending}>
                 {sending ? 'Sending...' : invoice.status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
               </button>
             )}
-            <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={handleDownloadPDF} disabled={downloading}>
+            <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 48, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }} onClick={handleDownloadPDF} disabled={downloading}>
               {downloading ? 'Downloading...' : 'Download PDF'}
             </button>
             {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE') && (
-              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={handleSendReminder} disabled={sendingReminder}>
+              <button className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', fontWeight: 500, minHeight: 48, fontFamily: 'var(--font-sans)', letterSpacing: 0, background: 'transparent', border: '1px solid var(--status-warning)', color: 'var(--status-warning)' }} onClick={handleSendReminder} disabled={sendingReminder}>
                 {sendingReminder ? 'Sending...' : 'Send reminder'}
               </button>
             )}
             {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE' || invoice.status === 'PARTIALLY_PAID') && !showPaymentForm && (
-              <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>Record payment</button>
+              <button onClick={() => setShowPaymentForm(true)} className="btn-action" style={{ width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 48, background: 'transparent', border: '1px solid var(--status-success)', color: 'var(--status-success)' }}>Record payment</button>
             )}
             {capitalEntry && (
               <a
@@ -398,7 +398,7 @@ export default function InvoiceDetail() {
                 className="btn-action"
                 onClick={() => setAppliedIds((prev) => saveAppliedId(String(id), prev))}
                 style={{
-                  width: '100%', padding: '10px', fontSize: 12,
+                  width: '100%', padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 48,
                   background: 'transparent',
                   border: `1px solid ${appliedIds.has(String(id)) ? 'var(--status-success)' : 'var(--accent-primary)'}`,
                   color: appliedIds.has(String(id)) ? 'var(--status-success)' : 'var(--accent-primary)',
@@ -418,7 +418,7 @@ export default function InvoiceDetail() {
 
           {showPaymentForm && (
             <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--border-subtle)' }}>
-              <div className="card-title" style={{ marginBottom: 12, fontSize: 12 }}>Record Payment</div>
+              <div className="card-title" style={{ marginBottom: 12, fontSize: 12 }}>Record payment</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input

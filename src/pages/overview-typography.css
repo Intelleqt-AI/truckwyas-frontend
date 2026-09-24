@@ -1,0 +1,40 @@
+/* Overview-only role adoption; no global component or geometry overrides. */
+.overview-typography .card-title,
+.overview-typography .agent-header {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.overview-typography .metric-card .card-title,
+.overview-typography .data-table th {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.overview-typography .metric-value {
+  font-family: var(--font-sans);
+  line-height: 36px;
+  font-variant-numeric: tabular-nums;
+}
+.overview-typography .metric-delta,
+.overview-typography .feed-meta {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.overview-typography .btn-action {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}

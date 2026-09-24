@@ -221,7 +221,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   const isActive = (path: string) => (path === '/' ? location.pathname === '/' : location.pathname.startsWith(path));
 
   return (
-    <div className="os-container" style={{ gridTemplateColumns: '60px 1fr', gridTemplateRows: '60px 1fr' }}>
+    <div className="os-container os-app-shell" style={{ gridTemplateColumns: '60px 1fr', gridTemplateRows: 'minmax(60px, auto) minmax(0, 1fr)' }}>
       <LiveEvents />
       <div className="ambient-glow" />
 
@@ -244,10 +244,10 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
         {authUser?.is_demo && (
           <div
             className="status-badge warning"
-            style={{ cursor: 'default', fontWeight: 700, letterSpacing: '0.05em' }}
+            style={{ cursor: 'default', fontWeight: 500, letterSpacing: 'normal' }}
             title="Shared public demo account — actions like emailing customers are simulated, not real."
           >
-            DEMO
+            Demo
           </div>
         )}
         {/* The Copilot page is gated to INSIGHTS_ROLES (App.tsx). Only show the
@@ -259,6 +259,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
             <input
               type="text"
               className="agent-input"
+              aria-label="Ask Copilot"
               placeholder="Ask Copilot anything..."
               value={agentQuery}
               onChange={e => setAgentQuery(e.target.value)}
@@ -271,33 +272,33 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
             />
           </div>
         )}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div className="os-header-actions">
           <div
-            className={`status-badge ${statusBadgeClass}`}
-            style={{ position: 'relative', cursor: 'default' }}
+            className={`status-badge os-subscription-trigger ${statusBadgeClass}`}
+            style={{ cursor: 'default' }}
             onMouseEnter={() => setShowStatusPopover(true)}
             onMouseLeave={() => setShowStatusPopover(false)}
           >
             <span style={{ width: 6, height: 6, background: 'currentColor', borderRadius: '50%', display: 'inline-block' }} />
             {subscriptionStatusLabel(subStatus, cancelAtPeriodEnd)}
             {showStatusPopover && (
-              <div style={{
-                position: 'absolute', top: '100%', right: 0, marginTop: 8,
-                width: 260, padding: 14, background: 'var(--bg-surface)',
+              <div className="os-header-popover" style={{
+                position: 'absolute', top: '100%', marginTop: 8,
+                width: 260, maxWidth: 'calc(100vw - 32px)', padding: 16, background: 'var(--bg-surface)',
                 border: '1px solid var(--border-subtle)', borderRadius: 6,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.3)', zIndex: 1000,
                 textAlign: 'left' as const, fontWeight: 400, whiteSpace: 'normal' as const,
               }}>
-                <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: (isSubscriptionBlocked(subStatus) || cancelAtPeriodEnd) ? 10 : 0 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: '20px', marginBottom: (isSubscriptionBlocked(subStatus) || cancelAtPeriodEnd) ? 12 : 0 }}>
                   {subscriptionStatusDetail(subStatus, cancelAtPeriodEnd)}
                 </div>
                 {(isSubscriptionBlocked(subStatus) || cancelAtPeriodEnd) && (
                   <button
                     onClick={() => navigate('/settings/billing')}
                     className="btn-action"
-                    style={{ width: '100%', fontSize: 10 }}
+                    style={{ width: '100%', fontSize: 14, lineHeight: '20px' }}
                   >
-                    GO TO BILLING
+                    Go to billing
                   </button>
                 )}
               </div>
@@ -323,12 +324,12 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
               </svg>
             )}
           </button>
-          <div ref={profileRef} style={{ position: 'relative' }}>
-            <div
+          <div ref={profileRef} className="os-profile-anchor">
+            <button type="button" className="os-profile-trigger" aria-label="Open profile menu" aria-expanded={showProfileMenu}
               onClick={() => setShowProfileMenu(p => !p)}
               style={{
-                width: 30,
-                height: 30,
+                width: 44,
+                height: 44,
                 background: avatarUrl ? 'transparent' : 'var(--accent-dim)',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: '50%',
@@ -336,9 +337,9 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 11,
+                fontSize: 14, lineHeight: '20px',
                 color: 'var(--accent-primary)',
-                fontWeight: 700,
+                fontWeight: 500,
                 cursor: 'pointer',
               }}
               title={userName}
@@ -348,22 +349,26 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
               ) : (
                 initials
               )}
-            </div>
+            </button>
             {showProfileMenu && (
               <div
+                className="os-header-popover"
                 style={{
                   position: 'absolute',
-                  top: 38,
-                  right: 0,
+                  top: '100%',
+                  marginTop: 8,
                   background: 'var(--bg-surface)',
                   border: '1px solid var(--border-subtle)',
-                  borderRadius: 2,
-                  minWidth: 180,
+                  borderRadius: 6,
+                  width: 280,
+                  maxHeight: 'calc(100dvh - 160px)',
+                  overflowY: 'auto',
+                  maxWidth: 'calc(100vw - 32px)',
                   zIndex: 1000,
                   boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
                 }}
               >
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 12 }}>
                   {avatarUrl && (
                     <img
                       src={avatarUrl}
@@ -372,48 +377,48 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
                     />
                   )}
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', fontWeight: 600 }}>
+                    <div style={{ fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', fontWeight: 600, overflowWrap: 'anywhere' }}>
                       {userName}
                     </div>
-                    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                    <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', marginTop: 4, overflowWrap: 'anywhere' }}>
                       {authUser?.email || authUser?.username || ''}
                     </div>
                   </div>
                 </div>
-                <div
+                <button type="button" className="os-profile-action"
                   onClick={() => {
                     setShowProfileMenu(false);
                     navigate('/settings');
                   }}
                   style={{
-                    padding: '10px 16px',
-                    fontSize: 11,
-                    fontFamily: 'var(--font-mono)',
+                    padding: '8px 16px',
+                    fontSize: 14, lineHeight: '20px',
+                    fontFamily: 'var(--font-sans)',
                     color: 'var(--text-secondary)',
                     cursor: 'pointer',
-                    letterSpacing: '0.05em',
+                    letterSpacing: 'normal',
                   }}
                   onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
                   onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
                 >
-                  PROFILE & SETTINGS
-                </div>
-                <div
+                  Profile & settings
+                </button>
+                <button type="button" className="os-profile-action"
                   onClick={handleLogout}
                   style={{
-                    padding: '10px 16px',
-                    fontSize: 11,
-                    fontFamily: 'var(--font-mono)',
-                    color: 'var(--status-danger)',
+                    padding: '8px 16px',
+                    fontSize: 14, lineHeight: '20px',
+                    fontFamily: 'var(--font-sans)',
+                    color: 'var(--status-danger-text, var(--status-danger))',
                     cursor: 'pointer',
-                    letterSpacing: '0.05em',
+                    letterSpacing: 'normal',
                     borderTop: '1px solid var(--border-subtle)',
                   }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  SIGN OUT
-                </div>
+                  Sign out
+                </button>
               </div>
             )}
           </div>
@@ -458,10 +463,10 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
 
       {/* CONTENT */}
       <main
+        className="os-app-main"
         style={{
           gridColumn: '2 / -1',
           overflowY: 'auto',
-          padding: 24,
           background: 'var(--bg-deep)',
           color: 'var(--text-primary)',
           fontFamily: 'var(--font-sans)',

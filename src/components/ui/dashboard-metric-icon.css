@@ -1,0 +1,8 @@
+/* Inline desktop affordances; no card dimensions or placeholder content. */
+.dashboard-metric-icon { display: none; }
+@media (min-width: 768px) {
+  .os-app-shell .dashboard-metric-label-content { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-width: 0; vertical-align: middle; }
+  .os-app-shell .dashboard-metric-label-text { min-width: 0; overflow-wrap: anywhere; }
+  .os-app-shell .dashboard-metric-icon { display: inline-block; flex: 0 0 16px; width: 16px; height: 16px; color: var(--accent-primary); }
+  .os-app-shell .dashboard-metric-legacy-icon { display: none; }
+}

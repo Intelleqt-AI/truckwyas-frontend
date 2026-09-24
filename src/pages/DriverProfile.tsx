@@ -1,3 +1,4 @@
+import './table-heading-roles.css';
 import { useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -242,15 +243,13 @@ export default function DriverProfile() {
         {loads.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No loads recorded</div>
         ) : (
-          <table className="data-table">
+          <table className="data-table table-heading-roles">
             <thead>
               <tr>
                 {['Load #', 'Route', 'Distance', 'Revenue', 'Status', 'Date'].map(h => (
                   <th key={h} style={{
                     padding: '8px 16px', textAlign: 'left',
-                    fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
-                    letterSpacing: '0.08em', color: 'var(--text-tertiary)',
-                    borderBottom: '1px solid var(--border-subtle)', fontWeight: 500,
+                    borderBottom: '1px solid var(--border-subtle)',
                   }}>{h}</th>
                 ))}
               </tr>

@@ -98,10 +98,10 @@ body {
 }
 
 /* ── react-day-picker: strip all injected borders/outlines ─────────────────── */
-.rdp-cell,
-.rdp-day,
-.rdp-head_cell,
-.rdp-button {
+.rdp-cell:not(.dashboard-date-cell),
+.rdp-day:not(.dashboard-date-day),
+.rdp-head_cell:not(.dashboard-date-head-cell),
+.rdp-button:not(.dashboard-date-day):not(.dashboard-date-nav-button) {
   border: none !important;
   outline: none !important;
   box-shadow: none !important;

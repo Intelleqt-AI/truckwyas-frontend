@@ -1,3 +1,5 @@
+import './quote-detail-responsive.css';
+import './quote-invoice-roles.css';
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -11,6 +13,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
 import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
 import { Loader } from '@/components/Loader';
+import { AlertTriangle } from 'lucide-react';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'var(--text-tertiary)',
@@ -26,7 +29,7 @@ const STATUS_LABEL: Record<string, string> = {
   SENT: 'Sent',
   ACCEPTED: 'Accepted',
   DECLINED: 'Declined',
-  IT: 'In-Transit',
+  IT: 'In transit',
   COMPLETED: 'Completed',
 };
 
@@ -204,7 +207,7 @@ export default function QuoteDetail() {
 
   const handleDelete = () => {
     setConfirmOpts({
-      title: 'Delete Quote',
+      title: 'Delete quote',
       message: `Delete ${quote?.quote_number}? This cannot be undone.`,
       confirmLabel: 'Delete',
       danger: true,
@@ -254,18 +257,27 @@ export default function QuoteDetail() {
   const inputStyle: React.CSSProperties = {
     background: 'var(--bg-surface)',
     border: '1px solid var(--border-subtle)',
-    padding: '10px 12px',
+    padding: '9px 12px',
     color: 'var(--text-primary)',
-    borderRadius: 2,
-    fontSize: 13,
-    outline: 'none',
+    borderRadius: 6,
+    fontSize: 14,
+    lineHeight: '20px',
+    minHeight: 40,
     width: '100%',
     fontFamily: 'var(--font-sans)',
   };
 
+  const fieldLabelStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px',
+    fontWeight: 500, letterSpacing: 'normal', color: 'var(--text-secondary)',
+  };
+  const sectionHeadingStyle: React.CSSProperties = {
+    margin: 0, fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px',
+    fontWeight: 600, letterSpacing: 'normal', color: 'var(--text-primary)',
+  };
   const label = (text: string) => (
-    <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 6, letterSpacing: '0.08em' }}>
-      {text.toUpperCase()}
+    <div style={{ ...fieldLabelStyle, marginBottom: 6 }}>
+      {text}
     </div>
   );
 
@@ -274,26 +286,28 @@ export default function QuoteDetail() {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <button
+          className="qi-action"
           onClick={() => navigate('/bookings/quotes')}
           style={{
             background: 'none',
             border: 'none',
             color: 'var(--text-tertiary)',
             cursor: 'pointer',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
+            fontFamily: 'var(--font-sans)',
+            fontSize: 14,
+            lineHeight: '20px',
             marginBottom: 8,
             padding: 0,
           }}
         >
           ← Back to quotes
         </button>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
-          Quote Detail
+        <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>
+          Quote detail
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{quote.quote_number}</div>
+            <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>{quote.quote_number}</h1>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{quote.customer_name}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -301,8 +315,9 @@ export default function QuoteDetail() {
               style={{
                 display: 'inline-block',
                 whiteSpace: 'nowrap',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
+                fontFamily: 'var(--font-sans)',
+                fontSize: 13,
+                lineHeight: '20px',
                 color: STATUS_COLOR[quote.status] || 'var(--text-secondary)',
                 padding: '4px 10px',
                 border: `1px solid ${STATUS_COLOR[quote.status] || 'var(--border-subtle)'}`,
@@ -320,16 +335,16 @@ export default function QuoteDetail() {
       {fuelAlert && fuelAlert.has_alert && (
         <div style={{ padding: '14px 20px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid var(--status-warning)', borderRadius: 2, marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
-            <div style={{ fontSize: 18 }}>⚠️</div>
+            <AlertTriangle size={18} color="var(--status-warning)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--status-warning)', marginBottom: 4 }}>
-                Fuel Price Alert
+              <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--status-warning)', marginBottom: 4 }}>
+                Fuel price alert
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 8 }}>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 8 }}>
                 {fuelAlert.message || `Diesel up R${fuelAlert.fuel_delta_zar?.toFixed(2)}/L since this quote was created. This job now costs ~R${Math.round(fuelAlert.estimated_cost_impact).toLocaleString()} more.`}
               </div>
               {fuelAlert.action && (
-                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>
                   {fuelAlert.action}
                 </div>
               )}
@@ -338,38 +353,38 @@ export default function QuoteDetail() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
+      <div className="quote-detail-grid">
         {/* LEFT — Quote Details */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Customer */}
-          <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 14 }}>Customer</div>
+          <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+            <h2 style={{ ...sectionHeadingStyle, marginBottom: 14 }}>Customer</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>NAME</div>
+                <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Name</div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{quote.customer_name || '—'}</div>
               </div>
               {quote.customer_company && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>COMPANY</div>
+                  <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Company</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_company}</div>
                 </div>
               )}
               {quote.customer_email && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>EMAIL</div>
+                  <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Email</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_email}</div>
                 </div>
               )}
               {quote.customer_phone && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>PHONE</div>
+                  <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Phone</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_phone}</div>
                 </div>
               )}
               {quote.customer_city && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 4 }}>CITY</div>
+                  <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>City</div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_city}</div>
                 </div>
               )}
@@ -377,26 +392,26 @@ export default function QuoteDetail() {
           </div>
 
           {/* Route */}
-          <div className="card" style={{ padding: 20 }}>
+          <div className="card" style={{ padding: 24, borderRadius: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <div className="card-title" style={{ marginBottom: 0 }}>
-                {quote.trip_type === 'ROUND_TRIP' ? 'Leg 1 — Outbound Route' : 'Route'}
-              </div>
+              <h2 style={{ ...sectionHeadingStyle, marginBottom: 0 }}>
+                {quote.trip_type === 'ROUND_TRIP' ? 'Leg 1 — Outbound route' : 'Route'}
+              </h2>
               {quote.trip_type === 'ROUND_TRIP' && (
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 4, fontWeight: 500, whiteSpace: 'nowrap', display: 'inline-block' }}>
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 4, fontWeight: 500, whiteSpace: 'nowrap', display: 'inline-block' }}>
                   Round trip
                 </span>
               )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                {label('Pickup Location')}
+                {label('Pickup location')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.pickup_location || '—'}</div>
               </div>
 
               {Array.isArray(quote.stops) && quote.stops.map((s: { location: string }, i: number) => (
                 <div key={i} style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16 }}>
-                  <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 2 }}>
+                  <div style={{ ...fieldLabelStyle, marginBottom: 2 }}>
                     Stop {i + 1}
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{s.location}</div>
@@ -404,7 +419,7 @@ export default function QuoteDetail() {
               ))}
 
               <div>
-                {label('Delivery Location')}
+                {label('Delivery location')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
               </div>
             </div>
@@ -427,44 +442,44 @@ export default function QuoteDetail() {
 
           {/* Return Leg — visible only for ROUND_TRIP quotes */}
           {quote.trip_type === 'ROUND_TRIP' && (
-            <div className="card" style={{ padding: 20, border: '1px solid var(--accent-primary)', borderLeft: '3px solid var(--accent-primary)' }}>
-              <div className="card-title" style={{ marginBottom: 16, color: 'var(--accent-primary)' }}>
-                Leg 2 — Return Route
-              </div>
+            <div className="card" style={{ padding: 24, borderRadius: 8, border: '1px solid var(--accent-primary)', borderLeft: '3px solid var(--accent-primary)' }}>
+              <h2 style={{ ...sectionHeadingStyle, marginBottom: 16, color: 'var(--accent-primary)' }}>
+                Leg 2 — Return route
+              </h2>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  {label('Returns From')}
+                  {label('Returns from')}
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
                 </div>
                 <div>
-                  {label('Return Destination')}
+                  {label('Return destination')}
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.return_location || '—'}</div>
                 </div>
                 <div>
-                  {label('Return Cargo')}
+                  {label('Return cargo')}
                   <div style={{ fontSize: 13, color: quote.return_cargo ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
                     {quote.return_cargo || 'Empty return'}
                   </div>
                 </div>
                 {quote.return_date && (
                   <div>
-                    {label('Return Date')}
-                    <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                    {label('Return date')}
+                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)' }}>
                       {new Date(quote.return_date).toLocaleDateString('en-ZA')}
                     </div>
                   </div>
                 )}
                 {quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
                   <div>
-                    {label('Return Rate')}
-                    <div style={{ fontSize: 13, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                    {label('Return rate')}
+                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--accent-primary)', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
                       {formatCurrency(parseFloat(quote.return_base_rate))}
                     </div>
                   </div>
                 )}
                 {quote.return_notes && (
                   <div style={{ gridColumn: '1 / -1' }}>
-                    {label('Return Notes')}
+                    {label('Return notes')}
                     <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{quote.return_notes}</div>
                   </div>
                 )}
@@ -473,15 +488,15 @@ export default function QuoteDetail() {
           )}
 
           {/* Cargo Details */}
-          <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 16 }}>Cargo Details</div>
+          <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+            <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Cargo details</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 {label('Description')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.cargo_description || '—'}</div>
               </div>
               <div>
-                {label('Vehicle Type')}
+                {label('Vehicle type')}
                 <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.vehicle_type || '—'}</div>
               </div>
               <div>
@@ -494,13 +509,13 @@ export default function QuoteDetail() {
               </div>
               {quote.vehicle_display && (
                 <div>
-                  {label('Assigned Vehicle')}
+                  {label('Assigned vehicle')}
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.vehicle_display}</div>
                 </div>
               )}
               {quote.driver_display && (
                 <div>
-                  {label('Assigned Driver')}
+                  {label('Assigned driver')}
                   <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.driver_display}</div>
                 </div>
               )}
@@ -508,8 +523,8 @@ export default function QuoteDetail() {
           </div>
 
           {/* Cost Breakdown */}
-          <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 16 }}>Cost Breakdown</div>
+          <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+            <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Cost breakdown</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {(() => {
                 const fuel = parseFloat(quote.fuel_surcharge || '0');
@@ -525,17 +540,17 @@ export default function QuoteDetail() {
                 // derive a "Service Charge" as total minus the other four,
                 // which is mathematically just base_rate under a wrong label.
                 const rows = [
-                  { label: 'Fuel Surcharge', value: fuel },
-                  { label: 'Toll Charges', value: toll },
-                  { label: 'Driver Allowance', value: driver },
-                  ...(additional > 0 ? [{ label: 'Additional Charges', value: additional }] : []),
-                  { label: 'Base Rate', value: baseRate },
+                  { label: 'Fuel surcharge', value: fuel },
+                  { label: 'Toll charges', value: toll },
+                  { label: 'Driver allowance', value: driver },
+                  ...(additional > 0 ? [{ label: 'Additional charges', value: additional }] : []),
+                  { label: 'Base rate', value: baseRate },
                 ];
 
                 return rows.map((item) => (
                   <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{item.label}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)' }}>
+                    <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{item.label}</span>
+                    <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)' }}>
                       {formatCurrency(item.value)}
                     </span>
                   </div>
@@ -543,19 +558,19 @@ export default function QuoteDetail() {
               })()}
               {quote.trip_type === 'ROUND_TRIP' && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed var(--accent-primary)' }}>
-                  <span style={{ fontSize: 12, color: 'var(--accent-primary)' }}>
-                    Return Leg ({quote.return_cargo ? 'with cargo' : 'empty return'})
+                  <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--accent-primary)' }}>
+                    Return leg ({quote.return_cargo ? 'with cargo' : 'empty return'})
                   </span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--accent-primary)', fontWeight: 600 }}>
+                  <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 13, lineHeight: '20px', color: 'var(--accent-primary)', fontWeight: 600 }}>
                     {formatCurrency(parseFloat(quote.return_base_rate))}
                   </span>
                 </div>
               )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 12, marginTop: 4 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {quote.trip_type === 'ROUND_TRIP' ? 'Total (both legs)' : 'Total Amount'}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, paddingTop: 12, marginTop: 4 }}>
+                <span style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {quote.trip_type === 'ROUND_TRIP' ? 'Total (both legs)' : 'Total amount'}
                 </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--accent-primary)' }}>
+                <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--accent-primary)', minWidth: 0, overflowWrap: 'anywhere', textAlign: 'right' }}>
                   {formatCurrency(parseFloat(quote.total_amount || '0'))}
                 </span>
               </div>
@@ -564,8 +579,8 @@ export default function QuoteDetail() {
 
           {/* Notes */}
           {quote.notes && (
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 12 }}>Notes</div>
+            <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+              <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Notes</h2>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{quote.notes}</div>
             </div>
           )}
@@ -574,12 +589,12 @@ export default function QuoteDetail() {
         {/* RIGHT — Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Metadata */}
-          <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 12 }}>Quote Info</div>
+          <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+            <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Quote info</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                {label('Quote Number')}
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)' }}>{quote.quote_number}</div>
+                {label('Quote number')}
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.quote_number}</div>
               </div>
               <div>
                 {label('Status')}
@@ -602,7 +617,7 @@ export default function QuoteDetail() {
                   </SelectContent>
                 </Select>
                 {billingBlocked && (
-                  <div style={{ fontSize: 11, color: 'var(--status-danger)', marginTop: 4 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', marginTop: 4 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
                     Status changes are blocked —{' '}
                     <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/settings/billing')}>
                       go to billing
@@ -612,18 +627,18 @@ export default function QuoteDetail() {
               </div>
               <div>
                 {label('Confidence')}
-                <div style={{ fontSize: 12, color: quote.confidence === 'HIGH' ? 'var(--status-success)' : quote.confidence === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)' }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: quote.confidence === 'HIGH' ? 'var(--status-success)' : quote.confidence === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)' }}>
                   {sentenceCase(quote.confidence)}
                 </div>
               </div>
               <div>
                 {label('Margin')}
-                <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>{quote.margin_percentage || 0}%</div>
+                <div style={{ fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>{quote.margin_percentage || 0}%</div>
               </div>
               {quote.valid_until && (
                 <div>
-                  {label('Valid Until')}
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                  {label('Valid until')}
+                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {new Date(quote.valid_until).toLocaleDateString('en-ZA')}
                     {new Date(quote.valid_until).getTime() - Date.now() < 48 * 60 * 60 * 1000 && (
                       <span style={{ color: 'var(--status-danger)', marginLeft: 8 }}>
@@ -636,7 +651,7 @@ export default function QuoteDetail() {
               {quote.created_at && (
                 <div>
                   {label('Created')}
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {new Date(quote.created_at).toLocaleDateString('en-ZA')}
                   </div>
                 </div>
@@ -646,8 +661,8 @@ export default function QuoteDetail() {
 
           {/* UPGRADE 3: Win Probability Display */}
           {quote.win_probability && (quote.status === 'DRAFT' || quote.status === 'SENT') && (
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 12 }}>Win Probability</div>
+            <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+              <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Win probability</h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                 <div style={{ flex: 1, height: 8, background: 'var(--bg-deep)', borderRadius: 4, overflow: 'hidden' }}>
                   <div style={{
@@ -659,11 +674,11 @@ export default function QuoteDetail() {
                     background: quote.win_probability >= 70 ? 'var(--status-success)' : quote.win_probability >= 40 ? 'var(--status-warning)' : 'var(--status-danger)',
                   }} />
                 </div>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--text-primary)' }}>
                   {Math.round(Number(quote.win_probability))}%
                 </span>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                 Estimated chance of winning at current price
               </div>
             </div>
@@ -671,8 +686,8 @@ export default function QuoteDetail() {
 
           {/* UPGRADE 1: Outcome Buttons */}
           {(quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome && (
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 12 }}>Mark Outcome</div>
+            <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+              <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Mark outcome</h2>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={() => {
@@ -681,7 +696,7 @@ export default function QuoteDetail() {
                     setShowOutcomeModal(true);
                   }}
                   className="btn-action"
-                  style={{ flex: 1, fontSize: 11, padding: '10px 16px', background: 'var(--status-success)', border: 'none', color: '#000' }}
+                  style={{ flex: 1, padding: '10px 16px', minHeight: 40, background: 'var(--status-success)', border: 'none', color: '#000' }}
                 >
                   ✓ Mark as accepted
                 </button>
@@ -691,7 +706,7 @@ export default function QuoteDetail() {
                     setShowOutcomeModal(true);
                   }}
                   className="btn-action"
-                  style={{ flex: 1, fontSize: 11, padding: '10px 16px', background: 'var(--status-danger)', border: 'none', color: '#fff' }}
+                  style={{ flex: 1, padding: '10px 16px', minHeight: 40, background: 'var(--status-danger)', border: 'none', color: '#fff' }}
                 >
                   ✗ Mark as rejected
                 </button>
@@ -700,13 +715,13 @@ export default function QuoteDetail() {
           )}
 
           {/* Actions */}
-          <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 12 }}>Actions</div>
+          <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+            <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Actions</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button
                 className="btn-action"
                 onClick={() => navigate(`/bookings/quotes/${id}/edit`)}
-                style={{ width: '100%', fontSize: 11, padding: '10px 16px' }}
+                style={{ width: '100%', padding: '10px 16px', minHeight: 40 }}
               >
                 Edit quote
               </button>
@@ -720,8 +735,8 @@ export default function QuoteDetail() {
                 onClick={() => sendToCustomerMutation.mutate()}
                 style={{
                   width: '100%',
-                  fontSize: 11,
                   padding: '10px 16px',
+                  minHeight: 40,
                   background: 'var(--accent-primary)',
                   border: 'none',
                 }}
@@ -735,19 +750,22 @@ export default function QuoteDetail() {
               {effectiveShareUrl && (
                 <div style={{
                   padding: '12px 14px',
-                  borderRadius: 2,
+                  borderRadius: 6,
                   background: 'var(--bg-surface)',
                   border: '1px solid var(--accent-primary)',
-                  fontSize: 11,
+                  fontSize: 13,
+                  lineHeight: '20px',
                   color: 'var(--text-primary)',
-                  fontFamily: 'var(--font-mono)',
+                  fontFamily: 'var(--font-sans)',
                 }}>
-                  <div style={{ color: 'var(--text-tertiary)', marginBottom: 6 }}>Share link</div>
+                  <div style={{ color: 'var(--text-tertiary)', marginBottom: 6, fontWeight: 500 }}>Share link</div>
                   <div style={{
                     wordBreak: 'break-all',
                     color: 'var(--accent-primary)',
                     marginBottom: 8,
-                    fontSize: 10,
+                    fontSize: 13,
+                    lineHeight: '20px',
+                    fontFamily: 'var(--font-mono)',
                   }}>
                     {effectiveShareUrl}
                   </div>
@@ -755,7 +773,8 @@ export default function QuoteDetail() {
                     <div style={{
                       color: effectiveEmailStatus.sent ? 'var(--status-success)' : 'var(--status-warning)',
                       marginBottom: 8,
-                      fontSize: 10,
+                      fontSize: 13,
+                      lineHeight: '20px',
                     }}>
                       {effectiveEmailStatus.sent
                         ? `✓ Quote emailed to ${effectiveEmailStatus.address}`
@@ -769,14 +788,18 @@ export default function QuoteDetail() {
                       navigator.clipboard.writeText(effectiveShareUrl);
                       toast.success('Link copied to clipboard');
                     }}
+                    className="qi-action"
                     style={{
-                      padding: '6px 12px',
+                      padding: '9px 12px',
+                      minHeight: 40,
                       background: 'var(--accent-primary)',
                       border: 'none',
-                      color: 'white',
-                      borderRadius: 2,
-                      fontSize: 10,
-                      fontFamily: 'var(--font-mono)',
+                      color: 'var(--btn-action-color, #fff)',
+                      borderRadius: 6,
+                      fontSize: 14,
+                      lineHeight: '20px',
+                      fontWeight: 500,
+                      fontFamily: 'var(--font-sans)',
                       cursor: 'pointer',
                       width: '100%',
                     }}
@@ -795,14 +818,17 @@ export default function QuoteDetail() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
-                      padding: '6px 12px',
+                      padding: '9px 12px',
+                      minHeight: 40,
                       marginTop: 8,
                       background: '#08933C',
                       border: 'none',
                       color: 'white',
-                      borderRadius: 2,
-                      fontSize: 10,
-                      fontFamily: 'var(--font-mono)',
+                      borderRadius: 6,
+                      fontSize: 14,
+                      lineHeight: '20px',
+                      fontWeight: 500,
+                      fontFamily: 'var(--font-sans)',
                       textDecoration: 'none',
                       cursor: 'pointer',
                       width: '100%',
@@ -823,7 +849,7 @@ export default function QuoteDetail() {
                   <button
                     className="btn-action"
                     onClick={handleConvertToLoad}
-                    style={{ width: '100%', fontSize: 11, padding: '10px 16px', background: 'var(--status-success)', border: 'none' }}
+                    style={{ width: '100%', padding: '10px 16px', minHeight: 40, background: 'var(--status-success)', border: 'none' }}
                     disabled={convertToLoadMutation.isPending}
                   >
                     {convertToLoadMutation.isPending ? 'Converting…' : '✓ Convert to booking'}
@@ -832,15 +858,19 @@ export default function QuoteDetail() {
               )}
 
               <button
+                className="qi-action"
                 onClick={handleDelete}
                 style={{
                   background: 'transparent',
                   border: '1px solid var(--status-danger)',
-                  color: 'var(--status-danger)',
-                  padding: '10px 16px',
-                  borderRadius: 2,
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
+                  color: 'var(--status-danger-text, var(--status-danger))',
+                  padding: '9px 16px',
+                  minHeight: 40,
+                  borderRadius: 6,
+                  fontSize: 14,
+                  lineHeight: '20px',
+                  fontWeight: 500,
+                  fontFamily: 'var(--font-sans)',
                   cursor: 'pointer',
                   width: '100%',
                 }}
@@ -862,15 +892,18 @@ export default function QuoteDetail() {
                     })
                     .catch((e: any) => toast.error(e?.message || 'PDF download failed'));
                 }}
+                className="qi-action"
                 style={{
-                  padding: '10px 16px',
+                  padding: '9px 16px',
+                  minHeight: 40,
                   background: 'var(--bg-surface)',
                   border: '1px solid var(--accent-primary)',
                   color: 'var(--accent-primary)',
-                  borderRadius: 2,
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
-                  letterSpacing: '0.08em',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  lineHeight: '20px',
+                  fontWeight: 500,
+                  fontFamily: 'var(--font-sans)',
                   cursor: 'pointer',
                   width: '100%',
                   marginTop: 8,
@@ -901,24 +934,25 @@ export default function QuoteDetail() {
         >
           <div
             className="card"
-            style={{ padding: 24, maxWidth: 440, margin: 20, width: '100%' }}
+            style={{ padding: 24, borderRadius: 12, maxWidth: 440, margin: 20, width: '100%' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-              {outcomeType === 'accepted' ? 'Mark Quote as Accepted' : 'Mark Quote as Rejected'}
-            </div>
+            <h2 style={{ margin: '0 0 16px', fontSize: 16, lineHeight: '24px', fontWeight: 600, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>
+              {outcomeType === 'accepted' ? 'Mark quote as accepted' : 'Mark quote as rejected'}
+            </h2>
 
             {outcomeType === 'accepted' && (
               <div style={{ marginBottom: 16 }}>
-                {label('Final Price Agreed (Optional)')}
+                {label('Final price agreed (optional)')}
                 <input
+                  className="qi-input"
                   type="number"
                   value={finalPrice}
                   onChange={e => setFinalPrice(e.target.value)}
                   placeholder={String(quote?.total_amount || '')}
                   style={inputStyle}
                 />
-                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 4 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
                   Leave blank to use quote total: {formatCurrency(parseFloat(quote?.total_amount || '0'))}
                 </div>
               </div>
@@ -926,7 +960,7 @@ export default function QuoteDetail() {
 
             {outcomeType === 'rejected' && (
               <div style={{ marginBottom: 16 }}>
-                {label('Rejection Reason')}
+                {label('Rejection reason')}
                 <Select value={rejectionReason} onValueChange={setRejectionReason}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select reason..." />
@@ -940,6 +974,7 @@ export default function QuoteDetail() {
                 </Select>
                 {rejectionReason === 'Other' && (
                   <input
+                    className="qi-input"
                     type="text"
                     placeholder="Please specify reason"
                     value={customRejectionReason}

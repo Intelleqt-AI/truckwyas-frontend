@@ -1,3 +1,5 @@
+import './fleet-vehicles-brand.css';
+import './table-heading-roles.css';
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -23,14 +25,17 @@ const tabStyle = (active: boolean): React.CSSProperties => ({
   background: 'none',
   border: 'none',
   borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
-  color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
-  fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  letterSpacing: '0.08em',
+  color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 14,
+  lineHeight: '20px',
+  letterSpacing: 'normal',
+  fontWeight: active ? 500 : 400,
   padding: '12px 0',
   marginRight: 24,
   cursor: 'pointer',
   marginBottom: -1,
+  whiteSpace: 'nowrap',
 });
 
 export default function FleetDashboard() {
@@ -75,11 +80,11 @@ export default function FleetDashboard() {
 
   if (error) {
     return (
-      <div>
+      <div className="fleet-page">
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
+          <h1 className="fleet-page-title">Fleet command</h1>
         </div>
-        <div className="card" style={{ padding: 20, color: 'var(--status-danger)' }}>
+        <div className="card" style={{ padding: 20, color: 'var(--status-danger)', fontSize: 13, lineHeight: '20px' }}>
           {error}
         </div>
       </div>
@@ -87,38 +92,38 @@ export default function FleetDashboard() {
   }
 
   return (
-    <div>
+    <div className="fleet-page">
       {/* Header */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div className="fleet-header-row" style={{ marginBottom: 24, alignItems: 'flex-start' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet Command</div>
+            <h1 className="fleet-page-title">Fleet command</h1>
             <LiveBadge />
           </div>
         </div>
-        <button className="btn-action" onClick={() => navigate(tab === 'vehicles' ? '/fleet/vehicles' : '/fleet/drivers')}>
+        <button data-fleet-control className="btn-action" onClick={() => navigate(tab === 'vehicles' ? '/fleet/vehicles' : '/fleet/drivers')}>
           + Add {tab === 'vehicles' ? 'vehicle' : 'driver'}
         </button>
       </div>
 
       {/* Stats — always visible */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="fleet-summary fleet-summary--5">
         {[
-          { label: 'Total Vehicles', value: vehicles.length, color: 'var(--text-primary)' },
+          { label: 'Total vehicles', value: vehicles.length, color: 'var(--text-primary)' },
           { label: 'Active', value: activeVehicles, color: 'var(--accent-primary)' },
           { label: 'Idle', value: idleVehicles, color: 'var(--text-secondary)' },
           { label: 'Maintenance', value: inMaintenance, color: 'var(--status-danger)' },
-          { label: 'Drivers On Duty', value: activeDrivers, color: 'var(--status-success)' },
+          { label: 'Drivers on duty', value: activeDrivers, color: 'var(--status-success)' },
         ].map(m => (
           <div key={m.label} className="card metric-card">
             <div className="card-header"><span className="card-title">{m.label}</span></div>
-            <div className="metric-value" style={{ fontSize: 26, color: m.color }}>{m.value}</div>
+            <div className="metric-value" style={{ color: m.color }}>{m.value}</div>
           </div>
         ))}
       </div>
 
       {/* Sub-tabs */}
-      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 20, display: 'flex' }}>
+      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 24, display: 'flex', overflowX: 'auto' }}>
         <button style={tabStyle(tab === 'vehicles')} onClick={() => setTab('vehicles')}>Vehicles</button>
         <button style={tabStyle(tab === 'drivers')} onClick={() => setTab('drivers')}>Drivers</button>
       </div>
@@ -126,7 +131,7 @@ export default function FleetDashboard() {
       {/* Vehicles tab */}
       {tab === 'vehicles' && (
         <div className="card table-card">
-          <table className="data-table">
+          <table className="data-table table-heading-roles">
             <thead>
               <tr>
                 <th>Registration</th><th>Vehicle</th><th>Driver</th><th>Status</th><th>Route</th><th className="text-right">Fuel %</th>
@@ -159,10 +164,10 @@ export default function FleetDashboard() {
       {/* Drivers tab */}
       {tab === 'drivers' && (
         <div className="card table-card">
-          <table className="data-table">
+          <table className="data-table table-heading-roles">
             <thead>
               <tr>
-                <th>Name</th><th>Code</th><th>Trips</th><th>On Time %</th><th>Rating</th><th className="text-right">Status</th>
+                <th>Name</th><th>Code</th><th>Trips</th><th>On time %</th><th>Rating</th><th className="text-right">Status</th>
               </tr>
             </thead>
             <tbody>

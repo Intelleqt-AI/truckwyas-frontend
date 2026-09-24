@@ -1,0 +1,159 @@
+/* Insights page presentation only (insights-page-brand, insights-metric-roles,
+   insights-period-controls, insights-lanes-results, insights-lanes-table-scroll
+   packets). Chart geometry, series colours and financial inputs stay in JSX. */
+
+.insights-page-brand {
+  min-width: 0;
+  font: 400 14px/20px var(--font-sans);
+  letter-spacing: normal;
+  /* Financial figures align in every list/table without per-cell declarations. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Semantic status TEXT colours, page-scoped. Chart/bar/dot fills keep the
+   existing --status-* swatches; these are only for readable text on surfaces. */
+.insights-page-brand {
+  --status-success-text: #86EFAC;
+  --status-warning-text: #FCD34D;
+  --status-danger-text: #FCA5A5;
+  --insights-success-surface: #10271B;
+  --insights-warning-surface: #302410;
+  --insights-danger-surface: #321919;
+}
+[data-theme="light"] .insights-page-brand {
+  --status-success-text: #166534;
+  --status-warning-text: #92400E;
+  --status-danger-text: #B91C1C;
+  --insights-success-surface: #F0FDF4;
+  --insights-warning-surface: #FFFBEB;
+  --insights-danger-surface: #FEF2F2;
+}
+
+/* Cards: 24px desktop / 16px phone, 8px radius. */
+.insights-page-brand .card { min-width: 0; padding: 24px; border-radius: 8px; }
+
+/* Metric grids: minmax(0,1fr) tracks; stack before values get cramped. */
+.insights-brand-grid { min-width: 0; display: grid; gap: 16px; }
+.insights-brand-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.insights-brand-grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.insights-brand-grid > * { min-width: 0; overflow-wrap: anywhere; }
+
+/* Business pulse only: five cards wide, wrapping down without shrinking money. */
+.insights-business-pulse {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+.insights-business-pulse > .card { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 1200px) {
+  .insights-business-pulse { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 1100px) {
+  .insights-brand-grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .insights-business-pulse { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .insights-brand-grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .insights-page-brand .card { padding: 16px; }
+}
+@media (max-width: 600px) {
+  .insights-business-pulse,
+  .insights-brand-grid--3,
+  .insights-brand-grid--4 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Period filters: sans 14/20, 40px desktop / 48px phone, 6px corners. */
+.insights-period-control {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font: 500 14px/20px var(--font-sans);
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.insights-period-control[aria-pressed="true"] {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--btn-action-color);
+}
+.insights-period-control:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+@media (max-width: 767px) { .insights-period-control { min-height: 48px; } }
+
+/* Tabs: shared sans role, 2px underline handled inline; touch height only. */
+.insights-brand-tab { min-height: 40px; flex-shrink: 0; }
+@media (max-width: 767px) { .insights-brand-tab { min-height: 48px; } }
+
+/* Named, keyboard-focusable local scroll regions for wide data lists.
+   The page itself must never scroll horizontally. */
+.insights-page-brand .insights-brand-region { max-width: 100%; overflow-x: auto; }
+.insights-page-brand [role="region"]:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+
+/* Recommendation arrow: named native button with a 44px target. */
+.insights-recommendation-action {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 8px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.insights-recommendation-action:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+
+/* Lanes: the two existing reports rendered as native tables inside their own
+   labelled scroll containers (columns stay reachable on phones). */
+.insights-page-brand .card.insights-lanes-panel { padding: 0; }
+.insights-lanes-scroll { max-width: 100%; min-width: 0; overflow-x: auto; }
+.insights-lanes-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.insights-lanes-table th {
+  font: 500 13px/20px var(--font-sans);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text-secondary);
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.insights-lanes-table td {
+  font: 400 14px/20px var(--font-sans);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-row);
+}
+.insights-lanes-table th,
+.insights-lanes-table td { padding: 12px 16px; }
+.insights-lanes-table th:first-child,
+.insights-lanes-table td:first-child { padding-left: 24px; }
+.insights-lanes-table th:last-child,
+.insights-lanes-table td:last-child { padding-right: 24px; }
+.insights-lanes-table [data-align="numeric"] { text-align: right; white-space: nowrap; }
+.insights-lanes-table tbody tr:last-child td { border-bottom: none; }
+.insights-lanes-legend {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-row);
+}
+.insights-lanes-legend,
+.insights-lanes-empty {
+  font: 400 13px/20px var(--font-sans);
+  color: var(--text-tertiary);
+  letter-spacing: normal;
+}
+.insights-lanes-empty { text-align: center; padding: 32px 24px; }

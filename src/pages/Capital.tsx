@@ -1,3 +1,5 @@
+import './capital-typography.css';
+import './table-heading-roles.css';
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -89,28 +91,32 @@ export default function Capital() {
   }
 
   return (
-    <div>
+    <div className="capital-typography">
       <div style={{ marginBottom: 24 }}>
         <div
           style={{
-            fontSize: 11,
-            fontFamily: "var(--font-mono)",
+            fontSize: 13,
+            lineHeight: "20px",
+            fontFamily: "var(--font-sans)",
             color: "var(--text-tertiary)",
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
+            letterSpacing: "normal",
+            textTransform: "none",
             marginBottom: 4,
           }}>
           Capital
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div
+          <h1
             style={{
               fontSize: 22,
-              fontWeight: 500,
+              lineHeight: "28px",
+              fontFamily: "var(--font-sans)",
+              margin: 0,
+              fontWeight: 600,
               color: "var(--text-primary)",
             }}>
-            Fast Pay Facility
-          </div>
+            Fast Pay facility
+          </h1>
           <LiveBadge />
         </div>
       </div>
@@ -138,7 +144,7 @@ export default function Capital() {
             }}>
             Fast Pay powered by Merchant Capital
           </div>
-          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>
             Get paid faster on your eligible invoices. Apply via our trusted
             lending partner — approval in minutes.
           </div>
@@ -155,25 +161,25 @@ export default function Capital() {
         }}>
         {[
           {
-            label: "Available Capital",
+            label: "Available capital",
             value: formatCurrency(available),
             sub: `of ${formatCurrency(facilityLimit)} limit`,
             color: "var(--status-success)",
           },
           {
-            label: "In Use",
+            label: "In use",
             value: formatCurrency(outstanding),
             sub: `${utilization}% utilization`,
             color: "var(--status-warning)",
           },
           {
-            label: "Eligible Invoices",
+            label: "Eligible invoices",
             value: eligibleInvoices.length,
             sub: "ready for fast pay",
             color: "var(--accent-primary)",
           },
           {
-            label: "Eligible Value",
+            label: "Eligible value",
             value: formatCurrency(eligibleTotal),
             sub: "total available",
             color: "var(--text-primary)",
@@ -185,12 +191,13 @@ export default function Capital() {
             </div>
             <div
               className="metric-value"
-              style={{ fontSize: 20, color: m.color }}>
+              style={{ color: m.color }}>
               {m.value}
             </div>
             <div
               style={{
-                fontSize: 11,
+                fontSize: 13,
+                lineHeight: "20px",
                 color: "var(--text-tertiary)",
                 marginTop: 4,
               }}>
@@ -207,10 +214,11 @@ export default function Capital() {
             display: "flex",
             justifyContent: "space-between",
             marginBottom: 8,
-            fontSize: 11,
-            fontFamily: "var(--font-mono)",
+            fontSize: 13,
+            lineHeight: "20px",
+            fontFamily: "var(--font-sans)",
           }}>
-          <span style={{ color: "var(--text-tertiary)" }}>FACILITY METER</span>
+          <span style={{ color: "var(--text-tertiary)" }}>Facility meter</span>
           <span
             style={{
               color:
@@ -218,7 +226,7 @@ export default function Capital() {
                   ? "var(--status-warning)"
                   : "var(--status-success)",
             }}>
-            {utilization}% USED
+            {utilization}% used
           </span>
         </div>
         <div
@@ -246,29 +254,31 @@ export default function Capital() {
           />
         </div>
         <div
+          className="capital-facility-values"
           style={{
             display: "flex",
             justifyContent: "space-between",
             marginTop: 8,
-            fontSize: 10,
-            fontFamily: "var(--font-mono)",
+            fontSize: 13,
+            lineHeight: "20px",
+            fontFamily: "var(--font-sans)",
             color: "var(--text-tertiary)",
           }}>
           <div>
             <div style={{ color: "var(--status-danger)", fontWeight: 500 }}>
-              OUTSTANDING
+              Outstanding
             </div>
             <div>{formatCurrency(outstanding)}</div>
           </div>
           <div style={{ textAlign: "center" }}>
             <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>
-              LIMIT
+              Limit
             </div>
             <div>{formatCurrency(facilityLimit)}</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ color: "var(--status-success)", fontWeight: 500 }}>
-              AVAILABLE
+              Available
             </div>
             <div>{formatCurrency(available)}</div>
           </div>
@@ -278,15 +288,17 @@ export default function Capital() {
       {/* Eligible invoices */}
       <div className="card table-card">
         <div className="card-header" style={{ marginBottom: 16 }}>
-          <span className="card-title">Fast Pay NOW — Eligible Invoices</span>
+          <h2 className="card-title" style={{ margin: 0 }}>Fast Pay now — eligible invoices</h2>
           <span
             style={{
-              fontSize: 10,
+              fontSize: 13,
+              lineHeight: "20px",
               color: "var(--text-tertiary)",
-              fontFamily: "var(--font-mono)",
+              fontFamily: "var(--font-sans)",
+              fontVariantNumeric: "tabular-nums",
             }}>
-            {eligibleInvoices.length} INVOICES · {formatCurrency(eligibleTotal)}{" "}
-            AVAILABLE
+            {eligibleInvoices.length} invoices · {formatCurrency(eligibleTotal)}{" "}
+            available
           </span>
         </div>
         {eligibleInvoices.length === 0 ? (
@@ -301,12 +313,12 @@ export default function Capital() {
             Pay.
           </div>
         ) : (
-          <table className="data-table">
+          <table className="data-table table-heading-roles">
             <thead>
               <tr>
                 <th>Invoice #</th>
                 <th>Customer</th>
-                <th>AI Risk</th>
+                <th>AI risk</th>
                 <th>Amount</th>
                 <th>Fundable</th>
                 <th className="text-right">Action</th>
@@ -332,14 +344,15 @@ export default function Capital() {
                     </td>
                     <td>
                       {riskPct === null || riskPct === undefined ? (
-                        <span style={{ color: "var(--text-tertiary)", fontSize: 11 }}>—</span>
+                        <span style={{ color: "var(--text-tertiary)", fontSize: 13, lineHeight: "20px" }}>—</span>
                       ) : (
                         <button
                           onClick={() => inv.customer_id && navigate(`/customers/${inv.customer_id}/risk`)}
                           title="Open AI risk profile"
                           style={{
-                            fontFamily: "var(--font-mono)",
-                            fontSize: 11,
+                            fontFamily: "var(--font-sans)",
+                            fontSize: 13,
+                            lineHeight: "20px",
                             fontWeight: 700,
                             color: riskColor,
                             background: "none",
@@ -353,8 +366,8 @@ export default function Capital() {
                         </button>
                       )}
                     </td>
-                    <td className="mono">{formatCurrency(amount)}</td>
-                    <td className="mono" style={{ color: fundable < amount ? "var(--status-warning)" : undefined }}>
+                    <td className="mono capital-amount">{formatCurrency(amount)}</td>
+                    <td className="mono capital-amount" style={{ color: fundable < amount ? "var(--status-warning)" : undefined }}>
                       {formatCurrency(fundable)}
                     </td>
                     <td className="text-left">
@@ -362,13 +375,14 @@ export default function Capital() {
                         <span
                           title={`Customer risk ${riskPct}% — above the 70% fast-pay limit`}
                           style={{
-                            fontSize: 10,
+                            fontSize: 13,
+                            lineHeight: "20px",
                             padding: "4px 12px",
                             background: "none",
                             color: "var(--status-danger)",
                             border: "1px solid var(--status-danger)",
                             borderRadius: 4,
-                            fontFamily: "var(--font-mono)",
+                            fontFamily: "var(--font-sans)",
                             fontWeight: 500,
                             display: "inline-block",
                             whiteSpace: "nowrap",
@@ -388,7 +402,8 @@ export default function Capital() {
                             )
                           }
                           style={{
-                            fontSize: 10,
+                            fontSize: 14,
+                            lineHeight: "20px",
                             padding: "4px 12px",
                             background: appliedIds.has(String(inv.id))
                               ? "var(--status-success)"
@@ -396,7 +411,7 @@ export default function Capital() {
                             color: "var(--btn-action-color)",
                             border: "none",
                             borderRadius: 2,
-                            fontFamily: "var(--font-mono)",
+                            fontFamily: "var(--font-sans)",
                             fontWeight: 600,
                             textDecoration: "none",
                             display: "inline-block",
@@ -424,20 +439,21 @@ export default function Capital() {
             <span
               className="card-title"
               style={{ color: "var(--text-secondary)" }}>
-              Not Eligible ({ineligibleInvoices.length})
+              Not eligible ({ineligibleInvoices.length})
             </span>
             <span
               style={{
-                fontSize: 10,
+                fontSize: 13,
+                lineHeight: "20px",
                 color: "var(--text-tertiary)",
-                fontFamily: "var(--font-mono)",
+                fontFamily: "var(--font-sans)",
                 userSelect: "none",
               }}>
               {showIneligible ? "▲ Hide" : "▼ Show reasons"}
             </span>
           </div>
           {showIneligible && (
-            <table className="data-table">
+            <table className="data-table table-heading-roles">
               <thead>
                 <tr>
                   <th>Invoice #</th>
@@ -451,12 +467,13 @@ export default function Capital() {
                   <tr key={inv.id}>
                     <td className="mono">{inv.invoice_number}</td>
                     <td>{inv.customer}</td>
-                    <td className="mono">{formatCurrency(inv.amount)}</td>
+                    <td className="mono capital-amount">{formatCurrency(inv.amount)}</td>
                     <td
                       style={{
                         color: "var(--status-danger)",
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 11,
+                        fontFamily: "var(--font-sans)",
+                        fontSize: 13,
+                        lineHeight: "20px",
                       }}>
                       {inv.reason}
                     </td>

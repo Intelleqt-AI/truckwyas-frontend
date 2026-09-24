@@ -186,8 +186,8 @@ export default function XeroIntegration() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-semibold text-foreground">
-          Xero Integration
+        <h2 className="font-semibold text-foreground" style={{ fontSize: 22, lineHeight: '28px' }}>
+          Xero integration
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
           Connect your Xero account to automatically sync invoices and payments
@@ -198,7 +198,7 @@ export default function XeroIntegration() {
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Connection Status</CardTitle>
+            <CardTitle style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600 }}>Connection status</CardTitle>
             {connection?.is_connected ? (
               <Badge className="bg-success text-white hover:bg-success">
                 <CheckCircle2 className="w-3 h-3 mr-1" />
@@ -210,7 +210,7 @@ export default function XeroIntegration() {
                 className="bg-muted text-muted-foreground"
               >
                 <XCircle className="w-3 h-3 mr-1" />
-                Not Connected
+                Not connected
               </Badge>
             )}
           </div>
@@ -239,7 +239,7 @@ export default function XeroIntegration() {
               {/* Sync Controls */}
               <div className="border-t pt-6">
                 <h3 className="text-sm font-medium text-foreground mb-4">
-                  Sync Data
+                  Sync data
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Invoice Sync */}
@@ -255,7 +255,7 @@ export default function XeroIntegration() {
                           isSyncing === "invoices" ? "animate-spin" : ""
                         }`}
                       />
-                      Sync Invoices
+                      Sync invoices
                     </Button>
                     <p className="text-xs text-muted-foreground">
                       Last synced: {formatDate(connection.last_invoice_sync)}
@@ -275,7 +275,7 @@ export default function XeroIntegration() {
                           isSyncing === "payments" ? "animate-spin" : ""
                         }`}
                       />
-                      Sync Payments
+                      Sync payments
                     </Button>
                     <p className="text-xs text-muted-foreground">
                       Last synced: {formatDate(connection.last_payment_sync)}
@@ -338,7 +338,7 @@ export default function XeroIntegration() {
       {connection?.is_connected && syncLogs && syncLogs.length > 0 && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Recent Sync Activity</CardTitle>
+            <CardTitle style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600 }}>Recent sync activity</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -356,8 +356,8 @@ export default function XeroIntegration() {
                     <div>
                       <p className="text-sm font-medium text-foreground">
                         {log.sync_type === "invoice"
-                          ? "Invoice Sync"
-                          : "Payment Sync"}
+                          ? "Invoice sync"
+                          : "Payment sync"}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {log.status === "success"

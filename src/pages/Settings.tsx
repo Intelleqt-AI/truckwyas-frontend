@@ -19,7 +19,7 @@ type Section = { group: string; items: SectionItem[] };
 
 const SECTIONS: Section[] = [
   {
-    group: 'My Account',
+    group: 'My account',
     items: [
       { id: 'profile', label: 'Profile', component: ProfileSettings },
       { id: 'notifications', label: 'Notifications', component: NotificationSettings },
@@ -29,8 +29,8 @@ const SECTIONS: Section[] = [
   {
     group: 'Workspace',
     items: [
-      { id: 'company', label: 'Company Details', component: CompanySettings, adminOnly: true },
-      { id: 'users', label: 'Users & Permissions', component: UsersPermissions, adminOnly: true },
+      { id: 'company', label: 'Company details', component: CompanySettings, adminOnly: true },
+      { id: 'users', label: 'Users & permissions', component: UsersPermissions, adminOnly: true },
       { id: 'billing', label: 'Billing', component: BillingSettings, adminOnly: true },
       { id: 'integrations', label: 'Integrations', component: IntegrationsSettings, adminOnly: true },
     ],
@@ -40,13 +40,13 @@ const SECTIONS: Section[] = [
     items: [
       { id: 'customers', label: 'Customers', component: CustomersDirectory },
       { id: 'vehicles', label: 'Vehicles', component: VehiclesDirectory },
-      { id: 'vehicle-types', label: 'Vehicle Types', component: VehicleTypesDirectory },
+      { id: 'vehicle-types', label: 'Vehicle types', component: VehicleTypesDirectory },
     ],
   },
   {
     group: 'Developers',
     items: [
-      { id: 'risk-api', label: 'Risk-Scoring API', component: DeveloperApi, adminOnly: true },
+      { id: 'risk-api', label: 'Risk-scoring API', component: DeveloperApi, adminOnly: true },
     ],
   },
 ];
@@ -95,11 +95,13 @@ export default function Settings() {
         {visibleSections.map((s, idx) => (
           <div key={s.group} style={{ marginBottom: idx < visibleSections.length - 1 ? 20 : 0 }}>
             <div style={{
-              fontSize: 10,
-              fontFamily: 'var(--font-mono)',
+              fontSize: 13,
+              lineHeight: '20px',
+              fontWeight: 500,
+              fontFamily: 'var(--font-sans)',
               color: 'var(--text-tertiary)',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
+              letterSpacing: 'normal',
+              textTransform: 'none',
               padding: '12px 20px 6px',
             }}>
               {s.group}
@@ -113,8 +115,10 @@ export default function Settings() {
                   style={{
                     display: 'block',
                     padding: '8px 20px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 14,
+                    lineHeight: '20px',
+                    letterSpacing: 'normal',
                     textDecoration: 'none',
                     color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
                     background: active ? 'rgba(var(--accent-primary-rgb, 37,99,235), 0.08)' : 'transparent',
@@ -133,11 +137,13 @@ export default function Settings() {
         {user?.is_superuser && (
           <div style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
             <div style={{
-              fontSize: 10,
-              fontFamily: 'var(--font-mono)',
+              fontSize: 13,
+              lineHeight: '20px',
+              fontWeight: 500,
+              fontFamily: 'var(--font-sans)',
               color: 'var(--text-tertiary)',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
+              letterSpacing: 'normal',
+              textTransform: 'none',
               padding: '0 20px 6px',
             }}>
               Platform
@@ -147,13 +153,15 @@ export default function Settings() {
               style={{
                 display: 'block',
                 padding: '8px 20px',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12,
+                fontFamily: 'var(--font-sans)',
+                fontSize: 14,
+                lineHeight: '20px',
+                letterSpacing: 'normal',
                 textDecoration: 'none',
                 color: 'var(--status-warning)',
               }}
             >
-              Admin Dashboard
+              Admin dashboard
             </NavLink>
           </div>
         )}

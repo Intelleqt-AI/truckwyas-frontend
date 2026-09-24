@@ -256,7 +256,7 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
                   style={{
                     flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
                     padding: '2px 6px', borderRadius: 3,
-                    color: 'var(--status-warning)',
+                    color: 'var(--status-warning-text, var(--status-warning))',
                     background: 'color-mix(in srgb, var(--status-warning) 15%, transparent)',
                     border: '1px solid var(--status-warning)',
                   }}

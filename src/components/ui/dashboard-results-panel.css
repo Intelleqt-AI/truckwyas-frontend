@@ -1,0 +1,121 @@
+/* Explicit table-results ownership; never applied to charts, boards or dialogs. */
+.os-app-shell .card.dashboard-results-panel {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border-radius: 8px;
+}
+.os-app-shell .dashboard-results-body {
+  min-width: 0;
+  max-width: 100%;
+}
+.os-app-shell .dashboard-results-scroll {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.os-app-shell .dashboard-results-scroll:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+@media (min-width: 768px) {
+  .os-app-shell .dashboard-results-caption { --results-caption-margin-bottom: 0px; padding: 0 24px 16px; }
+  .os-app-shell .card.dashboard-results-panel {
+    --results-panel-padding: 0px;
+    --results-panel-overflow: visible;
+  }
+  .os-app-shell .dashboard-results-actions { --results-actions-gap: 12px; gap: 12px; }
+  .os-app-shell .dashboard-results-pagination { --results-pagination-padding: 12px 24px; padding: 12px 24px; }
+  .os-app-shell .dashboard-results-empty-block { --results-empty-block-padding: 32px 24px; padding: 32px 24px; }
+  .os-app-shell .dashboard-results-toolbar {
+    --results-toolbar-padding: 16px 24px;
+    --results-toolbar-margin-bottom: 0px;
+    --results-toolbar-margin-top: 0px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 24px;
+    margin: 0;
+    border-bottom: 1px solid var(--border-active);
+  }
+  .os-app-shell .dashboard-results-table { width: 100%; border-collapse: collapse; }
+  .os-app-shell .dashboard-results-table .dashboard-results-row {
+    --results-row-border-bottom: none;
+  }
+  .os-app-shell .dashboard-results-table thead .dashboard-results-row {
+    --results-row-background: var(--bg-surface-hover);
+    background: var(--bg-surface-hover);
+  }
+  .os-app-shell .dashboard-results-table .dashboard-results-cell {
+    --results-cell-padding: 12px 16px;
+    padding: 12px 16px;
+  }
+  .os-app-shell .dashboard-results-table .dashboard-results-cell:first-child {
+    --results-cell-padding: 12px 16px 12px 24px;
+    padding-left: 24px;
+  }
+  .os-app-shell .dashboard-results-table .dashboard-results-cell:last-child {
+    --results-cell-padding: 12px 24px 12px 16px;
+    padding-right: 24px;
+  }
+  .os-app-shell .dashboard-results-table .dashboard-results-cell:only-child {
+    --results-cell-padding: 12px 24px;
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+  .os-app-shell .dashboard-results-table .dashboard-results-cell.dashboard-results-empty {
+    --results-cell-padding: 32px 24px;
+    --results-empty-inner-padding: 0px;
+    padding: 32px 24px;
+  }
+  .os-app-shell .dashboard-results-table thead .dashboard-results-cell {
+    --results-cell-border-bottom: 1px solid var(--border-active);
+    border-bottom: 1px solid var(--border-active);
+    background: var(--bg-surface-hover);
+  }
+  .os-app-shell .dashboard-results-table tbody .dashboard-results-cell {
+    --results-cell-border-bottom: 1px solid var(--border-row);
+    border-bottom: 1px solid var(--border-row);
+  }
+  .os-app-shell .dashboard-results-table tbody tr:last-child .dashboard-results-cell {
+    --results-cell-border-bottom: none;
+    border-bottom: none;
+  }
+  .os-app-shell .dashboard-results-action,
+  .os-app-shell .dashboard-results-control {
+    --results-action-padding: 8px 12px;
+    --results-action-font-size: 14px;
+    --results-action-font-weight: 500;
+    --results-action-font-family: var(--font-sans);
+    --results-action-letter-spacing: normal;
+    --results-action-line-height: 20px;
+    --results-action-border-radius: 6px;
+    --results-action-min-height: 40px;
+    --results-action-min-width: 0px;
+    --results-control-padding: 8px 12px;
+    --results-control-font-size: 14px;
+    --results-control-font-family: var(--font-sans);
+    --results-control-letter-spacing: normal;
+    --results-control-line-height: 20px;
+    --results-control-border-radius: 6px;
+    --results-control-min-height: 40px;
+    min-height: 40px;
+    min-width: 0;
+    border-radius: 6px;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 20px;
+    letter-spacing: normal;
+  }
+  .os-app-shell .dashboard-results-action { width: auto; font-weight: 500; }
+  .os-app-shell .dashboard-results-action[data-results-icon] {
+    --results-action-min-height: 44px;
+    --results-action-min-width: 44px;
+    --results-action-padding: 8px;
+    min-height: 44px;
+    min-width: 44px;
+    width: 44px;
+  }
+}

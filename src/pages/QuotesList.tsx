@@ -1,3 +1,5 @@
+import './bookings-typography.css';
+import './table-heading-roles.css';
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
@@ -77,7 +79,7 @@ const COLUMN_LABELS: Record<string, string> = {
   DECLINED: 'Declined',
   // Not board columns — kept only so a quote from before this change still
   // renders a readable label in the list view instead of the raw code.
-  IT: 'In-Transit',
+  IT: 'In transit',
   COMPLETED: 'Completed',
 };
 
@@ -118,37 +120,37 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 6, height: 6, borderRadius: 6, background: accent, flexShrink: 0 }} />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>{quote.quote_number}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{quote.quote_number}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             {quote.fuel_alert && (
-              <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 11 }}>⛽</span>
+              <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 13, lineHeight: '20px' }}>⛽</span>
             )}
             {quote.outcome === 'accepted' && (
-              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, fontFamily: 'var(--font-mono)', fontWeight: 500 }}>✓ Won</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, fontFamily: 'var(--font-sans)', fontWeight: 500 }}>✓ Won</span>
             )}
             {quote.outcome === 'rejected' && (
-              <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>✗ Lost</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', fontFamily: 'var(--font-sans)', fontWeight: 500 }}>✗ Lost</span>
             )}
           </div>
         </div>
-        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{quote.customer_name || '—'}</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{quote.customer_name || '—'}</div>
         <div style={{
-          fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10,
+          fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 10,
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden',
         }} title={routeOf(quote)}>
           {routeOf(quote)}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: quote.status === 'ACCEPTED' ? 10 : 0 }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
+          <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
           {quote.confidence && (
-            <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', color: confidenceColor(quote.confidence), border: `1px solid ${confidenceColor(quote.confidence)}` }}>{sentenceCase(quote.confidence)}</span>
+            <span style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', color: confidenceColor(quote.confidence), border: `1px solid ${confidenceColor(quote.confidence)}` }}>{sentenceCase(quote.confidence)}</span>
           )}
         </div>
         {quote.status === 'ACCEPTED' && convertedLoad && (
           <button
             onClick={(e) => onViewBooking?.(e, convertedLoad)}
-            style={{ width: '100%', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '0.05em', padding: '7px 8px', background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
+            style={{ width: '100%', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, padding: '7px 8px', background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
           >
             ✓ Converted — View booking →
           </button>
@@ -156,7 +158,7 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
         {quote.status === 'ACCEPTED' && !convertedLoad && onConvertToLoad && (
           <button
             onClick={(e) => onConvertToLoad(e, quote)}
-            style={{ width: '100%', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '0.05em', padding: '7px 8px', background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
+            style={{ width: '100%', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, padding: '7px 8px', background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 2, cursor: 'pointer', pointerEvents: 'auto' }}
           >
             → Convert to booking
           </button>
@@ -441,14 +443,14 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
   } = flattenColumn(activeListQuery);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+    <div className="bookings-typography" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* Header — hidden when embedded in Bookings tabs */}
       {!embedded && (
         <div style={{ marginBottom: 24, flexShrink: 0 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Operations</div>
+          <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Operations</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Loads & Quotes</div>
+              <div style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)' }}>Loads & quotes</div>
               <LiveBadge />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -470,7 +472,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
             placeholder="Search loads, customers, routes..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 12, outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 14, lineHeight: '20px', outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
           />
           <div style={{ display: 'flex', gap: 4 }}>
             {(['board', 'list'] as const).map(v => (
@@ -480,16 +482,16 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                 color: view === v ? 'var(--bg-deep)' : 'var(--text-secondary)',
                 padding: '6px 12px',
                 borderRadius: 2,
-                fontSize: 11,
-                fontFamily: 'var(--font-mono)',
+                fontSize: 14,
+                lineHeight: '20px',
+                fontFamily: 'var(--font-sans)',
                 cursor: 'pointer',
-                letterSpacing: '0.06em',
                 fontWeight: view === v ? 500 : 400,
                 transition: 'all 0.2s ease',
               }}>{v === 'board' ? 'Board' : 'List'}</button>
             ))}
           </div>
-          <div style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
+          <div style={{ marginLeft: 'auto', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
             <span>{totalQuotesCount} quotes</span>
           </div>
         </div>
@@ -502,11 +504,11 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           flexShrink: 0,
         }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--status-danger)', marginBottom: 2 }}>Quoting is blocked</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{subscriptionStatusDetail(authUser?.subscription_status)} Drag-and-drop status changes are disabled until then.</div>
+            <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--status-danger)', marginBottom: 2 }}>Quoting is blocked</div>
+            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{subscriptionStatusDetail(authUser?.subscription_status)} Drag-and-drop status changes are disabled until then.</div>
           </div>
-          <button onClick={() => navigate('/settings/billing')} className="btn-action" style={{ fontSize: 11, flexShrink: 0 }}>
-            GO TO BILLING
+          <button onClick={() => navigate('/settings/billing')} className="btn-action" style={{ flexShrink: 0 }}>
+            Go to billing
           </button>
         </div>
       )}
@@ -523,8 +525,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
               column scrolls its own card list instead of the whole page growing. */}
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexShrink: 0 }}>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}>QUOTES PIPELINE — DRAG TO UPDATE STATUS</span>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{totalQuotesCount} quotes</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)' }}>Quotes pipeline — drag to update status</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)' }}>{totalQuotesCount} quotes</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: '1fr', gap: 16, flex: 1, minHeight: 0 }}>
               {COLUMNS.map(col => {
@@ -533,11 +535,11 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                 <div key={col} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, background: 'var(--bg-panel)', borderRadius: 6, padding: '8px 4px 8px 8px' }}>
                   <div style={{ borderTop: `2px solid ${STATUS_COLOR[col] || 'var(--border-subtle)'}`, paddingTop: 8, marginBottom: 10, marginRight: 4, flexShrink: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[col] || 'var(--text-secondary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{COLUMN_LABELS[col]}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-secondary)', background: 'var(--bg-surface-hover)', padding: '2px 7px', borderRadius: 10 }}>{colCount}</span>
+                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: STATUS_COLOR[col] || 'var(--text-secondary)' }}>{COLUMN_LABELS[col]}</span>
+                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', background: 'var(--bg-surface-hover)', padding: '2px 7px', borderRadius: 10 }}>{colCount}</span>
                     </div>
                     {colTotal > 0 && (
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)', padding: '4px 2px 0' }}>{formatCurrency(colTotal)}</div>
+                      <div style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', padding: '4px 2px 0' }}>{formatCurrency(colTotal)}</div>
                     )}
                   </div>
                   <div className="kanban-col-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
@@ -557,20 +559,20 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                           />
                         ))}
                         {colItems.length === 0 && (
-                          <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 11, border: '1px dashed var(--border-subtle)', borderRadius: 2 }}>Drop here</div>
+                          <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px', border: '1px dashed var(--border-subtle)', borderRadius: 2 }}>Drop here</div>
                         )}
                         {hasNextPage && (
                           <button
                             onClick={() => fetchNextPage()}
                             disabled={isFetchingNextPage}
                             style={{
-                              width: '100%', padding: '8px', marginTop: 2, fontSize: 10, fontFamily: 'var(--font-mono)',
-                              letterSpacing: '0.05em', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+                              width: '100%', padding: '8px', marginTop: 2, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
+                              background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
                               color: 'var(--text-secondary)', borderRadius: 2, cursor: isFetchingNextPage ? 'default' : 'pointer',
                               opacity: isFetchingNextPage ? 0.6 : 1,
                             }}
                           >
-                            {isFetchingNextPage ? 'LOADING…' : `LOAD 10 MORE (${colCount - colItems.length} LEFT)`}
+                            {isFetchingNextPage ? 'Loading…' : `Load 10 more (${colCount - colItems.length} left)`}
                           </button>
                         )}
                       </DroppableColumn>
@@ -588,16 +590,16 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
               <div style={{ padding: 12, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 2, boxShadow: '0 8px 16px rgba(0,0,0,0.25)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <span style={{ width: 6, height: 6, borderRadius: 6, background: STATUS_COLOR[activeQuote.status] || 'var(--border-subtle)', flexShrink: 0 }} />
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>{activeQuote.quote_number}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{activeQuote.quote_number}</span>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{activeQuote.customer_name || '—'}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{activeQuote.customer_name || '—'}</div>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 8 }}>
                   {routeOf(activeQuote)}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(activeQuote.total_amount || '0'))}</span>
+                  <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(activeQuote.total_amount || '0'))}</span>
                   {activeQuote.confidence && (
-                    <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', color: confidenceColor(activeQuote.confidence), border: `1px solid ${confidenceColor(activeQuote.confidence)}` }}>{sentenceCase(activeQuote.confidence)}</span>
+                    <span style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', color: confidenceColor(activeQuote.confidence), border: `1px solid ${confidenceColor(activeQuote.confidence)}` }}>{sentenceCase(activeQuote.confidence)}</span>
                   )}
                 </div>
               </div>
@@ -621,10 +623,10 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                   color: statusFilter === status ? 'var(--bg-deep)' : 'var(--text-secondary)',
                   padding: '6px 12px',
                   borderRadius: 2,
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
+                  fontSize: 14,
+                  lineHeight: '20px',
+                  fontFamily: 'var(--font-sans)',
                   cursor: 'pointer',
-                  letterSpacing: '0.06em',
                   fontWeight: statusFilter === status ? 500 : 400,
                   transition: 'all 0.2s ease',
                 }}
@@ -635,15 +637,14 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           </div>
 
           <div className="card" style={{ padding: 0, overflow: 'auto', flex: 1, minHeight: 0 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)', position: 'sticky', top: 0, zIndex: 1 }}>
-                  {['QUOTE #', 'CUSTOMER', 'ROUTE', 'STATUS', 'OUTCOME', 'CREATED', 'AMOUNT', 'ACTION'].map(h => (
+                  {['Quote #', 'Customer', 'Route', 'Status', 'Outcome', 'Created', 'Amount', 'Action'].map(h => (
                     <th key={h} style={{
                       padding: '12px 16px',
-                      textAlign: h === 'AMOUNT' ? 'right' : h === 'ACTION' ? 'center' : 'left',
-                      fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-                      fontWeight: 500, letterSpacing: '0.08em', whiteSpace: 'nowrap',
+                      textAlign: h === 'Amount' ? 'right' : h === 'Action' ? 'center' : 'left',
+                      whiteSpace: 'nowrap',
                     }}>{h}</th>
                   ))}
                 </tr>
@@ -660,18 +661,18 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                     onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
-                    <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
                       {quote.quote_number}
                       {quote.fuel_alert && (
-                        <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 11, marginLeft: 6 }}>⛽</span>
+                        <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} style={{ fontSize: 13, marginLeft: 6 }}>⛽</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{quote.customer_name || '—'}</td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }} title={routeOf(quote)}>{routeOf(quote)}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{quote.customer_name || '—'}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }} title={routeOf(quote)}>{routeOf(quote)}</td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{
                         display: 'inline-block', whiteSpace: 'nowrap',
-                        fontFamily: 'var(--font-mono)', fontSize: 10,
+                        fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px',
                         color: STATUS_COLOR[quote.status] || 'var(--text-secondary)',
                         padding: '4px 8px',
                         border: `1px solid ${STATUS_COLOR[quote.status] || 'var(--border-subtle)'}`,
@@ -682,26 +683,26 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       {quote.outcome === 'accepted' && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', fontWeight: 500 }}>✓ Won</span>
+                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', padding: '2px 6px', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', fontWeight: 500 }}>✓ Won</span>
                       )}
                       {quote.outcome === 'rejected' && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', fontWeight: 500 }}>✗ Lost</span>
+                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', padding: '2px 6px', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger)', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', fontWeight: 500 }}>✗ Lost</span>
                       )}
                       {(!quote.outcome || quote.outcome === 'pending') && (
-                        <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>—</span>
+                        <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' }}>
                       {quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '—'}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {formatCurrency(parseFloat(quote.total_amount || '0'))}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                       {quote.status === 'ACCEPTED' && loadByQuoteId.has(String(quote.id)) && (
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate(`/bookings/${loadByQuoteId.get(String(quote.id)).id}`); }}
-                          style={{ background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          style={{ background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
                           ✓ View booking
                         </button>
@@ -709,7 +710,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {quote.status === 'ACCEPTED' && !loadByQuoteId.has(String(quote.id)) && (
                         <button
                           onClick={(e) => handleConvertToLoad(e, quote)}
-                          style={{ background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          style={{ background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, padding: '4px 10px', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
                           → Booking
                         </button>
@@ -723,7 +724,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
               <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={24} /></div>
             )}
             {!listIsLoading && listItems.length === 0 && (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No quotes found</div>
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No quotes found</div>
             )}
             {listHasNextPage && (
               <div style={{ padding: 12, display: 'flex', justifyContent: 'center' }}>
@@ -731,12 +732,12 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                   onClick={() => listFetchNextPage()}
                   disabled={listIsFetchingNextPage}
                   style={{
-                    padding: '8px 20px', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.05em',
+                    padding: '8px 20px', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
                     background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
                     borderRadius: 2, cursor: listIsFetchingNextPage ? 'default' : 'pointer', opacity: listIsFetchingNextPage ? 0.6 : 1,
                   }}
                 >
-                  {listIsFetchingNextPage ? 'LOADING…' : 'LOAD 10 MORE'}
+                  {listIsFetchingNextPage ? 'Loading…' : 'Load 10 more'}
                 </button>
               </div>
             )}

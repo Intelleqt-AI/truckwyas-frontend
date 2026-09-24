@@ -1,3 +1,4 @@
+import './table-heading-roles.css';
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -254,15 +255,13 @@ export default function CustomerDetail() {
         {quotes.length === 0 ? (
           <div style={{ textAlign: "center", padding: "24px 0", color: "var(--text-tertiary)", fontSize: 13 }}>No quotes yet for this customer</div>
         ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="table-heading-roles" style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
                 {["Quote #", "Route", "Amount", "Status", "Date"].map(h => (
                   <th key={h} style={{
                     padding: "8px 16px", textAlign: "left",
-                    fontFamily: "var(--font-mono)", fontSize: 10, textTransform: "uppercase",
-                    letterSpacing: "0.08em", color: "var(--text-tertiary)",
-                    borderBottom: "1px solid var(--border-subtle)", fontWeight: 500, whiteSpace: "nowrap",
+                    borderBottom: "1px solid var(--border-subtle)", whiteSpace: "nowrap",
                   }}>{h}</th>
                 ))}
               </tr>

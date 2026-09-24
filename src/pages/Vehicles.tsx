@@ -1,3 +1,6 @@
+import './fleet-vehicles-brand.css';
+import './table-heading-roles.css';
+import { Truck as EmptyFleetIcon } from 'lucide-react';
 import { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from '@tanstack/react-query';
@@ -218,9 +221,9 @@ export default function Vehicles() {
     return (
       <span style={{
         display: 'inline-flex', alignItems: 'center', gap: 4,
-        fontFamily: 'var(--font-mono)', fontSize: 10,
+        fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px',
         color: isStale ? 'var(--text-tertiary)' : 'var(--status-success)',
-        marginTop: 2,
+        marginTop: 4,
       }}>
         <span style={{
           width: 5, height: 5, borderRadius: '50%',
@@ -238,10 +241,11 @@ export default function Vehicles() {
       <span style={{
         display: 'inline-block',
         whiteSpace: 'nowrap',
-        fontFamily: 'var(--font-mono)',
-        fontSize: 10,
+        fontFamily: 'var(--font-sans)',
+        fontSize: 13,
+        lineHeight: '20px',
         color,
-        padding: '2px 6px',
+        padding: '4px 8px',
         background: 'var(--bg-surface-hover)',
         borderRadius: 4,
       }}>
@@ -258,35 +262,36 @@ export default function Vehicles() {
     background: 'transparent', border: 'none',
     borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-    fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
+    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal',
     fontWeight: active ? 500 : 400,
     padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
     transition: 'all 0.2s ease',
+    whiteSpace: 'nowrap',
   });
 
   return (
-    <div>
+    <div className="fleet-page">
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Fleet</div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal', textTransform: 'none', marginBottom: 4 }}>Fleet</div>
+        <div className="fleet-header-row">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fleet</div>
+            <h1 className="fleet-page-title">Fleet</h1>
             <LiveBadge />
           </div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 14px', borderRadius: 2, cursor: 'pointer', letterSpacing: '0.06em' }}>Heatmap</button>
-            <button
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button data-fleet-control onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', letterSpacing: 'normal' }}>Heatmap</button>
+            <button data-fleet-control
               onClick={() => setShowImport(true)}
               disabled={isDemo}
               title={isDemo ? 'Fixed in demo mode' : 'Paste a fleet list from Excel'}
               style={{
-                fontFamily: 'var(--font-mono)', fontSize: 11, background: 'none',
+                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none',
                 border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-                padding: '8px 14px', borderRadius: 2, letterSpacing: '0.06em',
+                padding: '8px 16px', borderRadius: 6, letterSpacing: 'normal',
                 cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
               }}
             >Import from Excel</button>
-            <button
+            <button data-fleet-control
               className="btn-action"
               onClick={() => setShowAddForm(true)}
               disabled={isDemo}
@@ -298,15 +303,15 @@ export default function Vehicles() {
       </div>
 
       {/* Fleet sub-tabs */}
-      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 20, display: 'flex' }}>
+      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 24, display: 'flex', overflowX: 'auto' }}>
         <button style={tabStyle(!location.pathname.includes('/drivers'))} onClick={() => navigate('/fleet/vehicles')}>Vehicles</button>
         <button style={tabStyle(location.pathname.includes('/drivers'))} onClick={() => navigate('/fleet/drivers')}>Drivers</button>
       </div>
 
       {/* Fleet Summary — always computed from real vehicle data */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="fleet-summary fleet-summary--4">
         <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Total Vehicles</span></div>
+          <div className="card-header"><span className="card-title">Total vehicles</span></div>
           <div className="metric-value" style={{ fontSize: 28 }}>{vehicles.length}</div>
         </div>
         <div className="card metric-card">
@@ -316,13 +321,13 @@ export default function Vehicles() {
           </div>
         </div>
         <div className="card metric-card">
-          <div className="card-header"><span className="card-title">In Maintenance</span></div>
+          <div className="card-header"><span className="card-title">In maintenance</span></div>
           <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-warning)' }}>
             {vehicles.filter(v => v.status === 'MAINTENANCE').length}
           </div>
         </div>
         <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Fleet Health Score</span></div>
+          <div className="card-header"><span className="card-title">Fleet health score</span></div>
           <div className="metric-value" style={{ fontSize: 28, color: 'var(--accent-primary)' }}>
             {(() => {
               const scores = vehicles.filter(v => v.ai_health_score).map(v => v.ai_health_score || 0);
@@ -332,45 +337,48 @@ export default function Vehicles() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', minWidth: 0, gap: 20 }}>
         {/* Vehicle Table */}
-        <div>
+        <div style={{ minWidth: 0 }}>
           {/* Search + Status Filter Toolbar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <input
+          <div className="fleet-toolbar">
+            <input data-fleet-control
               type="text"
+              aria-label="Search vehicles"
               placeholder="Search VIN, plate, make, model..."
               value={search}
               onChange={e => handleSearchChange(e.target.value)}
               style={{
                 width: 280,
+                maxWidth: '100%',
                 background: 'var(--bg-surface)',
                 border: '1px solid var(--border-subtle)',
                 color: 'var(--text-primary)',
                 padding: '8px 12px',
-                borderRadius: 2,
-                fontSize: 12,
-                fontFamily: 'var(--font-mono)',
-                outline: 'none',
+                borderRadius: 6,
+                lineHeight: '20px',
+                fontFamily: 'var(--font-sans)',
               }}
             />
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {['All', 'AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE'].map(status => {
                 const isActive = statusFilter === status;
                 return (
-                  <button
+                  <button data-fleet-control
                     key={status}
+                    aria-pressed={isActive}
                     onClick={() => setStatusFilter(status)}
                     style={{
                       background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
                       border: '1px solid var(--border-subtle)',
-                      color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                      padding: '6px 12px',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 11,
-                      borderRadius: 2,
+                      color: isActive ? 'var(--btn-action-color)' : 'var(--text-secondary)',
+                      padding: '8px 12px',
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: 14,
+                      lineHeight: '20px',
+                      borderRadius: 6,
                       cursor: 'pointer',
-                      letterSpacing: '0.06em',
+                      letterSpacing: 'normal',
                       fontWeight: isActive ? 500 : 400,
                       transition: 'all 0.2s ease'
                     }}
@@ -391,8 +399,8 @@ export default function Vehicles() {
           />
 
           {/* Table */}
-          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="card fleet-table-region" role="region" aria-label="Vehicles table" tabIndex={0} style={{ padding: 0, overflowX: 'auto', minWidth: 0, maxWidth: '100%' }}>
+            <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={{ padding: '12px 0 12px 20px', width: 32, borderBottom: '1px solid var(--border-subtle)' }}>
@@ -404,12 +412,10 @@ export default function Vehicles() {
                       />
                     )}
                   </th>
-                  {['Registration', 'Make / Model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency', ''].map(h => (
+                  {['Registration', 'Make / model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency', ''].map(h => (
                     <th key={h} style={{
-                      padding: '12px 20px 12px 12px', textAlign: 'left',
-                      fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
-                      letterSpacing: '0.08em', color: 'var(--text-tertiary)',
-                      borderBottom: '1px solid var(--border-subtle)', fontWeight: 600,
+                      padding: '12px 16px 12px 12px', textAlign: 'left',
+                      borderBottom: '1px solid var(--border-subtle)',
                     }}>{h}</th>
                   ))}
                 </tr>
@@ -419,15 +425,15 @@ export default function Vehicles() {
                   vehicles.length === 0 ? (
                     <tr>
                       <td colSpan={10} style={{ padding: 0 }}>
-                        <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-                          <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🚛</div>
-                          <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>
+                        <div style={{ padding: '48px var(--fleet-card-inset)', textAlign: 'center' }}>
+                          <div style={{ marginBottom: 16, opacity: 0.3 }}><EmptyFleetIcon size={40} aria-hidden="true" /></div>
+                          <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
                             No vehicles yet
                           </div>
-                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+                          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 20 }}>
                             Already have your fleet in a spreadsheet? Paste the list straight in.
                           </div>
-                          <button
+                          <button data-fleet-control
                             onClick={() => setShowImport(true)}
                             className="btn-action"
                             disabled={isDemo}
@@ -436,11 +442,11 @@ export default function Vehicles() {
                           >
                             Paste from Excel
                           </button>
-                          <button
+                          <button data-fleet-control
                             onClick={() => setShowAddForm(true)}
                             disabled={isDemo}
                             title={isDemo ? 'Fixed in demo mode' : undefined}
-                            style={{ ...secondaryButtonStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+                            style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', borderRadius: 6, padding: '8px 16px', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
                           >
                             Add one at a time
                           </button>
@@ -448,7 +454,7 @@ export default function Vehicles() {
                       </td>
                     </tr>
                   ) : (
-                    <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40 }}>No vehicles match your filters</td></tr>
+                    <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40, fontSize: 13, lineHeight: '20px' }}>No vehicles match your filters</td></tr>
                   )
                 ) : sorted.map((v, idx) => {
                   const utilizationPercent = ((v.total_trips || 0) / 20) * 100;
@@ -468,60 +474,61 @@ export default function Vehicles() {
                           onChange={on => toggleOne(v.id, on)}
                         />
                       </td>
-                      <td style={{ padding: '12px 20px 12px 12px', fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 16px 12px 12px', fontFamily: 'var(--font-mono)', fontWeight: 400, fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                         <div>{v.plate || v.registration || '—'}</div>
                         {formatLastSeen(v)}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={[v.make, v.model].filter(Boolean).join(' ')}>
+                      <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={[v.make, v.model].filter(Boolean).join(' ')}>
                         {[v.make, v.model].filter(Boolean).join(' ') || '—'}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.vehicle_type_name || '—'}
                         {v.vehicle_type_capacity != null && (
-                          <span style={{ marginLeft: 6, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                          <span style={{ marginLeft: 6, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
                             · {v.vehicle_type_capacity}t
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px' }}>{getStatusBadge(v.status)}</td>
-                      <td style={{ padding: '12px 20px 12px 32px' }}>
+                      <td style={{ padding: '12px 16px' }}>{getStatusBadge(v.status)}</td>
+                      <td style={{ padding: '12px 16px' }}>
                         <span style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 11,
+                          fontFamily: 'var(--font-sans)',
+                          fontSize: 13,
+                          lineHeight: '20px',
                           color: utilizationColor,
-                          padding: '3px 8px',
+                          padding: '4px 8px',
                           background: 'var(--bg-surface-hover)',
-                          borderRadius: 2,
+                          borderRadius: 4,
                           fontWeight: 600
                         }}>
                           {Math.min(utilizationPercent, 100).toFixed(0)}%
                         </span>
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.revenue_generated ? formatZAR(v.revenue_generated) : '—'}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.total_trips ?? 0}
                       </td>
-                      <td style={{ padding: '12px 20px 12px 32px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {v.fuel_efficiency_score ? `${parseFloat(v.fuel_efficiency_score as any).toFixed(0)}/100` : '—'}
                       </td>
-                      <td style={{ padding: '12px 20px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                          <button
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <button data-fleet-control
                             onClick={(e) => {
                               e.stopPropagation();
                               setEditVehicle(v);
                             }}
                             disabled={isDemo}
                             title={isDemo ? 'Fixed in demo mode' : undefined}
-                            style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1 }}
-                          >EDIT</button>
-                          <button
+                            style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
+                          >Edit</button>
+                          <button data-fleet-control
                             onClick={(e) => {
                               e.stopPropagation();
                               setConfirmOpts({
-                                title: 'Delete Vehicle',
+                                title: 'Delete vehicle',
                                 message: `Remove ${v.plate || v.registration} from your fleet? This cannot be undone.`,
                                 confirmLabel: 'Delete',
                                 danger: true,
@@ -538,8 +545,8 @@ export default function Vehicles() {
                             }}
                             disabled={isDemo}
                             title={isDemo ? 'Fixed in demo mode' : undefined}
-                            style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '4px 10px', borderRadius: 2, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.06em', opacity: isDemo ? 0.5 : 1 }}
-                          >DEL</button>
+                            style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger)', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
+                          >Delete</button>
                         </div>
                       </td>
                     </tr>

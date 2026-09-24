@@ -1,0 +1,130 @@
+/* Explicit dashboard opt-in, including the portalled calendar. */
+.dashboard-date-picker, .dashboard-date-popover {
+  --date-picker-control-border: #68717D;
+  --date-picker-subtle: #8A8F98;
+  --date-picker-on-accent: #060709;
+}
+[data-theme="light"] .dashboard-date-picker,
+[data-theme="light"] .dashboard-date-popover {
+  --date-picker-control-border: #6B7280;
+  --date-picker-subtle: #626975;
+  --date-picker-on-accent: #FFFFFF;
+}
+.dashboard-date-picker {
+  --date-picker-input-font: 14px;
+  --date-picker-input-height: 40px;
+  min-width: 0;
+  font-family: var(--font-sans);
+  line-height: 20px;
+  letter-spacing: normal;
+}
+.dashboard-date-picker .dashboard-date-input {
+  box-sizing: border-box;
+  min-height: var(--date-picker-input-height);
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+.dashboard-date-picker .dashboard-date-trigger {
+  justify-content: center;
+  width: 44px;
+  min-height: 44px;
+  border-radius: 6px;
+}
+.dashboard-date-picker:focus-within {
+  --date-picker-control-border: var(--accent-primary);
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+/* The compound field supplies the ring for both input and trigger. */
+.dashboard-date-picker .dashboard-date-trigger:focus-visible { outline: none; }
+.dashboard-date-popover button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+.dashboard-date-popover[data-state] {
+  box-sizing: border-box;
+  width: 298px;
+  max-width: calc(100vw - 16px);
+  padding: 8px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.dashboard-date-popover .dashboard-date-calendar {
+  padding: 0;
+  margin: 0;
+  font: inherit;
+}
+.dashboard-date-caption {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-bottom: 8px;
+}
+.dashboard-date-caption-label { font-size: 14px; line-height: 20px; font-weight: 500; }
+.dashboard-date-nav-button {
+  position: absolute;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 8px;
+  border: 1px solid var(--date-picker-control-border);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.dashboard-date-previous { left: 0; }
+.dashboard-date-next { right: 0; }
+.dashboard-date-table { width: 280px; border-collapse: collapse; }
+.dashboard-date-head-row, .dashboard-date-row { display: flex; }
+.dashboard-date-row { margin-top: 4px; }
+.dashboard-date-head-cell, .dashboard-date-cell {
+  box-sizing: border-box;
+  width: 40px;
+  min-width: 40px;
+  padding: 0;
+  text-align: center;
+  font: inherit;
+}
+.dashboard-date-head-cell { color: var(--text-secondary); font-weight: 500; }
+.dashboard-date-cell { position: relative; height: 40px; }
+/* Seven secondary day cells fit a 320px viewport; primary inputs remain 48px. */
+.dashboard-date-day {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 400;
+  letter-spacing: normal;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.dashboard-date-day:hover:not(:disabled), .dashboard-date-nav-button:hover {
+  background: var(--bg-surface-hover);
+}
+.dashboard-date-today { box-shadow: inset 0 0 0 1px var(--accent-primary); }
+.dashboard-date-day.dashboard-date-selected {
+  background: var(--accent-primary);
+  color: var(--date-picker-on-accent);
+  font-weight: 500;
+}
+.dashboard-date-outside { color: var(--date-picker-subtle); }
+.dashboard-date-disabled { color: var(--date-picker-subtle); cursor: not-allowed; }
+.dashboard-date-hidden { visibility: hidden; }
+@media (max-width: 767px) {
+  .dashboard-date-picker {
+    --date-picker-input-font: 16px;
+    --date-picker-input-height: 48px;
+  }
+}

@@ -1,3 +1,4 @@
+import '@/pages/admin/admin-brand.css';
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, deleteData } from '@/lib/Api';
@@ -37,22 +38,23 @@ const tabsStyle: React.CSSProperties = {
 };
 const tabBtn = (active: boolean): React.CSSProperties => ({
   padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer',
-  fontSize: 12, fontFamily: 'var(--font-mono)', letterSpacing: '0.03em',
+  fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
   color: active ? 'var(--text-primary)' : 'var(--text-tertiary)',
   borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
   marginBottom: -1,
 });
 const bodyStyle: React.CSSProperties = { flex: 1, overflowY: 'auto', padding: 20 };
 const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '6px 10px', fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-  letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-subtle)',
+  textAlign: 'left', padding: '6px 10px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)',
+  borderBottom: '1px solid var(--border-subtle)',
 };
 const tdStyle: React.CSSProperties = {
-  padding: '8px 10px', fontSize: 12, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '8px 10px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
-  padding: '5px 10px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--status-danger)',
-  borderRadius: 2, fontSize: 10.5, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', cursor: 'pointer',
+  padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--status-danger)',
+  borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer',
 };
 
 const fmt = (dateStr?: string | null) =>

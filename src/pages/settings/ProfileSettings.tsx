@@ -1,3 +1,4 @@
+import "./profile-form.css";
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData } from "@/lib/Api";
 import { useAuth } from "@/lib/AuthContext";
@@ -19,10 +20,12 @@ const sectionHeaderStyle: React.CSSProperties = {
 };
 
 const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.08em',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 16,
+  lineHeight: '24px',
+  margin: 0,
+  textTransform: 'none',
+  letterSpacing: 'normal',
   color: 'var(--text-secondary)',
   fontWeight: 600,
 };
@@ -33,11 +36,13 @@ const sectionBodyStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
-  fontFamily: 'var(--font-mono)',
-  fontSize: 10,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.08em',
-  color: 'var(--text-tertiary)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 13,
+  lineHeight: '20px',
+  fontWeight: 500,
+  textTransform: 'none',
+  letterSpacing: 'normal',
+  color: 'var(--text-primary)',
   marginBottom: 6,
 };
 
@@ -45,19 +50,20 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
   background: 'var(--input-bg)',
   border: '1px solid var(--border-subtle)',
-  borderRadius: 2,
-  padding: '8px 12px',
+  borderRadius: 6,
+  minHeight: 48,
+  minWidth: 0,
+  padding: '10px 12px',
   color: 'var(--text-primary)',
   fontFamily: 'var(--font-sans)',
-  fontSize: 13,
-  outline: 'none',
+  fontSize: 16,
+  lineHeight: '24px',
   transition: 'border-color 0.15s',
 };
 
 
 const gridStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
   gap: 16,
 };
 
@@ -130,22 +136,22 @@ export function ProfileSettings() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div className="tw-profile-settings" style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
-          Profile Settings
-        </div>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+          Profile settings
+        </h1>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
           Manage your personal information and account preferences
         </div>
       </div>
 
-      {/* Profile Picture */}
+      {/* Profile picture */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>Profile Picture</span>
+          <h2 style={sectionTitleStyle}>Profile picture</h2>
         </div>
-        <div style={{ ...sectionBodyStyle, display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ ...sectionBodyStyle, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           {avatarUrl ? (
             <img
               src={avatarUrl}
@@ -176,16 +182,16 @@ export function ProfileSettings() {
               style={{
                 background: 'none', border: '1px solid var(--border-subtle)',
                 color: 'var(--text-secondary)', padding: '6px 12px',
-                fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
+                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 6, minHeight: 40,
                 cursor: (uploadingAvatar || isDemo) ? 'not-allowed' : 'pointer',
-                letterSpacing: '0.05em',
+                letterSpacing: 'normal',
                 opacity: (uploadingAvatar || isDemo) ? 0.6 : 1,
               }}
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingAvatar || isDemo}
               title={isDemo ? 'Fixed in demo mode' : undefined}
             >
-              {uploadingAvatar ? 'UPLOADING...' : 'CHANGE PICTURE'}
+              {uploadingAvatar ? 'Uploading…' : 'Change picture'}
             </button>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
               JPG, GIF or PNG. Max size 2MB.
@@ -194,34 +200,34 @@ export function ProfileSettings() {
         </div>
       </div>
 
-      {/* Personal Information */}
+      {/* Personal information */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>Personal Information</span>
+          <h2 style={sectionTitleStyle}>Personal information</h2>
         </div>
         <div style={sectionBodyStyle}>
-          <div style={{ ...gridStyle, marginBottom: 16 }}>
+          <div className="tw-profile-fields" style={{ ...gridStyle, marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>First Name</label>
-              <input style={inputStyle} value={form.first_name} onChange={e => set('first_name', e.target.value)} />
+              <label htmlFor="profile-first_name" style={labelStyle}>First name</label>
+              <input id="profile-first_name" style={inputStyle} value={form.first_name} onChange={e => set('first_name', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Last Name</label>
-              <input style={inputStyle} value={form.last_name} onChange={e => set('last_name', e.target.value)} />
+              <label htmlFor="profile-last_name" style={labelStyle}>Last name</label>
+              <input id="profile-last_name" style={inputStyle} value={form.last_name} onChange={e => set('last_name', e.target.value)} />
             </div>
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Email Address</label>
-            <input style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+            <label htmlFor="profile-email" style={labelStyle}>Email address</label>
+            <input id="profile-email" style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
           </div>
-          <div style={gridStyle}>
+          <div className="tw-profile-fields" style={gridStyle}>
             <div>
-              <label style={labelStyle}>Job Title</label>
-              <input style={inputStyle} value={form.job_title} onChange={e => set('job_title', e.target.value)} />
+              <label htmlFor="profile-job_title" style={labelStyle}>Job title</label>
+              <input id="profile-job_title" style={inputStyle} value={form.job_title} onChange={e => set('job_title', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Phone Number</label>
-              <input style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
+              <label htmlFor="profile-phone" style={labelStyle}>Phone number</label>
+              <input id="profile-phone" style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
             </div>
           </div>
         </div>
@@ -230,14 +236,14 @@ export function ProfileSettings() {
       {/* Preferences */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>Preferences</span>
+          <h2 style={sectionTitleStyle}>Preferences</h2>
         </div>
         <div style={sectionBodyStyle}>
-          <div style={{ ...gridStyle, marginBottom: 16 }}>
+          <div className="tw-profile-fields" style={{ ...gridStyle, marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>Timezone</label>
+              <label htmlFor="profile-timezone" style={labelStyle}>Timezone</label>
               <Select value={form.timezone} onValueChange={val => set('timezone', val)}>
-                <SelectTrigger>
+                <SelectTrigger id="profile-timezone" style={{ ...inputStyle, outline: undefined }}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -249,9 +255,9 @@ export function ProfileSettings() {
               </Select>
             </div>
             <div>
-              <label style={labelStyle}>Language</label>
+              <label htmlFor="profile-language" style={labelStyle}>Language</label>
               <Select value={form.language} onValueChange={val => set('language', val)}>
-                <SelectTrigger>
+                <SelectTrigger id="profile-language" style={{ ...inputStyle, outline: undefined }}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -262,11 +268,11 @@ export function ProfileSettings() {
               </Select>
             </div>
           </div>
-          <div style={{ ...gridStyle, marginBottom: 20 }}>
+          <div className="tw-profile-fields" style={{ ...gridStyle, marginBottom: 20 }}>
             <div>
-              <label style={labelStyle}>Date Format</label>
+              <label htmlFor="profile-date_format" style={labelStyle}>Date format</label>
               <Select value={form.date_format} onValueChange={val => set('date_format', val)}>
-                <SelectTrigger>
+                <SelectTrigger id="profile-date_format" style={{ ...inputStyle, outline: undefined }}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -285,7 +291,7 @@ export function ProfileSettings() {
               title={isDemo ? 'Fixed in demo mode' : undefined}
               style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
             >
-              {saved ? 'SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
+              {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
             </button>
           </div>
         </div>

@@ -1,0 +1,22 @@
+/* Local Customers type roles. Existing grid, table scroll and actions retained. */
+.customers-typography .card-title {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.customers-typography .metric-value {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  line-height: 36px;
+}
+.customers-typography .btn-action {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}

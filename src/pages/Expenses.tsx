@@ -1,4 +1,8 @@
+import './expenses-type-roles.css';
+import './table-heading-roles.css';
+import './expense-row-actions.css';
 import { useState } from "react";
+import { Ellipsis } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData, deleteData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
@@ -81,6 +85,7 @@ export default function Expenses() {
   const [showAdd, setShowAdd] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
@@ -211,18 +216,18 @@ export default function Expenses() {
   ];
 
   return (
-    <div>
+    <div className="expenses-type-roles">
       {/* Header */}
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Finance</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Expenses</div>
+          <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal', textTransform: 'none', marginBottom: 4 }}>Finance</div>
+          <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)' }}>Expenses</h1>
           {categoryBreakdown.length > 0 && (
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
               <span>{categoryBreakdown[0].icon}</span>
               <strong style={{ color: 'var(--accent-primary)' }}>{categoryBreakdown[0].label}</strong>
               <span>is your #1 expense this month</span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>({formatCurrency(categoryBreakdown[0].total)})</span>
+              <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', color: 'var(--text-tertiary)' }}>({formatCurrency(categoryBreakdown[0].total)})</span>
             </div>
           )}
         </div>
@@ -254,8 +259,8 @@ export default function Expenses() {
                   {cat.label}
                 </span>
               </div>
-              <div className="metric-value" style={{ fontSize: 20 }}>{formatCurrency(cat.total)}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+              <div className="metric-value">{formatCurrency(cat.total)}</div>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', marginTop: 4 }}>
                 {percentage}% of total
               </div>
             </div>
@@ -267,11 +272,11 @@ export default function Expenses() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 24 }}>
         {/* Monthly Trend Chart */}
         <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, fontFamily: 'var(--font-sans)', margin: 0, color: 'var(--text-primary)', marginBottom: 16 }}>
             Monthly expense trend (last 6 months)
-          </div>
+          </h2>
           {monthlyTrend.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 12 }}>
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>
               No monthly data available
             </div>
           ) : (
@@ -295,9 +300,9 @@ export default function Expenses() {
                       x={`${x + barWidth / 2}%`}
                       y="195"
                       textAnchor="middle"
-                      fontSize="10"
+                      fontSize="13"
                       fill="var(--text-tertiary)"
-                      fontFamily="var(--font-mono)"
+                      fontFamily="var(--font-sans)"
                     >
                       {month}
                     </text>
@@ -305,9 +310,9 @@ export default function Expenses() {
                       x={`${x + barWidth / 2}%`}
                       y={175 - barHeight}
                       textAnchor="middle"
-                      fontSize="11"
+                      fontSize="13"
                       fill="var(--text-primary)"
-                      fontFamily="var(--font-mono)"
+                      fontFamily="var(--font-sans)"
                       fontWeight="600"
                     >
                       {(amount / 1000).toFixed(0)}K
@@ -321,11 +326,11 @@ export default function Expenses() {
 
         {/* Category Breakdown Donut Chart */}
         <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, fontFamily: 'var(--font-sans)', margin: 0, color: 'var(--text-primary)', marginBottom: 16 }}>
             Category breakdown
-          </div>
+          </h2>
           {categoryBreakdown.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 12 }}>
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>
               No category data
             </div>
           ) : (
@@ -362,13 +367,13 @@ export default function Expenses() {
                   });
                 })()}
                 <circle cx="100" cy="90" r="40" fill="var(--bg-deep)" />
-                <text x="100" y="85" textAnchor="middle" fontSize="20" fill="var(--text-primary)" fontWeight="700">
-                  {formatCurrency(totalExpenses).replace('R ', '')}
-                </text>
-                <text x="100" y="100" textAnchor="middle" fontSize="10" fill="var(--text-tertiary)" fontFamily="var(--font-mono)">
-                  TOTAL
-                </text>
               </svg>
+              <div style={{ textAlign: 'center', marginTop: 8, maxWidth: '100%', overflowWrap: 'anywhere' }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', marginBottom: 4 }}>Total expenses</div>
+                <div style={{ fontSize: 28, lineHeight: '36px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)', fontWeight: 600 }}>
+                  {formatCurrency(totalExpenses)}
+                </div>
+              </div>
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {categoryBreakdown.slice(0, 5).map((cat, i) => {
                   const colors = ['var(--accent-primary)', 'var(--status-success)', 'var(--status-warning)', 'var(--status-danger)', 'var(--text-secondary)'];
@@ -376,8 +381,8 @@ export default function Expenses() {
                   return (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: colors[i % colors.length] }} />
-                      <span style={{ fontSize: 11, color: 'var(--text-secondary)', flex: 1 }}>{cat.label}</span>
-                      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 600 }}>
+                      <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', flex: 1 }}>{cat.label}</span>
+                      <span style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)', fontWeight: 600 }}>
                         {percent.toFixed(1)}%
                       </span>
                     </div>
@@ -391,9 +396,9 @@ export default function Expenses() {
 
       {/* Budget vs Actual Section */}
       <div className="card" style={{ padding: 20, marginBottom: 24 }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 16 }}>
+        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, fontFamily: 'var(--font-sans)', margin: 0, color: 'var(--text-primary)', marginBottom: 16 }}>
           Budget vs actual
-        </div>
+        </h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {budgetData.map((item, i) => {
             const percentUsed = item.budget > 0 ? (item.actual / item.budget) * 100 : 0;
@@ -405,24 +410,25 @@ export default function Expenses() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 14 }}>{catInfo?.icon}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{catInfo?.label}</span>
+                    <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)', fontWeight: 500 }}>{catInfo?.label}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>ACTUAL</div>
-                      <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: isOverBudget ? 'var(--status-danger)' : 'var(--text-primary)', fontWeight: 600 }}>
+                      <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>Actual</div>
+                      <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', color: isOverBudget ? 'var(--status-danger)' : 'var(--text-primary)', fontWeight: 600 }}>
                         {formatCurrency(item.actual)}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>BUDGET</div>
-                      <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                      <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>Budget</div>
+                      <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>
                         {formatCurrency(item.budget)}
                       </div>
                     </div>
                     <div style={{
-                      fontSize: 11,
-                      fontFamily: 'var(--font-mono)',
+                      fontSize: 13, lineHeight: '20px',
+                      fontFamily: 'var(--font-sans)',
+                      fontVariantNumeric: 'tabular-nums',
                       color: isOverBudget ? 'var(--status-danger)' : percentUsed > 80 ? 'var(--status-warning)' : 'var(--status-success)',
                       fontWeight: 600,
                       minWidth: 50,
@@ -447,7 +453,7 @@ export default function Expenses() {
       </div>
 
       {/* Filters — single flex row */}
-      <div style={{ display: 'flex', flexDirection: 'row', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+      <div className="expenses-filter-bar" style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12, alignItems: 'center' }}>
         <input
           placeholder="Search expenses..."
           value={search}
@@ -455,7 +461,7 @@ export default function Expenses() {
           style={{
             background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
             color: 'var(--text-primary)', padding: '7px 10px',
-            fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
+            fontFamily: 'var(--font-sans)', fontSize: 'var(--expense-input-size)', lineHeight: '20px', borderRadius: 6,
             width: 180,
           }}
         />
@@ -465,7 +471,7 @@ export default function Expenses() {
           style={{
             background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
             color: 'var(--text-primary)', padding: '7px 10px',
-            fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
+            fontFamily: 'var(--font-sans)', fontSize: 'var(--expense-input-size)', lineHeight: '20px', borderRadius: 6,
             width: 160, cursor: 'pointer',
           }}
         >
@@ -477,7 +483,7 @@ export default function Expenses() {
           style={{
             background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
             color: 'var(--text-primary)', padding: '7px 10px',
-            fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
+            fontFamily: 'var(--font-sans)', fontSize: 'var(--expense-input-size)', lineHeight: '20px', borderRadius: 6,
             width: 150, cursor: 'pointer',
           }}
         >
@@ -490,7 +496,7 @@ export default function Expenses() {
           style={{
             background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
             color: 'var(--text-primary)', padding: '7px 10px',
-            fontFamily: 'var(--font-mono)', fontSize: 11, borderRadius: 2,
+            fontFamily: 'var(--font-sans)', fontSize: 'var(--expense-input-size)', lineHeight: '20px', borderRadius: 6,
             width: 140, cursor: 'pointer',
           }}
         >
@@ -500,9 +506,10 @@ export default function Expenses() {
         {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map(s => (
           <button
             key={s}
+            aria-pressed={statusFilter === s}
             onClick={() => { setStatusFilter(s); setPage(1); }}
             style={{
-              padding: '7px 12px', fontSize: 10, fontFamily: 'var(--font-mono)',
+              padding: '7px 12px', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
               fontWeight: 500, borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap',
               border: statusFilter === s ? 'none' : '1px solid var(--border-subtle)',
               background: statusFilter === s ? 'var(--accent-primary)' : 'var(--bg-surface)',
@@ -516,7 +523,7 @@ export default function Expenses() {
 
       {/* Table */}
       <div className="card table-card">
-        <table className="data-table">
+        <table className="data-table table-heading-roles">
           <thead>
             <tr>
               <th>Date</th>
@@ -530,17 +537,17 @@ export default function Expenses() {
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>No expenses found</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>No expenses found</td></tr>
             ) : rows.map(exp => (
               <tr key={exp.id}>
-                <td className="mono" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{formatDate(exp.expense_date || exp.date)}</td>
-                <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{formatStatus(exp.category)}</td>
-                <td style={{ fontSize: 12, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={exp.description}>{exp.description}</td>
-                <td className="mono" style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{exp.vehicle_info || exp.vehicle_registration || 'N/A'}</td>
-                <td className="mono" style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' }}>{formatCurrency(exp.amount)}</td>
+                <td style={{ fontSize: 13, lineHeight: '20px', whiteSpace: 'nowrap' }}>{formatDate(exp.expense_date || exp.date)}</td>
+                <td style={{ fontSize: 13, lineHeight: '20px', whiteSpace: 'nowrap' }}>{formatStatus(exp.category)}</td>
+                <td style={{ fontSize: 13, lineHeight: '20px', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={exp.description}>{exp.description}</td>
+                <td className="mono" style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{exp.vehicle_info || exp.vehicle_registration || 'N/A'}</td>
+                <td style={{ fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums', fontWeight: 500, whiteSpace: 'nowrap' }}>{formatCurrency(exp.amount)}</td>
                 <td>
                   <span style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 10,
+                    fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px',
                     color: exp.status === 'APPROVED' ? 'var(--status-success)' : exp.status === 'REJECTED' ? 'var(--status-danger)' : 'var(--status-warning)',
                     padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 4,
                     display: 'inline-block', whiteSpace: 'nowrap',
@@ -548,23 +555,47 @@ export default function Expenses() {
                     {formatStatus(exp.status || 'PENDING')}
                   </span>
                 </td>
-                <td>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                <td onKeyDown={e => { if (e.key === 'Escape') setOpenMenuId(null); }}>
+                  <div className="expense-row-actions">
                     <button
-                      onClick={() => setEditingExpense(exp)}
-                      className="btn-action"
-                      style={{ fontSize: 10, padding: '4px 10px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+                      type="button"
+                      className="expense-menu-trigger"
+                      aria-label={`Expense actions for ${exp.description || exp.id}`}
+                      aria-haspopup="menu"
+                      aria-expanded={openMenuId === exp.id}
+                      onClick={() => setOpenMenuId(openMenuId === exp.id ? null : exp.id)}
                     >
-                      Edit
+                      <Ellipsis size={16} aria-hidden="true" />
                     </button>
-                    <button
-                      onClick={() => handleDelete(exp.id)}
-                      disabled={deletingId === exp.id}
-                      className="btn-action"
-                      style={{ fontSize: 10, padding: '4px 10px', background: 'transparent', border: '1px solid var(--status-danger)', color: 'var(--status-danger)' }}
-                    >
-                      {deletingId === exp.id ? '...' : 'Del'}
-                    </button>
+                    {openMenuId === exp.id && (
+                      <>
+                        {/* click-away overlay */}
+                        <div
+                          style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                          onClick={() => setOpenMenuId(null)}
+                        />
+                        <div className="expense-menu" role="menu">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="expense-menu-item"
+                            onClick={() => { setOpenMenuId(null); setEditingExpense(exp); }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="expense-menu-item"
+                            style={{ color: 'var(--status-danger)' }}
+                            disabled={deletingId === exp.id}
+                            onClick={() => { setOpenMenuId(null); handleDelete(exp.id); }}
+                          >
+                            {deletingId === exp.id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -573,8 +604,8 @@ export default function Expenses() {
         </table>
 
         {totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid var(--border-subtle)' }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid var(--border-subtle)', flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
               {(page - 1) * perPage + 1}–{Math.min(page * perPage, sorted.length)} of {sorted.length}
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -614,9 +645,9 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
   const inputStyle = {
     background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
     color: 'var(--text-primary)', padding: '8px 12px',
-    fontFamily: 'var(--font-mono)', fontSize: 12, borderRadius: 2, width: '100%', boxSizing: 'border-box' as const,
+    fontFamily: 'var(--font-sans)', fontSize: 'var(--expense-input-size)', lineHeight: '20px', borderRadius: 6, width: '100%', boxSizing: 'border-box' as const,
   };
-  const labelStyle = { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase' as const, display: 'block', marginBottom: 6 };
+  const labelStyle = { fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal', textTransform: 'none' as const, display: 'block', marginBottom: 6 };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -648,13 +679,13 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'var(--modal-backdrop)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="card" style={{ padding: 20, width: 480, maxHeight: '90vh', overflowY: 'auto' }}>
+    <div className="expenses-type-roles" style={{ position: 'fixed', inset: 0, background: 'var(--modal-backdrop)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="card" style={{ padding: 20, width: 'min(480px, calc(100vw - 32px))', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>
+          <h2 style={{ fontSize: 16, lineHeight: '24px', fontFamily: 'var(--font-sans)', margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>
             {expense ? 'Edit expense' : 'Add expense'}
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          </h2>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 20, cursor: 'pointer', lineHeight: 1, minWidth: 44, minHeight: 44 }}>×</button>
         </div>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
@@ -695,7 +726,7 @@ function ExpenseModal({ expense, vehicles, onClose }: { expense?: Expense; vehic
             <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Enter expense details..." rows={3} required style={{ ...inputStyle, resize: 'vertical' }} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 8 }}>
-            <button type="button" onClick={onClose} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 16px', fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer', borderRadius: 2 }}>Cancel</button>
+            <button className="btn-action" type="button" onClick={onClose} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 16px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', cursor: 'pointer', borderRadius: 6 }}>Cancel</button>
             <button type="submit" disabled={submitting} className="btn-action">
               {submitting ? (expense ? 'Updating...' : 'Adding...') : (expense ? 'Update' : 'Add expense')}
             </button>

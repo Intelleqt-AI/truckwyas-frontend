@@ -1,0 +1,75 @@
+/* Desktop dashboard KPI anatomy. Existing smaller-viewport rules are retained. */
+@media (min-width: 768px) {
+  .os-app-shell .card.dashboard-kpi-card {
+    --dashboard-kpi-card-padding: 24px;
+    --dashboard-kpi-card-border-radius: 8px;
+    --dashboard-kpi-card-text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    min-height: 0;
+    padding: 24px;
+    border-radius: 8px;
+    text-align: left;
+  }
+  .os-app-shell .card.dashboard-kpi-card .dashboard-kpi-label {
+    --dashboard-kpi-label-font-size: 13px;
+    --dashboard-kpi-label-font-family: var(--font-sans);
+    --dashboard-kpi-label-line-height: 20px;
+    --dashboard-kpi-label-font-weight: 500;
+    --dashboard-kpi-label-letter-spacing: normal;
+    --dashboard-kpi-label-text-transform: none;
+    --dashboard-kpi-label-margin: 0;
+    --dashboard-kpi-label-margin-top: 0;
+    --dashboard-kpi-label-margin-bottom: 0;
+    font: 500 13px/20px var(--font-sans);
+    letter-spacing: normal;
+    text-transform: none;
+    margin: 0;
+    min-width: 0;
+  }
+  .os-app-shell .card.dashboard-kpi-card .dashboard-kpi-value {
+    --dashboard-kpi-value-font-size: 28px;
+    --dashboard-kpi-value-font-family: var(--font-sans);
+    --dashboard-kpi-value-line-height: 36px;
+    --dashboard-kpi-value-font-weight: 600;
+    --dashboard-kpi-value-letter-spacing: normal;
+    --dashboard-kpi-value-text-transform: none;
+    --dashboard-kpi-value-margin: 0;
+    --dashboard-kpi-value-margin-top: 0;
+    --dashboard-kpi-value-margin-bottom: 0;
+    font: 600 28px/36px var(--font-sans);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: normal;
+    text-transform: none;
+    min-width: 0;
+    margin: 0;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .os-app-shell .card.dashboard-kpi-card .dashboard-kpi-context {
+    --dashboard-kpi-context-font-size: 13px;
+    --dashboard-kpi-context-font-family: var(--font-sans);
+    --dashboard-kpi-context-line-height: 20px;
+    --dashboard-kpi-context-font-weight: 400;
+    --dashboard-kpi-context-letter-spacing: normal;
+    --dashboard-kpi-context-text-transform: none;
+    --dashboard-kpi-context-margin: 0;
+    --dashboard-kpi-context-margin-top: 0;
+    --dashboard-kpi-context-margin-bottom: 0;
+    font: 400 13px/20px var(--font-sans);
+    letter-spacing: normal;
+    text-transform: none;
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .os-app-shell .dashboard-kpi-grid {
+    --dashboard-kpi-track-min: 0px;
+    min-width: 0;
+    gap: 16px;
+  }
+}

@@ -1,5 +1,8 @@
+import './bookings-typography.css';
+import './table-heading-roles.css';
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { Package } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
@@ -43,9 +46,9 @@ const ACTIVE_STATUSES = ['PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'];
 const HISTORY_STATUSES = ['DELIVERED', 'INVOICED', 'CANCELLED'];
 
 const TAB_SUBTITLES: Record<BookingTab, string> = {
-  quotes: 'Sales Pipeline',
-  orders: 'Active Orders',
-  history: 'Completed & Archived',
+  quotes: 'Sales pipeline',
+  orders: 'Active orders',
+  history: 'Completed & archived',
 };
 
 export default function LoadsList() {
@@ -120,15 +123,14 @@ export default function LoadsList() {
 
   const renderTable = (data: Load[], showInvoiceAction: boolean) => (
     <div className="card" style={{ padding: 0, overflowX: 'auto', overflowY: 'hidden' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)' }}>
-            {['LOAD #', 'CUSTOMER', 'ROUTE', 'DRIVER', 'VEHICLE', 'STATUS', 'AMOUNT', 'ACTION'].map(h => (
+            {['Load #', 'Customer', 'Route', 'Driver', 'Vehicle', 'Status', 'Amount', 'Action'].map(h => (
               <th key={h} style={{
                 padding: '12px 16px',
-                textAlign: h === 'AMOUNT' ? 'right' : h === 'ACTION' ? 'center' : 'left',
-                fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-                fontWeight: 500, letterSpacing: '0.08em', whiteSpace: 'nowrap'
+                textAlign: h === 'Amount' ? 'right' : h === 'Action' ? 'center' : 'left',
+                whiteSpace: 'nowrap'
               }}>{h}</th>
             ))}
           </tr>
@@ -146,17 +148,17 @@ export default function LoadsList() {
               onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
-              <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{load.load_number}</td>
-              <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{load.customer_name || '—'}</td>
-              <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${load.pickup_location} → ${load.delivery_location}`}>
+              <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{load.load_number}</td>
+              <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{load.customer_name || '—'}</td>
+              <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${load.pickup_location} → ${load.delivery_location}`}>
                 {load.pickup_location} → {load.delivery_location}
               </td>
-              <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{load.driver_name || '—'}</td>
-              <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={load.vehicle_info || ''}>{load.vehicle_info || '—'}</td>
+              <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{load.driver_name || '—'}</td>
+              <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={load.vehicle_info || ''}>{load.vehicle_info || '—'}</td>
               <td style={{ padding: '12px 16px' }}>
                 <span style={{
                   display: 'inline-block', whiteSpace: 'nowrap',
-                  fontSize: 12,
+                  fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)',
                   color: STATUS_COLOR[load.status] || 'var(--text-secondary)',
                   padding: '3px 9px',
                   border: `1px solid ${STATUS_COLOR[load.status] || 'var(--border-subtle)'}`,
@@ -165,7 +167,7 @@ export default function LoadsList() {
                   {formatStatus(load.status)}
                 </span>
               </td>
-              <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
                 {formatCurrency(parseFloat(load.total_amount || '0'))}
               </td>
               <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
@@ -177,7 +179,7 @@ export default function LoadsList() {
                       background: 'transparent',
                       border: '1px solid var(--accent-primary)',
                       color: 'var(--accent-primary)',
-                      padding: '5px 12px', fontSize: 13, whiteSpace: 'nowrap',
+                      padding: '5px 12px', fontSize: 14, lineHeight: '20px', whiteSpace: 'nowrap',
                       borderRadius: 4,
                       cursor: convertingIds.has(load.id) ? 'not-allowed' : 'pointer',
                       opacity: convertingIds.has(load.id) ? 0.5 : 1,
@@ -195,19 +197,19 @@ export default function LoadsList() {
       {data.length === 0 && (
         loads.length === 0 ? (
           <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-            <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>📦</div>
-            <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>
+            <div style={{ marginBottom: 16, opacity: 0.3 }}><Package size={40} aria-hidden="true" /></div>
+            <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
               No loads yet
             </div>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
+            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 20 }}>
               Get started by creating your first quote or booking
             </div>
             <button onClick={() => navigate('/bookings/quotes/new')} className="btn-action">
-              CREATE QUOTE
+              Create quote
             </button>
           </div>
         ) : (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>
             No loads match your filters
           </div>
         )
@@ -222,10 +224,10 @@ export default function LoadsList() {
   if (error) {
     return (
       <div style={{ padding: 40 }}>
-        <div style={{ fontSize: 13, color: 'var(--status-danger)', marginBottom: 4 }}>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger)', marginBottom: 4 }}>
           Unable to reach the server.
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
           The server may be starting up — this usually resolves in 20–30 seconds.
         </div>
         <button
@@ -241,13 +243,13 @@ export default function LoadsList() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="bookings-typography" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexShrink: 0 }}>
         <div>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Bookings</div>
+          <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Bookings</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{TAB_SUBTITLES[activeTab]}</div>
+            <div style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)' }}>{TAB_SUBTITLES[activeTab]}</div>
             <LiveBadge />
           </div>
         </div>
@@ -256,7 +258,7 @@ export default function LoadsList() {
             onClick={() => navigate('/bookings/quotes/new')}
             style={{
               background: 'var(--accent-primary)', border: 'none', color: 'var(--btn-action-color, #fff)',
-              padding: '8px 16px', fontSize: 13,
+              padding: '8px 16px', fontSize: 14, lineHeight: '20px',
               fontWeight: 500, borderRadius: 4, cursor: 'pointer',
             }}
           >+ New quote</button>
@@ -304,7 +306,7 @@ export default function LoadsList() {
               placeholder="Search loads, customers, routes..."
               value={quoteSearch}
               onChange={e => setQuoteSearch(e.target.value)}
-              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 12, outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2, fontSize: 14, lineHeight: '20px', outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
             />
             <div style={{ display: 'flex', gap: 4 }}>
               {(['board', 'list'] as const).map(v => (
@@ -314,10 +316,10 @@ export default function LoadsList() {
                   color: quoteView === v ? 'var(--bg-deep)' : 'var(--text-secondary)',
                   padding: '6px 12px',
                   borderRadius: 2,
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
+                  fontSize: 14,
+                  lineHeight: '20px',
+                  fontFamily: 'var(--font-sans)',
                   cursor: 'pointer',
-                  letterSpacing: '0.06em',
                   fontWeight: quoteView === v ? 500 : 400,
                   transition: 'all 0.2s ease',
                 }}>{v === 'board' ? 'Board' : 'List'}</button>
@@ -338,16 +340,16 @@ export default function LoadsList() {
       {activeTab === 'orders' && (
         <div>
           {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 24 }}>
             {[
-              { label: 'Active Orders', value: activeLoads.length, color: 'var(--text-primary)' },
-              { label: 'In Transit', value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length, color: 'var(--accent-primary)' },
+              { label: 'Active orders', value: activeLoads.length, color: 'var(--text-primary)' },
+              { label: 'In transit', value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length, color: 'var(--accent-primary)' },
               { label: 'Loading', value: activeLoads.filter(l => l.status === 'LOADING').length, color: 'var(--status-warning)' },
-              { label: 'Revenue (Active)', value: formatCurrency(activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--accent-primary)' },
+              { label: 'Revenue (active)', value: formatCurrency(activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--accent-primary)' },
             ].map(m => (
               <div key={m.label} className="card metric-card">
                 <div className="card-header"><span className="card-title">{m.label}</span></div>
-                <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+                <div className="metric-value" style={{ color: m.color }}>{m.value}</div>
               </div>
             ))}
           </div>
@@ -364,7 +366,7 @@ export default function LoadsList() {
                     background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
                     border: `1px solid ${isActive ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
                     color: isActive ? 'var(--btn-action-color, #fff)' : 'var(--text-secondary)',
-                    padding: '6px 12px', fontSize: 13, whiteSpace: 'nowrap',
+                    padding: '6px 12px', fontSize: 14, lineHeight: '20px', whiteSpace: 'nowrap',
                     borderRadius: 4, cursor: 'pointer',
                     fontWeight: isActive ? 500 : 400,
                     transition: 'all 0.2s ease'
@@ -384,16 +386,16 @@ export default function LoadsList() {
       {activeTab === 'history' && (
         <div>
           {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 24 }}>
             {[
               { label: 'Completed', value: historyLoads.filter(l => l.status === 'DELIVERED' || l.status === 'INVOICED').length, color: 'var(--status-success)' },
               { label: 'Invoiced', value: historyLoads.filter(l => l.status === 'INVOICED').length, color: 'var(--accent-primary)' },
               { label: 'Cancelled', value: historyLoads.filter(l => l.status === 'CANCELLED').length, color: 'var(--status-error)' },
-              { label: 'Total Revenue', value: formatCurrency(historyLoads.filter(l => l.status !== 'CANCELLED').reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--accent-primary)' },
+              { label: 'Total revenue', value: formatCurrency(historyLoads.filter(l => l.status !== 'CANCELLED').reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--accent-primary)' },
             ].map(m => (
               <div key={m.label} className="card metric-card">
                 <div className="card-header"><span className="card-title">{m.label}</span></div>
-                <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+                <div className="metric-value" style={{ color: m.color }}>{m.value}</div>
               </div>
             ))}
           </div>
@@ -406,7 +408,7 @@ export default function LoadsList() {
               style={{
                 background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
                 padding: '6px 10px', color: 'var(--text-primary)', borderRadius: 2,
-                fontSize: 12, outline: 'none', width: 220, fontFamily: 'var(--font-sans)',
+                fontSize: 14, lineHeight: '20px', outline: 'none', width: 220, fontFamily: 'var(--font-sans)',
               }}
             />
             <div style={{ display: 'flex', gap: 8 }}>
@@ -420,18 +422,18 @@ export default function LoadsList() {
                       background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
                       border: '1px solid var(--border-subtle)',
                       color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                      padding: '6px 12px', fontFamily: 'var(--font-mono)', fontSize: 11,
-                      borderRadius: 2, cursor: 'pointer', textTransform: 'uppercase',
-                      letterSpacing: '0.06em', fontWeight: isActive ? 600 : 400,
+                      padding: '6px 12px', fontFamily: 'var(--font-sans)', fontSize: 14,
+                      lineHeight: '20px', borderRadius: 2, cursor: 'pointer',
+                      fontWeight: isActive ? 600 : 400,
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    {status === 'All' ? 'ALL' : status}
+                    {status === 'All' ? 'All' : formatStatus(status)}
                   </button>
                 );
               })}
             </div>
-            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>
+            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
               {filteredHistory.length} records
             </span>
           </div>

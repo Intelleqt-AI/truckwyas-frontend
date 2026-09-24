@@ -20,10 +20,12 @@ const sectionHeaderStyle: React.CSSProperties = {
 };
 
 const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.08em',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 16,
+  lineHeight: '24px',
+  textTransform: 'none' as const,
+  letterSpacing: 'normal',
+  margin: 0,
   color: 'var(--text-secondary)',
   fontWeight: 600,
 };
@@ -182,7 +184,7 @@ export function NotificationSettings() {
       {/* Email */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>Email Notifications</span>
+          <h2 style={sectionTitleStyle}>Email notifications</h2>
         </div>
         <div style={sectionBodyStyle}>
           <ToggleRow label="Quote activity" description="New quotes, updates, and expirations" checked={settings.email.quotes} onChange={v => setChannel('email', 'quotes', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
@@ -196,7 +198,7 @@ export function NotificationSettings() {
       {/* Push */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>Push Notifications</span>
+          <h2 style={sectionTitleStyle}>Push notifications</h2>
         </div>
         <div style={sectionBodyStyle}>
           <ToggleRow label="New bookings" checked={settings.push.new_bookings} onChange={v => setChannel('push', 'new_bookings', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
@@ -204,7 +206,7 @@ export function NotificationSettings() {
           <ToggleRow label="Maintenance due" checked={settings.push.maintenance_due} onChange={v => setChannel('push', 'maintenance_due', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           <ToggleRow label="Driver status updates" checked={settings.push.driver_updates} onChange={v => setChannel('push', 'driver_updates', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           {pushHint && (
-            <div style={{ padding: '10px 20px', fontSize: 11, color: 'var(--text-tertiary)' }}>{pushHint}</div>
+            <div style={{ padding: '10px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
           )}
         </div>
       </div>
@@ -212,10 +214,10 @@ export function NotificationSettings() {
       {/* SMS — no provider wired up yet; visible but disabled */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <span style={sectionTitleStyle}>SMS Notifications</span>
+          <h2 style={sectionTitleStyle}>SMS notifications</h2>
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 9, textTransform: 'uppercase' as const,
-            letterSpacing: '0.08em', color: 'var(--text-tertiary)',
+            fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', fontWeight: 500,
+            color: 'var(--text-tertiary)',
             border: '1px solid var(--border-subtle)', borderRadius: 4, padding: '2px 6px',
           }}>Coming soon</span>
         </div>
@@ -231,9 +233,9 @@ export function NotificationSettings() {
           onClick={handleSave}
           disabled={saving || isDemo}
           title={isDemo ? 'Fixed in demo mode' : undefined}
-          style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+          style={{ minHeight: 40, borderRadius: 6, opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
         >
-          {saved ? 'SAVED' : saving ? 'SAVING...' : 'SAVE CHANGES'}
+          {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
         </button>
       </div>
     </div>

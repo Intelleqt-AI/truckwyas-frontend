@@ -1,0 +1,22 @@
+/* Bookings and quote views only. Brand type roles for shared card/metric/button
+   classes, scoped under .bookings-typography so nothing else restyles.
+   Data, navigation and column layout unchanged. */
+.bookings-typography .card-title {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.bookings-typography .metric-value {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-size: 28px;
+  line-height: 36px;
+  letter-spacing: normal;
+  overflow-wrap: anywhere;
+}
+.bookings-typography .metric-card {
+  min-width: 0;
+}

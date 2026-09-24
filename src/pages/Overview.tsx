@@ -860,7 +860,7 @@ export default function Overview() {
                     <td className="mono">{quote.quote_number}</td>
                     <td>{quote.customer_name}</td>
                     <td
-                      style={{ color: "var(--text-secondary)", fontSize: 11 }}>
+                      style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: "20px" }}>
                       {quote.pickup_location?.split(" ").slice(0, 2).join(" ")}{" "}
                       →{" "}
                       {quote.delivery_location
@@ -956,7 +956,7 @@ export default function Overview() {
                       {load.customer_name || load.customer?.company_name || "—"}
                     </td>
                     <td
-                      style={{ color: "var(--text-secondary)", fontSize: 11 }}>
+                      style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: "20px" }}>
                       {(load.pickup_location || load.origin || "")
                         .split(" ")
                         .slice(0, 2)

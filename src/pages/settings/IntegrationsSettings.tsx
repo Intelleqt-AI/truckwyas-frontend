@@ -34,7 +34,7 @@ const sectionTitleStyle: React.CSSProperties = {
   textTransform: 'none' as const,
   letterSpacing: 'normal',
   margin: 0,
-  color: 'var(--text-secondary)',
+  color: 'var(--text-primary)',
   fontWeight: 600,
   marginBottom: 16,
 };
@@ -857,7 +857,7 @@ export function IntegrationsSettings() {
       {/* Partner API Keys Card */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={sectionTitleStyle}>Partner API keys</h2>
+          <h3 style={sectionTitleStyle}>Partner API keys</h3>
           <button
             onClick={() => setShowAddKey(!showAddKey)}
             disabled={isDemo}
@@ -940,7 +940,7 @@ export function IntegrationsSettings() {
       {/* Webhook Manager Card */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={sectionTitleStyle}>Webhooks</h2>
+          <h3 style={sectionTitleStyle}>Webhooks</h3>
           <button
             onClick={() => setShowAddWebhook(!showAddWebhook)}
             disabled={isDemo}

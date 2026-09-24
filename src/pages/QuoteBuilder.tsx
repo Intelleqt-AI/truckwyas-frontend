@@ -123,7 +123,7 @@ function SortableStopRow({ stop, index, inputStyle, onLocationChange, onRemove }
       opacity: removing ? 0 : (isDragging ? 0.5 : 1),
       zIndex: isDragging ? 2 : "auto",
     }}>
-      <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--accent-primary)", color: "var(--btn-action-color)", fontSize: 10, fontFamily: "var(--font-mono)", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--accent-primary)", color: "var(--btn-action-color)", fontSize: 12, fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         {index + 1}
       </span>
       <span {...attributes} {...listeners} title="Drag to reorder"
@@ -1384,7 +1384,7 @@ export default function QuoteBuilder() {
             <div style={{ marginTop: 3, display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 14px", fontSize: 13, lineHeight: 1.6 }}>
               {/* Label sits on the same line as the options: it's a lead-in, not
                   a field heading, so it keeps the form's spacing tight. */}
-              <span style={{ ...labelS, textTransform: "none", letterSpacing: "normal" }}>
+              <span style={labelS}>
                 Suggested for this {weight}t load:
               </span>
               {suggestions.map((x) => (

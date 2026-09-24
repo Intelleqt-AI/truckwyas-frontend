@@ -32,6 +32,12 @@
     min-width: 0;
     overflow-wrap: anywhere;
   }
+  .copilot-proposal .copilot-proposal-title {
+    min-width: 0;
+    font: 600 16px/24px var(--font-sans);
+    letter-spacing: normal;
+    text-transform: none;
+  }
   .copilot-proposal .btn-action {
     min-height: 40px;
     border-radius: 6px;

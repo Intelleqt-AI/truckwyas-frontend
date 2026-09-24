@@ -98,9 +98,13 @@ body {
 }
 
 /* ── react-day-picker: strip all injected borders/outlines ─────────────────── */
-.rdp-cell:not(.dashboard-date-cell),
-.rdp-day:not(.dashboard-date-day),
-.rdp-head_cell:not(.dashboard-date-head-cell),
+/* Calendar (components/ui/calendar.tsx) replaces rdp's own cell/day/head_cell
+   classNames, so the literal .rdp-cell/.rdp-day/.rdp-head_cell names are never
+   emitted — target the elements rdp actually renders instead. The dashboard
+   opt-in classes stay carved out so date-picker-dashboard.css owns them. */
+.rdp td:not(.dashboard-date-cell),
+.rdp th:not(.dashboard-date-head-cell),
+.rdp .rdp-day-btn:not(.dashboard-date-day),
 .rdp-button:not(.dashboard-date-day):not(.dashboard-date-nav-button) {
   border: none !important;
   outline: none !important;

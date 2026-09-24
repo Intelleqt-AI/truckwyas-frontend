@@ -1,3 +1,4 @@
+import '@/pages/settings/settings-brand.css';
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { fetchData, patchData } from "@/lib/Api";
@@ -54,6 +55,10 @@ function ToggleRow({ label, description, checked, onChange, disabled, disabledTi
         {description && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{description}</div>}
       </div>
       <button
+        className="settings-control"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
         onClick={() => !disabled && onChange(!checked)}
         disabled={disabled}
         title={disabled ? disabledTitle : undefined}
@@ -229,7 +234,7 @@ export function NotificationSettings() {
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button
-          className="btn-action"
+          className="btn-action settings-control"
           onClick={handleSave}
           disabled={saving || isDemo}
           title={isDemo ? 'Fixed in demo mode' : undefined}

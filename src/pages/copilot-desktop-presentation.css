@@ -53,6 +53,22 @@
   }
   .copilot-page .cp-status { --cp-radius: 4px; }
   .copilot-page .cp-panel { --cp-radius: 8px; }
+  .copilot-page .cp-page-title {
+    --cp-page-size: 22px;
+    --cp-page-line: 28px;
+    --cp-title-weight: 600;
+    font: 600 22px/28px var(--font-sans);
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .copilot-page .cp-section-title {
+    --cp-section-size: 16px;
+    --cp-section-line: 24px;
+    --cp-title-weight: 600;
+    font: 600 16px/24px var(--font-sans);
+    letter-spacing: normal;
+    text-transform: none;
+  }
   .copilot-page button,
   .copilot-page textarea {
     min-height: 40px;

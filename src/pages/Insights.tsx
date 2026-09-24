@@ -408,17 +408,19 @@ export default function Insights() {
         {period === 'CUSTOM' && (
           <>
             <DatePicker
+              dashboard
               value={customFrom}
               onChange={setCustomFrom}
               placeholder="From"
-              style={{ width: 160, maxWidth: '100%', padding: 0, fontSize: 14, lineHeight: '20px' }}
+              style={{ width: 160, maxWidth: '100%' }}
             />
             <span style={{ color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>to</span>
             <DatePicker
+              dashboard
               value={customTo}
               onChange={setCustomTo}
               placeholder="To"
-              style={{ width: 160, maxWidth: '100%', padding: 0, fontSize: 14, lineHeight: '20px' }}
+              style={{ width: 160, maxWidth: '100%' }}
             />
           </>
         )}
@@ -822,7 +824,7 @@ export default function Insights() {
               {/* SECTION 2: ROUTE PROFITABILITY RANKING */}
               <div>
                 <SectionHeader>Route efficiency ranking — revenue per km driven</SectionHeader>
-                <p style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Percentages show revenue less the recorded fuel surcharge. All other costs are excluded; this is not net margin.</p>
+                <p style={{ margin: '0 0 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Percentages show revenue less the recorded fuel surcharge. All other costs are excluded; this is not net margin.</p>
                 <div className="card insights-brand-region" role="region" aria-label="Route efficiency ranking" tabIndex={0}>
                   {(() => {
                     const routeMap = new Map<string, {

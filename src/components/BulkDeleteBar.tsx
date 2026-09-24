@@ -3,11 +3,11 @@ import { postData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 
-/** The app's secondary button: mono, 11px, square-ish corners — matches the
- *  Heatmap/Reset buttons the rest of the pages already use. Defined once here
- *  because the import and delete controls were each re-inventing it slightly
- *  differently, and the 0-vertical-padding version sat visibly short beside a
- *  primary button. */
+/** The app's secondary button: sans-serif, 14px, 6px rounded corners, 40px
+ *  minimum height — matches the Heatmap/Reset buttons the rest of the pages
+ *  already use. Defined once here because the import and delete controls were
+ *  each re-inventing it slightly differently, and the 0-vertical-padding
+ *  version sat visibly short beside a primary button. */
 export const secondaryButtonStyle: React.CSSProperties = {
   fontFamily: 'var(--font-sans)',
   fontSize: 14,
@@ -93,7 +93,8 @@ export function BulkDeleteBar({ entity, selected, onClear, onDeleted }: Props) {
             onClick={() => setConfirming(true)}
             style={{
               ...secondaryButtonStyle,
-              borderColor: 'var(--status-danger)', color: 'var(--status-danger)',
+              borderColor: 'var(--status-danger-text, var(--status-danger))',
+              color: 'var(--status-danger-text, var(--status-danger))',
             }}
           >Delete</button>
           <button

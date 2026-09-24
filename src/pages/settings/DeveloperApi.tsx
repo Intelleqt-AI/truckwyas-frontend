@@ -306,8 +306,8 @@ export function DeveloperApi() {
       {/* ── Request body schema ── */}
       <div style={sectionStyle}>
         <div style={sectionHeader}><h3 style={sectionTitle}>Request body schema</h3></div>
-        <div style={{ overflowY: 'auto', maxHeight: 320 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, lineHeight: '20px' }}>
+        <div className="settings-scroll-region" role="region" aria-label="Request body schema" tabIndex={0} style={{ overflowY: 'auto', maxHeight: 320 }}>
+          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, lineHeight: '20px' }}>
             <thead>
               <tr style={{ background: 'var(--bg-deep)' }}>
                 {['Object', 'Field', 'Type', 'Required', 'Description'].map(h => (
@@ -478,7 +478,7 @@ export function DeveloperApi() {
                     <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No calls recorded yet.</div>
                   ) : (
                     <div className="settings-scroll-region" role="region" aria-label={`Call history for ${k.name}`} tabIndex={0} style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, lineHeight: '20px' }}>
+                    <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, lineHeight: '20px' }}>
                       <thead>
                         <tr>
                           {['Time', 'Invoice amount', 'Tier', 'Score', 'Eligible', 'IP'].map(h => (

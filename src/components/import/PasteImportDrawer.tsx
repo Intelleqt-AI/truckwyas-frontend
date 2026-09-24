@@ -241,7 +241,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
               <button className="btn-action" onClick={check} disabled={busy} style={{ flex: 1 }}>
-                {busy ? <Loader size={12} color="currentColor" /> : 'CHECK LIST'}
+                {busy ? <Loader size={12} color="currentColor" /> : 'Check list'}
               </button>
               {onClose && (
                 <button onClick={close}
@@ -320,7 +320,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
 
             <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
               <button className="btn-action" onClick={commit} disabled={busy || preview.ready === 0} style={{ flex: 1 }}>
-                {busy ? <Loader size={12} color="currentColor" /> : `IMPORT ${preview.ready}`}
+                {busy ? <Loader size={12} color="currentColor" /> : `Import ${preview.ready}`}
               </button>
               <button onClick={() => setPreview(null)} disabled={busy}
                 style={secondaryButtonStyle}>

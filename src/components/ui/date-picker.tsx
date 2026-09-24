@@ -8,6 +8,8 @@ import "./date-picker-dashboard.css"
 
 interface DatePickerProps {
   dashboard?: boolean
+  /** Applied to the text input so a sibling <label htmlFor> can bind to it. */
+  id?: string
   value: string
   onChange: (value: string) => void
   placeholder?: string
@@ -17,11 +19,8 @@ interface DatePickerProps {
 
 // Presentation-only opt-in: retain DayPicker's selection and keyboard behavior.
 const DASHBOARD_CALENDAR_CLASSES = {
-  months: "dashboard-date-months",
-  month: "dashboard-date-month",
   caption: "dashboard-date-caption",
   caption_label: "dashboard-date-caption-label",
-  nav: "dashboard-date-nav",
   nav_button: "dashboard-date-nav-button",
   nav_button_previous: "dashboard-date-previous",
   nav_button_next: "dashboard-date-next",
@@ -49,7 +48,7 @@ function tryParse(raw: string): Date | null {
   return null
 }
 
-export function DatePicker({ dashboard = false, value, onChange, placeholder = "DD/MM/YYYY", style, maxDate }: DatePickerProps) {
+export function DatePicker({ dashboard = false, id, value, onChange, placeholder = "DD/MM/YYYY", style, maxDate }: DatePickerProps) {
   const [open, setOpen] = useState(false)
   const [inputVal, setInputVal] = useState('')
   const [month, setMonth] = useState<Date>(new Date())
@@ -118,6 +117,7 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
         }}
       >
         <input
+          id={id}
           className={dashboard ? "dashboard-date-input" : undefined}
           type="text"
           value={inputVal}

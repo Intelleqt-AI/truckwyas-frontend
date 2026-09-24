@@ -136,22 +136,22 @@ export default function UserActivityDrawer({
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Activity</div>
             <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>{userLabel}</div>
           </div>
-          <button style={closeBtnStyle} onClick={onClose} aria-label="Close">×</button>
+          <button className="admin-control" style={closeBtnStyle} onClick={onClose} aria-label="Close">×</button>
         </div>
 
         <div style={tabsStyle}>
-          <button style={tabBtn(tab === 'activity')} onClick={() => setTab('activity')}>Activity</button>
-          <button style={tabBtn(tab === 'sessions')} onClick={() => setTab('sessions')}>
+          <button className="admin-control" style={tabBtn(tab === 'activity')} onClick={() => setTab('activity')}>Activity</button>
+          <button className="admin-control" style={tabBtn(tab === 'sessions')} onClick={() => setTab('sessions')}>
             Sessions {sessionsQuery.data ? `(${sessions.length})` : ''}
           </button>
-          <button style={tabBtn(tab === 'auth')} onClick={() => setTab('auth')}>Sign-in history</button>
+          <button className="admin-control" style={tabBtn(tab === 'auth')} onClick={() => setTab('auth')}>Sign-in history</button>
         </div>
 
         <div style={bodyStyle}>
           {tab === 'activity' && (
             activityQuery.isLoading ? <Loader size={20} /> : (
               <>
-                <div style={{ overflowX: 'auto' }}>
+                <div className="admin-scroll-region" role="region" aria-label="User activity" tabIndex={0} style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
@@ -213,6 +213,7 @@ export default function UserActivityDrawer({
                       </div>
                     </div>
                     <button
+                      className="admin-control"
                       style={secondaryBtnStyle}
                       disabled={revoking === s.id}
                       onClick={() => setRevokeTarget(s)}
@@ -231,7 +232,7 @@ export default function UserActivityDrawer({
           {tab === 'auth' && (
             authQuery.isLoading ? <Loader size={20} /> : (
               <>
-                <div style={{ overflowX: 'auto' }}>
+                <div className="admin-scroll-region" role="region" aria-label="Sign-in history" tabIndex={0} style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>

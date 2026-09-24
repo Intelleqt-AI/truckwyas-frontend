@@ -26,7 +26,7 @@ const sectionTitleStyle: React.CSSProperties = {
   margin: 0,
   textTransform: 'none',
   letterSpacing: 'normal',
-  color: 'var(--text-secondary)',
+  color: 'var(--text-primary)',
   fontWeight: 600,
 };
 
@@ -138,9 +138,9 @@ export function ProfileSettings() {
   return (
     <div className="tw-profile-settings" style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+        <h2 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
           Profile settings
-        </h1>
+        </h2>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
           Manage your personal information and account preferences
         </div>
@@ -243,7 +243,7 @@ export function ProfileSettings() {
             <div>
               <label htmlFor="profile-timezone" style={labelStyle}>Timezone</label>
               <Select value={form.timezone} onValueChange={val => set('timezone', val)}>
-                <SelectTrigger id="profile-timezone" style={{ ...inputStyle, outline: undefined }}>
+                <SelectTrigger id="profile-timezone" style={inputStyle}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -257,7 +257,7 @@ export function ProfileSettings() {
             <div>
               <label htmlFor="profile-language" style={labelStyle}>Language</label>
               <Select value={form.language} onValueChange={val => set('language', val)}>
-                <SelectTrigger id="profile-language" style={{ ...inputStyle, outline: undefined }}>
+                <SelectTrigger id="profile-language" style={inputStyle}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -272,7 +272,7 @@ export function ProfileSettings() {
             <div>
               <label htmlFor="profile-date_format" style={labelStyle}>Date format</label>
               <Select value={form.date_format} onValueChange={val => set('date_format', val)}>
-                <SelectTrigger id="profile-date_format" style={{ ...inputStyle, outline: undefined }}>
+                <SelectTrigger id="profile-date_format" style={inputStyle}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

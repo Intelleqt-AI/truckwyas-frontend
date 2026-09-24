@@ -120,8 +120,8 @@ export default function CreateInvoice() {
                     <input id="create-invoice-amount" className="qi-input" type="number" placeholder="0.00" value={form.amount} onChange={set('amount')} style={inputStyle} />
                   </div>
                   <div>
-                    <div style={labelStyle}>Due date</div>
-                    <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} maxDate={today} />
+                    <label htmlFor="create-invoice-due-date" style={labelStyle}>Due date</label>
+                    <DatePicker dashboard id="create-invoice-due-date" value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} maxDate={today} />
                   </div>
                 </div>
                 <div>

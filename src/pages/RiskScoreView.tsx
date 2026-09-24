@@ -113,9 +113,9 @@ export default function RiskScoreView() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>FAST PAY</div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Customer Risk Scores</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>AI-computed creditworthiness for fast pay eligibility</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Fast pay</div>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', margin: 0 }}>Customer risk scores</h1>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>AI-computed creditworthiness for fast pay eligibility</div>
       </div>
 
       {/* Portfolio KPIs */}
@@ -132,7 +132,7 @@ export default function RiskScoreView() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24, marginBottom: 24 }}>
         {/* Portfolio score card */}
         <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>PORTFOLIO OVERVIEW</div>
+          <h2 style={{ fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px', fontWeight: 600, textTransform: 'none', letterSpacing: 0, color: 'var(--text-primary)', margin: '0 0 16px' }}>Portfolio overview</h2>
           <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
             <ScoreRing score={avgScore} tier={avgScore >= 85 ? 'PRIME' : avgScore >= 70 ? 'STANDARD' : avgScore >= 55 ? 'ELEVATED' : avgScore >= 40 ? 'HIGH' : 'INELIGIBLE'} />
             <div>
@@ -145,7 +145,7 @@ export default function RiskScoreView() {
 
         {/* Score factors legend */}
         <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>SCORE FACTORS</div>
+          <h2 style={{ fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px', fontWeight: 600, textTransform: 'none', letterSpacing: 0, color: 'var(--text-primary)', margin: '0 0 16px' }}>Score factors</h2>
           {[
             { label: 'Payment History', weight: 35 },
             { label: 'Invoice Age', weight: 20 },
@@ -165,8 +165,8 @@ export default function RiskScoreView() {
       {/* Customer table */}
       <div className="card" style={{ overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em' }}>ALL CUSTOMERS — RISK SCORES</div>
-          <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{customerScores.length} scored</div>
+          <h2 style={{ fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px', fontWeight: 600, textTransform: 'none', letterSpacing: 0, color: 'var(--text-primary)', margin: 0 }}>All customers — risk scores</h2>
+          <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)' }}>{customerScores.length} scored</div>
         </div>
         {isLoading ? (
           <div style={{ padding: '40px 20px', display: 'flex', justifyContent: 'center' }}><Loader size={28} label="Loading scores…" /></div>
@@ -195,20 +195,20 @@ export default function RiskScoreView() {
                       <div style={{ width: 60, height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
                         <div style={{ height: 4, width: `${cs.total_score}%`, background: TIER_COLOR[cs.tier] || 'var(--accent-primary)', borderRadius: 2 }} />
                       </div>
-                      <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: TIER_COLOR[cs.tier], fontWeight: 600 }}>{cs.total_score}</span>
+                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums', color: TIER_COLOR[cs.tier], fontWeight: 600 }}>{cs.total_score}</span>
                     </div>
                   </td>
                   <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: TIER_COLOR[cs.tier], padding: '3px 8px', background: TIER_BG[cs.tier], borderRadius: 4, border: `1px solid ${TIER_COLOR[cs.tier]}44`, display: 'inline-block', whiteSpace: 'nowrap' }}>{cap(cs.tier)}</span>
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: TIER_COLOR[cs.tier], padding: '3px 8px', background: TIER_BG[cs.tier], borderRadius: 4, border: `1px solid ${TIER_COLOR[cs.tier]}44`, display: 'inline-block', whiteSpace: 'nowrap' }}>{cap(cs.tier)}</span>
                   </td>
-                  <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{cs.factor_payment_history ?? '—'}/35</td>
-                  <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{cs.factor_invoice_age ?? '—'}/20</td>
-                  <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{cs.factor_pod_quality ?? '—'}/15</td>
-                  <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: cs.is_eligible ? 'var(--accent-primary)' : 'var(--text-tertiary)' }}>
+                  <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>{cs.factor_payment_history ?? '—'}/35</td>
+                  <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>{cs.factor_invoice_age ?? '—'}/20</td>
+                  <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>{cs.factor_pod_quality ?? '—'}/15</td>
+                  <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums', color: cs.is_eligible ? 'var(--accent-primary)' : 'var(--text-tertiary)' }}>
                     {cs.is_eligible ? `${parseFloat(cs.fee_percent || FEE_MAP[cs.tier] || 0).toFixed(1)}%` : 'N/A'}
                   </td>
                   <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: cs.is_eligible ? 'var(--status-success)' : 'var(--status-danger)' }}>
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: cs.is_eligible ? 'var(--status-success)' : 'var(--status-danger)' }}>
                       {cs.is_eligible ? '✓ Yes' : '✗ No'}
                     </span>
                   </td>

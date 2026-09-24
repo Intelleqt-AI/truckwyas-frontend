@@ -178,7 +178,7 @@ export default function Customers() {
             onClick={() => setShowImport(true)}
             disabled={isDemo}
             title={isDemo ? 'Fixed in demo mode' : 'Paste a list from Excel'}
-            style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', textTransform: 'none', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+            style={{ ...secondaryButtonStyle, letterSpacing: 'normal', textTransform: 'none', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
           >Import from Excel</button>
           <button
             className="btn-action"
@@ -290,7 +290,7 @@ export default function Customers() {
                           onClick={() => setShowAddForm(true)}
                           disabled={isDemo}
                           title={isDemo ? 'Fixed in demo mode' : undefined}
-                          style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', textTransform: 'none', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+                          style={{ ...secondaryButtonStyle, letterSpacing: 'normal', textTransform: 'none', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
                         >Add one at a time</button>
                       </div>
                     </div>

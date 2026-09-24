@@ -183,6 +183,7 @@ export default function VehicleTypesPanel() {
         <div key={fld.key} style={{ marginBottom: 14 }}>
           <label style={labelStyle}>{fld.label}</label>
           <input
+            className="admin-control"
             type={fld.type}
             value={(f as any)[fld.key]}
             onChange={e => setF(prev => ({ ...prev, [fld.key]: e.target.value }))}
@@ -228,7 +229,7 @@ export default function VehicleTypesPanel() {
       {isLoading ? (
         <Loader size={24} />
       ) : (
-        <div style={{ overflowX: 'auto' }}>
+        <div className="admin-scroll-region" role="region" aria-label="Truck types" tabIndex={0} style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>

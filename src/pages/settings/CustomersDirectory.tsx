@@ -1,4 +1,5 @@
 import './customers-directory-controls.css';
+import '@/pages/settings/settings-brand.css';
 import { useState, useEffect } from "react";
 import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
@@ -153,7 +154,7 @@ export function CustomersDirectory() {
   return (
     <div className="customer-directory-controls" style={{ maxWidth: 960, minWidth: 0, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Customers</div>
+        <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Customers</h2>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Your customer directory</div>
       </div>
 
@@ -162,7 +163,7 @@ export function CustomersDirectory() {
           padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)',
           display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--text-secondary)', fontWeight: 600 }}>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontWeight: 500 }}>
             Customers ({customers.length})
           </span>
           <div style={{ display: 'flex', flexWrap: 'wrap', minWidth: 0, gap: 10 }}>
@@ -243,7 +244,7 @@ export function CustomersDirectory() {
         {loading ? (
           <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
         ) : (
-          <div role="region" aria-label="Customer directory table" tabIndex={0} style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'auto' }}>
+          <div className="settings-scroll-region" role="region" aria-label="Customer directory table" tabIndex={0} style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'auto' }}>
           <table style={{ width: '100%', minWidth: 830, borderCollapse: 'collapse' as const, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
             <thead>
               <tr>

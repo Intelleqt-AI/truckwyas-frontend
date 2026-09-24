@@ -446,7 +446,7 @@ export default function Vehicles() {
                             onClick={() => setShowAddForm(true)}
                             disabled={isDemo}
                             title={isDemo ? 'Fixed in demo mode' : undefined}
-                            style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', borderRadius: 6, padding: '8px 16px', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+                            style={{ ...secondaryButtonStyle, letterSpacing: 'normal', padding: '8px 16px', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
                           >
                             Add one at a time
                           </button>

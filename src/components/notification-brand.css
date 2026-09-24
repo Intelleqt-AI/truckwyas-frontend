@@ -21,6 +21,13 @@
   .os-app-shell .dashboard-notification-trigger { min-width: 44px; min-height: 44px; border-radius: 6px; }
   .os-app-shell .dashboard-notification-icon { width: 24px; height: 24px; }
   .os-app-shell .dashboard-notification-count { font-variant-numeric: tabular-nums; }
+  .os-app-shell .dashboard-notification-panel {
+    min-width: 0;
+    max-width: calc(100vw - 32px);
+    overscroll-behavior: contain;
+    font: 400 14px/20px var(--font-sans);
+    letter-spacing: normal;
+  }
   .os-app-shell .dashboard-notification-header { gap: 12px; flex-wrap: wrap; flex-shrink: 0; }
   .os-app-shell .dashboard-notification-title { font: 600 16px/24px var(--font-sans); letter-spacing: normal; }
   .os-app-shell .dashboard-notification-mark-read { min-height: 40px; padding: 8px 0; border-radius: 6px; font-weight: 500; line-height: 20px; }

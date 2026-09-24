@@ -316,8 +316,9 @@ export default function InvoiceDetail() {
                   <td className="mono">{payment.payment_date?.slice(0, 10) || payment.date?.slice(0, 10) || '—'}</td>
                   <td>
                     <span style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 10,
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: 13,
+                      lineHeight: '20px',
                       padding: '2px 6px',
                       background: 'var(--bg-surface-hover)',
                       borderRadius: 2,
@@ -326,7 +327,7 @@ export default function InvoiceDetail() {
                       {payment.payment_method || payment.method || 'EFT'}
                     </span>
                   </td>
-                  <td className="mono" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                  <td className="mono" style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {payment.reference || '—'}
                   </td>
                   <td className="mono text-right" style={{ color: 'var(--status-success)', fontWeight: 600 }}>
@@ -409,8 +410,8 @@ export default function InvoiceDetail() {
               </a>
             )}
             {ineligibleEntry && (
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: 2, padding: '8px 10px', lineHeight: 1.4 }}>
-                <div style={{ color: 'var(--text-secondary)', marginBottom: 3, fontSize: 10, letterSpacing: '0.05em' }}>Not eligible for capital</div>
+              <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: 2, padding: '8px 10px' }}>
+                <div style={{ color: 'var(--text-secondary)', marginBottom: 3, fontSize: 13, lineHeight: '20px', fontWeight: 500, letterSpacing: 0 }}>Not eligible for capital</div>
                 {ineligibleEntry.reason}
               </div>
             )}
@@ -418,7 +419,7 @@ export default function InvoiceDetail() {
 
           {showPaymentForm && (
             <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--border-subtle)' }}>
-              <div className="card-title" style={{ marginBottom: 12, fontSize: 12 }}>Record payment</div>
+              <h2 className="card-title" style={{ fontFamily: 'var(--font-sans)', fontSize: 16, lineHeight: '24px', fontWeight: 600, textTransform: 'none', letterSpacing: 0, margin: 0, marginBottom: 12 }}>Record payment</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input
@@ -427,20 +428,20 @@ export default function InvoiceDetail() {
                     placeholder={`Amount (balance: ${formatCurrency(invoice.balance)})`}
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                    style={{ flex: 1, padding: '8px', fontSize: 12, border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+                    style={{ flex: 1, padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 48, fontFamily: 'var(--font-sans)', border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                   />
                   <button
                     type="button"
                     onClick={() => setPaymentAmount(String(invoice.balance))}
-                    style={{ padding: '8px 10px', fontSize: 11, fontFamily: 'var(--font-mono)', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 2, color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    style={{ padding: '8px 10px', fontSize: 14, lineHeight: '20px', minHeight: 48, fontFamily: 'var(--font-sans)', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 2, color: 'var(--text-secondary)', cursor: 'pointer', whiteSpace: 'nowrap' }}
                   >
                     Full
                   </button>
                 </div>
                 <DatePicker
+                  dashboard
                   value={paymentDate}
                   onChange={setPaymentDate}
-                  style={{ padding: '8px', fontSize: 12 }}
                   maxDate={new Date()}
                 />
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
@@ -459,21 +460,21 @@ export default function InvoiceDetail() {
                   placeholder="Reference (optional)"
                   value={paymentReference}
                   onChange={(e) => setPaymentReference(e.target.value)}
-                  style={{ padding: '8px', fontSize: 12, border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
+                  style={{ padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 48, fontFamily: 'var(--font-sans)', border: '1px solid var(--border-subtle)', borderRadius: 2, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}
                 />
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button
                     onClick={handleRecordPayment}
                     disabled={recordingPayment}
                     className="btn-action"
-                    style={{ flex: 1, padding: '10px', fontSize: 12, background: 'var(--accent-primary)', border: 'none', color: 'white' }}
+                    style={{ flex: 1, padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 48, background: 'var(--accent-primary)', border: 'none', color: 'white' }}
                   >
                     {recordingPayment ? 'Recording...' : 'Save'}
                   </button>
                   <button
                     onClick={() => setShowPaymentForm(false)}
                     className="btn-action"
-                    style={{ flex: 1, padding: '10px', fontSize: 12, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+                    style={{ flex: 1, padding: '10px', fontSize: 14, lineHeight: '20px', minHeight: 48, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
                   >
                     Cancel
                   </button>

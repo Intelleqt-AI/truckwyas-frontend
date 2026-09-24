@@ -36,10 +36,10 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         day_hidden: "invisible",
         ...classNames,
       }}
+      // Border resets live in CSS (index.css for the default calendar,
+      // date-picker-dashboard.css for the dashboard opt-in) so stylesheets can
+      // still own the borders; inline styles here would silently outrank them.
       styles={{
-        cell: { border: "none" },
-        day: { border: "none" },
-        head_cell: { border: "none" },
         table: { borderCollapse: "collapse" },
       }}
       components={{

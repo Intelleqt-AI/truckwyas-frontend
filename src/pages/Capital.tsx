@@ -436,11 +436,9 @@ export default function Capital() {
             className="card-header"
             style={{ marginBottom: showIneligible ? 16 : 0, cursor: "pointer" }}
             onClick={() => setShowIneligible((v) => !v)}>
-            <span
-              className="card-title"
-              style={{ color: "var(--text-secondary)" }}>
+            <h2 className="card-title" style={{ margin: 0 }}>
               Not eligible ({ineligibleInvoices.length})
-            </span>
+            </h2>
             <span
               style={{
                 fontSize: 13,

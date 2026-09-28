@@ -358,9 +358,8 @@ export default function QuoteBuilder() {
   const winModel = modelStats?.win_model;
 
   const selectedVT = useMemo(() => vehicleTypes.find((v: any) => v.name === vehicleType), [vehicleTypes, vehicleType]);
-  // Fuel price comes from the company's own per-fuel-type defaults, keyed by
-  // the SELECTED vehicle type's fuel type — not a separately-fetched live
-  // diesel price, and not always Diesel regardless of what's actually chosen.
+  // Fuel price is keyed by the SELECTED vehicle type's fuel type, not always
+  // Diesel. Non-diesel types use the company's per-fuel-type default.
   const companyFuelPriceField = (FUEL_PRICE_FIELD_BY_TYPE as Record<string, string>)[selectedVT?.fuel_type || 'Diesel'] || 'fuel_price_per_litre';
   // Diesel: the live price for the company's zone, unless the fleet has set
   // its own price (anything other than the untouched 23.50 model default) —

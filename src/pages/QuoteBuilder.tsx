@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, patchData, fetchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { formatCurrency } from "@/lib/formatters";
+import { resolveDieselPrice, dieselBasisNote, liveDieselHint } from "@/lib/dieselPrice";
 import { LocationInput, type LocationCoords } from "@/components/LocationInput";
 import { RouteMapView } from "@/components/RouteMapView";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -333,6 +334,9 @@ export default function QuoteBuilder() {
   const { data: customersRaw } = useQuery({ queryKey: ["customers"], queryFn: () => fetchData("api/v1/customers/") });
   const { data: vehicleTypesRaw } = useQuery({ queryKey: ["vehicle-types"], queryFn: () => fetchData("api/v1/vehicle-types/") });
   const { data: modelStats } = useQuery({ queryKey: ["quote-model-stats"], queryFn: () => fetchData("/api/v1/quotes/model-stats/") });
+  // Live diesel for the company's fuel zone. A failure just means no live
+  // price (the company setting is used, as before) — never blocks the quote.
+  const { data: liveFuel } = useQuery({ queryKey: ["fuel-price-current"], queryFn: () => fetchData("api/v1/fuel-prices/current/").catch(() => null), staleTime: 10 * 60 * 1000 });
 
   const customers: any[] = customersRaw?.results || customersRaw || [];
   // Available types, de-duplicated by name (the fleet can have several vehicles of one type).
@@ -356,17 +360,20 @@ export default function QuoteBuilder() {
   const winModel = modelStats?.win_model;
 
   const selectedVT = useMemo(() => vehicleTypes.find((v: any) => v.name === vehicleType), [vehicleTypes, vehicleType]);
-  // Fuel price comes from the company's own per-fuel-type defaults, keyed by
-  // the SELECTED vehicle type's fuel type — not a separately-fetched live
-  // diesel price, and not always Diesel regardless of what's actually chosen.
+  // Fuel price is keyed by the SELECTED vehicle type's fuel type, not always
+  // Diesel. Non-diesel types use the company's per-fuel-type default.
   const companyFuelPriceField = (FUEL_PRICE_FIELD_BY_TYPE as Record<string, string>)[selectedVT?.fuel_type || 'Diesel'] || 'fuel_price_per_litre';
-  const fuelPricePerL = Number(companyProfile?.[companyFuelPriceField]) || Number(companyProfile?.fuel_price_per_litre) || 21.7;
+  // Diesel: the live price for the company's zone, unless the fleet has set
+  // its own price (anything other than the untouched 23.50 model default) —
+  // see src/lib/dieselPrice.ts. Other fuel types are unchanged.
+  const isDieselPricing = companyFuelPriceField === 'fuel_price_per_litre';
+  const diesel = resolveDieselPrice({ company: companyProfile, live: liveFuel });
+  const fuelPricePerL = (isDieselPricing ? diesel.price : null) || Number(companyProfile?.[companyFuelPriceField]) || Number(companyProfile?.fuel_price_per_litre) || 21.7;
   // Diesel is gazetted per zone (coastal ports vs inland, ~R0.87/L apart), so
-  // say which one this price is. Only diesel is split that way, so the note is
-  // omitted for the other fuel types.
-  const fuelZoneNote = companyFuelPriceField === 'fuel_price_per_litre'
-    ? (companyProfile?.fuel_zone === 'COASTAL' ? ' · coastal' : ' · inland')
-    : '';
+  // say which one this price is and where it came from (live / your price).
+  // Only diesel is split that way, so the note is omitted for other fuel types.
+  const fuelZoneNote = isDieselPricing ? dieselBasisNote(diesel) : '';
+  const liveDieselHintText = isDieselPricing ? liveDieselHint(diesel) : null;
   // With no vehicle type picked there is no reference tonnage to scale fuel
   // from, and a flat figure would price a 5t load and a 30t load identically.
   // So infer the truck the load will run on from the load itself: of the types
@@ -1508,7 +1515,7 @@ export default function QuoteBuilder() {
             )}
             {!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && !calculatingRoute && (<>
               {[
-                { key: "fuel", l: `Fuel: ${fuelConsumption.toFixed(1)} L/100km @ R${Number(fuelPricePerL).toFixed(2)}${fuelZoneNote}${fuelBasisNote}`, v: fuelCost, c: "var(--status-danger)" },
+                { key: "fuel", l: `Fuel: ${fuelConsumption.toFixed(1)} L/100km @ R${Number(fuelPricePerL).toFixed(2)}/L${fuelZoneNote}${fuelBasisNote}`, v: fuelCost, c: "var(--status-danger)" },
                 { key: "tolls", l: "Tolls (SA plazas)", v: tollCost, c: "var(--status-warning)" },
                 ...(crossBorderCost > 0 ? [{ key: "cb", l: "Cross-border / weighbridge", v: crossBorderCost, c: "#2BB6A6" }] : []),
                 { key: "driver", l: "Driver allowance", v: driverAllowance, c: "var(--text-tertiary)" },
@@ -1516,7 +1523,12 @@ export default function QuoteBuilder() {
               ].map((r, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border-row)", fontSize: 13 }}>
                   <span style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={dot(r.c)} />{r.l}
+                    <span style={dot(r.c)} />{r.key === "fuel" && liveDieselHintText ? (
+                      <span style={{ display: "flex", flexDirection: "column" }}>
+                        <span>{r.l}</span>
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{liveDieselHintText}</span>
+                      </span>
+                    ) : r.l}
                     {r.key === "fuel" && (
                       <Popover>
                         <PopoverTrigger asChild>
@@ -1560,6 +1572,7 @@ export default function QuoteBuilder() {
                               ["Distance", `${Math.round(chargeDistance)} km${legs === 2 ? " (round trip)" : ""}`],
                               ["Diesel used", `${Math.round(chargeDistance * fuelConsumption / 100)} L`],
                               ["Diesel price", `R${Number(fuelPricePerL).toFixed(2)}/L${fuelZoneNote.replace(' · ', ' ')}`],
+                              ...(liveDieselHintText ? [["Live diesel", liveDieselHintText.replace(/^Live diesel: /, '')]] : []),
                             ].map(([k, v]) => (
                               <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0" }}>
                                 <span style={{ color: "var(--text-tertiary)" }}>{k}</span>

@@ -29,3 +29,6 @@
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
+
+/* When shown under a section header, keep the standard gap before content. */
+.section-header + .stale-data-notice { margin-bottom: 24px; }

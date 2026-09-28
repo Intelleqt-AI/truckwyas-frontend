@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData } from "@/lib/Api";
@@ -451,12 +452,17 @@ export default function InvoiceDetail() {
                 {downloading ? 'Downloading…' : 'Download PDF'}
               </button>
               {capitalEntry && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '8px 12px' }}>
-                  <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>
-                    {applied ? 'Applied for Fast Pay' : 'Eligible for Fast Pay'}
+                applied ? (
+                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '8px 12px' }}>
+                    <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>Applied for Fast Pay</div>
+                    Your earlier application is on record.
                   </div>
-                  {applied ? 'Your earlier application is on record.' : 'Fast Pay is being set up. Early settlement for this invoice will be available here soon.'}
-                </div>
+                ) : (
+                  <button type="button" className="btn-action fin-btn-secondary" style={{ width: '100%' }}
+                    disabled={!CAPITAL_LAUNCHED} title={CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON}>
+                    {CAPITAL_LAUNCHED ? 'Apply for Fast Pay' : 'Apply for Fast Pay (coming soon)'}
+                  </button>
+                )
               )}
               {ineligibleEntry && (
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '8px 12px' }}>

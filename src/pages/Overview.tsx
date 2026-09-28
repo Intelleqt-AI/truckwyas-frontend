@@ -1,4 +1,5 @@
 import "@/components/ui/dashboard-kpi.css";
+import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import StaleDataNotice from '@/components/data/StaleDataNotice';
 import '@/components/data/stale-data-notice.css';
 import './overview-typography.css';
@@ -493,7 +494,9 @@ export default function Overview() {
               Create invoice
             </button>
             <button
-              onClick={() => navigate("/capital")}
+              onClick={() => CAPITAL_LAUNCHED && navigate("/capital")}
+              disabled={!CAPITAL_LAUNCHED}
+              title={CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON}
               className="btn-action"
               style={{
                 padding: "8px 16px",
@@ -501,7 +504,7 @@ export default function Overview() {
                 border: "1px solid var(--border-subtle)",
                 color: "var(--text-secondary)",
               }}>
-              Request advance
+              {CAPITAL_LAUNCHED ? "Request advance" : "Request advance (coming soon)"}
             </button>
             <button
               onClick={() => navigate("/finance/expenses")}

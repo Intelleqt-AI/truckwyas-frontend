@@ -1,4 +1,5 @@
 import "./table-heading-roles.css";
+import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import "./expense-row-actions.css";
 import "./finance-brand.css";
 import { useState, useEffect } from "react";
@@ -487,10 +488,18 @@ export default function Invoices() {
                                   </button>
                                 )}
                                 {capitalEntry && (
-                                  <div className="fin-menu-note">
-                                    <strong>{applied ? "Applied for Fast Pay" : "Eligible for Fast Pay"}</strong>
-                                    {applied ? "Your earlier application is on record." : "Coming soon: Fast Pay is being set up."}
-                                  </div>
+                                  applied ? (
+                                    <div className="fin-menu-note">
+                                      <strong>Applied for Fast Pay</strong>
+                                      Your earlier application is on record.
+                                    </div>
+                                  ) : (
+                                    <button type="button" role="menuitem" className="expense-menu-item"
+                                      disabled={!CAPITAL_LAUNCHED} aria-disabled={!CAPITAL_LAUNCHED}
+                                      title={CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON}>
+                                      {CAPITAL_LAUNCHED ? "Request Fast Pay" : "Request Fast Pay (coming soon)"}
+                                    </button>
+                                  )
                                 )}
                                 {ineligibleEntry && (
                                   <div className="fin-menu-note">

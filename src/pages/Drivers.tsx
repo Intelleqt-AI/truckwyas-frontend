@@ -1,4 +1,5 @@
 import './fleet-vehicles-brand.css';
+import StaleDataNotice from '@/components/data/StaleDataNotice';
 import './table-heading-roles.css';
 import { UserRound as EmptyDriversIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from "react";
@@ -118,7 +119,7 @@ export default function Drivers() {
     return () => clearTimeout(searchTimer.current);
   }, [search]);
 
-  const { data, isLoading: loading, refetch } = useQuery({
+  const { data, isLoading: loading, refetch, dataUpdatedAt, isRefetchError } = useQuery({
     queryKey: ['drivers-page', debouncedSearch],
     queryFn: async () => {
       const q = debouncedSearch;
@@ -226,6 +227,7 @@ export default function Drivers() {
           >+ Add driver</button>
         }
       />
+      <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
 
       {/* KPI strip — same 4-card grid, toolbar and table card as Vehicles so
           switching tabs never moves the page. */}

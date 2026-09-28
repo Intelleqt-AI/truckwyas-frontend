@@ -1,4 +1,5 @@
 import './capital-typography.css';
+import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import './table-heading-roles.css';
 import './finance-brand.css';
 import { CheckCircle2 } from 'lucide-react';
@@ -71,6 +72,7 @@ export default function AdvanceRequest() {
   }, []);
 
   const handleSubmit = async () => {
+    if (!CAPITAL_LAUNCHED) return;
     if (!selectedInvoiceId) return;
     setSubmitting(true);
     setError(null);
@@ -126,7 +128,9 @@ export default function AdvanceRequest() {
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal', textTransform: 'none', marginBottom: 4 }}>Capital</div>
         <h1 style={{ fontSize: 22, lineHeight: '28px', fontFamily: 'var(--font-sans)', margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>Request advance</h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>Get paid early on an eligible invoice in three steps.</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>
+          {CAPITAL_LAUNCHED ? 'Get paid early on an eligible invoice in three steps.' : CAPITAL_COMING_SOON}
+        </div>
       </div>
 
       {/* Step counter */}
@@ -327,7 +331,7 @@ export default function AdvanceRequest() {
                 color: submitting ? 'var(--text-tertiary)' : 'var(--text-primary)',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: 6,
-                cursor: submitting ? 'not-allowed' : 'pointer',
+                cursor: submitting || !CAPITAL_LAUNCHED ? 'not-allowed' : 'pointer',
                 minHeight: 40,
                 fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px'
               }}
@@ -337,11 +341,12 @@ export default function AdvanceRequest() {
             </button>
             <button
               className="btn-action"
-              disabled={submitting}
+              disabled={submitting || !CAPITAL_LAUNCHED}
+              title={CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON}
               style={{
                 padding: '10px 20px',
-                background: submitting ? 'var(--bg-surface)' : 'var(--accent-primary)',
-                color: submitting ? 'var(--text-tertiary)' : 'var(--btn-action-color)',
+                background: submitting || !CAPITAL_LAUNCHED ? 'var(--bg-surface)' : 'var(--accent-primary)',
+                color: submitting || !CAPITAL_LAUNCHED ? 'var(--text-tertiary)' : 'var(--btn-action-color)',
                 border: 'none', borderRadius: 6,
                 cursor: submitting ? 'not-allowed' : 'pointer',
                 minHeight: 40,
@@ -349,7 +354,7 @@ export default function AdvanceRequest() {
               }}
               onClick={handleSubmit}
             >
-              {submitting ? 'Submitting…' : 'Confirm request'}
+              {!CAPITAL_LAUNCHED ? 'Coming soon' : submitting ? 'Submitting…' : 'Confirm request'}
             </button>
           </div>
         </div>

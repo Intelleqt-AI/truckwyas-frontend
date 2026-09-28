@@ -1,4 +1,5 @@
 import './capital-typography.css';
+import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import './table-heading-roles.css';
 import './finance-brand.css';
 import { useState, useEffect } from "react";
@@ -263,12 +264,13 @@ export default function Capital() {
                             title={`Customer risk ${riskPct}% — above the 70% Fast Pay limit`}>
                             High risk
                           </span>
+                        ) : applied ? (
+                          <span className="fin-chip fin-chip--success" title="Your earlier application is on record">Applied</span>
                         ) : (
-                          <span
-                            className={`fin-chip ${applied ? "fin-chip--success" : ""}`}
-                            title={applied ? "Your earlier application is on record" : "Fast Pay is being set up"}>
-                            {applied ? "Applied" : "Eligible, coming soon"}
-                          </span>
+                          <button type="button" className="btn-action fin-btn-secondary"
+                            disabled={!CAPITAL_LAUNCHED} title={CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON}>
+                            {CAPITAL_LAUNCHED ? "Apply" : "Coming soon"}
+                          </button>
                         )}
                       </td>
                     </tr>

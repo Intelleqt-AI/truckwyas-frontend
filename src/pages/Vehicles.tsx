@@ -1,4 +1,5 @@
 import './fleet-vehicles-brand.css';
+import StaleDataNotice from '@/components/data/StaleDataNotice';
 import './table-heading-roles.css';
 import { Truck as EmptyFleetIcon } from 'lucide-react';
 import { useState, useRef } from "react";
@@ -176,7 +177,7 @@ export default function Vehicles() {
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
 
-  const { data, isLoading: loading, refetch } = useQuery({
+  const { data, isLoading: loading, refetch, dataUpdatedAt, isRefetchError } = useQuery({
     // search drives the vehicles fetch URL (server-side search), so it must be
     // part of the key — statusFilter / sortBy are applied client-side in render.
     queryKey: ['vehicles-page', debouncedSearch],
@@ -287,6 +288,7 @@ export default function Vehicles() {
           >+ Add vehicle</button>
         </>}
       />
+      <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
 
       {/* Fleet summary — always computed from real vehicle data. Same 4-card
           grid, toolbar and table card as Drivers so switching tabs never moves the page. */}

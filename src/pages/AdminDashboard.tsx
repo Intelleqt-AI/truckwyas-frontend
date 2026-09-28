@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useParams, NavLink, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import '@/pages/admin/admin-brand.css';
@@ -57,6 +58,16 @@ const ALL_ITEMS = SECTIONS.flatMap(s => s.items);
 export default function AdminDashboard() {
   const { section } = useParams();
   const { user: authUser } = useAuth();
+  // On phones the section list is one horizontal row; keep the current one in view.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || nav.scrollWidth <= nav.clientWidth) return;
+    const cur = nav.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!cur) return;
+    const left = cur.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft;
+    nav.scrollLeft = left - (nav.clientWidth - cur.offsetWidth) / 2;
+  }, [section]);
 
   // Real enforcement is server-side (every /api/v1/admin/ endpoint requires
   // IsSuperUser) — this is just so a non-superuser never lands on a dead page.
@@ -70,15 +81,15 @@ export default function AdminDashboard() {
   const CurrentComponent = current.component;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100%', gap: 0 }}>
+    <div className="tw-admin-shell" style={{ display: 'flex', minHeight: '100%', gap: 0 }}>
       {/* Sidebar — same shape as Settings.tsx's own section nav, so the two
           "many sub-pages under one prefix" areas of the app feel consistent. */}
-      <div style={{
+      <div className="tw-admin-shell__side" style={{
         width: 220,
         flexShrink: 0,
         borderRight: '1px solid var(--border-subtle)',
       }}>
-        <nav aria-label="Admin dashboard" style={{
+        <nav ref={navRef} aria-label="Admin dashboard" className="tw-admin-shell__nav" style={{
           position: 'sticky',
           top: 0,
           maxHeight: '100vh',
@@ -86,15 +97,15 @@ export default function AdminDashboard() {
           paddingTop: 8,
           paddingBottom: 24,
         }}>
-          <div style={{ padding: '4px 20px 16px' }}>
+          <div className="tw-admin-shell__brand" style={{ padding: '4px 20px 16px' }}>
             <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal' }}>
               Platform
             </div>
             <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>Admin dashboard</div>
           </div>
           {SECTIONS.map((s, idx) => (
-            <div key={s.group} style={{ marginBottom: idx < SECTIONS.length - 1 ? 20 : 0 }}>
-              <div style={{
+            <div key={s.group} className="tw-admin-shell__group" style={{ marginBottom: idx < SECTIONS.length - 1 ? 20 : 0 }}>
+              <div className="tw-admin-shell__group-label" style={{
                 fontSize: 13,
                 lineHeight: '20px',
                 fontWeight: 500,
@@ -139,11 +150,11 @@ export default function AdminDashboard() {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, padding: '0 0 60px 32px', minWidth: 0 }}>
+      <div className="tw-admin-shell__content" style={{ flex: 1, padding: '0 0 60px 32px', minWidth: 0 }}>
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)' }}>{current.label}</h1>
           <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>
-            Cross-tenant visibility and controls, superuser only. Every write action is recorded in the audit log.
+            Superuser only. Every change is audited.
           </div>
         </div>
         <CurrentComponent />

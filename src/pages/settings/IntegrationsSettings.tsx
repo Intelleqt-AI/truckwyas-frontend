@@ -6,6 +6,7 @@ import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
 import { settingsBadgeStyle, settingsCardStyle, settingsInputStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
 import { formatDate } from "@/lib/formatters";
+import RowActions from '@/components/ui/RowActions';
 
 const cardStyle: React.CSSProperties = { ...settingsCardStyle, padding: 24 };
 
@@ -897,17 +898,15 @@ export function IntegrationsSettings() {
                     {key.last_used && ` · Last used ${formatDate(key.last_used)}`}
                   </div>
                 </div>
-                <button
-                  onClick={() => { if (window.confirm(`Revoke the API key "${key.name}"? Systems using it will stop working immediately.`)) handleRevokeKey(key.id); }}
-                  disabled={isDemo}
-                  title={isDemo ? 'Not available in the demo' : undefined}
-                  className="settings-control"
-                  style={{
-                    ...secondaryBtnStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))',
-                    cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                  }}>
-                  Revoke
-                </button>
+                <RowActions
+                  label={key.name}
+                  items={[{
+                    label: 'Revoke',
+                    danger: true,
+                    disabled: isDemo,
+                    onSelect: () => { if (window.confirm(`Revoke the API key "${key.name}"? Systems using it will stop working immediately.`)) handleRevokeKey(key.id); },
+                  }]}
+                />
               </div>
             ))}
           </div>
@@ -988,8 +987,8 @@ export function IntegrationsSettings() {
               <div key={webhook.id} style={{
                 ...nestedBoxStyle, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
               }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginBottom: 4 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginBottom: 4, overflowWrap: 'anywhere' }}>
                     {webhook.url}
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -1003,28 +1002,18 @@ export function IntegrationsSettings() {
                     ))}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleTestWebhook(webhook.id)}
-                  disabled={isDemo}
-                  title={isDemo ? 'Not available in the demo' : undefined}
-                  className="settings-control"
-                  style={{
-                    ...secondaryBtnStyle, border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)',
-                    cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                  }}>
-                  Test
-                </button>
-                <button
-                  onClick={() => { if (window.confirm(`Delete the webhook to ${webhook.url}? It will stop receiving events.`)) handleDeleteWebhook(webhook.id); }}
-                  disabled={isDemo}
-                  title={isDemo ? 'Not available in the demo' : undefined}
-                  className="settings-control"
-                  style={{
-                    ...secondaryBtnStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))',
-                    cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                  }}>
-                  Delete
-                </button>
+                <RowActions
+                  label={webhook.url}
+                  items={[
+                    { label: 'Send test', onSelect: () => handleTestWebhook(webhook.id), disabled: isDemo },
+                    {
+                      label: 'Delete',
+                      danger: true,
+                      disabled: isDemo,
+                      onSelect: () => { if (window.confirm(`Delete the webhook to ${webhook.url}? It will stop receiving events.`)) handleDeleteWebhook(webhook.id); },
+                    },
+                  ]}
+                />
               </div>
             ))}
           </div>

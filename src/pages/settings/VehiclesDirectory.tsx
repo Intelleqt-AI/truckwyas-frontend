@@ -9,6 +9,7 @@ import { EditVehicleDrawer } from "@/components/EditVehicleDrawer";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
+import RowActions from "@/components/ui/RowActions";
 import { settingsCardStyle, settingsCardTitleStyle, settingsInputStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
 
 interface Vehicle {
@@ -57,7 +58,6 @@ const statusColor = (s: string) =>
 
 const sectionStyle: React.CSSProperties = { ...settingsCardStyle, marginBottom: 0 };
 
-const rowActionStyle = settingsSecondaryButtonStyle;
 
 export function VehiclesDirectory() {
   const { user: authUser } = useAuth();
@@ -151,7 +151,7 @@ export function VehiclesDirectory() {
           <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
         ) : (
           <div className="settings-scroll-region" role="region" aria-label="Vehicles" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles settings-table">
+          <table className="table-heading-roles settings-table settings-table--pin-actions">
             <thead>
               <tr>
                 <th style={{ width: 32, }}>
@@ -215,29 +215,13 @@ export function VehiclesDirectory() {
                     })()}
                   </td>
                   <td style={{ textAlign: 'right' as const }}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <button
-                        className="settings-control"
-                        onClick={() => setEditVehicle(v)}
-                        disabled={isDemo}
-                        title={isDemo ? 'Not available in the demo' : undefined}
-                        style={{
-                          ...rowActionStyle,
-                          cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                        }}
-                      >Edit</button>
-                      <button
-                        className="settings-control"
-                        onClick={() => setDeleteTarget({ id: v.id, name: v.plate || `Vehicle ${v.id}` })}
-                        disabled={isDemo}
-                        title={isDemo ? 'Not available in the demo' : undefined}
-                        style={{
-                          /* Neutral in the row; the confirmation carries the danger colour. */
-                          ...rowActionStyle,
-                          cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                        }}
-                      >Delete</button>
-                    </div>
+                    <RowActions
+                      label={v.plate || `Vehicle ${v.id}`}
+                      items={[
+                        { label: 'Edit', onSelect: () => setEditVehicle(v), disabled: isDemo },
+                        { label: 'Delete', danger: true, onSelect: () => setDeleteTarget({ id: v.id, name: v.plate || `Vehicle ${v.id}` }), disabled: isDemo },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

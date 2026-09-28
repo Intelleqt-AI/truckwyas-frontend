@@ -5,6 +5,7 @@ import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import RowActions from '@/components/ui/RowActions';
 
 // Platform-wide vehicle type catalog (company=None rows) — every company's
 // New Quote / Add Vehicle pickers show these plus whatever custom types that
@@ -26,12 +27,10 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
   padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
-const secondaryBtnStyle: React.CSSProperties = {
-  padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer',
-};
 // Cells holding 40px controls trim their vertical padding so the row stays 48px.
 const controlTdStyle: React.CSSProperties = { ...tdStyle, paddingTop: 4, paddingBottom: 4 };
+// The one row action (RowActions) stays pinned right, so wide tables never hide it.
+const actionTdStyle: React.CSSProperties = { ...controlTdStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' };
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500,
   fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', marginBottom: 6,
@@ -239,7 +238,7 @@ export default function VehicleTypesPanel() {
                 <th className="num" style={thStyle}>Base rate</th>
                 <th className="num" style={thStyle}>Fuel</th>
                 <th style={thStyle}>Status</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
+                <th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -255,21 +254,15 @@ export default function VehicleTypesPanel() {
                   <td style={tdStyle}>
                     <span className={`status-badge ${t.active ? 'active' : 'delayed'}`}>{t.active ? 'Active' : 'Inactive'}</span>
                   </td>
-                  <td style={controlTdStyle}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <button className="admin-control" style={secondaryBtnStyle} disabled={pending === t.id} onClick={() => openEdit(t)}>Edit</button>
-                      <button className="admin-control" style={secondaryBtnStyle} disabled={pending === t.id} onClick={() => toggleActive(t)}>
-                        {t.active ? 'Deactivate' : 'Activate'}
-                      </button>
-                      <button
-                        className="admin-control"
-                        style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }}
-                        disabled={pending === t.id}
-                        onClick={() => setDeleteTarget(t)}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                  <td style={actionTdStyle}>
+                    <RowActions
+                      label={t.name}
+                      items={[
+                        { label: 'Edit', onSelect: () => openEdit(t), disabled: pending === t.id },
+                        { label: t.active ? 'Deactivate' : 'Activate', onSelect: () => toggleActive(t), disabled: pending === t.id },
+                        { label: 'Delete', danger: true, onSelect: () => setDeleteTarget(t), disabled: pending === t.id },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

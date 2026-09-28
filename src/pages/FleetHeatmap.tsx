@@ -5,6 +5,8 @@ import { formatCurrency } from '@/lib/formatters';
 import { Loader } from '@/components/Loader';
 import SectionHeader from '@/components/layout/SectionHeader';
 import './fleet-vehicles-brand.css';
+import './ops-tiles.css';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 // 7-day heatmap — Mon → Sun
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -122,7 +124,7 @@ export default function FleetHeatmap() {
       <SectionHeader
         eyebrow="Fleet"
         title="Activity heatmap"
-        description="When your loads are picked up, and the routes you run most."
+        description="Pickup times and top routes"
         actions={
           <button data-fleet-control className="fleet-secondary-button" onClick={() => navigate('/fleet/vehicles')}>
             Back to fleet
@@ -130,22 +132,22 @@ export default function FleetHeatmap() {
         }
       />
 
-      {/* Summary strip: how much of the fleet is working right now. */}
-      <section className="card fleet-kpis" aria-label="Fleet right now">
-        <div className="fleet-kpi">
-          <div className="fleet-kpi__label">On a job now</div>
-          <div className="fleet-kpi__value">{statusMap['IN_USE'] || 0}<span className="fleet-kpi__of">of {vehicles.length}</span></div>
-          <div className="fleet-kpi__note">{utilRate}% of the fleet has status In use.</div>
+      {/* Summary tiles: how much of the fleet is working right now. */}
+      <section className="ops-tiles" aria-label="Fleet right now">
+        <div className="ops-tile">
+          <h2 className="ops-tile__label">On a job now</h2>
+          <div className="ops-tile__value">{statusMap['IN_USE'] || 0}<span className="ops-tile__of">of {vehicles.length}</span></div>
+          <div className="ops-tile__sub">{utilRate}% of the fleet</div>
         </div>
-        <div className="fleet-kpi">
-          <div className="fleet-kpi__label">Available</div>
-          <div className="fleet-kpi__value">{statusMap['AVAILABLE'] || 0}</div>
-          <div className="fleet-kpi__note">Ready to take a load.</div>
+        <div className="ops-tile">
+          <h2 className="ops-tile__label">Available</h2>
+          <div className="ops-tile__value">{statusMap['AVAILABLE'] || 0}</div>
+          <div className="ops-tile__sub">Ready for a load</div>
         </div>
-        <div className="fleet-kpi">
-          <div className="fleet-kpi__label">In maintenance</div>
-          <div className="fleet-kpi__value">{statusMap['MAINTENANCE'] || 0}</div>
-          <div className="fleet-kpi__note">Off the road until marked available.</div>
+        <div className="ops-tile">
+          <h2 className="ops-tile__label">In maintenance</h2>
+          <div className="ops-tile__value">{statusMap['MAINTENANCE'] || 0}</div>
+          <div className="ops-tile__sub">Off the road</div>
         </div>
       </section>
 
@@ -154,8 +156,11 @@ export default function FleetHeatmap() {
         <section className="card fleet-panel">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
             <div>
-              <h2 className="fleet-panel__title" style={{ margin: 0 }}>When are loads picked up?</h2>
-              <p className="fleet-muted" style={{ margin: '4px 0 0' }}>Pickups by weekday and hour, shaded against the busiest slot. {sampleNote}</p>
+              <h2 className="fleet-panel__title" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                Pickup times
+                <InfoTip>Pickups by weekday and hour, shaded against the busiest slot.</InfoTip>
+              </h2>
+              <p className="fleet-muted" style={{ margin: '4px 0 0' }}>{sampleNote.replace(/\.$/, '')}</p>
             </div>
             <div className="fleet-muted" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               <span>Low</span>
@@ -190,10 +195,13 @@ export default function FleetHeatmap() {
 
         {/* Top routes */}
         <section className="card fleet-panel">
-          <h2 className="fleet-panel__title" style={{ marginBottom: 4 }}>Which routes do you run most?</h2>
-          <p className="fleet-muted" style={{ margin: '0 0 16px' }}>Top {Math.min(8, topRoutes.length)} by number of loads, with order totals. {sampleNote}</p>
+          <h2 className="fleet-panel__title" style={{ marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            Top routes
+            <InfoTip>Top {Math.min(8, topRoutes.length)} routes by number of loads, with order totals. {sampleNote}</InfoTip>
+          </h2>
+          <p className="fleet-muted" style={{ margin: '0 0 16px' }}>By number of loads</p>
           {topRoutes.length === 0 ? (
-            <div className="fleet-muted" style={{ textAlign: 'center', padding: '20px 0' }}>No loads yet, so there are no routes to rank.</div>
+            <div className="fleet-muted" style={{ textAlign: 'center', padding: '20px 0' }}>No loads yet.</div>
           ) : topRoutes.map(([route, data]) => (
             <RouteBar key={route} route={route} count={data.count} revenue={data.revenue} maxCount={maxRouteCount} total={loads.length} />
           ))}

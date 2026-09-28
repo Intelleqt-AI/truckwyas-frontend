@@ -140,6 +140,11 @@
 .bk-table .is-id { font-family: var(--font-mono); font-size: 13px; color: var(--text-primary); font-weight: 400; }
 .bk-table .is-date { color: var(--text-secondary); }
 .bk-table .is-truncate { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+/* One row action (RowActions) pinned to the right edge, so it is reachable
+   without scrolling a wide table sideways. */
+.bk-table--pin-actions th:last-child:not([colspan]),
+.bk-table--pin-actions td:last-child:not([colspan]) { position: sticky; right: 0; z-index: 1; width: 1%; background: var(--bg-surface); }
+.bk-table--pin-actions tbody tr.is-clickable:hover td:last-child:not([colspan]) { background: var(--bg-surface-hover); }
 
 /* Status chips: sentence case label + AA text role on a tinted surface. */
 .bk-status {
@@ -340,35 +345,7 @@
 
 /* ---- Design principles v2 (docs/brand/DESIGN-PRINCIPLES.md) ---- */
 
-/* Summary strip: one quiet card, figures separated by hairlines. Only numbers
-   that drive a decision; each carries a one-line basis underneath. */
-.bk-summary {
-  display: grid;
-  grid-template-columns: repeat(var(--bk-summary-cols, 3), minmax(0, 1fr));
-  margin-bottom: 24px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card, 12px);
-  font-family: var(--font-sans);
-}
-.bk-summary__cell { padding: 20px 24px; min-width: 0; }
-.bk-summary__cell + .bk-summary__cell { border-left: 1px solid var(--border-subtle); }
-.bk-summary__label { font-size: 13px; line-height: 20px; font-weight: 500; color: var(--text-secondary); }
-.bk-summary__value {
-  margin-top: 4px;
-  font-size: 22px; line-height: 28px; font-weight: 600;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-.bk-summary__of { font-size: 14px; line-height: 20px; font-weight: 400; color: var(--text-secondary); margin-left: 4px; }
-.bk-summary__note { margin-top: 4px; font-size: 13px; line-height: 20px; color: var(--text-secondary); }
-.bk-summary__value.is-attention { color: var(--status-warning-text, var(--status-warning)); }
-@media (max-width: 720px) {
-  .bk-summary { grid-template-columns: minmax(0, 1fr); }
-  .bk-summary__cell { padding: 16px; }
-  .bk-summary__cell + .bk-summary__cell { border-left: none; border-top: 1px solid var(--border-subtle); }
-}
+/* Summary figures now use separate tiles: see ops-tiles.css. */
 
 /* Plain-language notice (zero states, blockers). No rail, no glow. */
 .bk-notice {

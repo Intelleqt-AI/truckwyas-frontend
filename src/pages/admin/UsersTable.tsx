@@ -8,6 +8,7 @@ import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import PaginationControls from '@/pages/admin/PaginationControls';
 import UserActivityDrawer from '@/pages/admin/UserActivityDrawer';
+import RowActions from '@/components/ui/RowActions';
 
 const PAGE_SIZE = 20;
 
@@ -37,11 +38,8 @@ const tdStyle: React.CSSProperties = {
 };
 // Cells holding 40px controls trim their vertical padding so the row stays 48px.
 const controlTdStyle: React.CSSProperties = { ...tdStyle, paddingTop: 4, paddingBottom: 4 };
-const secondaryBtnStyle: React.CSSProperties = {
-  padding: '8px 12px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)',
-  minHeight: 40, cursor: 'pointer',
-};
+// The one row action (RowActions) stays pinned right, so wide tables never hide it.
+const actionTdStyle: React.CSSProperties = { ...controlTdStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' };
 const fieldLabelStyle: React.CSSProperties = {
   display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6,
 };
@@ -270,7 +268,7 @@ export default function UsersTable() {
                 <th style={thStyle}>Role</th>
                 <th style={thStyle}>Status</th>
                 <th style={thStyle}>Last login</th>
-                <th style={thStyle}>Actions</th>
+                <th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -303,53 +301,18 @@ export default function UsersTable() {
                       <span className={`status-badge ${u.is_active ? 'active' : 'delayed'}`}>{u.is_active ? 'Active' : 'Inactive'}</span>
                     </td>
                     <td style={tdStyle}>{fmt(u.last_login)}</td>
-                    <td style={controlTdStyle}>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button
-                          className="admin-control"
-                          style={secondaryBtnStyle}
-                          onClick={() => setActivityTarget(u)}
-                        >
-                          Activity
-                        </button>
-                        {u.is_active ? (
-                          <button
-                            className="admin-control"
-                            style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))' }}
-                            disabled={!!rowPending}
-                            onClick={() => setLockTarget(u)}
-                          >
-                            {rowPending === 'lock' ? 'Locking…' : 'Lock'}
-                          </button>
-                        ) : (
-                          <button
-                            className="admin-control"
-                            style={secondaryBtnStyle}
-                            disabled={!!rowPending}
-                            onClick={() => runAction(u, 'unlock')}
-                          >
-                            {rowPending === 'unlock' ? 'Unlocking…' : 'Unlock'}
-                          </button>
-                        )}
-                        <button
-                          className="admin-control"
-                          style={secondaryBtnStyle}
-                          disabled={!!rowPending}
-                          onClick={() => runAction(u, 'reset_password')}
-                        >
-                          {rowPending === 'reset_password' ? 'Sending…' : 'Reset password'}
-                        </button>
-                        {!u.is_superuser && (
-                          <button
-                            className="admin-control"
-                            style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }}
-                            disabled={!!rowPending}
-                            onClick={() => setDeleteTarget(u)}
-                          >
-                            {rowPending === 'delete' ? 'Deleting…' : 'Delete'}
-                          </button>
-                        )}
-                      </div>
+                    <td style={actionTdStyle}>
+                      <RowActions
+                        label={u.name || u.email}
+                        items={[
+                          { label: 'Activity', onSelect: () => setActivityTarget(u) },
+                          { label: rowPending === 'reset_password' ? 'Sending…' : 'Reset password', onSelect: () => runAction(u, 'reset_password'), disabled: !!rowPending },
+                          u.is_active
+                            ? { label: rowPending === 'lock' ? 'Locking…' : 'Lock', danger: true, onSelect: () => setLockTarget(u), disabled: !!rowPending }
+                            : { label: rowPending === 'unlock' ? 'Unlocking…' : 'Unlock', onSelect: () => runAction(u, 'unlock'), disabled: !!rowPending },
+                          ...(!u.is_superuser ? [{ label: rowPending === 'delete' ? 'Deleting…' : 'Delete', danger: true, onSelect: () => setDeleteTarget(u), disabled: !!rowPending }] : []),
+                        ]}
+                      />
                     </td>
                   </tr>
                 );

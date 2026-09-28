@@ -16,6 +16,7 @@ import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
 import { useAuth } from '@/lib/AuthContext';
+import RowActions from '@/components/ui/RowActions';
 
 interface Customer {
   id: number;
@@ -175,7 +176,7 @@ export default function Customers() {
   const header = (
     <SectionHeader
       title="Customers"
-      description="Everyone you quote and invoice, with their payment terms and credit limits."
+      description="Who you quote and invoice"
       actions={
         <>
           <button
@@ -205,7 +206,7 @@ export default function Customers() {
 
       {/* Table. No summary tiles: nothing on this directory drives a decision
           except finding the customer, so the count sits in the toolbar. */}
-      <div className="card" style={{ padding: 0, overflowX: "auto", borderRadius: "var(--radius-card, 12px)" }}>
+      <div className="card" style={{ padding: 0, overflow: "hidden", borderRadius: "var(--radius-card, 12px)" }}>
         {/* Sits above the toolbar so it never covers the rows being chosen. */}
         <div style={{ padding: selected.length ? "12px 16px 0" : 0 }}>
           <BulkDeleteBar
@@ -226,7 +227,7 @@ export default function Customers() {
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
             <span className="bk-toolbar__end" style={{ marginRight: 8 }}>
               {customers.length < totalCustomers
                 ? `Showing ${customers.length} of ${totalCustomers} customers`
@@ -247,7 +248,8 @@ export default function Customers() {
             </Select>
           </div>
         </div>
-        <table className="table-heading-roles bk-table">
+        <div style={{ overflowX: "auto" }}>
+        <table className="table-heading-roles bk-table bk-table--pin-actions">
           <thead>
             <tr>
               <th scope="col" style={{ paddingRight: 0, width: 32 }}>
@@ -338,19 +340,15 @@ export default function Customers() {
                     <span className={`bk-status bk-status--${status === "ACTIVE" ? "success" : "neutral"}`}>{status === "ACTIVE" ? "Active" : "Inactive"}</span>
                   </td>
                   <td className="is-num">
-                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-                      <button
-                        type="button"
-                        className="bk-btn bk-btn--quiet bk-btn--sm"
-                        aria-label={`Edit ${c.name}`}
-                        onClick={e => { e.stopPropagation(); openEdit(c); }}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                      >Edit</button>
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          setConfirmOpts({
+                    <RowActions
+                      label={c.name}
+                      items={[
+                        { label: "Edit", onSelect: () => openEdit(c), disabled: isDemo },
+                        {
+                          label: "Delete",
+                          danger: true,
+                          disabled: isDemo,
+                          onSelect: () => setConfirmOpts({
                             title: "Delete customer",
                             message: `Remove "${c.name}"? This cannot be undone.`,
                             confirmLabel: "Delete",
@@ -364,21 +362,17 @@ export default function Customers() {
                                 toast.error(err?.message || "Failed to delete");
                               }
                             },
-                          });
-                        }}
-                        type="button"
-                        className="bk-btn bk-btn--quiet-danger bk-btn--sm"
-                        aria-label={`Delete ${c.name}`}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                      >Delete</button>
-                    </div>
+                          }),
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       <PasteImportDrawer

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import '@/pages/settings/settings-brand.css';
@@ -66,6 +67,17 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
   const { user } = useAuth();
   const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
 
+  // On phones the list is one horizontal row; keep the current page in view.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || nav.scrollWidth <= nav.clientWidth) return;
+    const cur = nav.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!cur) return;
+    const left = cur.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft;
+    nav.scrollLeft = left - (nav.clientWidth - cur.offsetWidth) / 2;
+  }, [activeId]);
+
   const visibleSections = SETTINGS_NAV.map(s => ({
     ...s,
     items: s.items.filter(item => !item.adminOnly || isAdmin),
@@ -76,12 +88,12 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
       {/* Sidebar — this outer column stays full height so its right border
           runs top to bottom alongside the (taller) settings panel; only the
           nav content inside is sticky, via the inner wrapper below. */}
-      <div style={{
+      <div className="tw-settings-shell__side" style={{
         width: 220,
         flexShrink: 0,
         borderRight: '1px solid var(--border-subtle)',
       }}>
-      <nav aria-label="Settings" style={{
+      <nav ref={navRef} aria-label="Settings" className="tw-settings-shell__nav" style={{
         position: 'sticky',
         top: 0,
         maxHeight: '100vh',
@@ -90,8 +102,8 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
         paddingBottom: 24,
       }}>
         {visibleSections.map((s, idx) => (
-          <div key={s.group} style={{ marginBottom: idx < visibleSections.length - 1 ? 20 : 0 }}>
-            <div style={{ ...groupLabelStyle, padding: '12px 20px 6px' }}>
+          <div key={s.group} className="tw-settings-shell__group" style={{ marginBottom: idx < visibleSections.length - 1 ? 20 : 0 }}>
+            <div className="tw-settings-shell__group-label" style={{ ...groupLabelStyle, padding: '12px 20px 6px' }}>
               {s.group}
             </div>
             {s.items.map(item => {
@@ -112,8 +124,8 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
         {/* Platform-level, not a company setting — jumps to its own full
             page rather than rendering inline like the sections above. */}
         {user?.is_superuser && (
-          <div style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
-            <div style={{ ...groupLabelStyle, padding: '0 20px 6px' }}>
+          <div className="tw-settings-shell__group" style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
+            <div className="tw-settings-shell__group-label" style={{ ...groupLabelStyle, padding: '0 20px 6px' }}>
               Platform
             </div>
             <NavLink
@@ -128,7 +140,7 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, padding: '0 0 0 32px', minWidth: 0 }}>
+      <div className="tw-settings-shell__content" style={{ flex: 1, padding: '0 0 0 32px', minWidth: 0 }}>
         {children}
       </div>
     </div>

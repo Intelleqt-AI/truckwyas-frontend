@@ -7,6 +7,7 @@ import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
 import { settingsCardStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsBadgeStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
+import RowActions from '@/components/ui/RowActions';
 
 interface VehicleType {
   id: number;
@@ -38,7 +39,6 @@ const sectionStyle: React.CSSProperties = { ...settingsCardStyle, marginBottom: 
 const labelStyle = settingsLabelStyle;
 const inputStyle = settingsInputStyle;
 
-const rowActionStyle = settingsSecondaryButtonStyle;
 
 const drawerPrimaryBtnStyle: React.CSSProperties = {
   flex: 1, padding: '8px 12px', minHeight: 40, fontFamily: 'var(--font-sans)',
@@ -239,7 +239,7 @@ export function VehicleTypesDirectory() {
           <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
         ) : (
           <div className="settings-scroll-region" role="region" aria-label="Vehicle types" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles settings-table">
+          <table className="table-heading-roles settings-table settings-table--pin-actions">
             <thead>
               <tr>
                 <th style={{ width: 36 }}>
@@ -301,30 +301,14 @@ export function VehicleTypesDirectory() {
                       color: t.active ? 'var(--accent-primary)' : 'var(--text-tertiary)',
                     }}>{t.active ? 'Active' : 'Inactive'}</span>
                   </td>
-                  <td style={{ textAlign: 'right' as const }}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <button
-                        className="settings-control"
-                        onClick={() => openEdit(t)}
-                        disabled={editDisabled}
-                        title={isDemo ? 'Not available in the demo' : (isShared ? badgeTitle : undefined)}
-                        style={{
-                          ...rowActionStyle,
-                          cursor: editDisabled ? 'not-allowed' : 'pointer', opacity: editDisabled ? 0.5 : 1,
-                        }}
-                      >Edit</button>
-                      <button
-                        className="settings-control"
-                        onClick={() => setDeleteTarget({ id: t.id, name: t.name, isReset: isOverride })}
-                        disabled={deleteDisabled}
-                        title={isDemo ? 'Not available in the demo' : (isShared ? badgeTitle : undefined)}
-                        style={{
-                          /* Neutral in the row; the confirmation carries the danger colour. */
-                          ...rowActionStyle,
-                          cursor: deleteDisabled ? 'not-allowed' : 'pointer', opacity: deleteDisabled ? 0.5 : 1,
-                        }}
-                      >{isOverride ? 'Reset' : 'Delete'}</button>
-                    </div>
+                  <td style={{ textAlign: 'right' as const }} title={isDemo ? 'Not available in the demo' : (isShared ? badgeTitle : undefined)}>
+                    <RowActions
+                      label={t.name}
+                      items={[
+                        { label: 'Edit', onSelect: () => openEdit(t), disabled: editDisabled },
+                        { label: isOverride ? 'Reset' : 'Delete', danger: !isOverride, onSelect: () => setDeleteTarget({ id: t.id, name: t.name, isReset: isOverride }), disabled: deleteDisabled },
+                      ]}
+                    />
                   </td>
                 </tr>
                 );

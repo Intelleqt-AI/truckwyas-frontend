@@ -32,3 +32,30 @@ table.admin-table .num { text-align: right !important; font-variant-numeric: tab
 .admin-tint-hover:hover:not(:disabled) {
   background: var(--surface-tint-hover) !important;
 }
+
+/* ---- Phone and small tablet: the admin section list becomes one scrollable
+   row of links above the page, so tables get the full width. ---- */
+@media (max-width: 768px) {
+  .tw-admin-shell { flex-direction: column; }
+  .tw-admin-shell > .tw-admin-shell__side {
+    width: auto !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 16px;
+    min-width: 0;
+  }
+  .tw-admin-shell .tw-admin-shell__nav {
+    position: static !important;
+    max-height: none !important;
+    display: flex; align-items: center; gap: 4px;
+    overflow-x: auto; overflow-y: hidden;
+    padding: 0 0 8px !important;
+    scrollbar-width: none;
+  }
+  .tw-admin-shell .tw-admin-shell__nav::-webkit-scrollbar { display: none; }
+  .tw-admin-shell .tw-admin-shell__brand,
+  .tw-admin-shell .tw-admin-shell__group-label { display: none; }
+  .tw-admin-shell .tw-admin-shell__group { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin: 0 !important; }
+  .tw-admin-shell .admin-nav-link { white-space: nowrap; flex-shrink: 0; margin: 0 !important; }
+  .tw-admin-shell > .tw-admin-shell__content { padding: 0 0 24px !important; }
+}

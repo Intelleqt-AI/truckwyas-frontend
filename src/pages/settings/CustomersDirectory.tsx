@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
+import RowActions from "@/components/ui/RowActions";
 import { settingsCardStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, SettingsPageHeader } from "./settingsUi";
 
 interface Customer {
@@ -225,7 +226,7 @@ export function CustomersDirectory() {
           <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
         ) : (
           <div role="region" aria-label="Customer directory table" tabIndex={0} style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'auto' }}>
-          <table className="table-heading-roles settings-table" style={{ minWidth: 830, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
+          <table className="table-heading-roles settings-table settings-table--pin-actions" style={{ minWidth: 830, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
             <thead>
               <tr>
                 <th style={{ width: 32, fontSize: 13, lineHeight: '20px', fontWeight: 500, }}>
@@ -270,31 +271,13 @@ export function CustomersDirectory() {
                     }}>{Object.prototype.hasOwnProperty.call(STATUS_LABEL, c.status) ? STATUS_LABEL[c.status] : c.status}</span>
                   </td>
                   <td style={{ textAlign: 'right' as const }}>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button
-                        onClick={() => openEdit(c)}
-                        disabled={isDemo}
-                        title={isDemo ? 'Not available in the demo' : undefined}
-                        style={{
-                          background: 'none', border: '1px solid var(--border-subtle)',
-                          color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 'var(--radius-control)', cursor: isDemo ? 'not-allowed' : 'pointer',
-                          letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1,
-                        }}
-                      >Edit</button>
-                      <button
-                        onClick={() => setDeleteTarget({ id: c.id, name: c.name })}
-                        disabled={isDemo}
-                        title={isDemo ? 'Not available in the demo' : undefined}
-                        style={{
-                          /* Neutral in the row; the confirmation carries the danger colour. */
-                          background: 'none', border: '1px solid var(--border-subtle)',
-                          color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 'var(--radius-control)', cursor: isDemo ? 'not-allowed' : 'pointer',
-                          letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1,
-                        }}
-                      >Delete</button>
-                    </div>
+                    <RowActions
+                      label={c.name}
+                      items={[
+                        { label: 'Edit', onSelect: () => openEdit(c), disabled: isDemo },
+                        { label: 'Delete', danger: true, onSelect: () => setDeleteTarget({ id: c.id, name: c.name }), disabled: isDemo },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

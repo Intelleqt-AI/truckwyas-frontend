@@ -18,6 +18,9 @@ import { EditVehicleDrawer } from '@/components/EditVehicleDrawer';
 import { Loader } from '@/components/Loader';
 import SectionHeader, { FLEET_TABS } from '@/components/layout/SectionHeader';
 import { useAuth } from '@/lib/AuthContext';
+import RowActions from '@/components/ui/RowActions';
+import { InfoTip } from '@/components/ui/InfoTip';
+import './ops-tiles.css';
 
 interface Vehicle {
   id: number;
@@ -281,25 +284,28 @@ export default function Vehicles() {
       />
       <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
 
-      {/* Fleet summary: one strip, same geometry as Drivers so switching tabs
-          never moves the page. Hidden when there is no fleet yet; the table's
-          empty state carries the next action instead of a row of zeros. */}
+      {/* Fleet summary: separate tiles, same geometry as Drivers so switching
+          tabs never moves the page. Hidden when there is no fleet yet; the
+          table's empty state carries the next action instead of zeros. */}
       {(loading || vehicles.length > 0) && (
-        <section className="card fleet-kpis" aria-label="Fleet summary" aria-busy={loading}>
-          <div className="fleet-kpi">
-            <div className="fleet-kpi__label">Available now</div>
-            <div className="fleet-kpi__value">{loading ? '—' : readyCount}{!loading && <span className="fleet-kpi__of">of {vehicles.length}</span>}</div>
-            <div className="fleet-kpi__note">{loading ? 'Loading' : `${onJobCount} on a job, ${maintenanceCount} in maintenance.`}</div>
+        <section className="ops-tiles" aria-label="Fleet summary" aria-busy={loading}>
+          <div className="ops-tile">
+            <h2 className="ops-tile__label">Available now</h2>
+            <div className="ops-tile__value">{loading ? '—' : readyCount}{!loading && <span className="ops-tile__of">of {vehicles.length}</span>}</div>
+            <div className="ops-tile__sub" title={`${onJobCount} on a job, ${maintenanceCount} in maintenance`}>{loading ? 'Loading' : `${onJobCount} on a job, ${maintenanceCount} in maintenance`}</div>
           </div>
-          <div className="fleet-kpi">
-            <div className="fleet-kpi__label">Delivered revenue</div>
-            <div className="fleet-kpi__value">{loading ? '—' : formatZAR(deliveredRevenue)}</div>
-            <div className="fleet-kpi__note">{loading ? 'Loading' : `From ${deliveredLoads} delivered ${deliveredLoads === 1 ? 'load' : 'loads'}, all time.`}</div>
+          <div className="ops-tile">
+            <h2 className="ops-tile__label">
+              Delivered revenue
+              <InfoTip>Value of delivered loads per vehicle, summed across the fleet. All time.</InfoTip>
+            </h2>
+            <div className="ops-tile__value">{loading ? '—' : formatZAR(deliveredRevenue)}</div>
+            <div className="ops-tile__sub">{loading ? 'Loading' : `${deliveredLoads} ${deliveredLoads === 1 ? 'load' : 'loads'}, all time`}</div>
           </div>
-          <div className="fleet-kpi">
-            <div className="fleet-kpi__label">Not earning yet</div>
-            <div className="fleet-kpi__value">{loading ? '—' : notEarning}{!loading && <span className="fleet-kpi__of">of {vehicles.length}</span>}</div>
-            <div className="fleet-kpi__note">{loading ? 'Loading' : notEarning > 0 ? 'Vehicles with no delivered load yet.' : 'Every vehicle has delivered at least one load.'}</div>
+          <div className="ops-tile">
+            <h2 className="ops-tile__label">Not earning yet</h2>
+            <div className="ops-tile__value">{loading ? '—' : notEarning}{!loading && <span className="ops-tile__of">of {vehicles.length}</span>}</div>
+            <div className="ops-tile__sub">{loading ? 'Loading' : notEarning > 0 ? 'No delivered load yet' : 'Every vehicle has earned'}</div>
           </div>
         </section>
       )}
@@ -442,23 +448,15 @@ export default function Vehicles() {
                     {v.ai_health_score ? Math.round(v.ai_health_score) : '—'}
                   </td>
                   <td className="fleet-table__actions">
-                    <div>
-                      <button
-                        className="fleet-row-action"
-                        aria-label={`Edit ${v.plate || v.registration || 'vehicle'}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditVehicle(v);
-                        }}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                      >Edit</button>
-                      <button
-                        className="fleet-row-action fleet-row-action--danger"
-                        aria-label={`Delete ${v.plate || v.registration || 'vehicle'}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmOpts({
+                    <RowActions
+                      label={v.plate || v.registration || 'vehicle'}
+                      items={[
+                        { label: 'Edit', onSelect: () => setEditVehicle(v), disabled: isDemo },
+                        {
+                          label: 'Delete',
+                          danger: true,
+                          disabled: isDemo,
+                          onSelect: () => setConfirmOpts({
                             title: 'Delete vehicle',
                             message: `Remove ${v.plate || v.registration} from your fleet? This cannot be undone.`,
                             confirmLabel: 'Delete',
@@ -472,12 +470,10 @@ export default function Vehicles() {
                                 toast.error(err?.message || 'Failed to delete vehicle');
                               }
                             },
-                          });
-                        }}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                      >Delete</button>
-                    </div>
+                          }),
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               );

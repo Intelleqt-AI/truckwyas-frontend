@@ -2,6 +2,8 @@ import './quote-invoice-roles.css';
 import './table-heading-roles.css';
 import './bookings-typography.css';
 import './bookings-section.css';
+import './ops-tiles.css';
+import { InfoTip } from '@/components/ui/InfoTip';
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -168,6 +170,9 @@ export default function CustomerDetail() {
     setSaving(false);
   }
 
+  // Tiles show whole rands; the exact amount sits in the title.
+  const wholeRand = (n: number) => 'R ' + Math.round(n).toLocaleString('en-ZA');
+
   return (
     <div className="bk-detail bookings-typography">
       {/* Back + Header */}
@@ -203,28 +208,33 @@ export default function CustomerDetail() {
 
       {/* Key figure first: what this customer is worth, from their own quotes. */}
       {totalQuotes > 0 ? (
-        <section className="bk-summary" aria-label="Customer value">
-          <div className="bk-summary__cell">
-            <div className="bk-summary__label">Won from accepted quotes</div>
-            <div className="bk-summary__value">{formatZAR(totalRevenue)}</div>
-            <div className="bk-summary__note">Quote totals, from {basis}.</div>
+        <section className="ops-tiles" aria-label="Customer value">
+          <div className="ops-tile">
+            <h2 className="ops-tile__label">
+              Won from quotes
+              <InfoTip>Totals of accepted quotes, from {basis}.</InfoTip>
+            </h2>
+            <div className="ops-tile__value" title={formatZAR(totalRevenue)}>{wholeRand(totalRevenue)}</div>
+            <div className="ops-tile__sub">Accepted quotes</div>
           </div>
-          <div className="bk-summary__cell">
-            <div className="bk-summary__label">Quotes accepted</div>
-            <div className="bk-summary__value">{acceptedQuotes}<span className="bk-summary__of">of {totalQuotes}</span></div>
-            <div className="bk-summary__note">{Math.round((acceptedQuotes / totalQuotes) * 100)}% of their quotes, drafts included, were accepted.</div>
+          <div className="ops-tile">
+            <h2 className="ops-tile__label">
+              Quotes accepted
+              <InfoTip>Share of all their quotes, drafts included, that were accepted.</InfoTip>
+            </h2>
+            <div className="ops-tile__value">{acceptedQuotes}<span className="ops-tile__of">of {totalQuotes}</span></div>
+            <div className="ops-tile__sub">{Math.round((acceptedQuotes / totalQuotes) * 100)}% win rate</div>
           </div>
-          <div className="bk-summary__cell">
-            <div className="bk-summary__label">Credit limit</div>
-            <div className="bk-summary__value">{customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "—"}</div>
-            <div className="bk-summary__note">{customer.credit_limit ? `${paymentTermsLabel(customer.payment_terms_default)} payment terms.` : "No limit set. Add one under Edit customer."}</div>
+          <div className="ops-tile">
+            <h2 className="ops-tile__label">Credit limit</h2>
+            <div className="ops-tile__value" title={customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : undefined}>{customer.credit_limit ? wholeRand(parseFloat(customer.credit_limit)) : "—"}</div>
+            <div className="ops-tile__sub">{customer.credit_limit ? `${paymentTermsLabel(customer.payment_terms_default)} terms` : "No limit set"}</div>
           </div>
         </section>
       ) : (
         <div className="bk-notice">
           <div>
             <p className="bk-notice__text">You have not quoted {customer.name} yet.</p>
-            <p className="bk-notice__sub">Their value and win rate appear here once you send them a quote.</p>
           </div>
           <button type="button" className="bk-btn bk-btn--secondary" onClick={() => navigate("/bookings/quotes/new")}>New quote</button>
         </div>

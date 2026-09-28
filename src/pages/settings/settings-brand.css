@@ -67,6 +67,10 @@ table.settings-table td:last-child { padding-right: 24px; }
 table.settings-table td:has(> button, > select, > [role="combobox"], > div > button) { padding-top: 4px; padding-bottom: 4px; }
 table.settings-table tbody tr { transition: background-color 0.15s; }
 table.settings-table tbody tr:hover { background: var(--surface-tint-hover); }
+/* One row action (RowActions) pinned to the right edge, so a wide table never
+   hides it behind a sideways scroll. */
+table.settings-table--pin-actions tr > :last-child:not([colspan]) { position: sticky; right: 0; z-index: 1; width: 1%; background: var(--bg-surface); }
+table.settings-table--pin-actions tbody tr:hover > td:last-child:not([colspan]) { background: linear-gradient(var(--surface-tint-hover), var(--surface-tint-hover)), var(--bg-surface); }
 table.settings-table th { border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
 table.settings-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 
@@ -120,4 +124,33 @@ table.settings-table.is-inset :is(th, td):last-child { padding-right: 0; }
   background: var(--surface-tint-active);
   color: var(--text-primary);
   font-weight: 500;
+}
+
+/* ---- Phone and small tablet: the settings list becomes one scrollable row
+   of links above the page, so content gets the full width. ---- */
+@media (max-width: 768px) {
+  .tw-settings-shell { flex-direction: column; }
+  .tw-settings-shell > .tw-settings-shell__side {
+    width: auto !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 16px;
+    min-width: 0;
+  }
+  .tw-settings-shell .tw-settings-shell__nav {
+    position: static !important;
+    max-height: none !important;
+    display: flex; align-items: center; gap: 4px;
+    overflow-x: auto; overflow-y: hidden;
+    padding: 0 0 8px !important;
+    scrollbar-width: none;
+  }
+  .tw-settings-shell .tw-settings-shell__nav::-webkit-scrollbar { display: none; }
+  .tw-settings-shell .tw-settings-shell__group {
+    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+    margin: 0 !important; padding: 0 !important; border: 0 !important;
+  }
+  .tw-settings-shell .tw-settings-shell__group-label { display: none; }
+  .tw-settings-shell .settings-nav-link { white-space: nowrap; flex-shrink: 0; margin: 0; }
+  .tw-settings-shell > .tw-settings-shell__content { padding: 0 !important; }
 }

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/lib/AuthContext';
 import { formatDateTime } from '@/lib/formatters';
 import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsSecondaryButtonStyle, settingsDangerButtonStyle, SettingsPageHeader } from './settingsUi';
+import RowActions from '@/components/ui/RowActions';
 
 // Presentation only: the API sends a raw ISO timestamp; show it in the app's
 // date format, and anything unparseable verbatim.
@@ -20,7 +21,6 @@ const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle: React.CSSProperties = { ...settingsCardHeaderStyle, justifyContent: 'space-between' };
 const sectionTitleStyle = settingsCardTitleStyle;
 const fieldLabelStyle = settingsLabelStyle;
-const rowActionStyle = settingsSecondaryButtonStyle;
 
 const roleBadgeStyle: React.CSSProperties = {
   fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
@@ -307,7 +307,7 @@ export function UsersPermissions() {
           </div>
         ) : (
           <div className="settings-scroll-region" role="region" aria-label="Team members" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles settings-table">
+          <table className="table-heading-roles settings-table settings-table--pin-actions">
             <thead>
               <tr>
                 {['User', 'Role', 'Status', 'Last active', ''].map(h => (
@@ -381,18 +381,10 @@ export function UsersPermissions() {
                 </td>
                 <td style={{ textAlign: 'right' as const }}>
                   {isAdmin && (
-                    <button
-                      className="settings-control"
-                      onClick={() => setDeleteConfirm(u.id)}
-                      disabled={isDemo}
-                      title={isDemo ? 'Fixed in demo mode' : undefined}
-                      style={{
-                        /* Neutral in the row; the danger colour belongs to the
-                           confirmation step, so a list of users is not a wall of red. */
-                        ...rowActionStyle, color: 'var(--text-secondary)',
-                        cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                      }}
-                    >Remove</button>
+                    <RowActions
+                      label={u.email || `User ${u.id}`}
+                      items={[{ label: 'Remove', danger: true, onSelect: () => setDeleteConfirm(u.id), disabled: isDemo }]}
+                    />
                   )}
                 </td>
               </tr>
@@ -410,7 +402,7 @@ export function UsersPermissions() {
             <h2 style={sectionTitleStyle}>Pending invites</h2>
           </div>
           <div className="settings-scroll-region" role="region" aria-label="Pending invites" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles settings-table">
+          <table className="table-heading-roles settings-table settings-table--pin-actions">
             <thead>
               <tr>
                 {['Email', 'Role', 'Invited', 'Expires', ''].map(h => (
@@ -436,32 +428,13 @@ export function UsersPermissions() {
                     {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '—'}
                   </td>
                   <td style={{ textAlign: 'right' as const }}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <button
-                        className="settings-control"
-                        onClick={() => handleResendInvite(inv.token)}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{
-                          ...rowActionStyle,
-                          cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                        }}
-                      >Resend</button>
-                      {isAdmin && (
-                        <button
-                          className="settings-control"
-                          onClick={() => handleRevokeInvite(inv.token)}
-                          disabled={isDemo}
-                          title={isDemo ? 'Fixed in demo mode' : undefined}
-                          style={{
-                            /* Neutral in the row; the danger colour belongs to the
-                           confirmation step, so a list of users is not a wall of red. */
-                        ...rowActionStyle, color: 'var(--text-secondary)',
-                            cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-                          }}
-                        >Revoke</button>
-                      )}
-                    </div>
+                    <RowActions
+                      label={inv.email}
+                      items={[
+                        { label: 'Resend', onSelect: () => handleResendInvite(inv.token), disabled: isDemo },
+                        ...(isAdmin ? [{ label: 'Revoke', danger: true, onSelect: () => handleRevokeInvite(inv.token), disabled: isDemo }] : []),
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

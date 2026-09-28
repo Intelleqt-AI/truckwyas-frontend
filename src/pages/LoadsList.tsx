@@ -1,6 +1,8 @@
 import './bookings-typography.css';
 import './table-heading-roles.css';
 import './bookings-section.css';
+import './ops-tiles.css';
+import { InfoTip } from '@/components/ui/InfoTip';
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, Plus } from 'lucide-react';
@@ -208,19 +210,23 @@ export default function LoadsList() {
     </div>
   );
 
-  // One quiet summary strip: only the numbers that tell you what to do next,
-  // each with its basis in plain words underneath.
-  const summary = (items: { label: string; value: React.ReactNode; note: string; attention?: boolean }[]) => (
-    <section className="bk-summary" aria-label="Summary">
+  // Summary tiles: only the numbers that tell you what to do next. Each is
+  // its own card (label, figure, one short line); method sits in an InfoTip.
+  const summary = (items: { label: string; value: React.ReactNode; title?: string; note: string; tip?: string; attention?: boolean }[]) => (
+    <section className="ops-tiles" aria-label="Summary">
       {items.map(m => (
-        <div key={m.label} className="bk-summary__cell">
-          <div className="bk-summary__label">{m.label}</div>
-          <div className={`bk-summary__value${m.attention ? ' is-attention' : ''}`}>{m.value}</div>
-          <div className="bk-summary__note">{m.note}</div>
+        <div key={m.label} className="ops-tile">
+          <h2 className="ops-tile__label">
+            {m.label}
+            {m.tip && <InfoTip>{m.tip}</InfoTip>}
+          </h2>
+          <div className={`ops-tile__value${m.attention ? ' is-attention' : ''}`} title={m.title}>{m.value}</div>
+          <div className="ops-tile__sub" title={m.note}>{m.note}</div>
         </div>
       ))}
     </section>
   );
+  const wholeRand = (n: number) => 'R ' + Math.round(n).toLocaleString('en-ZA');
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const pendingCount = activeLoads.filter(l => l.status === 'PENDING').length;
   const deliveredNotInvoiced = historyLoads.filter(l => l.status === 'DELIVERED').length;
@@ -287,24 +293,30 @@ export default function LoadsList() {
             {
               label: 'Waiting for a vehicle',
               value: pendingCount,
-              note: pendingCount > 0 ? 'Pending orders. Assign a vehicle to move them forward.' : 'Every active order has a vehicle.',
+              note: pendingCount > 0 ? 'Assign a vehicle' : 'All have a vehicle',
+              tip: 'Pending orders with no vehicle assigned yet.',
               attention: pendingCount > 0,
             },
             {
               label: 'On the road',
               value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length,
-              note: `In transit. ${plural(activeLoads.filter(l => l.status === 'LOADING').length, 'order', 'orders')} loading, ${activeLoads.filter(l => l.status === 'ASSIGNED').length} assigned.`,
+              note: `${activeLoads.filter(l => l.status === 'LOADING').length} loading, ${activeLoads.filter(l => l.status === 'ASSIGNED').length} assigned`,
+              tip: 'Orders with status In transit.',
             },
-            {
-              label: 'Value of active orders',
-              value: formatCurrency(activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)),
-              note: `Order totals across ${plural(activeLoads.length, 'active order', 'active orders')}.`,
-            },
+            (() => {
+              const total = activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0);
+              return {
+                label: 'Active order value',
+                value: wholeRand(total),
+                title: formatCurrency(total),
+                note: plural(activeLoads.length, 'active order', 'active orders'),
+                tip: 'Sum of order totals across active orders.',
+              };
+            })(),
           ]) : (
             <div className="bk-notice">
               <div>
                 <p className="bk-notice__text">No orders are in progress.</p>
-                <p className="bk-notice__sub">A quote becomes an order when you convert it to a booking.</p>
               </div>
               <button type="button" className="bk-btn bk-btn--secondary" onClick={() => navigate('/bookings/quotes')}>View quotes</button>
             </div>
@@ -338,19 +350,24 @@ export default function LoadsList() {
             {
               label: 'Delivered, not invoiced',
               value: deliveredNotInvoiced,
-              note: deliveredNotInvoiced > 0 ? 'Create the invoice so you can get paid.' : 'Every delivered load has been invoiced.',
+              note: deliveredNotInvoiced > 0 ? 'Invoice to get paid' : 'All invoiced',
               attention: deliveredNotInvoiced > 0,
             },
             {
               label: 'Invoiced',
               value: historyLoads.filter(l => l.status === 'INVOICED').length,
-              note: `${plural(historyLoads.filter(l => l.status === 'CANCELLED').length, 'load', 'loads')} cancelled.`,
+              note: `${plural(historyLoads.filter(l => l.status === 'CANCELLED').length, 'load', 'loads')} cancelled`,
             },
-            {
-              label: 'Revenue from completed loads',
-              value: formatCurrency(completedLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)),
-              note: `Order totals across ${plural(completedLoads.length, 'delivered or invoiced load', 'delivered or invoiced loads')}.`,
-            },
+            (() => {
+              const total = completedLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0);
+              return {
+                label: 'Completed revenue',
+                value: wholeRand(total),
+                title: formatCurrency(total),
+                note: plural(completedLoads.length, 'load', 'loads'),
+                tip: 'Sum of order totals across delivered and invoiced loads.',
+              };
+            })(),
           ])}
 
           <div className="bk-toolbar">

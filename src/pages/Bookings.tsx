@@ -1,5 +1,7 @@
 import "./bookings-typography.css";
 import "./bookings-section.css";
+import "./ops-tiles.css";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { useState, useRef } from "react";
 import { ArrowLeft, Upload, X } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -417,21 +419,24 @@ export default function Bookings() {
         const distance = parseFloat(load.distance || '0');
         const weight = parseFloat(load.weight || '0');
         return (
-          <section className="bk-summary" aria-label="Job figures">
-            <div className="bk-summary__cell">
-              <div className="bk-summary__label">Distance</div>
-              <div className="bk-summary__value">{distance > 0 ? `${Math.round(distance).toLocaleString('en-ZA')} km` : '—'}</div>
-              <div className="bk-summary__note">{distance > 0 ? 'Planned route distance.' : 'No route distance recorded.'}</div>
+          <section className="ops-tiles" aria-label="Job figures">
+            <div className="ops-tile">
+              <h2 className="ops-tile__label">Distance</h2>
+              <div className="ops-tile__value">{distance > 0 ? `${Math.round(distance).toLocaleString('en-ZA')} km` : '—'}</div>
+              <div className="ops-tile__sub">{distance > 0 ? 'Planned route' : 'Not recorded'}</div>
             </div>
-            <div className="bk-summary__cell">
-              <div className="bk-summary__label">Base rate per km</div>
-              <div className="bk-summary__value">{distance > 0 ? `R ${(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)).toFixed(2)}` : '—'}</div>
-              <div className="bk-summary__note">Base rate divided by distance, before surcharges.</div>
+            <div className="ops-tile">
+              <h2 className="ops-tile__label">
+                Base rate per km
+                <InfoTip>Base rate divided by distance, before surcharges.</InfoTip>
+              </h2>
+              <div className="ops-tile__value">{distance > 0 ? `R ${(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)).toFixed(2)}` : '—'}</div>
+              <div className="ops-tile__sub">Before surcharges</div>
             </div>
-            <div className="bk-summary__cell">
-              <div className="bk-summary__label">Cargo weight</div>
-              <div className="bk-summary__value">{weight > 0 ? `${Math.round(weight).toLocaleString('en-ZA')} kg` : '—'}</div>
-              <div className="bk-summary__note">{load.cargo_description || (weight > 0 ? 'As captured on the order.' : 'No weight recorded.')}</div>
+            <div className="ops-tile">
+              <h2 className="ops-tile__label">Cargo weight</h2>
+              <div className="ops-tile__value">{weight > 0 ? `${Math.round(weight).toLocaleString('en-ZA')} kg` : '—'}</div>
+              <div className="ops-tile__sub" title={load.cargo_description || undefined}>{load.cargo_description || (weight > 0 ? 'As on the order' : 'Not recorded')}</div>
             </div>
           </section>
         );

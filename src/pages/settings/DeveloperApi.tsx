@@ -6,6 +6,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { Loader } from '@/components/Loader';
 import { useAuth } from '@/lib/AuthContext';
 import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsInputStyle, settingsLabelStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from './settingsUi';
+import RowActions from '@/components/ui/RowActions';
 
 interface ApiKey {
   id: number;
@@ -37,7 +38,6 @@ const sectionHeader: React.CSSProperties = { ...settingsCardHeaderStyle, justify
 const sectionTitle = settingsCardTitleStyle;
 const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px' };
 
-const rowActionStyle = settingsSecondaryButtonStyle;
 
 /* Compact inline chips beside the key string — deliberate legacy-size
    exception (a 40px control inline with a mono key string breaks the row);
@@ -422,24 +422,15 @@ export function DeveloperApi() {
                       {k.webhook_url && <span style={{ ...mono, color: 'var(--text-tertiary)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>webhook: {k.webhook_url}</span>}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
-                    <button className="settings-control" onClick={() => toggleLogs(k)} style={{ ...rowActionStyle, cursor: 'pointer' }}>
-                      {logsOpen ? 'Hide logs' : 'Logs'}
-                    </button>
-                    <button
-                      onClick={() => openEdit(k)}
-                      disabled={isDemo}
-                      title={isDemo ? 'Fixed in demo mode' : undefined}
-                      className="settings-control"
-                      style={{ ...rowActionStyle, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
-                    >Edit</button>
-                    <button
-                      onClick={() => setRevokeTarget(k)}
-                      disabled={isDemo}
-                      title={isDemo ? 'Fixed in demo mode' : undefined}
-                      className="settings-control"
-                      style={{ ...rowActionStyle, border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
-                    >Revoke</button>
+                  <div style={{ display: 'flex', flexShrink: 0, alignItems: 'center' }}>
+                    <RowActions
+                      label={k.name}
+                      items={[
+                        { label: logsOpen ? 'Hide logs' : 'Logs', onSelect: () => toggleLogs(k) },
+                        { label: 'Edit', onSelect: () => openEdit(k), disabled: isDemo },
+                        { label: 'Revoke', danger: true, onSelect: () => setRevokeTarget(k), disabled: isDemo },
+                      ]}
+                    />
                   </div>
                 </div>
               </div>

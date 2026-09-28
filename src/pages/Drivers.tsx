@@ -15,6 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader } from '@/components/Loader';
 import SectionHeader, { FLEET_TABS } from '@/components/layout/SectionHeader';
 import { useAuth } from '@/lib/AuthContext';
+import RowActions from '@/components/ui/RowActions';
+import { InfoTip } from '@/components/ui/InfoTip';
+import './ops-tiles.css';
 
 interface Driver {
   id: number;
@@ -249,31 +252,35 @@ export default function Drivers() {
       />
       <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
 
-      {/* Driver summary: same strip geometry as Vehicles so switching tabs
-          never moves the page. Hidden when there are no drivers yet. */}
+      {/* Driver summary: separate tiles, same geometry as Vehicles so
+          switching tabs never moves the page. Hidden when there are no drivers. */}
       {(loading || drivers.length > 0) && (
-        <section className="card fleet-kpis" aria-label="Driver summary" aria-busy={loading}>
-          <div className="fleet-kpi">
-            <div className="fleet-kpi__label">Active drivers</div>
-            <div className="fleet-kpi__value">{loading ? '—' : activeCount}{!loading && <span className="fleet-kpi__of">of {overview?.total_drivers ?? drivers.length}</span>}</div>
-            <div className="fleet-kpi__note">{loading ? 'Loading' : availabilityNote ? `${availabilityNote}.` : 'Everyone is active.'}</div>
+        <section className="ops-tiles" aria-label="Driver summary" aria-busy={loading}>
+          <div className="ops-tile">
+            <h2 className="ops-tile__label">Active drivers</h2>
+            <div className="ops-tile__value">{loading ? '—' : activeCount}{!loading && <span className="ops-tile__of">of {overview?.total_drivers ?? drivers.length}</span>}</div>
+            <div className="ops-tile__sub">{loading ? 'Loading' : availabilityNote ? availabilityNote.replace(/^./, c => c.toUpperCase()) : 'Everyone is active'}</div>
           </div>
-          <div className="fleet-kpi">
-            <div className="fleet-kpi__label">Completed loads</div>
-            <div className="fleet-kpi__value">{loading ? '—' : completedLoads}</div>
-            <div className="fleet-kpi__note">{loading ? 'Loading' : 'Delivered or invoiced, all time.'}</div>
+          <div className="ops-tile">
+            <h2 className="ops-tile__label">
+              Completed loads
+              <InfoTip>Loads delivered or invoiced, all time.</InfoTip>
+            </h2>
+            <div className="ops-tile__value">{loading ? '—' : completedLoads}</div>
+            <div className="ops-tile__sub">{loading ? 'Loading' : 'All time'}</div>
           </div>
-          <div className="fleet-kpi">
-            <div className="fleet-kpi__label">{expired.length > 0 ? 'Expired licences' : 'Next licence renewal'}</div>
-            <div className={`fleet-kpi__value${expired.length > 0 ? ' is-attention' : ''}`}>
+          <div className="ops-tile">
+            <h2 className="ops-tile__label">{expired.length > 0 ? 'Expired licences' : 'Next licence renewal'}</h2>
+            <div className={`ops-tile__value${expired.length > 0 ? ' is-attention' : ''}`}>
               {loading ? '—' : expired.length > 0 ? expired.length : nextRenewal ? formatDay(nextRenewal.d.license_expiry) : '—'}
             </div>
-            <div className="fleet-kpi__note">
-              {loading ? 'Loading'
-                : expired.length > 0 ? `${expired.slice(0, 2).map(x => getDriverName(x.d)).join(', ')}${expired.length > 2 ? ` and ${expired.length - 2} more` : ''}. Renew before their next load.`
-                : nextRenewal ? `${getDriverName(nextRenewal.d)}, in ${Math.ceil((nextRenewal.t - now) / DAY_MS)} days.`
-                : 'No licence expiry dates recorded.'}
-            </div>
+            {(() => {
+              const sub = loading ? 'Loading'
+                : expired.length > 0 ? `${expired.slice(0, 2).map(x => getDriverName(x.d)).join(', ')}${expired.length > 2 ? ` and ${expired.length - 2} more` : ''}`
+                : nextRenewal ? `${getDriverName(nextRenewal.d)}, in ${Math.ceil((nextRenewal.t - now) / DAY_MS)} days`
+                : 'No expiry dates recorded';
+              return <div className="ops-tile__sub" title={sub}>{sub}</div>;
+            })()}
           </div>
         </section>
       )}
@@ -388,58 +395,56 @@ export default function Drivers() {
                     <td className="is-numeric">{efficiencyScore > 0 ? efficiencyScore : '—'}</td>
                   )}
                   <td className="fleet-table__actions">
-                    <div>
-                      <button
-                        className="fleet-row-action"
-                        aria-label={`Edit ${getDriverName(d)}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditDriver(d);
-                          const dUd: any = d.user_details || {};
-                          setEditForm({
-                            first_name: d.first_name || '',
-                            last_name: d.last_name || '',
-                            email: dUd.email || '',
-                            phone: dUd.phone || '',
-                            address: dUd.address || '',
-                            license_number: d.license_number || '',
-                            license_expiry: d.license_expiry || '',
-                            medical_card_expiry: d.medical_card_expiry || '',
-                            hire_date: d.hire_date || '',
-                            status: d.status || 'ACTIVE',
-                            license_state: d.license_state || 'GP',
-                            emergency_contact: d.emergency_contact || d.emergency_phone || '',
-                            vehicle: vehicles.find(v => v.driver_id === d.id)?.id?.toString() ?? '',
-                          });
-                        }}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                      >Edit</button>
-                      <button
-                        className="fleet-row-action fleet-row-action--danger"
-                        aria-label={`Delete ${getDriverName(d)}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmOpts({
-                            title: 'Delete driver',
-                            message: `Remove ${getDriverName(d)} from your team? This cannot be undone.`,
-                            confirmLabel: 'Delete',
-                            danger: true,
-                            onConfirm: async () => {
-                              try {
-                                await deleteData({ url: `api/v1/drivers/${d.id}/` });
-                                toast.success('Driver deleted');
-                                refetch();
-                              } catch (err: any) {
-                                toast.error(err?.message || 'Failed to delete driver');
-                              }
-                            },
-                          });
-                        }}
-                        disabled={isDemo}
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                      >Delete</button>
-                    </div>
+                    <RowActions
+                      label={getDriverName(d)}
+                      items={[
+                        {
+                          label: 'Edit',
+                          disabled: isDemo,
+                          onSelect: () => {
+                            setEditDriver(d);
+                            const dUd: any = d.user_details || {};
+                            setEditForm({
+                              first_name: d.first_name || '',
+                              last_name: d.last_name || '',
+                              email: dUd.email || '',
+                              phone: dUd.phone || '',
+                              address: dUd.address || '',
+                              license_number: d.license_number || '',
+                              license_expiry: d.license_expiry || '',
+                              medical_card_expiry: d.medical_card_expiry || '',
+                              hire_date: d.hire_date || '',
+                              status: d.status || 'ACTIVE',
+                              license_state: d.license_state || 'GP',
+                              emergency_contact: d.emergency_contact || d.emergency_phone || '',
+                              vehicle: vehicles.find(v => v.driver_id === d.id)?.id?.toString() ?? '',
+                            });
+                          },
+                        },
+                        {
+                          label: 'Delete',
+                          danger: true,
+                          disabled: isDemo,
+                          onSelect: () => {
+                            setConfirmOpts({
+                              title: 'Delete driver',
+                              message: `Remove ${getDriverName(d)} from your team? This cannot be undone.`,
+                              confirmLabel: 'Delete',
+                              danger: true,
+                              onConfirm: async () => {
+                                try {
+                                  await deleteData({ url: `api/v1/drivers/${d.id}/` });
+                                  toast.success('Driver deleted');
+                                  refetch();
+                                } catch (err: any) {
+                                  toast.error(err?.message || 'Failed to delete driver');
+                                }
+                              },
+                            });
+                          },
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               );

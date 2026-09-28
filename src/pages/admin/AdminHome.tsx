@@ -2,16 +2,15 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { Loader } from '@/components/Loader';
+import { InfoTip } from '@/components/ui/InfoTip';
+import '../ops-tiles.css';
 
-// Platform-wide KPI cards — the "calculations" landing page for the admin
-// section. Each card is clickable, jumping to the section it summarizes
-// (same clickable-metric idiom Overview.tsx uses for its own KPI row).
+// Platform-wide KPI tiles, the landing page for the admin section. Companies
+// and Users tiles are clickable, jumping to the section they summarise.
 
 const formatCurrency = (n: number) =>
   new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 0 }).format(n);
 
-// Brand primary-metric role: 28/36 semibold, tabular numerals.
-const metricStyle: React.CSSProperties = { fontFamily: 'var(--font-sans)', fontSize: 28, lineHeight: '36px', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' };
 
 export default function AdminHome() {
   const navigate = useNavigate();
@@ -23,43 +22,54 @@ export default function AdminHome() {
   if (isLoading) return <Loader size={28} />;
   if (!overview) return null;
 
+  const go = (to: string) => ({
+    role: 'link' as const,
+    tabIndex: 0,
+    onClick: () => navigate(to),
+    onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter') navigate(to); },
+  });
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-      <div className="card metric-card admin-control admin-tint-hover" role="link" tabIndex={0} style={{ cursor: 'pointer' }} onClick={() => navigate('/admin/companies')} onKeyDown={e => { if (e.key === 'Enter') navigate('/admin/companies'); }}>
-        <div className="card-header"><span className="card-title">Companies</span></div>
-        <div className="metric-value" style={metricStyle}>{overview.total_companies}</div>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
-          {overview.companies_by_status.active} active · {overview.companies_by_status.suspended} suspended · {overview.companies_by_status.cancelled} cancelled
-        </div>
-      </div>
-      <div className="card metric-card admin-control admin-tint-hover" role="link" tabIndex={0} style={{ cursor: 'pointer' }} onClick={() => navigate('/admin/users')} onKeyDown={e => { if (e.key === 'Enter') navigate('/admin/users'); }}>
-        <div className="card-header"><span className="card-title">Users</span></div>
-        <div className="metric-value" style={metricStyle}>{overview.total_users}</div>
-      </div>
-      <div className="card metric-card">
-        <div className="card-header"><span className="card-title">Quotes</span></div>
-        <div className="metric-value" style={metricStyle}>{overview.total_quotes}</div>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>{overview.quotes_this_month} this month</div>
-      </div>
-      <div className="card metric-card">
-        <div className="card-header"><span className="card-title">Orders</span></div>
-        <div className="metric-value" style={metricStyle}>{overview.total_loads}</div>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>{overview.loads_this_month} this month</div>
-      </div>
-      <div className="card metric-card" style={{ gridColumn: '1 / -1' }}>
-        <div className="card-header"><span className="card-title">Estimated MRR</span></div>
-        {/* Zero is a state to explain, not a headline number (design principles §1). */}
-        {Number(overview.mrr_estimate) > 0 ? (
-          <div className="metric-value" style={metricStyle}>{formatCurrency(overview.mrr_estimate)}</div>
-        ) : (
-          <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>
-            No recurring revenue yet.
+    <>
+      <section className="ops-tiles ops-tiles--4" aria-label="Platform totals">
+        <div className="ops-tile ops-tile--link admin-control" {...go('/admin/companies')}>
+          <h2 className="ops-tile__label">Companies</h2>
+          <div className="ops-tile__value">{overview.total_companies}</div>
+          <div className="ops-tile__sub" title={`${overview.companies_by_status.active} active, ${overview.companies_by_status.suspended} suspended, ${overview.companies_by_status.cancelled} cancelled`}>
+            {overview.companies_by_status.active} active, {overview.companies_by_status.suspended} suspended
           </div>
-        )}
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
-          Active + grace-period companies × flat monthly fee. This is an estimate, not reconciled against actual Paystack charges.
         </div>
-      </div>
-    </div>
+        <div className="ops-tile ops-tile--link admin-control" {...go('/admin/users')}>
+          <h2 className="ops-tile__label">Users</h2>
+          <div className="ops-tile__value">{overview.total_users}</div>
+          <div className="ops-tile__sub">All companies</div>
+        </div>
+        <div className="ops-tile">
+          <h2 className="ops-tile__label">Quotes</h2>
+          <div className="ops-tile__value">{overview.total_quotes}</div>
+          <div className="ops-tile__sub">{overview.quotes_this_month} this month</div>
+        </div>
+        <div className="ops-tile">
+          <h2 className="ops-tile__label">Orders</h2>
+          <div className="ops-tile__value">{overview.total_loads}</div>
+          <div className="ops-tile__sub">{overview.loads_this_month} this month</div>
+        </div>
+      </section>
+      <section className="ops-tiles ops-tiles--4" aria-label="Revenue">
+        <div className="ops-tile">
+          <h2 className="ops-tile__label">
+            Estimated MRR
+            <InfoTip>Active and grace-period companies times the flat monthly fee. An estimate, not reconciled against actual Paystack charges.</InfoTip>
+          </h2>
+          {/* Zero is a state to explain, not a headline number (design principles §1). */}
+          {Number(overview.mrr_estimate) > 0 ? (
+            <div className="ops-tile__value" title={formatCurrency(overview.mrr_estimate)}>{formatCurrency(overview.mrr_estimate)}</div>
+          ) : (
+            <div className="ops-tile__value" style={{ fontSize: 15, lineHeight: '22px', fontWeight: 500, letterSpacing: 'normal', whiteSpace: 'normal' }}>No recurring revenue yet</div>
+          )}
+          <div className="ops-tile__sub">Estimate, per month</div>
+        </div>
+      </section>
+    </>
   );
 }

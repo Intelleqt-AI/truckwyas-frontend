@@ -136,8 +136,15 @@
   font: 400 13px/20px var(--font-mono);
   color: var(--text-primary);
 }
-.fleet-page .fleet-table__actions { text-align: right; }
-.fleet-page .fleet-table__actions > div { display: flex; gap: 8px; justify-content: flex-end; }
+.fleet-page .fleet-table__actions { text-align: right; width: 1%; }
+/* One row action (RowActions). It stays pinned to the right edge so it is
+   reachable without scrolling the table sideways on narrower screens. */
+.fleet-page .fleet-table th:last-child:not([colspan]),
+.fleet-page .fleet-table td.fleet-table__actions {
+  position: sticky; right: 0; z-index: 1;
+  background: var(--bg-surface);
+}
+.fleet-page .fleet-table tbody tr.is-clickable:hover td.fleet-table__actions { background: var(--bg-surface-hover); }
 .fleet-page .fleet-table td.fleet-table__state-cell { padding: 0; }
 .fleet-page .fleet-table td.fleet-table__no-match {
   padding: 40px var(--fleet-card-inset);
@@ -240,33 +247,8 @@
 .fleet-page .card.card { border-radius: var(--radius-card, 12px); box-shadow: none; }
 .fleet-page .card.card:hover { border-color: var(--border-subtle); box-shadow: none; }
 
-/* Summary strip: one card, hairline-separated figures, each with its basis.
-   Vehicles and Drivers render the same strip so switching tabs never moves the page. */
-.fleet-page .card.fleet-kpis {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 24px;
-  padding: 0;
-  flex-direction: row;
-}
-.fleet-page .fleet-kpi { padding: 20px 24px; min-width: 0; }
-.fleet-page .fleet-kpi + .fleet-kpi { border-left: 1px solid var(--border-subtle); }
-.fleet-page .fleet-kpi__label { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
-.fleet-page .fleet-kpi__value {
-  margin-top: 4px;
-  font: 600 22px/28px var(--font-sans);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
-  overflow-wrap: anywhere;
-}
-.fleet-page .fleet-kpi__value.is-attention { color: var(--status-warning-text, var(--status-warning)); }
-.fleet-page .fleet-kpi__of { font: 400 14px/20px var(--font-sans); color: var(--text-secondary); margin-left: 4px; }
-.fleet-page .fleet-kpi__note { margin-top: 4px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
-@media (max-width: 720px) {
-  .fleet-page .card.fleet-kpis { grid-template-columns: minmax(0, 1fr); }
-  .fleet-page .fleet-kpi { padding: 16px; }
-  .fleet-page .fleet-kpi + .fleet-kpi { border-left: none; border-top: 1px solid var(--border-subtle); }
-}
+/* Summary figures now use separate tiles: see ops-tiles.css. */
+
 
 /* Rows: hover is a surface tint. */
 .fleet-page .fleet-table tbody tr.is-clickable { cursor: pointer; border-bottom: 1px solid var(--border-row); transition: background 0.15s ease; }

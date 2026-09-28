@@ -6,11 +6,15 @@ import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
 import { formatRelativeTime } from "@/lib/formatters";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/AuthContext";
+import RowActions from "@/components/ui/RowActions";
 import { SettingsToggleRow, settingsBadgeStyle, settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsDangerButtonStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
 
 const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle = settingsCardHeaderStyle;
 const sectionTitleStyle = settingsCardTitleStyle;
+const LIST_CAP = 8;
+const countStyle: React.CSSProperties = { fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' };
+const showAllRowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'center', padding: '8px 24px', borderTop: '1px solid var(--border-row)' };
 const labelStyle = settingsLabelStyle;
 const inputStyle = settingsInputStyle;
 
@@ -53,6 +57,9 @@ export function SecuritySettings() {
   const [activity, setActivity] = useState<any[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(true);
   const [bulkBusy, setBulkBusy] = useState(false);
+  // Presentation only: long lists show the first few rows with "Show all".
+  const [showAllSessions, setShowAllSessions] = useState(false);
+  const [showAllActivity, setShowAllActivity] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -132,6 +139,10 @@ export function SecuritySettings() {
   };
 
   const otherCount = sessions.filter(s => !s.current).length;
+  // This device first, then the rest in the order the API returns them.
+  const orderedSessions = [...sessions.filter(s => s.current), ...sessions.filter(s => !s.current)];
+  const visibleSessions = showAllSessions ? orderedSessions : orderedSessions.slice(0, LIST_CAP);
+  const visibleActivity = showAllActivity ? activity : activity.slice(0, LIST_CAP);
   const hasOthers = otherCount > 0;
 
   const handleBulkLogout = async () => {
@@ -272,6 +283,7 @@ export function SecuritySettings() {
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <h2 style={sectionTitleStyle}>Active sessions</h2>
+          {!loadingSessions && sessions.length > 0 && <span style={countStyle}>{sessions.length}</span>}
         </div>
         {loadingSessions ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading sessions…</div>
@@ -279,12 +291,12 @@ export function SecuritySettings() {
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No active sessions</div>
         ) : (
           <div>
-          {sessions.map((s, i) => (
-            <div key={i} style={{
+          {visibleSessions.map((s, i) => (
+            <div key={s.id ?? i} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '12px 24px', gap: 16, borderBottom: i < sessions.length - 1 ? '1px solid var(--border-row)' : 'none',
+              padding: '12px 24px', gap: 16, borderBottom: i < visibleSessions.length - 1 ? '1px solid var(--border-row)' : 'none',
             }}>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                   <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{s.device}</span>
                   {s.current && (
@@ -294,20 +306,25 @@ export function SecuritySettings() {
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{s.location} · {formatRelativeTime(s.time)}</div>
               </div>
               {!s.current && (
-                <button
-                  className="settings-control"
-                  onClick={() => handleRevokeSession(s.id)}
-                  disabled={revokingId === s.id || isDemo}
-                  title={isDemo ? 'Fixed in demo mode' : undefined}
-                  style={{
-                    ...dangerBtnStyle,
-                    cursor: isDemo ? 'not-allowed' : revokingId === s.id ? 'default' : 'pointer',
-                    opacity: (revokingId === s.id || isDemo) ? 0.5 : 1,
-                  }}
-                >{revokingId === s.id ? 'Revoking…' : 'Revoke'}</button>
+                <RowActions
+                  label={`${s.device || 'Session'} ${s.location || ''}`.trim()}
+                  items={[{
+                    label: revokingId === s.id ? 'Revoking…' : 'Revoke',
+                    danger: true,
+                    onSelect: () => handleRevokeSession(s.id),
+                    disabled: revokingId === s.id || isDemo,
+                  }]}
+                />
               )}
             </div>
           ))}
+          {orderedSessions.length > LIST_CAP && (
+            <div style={showAllRowStyle}>
+              <button type="button" className="settings-control tw-btn tw-btn--ghost" onClick={() => setShowAllSessions(v => !v)}>
+                {showAllSessions ? 'Show fewer' : `Show all ${orderedSessions.length}`}
+              </button>
+            </div>
+          )}
           <div style={{
             display: 'flex', justifyContent: 'flex-end',
             padding: '12px 24px', borderTop: '1px solid var(--border-row)',
@@ -332,6 +349,7 @@ export function SecuritySettings() {
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <h2 style={sectionTitleStyle}>Login activity</h2>
+          {!loadingActivity && activity.length > 0 && <span style={countStyle}>{activity.length}</span>}
         </div>
         {loadingActivity ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading activity…</div>
@@ -339,13 +357,13 @@ export function SecuritySettings() {
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No recent activity</div>
         ) : (
           <div>
-          {activity.map((a, i) => {
+          {visibleActivity.map((a, i) => {
             const meta = ACTIVITY_META[a.event]
               || (a.action === 'LOGIN' ? ACTIVITY_META.login : ACTIVITY_META.logout);
             return (
               <div key={a.id} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
-                padding: '12px 24px', borderBottom: i < activity.length - 1 ? '1px solid var(--border-row)' : 'none',
+                padding: '12px 24px', borderBottom: i < visibleActivity.length - 1 ? '1px solid var(--border-row)' : 'none',
               }}>
                 <span style={{
                   width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
@@ -360,6 +378,13 @@ export function SecuritySettings() {
               </div>
             );
           })}
+          {activity.length > LIST_CAP && (
+            <div style={showAllRowStyle}>
+              <button type="button" className="settings-control tw-btn tw-btn--ghost" onClick={() => setShowAllActivity(v => !v)}>
+                {showAllActivity ? 'Show fewer' : `Show all ${activity.length}`}
+              </button>
+            </div>
+          )}
           </div>
         )}
       </div>

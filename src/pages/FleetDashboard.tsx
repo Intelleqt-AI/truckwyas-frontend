@@ -1,5 +1,6 @@
 import './fleet-vehicles-brand.css';
 import './table-heading-roles.css';
+import './ops-tiles.css';
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -118,22 +119,22 @@ export default function FleetDashboard() {
     <div className="fleet-page">
       {header}
 
-      {/* Summary strip: what is working, what is free, what is off the road. */}
-      <section className="card fleet-kpis" aria-label="Fleet right now">
-        <div className="fleet-kpi">
-          <div className="fleet-kpi__label">On a job now</div>
-          <div className="fleet-kpi__value">{activeVehicles}<span className="fleet-kpi__of">of {vehicles.length}</span></div>
-          <div className="fleet-kpi__note">Vehicles with status In use.</div>
+      {/* Summary tiles: what is working, what is free, who is on. */}
+      <section className="ops-tiles" aria-label="Fleet right now">
+        <div className="ops-tile">
+          <h2 className="ops-tile__label">On a job now</h2>
+          <div className="ops-tile__value">{activeVehicles}<span className="ops-tile__of">of {vehicles.length}</span></div>
+          <div className="ops-tile__sub">Status In use</div>
         </div>
-        <div className="fleet-kpi">
-          <div className="fleet-kpi__label">Available</div>
-          <div className="fleet-kpi__value">{idleVehicles}</div>
-          <div className="fleet-kpi__note">{inMaintenance} in maintenance.</div>
+        <div className="ops-tile">
+          <h2 className="ops-tile__label">Available</h2>
+          <div className="ops-tile__value">{idleVehicles}</div>
+          <div className="ops-tile__sub">{inMaintenance} in maintenance</div>
         </div>
-        <div className="fleet-kpi">
-          <div className="fleet-kpi__label">Active drivers</div>
-          <div className="fleet-kpi__value">{activeDrivers}<span className="fleet-kpi__of">of {drivers.length}</span></div>
-          <div className="fleet-kpi__note">Drivers with status Active.</div>
+        <div className="ops-tile">
+          <h2 className="ops-tile__label">Active drivers</h2>
+          <div className="ops-tile__value">{activeDrivers}<span className="ops-tile__of">of {drivers.length}</span></div>
+          <div className="ops-tile__sub">Status Active</div>
         </div>
       </section>
 

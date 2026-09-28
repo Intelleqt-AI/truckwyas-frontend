@@ -5,6 +5,7 @@ import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import RowActions from '@/components/ui/RowActions';
 
 // Platform-wide cross-border pricing reference data — feeds the "Border
 // fees", "Weighbridge" and "Non-SA tolls" line items on every cross-tenant
@@ -25,12 +26,10 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
   padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
-const secondaryBtnStyle: React.CSSProperties = {
-  padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer',
-};
 // Cells holding 40px controls trim their vertical padding so the row stays 48px.
 const controlTdStyle: React.CSSProperties = { ...tdStyle, paddingTop: 4, paddingBottom: 4 };
+// The one row action (RowActions) stays pinned right, so wide tables never hide it.
+const actionTdStyle: React.CSSProperties = { ...controlTdStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' };
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500,
   fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', marginBottom: 6,
@@ -266,7 +265,7 @@ export default function CrossBorderRatesPanel() {
         {feesLoading ? <Loader size={24} /> : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={thStyle}>From</th><th style={thStyle}>To</th><th className="num" style={thStyle}>Fee</th><th style={thStyle}>Notes</th><th style={thStyle}>Status</th><th style={{ ...thStyle, textAlign: 'right' }}>Actions</th></tr></thead>
+              <thead><tr><th style={thStyle}>From</th><th style={thStyle}>To</th><th className="num" style={thStyle}>Fee</th><th style={thStyle}>Notes</th><th style={thStyle}>Status</th><th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>
                 {fees.map(f => (
                   <tr key={f.id} style={{ opacity: f.is_active ? 1 : 0.55 }}>
@@ -275,12 +274,15 @@ export default function CrossBorderRatesPanel() {
                     <td className="num" style={tdStyle}>{fmtRand(f.fee_zar)}</td>
                     <td style={{ ...tdStyle, fontSize: 13, color: 'var(--text-tertiary)', maxWidth: 320 }}>{f.notes || '—'}</td>
                     <td style={tdStyle}><span className={`status-badge ${f.is_active ? 'active' : 'delayed'}`}>{f.is_active ? 'Active' : 'Inactive'}</span></td>
-                    <td style={controlTdStyle}>
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                        <button className="admin-control" style={secondaryBtnStyle} disabled={feePending === f.id} onClick={() => openEditFee(f)}>Edit</button>
-                        <button className="admin-control" style={secondaryBtnStyle} disabled={feePending === f.id} onClick={() => toggleFeeActive(f)}>{f.is_active ? 'Deactivate' : 'Activate'}</button>
-                        <button className="admin-control" style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }} disabled={feePending === f.id} onClick={() => setDeleteFee(f)}>Delete</button>
-                      </div>
+                    <td style={actionTdStyle}>
+                      <RowActions
+                        label={`${f.from_country} to ${f.to_country}`}
+                        items={[
+                          { label: 'Edit', onSelect: () => openEditFee(f), disabled: feePending === f.id },
+                          { label: f.is_active ? 'Deactivate' : 'Activate', onSelect: () => toggleFeeActive(f), disabled: feePending === f.id },
+                          { label: 'Delete', danger: true, onSelect: () => setDeleteFee(f), disabled: feePending === f.id },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -317,7 +319,7 @@ export default function CrossBorderRatesPanel() {
         {ratesLoading ? <Loader size={24} /> : (
           <div style={{ overflowX: 'auto' }}>
             <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={thStyle}>Country</th><th className="num" style={thStyle}>Weighbridge</th><th className="num" style={thStyle}>Toll/km</th><th className="num" style={thStyle}>Border distance</th><th style={thStyle}>Status</th><th style={{ ...thStyle, textAlign: 'right' }}>Actions</th></tr></thead>
+              <thead><tr><th style={thStyle}>Country</th><th className="num" style={thStyle}>Weighbridge</th><th className="num" style={thStyle}>Toll/km</th><th className="num" style={thStyle}>Border distance</th><th style={thStyle}>Status</th><th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>
                 {rates.map(r => (
                   <tr key={r.id} style={{ opacity: r.is_active ? 1 : 0.55 }}>
@@ -326,12 +328,15 @@ export default function CrossBorderRatesPanel() {
                     <td className="num" style={tdStyle}>{fmtRand(r.toll_rate_per_km)}/km</td>
                     <td className="num" style={tdStyle}>{r.sa_border_distance_km}km</td>
                     <td style={tdStyle}><span className={`status-badge ${r.is_active ? 'active' : 'delayed'}`}>{r.is_active ? 'Active' : 'Inactive'}</span></td>
-                    <td style={controlTdStyle}>
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                        <button className="admin-control" style={secondaryBtnStyle} disabled={ratePending === r.id} onClick={() => openEditRate(r)}>Edit</button>
-                        <button className="admin-control" style={secondaryBtnStyle} disabled={ratePending === r.id} onClick={() => toggleRateActive(r)}>{r.is_active ? 'Deactivate' : 'Activate'}</button>
-                        <button className="admin-control" style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }} disabled={ratePending === r.id} onClick={() => setDeleteRate(r)}>Delete</button>
-                      </div>
+                    <td style={actionTdStyle}>
+                      <RowActions
+                        label={r.country_name}
+                        items={[
+                          { label: 'Edit', onSelect: () => openEditRate(r), disabled: ratePending === r.id },
+                          { label: r.is_active ? 'Deactivate' : 'Activate', onSelect: () => toggleRateActive(r), disabled: ratePending === r.id },
+                          { label: 'Delete', danger: true, onSelect: () => setDeleteRate(r), disabled: ratePending === r.id },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

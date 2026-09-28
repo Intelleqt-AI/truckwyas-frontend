@@ -7,6 +7,7 @@ import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import PaginationControls from '@/pages/admin/PaginationControls';
+import RowActions from '@/components/ui/RowActions';
 
 const PAGE_SIZE = 20;
 
@@ -131,7 +132,7 @@ const sectionTitleStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
   padding: '8px 12px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 400,
-  fontFamily: 'var(--font-sans)', minHeight: 40, width: 240,
+  fontFamily: 'var(--font-sans)', minHeight: 40, width: 240, maxWidth: '100%',
 };
 const selectStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
@@ -142,13 +143,10 @@ const thStyle: React.CSSProperties = { textAlign: 'left', padding: '12px 16px', 
 const tdStyle: React.CSSProperties = {
   padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
-const secondaryBtnStyle: React.CSSProperties = {
-  padding: '8px 12px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)',
-  minHeight: 40, cursor: 'pointer', whiteSpace: 'nowrap',
-};
 // Cells holding 40px controls trim their vertical padding so the row stays 48px.
 const controlTdStyle: React.CSSProperties = { ...tdStyle, paddingTop: 4, paddingBottom: 4 };
+// The one row action (RowActions) stays pinned right, so wide tables never hide it.
+const actionTdStyle: React.CSSProperties = { ...controlTdStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' };
 const linkButtonStyle: React.CSSProperties = {
   background: 'none', border: 'none', padding: 0, color: 'var(--accent-primary)', fontSize: 13, lineHeight: '20px',
   fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap',
@@ -217,7 +215,7 @@ export function CompaniesTable() {
     <div className="card" style={cardStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <h2 style={sectionTitleStyle}>Companies {data ? `(${data.count})` : ''}</h2>
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', minWidth: 0 }}>
           <select className="admin-control" aria-label="Filter by status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={selectStyle}>
             {STATUS_FILTER_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -239,7 +237,7 @@ export function CompaniesTable() {
                 <th className="num" style={thStyle}>Quotes</th>
                 <th className="num" style={thStyle}>Orders</th>
                 <th style={thStyle}>Created</th>
-                <th style={thStyle}>Actions</th>
+                <th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -276,46 +274,16 @@ export function CompaniesTable() {
                       <td className="num" style={tdStyle}>{c.quote_count}</td>
                       <td className="num" style={tdStyle}>{c.load_count}</td>
                       <td style={tdStyle}>{fmtDateTime(c.created_at)}</td>
-                      <td style={controlTdStyle}>
-                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                          <button type="button" className="admin-control" style={linkButtonStyle} onClick={() => setExpandedId(isExpanded ? null : c.id)}>
-                            {isExpanded ? 'Hide billing' : 'Billing history'}
-                          </button>
-                          {!c.is_deleted && (
-                            isDownState ? (
-                              <button
-                                type="button"
-                                className="btn-action admin-control"
-                                style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}
-                                disabled={actionMutation.isPending}
-                                onClick={() => runAction(c.id, 'reactivate')}
-                              >
-                                Reactivate
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="admin-control"
-                                style={secondaryBtnStyle}
-                                disabled={actionMutation.isPending}
-                                onClick={() => setConfirmAction({ company: c, action: 'suspend' })}
-                              >
-                                Suspend
-                              </button>
-                            )
-                          )}
-                          {!c.is_deleted && (
-                            <button
-                              type="button"
-                              className="admin-control"
-                              style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }}
-                              disabled={actionMutation.isPending}
-                              onClick={() => setConfirmAction({ company: c, action: 'delete' })}
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </div>
+                      <td style={actionTdStyle}>
+                        <RowActions
+                          label={c.company_name}
+                          items={[
+                            { label: isExpanded ? 'Hide billing' : 'Billing history', onSelect: () => setExpandedId(isExpanded ? null : c.id) },
+                            ...(!c.is_deleted && isDownState ? [{ label: 'Reactivate', onSelect: () => runAction(c.id, 'reactivate'), disabled: actionMutation.isPending }] : []),
+                            ...(!c.is_deleted && !isDownState ? [{ label: 'Suspend', danger: true, onSelect: () => setConfirmAction({ company: c, action: 'suspend' }), disabled: actionMutation.isPending }] : []),
+                            ...(!c.is_deleted ? [{ label: 'Delete', danger: true, onSelect: () => setConfirmAction({ company: c, action: 'delete' }), disabled: actionMutation.isPending }] : []),
+                          ]}
+                        />
                       </td>
                     </tr>
                     {isExpanded && <CompanyBillingPanel company={c} />}

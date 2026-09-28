@@ -47,9 +47,18 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, ca
   const ticks = niceTicks(lo < 0 ? lo * 1.08 : lo, (hi || 1) * 1.08, 4);
   const axisW = Math.max(...ticks.map((t) => randCompact(t).length)) * 7 + 8;
   const padT = 22;
-  const padB = 28;
+  const bandW = (W - axisW) / Math.max(1, steps.length);
+  // Narrow screens: break two-word labels onto two lines rather than let them collide.
+  const wrap = steps.some((s) => s.label.length * 6.8 > bandW - 6);
+  const lines = (label: string) => {
+    if (!wrap || !label.includes(' ')) return [label];
+    const mid = label.length / 2;
+    const cut = [...label.matchAll(/ /g)].map((m) => m.index!).sort((p, q) => Math.abs(p - mid) - Math.abs(q - mid))[0];
+    return [label.slice(0, cut), label.slice(cut + 1)];
+  };
+  const padB = wrap ? 42 : 28;
   const y = linear(ticks[0], ticks[ticks.length - 1], height - padB, padT);
-  const band = (W - axisW) / Math.max(1, steps.length);
+  const band = bandW;
   const bw = Math.min(24, band * 0.5);
   const cx = (i: number) => axisW + band * i + band / 2;
 
@@ -124,7 +133,9 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, ca
                   )}
                   {empty && <text x={x} y={y0 - 8} textAnchor="middle" className="viz-muted">None</text>}
                 </g>
-                <text x={x} y={height - 8} textAnchor="middle" className={s.kind === 'total' ? 'viz-strong' : undefined}>{s.label}</text>
+                <text x={x} y={height - (lines(s.label).length > 1 ? 22 : 8)} textAnchor="middle" className={s.kind === 'total' ? 'viz-strong' : undefined}>
+                  {lines(s.label).map((t, k) => <tspan key={k} x={x} dy={k === 0 ? 0 : 14}>{t}</tspan>)}
+                </text>
                 <rect className="viz-hit" x={x - band / 2} y={0} width={band} height={height} tabIndex={0}
                   aria-label={`${s.label}: ${empty && s.emptyText ? s.emptyText : rand(s.value)}`}
                   onPointerEnter={(e) => open(i, e.currentTarget)} onFocus={(e) => open(i, e.currentTarget)} onBlur={close} />

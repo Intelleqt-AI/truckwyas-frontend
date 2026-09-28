@@ -1,0 +1,83 @@
+/* Shared section header: identical geometry on every sibling route. */
+.section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 24px;
+  font-family: var(--font-sans);
+}
+.section-header__top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  /* Reserve the same height with or without a description or actions. */
+  min-height: 48px;
+}
+.section-header__titles { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.section-header__eyebrow {
+  font-size: 13px; line-height: 20px; font-weight: 500;
+  color: var(--text-secondary);
+}
+.section-header__title-row { display: flex; align-items: center; gap: 12px; min-height: 28px; }
+.section-header__title {
+  margin: 0;
+  font-size: 22px; line-height: 28px; font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: normal;
+}
+.section-header__description {
+  margin: 0;
+  font-size: 13px; line-height: 20px;
+  color: var(--text-secondary);
+  max-width: 72ch;
+}
+.section-header__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 40px; }
+.section-header__tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.section-header__tabs::-webkit-scrollbar { display: none; }
+.section-header__tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 2px;
+  font-size: 14px; line-height: 20px; font-weight: 400;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  /* Underline is drawn inside the box so the active tab never changes height. */
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.section-header__tab {
+  flex-direction: column;
+  justify-content: center;
+}
+/* Reserve the bold width so activating a tab never shifts its neighbours. */
+.section-header__tab::after {
+  content: attr(data-label);
+  height: 0;
+  visibility: hidden;
+  overflow: hidden;
+  font-weight: 500;
+  user-select: none;
+  pointer-events: none;
+}
+.section-header__tab:hover { color: var(--text-primary); }
+.section-header__tab.is-active {
+  color: var(--text-primary);
+  font-weight: 500;
+  border-bottom-color: var(--accent-primary);
+}
+.section-header__tab:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

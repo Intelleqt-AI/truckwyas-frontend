@@ -39,6 +39,46 @@ function statusColor(s: string): { bg: string; color: string } {
   return { bg: C.navyLight, color: C.navy };
 }
 
+interface PaymentDetails {
+  bank_name: string;
+  account_holder: string;
+  account_number: string;
+  branch_code: string;
+  account_type: string;
+  account_type_label: string;
+  payment_reference_hint: string;
+}
+
+/** The company's own bank details — only sent by the API when the company
+ *  has set them (Settings > Company > Banking details). */
+function HowToPay({ details, invoiceNumber }: { details: PaymentDetails; invoiceNumber: string }) {
+  const rows = [
+    { label: 'Bank', value: details.bank_name },
+    { label: 'Account holder', value: details.account_holder },
+    { label: 'Account number', value: details.account_number, mono: true },
+    { label: 'Branch code', value: details.branch_code, mono: true },
+    { label: 'Account type', value: details.account_type_label },
+    { label: 'Reference', value: invoiceNumber, mono: true },
+  ].filter(r => r.value);
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, auto) 1fr', rowGap: 6, columnGap: 16, fontSize: 13, marginBottom: 12 }}>
+        {rows.map(r => (
+          <div key={r.label} style={{ display: 'contents' }}>
+            <span style={{ color: C.muted }}>{r.label}</span>
+            <span style={{ color: C.text, fontWeight: 600, fontFamily: r.mono ? C.mono : undefined, wordBreak: 'break-all' }}>{r.value}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>
+        {details.payment_reference_hint || (
+          <>Please pay by EFT and use <strong style={{ color: C.text }}>{invoiceNumber}</strong> as your payment reference.</>
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function PublicInvoice() {
   const { id, token } = useParams<{ id: string; token: string }>();
 
@@ -234,12 +274,16 @@ export default function PublicInvoice() {
               {data.status !== 'PAID' && data.status !== 'CANCELLED' && (
                 <div style={{ background: '#f8fafc', border: `1px solid ${C.border}`, borderRadius: 8, padding: '20px 24px' }}>
                   <div style={{ fontSize: 11, fontFamily: C.mono, color: C.navy, letterSpacing: '0.1em', marginBottom: 12, fontWeight: 600 }}>
-                    PAYMENT INSTRUCTIONS
+                    {data.payment_details ? 'HOW TO PAY' : 'PAYMENT INSTRUCTIONS'}
                   </div>
-                  <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.8 }}>
-                    Please use EFT and include <strong style={{ color: C.text }}>{data.invoice_number}</strong> as your payment reference.<br />
-                    Contact <strong style={{ color: C.text }}>{data.company_name}</strong> for banking details.
-                  </div>
+                  {data.payment_details ? (
+                    <HowToPay details={data.payment_details} invoiceNumber={data.invoice_number} />
+                  ) : (
+                    <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.8 }}>
+                      Please use EFT and include <strong style={{ color: C.text }}>{data.invoice_number}</strong> as your payment reference.<br />
+                      Contact <strong style={{ color: C.text }}>{data.company_name}</strong> for banking details.
+                    </div>
+                  )}
                 </div>
               )}
 

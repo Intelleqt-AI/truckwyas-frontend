@@ -82,6 +82,8 @@ export function CompanySettings() {
     cross_border_crossings_per_year: '',
     fuel_zone: 'INLAND',
     fuel_price_per_litre: '', fuel_price_petrol: '', fuel_price_electric: '', fuel_price_hybrid: '',
+    bank_name: '', bank_account_holder: '', bank_account_number: '', bank_branch_code: '',
+    bank_account_type: '', payment_reference_hint: '',
   });
   const [logoUrl, setLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -170,6 +172,12 @@ export function CompanySettings() {
           fuel_price_petrol: d.fuel_price_petrol != null ? String(d.fuel_price_petrol) : '',
           fuel_price_electric: d.fuel_price_electric != null ? String(d.fuel_price_electric) : '',
           fuel_price_hybrid: d.fuel_price_hybrid != null ? String(d.fuel_price_hybrid) : '',
+          bank_name: d.bank_name || '',
+          bank_account_holder: d.bank_account_holder || '',
+          bank_account_number: d.bank_account_number || '',
+          bank_branch_code: d.bank_branch_code || '',
+          bank_account_type: d.bank_account_type || '',
+          payment_reference_hint: d.payment_reference_hint || '',
         });
         // Only show a real uploaded logo, not the backend's default placeholder
         if (d.logo_url && !d.logo_url.endsWith('/brand/logo.svg')) setLogoUrl(d.logo_url);
@@ -243,6 +251,22 @@ export function CompanySettings() {
       toast.error('Border crossings per year must be between 1 and 5000');
       return;
     }
+    // Banking details: spaces/hyphens are fine (the server strips them), but
+    // what's left must be digits. Blank clears the field.
+    const accountDigits = form.bank_account_number.replace(/[\s-]/g, '');
+    if (accountDigits && !/^\d{6,20}$/.test(accountDigits)) {
+      toast.error('Account number must be 6–20 digits');
+      return;
+    }
+    const branchDigits = form.bank_branch_code.replace(/[\s-]/g, '');
+    if (branchDigits && !/^\d{4,10}$/.test(branchDigits)) {
+      toast.error('Branch code must be 4–10 digits');
+      return;
+    }
+    if (!!form.bank_name.trim() !== !!accountDigits) {
+      toast.error('Enter both a bank name and an account number, or leave both blank');
+      return;
+    }
     setSaving(true);
     try {
       await patchData({ url: '/api/v1/company/profile/', data: {
@@ -267,6 +291,12 @@ export function CompanySettings() {
         fuel_price_petrol: form.fuel_price_petrol ? parseFloat(form.fuel_price_petrol) : null,
         fuel_price_electric: form.fuel_price_electric ? parseFloat(form.fuel_price_electric) : null,
         fuel_price_hybrid: form.fuel_price_hybrid ? parseFloat(form.fuel_price_hybrid) : null,
+        bank_name: form.bank_name.trim() || null,
+        bank_account_holder: form.bank_account_holder.trim() || null,
+        bank_account_number: accountDigits || null,
+        bank_branch_code: branchDigits || null,
+        bank_account_type: form.bank_account_type || null,
+        payment_reference_hint: form.payment_reference_hint.trim() || null,
       } });
       // The quote builder reads these defaults through the shared
       // ["company-profile"] query, which has a 5 minute staleTime — so without
@@ -441,6 +471,62 @@ export function CompanySettings() {
             <div>
               <label style={labelStyle}>Support email</label>
               <input className="settings-control" style={inputStyle} type="email" value={form.support_email} onChange={e => set('support_email', e.target.value)} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Banking details */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Banking details</h3></div>
+        <div style={{ padding: 20 }}>
+          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
+            Shown in a &ldquo;How to pay&rdquo; section on the invoices you send your customers
+            (PDF, invoice email and online invoice) once a bank name and account number are
+            filled in. Until then, invoices ask customers to contact you for banking details.
+          </div>
+          <div style={{ ...grid2, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>Bank name</label>
+              <input className="settings-control" style={inputStyle} value={form.bank_name} onChange={e => set('bank_name', e.target.value)} placeholder="e.g. FNB" maxLength={100} />
+            </div>
+            <div>
+              <label style={labelStyle}>Account holder</label>
+              <input className="settings-control" style={inputStyle} value={form.bank_account_holder} onChange={e => set('bank_account_holder', e.target.value)} placeholder={form.company_name || 'Registered account name'} maxLength={200} />
+              <div style={helpTextStyle}>Defaults to your company name if left blank.</div>
+            </div>
+          </div>
+          <div style={{ ...grid3, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>Account number</label>
+              <input className="settings-control" style={inputStyle} inputMode="numeric" autoComplete="off" value={form.bank_account_number} onChange={e => set('bank_account_number', e.target.value)} placeholder="Digits only" maxLength={30} />
+              <div style={helpTextStyle}>6–20 digits.</div>
+            </div>
+            <div>
+              <label style={labelStyle}>Branch code</label>
+              <input className="settings-control" style={inputStyle} inputMode="numeric" autoComplete="off" value={form.bank_branch_code} onChange={e => set('bank_branch_code', e.target.value)} placeholder="e.g. 250655" maxLength={14} />
+              <div style={helpTextStyle}>Universal branch code, 4–10 digits.</div>
+            </div>
+            <div>
+              <label style={labelStyle}>Account type</label>
+              <Select value={form.bank_account_type || 'none'} onValueChange={val => set('bank_account_type', val === 'none' ? '' : val)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not specified</SelectItem>
+                  <SelectItem value="CHEQUE">Cheque / current</SelectItem>
+                  <SelectItem value="SAVINGS">Savings</SelectItem>
+                  <SelectItem value="TRANSMISSION">Transmission</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Payment reference instructions (optional)</label>
+            <input className="settings-control" style={inputStyle} value={form.payment_reference_hint} onChange={e => set('payment_reference_hint', e.target.value)} placeholder="Please use the invoice number as your payment reference." maxLength={200} />
+            <div style={helpTextStyle}>
+              Replaces the default reference wording on your invoices.
             </div>
           </div>
         </div>

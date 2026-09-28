@@ -56,16 +56,6 @@ const groupLabelStyle: React.CSSProperties = {
   textTransform: 'none',
 };
 
-const navLinkBase: React.CSSProperties = {
-  display: 'block',
-  padding: '8px 20px',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 14,
-  lineHeight: '20px',
-  letterSpacing: 'normal',
-  textDecoration: 'none',
-};
-
 interface SettingsShellProps {
   /** Sidebar item to highlight (sub-pages pass their parent section). */
   activeId: string;
@@ -110,18 +100,8 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
                 <NavLink
                   key={item.id}
                   to={`/settings/${item.id}`}
-                  className="settings-control"
+                  className="settings-control settings-nav-link"
                   aria-current={active ? 'page' : undefined}
-                  style={{
-                    ...navLinkBase,
-                    fontWeight: active ? 500 : 400,
-                    /* accent-primary on the tinted active row measures 4.2:1
-                       in light — the info text role passes on that surface. */
-                    color: active ? 'var(--status-info-text, var(--accent-primary))' : 'var(--text-secondary)',
-                    background: active ? 'rgba(var(--accent-primary-rgb, 37,99,235), 0.08)' : 'transparent',
-                    borderLeft: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
-                    transition: 'color 0.15s, background 0.15s',
-                  }}
                 >
                   {item.label}
                 </NavLink>
@@ -138,12 +118,7 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
             </div>
             <NavLink
               to="/admin"
-              className="settings-control"
-              style={{
-                ...navLinkBase,
-                borderLeft: '2px solid transparent',
-                color: 'var(--status-warning-text, var(--status-warning))',
-              }}
+              className="settings-control settings-nav-link"
             >
               Admin dashboard
             </NavLink>

@@ -130,12 +130,12 @@ const sectionTitleStyle: React.CSSProperties = {
 };
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  padding: '8px 12px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 400,
   fontFamily: 'var(--font-sans)', minHeight: 40, width: 240,
 };
 const selectStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  padding: '8px 12px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 400,
   fontFamily: 'var(--font-sans)', minHeight: 40, cursor: 'pointer',
 };
 const thStyle: React.CSSProperties = { textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' };
@@ -144,16 +144,18 @@ const tdStyle: React.CSSProperties = {
 };
 const secondaryBtnStyle: React.CSSProperties = {
   padding: '8px 12px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)',
+  borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)',
   minHeight: 40, cursor: 'pointer', whiteSpace: 'nowrap',
 };
+// Cells holding 40px controls trim their vertical padding so the row stays 48px.
+const controlTdStyle: React.CSSProperties = { ...tdStyle, paddingTop: 4, paddingBottom: 4 };
 const linkButtonStyle: React.CSSProperties = {
   background: 'none', border: 'none', padding: 0, color: 'var(--accent-primary)', fontSize: 13, lineHeight: '20px',
   fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap',
 };
 const smallInputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  padding: '8px 12px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 400,
   fontFamily: 'var(--font-sans)', minHeight: 40,
 };
 const panelLabelStyle: React.CSSProperties = {
@@ -274,7 +276,7 @@ export function CompaniesTable() {
                       <td className="num" style={tdStyle}>{c.quote_count}</td>
                       <td className="num" style={tdStyle}>{c.load_count}</td>
                       <td style={tdStyle}>{fmtDateTime(c.created_at)}</td>
-                      <td style={tdStyle}>
+                      <td style={controlTdStyle}>
                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                           <button type="button" className="admin-control" style={linkButtonStyle} onClick={() => setExpandedId(isExpanded ? null : c.id)}>
                             {isExpanded ? 'Hide billing' : 'Billing history'}
@@ -284,7 +286,7 @@ export function CompaniesTable() {
                               <button
                                 type="button"
                                 className="btn-action admin-control"
-                                style={{ minHeight: 40, borderRadius: 6 }}
+                                style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}
                                 disabled={actionMutation.isPending}
                                 onClick={() => runAction(c.id, 'reactivate')}
                               >
@@ -395,7 +397,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
         data: { amount: Number(amount) || 0, ...(note.trim() ? { note: note.trim() } : {}) },
       }),
     onSuccess: (result: any) => {
-      toast.success(`Payment recorded — company is now ${result?.subscription_status || 'active'}`);
+      toast.success(`Payment recorded. The company is now ${result?.subscription_status || 'active'}`);
       setAmount('');
       setNote('');
       qc.invalidateQueries({ queryKey: ['admin-companies-full'] });
@@ -423,7 +425,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
   return (
     <tr>
       <td style={{ ...tdStyle, background: 'var(--bg-panel)' }} colSpan={COLUMN_COUNT}>
-        <div style={{ padding: '12px 4px', display: 'grid', gap: 20 }}>
+        <div style={{ padding: '12px 0', display: 'grid', gap: 24 }}>
           {/* The subscription fee and each load's delivery fee are two
               separate billing lanes — only a successful (or manually
               recorded) SUBSCRIPTION charge clears grace_period; marking a
@@ -433,11 +435,11 @@ function CompanyBillingPanel({ company }: { company: Company }) {
           {company.subscription_status === 'grace_period' && (
             <div style={{
               padding: 16, background: 'var(--status-warning-bg, rgba(245,158,11,0.1))',
-              border: '1px solid var(--status-warning)', borderRadius: 8, fontSize: 14, lineHeight: '20px',
+              border: '1px solid var(--status-warning)', borderRadius: 'var(--radius-nested)', fontSize: 14, lineHeight: '20px',
             }}>
               <strong style={{ color: 'var(--status-warning-text, var(--status-warning))' }}>In grace period</strong>
-              {company.grace_period_expires_at && <> — expires {fmtDate(company.grace_period_expires_at)}</>}.
-              This is caused by a failed <em>subscription</em> charge, not a delivery-fee charge — use{' '}
+              {company.grace_period_expires_at && <> until {fmtDate(company.grace_period_expires_at)}</>}.
+              This is caused by a failed <em>subscription</em> charge, not a delivery-fee charge. Use{' '}
               <strong>Record payment</strong> below to resolve it. Marking a delivery-fee row as paid in the
               billing history won't clear this, even if one happens to be failed too.
             </div>
@@ -457,7 +459,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                 <button
                   type="button"
                   className="btn-action admin-control"
-                  style={{ minHeight: 40, borderRadius: 6 }}
+                  style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}
                   disabled={!nextBillingDate || dateMutation.isPending}
                   onClick={() => dateMutation.mutate(nextBillingDate)}
                 >
@@ -501,7 +503,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                 <button
                   type="button"
                   className="btn-action admin-control"
-                  style={{ minHeight: 40, borderRadius: 6 }}
+                  style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}
                   disabled={amount === '' || paymentMutation.isPending}
                   onClick={() => paymentMutation.mutate()}
                 >
@@ -509,7 +511,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                 </button>
               </div>
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 6, maxWidth: 340 }}>
-                Reactivates the company immediately, even from suspended/cancelled — this is how a payment taken
+                Reactivates the company immediately, even from suspended or cancelled. This is how a payment taken
                 outside Paystack unlocks an account. Use amount 0 with a note to record a waiver.
               </div>
             </div>
@@ -550,7 +552,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                               type="button"
                               className="admin-control"
                               style={linkButtonStyle}
-                              title="Only fixes this one invoice's delivery fee — doesn't affect the subscription or clear a grace period"
+                              title="Only fixes this one invoice's delivery fee. It doesn't affect the subscription or clear a grace period"
                               disabled={markPaidMutation.isPending}
                               onClick={() => markPaidMutation.mutate(ch.raw_id)}
                             >

@@ -1,5 +1,4 @@
 import "./auth-brand.css";
-import { Truck } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchData, patchData, postData } from "@/lib/Api";
@@ -116,7 +115,7 @@ export function Onboarding() {
     minHeight: 40,
     background: 'var(--input-bg)',
     border: '1px solid var(--border-subtle)',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-control)',
     color: 'var(--text-primary)',
     fontSize: 14,
     lineHeight: '20px',
@@ -135,7 +134,8 @@ export function Onboarding() {
       alignItems: 'center',
       justifyContent: 'center',
       background: 'var(--bg-deep)',
-      padding: 20,
+      padding: 16,
+      boxSizing: 'border-box',
     }}>
       <div style={{
         width: '100%',
@@ -144,11 +144,12 @@ export function Onboarding() {
         maxWidth: step === 2 || step === 3 ? 820 : 520,
         background: 'var(--bg-surface)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--card-radius)',
-        padding: 40,
+        borderRadius: 'var(--radius-card)',
+        padding: 24,
+        boxSizing: 'border-box',
       }}>
         {/* Progress bar */}
-        <div style={{ marginBottom: 32 }}>
+        <div style={{ marginBottom: 24 }}>
           {/* A grid, not space-between: the step count stays centred whether or
               not Back is showing, instead of shifting as it appears. */}
           <div style={{
@@ -185,12 +186,12 @@ export function Onboarding() {
               </button>
             )}
           </div>
-          <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
+          <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 999 }}>
             <div style={{
               height: '100%',
               width: `${(step / 4) * 100}%`,
               background: 'var(--accent-primary)',
-              borderRadius: 6,
+              borderRadius: 999,
               transition: 'width 0.3s ease',
             }} />
           </div>
@@ -200,7 +201,7 @@ export function Onboarding() {
         {step === 1 && (
           <div>
             <div style={{ marginBottom: 24 }}>
-              <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
+              <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
                 Welcome to TruckWys
               </h1>
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
@@ -239,7 +240,7 @@ export function Onboarding() {
                     boxSizing: 'border-box',
                       background: 'var(--input-bg)',
                       border: '1px solid var(--border-subtle)',
-                      borderRadius: 6,
+                      borderRadius: 'var(--radius-control)',
                       color: 'var(--text-primary)',
                       fontSize: 14,
                     lineHeight: '20px',
@@ -298,7 +299,7 @@ export function Onboarding() {
                     boxSizing: 'border-box',
                       background: 'var(--input-bg)',
                       border: '1px solid var(--border-subtle)',
-                      borderRadius: 6,
+                      borderRadius: 'var(--radius-control)',
                       color: 'var(--text-primary)',
                       fontSize: 14,
                     lineHeight: '20px',
@@ -310,7 +311,7 @@ export function Onboarding() {
                   onClick={handleStep1Submit}
                   disabled={submitting}
                   className="btn-action"
-                  style={{ width: '100%' }}
+                  style={{ width: '100%', borderRadius: 'var(--radius-control)' }}
                 >
                   {submitting ? 'Saving…' : 'Continue'}
                 </button>
@@ -323,7 +324,7 @@ export function Onboarding() {
         {step === 2 && (
           <ImportStep
             title="Import your customers"
-            blurb="Already have them in a spreadsheet? Paste the list straight in — we work out which column is which. You can always add them later instead."
+            blurb="Already have them in a spreadsheet? Paste the list straight in and we work out which column is which. You can always add them later instead."
             entity="customers"
             imported={customersImported}
             onImported={setCustomersImported}
@@ -346,21 +347,20 @@ export function Onboarding() {
         {/* Step 4: You're all set */}
         {step === 4 && (
           <div style={{ textAlign: 'center' }}>
-            <Truck aria-hidden="true" size={48} strokeWidth={1.5} style={{ color: 'var(--accent-primary)', marginBottom: 16 }} />
             <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
               You're all set!
             </h1>
-            <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 32, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 24, lineHeight: '20px' }}>
               {customersImported > 0 || vehiclesImported > 0 ? (
                 <>
                   {[customersImported > 0 ? `${customersImported} customers` : null,
                     vehiclesImported > 0 ? `${vehiclesImported} vehicles` : null]
                     .filter(Boolean).join(' and ')} imported. Jump in and price your first
-                  load — you can add more any time from the app.
+                  load. You can add more any time from the app.
                 </>
               ) : (
                 <>
-                  Your business is ready. Jump in and create your first quote — you can
+                  Your business is ready. Jump in and create your first quote. You can
                   import your customers and fleet any time from the app.
                 </>
               )}
@@ -369,7 +369,7 @@ export function Onboarding() {
             <button
               onClick={handleComplete}
               className="btn-action"
-              style={{ width: '100%', marginBottom: 16 }}
+              style={{ width: '100%', marginBottom: 16, borderRadius: 'var(--radius-control)' }}
             >
               Go to dashboard
             </button>
@@ -377,10 +377,12 @@ export function Onboarding() {
             {/* Vehicles were just offered as their own step, so pointing back
                 at Fleet here asked again for something already answered. */}
             <a href="/bookings/quotes/new" style={{
-              padding: '10px',
+              padding: '10px 16px',
+              minHeight: 40,
+              boxSizing: 'border-box',
               background: 'var(--bg-deep)',
               border: '1px solid var(--border-subtle)',
-              borderRadius: 6,
+              borderRadius: 'var(--radius-control)',
               color: 'var(--text-secondary)',
               textDecoration: 'none',
               display: 'block',
@@ -420,11 +422,11 @@ function ImportStep({
 }) {
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
           {title}
         </h1>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: '20px' }}>
           {blurb}
         </div>
       </div>

@@ -23,21 +23,23 @@ const sectionTitleStyle: React.CSSProperties = {
 };
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  padding: '8px 12px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 400,
   fontFamily: 'var(--font-sans)', minHeight: 40, width: 240,
 };
 const selectStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  padding: '8px 12px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 400,
   fontFamily: 'var(--font-sans)', minHeight: 40, cursor: 'pointer',
 };
 const thStyle: React.CSSProperties = { textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
   padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
+// Cells holding 40px controls trim their vertical padding so the row stays 48px.
+const controlTdStyle: React.CSSProperties = { ...tdStyle, paddingTop: 4, paddingBottom: 4 };
 const secondaryBtnStyle: React.CSSProperties = {
   padding: '8px 12px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)',
+  borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)',
   minHeight: 40, cursor: 'pointer',
 };
 const fieldLabelStyle: React.CSSProperties = {
@@ -139,7 +141,7 @@ export default function UsersTable() {
           ...(newLastName.trim() ? { last_name: newLastName.trim() } : {}),
         },
       });
-      toast.success(`Account created — a setup email was sent to ${res?.email || email} so they can set a password and onboard their company.`);
+      toast.success(`Account created. A setup email was sent to ${res?.email || email} so they can set a password and onboard their company.`);
       resetCreateForm();
       setShowCreate(false);
       refresh();
@@ -220,7 +222,7 @@ export default function UsersTable() {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <button className="btn-action admin-control" style={{ minHeight: 40, borderRadius: 6 }} onClick={() => setShowCreate(s => !s)}>
+          <button className="btn-action admin-control" style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }} onClick={() => setShowCreate(s => !s)}>
             {showCreate ? 'Cancel' : 'New user'}
           </button>
         </div>
@@ -231,7 +233,7 @@ export default function UsersTable() {
           style={{
             display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap',
             padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))',
-            border: '1px solid var(--border-subtle)', borderRadius: 8,
+            border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)',
           }}
         >
           <label>
@@ -246,7 +248,7 @@ export default function UsersTable() {
             <span style={fieldLabelStyle}>Last name</span>
             <input className="admin-control" style={{ ...inputStyle, width: 160 }} placeholder="Optional" value={newLastName} onChange={e => setNewLastName(e.target.value)} />
           </label>
-          <button className="btn-action admin-control" style={{ minHeight: 40, borderRadius: 6 }} disabled={creating} onClick={handleCreate}>
+          <button className="btn-action admin-control" style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }} disabled={creating} onClick={handleCreate}>
             {creating ? 'Creating…' : 'Create'}
           </button>
           <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', flexBasis: '100%' }}>
@@ -282,7 +284,7 @@ export default function UsersTable() {
                     </td>
                     <td style={tdStyle}>{u.email}</td>
                     <td style={tdStyle}>{u.company_name || '—'}</td>
-                    <td style={tdStyle}>
+                    <td style={controlTdStyle}>
                       <select
                         className="admin-control"
                         style={{ ...selectStyle, padding: '8px 12px' }}
@@ -301,7 +303,7 @@ export default function UsersTable() {
                       <span className={`status-badge ${u.is_active ? 'active' : 'delayed'}`}>{u.is_active ? 'Active' : 'Inactive'}</span>
                     </td>
                     <td style={tdStyle}>{fmt(u.last_login)}</td>
-                    <td style={tdStyle}>
+                    <td style={controlTdStyle}>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button
                           className="admin-control"
@@ -373,7 +375,7 @@ export default function UsersTable() {
       {lockTarget && (
         <ConfirmModal
           title="Lock account"
-          message={`This deactivates ${lockTarget.name || lockTarget.email}'s account — they won't be able to log in until unlocked. This doesn't delete any of their data.`}
+          message={`This deactivates ${lockTarget.name || lockTarget.email}'s account. They won't be able to log in until unlocked. This doesn't delete any of their data.`}
           confirmLabel="Lock account"
           danger
           onConfirm={() => runAction(lockTarget, 'lock')}
@@ -384,7 +386,7 @@ export default function UsersTable() {
       {deleteTarget && (
         <ConfirmModal
           title="Delete user"
-          message={`Delete ${deleteTarget.name || deleteTarget.email}? Their account is deactivated and their email is freed up so it can be used to sign up again — this doesn't remove their existing loads, quotes or invoices, and can't be undone from here.`}
+          message={`Delete ${deleteTarget.name || deleteTarget.email}? Their account is deactivated and their email is freed up so it can be used to sign up again. This doesn't remove their existing loads, quotes or invoices, and can't be undone from here.`}
           confirmLabel="Delete"
           danger
           onConfirm={() => runAction(deleteTarget, 'delete')}

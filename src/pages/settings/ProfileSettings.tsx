@@ -2,7 +2,7 @@ import "./profile-form.css";
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData } from "@/lib/Api";
 import { useAuth } from "@/lib/AuthContext";
-import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsCardBodyStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle } from './settingsUi';
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsCardBodyStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from './settingsUi';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const sectionStyle = settingsCardStyle;
@@ -89,14 +89,7 @@ export function ProfileSettings() {
 
   return (
     <div className="tw-profile-settings" style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
-          Profile settings
-        </h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-          Manage your personal information and account preferences
-        </div>
-      </div>
+      <SettingsPageHeader title="Profile settings" description="Manage your personal information and account preferences" />
 
       {/* Profile picture */}
       <div style={sectionStyle}>
@@ -134,11 +127,8 @@ export function ProfileSettings() {
               type="button"
               className="settings-control"
               style={{
-                background: 'none', border: '1px solid var(--border-subtle)',
-                color: 'var(--text-secondary)', padding: '8px 12px',
-                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 6, minHeight: 40,
+                ...settingsSecondaryButtonStyle,
                 cursor: (uploadingAvatar || isDemo) ? 'not-allowed' : 'pointer',
-                letterSpacing: 'normal',
                 opacity: (uploadingAvatar || isDemo) ? 0.6 : 1,
               }}
               onClick={() => fileInputRef.current?.click()}

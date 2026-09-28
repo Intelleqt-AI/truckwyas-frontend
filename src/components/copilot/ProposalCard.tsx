@@ -76,7 +76,7 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
       {!!proposal.warning && (
         <div style={{
           marginBottom: "var(--cpp-space, 10px)", padding: "var(--cpp-callout-inset, 7px 10px)", fontSize: "var(--cpp-body-size, 12px)", lineHeight: "var(--cpp-line, 1.5)",
-          color: "var(--status-warning-text, var(--status-warning))", borderRadius: 4,
+          color: "var(--status-warning-text, var(--status-warning))", borderRadius: 6,
           background: 'color-mix(in srgb, var(--status-warning) 12%, transparent)',
           border: '1px solid color-mix(in srgb, var(--status-warning) 35%, transparent)',
         }}>{proposal.warning}</div>
@@ -86,7 +86,7 @@ export default function ProposalCard({ proposal, onConfirm, onDismiss, busy }: P
       {!!proposal.analysis_summary && (
         <div style={{
           marginBottom: "var(--cpp-space, 10px)", padding: "var(--cpp-callout-inset, 8px 10px)", fontSize: "var(--cpp-body-size, 12px)", lineHeight: "var(--cpp-line, 1.5)",
-          color: 'var(--text-secondary)', borderRadius: 4, background: 'var(--bg-inset, var(--bg-base))',
+          color: 'var(--text-secondary)', borderRadius: 6, background: 'var(--bg-inset, var(--bg-base))',
           border: '1px solid var(--border-subtle)',
         }}>
           <div style={{

@@ -18,7 +18,20 @@ function getUtilColor(value: number) {
   return 'var(--heat-max)';
 }
 
-// Deterministic fake heatmap seeded from vehicle/load data
+// Pickup counts by weekday and hour, from the loads' own pickup dates.
+function countPickups(loads: any[]) {
+  const grid: number[][] = DAYS.map(() => HOURS.map(() => 0));
+  for (const load of loads) {
+    if (!load.pickup_date) continue;
+    const d = new Date(load.pickup_date);
+    const dayIdx = d.getDay() === 0 ? 6 : d.getDay() - 1; // Mon=0
+    const hour = d.getHours();
+    grid[dayIdx][Math.min(hour, 23)]++;
+  }
+  return grid;
+}
+
+// Same counts normalised to 0-100 of the busiest slot, for the colour scale.
 function generateHeatmap(loads: any[], vehicleCount: number) {
   const grid: number[][] = DAYS.map(() => HOURS.map(() => 0));
   if (vehicleCount === 0) return grid;
@@ -32,7 +45,7 @@ function generateHeatmap(loads: any[], vehicleCount: number) {
     if (!load.pickup_date) continue;
     const d = new Date(load.pickup_date);
     const dayIdx = d.getDay() === 0 ? 6 : d.getDay() - 1; // Mon=0
-    const hour = d.getHours() || 8;
+    const hour = d.getHours();
     grid[dayIdx][Math.min(hour, 23)]++;
   }
 
@@ -41,23 +54,22 @@ function generateHeatmap(loads: any[], vehicleCount: number) {
   return grid.map(row => row.map(v => Math.round((v / maxVal) * 100)));
 }
 
-const RouteBar = ({ route, count, revenue }: any) => {
-  const maxCount = 10;
-  return (
-    <div className="fleet-route">
-      <div className="fleet-route__row">
-        <span className="fleet-route__name">{route}</span>
-        <div className="fleet-route__figures">
-          <span>{count} trips</span>
-          <span className="fleet-route__money">{formatCurrency(revenue)}</span>
-        </div>
-      </div>
-      <div className="fleet-route__track" aria-hidden="true">
-        <div className="fleet-route__fill" style={{ width: `${Math.min(100, (count / maxCount) * 100)}%` }} />
+// Ranked row: the bar encodes the load count the list is sorted by, scaled
+// to the busiest route; the share of all loads sits next to the count.
+const RouteBar = ({ route, count, revenue, maxCount, total }: any) => (
+  <div className="fleet-route">
+    <div className="fleet-route__row">
+      <span className="fleet-route__name">{route}</span>
+      <div className="fleet-route__figures">
+        <span>{count} {count === 1 ? 'load' : 'loads'}, {total ? Math.round((count / total) * 100) : 0}%</span>
+        <span className="fleet-route__money">{formatCurrency(revenue)}</span>
       </div>
     </div>
-  );
-};
+    <div className="fleet-route__track" aria-hidden="true">
+      <div className="fleet-route__fill" style={{ width: `${Math.min(100, (count / Math.max(maxCount, 1)) * 100)}%` }} />
+    </div>
+  </div>
+);
 
 export default function FleetHeatmap() {
   const navigate = useNavigate();
@@ -76,6 +88,11 @@ export default function FleetHeatmap() {
   const vehicles = Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData?.results || []);
 
   const heatmap = generateHeatmap(loads, vehicles.length);
+  const pickupCounts = countPickups(loads);
+  const loadsOnServer: number = Array.isArray(loadsData) ? loads.length : (loadsData?.count ?? loads.length);
+  const sampleNote = loadsOnServer > loads.length
+    ? `Based on the latest ${loads.length} of ${loadsOnServer} loads.`
+    : `Based on ${loads.length} ${loads.length === 1 ? 'load' : 'loads'}.`;
 
   // Route frequency analysis
   const routeMap: Record<string, { count: number; revenue: number }> = {};
@@ -88,22 +105,13 @@ export default function FleetHeatmap() {
   const topRoutes = Object.entries(routeMap)
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 8);
+  const maxRouteCount = topRoutes[0]?.[1].count ?? 0;
 
   // Status breakdown
   const statusMap: Record<string, number> = {};
   for (const v of vehicles) {
     statusMap[v.status] = (statusMap[v.status] || 0) + 1;
   }
-
-  // Dots are decorative swatches; the adjacent text label carries the meaning.
-  const STATUS_COLOR: Record<string, string> = {
-    AVAILABLE: 'var(--status-success)',
-    IN_USE: 'var(--accent-primary)',
-    MAINTENANCE: 'var(--status-warning)',
-    OUT_OF_SERVICE: 'var(--status-danger)',
-  };
-  const formatStatus = (st: string) =>
-    st ? st.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
 
   const utilRate = vehicles.length > 0
     ? Math.round((statusMap['IN_USE'] || 0) / vehicles.length * 100)
@@ -113,8 +121,8 @@ export default function FleetHeatmap() {
     <div className="fleet-page">
       <SectionHeader
         eyebrow="Fleet"
-        title="Utilisation heatmap"
-        description="Load activity by day and hour, and your busiest routes."
+        title="Activity heatmap"
+        description="When your loads are picked up, and the routes you run most."
         actions={
           <button data-fleet-control className="fleet-secondary-button" onClick={() => navigate('/fleet/vehicles')}>
             Back to fleet
@@ -122,38 +130,22 @@ export default function FleetHeatmap() {
         }
       />
 
-      {/* KPI strip — same summary grid as the Fleet list pages */}
-      <div className="fleet-summary fleet-summary--4">
-        {[
-          { label: 'Fleet size', value: vehicles.length, sub: 'Total vehicles', color: 'var(--text-primary)' },
-          { label: 'In use now', value: statusMap['IN_USE'] || 0, sub: `${utilRate}% utilisation`, color: 'var(--accent-primary)' },
-          { label: 'Available', value: statusMap['AVAILABLE'] || 0, sub: 'Ready to deploy', color: 'var(--status-success-text, var(--status-success))' },
-          { label: 'In maintenance', value: statusMap['MAINTENANCE'] || 0, sub: 'Off the road', color: 'var(--status-warning-text, var(--status-warning))' },
-        ].map(k => (
-          <div key={k.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{k.label}</span></div>
-            <div className="metric-value" style={{ color: k.color }}>{k.value}</div>
-            <div className="fleet-metric-sub">{k.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Utilisation gauge */}
-      <section className="card fleet-panel" style={{ marginBottom: 24 }}>
-        <h2 className="fleet-panel__title">Fleet utilisation rate</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ flex: 1, height: 12, background: 'var(--border-subtle)', borderRadius: 6 }} aria-hidden="true">
-            <div style={{ height: 12, width: `${utilRate}%`, background: utilRate >= 70 ? 'var(--status-success)' : utilRate >= 40 ? 'var(--accent-primary)' : 'var(--status-warning)', borderRadius: 6, transition: 'width 0.6s ease' }} />
-          </div>
-          <span className="fleet-panel__figure" style={{ color: utilRate >= 70 ? 'var(--status-success-text, var(--status-success))' : 'var(--accent-primary)' }}>{utilRate}%</span>
+      {/* Summary strip: how much of the fleet is working right now. */}
+      <section className="card fleet-kpis" aria-label="Fleet right now">
+        <div className="fleet-kpi">
+          <div className="fleet-kpi__label">On a job now</div>
+          <div className="fleet-kpi__value">{statusMap['IN_USE'] || 0}<span className="fleet-kpi__of">of {vehicles.length}</span></div>
+          <div className="fleet-kpi__note">{utilRate}% of the fleet has status In use.</div>
         </div>
-        <div style={{ display: 'flex', gap: 20, marginTop: 12, flexWrap: 'wrap' }}>
-          {Object.entries(statusMap).map(([st, count]) => (
-            <div key={st} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLOR[st] || 'var(--text-tertiary)' }} aria-hidden="true" />
-              <span className="fleet-muted">{formatStatus(st)} ({count})</span>
-            </div>
-          ))}
+        <div className="fleet-kpi">
+          <div className="fleet-kpi__label">Available</div>
+          <div className="fleet-kpi__value">{statusMap['AVAILABLE'] || 0}</div>
+          <div className="fleet-kpi__note">Ready to take a load.</div>
+        </div>
+        <div className="fleet-kpi">
+          <div className="fleet-kpi__label">In maintenance</div>
+          <div className="fleet-kpi__value">{statusMap['MAINTENANCE'] || 0}</div>
+          <div className="fleet-kpi__note">Off the road until marked available.</div>
         </div>
       </section>
 
@@ -161,7 +153,10 @@ export default function FleetHeatmap() {
         {/* Heatmap */}
         <section className="card fleet-panel">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
-            <h2 className="fleet-panel__title" style={{ margin: 0 }}>Load activity by day and hour</h2>
+            <div>
+              <h2 className="fleet-panel__title" style={{ margin: 0 }}>When are loads picked up?</h2>
+              <p className="fleet-muted" style={{ margin: '4px 0 0' }}>Pickups by weekday and hour, shaded against the busiest slot. {sampleNote}</p>
+            </div>
             <div className="fleet-muted" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               <span>Low</span>
               {[0, 25, 50, 75, 100].map(v => <div key={v} style={{ width: 12, height: 12, background: getUtilColor(v), borderRadius: 2, border: '1px solid var(--border-subtle)' }} aria-hidden="true" />)}
@@ -185,10 +180,7 @@ export default function FleetHeatmap() {
                 <div key={day} className="fleet-heatmap__row">
                   <div className="fleet-heatmap__day">{day}</div>
                   {heatmap[di].map((val, hi) => (
-                    <div key={hi} title={`${day} ${hi}:00 — ${val}%`} style={{ aspectRatio: '1', background: getUtilColor(val), borderRadius: 2, cursor: 'default', transition: 'transform 0.1s', minHeight: 0 }}
-                      onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.2)')}
-                      onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
-                    />
+                    <div key={hi} title={`${day} ${String(hi).padStart(2, '0')}:00, ${pickupCounts[di][hi]} ${pickupCounts[di][hi] === 1 ? 'pickup' : 'pickups'}`} aria-label={`${day} ${hi}:00, ${pickupCounts[di][hi]} pickups`} style={{ aspectRatio: '1', background: getUtilColor(val), borderRadius: 2, minHeight: 0 }} />
                   ))}
                 </div>
               ))}
@@ -198,11 +190,12 @@ export default function FleetHeatmap() {
 
         {/* Top routes */}
         <section className="card fleet-panel">
-          <h2 className="fleet-panel__title">Top routes by volume</h2>
+          <h2 className="fleet-panel__title" style={{ marginBottom: 4 }}>Which routes do you run most?</h2>
+          <p className="fleet-muted" style={{ margin: '0 0 16px' }}>Top {Math.min(8, topRoutes.length)} by number of loads, with order totals. {sampleNote}</p>
           {topRoutes.length === 0 ? (
-            <div className="fleet-muted" style={{ textAlign: 'center', padding: '20px 0' }}>No route data yet</div>
+            <div className="fleet-muted" style={{ textAlign: 'center', padding: '20px 0' }}>No loads yet, so there are no routes to rank.</div>
           ) : topRoutes.map(([route, data]) => (
-            <RouteBar key={route} route={route} count={data.count} revenue={data.revenue} />
+            <RouteBar key={route} route={route} count={data.count} revenue={data.revenue} maxCount={maxRouteCount} total={loads.length} />
           ))}
         </section>
       </div>

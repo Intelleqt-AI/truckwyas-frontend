@@ -69,7 +69,7 @@ export default function JobHealthPanel() {
                 <tr key={row.task_name}>
                   <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)' }}>{row.task_name}</td>
                   <td style={tdStyle}><StatusPill row={row} /></td>
-                  <td style={{ ...tdStyle, color: row.last_started_at ? 'var(--text-primary)' : 'var(--status-warning)' }}>
+                  <td style={{ ...tdStyle, color: row.last_started_at ? 'var(--text-primary)' : 'var(--status-warning-text, var(--status-warning))' }}>
                     {fmt(row.last_started_at)}
                   </td>
                   <td style={tdStyle}>{fmt(row.last_finished_at)}</td>

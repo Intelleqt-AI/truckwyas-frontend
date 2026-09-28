@@ -17,7 +17,7 @@ export const secondaryButtonStyle: React.CSSProperties = {
   border: '1px solid var(--border-subtle)',
   color: 'var(--text-secondary)',
   padding: '8px 14px',
-  borderRadius: 6,
+  borderRadius: 'var(--radius-control)',
   minHeight: 40,
   cursor: 'pointer',
 };
@@ -64,7 +64,7 @@ export function BulkDeleteBar({ entity, selected, onClear, onDeleted }: Props) {
       if (blocked.length > 0) {
         // Name them: "3 couldn't be deleted" with no reason is the kind of
         // message that sends someone to support.
-        const shown = blocked.slice(0, 3).map(b => `${b.name} — ${b.reason}`).join('; ');
+        const shown = blocked.slice(0, 3).map(b => `${b.name} (${b.reason})`).join('; ');
         const more = blocked.length > 3 ? ` and ${blocked.length - 3} more` : '';
         toast.error(`Kept ${blocked.length}: ${shown}${more}`);
       }
@@ -80,7 +80,7 @@ export function BulkDeleteBar({ entity, selected, onClear, onDeleted }: Props) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-      padding: '8px 16px', marginBottom: 16, borderRadius: 8,
+      padding: '8px 16px', marginBottom: 16, borderRadius: 'var(--radius-card)',
       background: 'var(--bg-surface-hover)', border: '1px solid var(--border-subtle)',
     }}>
       <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>

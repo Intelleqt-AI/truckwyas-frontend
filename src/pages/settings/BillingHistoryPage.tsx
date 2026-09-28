@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { SettingsShell } from "./SettingsShell";
-import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle } from "./settingsUi";
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
 
 const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle: React.CSSProperties = { ...settingsCardHeaderStyle, justifyContent: 'space-between' };
@@ -138,23 +138,17 @@ export default function BillingHistoryPage() {
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
       {/* Title block sits at the same y as every other settings section; the
           way back lives beside it instead of pushing the h1 down. */}
-      <div style={{ marginBottom: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div style={{ minWidth: 0 }}>
-          <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Billing history</h1>
-          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-            Every charge to your card on file — the monthly plan and the per-delivery platform fee
-          </div>
-        </div>
-        <button type="button" className="settings-control" onClick={() => navigate('/settings/billing')} style={{
-          background: 'transparent', border: '1px solid var(--border-subtle)', borderRadius: 6, color: 'var(--text-secondary)',
-          fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, cursor: 'pointer',
-          padding: '8px 12px', minHeight: 40, flexShrink: 0,
-        }}>
-          Back to billing
-        </button>
-      </div>
+      <SettingsPageHeader
+        title="Billing history"
+        description="Every charge to your card on file: the monthly plan and the per-delivery platform fee"
+        actions={
+          <button type="button" className="settings-control" onClick={() => navigate('/settings/billing')} style={{ ...settingsSecondaryButtonStyle, flexShrink: 0 }}>
+            Back to billing
+          </button>
+        }
+      />
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         {PERIODS.map(p => (
           <button
             key={p}
@@ -166,7 +160,7 @@ export default function BillingHistoryPage() {
               border: '1px solid var(--border-subtle)',
               color: period === p ? 'var(--btn-action-color, var(--bg-deep))' : 'var(--text-secondary)',
               padding: '8px 12px',
-              borderRadius: 6,
+              borderRadius: 'var(--radius-control)',
               minHeight: 40,
               fontSize: 14,
               lineHeight: '20px',
@@ -183,8 +177,8 @@ export default function BillingHistoryPage() {
 
       {loading ? (
         <div style={sectionStyle}>
-          <div style={{ padding: 20 }}>
-            <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 4, width: '40%' }} />
+          <div style={{ padding: 24 }}>
+            <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', width: '40%' }} />
           </div>
         </div>
       ) : (

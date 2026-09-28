@@ -21,3 +21,14 @@ table.admin-table :is(th, td):first-child { padding-left: 0 !important; }
 table.admin-table :is(th, td):last-child { padding-right: 0 !important; }
 table.admin-table th { white-space: nowrap; }
 table.admin-table .num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Sidebar nav: subtle filled item, tint on hover (active item keeps its own fill). */
+.admin-nav-link:hover:not([aria-current="page"]) {
+  background: var(--surface-tint-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Generic hover tint for rows, icon buttons and interactive cards. */
+.admin-tint-hover:hover:not(:disabled) {
+  background: var(--surface-tint-hover) !important;
+}

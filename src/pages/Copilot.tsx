@@ -1,6 +1,8 @@
 import './copilot-desktop-presentation.css';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { X, TriangleAlert, Check } from 'lucide-react';
+import { X, TriangleAlert, Check, Bot } from 'lucide-react';
+import SectionHeader from '@/components/layout/SectionHeader';
+import { CAPITAL_LAUNCHED } from '@/lib/features';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { postData, fetchData, deleteData } from '@/lib/Api';
 import { useAuth } from '@/lib/AuthContext';
@@ -42,24 +44,27 @@ function looksLikeMarkdown(s: string): boolean {
 
 const STARTERS: { title: string; prompt: string; hint: string }[] = [
   { title: "What's overdue?", prompt: "What's overdue?", hint: 'Chase the right accounts first' },
-  { title: 'Fast-pay capacity', prompt: 'How much can I advance?', hint: 'Eligible invoices & net payout' },
-  { title: 'Quotes pipeline', prompt: "How's my pipeline?", hint: 'Win/loss & open quotes' },
-  { title: 'Fleet status', prompt: 'Fleet status', hint: 'Active, idle & maintenance' },
+  // Fast Pay is not live: no starter invites a capacity or payout answer until it is.
+  ...(CAPITAL_LAUNCHED ? [{ title: 'Fast Pay capacity', prompt: 'How much can I advance?', hint: 'Eligible invoices and net payout' }] : []),
+  { title: 'Quotes pipeline', prompt: "How's my pipeline?", hint: 'Won, lost and open quotes' },
+  { title: 'Fleet status', prompt: 'Fleet status', hint: 'Active, idle and in maintenance' },
 ];
 
 // Extra starters for roles that can write — the agent drafts the record, the
 // user confirms via the proposal card. Hidden for VIEWER/DRIVER.
 const WRITE_STARTERS: { title: string; prompt: string; hint: string }[] = [
-  { title: 'Add a customer', prompt: 'Add a new customer', hint: 'Draft a record — you confirm before it saves' },
+  { title: 'Add a customer', prompt: 'Add a new customer', hint: 'Drafts the record. You confirm before it saves' },
   { title: 'Draft a quote', prompt: 'Create a new quote', hint: 'Propose a quote for your confirmation' },
 ];
 
-const GENERIC_INTRO_TEXT = "I'm your TruckWys copilot. Ask me about your cash position, overdue invoices, quotes pipeline, fleet status or fast-pay capacity — I answer from your live data.";
+const GENERIC_INTRO_TEXT = CAPITAL_LAUNCHED
+  ? "I'm your TruckWys copilot. Ask me about your cash position, overdue invoices, quotes pipeline, fleet status or Fast Pay capacity. I answer from your live data."
+  : "I'm your TruckWys copilot. Ask me about your cash position, overdue invoices, quotes pipeline or fleet status. I answer from your live data.";
 
 function buildIntro(firstName?: string): Message {
   return {
     role: 'assistant',
-    content: firstName ? `Hi ${firstName} — ${GENERIC_INTRO_TEXT}` : GENERIC_INTRO_TEXT,
+    content: firstName ? `Hi ${firstName}. ${GENERIC_INTRO_TEXT}` : GENERIC_INTRO_TEXT,
   };
 }
 
@@ -284,7 +289,7 @@ export default function Copilot() {
       // on the server, so reopening the thread resurrects a confirmable card.
       patchProposal(msgIndex, { status: 'dismissed' });
     } catch (e: any) {
-      patchProposal(msgIndex, { result: { error: e?.message || 'Could not dismiss — please try again.' } });
+      patchProposal(msgIndex, { result: { error: e?.message || 'Could not dismiss. Try again.' } });
     } finally {
       setProposalBusy(false);
     }
@@ -318,53 +323,50 @@ export default function Copilot() {
         />
       );
     }
+    // Neutral marks for both sides. The assistant mark does not say "AI":
+    // some replies come from the rules engine, and those are labelled below.
     return (
-      <div style={{
-        flexShrink: 0, minWidth: 28, height: 28, padding: '0 6px', boxSizing: 'border-box', borderRadius: "var(--cp-radius, 2px)", display: 'grid', placeItems: 'center',
-        background: role === 'user' ? 'var(--bg-surface)' : 'var(--accent-primary)',
-        border: role === 'user' ? '1px solid var(--border-subtle)' : 'none',
-        color: role === 'user' ? 'var(--text-secondary)' : 'var(--cp-on-accent, var(--bg-deep))',
-        fontFamily: 'var(--cp-font, var(--font-mono))', fontSize: "var(--cp-support-size, 9px)", lineHeight: "var(--cp-support-line, inherit)", fontWeight: 600, letterSpacing: "var(--cp-tracking, 0.05em)",
-      }} aria-hidden="true">{role === 'user' ? 'You' : 'AI'}</div>
+      <div className="cp-avatar" style={{
+        flexShrink: 0, minWidth: 28, height: 28, padding: role === 'user' ? '0 6px' : 0, boxSizing: 'border-box', borderRadius: 'var(--radius-chip)', display: 'grid', placeItems: 'center',
+        background: role === 'user' ? 'var(--bg-surface)' : 'var(--bg-surface-hover)',
+        border: '1px solid var(--border-subtle)',
+        color: 'var(--text-secondary)',
+        fontFamily: 'var(--font-sans)', fontSize: 12, lineHeight: '16px', fontWeight: 600,
+      }} aria-hidden="true">{role === 'user' ? 'You' : <Bot size={16} />}</div>
     );
   };
 
   return (
     <div className="copilot-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <style>{`
-        @keyframes cp-blink { 0%,80%,100% { opacity:.2 } 40% { opacity:1 } }
         @keyframes cp-rise { from { opacity:0; transform: translateY(5px) } to { opacity:1; transform:none } }
         .cp-msg { animation: cp-rise .16s ease both; }
-        .cp-dot { width:5px; height:5px; border-radius:50%; background:var(--text-tertiary); display:inline-block; animation: cp-blink 1.2s infinite both; }
-        .cp-card:hover { border-color: var(--accent-primary); }
-        .cp-chip:hover { background: var(--accent-primary); color: var(--cp-on-accent, var(--bg-deep)); }
+        .cp-card:hover { background: var(--bg-surface-hover) !important; }
+        .cp-chip:hover { background: var(--bg-surface-hover) !important; }
         .cp-conv:hover { background: var(--bg-surface-hover); }
         .cp-conv:hover .cp-del { opacity: 1; }
         .cp-del:hover { color: var(--status-danger) !important; }
         .cp-md > :last-child { margin-bottom: 0 !important; }
       `}</style>
 
-      {/* Header — eyebrow + title + status pill */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: "var(--cp-space-14, 14px)" }}>
-        <div>
-          <div style={labelStyle}>Intelligence</div>
-          <h1 className="cp-page-title" style={{ fontSize: "var(--cp-page-size, 22px)", lineHeight: "var(--cp-page-line, inherit)", fontWeight: 'var(--cp-title-weight, 500)' as React.CSSProperties['fontWeight'], color: 'var(--text-primary)', margin: 0 }}>Copilot</h1>
-        </div>
-        <span className="cp-status" style={{
-          display: 'inline-flex', alignItems: 'center', gap: "var(--cp-space-6, 6px)", fontFamily: 'var(--cp-font, var(--font-mono))', fontSize: "var(--cp-support-size, 10px)", lineHeight: "var(--cp-support-line, inherit)",
-          padding: "var(--cp-inset-0, 4px 9px)", borderRadius: "var(--cp-radius, 2px)", letterSpacing: "var(--cp-tracking, 0.07em)",
-          background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-          color: aiAvailable ? 'var(--accent-primary)' : 'var(--text-secondary)',
-        }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)' }} />
-          {aiAvailable === null ? 'Ready' : aiAvailable ? 'AI available' : 'Rules engine'}
-        </span>
-      </div>
+      <SectionHeader
+        title="Copilot"
+        description="Answers come from your live TruckWys data. Anything it drafts waits for you to confirm."
+        titleAdornment={aiAvailable === null ? undefined : (
+          <span className="cp-status" style={{
+            display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 'var(--radius-chip)',
+            background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+            color: 'var(--text-secondary)', font: '500 13px/20px var(--font-sans)', whiteSpace: 'nowrap',
+          }}>
+            {aiAvailable ? 'AI available' : 'Rules engine only'}
+          </span>
+        )}
+      />
 
       {/* Two-pane: conversation history sidebar (left) + active chat (right) */}
-      <div className="cp-layout" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 12 }}>
+      <div className="cp-layout" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
         {/* Sidebar */}
-        <div className="cp-panel cp-sidebar" style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: "var(--cp-radius, 2px)", overflow: 'hidden' }}>
+        <div className="cp-panel cp-sidebar" style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-card)', overflow: 'hidden' }}>
           <div style={{ padding: "var(--cp-space-10, 10px)", borderBottom: '1px solid var(--border-subtle)' }}>
             <button onClick={newChat} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: "var(--cp-space-6, 6px)", background: 'var(--accent-primary)', color: 'var(--cp-on-accent, var(--bg-deep))', border: 'none', borderRadius: "var(--cp-radius, 2px)", padding: "var(--cp-inset-1, 9px 12px)", cursor: 'pointer', fontFamily: 'var(--cp-font, var(--font-mono))', fontSize: "var(--cp-control-size, 11px)", lineHeight: "var(--cp-support-line, inherit)", fontWeight: "var(--cp-control-weight, 600)" as React.CSSProperties['fontWeight'], letterSpacing: "var(--cp-tracking, 0.05em)" }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -380,10 +382,11 @@ export default function Copilot() {
                 key={c.id}
                 onClick={() => openConversation(c.id)}
                 className="cp-conv"
-                style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: "var(--cp-space-6, 6px)", padding: "var(--cp-inset-3, 10px 10px 10px 12px)", cursor: 'pointer', borderLeft: c.id === conversationId ? '2px solid var(--accent-primary)' : '2px solid transparent', background: c.id === conversationId ? 'var(--bg-surface-hover)' : 'transparent' }}
+                style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: "var(--cp-space-6, 6px)", padding: "var(--cp-inset-3, 10px 10px 10px 12px)", cursor: 'pointer', background: c.id === conversationId ? 'var(--bg-surface-hover)' : 'transparent' }}
+                aria-current={c.id === conversationId ? 'true' : undefined}
               >
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: "var(--cp-body-size, 12.5px)", lineHeight: "var(--cp-body-line, inherit)", color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'New conversation'}</div>
+                  <div style={{ fontSize: "var(--cp-body-size, 12.5px)", lineHeight: "var(--cp-body-line, inherit)", fontWeight: c.id === conversationId ? 500 : 400, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'New conversation'}</div>
                   <div style={{ fontSize: "var(--cp-support-size, 10px)", lineHeight: "var(--cp-support-line, inherit)", color: 'var(--text-tertiary)', fontFamily: 'var(--cp-font, var(--font-mono))', marginTop: "var(--cp-space-2, 2px)" }}>{c.message_count} {c.message_count === 1 ? 'message' : 'messages'} · {relTime(c.updated_at)}</div>
                 </div>
                 <button onClick={(e) => deleteConversation(c.id, e)} className="cp-del" title="Delete conversation" aria-label={`Delete conversation ${c.title || 'New conversation'}`} style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: "var(--cp-control-size, 13px)", lineHeight: "var(--cp-body-line, inherit)", padding: "var(--cp-space-2, 2px)", opacity: "var(--cp-delete-opacity, 0.6)" as React.CSSProperties['opacity'] }}><X size={13} aria-hidden="true" /></button>
@@ -399,10 +402,10 @@ export default function Copilot() {
             <div>
               <h2 className="cp-section-title" style={{ fontSize: "var(--cp-section-size, 18px)", lineHeight: "var(--cp-section-line, inherit)", fontWeight: 'var(--cp-title-weight, 500)' as React.CSSProperties['fontWeight'], color: 'var(--text-primary)', margin: 0, marginBottom: 8 }}>How can I help you run the business today?</h2>
               <div style={{ fontSize: "var(--cp-body-size, 13px)", color: 'var(--text-secondary)', maxWidth: 620, marginBottom: "var(--cp-space-22, 22px)", lineHeight: "var(--cp-body-line, 1.55)" }}>{introMsg.content}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))', gap: "var(--cp-space-10, 10px)" }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))', gap: "var(--cp-space-10, 10px)" }}>
                 {starters.map(s => (
                   <button key={s.title} className="cp-card cp-panel" onClick={() => send(s.prompt)}
-                    style={{ textAlign: 'left', cursor: 'pointer', padding: "var(--cp-starter-inset, 14px)", background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: "var(--cp-radius, 2px)", transition: 'border-color .15s ease' }}>
+                    style={{ textAlign: 'left', cursor: 'pointer', padding: "var(--cp-starter-inset, 14px)", background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: "var(--cp-radius, 2px)", transition: 'background-color .15s ease' }}>
                     <div style={{ fontSize: "var(--cp-body-size, 12.5px)", lineHeight: "var(--cp-body-line, inherit)", fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>{s.title}</div>
                     <div style={{ fontSize: "var(--cp-support-size, 11px)", lineHeight: "var(--cp-support-line, inherit)", color: 'var(--text-tertiary)' }}>{s.hint}</div>
                   </button>
@@ -418,7 +421,7 @@ export default function Copilot() {
                     {avatar(m.role)}
                     <div style={{ maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
                       <div style={{
-                        padding: "var(--cp-inset-4, 11px 14px)", borderRadius: "var(--cp-radius, 2px)", fontSize: "var(--cp-body-size, 13.5px)", lineHeight: "var(--cp-body-line, 1.6)", whiteSpace: 'pre-wrap',
+                        padding: "var(--cp-inset-4, 11px 14px)", borderRadius: 'var(--radius-nested)', fontSize: "var(--cp-body-size, 13.5px)", lineHeight: "var(--cp-body-line, 1.6)", whiteSpace: 'pre-wrap',
                         background: m.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-surface)',
                         color: m.role === 'user' ? 'var(--cp-on-accent, var(--bg-deep))' : 'var(--text-primary)',
                         border: m.role === 'user' ? 'none' : '1px solid var(--border-subtle)',
@@ -436,7 +439,7 @@ export default function Copilot() {
 
                       {m.role === 'assistant' && m.degraded && (
                         <div style={{ marginTop: "var(--cp-space-5, 5px)", fontSize: "var(--cp-support-size, 10.5px)", lineHeight: "var(--cp-support-line, inherit)", color: 'var(--text-tertiary)', fontFamily: 'var(--cp-font, var(--font-mono))', letterSpacing: "var(--cp-tracking, 0.04em)" }}>
-                          <TriangleAlert size={14} aria-hidden="true" style={{ verticalAlign: 'text-bottom', marginRight: 4 }} /> Rules engine — AI is unavailable, so this answer is basic. Try again shortly.
+                          <TriangleAlert size={14} aria-hidden="true" style={{ verticalAlign: 'text-bottom', marginRight: 4 }} /> Answered by the rules engine because AI is unavailable, so it is basic. Try again shortly.
                         </div>
                       )}
 
@@ -450,7 +453,7 @@ export default function Copilot() {
                       )}
 
                       {m.proposedAction && m.actionState === 'pending' && (
-                        <div className="cp-panel" style={{ marginTop: "var(--cp-space-10, 10px)", padding: "var(--cp-space-13, 13px)", width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', borderRadius: "var(--cp-radius, 2px)" }}>
+                        <div className="cp-panel" style={{ marginTop: "var(--cp-space-10, 10px)", padding: "var(--cp-space-13, 13px)", width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-nested)' }}>
                           <div style={{ fontSize: "var(--cp-body-size, 12.5px)", lineHeight: "var(--cp-body-line, inherit)", fontWeight: 600, color: 'var(--text-primary)', marginBottom: "var(--cp-space-3, 3px)" }}>{m.proposedAction.label}</div>
                           {m.proposedAction.detail && <div style={{ fontSize: "var(--cp-support-size, 11.5px)", lineHeight: "var(--cp-support-line, inherit)", color: 'var(--text-secondary)', marginBottom: "var(--cp-space-11, 11px)" }}>{m.proposedAction.detail}</div>}
                           <div style={{ display: 'flex', gap: 8 }}>
@@ -469,8 +472,8 @@ export default function Copilot() {
                         <div style={{ display: 'flex', gap: 8, marginTop: "var(--cp-space-9, 9px)", flexWrap: 'wrap' }}>
                           {m.actions.map((a, j) => (
                             <button key={j} className="cp-chip" onClick={() => navigate(a.route)}
-                              style={{ background: 'var(--bg-surface)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', padding: "var(--cp-inset-5, 6px 11px)", fontFamily: 'var(--cp-font, var(--font-mono))', fontSize: "var(--cp-control-size, 10.5px)", lineHeight: "var(--cp-support-line, inherit)", borderRadius: "var(--cp-radius, 2px)", cursor: 'pointer', letterSpacing: "var(--cp-tracking, 0.04em)", transition: 'all .12s ease', textTransform: 'var(--cp-case, uppercase)' as React.CSSProperties['textTransform'] }}>
-                              {a.label} →
+                              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: "var(--cp-inset-5, 6px 11px)", fontFamily: 'var(--cp-font, var(--font-mono))', fontSize: "var(--cp-control-size, 10.5px)", lineHeight: "var(--cp-support-line, inherit)", borderRadius: 'var(--radius-control)', cursor: 'pointer', letterSpacing: "var(--cp-tracking, 0.04em)", transition: 'background-color .12s ease', textTransform: 'var(--cp-case, uppercase)' as React.CSSProperties['textTransform'] }}>
+                              {a.label}
                             </button>
                           ))}
                         </div>
@@ -482,8 +485,8 @@ export default function Copilot() {
               {loading && (
                 <div className="cp-msg" style={{ display: 'flex', gap: "var(--cp-space-10, 10px)" }}>
                   {avatar('assistant')}
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: "var(--cp-space-5, 5px)", padding: "var(--cp-inset-6, 13px 15px)", background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: "var(--cp-radius, 2px)" }}>
-                    <span className="cp-dot" /><span className="cp-dot" style={{ animationDelay: '.2s' }} /><span className="cp-dot" style={{ animationDelay: '.4s' }} />
+                  <div role="status" style={{ display: 'inline-flex', alignItems: 'center', padding: "var(--cp-inset-6, 13px 15px)", background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)', color: 'var(--text-secondary)' }}>
+                    Working on an answer
                   </div>
                 </div>
               )}
@@ -502,7 +505,7 @@ export default function Copilot() {
               style={{ flex: 1, minWidth: 0, resize: 'none', maxHeight: 140, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: "var(--cp-radius, 2px)", color: 'var(--text-primary)', fontSize: "var(--cp-body-size, 13.5px)", lineHeight: "var(--cp-body-line, 1.5)", outline: 'var(--cp-input-outline, none)' as React.CSSProperties['outline'], fontFamily: 'var(--font-sans)', padding: "var(--cp-inset-7, 10px 12px)" }} />
             <button className="btn-action" onClick={() => send()} disabled={loading || !input.trim()}
               style={{ background: input.trim() && !loading ? 'var(--accent-primary)' : 'var(--bg-surface-hover)', color: input.trim() && !loading ? 'var(--cp-on-accent, var(--bg-deep))' : 'var(--text-tertiary)', border: 'none', padding: "var(--cp-inset-8, 10px 18px)" }}>
-              {loading ? '…' : 'Send'}
+              {loading ? 'Sending' : 'Send'}
             </button>
           </div>
         </div>

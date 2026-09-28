@@ -4,12 +4,14 @@ import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
 import "./finance-brand.css";
 import { Loader } from "@/components/Loader";
+import { ChevronLeft } from "lucide-react";
+import SectionHeader from "@/components/layout/SectionHeader";
 
 const TIER_META: Record<string, { tone: string; label: string; feeRange: string; desc: string }> = {
-  PRIME:    { tone: 'success', label: 'Prime',    feeRange: '1.5%–2.0%', desc: 'Low-risk customer with strong payment history.' },
-  STANDARD: { tone: 'info',    label: 'Standard', feeRange: '2.0%–2.75%', desc: 'Normal risk — reliable customer, acceptable DSO.' },
-  ELEVATED: { tone: 'warning', label: 'Elevated', feeRange: '2.75%–3.5%', desc: 'Moderate risk — slower payer or older invoice.' },
-  HIGH:     { tone: 'danger',  label: 'High',     feeRange: '3.5%–4.5%', desc: 'Higher risk — late payment history or high DSO.' },
+  PRIME:    { tone: 'success', label: 'Prime',    feeRange: '1.5% to 2.0%', desc: 'Low-risk customer with strong payment history.' },
+  STANDARD: { tone: 'info',    label: 'Standard', feeRange: '2.0% to 2.75%', desc: 'Normal risk: a reliable customer who pays within usual terms.' },
+  ELEVATED: { tone: 'warning', label: 'Elevated', feeRange: '2.75% to 3.5%', desc: 'Moderate risk: a slower payer or an older invoice.' },
+  HIGH:     { tone: 'danger',  label: 'High',     feeRange: '3.5% to 4.5%', desc: 'Higher risk: a history of late payment.' },
 };
 
 // Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
@@ -77,7 +79,7 @@ export default function AdvanceDetail() {
         <div className="card fin-empty">
           <h1 className="fin-empty__title" style={{ fontSize: 22, lineHeight: '28px' }}>Advance not found</h1>
           <p className="fin-empty__body">{error ? 'We couldn’t load this advance. Check your connection and try again.' : 'It may have been removed, or the link is wrong.'}</p>
-          <button className="btn-action" onClick={() => navigate('/capital')}>Back to Capital</button>
+          <button className="btn-action" onClick={() => navigate('/capital')}>Back to Fast Pay</button>
         </div>
       </div>
     );
@@ -85,8 +87,8 @@ export default function AdvanceDetail() {
 
   // Extract data with fallbacks
   const status = advance.status || 'REQUESTED';
-  const invoiceNumber = advance.invoice_number || advance.invoiceNumber || 'N/A';
-  const customerName = advance.customer_name || advance.customerName || 'N/A';
+  const invoiceNumber = advance.invoice_number || advance.invoiceNumber || '—';
+  const customerName = advance.customer_name || advance.customerName || '—';
   // API returns Decimal fields as strings — coerce to numbers before any math/toFixed.
   const grossAmount = Number(advance.invoice_total || advance.gross_amount || advance.invoice_amount || advance.amount || 0);
   const feePercent = Number(advance.fee_percent ?? 2.0) || 2.0;
@@ -117,22 +119,19 @@ export default function AdvanceDetail() {
     <div className="fin-page">
       <button
         type="button"
-        style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 8, padding: 0, minHeight: 40 }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 8, padding: 0, minHeight: 40 }}
         onClick={() => navigate('/capital')}
       >
-        ← Back to Capital
+        <ChevronLeft size={16} aria-hidden="true" />
+        Back to Fast Pay
       </button>
 
-      <header style={{ marginBottom: 24 }}>
-        <div style={{ ...labelStyle, marginBottom: 4 }}>Capital · Advance</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>Advance #{advance.id}</h1>
-          <span className={chip(STATUS_TONE[status])}>{formatStatus(status)}</span>
-        </div>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>
-          Requested {safeDateTime(createdAt)} · Invoice <span className="fin-id">{invoiceNumber}</span> · {customerName}
-        </div>
-      </header>
+      <SectionHeader
+        eyebrow="Fast Pay"
+        title={`Advance #${advance.id}`}
+        titleAdornment={<span className={chip(STATUS_TONE[status])} style={{ borderRadius: 'var(--radius-chip)' }}>{formatStatus(status)}</span>}
+        description={<>Requested {safeDateTime(createdAt)}. Invoice <span className="fin-id">{invoiceNumber}</span>, {customerName}.</>}
+      />
 
       <div className="fin-grid-2" style={{ alignItems: 'start' }}>
         {/* Main column */}
@@ -198,24 +197,24 @@ export default function AdvanceDetail() {
                     <div
                       aria-hidden="true"
                       style={{
-                        width: 32, height: 32, borderRadius: '50%',
+                        width: 24, height: 24, borderRadius: '50%',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: step.completed ? 'var(--accent-primary)' : 'var(--bg-surface-hover)',
                         border: step.completed ? 'none' : '1px solid var(--border-subtle)',
                         color: step.completed ? 'var(--btn-action-color)' : 'var(--text-tertiary)',
-                        fontWeight: 600, fontSize: 14,
+                        fontWeight: 600, fontSize: 13,
                       }}>
                       {step.completed ? '✓' : index + 1}
                     </div>
                     {index < timelineSteps.length - 1 && (
                       <div style={{
-                        position: 'absolute', left: '50%', top: 32, width: 2, height: 20,
+                        position: 'absolute', left: '50%', top: 24, width: 2, height: 38,
                         background: step.completed ? 'var(--accent-primary)' : 'var(--border-subtle)',
                         transform: 'translateX(-50%)',
                       }} />
                     )}
                   </div>
-                  <div style={{ flex: 1, paddingTop: 6 }}>
+                  <div style={{ flex: 1, paddingTop: 2 }}>
                     <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: step.completed ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
                       {step.label}
                       <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{step.completed ? ' (done)' : ' (not yet)'}</span>
@@ -242,19 +241,19 @@ export default function AdvanceDetail() {
                 {disbursedAt && (
                   <div>
                     <dt style={labelStyle}>Disbursed</dt>
-                    <dd style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{safeDate(disbursedAt)} · Funds transferred</dd>
+                    <dd style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{safeDate(disbursedAt)}, funds transferred</dd>
                   </div>
                 )}
                 {repaymentDate && !settledAt && (
                   <div>
                     <dt style={labelStyle}>Repayment due</dt>
-                    <dd style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{safeDate(repaymentDate)} · Repaid when your customer pays</dd>
+                    <dd style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{safeDate(repaymentDate)}, repaid when your customer pays</dd>
                   </div>
                 )}
                 {settledAt && (
                   <div>
                     <dt style={labelStyle}>Settled</dt>
-                    <dd style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{safeDate(settledAt)} · Fully repaid</dd>
+                    <dd style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{safeDate(settledAt)}, fully repaid</dd>
                   </div>
                 )}
               </dl>

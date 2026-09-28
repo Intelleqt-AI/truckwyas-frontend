@@ -4,16 +4,10 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
-import { formatCurrency } from '@/lib/formatters';
+import { formatDate } from '@/lib/formatters';
+import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import { Loader } from '@/components/Loader';
 
-const TIER_COLOR: Record<string, string> = {
-  PRIME: 'var(--status-success)',
-  STANDARD: 'var(--accent-primary)',
-  ELEVATED: 'var(--status-warning)',
-  HIGH: 'var(--status-danger)',
-  INELIGIBLE: 'var(--text-tertiary)',
-};
 
 // Sentence-case a single token for display: "PRIME" → "Prime".
 const cap = (s?: string) =>
@@ -29,23 +23,6 @@ const TIER_TONE: Record<string, string> = {
 const tierChip = (t?: string) => {
   const tone = TIER_TONE[t || ''] || 'neutral';
   return `fin-chip${tone === 'neutral' ? '' : ` fin-chip--${tone}`}`;
-};
-
-const ScoreRing = ({ score, tier }: { score: number; tier: string }) => {
-  const color = TIER_COLOR[tier] || 'var(--text-secondary)';
-  const pct = (score / 100) * 283; // circumference ~283
-  return (
-    <div style={{ position: 'relative', width: 80, height: 80 }}>
-      <svg width="80" height="80" style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx="40" cy="40" r="34" fill="none" stroke="var(--border-subtle)" strokeWidth="6" />
-        <circle cx="40" cy="40" r="34" fill="none" stroke={color} strokeWidth="6"
-          strokeDasharray={`${pct} 283`} strokeLinecap="round" style={{ transition: 'stroke-dasharray 0.6s ease' }} />
-      </svg>
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{score}</span>
-      </div>
-    </div>
-  );
 };
 
 export default function RiskScoreView() {
@@ -117,70 +94,93 @@ export default function RiskScoreView() {
   const tiers = ['PRIME', 'STANDARD', 'ELEVATED', 'HIGH', 'INELIGIBLE'];
   const tierCounts = tiers.reduce((acc, t) => ({ ...acc, [t]: customerScores.filter(c => c.tier === t).length }), {} as Record<string, number>);
   const avgScore = customerScores.length > 0 ? Math.round(customerScores.reduce((s, c) => s + c.total_score, 0) / customerScores.length) : 0;
+  const maxTier = Math.max(0, ...tiers.map(t => tierCounts[t] || 0));
+  const expiredCount = customerScores.filter((c: any) => c.is_expired || c.is_valid === false).length;
+  const scoredOn = (c: any) => {
+    const d = c.calculated_at || c.created_at;
+    if (!d) return '—';
+    const t = new Date(d);
+    return isNaN(t.getTime()) ? '—' : formatDate(t);
+  };
 
-  const FEE_MAP: Record<string, number> = { PRIME: 2.0, STANDARD: 2.5, ELEVATED: 3.5, HIGH: 4.5, INELIGIBLE: 0 };
+  // The scoring model's own pillars and weights, read from a stored score.
+  const pillars: any[] = (scores.find((x: any) => x?.factors_breakdown?.pillars?.length)?.factors_breakdown?.pillars) || [];
 
   return (
     <div className="fin-page">
-      <header style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 4 }}>Fast Pay</div>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>Customer risk scores</h1>
-        <p style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
-          Creditworthiness scores used to check Fast Pay eligibility.
-        </p>
+      <header className="fin-detail-head">
+        <div style={{ minWidth: 0 }}>
+          <div className="fin-detail-head__eyebrow">Fast Pay</div>
+          <div className="fin-detail-head__title-row"><h1>Customer risk scores</h1></div>
+          <p className="fin-detail-head__sub" style={{ maxWidth: '72ch' }}>
+            How safe each customer's invoices would be to advance, scored out of 100 by the Fast Pay rules. Higher is safer.
+            {!CAPITAL_LAUNCHED && ` ${CAPITAL_COMING_SOON}`}
+          </p>
+        </div>
       </header>
 
-      {/* Tier counts */}
-      <div className="fin-kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
-        {tiers.map(t => (
-          <div key={t} className="card fin-kpi">
-            <span className="fin-kpi__label"><span className={tierChip(t)}>{cap(t)}</span></span>
-            <span className="fin-kpi__value">{tierCounts[t] || 0}</span>
-            <span className="fin-kpi__sub">{FEE_MAP[t] > 0 ? `${FEE_MAP[t]}% fee` : 'Not eligible'}</span>
-          </div>
-        ))}
-      </div>
-
       <div className="fin-grid-2">
-        {/* Portfolio score card */}
-        <section className="card" aria-labelledby="portfolio-title">
-          <h2 id="portfolio-title" className="fin-h2" style={{ marginBottom: 16 }}>Portfolio overview</h2>
-          <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
-            <ScoreRing score={avgScore} tier={avgScore >= 85 ? 'PRIME' : avgScore >= 70 ? 'STANDARD' : avgScore >= 55 ? 'ELEVATED' : avgScore >= 40 ? 'HIGH' : 'INELIGIBLE'} />
-            <div>
-              <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>Portfolio score {avgScore}/100</div>
-              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>{customerScores.length} customers scored</div>
-              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{customerScores.filter(c => c.tier !== 'INELIGIBLE').length} eligible for Fast Pay</div>
+        <section className="card" aria-labelledby="tiers-title">
+          <div className="fin-panel-head">
+            <div className="fin-panel-head__text">
+              <h2 id="tiers-title" className="fin-panel-title">How are your customers spread across risk tiers?</h2>
+              <p className="fin-panel-desc">
+                {customerScores.length > 0
+                  ? `${customerScores.length} customers scored, average ${avgScore} out of 100. Each customer's highest stored score is shown.${expiredCount > 0 ? ` ${expiredCount === customerScores.length ? 'All' : expiredCount} of these scores ${expiredCount === 1 ? 'has' : 'have'} expired, so treat them as out of date.` : ''}`
+                  : 'Customers appear here once their invoices are scored.'}
+              </p>
             </div>
           </div>
-        </section>
-
-        {/* Score factors legend */}
-        <section className="card" aria-labelledby="factors-title">
-          <h2 id="factors-title" className="fin-h2" style={{ marginBottom: 8 }}>Score factors</h2>
-          <dl style={{ margin: 0 }}>
-            {[
-              { label: 'Payment history', weight: 35 },
-              { label: 'Invoice age', weight: 20 },
-              { label: 'POD quality', weight: 15 },
-              { label: 'Credit score', weight: 15 },
-              { label: 'Relationship', weight: 10 },
-              { label: 'Facility use', weight: 5 },
-            ].map(f => (
-              <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)', fontSize: 13, lineHeight: '20px' }}>
-                <dt style={{ color: 'var(--text-secondary)' }}>{f.label}</dt>
-                <dd style={{ margin: 0, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{f.weight} pts</dd>
+          <div className="fin-rank" role="table" aria-label="Customers per risk tier">
+            <div className="fin-rank__row fin-rank__head" role="row">
+              <span role="columnheader">Tier</span>
+              <span aria-hidden="true" />
+              <span role="columnheader" className="fin-rank__value">Customers</span>
+              <span role="columnheader" className="fin-rank__share">Share</span>
+            </div>
+            {tiers.map(t => (
+              <div key={t} className={`fin-rank__row${(tierCounts[t] || 0) === 0 ? ' is-thin' : ''}`} role="row">
+                <span className="fin-rank__label" role="cell"><span className={tierChip(t)}>{cap(t)}</span></span>
+                <span className="fin-rank__track" aria-hidden="true">
+                  <span className="fin-rank__bar" style={{ display: 'block', width: `${maxTier > 0 ? ((tierCounts[t] || 0) / maxTier) * 100 : 0}%` }} />
+                </span>
+                <span className="fin-rank__value" role="cell">{tierCounts[t] || 0}</span>
+                <span className="fin-rank__share" role="cell">
+                  {customerScores.length > 0 ? `${Math.round(((tierCounts[t] || 0) / customerScores.length) * 100)}%` : ''}
+                </span>
               </div>
             ))}
-          </dl>
+          </div>
+        </section>
+
+        <section className="card" aria-labelledby="factors-title">
+          <div className="fin-panel-head">
+            <div className="fin-panel-head__text">
+              <h2 id="factors-title" className="fin-panel-title">What goes into a score?</h2>
+              <p className="fin-panel-desc">{pillars.length > 0 ? `The ${pillars.length} areas the model scores, and how much each counts towards 100.` : 'The areas the model scores.'}</p>
+            </div>
+          </div>
+          {pillars.length === 0 ? (
+            <div className="fin-empty fin-empty--compact">The breakdown appears once a customer is scored.</div>
+          ) : (
+            <dl className="fin-dl">
+              {pillars.map((p: any) => (
+                <div key={p.pillar} className="fin-dl__row">
+                  <dt>{String(p.pillar).replace(/ & /g, ' and ').toLowerCase().replace(/^./, (c: string) => c.toUpperCase())}</dt>
+                  <dd>{Math.round((p.weight ?? 0) * 100)} pts</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </section>
       </div>
 
-      {/* Customer table */}
       <section className="card fin-table-card" aria-labelledby="scores-title">
-        <div className="fin-table-card__head">
-          <h2 id="scores-title" className="fin-h2">All customers</h2>
-          <span className="fin-support">{customerScores.length} scored</span>
+        <div className="fin-panel-head">
+          <div className="fin-panel-head__text">
+            <h2 id="scores-title" className="fin-panel-title">Which customers are safest to advance against?</h2>
+            <p className="fin-panel-desc">Highest score first. Eligibility follows the Fast Pay rules at the time of scoring.</p>
+          </div>
         </div>
         {isLoading ? (
           <div style={{ padding: '40px 20px', display: 'flex', justifyContent: 'center' }}><Loader size={28} label="Loading scores…" /></div>
@@ -197,39 +197,37 @@ export default function RiskScoreView() {
                   <th>Customer</th>
                   <th>Score</th>
                   <th>Tier</th>
-                  <th className="num">Payment history</th>
-                  <th className="num">Invoice age</th>
-                  <th className="num">POD</th>
-                  <th className="num">Fast Pay fee</th>
-                  <th>Eligible</th>
+                  <th>Scored</th>
+                  <th>Meets the rules</th>
+                  {CAPITAL_LAUNCHED && <th className="num">Fee</th>}
                 </tr>
               </thead>
               <tbody>
-                {customerScores.map((cs: any) => (
-                  <tr key={cs.id} className="is-clickable" onClick={() => navigate(`/customers/${cs.cid}`)}>
-                    <td className="fin-strong">{cs.customer_name}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 60, height: 4, background: 'var(--border-subtle)', borderRadius: 2 }} aria-hidden="true">
-                          <div style={{ height: 4, width: `${cs.total_score}%`, background: TIER_COLOR[cs.tier] || 'var(--accent-primary)', borderRadius: 2 }} />
+                {customerScores.map((cs: any) => {
+                  const expired = cs.is_expired || cs.is_valid === false;
+                  return (
+                    <tr key={cs.id} className="is-clickable" onClick={() => navigate(`/customers/${cs.cid}`)}>
+                      <td className="fin-strong"><div className="fin-truncate" title={cs.customer_name}>{cs.customer_name}</div></td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 500, fontVariantNumeric: 'tabular-nums', minWidth: 24, textAlign: 'right' }}>{cs.total_score}</span>
+                          <div className="fin-rank__track" style={{ width: 64 }} aria-hidden="true">
+                            <div className="fin-rank__bar" style={{ width: `${Math.max(0, Math.min(100, cs.total_score))}%` }} />
+                          </div>
                         </div>
-                        <span style={{ color: 'var(--text-primary)', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{cs.total_score}</span>
-                      </div>
-                    </td>
-                    <td><span className={tierChip(cs.tier)}>{cap(cs.tier)}</span></td>
-                    <td className="num">{cs.factor_payment_history ?? '—'}/35</td>
-                    <td className="num">{cs.factor_invoice_age ?? '—'}/20</td>
-                    <td className="num">{cs.factor_pod_quality ?? '—'}/15</td>
-                    <td className="num">
-                      {cs.is_eligible ? `${parseFloat(cs.fee_percent || FEE_MAP[cs.tier] || 0).toFixed(1)}%` : '—'}
-                    </td>
-                    <td>
-                      <span className={`fin-chip ${cs.is_eligible ? 'fin-chip--success' : 'fin-chip--danger'}`}>
-                        {cs.is_eligible ? 'Yes' : 'No'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td><span className={tierChip(cs.tier)}>{cap(cs.tier)}</span></td>
+                      <td className="fin-date">
+                        {scoredOn(cs)}
+                        {expired && <span className="fin-text-muted"> · expired</span>}
+                      </td>
+                      <td>{cs.is_eligible ? 'Yes' : <span className="fin-text-muted">No</span>}</td>
+                      {CAPITAL_LAUNCHED && (
+                        <td className="num">{cs.is_eligible && cs.fee_percent != null ? `${parseFloat(cs.fee_percent).toFixed(1)}%` : '—'}</td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

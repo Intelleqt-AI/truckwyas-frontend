@@ -2,7 +2,7 @@
 .customer-directory-controls input,
 .customer-directory-controls [role="combobox"] {
   min-height: 40px;
-  border-radius: 6px;
+  border-radius: var(--radius-control, 8px);
   box-sizing: border-box;
 }
 .customer-directory-controls button { min-width: 40px; }

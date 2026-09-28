@@ -1,7 +1,7 @@
 import "./auth-brand.css";
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff, Check, CheckCircle2 } from 'lucide-react';
+import { Eye, EyeOff, Check } from 'lucide-react';
 import { postData } from '@/lib/Api';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { MobileAuthLayout } from '@/components/MobileAuthLayout';
@@ -11,7 +11,7 @@ import { MobileAuthLayout } from '@/components/MobileAuthLayout';
 const PLAN_FEATURES = [
   "Unlimited loads & invoices",
   "AI-powered quote optimisation",
-  "Fast Pay capital access",
+  "Fast Pay capital access (not live yet)",
   "Advanced analytics & reporting",
   "Fleet intelligence dashboard",
   "Multi-user access",
@@ -114,7 +114,7 @@ export default function PasswordReset() {
     padding: '8px 12px',
     minHeight: 40,
     color: 'var(--text-primary)',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-control)',
     fontSize: 14,
     lineHeight: '20px',
     width: '100%',
@@ -139,15 +139,14 @@ export default function PasswordReset() {
     <>
         {step === 'done' ? (
           <div style={{ textAlign: 'center' }}>
-            <CheckCircle2 aria-hidden="true" size={40} strokeWidth={1.5} style={{ color: 'var(--status-success-text, var(--accent-primary))', marginBottom: 16 }} />
             <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>Password updated</h1>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24 }}>Your password has been reset. You can now log in.</div>
-            <button className="btn-action" style={{ width: '100%' }} onClick={() => navigate('/login')}>Back to login</button>
+            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 24 }}>Your password has been reset. You can now log in.</div>
+            <button className="btn-action" style={{ width: '100%', borderRadius: 'var(--radius-control)' }} onClick={() => navigate('/login')}>Back to login</button>
           </div>
         ) : (
           <>
-            <div style={{ marginBottom: 20 }}>
-              <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
+            <div style={{ marginBottom: 24 }}>
+              <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
                 {step === 'request' ? 'Reset password' : 'Enter reset code'}
               </h1>
               {step === 'confirm' && (
@@ -161,24 +160,24 @@ export default function PasswordReset() {
             </div>
 
             {error && (
-              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
+              <div role="alert" style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
                 {error}
               </div>
             )}
 
             {step === 'request' ? (
-              <form onSubmit={requestReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <form onSubmit={requestReset} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
                   <label style={labelStyle}>Email address</label>
                   <input className="tw-auth-control" type="email" required value={email} onChange={e => setEmail(e.target.value)}
                     style={inputStyle} placeholder="your@email.com" />
                 </div>
-                <button type="submit" className="btn-action" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
+                <button type="submit" className="btn-action" style={{ width: '100%', marginTop: 8, borderRadius: 'var(--radius-control)' }} disabled={loading}>
                   {loading ? 'Sending…' : 'Send reset code'}
                 </button>
               </form>
             ) : (
-              <form onSubmit={confirmReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <form onSubmit={confirmReset} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* Resend row */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>
@@ -200,13 +199,13 @@ export default function PasswordReset() {
 
                 {/* New password */}
                 <div>
-                  <label style={labelStyle}>NEW PASSWORD</label>
+                  <label style={labelStyle}>New password</label>
                   <div style={{ position: 'relative' }}>
                     <input className="tw-auth-control" type={showNew ? 'text' : 'password'} required value={newPassword} onChange={e => setNewPassword(e.target.value)}
                       placeholder="Min 8 characters" style={{ ...inputStyle, paddingRight: 40 }} />
                     <button type="button" tabIndex={-1} aria-label="Show or hide password" onClick={() => setShowNew(v => !v)}
-                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}>
-                      {showNew ? <EyeOff size={15} /> : <Eye size={15} />}
+                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}>
+                      {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
@@ -218,13 +217,13 @@ export default function PasswordReset() {
                     <input className="tw-auth-control" type={showConfirm ? 'text' : 'password'} required value={confirm} onChange={e => setConfirm(e.target.value)}
                       placeholder="Repeat new password" style={{ ...inputStyle, paddingRight: 40 }} />
                     <button type="button" tabIndex={-1} aria-label="Show or hide password" onClick={() => setShowConfirm(v => !v)}
-                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}>
-                      {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
+                      style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}>
+                      {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
 
-                <button type="submit" className="btn-action" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
+                <button type="submit" className="btn-action" style={{ width: '100%', marginTop: 8, borderRadius: 'var(--radius-control)' }} disabled={loading}>
                   {loading ? 'Resetting…' : 'Set new password'}
                 </button>
               </form>
@@ -241,7 +240,7 @@ export default function PasswordReset() {
   );
 
   const desktopFormCard = (
-    <div style={{ width: '100%', maxWidth: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxSizing: 'border-box' }}>
+    <div style={{ width: '100%', maxWidth: 420, padding: 24, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-card)', boxSizing: 'border-box' }}>
       {/* The split layout already shows the logo in its content panel. */}
       {formBody}
     </div>
@@ -262,8 +261,8 @@ export default function PasswordReset() {
       </div>
 
       <div style={{
-        marginTop: 18, padding: '10px 13px', border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--card-radius)', background: 'var(--bg-surface-hover)',
+        marginTop: 20, padding: '12px 16px', border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-nested)', background: 'var(--bg-surface-hover)',
         fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
       }}>
         Reminder: every completed load also carries a <strong style={{ color: 'var(--text-primary)' }}>0.25% platform fee</strong>,
@@ -281,10 +280,10 @@ export default function PasswordReset() {
       <MobileAuthLayout
         eyebrow="Account recovery"
         title={<>Let's get you <span style={{ color: 'var(--accent-primary)' }}>back in</span>.</>}
-        subtitle="Loads, quotes, invoices, and fleet intelligence — all in one dashboard, waiting right where you left them."
+        subtitle="Loads, quotes, invoices, and fleet intelligence, all in one dashboard, waiting right where you left them."
         footer={extraContent}
       >
-        <div style={{ width: '100%', maxWidth: 420, padding: 32, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxSizing: 'border-box' }}>
+        <div style={{ width: '100%', maxWidth: 420, padding: 24, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-card)', boxSizing: 'border-box' }}>
           {formBody}
         </div>
       </MobileAuthLayout>
@@ -318,7 +317,7 @@ export default function PasswordReset() {
       {/* Content side — same "welcome back" framing as Login, not a sales pitch */}
       <div className="pwreset-split__content" style={{
         position: 'relative', overflow: 'hidden',
-        background: `radial-gradient(120% 100% at 0% 0%, var(--glow-color), var(--glow-transparent)), var(--bg-surface)`,
+        background: 'var(--bg-surface)',
         borderRight: '1px solid var(--border-subtle)',
       }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
@@ -330,8 +329,8 @@ export default function PasswordReset() {
           <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', marginBottom: 16 }}>
             Let's get you <span style={{ color: 'var(--accent-primary)' }}>back in</span>.
           </div>
-          <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 32 }}>
-            Loads, quotes, invoices, and fleet intelligence — all in one dashboard, waiting right where you left them.
+          <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: '22px', marginBottom: 32 }}>
+            Loads, quotes, invoices, and fleet intelligence, all in one dashboard, waiting right where you left them.
           </div>
 
           {extraContent}

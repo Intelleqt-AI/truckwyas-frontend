@@ -9,13 +9,13 @@ import '@/pages/settings/settings-brand.css';
 export const settingsCardStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
   border: '1px solid var(--border-subtle)',
-  borderRadius: 'var(--card-radius, 8px)',
+  borderRadius: 'var(--radius-card)',
   marginBottom: 16,
   minWidth: 0,
 };
 
 export const settingsCardHeaderStyle: React.CSSProperties = {
-  padding: '16px 20px 12px',
+  padding: '20px 24px 16px',
   borderBottom: '1px solid var(--border-subtle)',
   display: 'flex',
   alignItems: 'center',
@@ -35,7 +35,7 @@ export const settingsCardTitleStyle: React.CSSProperties = {
   margin: 0,
 };
 
-export const settingsCardBodyStyle: React.CSSProperties = { padding: 20 };
+export const settingsCardBodyStyle: React.CSSProperties = { padding: 24 };
 
 export const settingsLabelStyle: React.CSSProperties = {
   display: 'block',
@@ -58,7 +58,7 @@ export const settingsInputStyle: React.CSSProperties = {
   boxSizing: 'border-box',
   background: 'var(--input-bg)',
   border: '1px solid var(--border-subtle)',
-  borderRadius: 6,
+  borderRadius: 'var(--radius-control)',
   minHeight: 40,
   minWidth: 0,
   padding: '8px 12px',
@@ -88,7 +88,7 @@ export const settingsCardActionsStyle: React.CSSProperties = {
   justifyContent: 'flex-end',
   gap: 12,
   flexWrap: 'wrap',
-  marginTop: 20,
+  marginTop: 24,
 };
 
 interface SettingsSwitchProps {
@@ -130,7 +130,8 @@ export function SettingsToggleRow({ label, description, checked, onChange, disab
   return (
     <div className="settings-toggle-row" style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-      padding: '12px 20px',
+      padding: '12px 24px',
+      minHeight: 48,
       opacity: disabled ? 0.6 : 1,
     }}>
       <div style={{ minWidth: 0 }}>
@@ -145,20 +146,23 @@ export function SettingsToggleRow({ label, description, checked, onChange, disab
   );
 }
 
-/** Small neutral badge (4px radius, 12/16 sans). */
+/** Small neutral badge: the chip role (6px radius, 13/20 medium sans). */
 export const settingsBadgeStyle: React.CSSProperties = {
   fontFamily: 'var(--font-sans)',
-  fontSize: 12,
-  lineHeight: '16px',
+  fontSize: 13,
+  lineHeight: '20px',
   fontWeight: 500,
   color: 'var(--text-secondary)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 4,
-  padding: '2px 6px',
+  background: 'var(--status-neutral-bg)',
+  border: '1px solid transparent',
+  borderRadius: 'var(--radius-chip)',
+  padding: '0 8px',
+  display: 'inline-flex',
+  alignItems: 'center',
   whiteSpace: 'nowrap',
 };
 
-/** Outlined secondary action (40px, 6px radius). Pair with className="settings-control". */
+/** Outlined secondary action (40px, 8px control radius). Pair with className="settings-control". */
 export const settingsSecondaryButtonStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -166,10 +170,10 @@ export const settingsSecondaryButtonStyle: React.CSSProperties = {
   gap: 8,
   background: 'transparent',
   border: '1px solid var(--border-subtle)',
-  color: 'var(--text-secondary)',
-  padding: '8px 12px',
+  color: 'var(--text-primary)',
+  padding: '8px 16px',
   minHeight: 40,
-  borderRadius: 6,
+  borderRadius: 'var(--radius-control)',
   fontFamily: 'var(--font-sans)',
   fontSize: 14,
   lineHeight: '20px',
@@ -189,7 +193,7 @@ export const settingsDangerButtonStyle: React.CSSProperties = {
 /** Standard settings section title block (one h1 + supporting line). */
 export function SettingsPageHeader({ title, description, actions }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+    <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
       <div style={{ minWidth: 0 }}>
         <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: description ? 4 : 0 }}>{title}</h1>
         {description && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{description}</div>}

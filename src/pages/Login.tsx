@@ -13,7 +13,7 @@ import { MobileAuthLayout } from "@/components/MobileAuthLayout";
 const PLAN_FEATURES = [
   "Unlimited loads & invoices",
   "AI-powered quote optimisation",
-  "Fast Pay capital access",
+  "Fast Pay capital access (not live yet)",
   "Advanced analytics & reporting",
   "Fleet intelligence dashboard",
   "Multi-user access",
@@ -114,7 +114,7 @@ const Login = () => {
     padding: '8px 12px',
     minHeight: 40,
     color: 'var(--text-primary)',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-control)',
     fontSize: 14,
     lineHeight: '20px',
     width: '100%',
@@ -138,8 +138,8 @@ const Login = () => {
       maxWidth: 400,
       background: 'var(--bg-surface)',
       border: '1px solid var(--border-subtle)',
-      borderRadius: 8,
-      padding: 32,
+      borderRadius: 'var(--radius-card)',
+      padding: 24,
       boxSizing: 'border-box',
     }}>
       <div style={{ marginBottom: 24 }}>
@@ -229,7 +229,7 @@ const Login = () => {
             padding: '12px 16px',
             background: 'var(--status-danger-bg)',
             border: '1px solid var(--status-danger)',
-            borderRadius: 6,
+            borderRadius: 'var(--radius-nested)',
             color: 'var(--status-danger-text, var(--status-danger))',
             fontSize: 13,
             lineHeight: '20px',
@@ -243,7 +243,8 @@ const Login = () => {
           className="btn-action"
           style={{
             width: '100%',
-            padding: '12px 16px',
+            padding: '10px 16px',
+            borderRadius: 'var(--radius-control)',
             fontSize: 14,
             lineHeight: '20px',
             letterSpacing: 'normal',
@@ -311,7 +312,7 @@ const Login = () => {
 
       <div style={{
         marginTop: 20, padding: '12px 16px', border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--card-radius)', background: 'var(--bg-surface-hover)',
+        borderRadius: 'var(--radius-nested)', background: 'var(--bg-surface-hover)',
         fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
       }}>
         Reminder: every completed load also carries a <strong style={{ color: 'var(--text-primary)' }}>0.25% platform fee</strong>,
@@ -329,7 +330,7 @@ const Login = () => {
       <MobileAuthLayout
         eyebrow="Welcome back"
         title={<>Your fleet, right where <span style={{ color: 'var(--accent-primary)' }}>you left it</span>.</>}
-        subtitle="Loads, quotes, invoices, and fleet intelligence — all in one dashboard, updated in real time."
+        subtitle="Loads, quotes, invoices, and fleet intelligence, all in one dashboard, updated in real time."
         footer={extraContent}
       >
         {formCard}
@@ -364,7 +365,7 @@ const Login = () => {
       {/* Content side — a reminder of what's waiting, not a sales pitch */}
       <div className="login-split__content" style={{
         position: 'relative', overflow: 'hidden',
-        background: `radial-gradient(120% 100% at 0% 0%, var(--glow-color), var(--glow-transparent)), var(--bg-surface)`,
+        background: 'var(--bg-surface)',
         borderRight: '1px solid var(--border-subtle)',
       }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
@@ -377,7 +378,7 @@ const Login = () => {
             Your fleet, right where <span style={{ color: 'var(--accent-primary)' }}>you left it</span>.
           </p>
           <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: '22px', marginBottom: 32 }}>
-            Loads, quotes, invoices, and fleet intelligence — all in one dashboard, updated in real time.
+            Loads, quotes, invoices, and fleet intelligence, all in one dashboard, updated in real time.
           </div>
 
           {extraContent}

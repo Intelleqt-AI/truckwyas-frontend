@@ -204,7 +204,7 @@ export default function Bookings() {
       });
       invalidateLoad();
       setPodModalOpen(false);
-      toast.success(`POD uploaded (${data.filename}) — status set to Delivered`);
+      toast.success(`POD uploaded (${data.filename}). Status set to Delivered.`);
     } catch (e: any) {
       toast.error(e?.message || 'Upload failed');
     } finally {
@@ -268,7 +268,7 @@ export default function Bookings() {
       await patchData({ url: `api/v1/loads/${id}/`, data: { status: 'ASSIGNED' } });
       invalidateLoad();
       setAssignModalOpen(false);
-      toast.success('Driver and vehicle assigned — status set to Assigned');
+      toast.success('Driver and vehicle assigned. Status set to Assigned.');
     } catch (e: any) {
       toast.error(e?.message || 'Failed to assign driver and vehicle');
     } finally {
@@ -311,32 +311,16 @@ export default function Bookings() {
       </button>
       <div className="bk-detail-header">
         <div className="bk-detail-header__titles">
-          <div className="bk-eyebrow">Bookings · Order</div>
+          <div className="bk-eyebrow">Order</div>
           <div className="bk-title-row">
             <h1 className="bk-title">{load.load_number}</h1>
             <span className={`bk-status bk-status--${STATUS_TONE[load.status] || 'neutral'}`}>{titleCase(load.status)}</span>
           </div>
           <p className="bk-subtitle">{load.customer_name}</p>
         </div>
-        <div className="bk-detail-header__actions" style={{ flexDirection: 'column', alignItems: 'flex-end' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="bk-field__label" id="load-status-label">Status</span>
-            <Select value={load.status} onValueChange={updateStatus} disabled={billingBlocked}>
-              <SelectTrigger aria-labelledby="load-status-label" style={{ minWidth: 160, minHeight: 40 }}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={load.status}>{titleCase(load.status)}</SelectItem>
-                {allowedNextStatuses.map(s => <SelectItem key={s} value={s}>{titleCase(s)}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          {billingBlocked && (
-            <p className="bk-help bk-help--danger" style={{ textAlign: 'right', maxWidth: 260 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
-              Status changes are blocked —{' '}
-              <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>go to billing</button>
-            </p>
-          )}
+        <div className="bk-amount">
+          <span className="bk-amount__label">Order total</span>
+          <span className="bk-amount__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</span>
         </div>
       </div>
 
@@ -345,7 +329,9 @@ export default function Bookings() {
         const STEPS = ['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED'];
         const currentIdx = STEPS.indexOf(load.status);
         return (
-          <div className="bk-card bk-stepper" style={{ padding: '16px 24px', marginBottom: 24 }}>
+          <section className="bk-card" style={{ padding: '16px 24px', marginBottom: 24 }} aria-label="Order progress">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+          <div className="bk-stepper" style={{ flex: 1, minWidth: 0 }}>
             <ol aria-label="Order progress" style={{ display: 'flex', gap: 0, listStyle: 'none', margin: 0, padding: 0 }}>
               {STEPS.map((step, stepIdx) => {
                 const isActive = stepIdx === currentIdx;
@@ -356,14 +342,16 @@ export default function Bookings() {
                 // lists the immediate next step(s).
                 const isClickable = !billingBlocked && allowedNextStatuses.includes(step);
                 const label = titleCase(step);
+                // Done steps are filled, the current step is larger, a step you
+                // can move to next is an outlined ring. No glows.
                 const dot = (
                   <span style={{
                     width: isActive ? 12 : 10,
                     height: isActive ? 12 : 10,
+                    boxSizing: 'border-box',
                     borderRadius: '50%',
-                    background: isPast ? 'var(--accent-primary)' : 'var(--border-active)',
-                    boxShadow: isActive ? '0 0 0 4px var(--accent-glow)' : (isClickable ? '0 0 0 3px var(--accent-glow)' : 'none'),
-                    transition: 'all 0.3s',
+                    background: isPast ? 'var(--accent-primary)' : 'var(--bg-surface)',
+                    border: `2px solid ${isPast || isClickable ? 'var(--accent-primary)' : 'var(--border-active)'}`,
                   }} />
                 );
                 const text = (
@@ -378,7 +366,7 @@ export default function Bookings() {
                 );
                 return (
                   <li key={step} aria-current={isActive ? 'step' : undefined} style={{ flex: 1, display: 'flex', alignItems: 'center', minWidth: 0 }}>
-                    <span aria-hidden="true" style={{ flex: 1, height: 2, background: isPast ? 'var(--accent-primary)' : 'var(--border-subtle)', transition: 'background 0.3s' }} />
+                    <span aria-hidden="true" style={{ flex: 1, height: 2, background: isPast ? 'var(--accent-primary)' : 'var(--border-subtle)' }} />
                     {isClickable ? (
                       <button
                         type="button"
@@ -398,58 +386,88 @@ export default function Bookings() {
               })}
             </ol>
           </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="bk-field__label" id="load-status-label">Status</span>
+              <Select value={load.status} onValueChange={updateStatus} disabled={billingBlocked}>
+                <SelectTrigger aria-labelledby="load-status-label" style={{ minWidth: 160, minHeight: 40 }}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={load.status}>{titleCase(load.status)}</SelectItem>
+                  {allowedNextStatuses.map(s => <SelectItem key={s} value={s}>{titleCase(s)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {billingBlocked && (
+              <p className="bk-help bk-help--danger" style={{ textAlign: 'right', maxWidth: 260 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+                Status changes are blocked.{' '}
+                <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>Go to billing</button>
+              </p>
+            )}
+          </div>
+          </div>
+          </section>
         );
       })()}
 
-      {/* Key metrics */}
-      <div className="bk-metrics bk-metrics--money">
-        {[
-          { label: 'Total amount', value: formatCurrency(parseFloat(load.total_amount || '0')) },
-          { label: 'Distance', value: `${parseFloat(load.distance || '0').toFixed(0)} km` },
-          { label: 'Weight', value: `${parseFloat(load.weight || '0').toFixed(0)} kg` },
-          { label: 'Rate per km', value: `R ${(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)).toFixed(2)}` },
-        ].map(m => (
-          <div key={m.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{m.label}</span></div>
-            <div className="metric-value" style={{ color: 'var(--text-primary)' }}>{m.value}</div>
-          </div>
-        ))}
-      </div>
+      {/* The job in three figures. A zero means the value was never captured,
+          so it shows as missing rather than as 0 km or 0 kg. */}
+      {(() => {
+        const distance = parseFloat(load.distance || '0');
+        const weight = parseFloat(load.weight || '0');
+        return (
+          <section className="bk-summary" aria-label="Job figures">
+            <div className="bk-summary__cell">
+              <div className="bk-summary__label">Distance</div>
+              <div className="bk-summary__value">{distance > 0 ? `${Math.round(distance).toLocaleString('en-ZA')} km` : '—'}</div>
+              <div className="bk-summary__note">{distance > 0 ? 'Planned route distance.' : 'No route distance recorded.'}</div>
+            </div>
+            <div className="bk-summary__cell">
+              <div className="bk-summary__label">Base rate per km</div>
+              <div className="bk-summary__value">{distance > 0 ? `R ${(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)).toFixed(2)}` : '—'}</div>
+              <div className="bk-summary__note">Base rate divided by distance, before surcharges.</div>
+            </div>
+            <div className="bk-summary__cell">
+              <div className="bk-summary__label">Cargo weight</div>
+              <div className="bk-summary__value">{weight > 0 ? `${Math.round(weight).toLocaleString('en-ZA')} kg` : '—'}</div>
+              <div className="bk-summary__note">{load.cargo_description || (weight > 0 ? 'As captured on the order.' : 'No weight recorded.')}</div>
+            </div>
+          </section>
+        );
+      })()}
 
       <div className="bk-detail-grid">
         {/* Route */}
         <section className="bk-card" aria-labelledby="bk-route-title">
           <div className="bk-card__head"><h2 className="bk-card__title" id="bk-route-title">Route</h2></div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <div className="bk-field__label">Pickup</div>
-              <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontWeight: 500 }}>{load.pickup_location}</div>
-              <div className="bk-help">{load.pickup_city}, {load.pickup_state}</div>
-              <div className="bk-help">{fmt(load.pickup_date)}</div>
-            </div>
-            {Array.isArray(load.stops) && load.stops.length > 0 && (
-              <div style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div className="bk-field__label">Stops ({load.stops.length})</div>
-                {load.stops.map((s: { location: string }, i: number) => (
-                  <div key={i} style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', display: 'flex', gap: 8 }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
-                    {s.location}
-                  </div>
-                ))}
+          <ol className="bk-route">
+            <li className="bk-route__stop">
+              <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
+              <div>
+                <div className="bk-route__label">Pickup</div>
+                <div className="bk-route__place">{load.pickup_location}</div>
+                <div className="bk-route__meta">{[load.pickup_city, load.pickup_state].filter(Boolean).join(', ')}{load.pickup_date ? `. ${fmt(load.pickup_date)}` : ''}</div>
               </div>
-            )}
-            {load.cargo_description && (
-              <div style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16 }}>
-                <p className="bk-help">{load.cargo_description}</p>
+            </li>
+            {Array.isArray(load.stops) && load.stops.map((s: { location: string }, i: number) => (
+              <li key={i} className="bk-route__stop">
+                <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
+                <div>
+                  <div className="bk-route__label">Stop {i + 1}</div>
+                  <div className="bk-route__place">{s.location}</div>
+                </div>
+              </li>
+            ))}
+            <li className="bk-route__stop">
+              <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
+              <div>
+                <div className="bk-route__label">Delivery</div>
+                <div className="bk-route__place">{load.delivery_location}</div>
+                <div className="bk-route__meta">{[load.delivery_city, load.delivery_state].filter(Boolean).join(', ')}{load.delivery_date ? `. ${fmt(load.delivery_date)}` : ''}</div>
               </div>
-            )}
-            <div>
-              <div className="bk-field__label">Delivery</div>
-              <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontWeight: 500 }}>{load.delivery_location}</div>
-              <div className="bk-help">{load.delivery_city}, {load.delivery_state}</div>
-              <div className="bk-help">{fmt(load.delivery_date)}</div>
-            </div>
-          </div>
+            </li>
+          </ol>
 
           {/* Live map — pickup, delivery, and (if the assigned vehicle is CtrlFleet-linked) its last known position */}
           <div style={{ marginTop: 16 }}>
@@ -460,7 +478,7 @@ export default function Bookings() {
               deliveryCoords={load.delivery_lat ? { lat: Number(load.delivery_lat), lon: Number(load.delivery_lng) } : undefined}
               stops={Array.isArray(load.stops) ? load.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
               geometry={Array.isArray(load.route_geometry) && load.route_geometry.length > 1 ? load.route_geometry.map((p: { lat: number; lon: number }) => [Number(p.lat), Number(p.lon)] as [number, number]) : undefined}
-              dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 12, boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
+              dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-dialog, 16px)', boxShadow: 'none' }}
               currentLocation={
                 vehicleDetail?.latitude && vehicleDetail?.longitude
                   ? { lat: parseFloat(vehicleDetail.latitude), lon: parseFloat(vehicleDetail.longitude) }
@@ -468,7 +486,7 @@ export default function Bookings() {
               }
               currentLocationLabel={
                 vehicleDetail?.last_location_at
-                  ? `${vehicleDetail.plate} — last seen ${new Date(vehicleDetail.last_location_at).toLocaleString()}`
+                  ? `${vehicleDetail.plate}, last seen ${new Date(vehicleDetail.last_location_at).toLocaleString('en-ZA')}`
                   : undefined
               }
               height={220}
@@ -478,10 +496,10 @@ export default function Bookings() {
                 {!load.vehicle
                   ? 'No vehicle assigned yet'
                   : !vehicleDetail?.ctrlfleet_vehicle_code
-                    ? 'Assigned vehicle isn’t linked to CtrlFleet — no live tracking'
+                    ? 'The assigned vehicle is not linked to CtrlFleet, so there is no live tracking.'
                     : vehicleDetail?.last_location_at
-                      ? `Last synced ${new Date(vehicleDetail.last_location_at).toLocaleString()}`
-                      : 'Linked to CtrlFleet — no position synced yet'}
+                      ? `Last synced ${new Date(vehicleDetail.last_location_at).toLocaleString('en-ZA')}`
+                      : 'Linked to CtrlFleet. No position synced yet.'}
               </p>
               {load.vehicle && vehicleDetail?.ctrlfleet_vehicle_code && (
                 <button
@@ -529,10 +547,10 @@ export default function Bookings() {
                 {hasInvoice && (
                   <button
                     type="button"
-                    className="bk-btn bk-btn--success bk-btn--block"
+                    className="bk-btn bk-btn--primary bk-btn--block"
                     onClick={() => navigate(`/finance/invoices/${invoiceId}`)}
                   >
-                    Invoice created — view invoice
+                    View invoice
                   </button>
                 )}
 
@@ -545,11 +563,11 @@ export default function Bookings() {
                 />
                 <button
                   type="button"
-                  className={`bk-btn bk-btn--block ${hasPOD ? 'bk-btn--success-outline' : 'bk-btn--secondary'}`}
+                  className="bk-btn bk-btn--block bk-btn--secondary"
                   onClick={() => (hasPOD ? setPodPreviewOpen(true) : fileRef.current?.click())}
                   disabled={podButtonUploading}
                 >
-                  {podButtonUploading ? 'Uploading…' : hasPOD ? `View POD — ${load.pod_received_by || 'uploaded'}` : <><Upload size={16} aria-hidden="true" /> Upload POD</>}
+                  {podButtonUploading ? 'Uploading…' : hasPOD ? (load.pod_received_by ? `View POD, received by ${load.pod_received_by}` : 'View POD') : <><Upload size={16} aria-hidden="true" /> Upload POD</>}
                 </button>
               </div>
             </section>
@@ -567,8 +585,8 @@ export default function Bookings() {
             </div>
             {billingBlocked && (
               <p className="bk-help bk-help--danger" style={{ marginBottom: 8 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
-                Assignment is locked —{' '}
-                <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>go to billing</button>
+                Assignment is locked.{' '}
+                <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>Go to billing</button>
               </p>
             )}
 
@@ -612,7 +630,7 @@ export default function Bookings() {
                 </div>
                 {(!!assignDriverId && !assignVehicleId) && (
                   <p className="bk-help bk-help--warning" style={{ marginBottom: 8 }}>
-                    A driver needs a vehicle — select a vehicle too, or clear the driver.
+                    A driver needs a vehicle. Select a vehicle too, or clear the driver.
                   </p>
                 )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -672,7 +690,7 @@ export default function Bookings() {
               </SelectContent>
             </Select>
             {assignableVehicles.length === 0 && (
-              <p className="bk-help bk-help--warning">No available vehicles — check the Fleet page.</p>
+              <p className="bk-help bk-help--warning">No vehicles are available. Check the Fleet page.</p>
             )}
           </div>
 
@@ -689,7 +707,7 @@ export default function Bookings() {
               </SelectContent>
             </Select>
             {assignableDrivers.length === 0 && (
-              <p className="bk-help bk-help--warning">No available drivers — check the Fleet page.</p>
+              <p className="bk-help bk-help--warning">No drivers are available. Check the Fleet page.</p>
             )}
           </div>
 
@@ -774,7 +792,7 @@ export default function Bookings() {
             </button>
           </div>
 
-          <div style={{ flex: 1, overflow: 'auto', background: 'var(--bg-deep)', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
+          <div style={{ flex: 1, overflow: 'auto', background: 'var(--bg-deep)', borderRadius: 'var(--radius-nested, 8px)', border: '1px solid var(--border-subtle)' }}>
             {load.pod_document ? (
               /\.pdf($|\?)/i.test(load.pod_document) ? (
                 <iframe src={load.pod_document} title="POD document" style={{ width: '100%', height: '60vh', border: 'none' }} />
@@ -782,7 +800,7 @@ export default function Bookings() {
                 <img src={load.pod_document} alt="Proof of delivery" style={{ width: '100%', height: 'auto', display: 'block' }} />
               )
             ) : (
-              <p className="bk-help" style={{ padding: 24 }}>No document file was attached — only a receipt name is on record.</p>
+              <p className="bk-help" style={{ padding: 24 }}>No document file was attached. Only the name of the person who received it is on record.</p>
             )}
           </div>
 

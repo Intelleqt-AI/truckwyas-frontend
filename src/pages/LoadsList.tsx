@@ -136,7 +136,7 @@ export default function LoadsList() {
     return matchStatus && matchSearch;
   });
 
-  const renderTable = (data: Load[], showInvoiceAction: boolean) => (
+  const renderTable = (data: Load[], showInvoiceAction: boolean, emptyText: string) => (
     <div className="bk-table-wrap">
       <table className="table-heading-roles bk-table">
         <thead>
@@ -148,7 +148,7 @@ export default function LoadsList() {
             <th scope="col">Vehicle</th>
             <th scope="col">Status</th>
             <th scope="col" className="is-num">Amount</th>
-            {showInvoiceAction && <th scope="col" className="is-center">Action</th>}
+            {showInvoiceAction && <th scope="col" className="is-num"><span className="sr-only">Action</span></th>}
           </tr>
         </thead>
         <tbody>
@@ -159,12 +159,12 @@ export default function LoadsList() {
               onClick={() => navigate(`/bookings/${load.id}`)}
             >
               <td className="is-id">{load.load_number}</td>
-              <td className="is-primary is-truncate" style={{ maxWidth: 200 }} title={load.customer_name || ''}>{load.customer_name || '—'}</td>
+              <td className="is-primary is-truncate" style={{ maxWidth: 180 }} title={load.customer_name || ''}>{load.customer_name || '—'}</td>
               <td className="is-truncate" style={{ maxWidth: 220 }} title={`${load.pickup_location} → ${load.delivery_location}`}>
                 {load.pickup_location} → {load.delivery_location}
               </td>
-              <td>{load.driver_name || '—'}</td>
-              <td className="is-truncate" style={{ maxWidth: 160 }} title={load.vehicle_info || ''}>{load.vehicle_info || '—'}</td>
+              <td className="is-truncate" style={{ maxWidth: 160 }} title={load.driver_name || ''}>{load.driver_name || '—'}</td>
+              <td className="is-truncate" style={{ maxWidth: 140 }} title={load.vehicle_info || ''}>{load.vehicle_info || '—'}</td>
               <td>
                 <span className={`bk-status bk-status--${STATUS_TONE[load.status] || 'neutral'}`}>
                   {formatStatus(load.status)}
@@ -173,14 +173,13 @@ export default function LoadsList() {
               <td className="is-money">
                 {formatCurrency(parseFloat(load.total_amount || '0'))}
               </td>
-              {showInvoiceAction && <td className="is-center" onClick={(e) => e.stopPropagation()}>
+              {showInvoiceAction && <td className="is-num" onClick={(e) => e.stopPropagation()}>
                 {load.status === 'DELIVERED' && (
                   <button
                     type="button"
-                    className="bk-btn bk-btn--outline"
+                    className="bk-btn bk-btn--secondary bk-btn--sm"
                     onClick={(e) => handleConvertToInvoice(load, e)}
                     disabled={convertingIds.has(load.id)}
-                    style={{ padding: '8px 12px' }}
                   >
                     {convertingIds.has(load.id) ? 'Creating…' : 'Create invoice'}
                   </button>
@@ -202,23 +201,30 @@ export default function LoadsList() {
           </div>
         ) : (
           <div className="bk-empty">
-            <p className="bk-empty__text">No loads match your filters.</p>
+            <p className="bk-empty__text">{emptyText}</p>
           </div>
         )
       )}
     </div>
   );
 
-  const metricCards = (items: { label: string; value: React.ReactNode; color: string }[]) => (
-    <div className="bk-metrics bk-metrics--money">
+  // One quiet summary strip: only the numbers that tell you what to do next,
+  // each with its basis in plain words underneath.
+  const summary = (items: { label: string; value: React.ReactNode; note: string; attention?: boolean }[]) => (
+    <section className="bk-summary" aria-label="Summary">
       {items.map(m => (
-        <div key={m.label} className="card metric-card">
-          <div className="card-header"><span className="card-title">{m.label}</span></div>
-          <div className="metric-value" style={{ color: m.color }}>{m.value}</div>
+        <div key={m.label} className="bk-summary__cell">
+          <div className="bk-summary__label">{m.label}</div>
+          <div className={`bk-summary__value${m.attention ? ' is-attention' : ''}`}>{m.value}</div>
+          <div className="bk-summary__note">{m.note}</div>
         </div>
       ))}
-    </div>
+    </section>
   );
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const pendingCount = activeLoads.filter(l => l.status === 'PENDING').length;
+  const deliveredNotInvoiced = historyLoads.filter(l => l.status === 'DELIVERED').length;
+  const completedLoads = historyLoads.filter(l => l.status !== 'CANCELLED');
 
   // Body below the shared header. Loading and error states render here so
   // the title and sub-navigation stay put while data arrives.
@@ -232,7 +238,7 @@ export default function LoadsList() {
       <div className="card" role="alert" style={{ padding: 24 }}>
         <h2 className="bk-empty__title" style={{ textAlign: 'left' }}>Unable to load bookings</h2>
         <p className="bk-empty__text" style={{ marginBottom: 16 }}>
-          The server may be starting up — this usually resolves in 20–30 seconds.
+          The server may be starting up. This usually resolves in 20 to 30 seconds.
         </p>
         <div>
           <button
@@ -277,12 +283,32 @@ export default function LoadsList() {
       {/* ORDERS TAB */}
       {activeTab === 'orders' && !body && (
         <div>
-          {metricCards([
-            { label: 'Active orders', value: activeLoads.length, color: 'var(--text-primary)' },
-            { label: 'In transit', value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length, color: 'var(--text-primary)' },
-            { label: 'Loading', value: activeLoads.filter(l => l.status === 'LOADING').length, color: 'var(--text-primary)' },
-            { label: 'Revenue (active)', value: formatCurrency(activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--text-primary)' },
-          ])}
+          {activeLoads.length > 0 ? summary([
+            {
+              label: 'Waiting for a vehicle',
+              value: pendingCount,
+              note: pendingCount > 0 ? 'Pending orders. Assign a vehicle to move them forward.' : 'Every active order has a vehicle.',
+              attention: pendingCount > 0,
+            },
+            {
+              label: 'On the road',
+              value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length,
+              note: `In transit. ${plural(activeLoads.filter(l => l.status === 'LOADING').length, 'order', 'orders')} loading, ${activeLoads.filter(l => l.status === 'ASSIGNED').length} assigned.`,
+            },
+            {
+              label: 'Value of active orders',
+              value: formatCurrency(activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)),
+              note: `Order totals across ${plural(activeLoads.length, 'active order', 'active orders')}.`,
+            },
+          ]) : (
+            <div className="bk-notice">
+              <div>
+                <p className="bk-notice__text">No orders are in progress.</p>
+                <p className="bk-notice__sub">A quote becomes an order when you convert it to a booking.</p>
+              </div>
+              <button type="button" className="bk-btn bk-btn--secondary" onClick={() => navigate('/bookings/quotes')}>View quotes</button>
+            </div>
+          )}
 
           <div className="bk-toolbar">
             <div className="bk-filters" role="group" aria-label="Filter orders by status">
@@ -301,18 +327,30 @@ export default function LoadsList() {
             <span className="bk-toolbar__end">{filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}</span>
           </div>
 
-          {renderTable(filteredOrders, false)}
+          {renderTable(filteredOrders, false, activeLoads.length === 0 ? 'Nothing in progress right now.' : 'No orders match this filter.')}
         </div>
       )}
 
       {/* HISTORY TAB */}
       {activeTab === 'history' && !body && (
         <div>
-          {metricCards([
-            { label: 'Completed', value: historyLoads.filter(l => l.status === 'DELIVERED' || l.status === 'INVOICED').length, color: 'var(--text-primary)' },
-            { label: 'Invoiced', value: historyLoads.filter(l => l.status === 'INVOICED').length, color: 'var(--text-primary)' },
-            { label: 'Cancelled', value: historyLoads.filter(l => l.status === 'CANCELLED').length, color: 'var(--text-primary)' },
-            { label: 'Total revenue', value: formatCurrency(historyLoads.filter(l => l.status !== 'CANCELLED').reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--text-primary)' },
+          {historyLoads.length > 0 && summary([
+            {
+              label: 'Delivered, not invoiced',
+              value: deliveredNotInvoiced,
+              note: deliveredNotInvoiced > 0 ? 'Create the invoice so you can get paid.' : 'Every delivered load has been invoiced.',
+              attention: deliveredNotInvoiced > 0,
+            },
+            {
+              label: 'Invoiced',
+              value: historyLoads.filter(l => l.status === 'INVOICED').length,
+              note: `${plural(historyLoads.filter(l => l.status === 'CANCELLED').length, 'load', 'loads')} cancelled.`,
+            },
+            {
+              label: 'Revenue from completed loads',
+              value: formatCurrency(completedLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)),
+              note: `Order totals across ${plural(completedLoads.length, 'delivered or invoiced load', 'delivered or invoiced loads')}.`,
+            },
           ])}
 
           <div className="bk-toolbar">
@@ -340,7 +378,7 @@ export default function LoadsList() {
             <span className="bk-toolbar__end">{filteredHistory.length} {filteredHistory.length === 1 ? 'record' : 'records'}</span>
           </div>
 
-          {renderTable(filteredHistory, true)}
+          {renderTable(filteredHistory, true, historyLoads.length === 0 ? 'No delivered, invoiced or cancelled loads yet.' : 'No loads match your search or filter.')}
         </div>
       )}
     </div>

@@ -1,16 +1,17 @@
-import "@/components/ui/dashboard-kpi.css";
-import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
+import { CAPITAL_LAUNCHED } from '@/lib/features';
 import StaleDataNotice from '@/components/data/StaleDataNotice';
 import '@/components/data/stale-data-notice.css';
 import './overview-typography.css';
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { Loader } from "@/components/Loader";
-import { DashboardMetricIcon } from "@/components/ui/DashboardMetricIcon";
+import SectionHeader from "@/components/layout/SectionHeader";
+import { FleetActivity, QuoteConversion, OwedStrip } from "@/components/overview/charts";
+import { Sparkline, CoverDumbbell } from "@/components/viz";
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed below) and survives navigation — revisiting
@@ -59,7 +60,11 @@ async function loadOverview() {
   const insights = insightsArr.map((s: any) => ({
     category: s.category || s.type || "Update",
     title: s.title || "",
-    body: s.body || s.message || "",
+    // The backend appends invented loss estimates (e.g. "Estimated revenue
+    // loss: R 72,000/day") with no basis. Drop them until the backend stops.
+    body: String(s.body || s.message || "")
+      .replace(/\s*Estimated revenue loss:[^.]*\.?/gi, "")
+      .trim(),
     action: s.action || "VIEW",
     severity: s.severity || "low",
     type: s.type || "INFO",
@@ -76,6 +81,7 @@ async function loadOverview() {
 
   const quotes = quotesData?.results || quotesData || [];
   const recentQuotes = quotes.slice(0, 5);
+  const quotesTotal: number | undefined = quotesData?.count;
 
   const loads = loadsData?.results || loadsData || [];
   // "Active" = anywhere in the open lifecycle (PENDING/ASSIGNED/LOADING/
@@ -88,6 +94,7 @@ async function loadOverview() {
     (l: any) => !TERMINAL_LOAD_STATUSES.includes(l.status),
   ).length;
   const recentLoads = loads.slice(0, 5);
+  const loadsTotal: number | undefined = loadsData?.count;
 
   const vehicles = vehiclesData?.results || vehiclesData || [];
   const totalVehicles = vehicles.length;
@@ -131,6 +138,12 @@ async function loadOverview() {
     availableVehicles,
     activity,
     heatmapData,
+    // Full lists already fetched above, kept for the charts (no new requests).
+    quotes,
+    quotesTotal,
+    loads,
+    loadsTotal,
+    vehicles,
   };
 }
 
@@ -147,7 +160,7 @@ const CARD_MENUS: Record<string, { label: string; route: string }[]> = {
   outstanding: [
     { label: "View outstanding invoices", route: "/finance/invoices?status=OVERDUE" },
     { label: "View all invoices",         route: "/finance/invoices" },
-    { label: "Request capital advance",   route: "/capital" },
+    { label: CAPITAL_LAUNCHED ? "Request capital advance" : "See Fast Pay (not live yet)", route: "/capital" },
   ],
 };
 
@@ -202,9 +215,37 @@ function KpiMenu({
   );
 }
 
+// Presentation-only helpers for the redesigned panels.
+const shortPlace = (s?: string) =>
+  (s || "").split(" ").slice(0, 2).join(" ").replace(/[,\s]+$/, "") || "—";
+// Backend signal titles use " — " as a separator; show a colon instead.
+const cleanSignalText = (s?: string) => (s || "").replace(/\s+—\s+/g, ": ");
+const isFastPaySignal = (i: any) => /fast\s*pay|advance/i.test(`${i.title} ${i.body}`);
+
+function Delta({ value, unit, period }: { value: number; unit: "%" | "pts"; period: string }) {
+  const up = value > 0;
+  const flat = value === 0;
+  const sign = up ? "+" : value < 0 ? "−" : "";
+  const shown = `${sign}${Math.abs(value)}${unit === "%" ? "%" : " pts"}`;
+  return (
+    <span className={`ov-delta ${flat ? "" : up ? "is-up" : "is-down"}`}>
+      {!flat && (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+          <polyline points={up ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+        </svg>
+      )}
+      <span>{shown}</span>
+      <span className="ov-delta__period">{period}</span>
+    </span>
+  );
+}
+
+function StatusChip({ status, positive }: { status?: string; positive: boolean }) {
+  return <span className={`ov-chip${positive ? " is-positive" : ""}`}>{titleCase(status)}</span>;
+}
+
 export default function Overview() {
   const navigate = useNavigate();
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   useEffect(() => {
@@ -221,39 +262,23 @@ export default function Overview() {
 
   // Cached data drives the view; defaults keep the first render safe.
   const financeData = data?.financeData ?? null;
-  const insights = data?.insights ?? [];
-  const advances = data?.advances ?? [];
-  // Advances actually in TruckWys's own request pipeline — REQUESTED
-  // (submitted, not yet scored) or SCORING (risk engine actively evaluating
-  // it). In practice this is usually 0 while Fast Pay is being set up, so
-  // it's added to the eligible-invoice count below rather than shown alone.
-  const pendingAdvancesCount = advances.filter(
-    (a: any) => a.status === "REQUESTED" || a.status === "SCORING",
-  ).length;
-  // Invoices that qualify for an advance but don't have one requested yet —
-  // the backend excludes invoices with an active request from this list, so
-  // it's disjoint from pendingAdvancesCount and safe to add.
-  const eligibleInvoicesCount = data?.eligibleInvoicesCount ?? 0;
-  const advancesActionableCount = pendingAdvancesCount + eligibleInvoicesCount;
+  const failed = data?.failedSources ?? [];
+  // Fast Pay is not live: its signals (advance amounts, fees, payout times)
+  // describe money that is not available, so they are not shown.
+  const insights = (data?.insights ?? []).filter((i: any) => CAPITAL_LAUNCHED || !isFastPaySignal(i));
   const recentQuotes = data?.recentQuotes ?? [];
+  const allQuotes: any[] = data?.quotes ?? [];
+  const quotesTotal: number | undefined = data?.quotesTotal;
   const recentLoads = data?.recentLoads ?? [];
   const activeLoadsCount = data?.activeLoadsCount ?? 0;
   const totalVehicles = data?.totalVehicles ?? 0;
   const activeVehicles = data?.activeVehicles ?? 0;
   const availableVehicles = data?.availableVehicles ?? 0;
   const activity = data?.activity ?? [];
-  const heatmapData = data?.heatmapData ?? [];
-  const activityLoading = loading;
+  const heatmapData: number[] = data?.heatmapData ?? [];
 
   useEffect(() => {
     document.title = "Overview - TruckWys";
-
-    // Real-time clock update
-    const clockInterval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(clockInterval);
   }, []);
 
   useAutoRefresh(refetch);
@@ -268,896 +293,366 @@ export default function Overview() {
     return `${Math.floor(h / 24)}d ago`;
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("en-ZA", {
-      timeZone: "Africa/Johannesburg",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-  };
-
-  const formatDate = (date: Date) => {
-    // Built from parts so every browser shows "Mon, 28 Sep 2026" (no "Sept").
+  const today = (() => {
+    // Built from parts so every browser shows "Monday, 28 Sep 2026" (no "Sept").
     const parts = new Intl.DateTimeFormat("en-ZA", {
-      timeZone: "Africa/Johannesburg",
-      weekday: "short",
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
-    }).formatToParts(date);
+      timeZone: "Africa/Johannesburg", weekday: "long", year: "numeric", month: "numeric", day: "numeric",
+    }).formatToParts(new Date());
     const get = (t: string) => parts.find((p) => p.type === t)?.value || "";
     return `${get("weekday")}, ${Number(get("day"))} ${MONTHS_SHORT[Number(get("month")) - 1] || ""} ${get("year")}`;
-  };
+  })();
 
-  const getHeatClass = (count: number) => {
-    if (count === 0) return "";
-    const max = Math.max(...heatmapData, 1);
-    const ratio = count / max;
-    if (ratio >= 0.75) return "heat-high";
-    if (ratio >= 0.5) return "heat-med";
-    if (ratio > 0) return "heat-low";
-    return "";
-  };
+  // ---- Derived presentation values (no new calculations of business figures) ----
+  const trend: any[] = financeData?.monthly_trend || [];
+  const monthLabel = (m: any) => MONTHS_SHORT[Number(String(m.month).slice(5, 7)) - 1] || m.month || "";
+  const revenueSeries = trend.map((m) => Number(m.revenue) || 0);
+  const marginSeries = trend.map((m) => (m.revenue > 0 ? ((m.revenue - m.expenses) / m.revenue) * 100 : null));
+  const marginBasis = financeData
+    ? financeData.revenue_mtd > 0 ? "this month" : financeData.total_revenue > 0 ? "all time" : null
+    : null;
+  const loads28 = heatmapData.reduce((a, b) => a + b, 0);
+  const trendLabels = trend.map((m) => `${monthLabel(m)} ${String(m.month).slice(0, 4)}`);
+  const dayLabels28 = heatmapData.map((_, i) => {
+    const d = new Date(Date.now() - (27 - i) * 86400000);
+    return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+  });
+  const vehiclesFailed = failed.includes("vehicles") && !data?.totalVehicles;
+  const outstanding = Number(financeData?.outstanding_invoices_total || 0);
+  const overdue = Number(financeData?.overdue_invoices_total || 0);
+
+  const skeleton = <span className="ov-skel" aria-label="Loading" />;
 
   return (
-    <div
-      className="overview-typography"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        // "dense": the default (sparse) packing advances a one-way cursor —
-        // once a 2-wide card (e.g. Recent Bookings) can't fit in a single
-        // leftover column, the algorithm moves on and never backfills that
-        // gap with a later, smaller card. Dense packing fills those gaps
-        // instead — the actual cause of the empty column-3 strip between
-        // Fleet Utilization and Recent Activity. Doesn't affect DOM/reading
-        // order, only visual position.
-        gridAutoFlow: "dense",
-        gap: 16,
-        alignContent: "start",
-      }}>
-      {/* One semantic H1 per screen. The dashboard deliberately leads with the
-          clock/command bar instead of a visible title, so the heading is
-          visually hidden but still announced to assistive technology. */}
-      <h1
-        style={{
-          position: "absolute",
-          width: 1,
-          height: 1,
-          margin: -1,
-          padding: 0,
-          overflow: "hidden",
-          clip: "rect(0 0 0 0)",
-          whiteSpace: "nowrap",
-          border: 0,
-          fontSize: 22,
-          lineHeight: "28px",
-          fontWeight: 600,
-        }}>
-        Dashboard
-      </h1>
-      {/* Command bar — compact clock + actionable live pulse */}
-      <div
-          className="card"
-          style={{
-            gridColumn: "span 3",
-            padding: "12px 20px",
-            background: "var(--bg-surface)",
-          }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 16,
-              flexWrap: "wrap",
-            }}>
-            {/* Compact date / time */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div>
-                <div
-                  style={{
-                    fontSize: 13, lineHeight: "20px",
-                    fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                    color: "var(--text-tertiary)",
-                    letterSpacing: "normal",
-                    textTransform: "none",
-                  }}>
-                  {formatDate(currentTime)}
-                </div>
-                <div
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 600,
-                    color: "var(--text-primary)",
-                    fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                    marginTop: 1,
-                  }}>
-                  {formatTime(currentTime)}{" "}
-                  <span
-                    style={{
-                      fontSize: 13, lineHeight: "20px",
-                      color: "var(--text-tertiary)",
-                      marginLeft: 4,
-                    }}>
-                    SAST
-                  </span>
-                </div>
-              </div>
-              <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
-              {isError && !data && (
-                <div className="stale-data-notice" role="alert">
-                  <span>The overview couldn't be loaded.</span>
-                  <button type="button" className="stale-data-notice__retry" onClick={() => refetch()}>
-                    Try again
-                  </button>
-                </div>
-              )}
-              {!isRefetchError && (data?.failedSources?.length ?? 0) > 0 && (
-                <div className="stale-data-notice" role="status">
-                  <span>
-                    Some figures couldn't load: {data!.failedSources.join(", ")}.
-                  </span>
-                  <button type="button" className="stale-data-notice__retry" onClick={() => refetch()}>
-                    Try again
-                  </button>
-                </div>
-              )}
-            </div>
+    <div className="overview-typography ov-page">
+      <SectionHeader
+        title="Overview"
+        description={today}
+        actions={
+          <>
+            <button type="button" className="ov-btn" onClick={() => navigate("/finance/expenses")}>Add expense</button>
+            <button type="button" className="ov-btn" onClick={() => navigate("/finance/reports")}>View reports</button>
+            <button type="button" className="ov-btn ov-btn--primary" onClick={() => navigate("/finance/invoices/new")}>Create invoice</button>
+          </>
+        }
+      />
 
-            {/* Actionable pulse — clickable */}
-            <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
-              {(
-                [
-                  {
-                    label: "Active loads",
-                    value: String(activeLoadsCount),
-                    route: "/bookings",
-                    warn: false,
-                  },
-                  {
-                    label: "Active vehicles",
-                    value: `${activeVehicles}/${totalVehicles}`,
-                    route: "/fleet",
-                    warn: false,
-                  },
-                  {
-                    label: "Advances pending",
-                    value: String(advancesActionableCount),
-                    route: "/capital",
-                    warn: advancesActionableCount > 0,
-                  },
-                ] as const
-              ).map((s) => (
-                <button
-                  type="button"
-                  key={s.label}
-                  className="overview-pulse"
-                  onClick={() => navigate(s.route)}>
-                  <div
-                    style={{
-                      fontSize: 13, lineHeight: "20px",
-                      fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                      color: "var(--text-tertiary)",
-                      textTransform: "none",
-                      letterSpacing: "normal",
-                      marginBottom: 2,
-                    }}>
-                    {s.label}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 16,
-                      lineHeight: "24px",
-                      fontWeight: 600,
-                      fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                      color: s.warn
-                        ? "var(--status-warning-text, var(--status-warning))"
-                        : "var(--text-primary)",
-                    }}>
-                    {s.value}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions — moved up from the bottom of the page so the most
-            common next steps are reachable without scrolling past every
-            chart/table first. A slim horizontal bar (not a 2x2 box) keeps it
-            from eating much vertical space up here. */}
-        <div
-          className="card"
-          style={{
-            gridColumn: "span 3",
-            padding: "16px 20px",
-          }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-              flexWrap: "wrap",
-            }}>
-            <span className="card-title" style={{ marginRight: 4 }}>
-              Quick actions
-            </span>
-            <button
-              onClick={() => navigate("/finance/invoices/new")}
-              className="btn-action"
-              style={{
-                padding: "8px 16px",
-              }}>
-              Create invoice
-            </button>
-            <button
-              onClick={() => CAPITAL_LAUNCHED && navigate("/capital")}
-              disabled={!CAPITAL_LAUNCHED}
-              title={CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON}
-              className="btn-action"
-              style={{
-                padding: "8px 16px",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              {CAPITAL_LAUNCHED ? "Request advance" : "Request advance (coming soon)"}
-            </button>
-            <button
-              onClick={() => navigate("/finance/expenses")}
-              className="btn-action"
-              style={{
-                padding: "8px 16px",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              Add expense
-            </button>
-            <button
-              onClick={() => navigate("/finance/reports")}
-              className="btn-action"
-              style={{
-                padding: "8px 16px",
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-              }}>
-              View reports
+      <div className="ov-notices">
+        <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
+        {isError && !data && (
+          <div className="stale-data-notice" role="alert">
+            <span>The overview couldn't be loaded.</span>
+            <button type="button" className="stale-data-notice__retry" onClick={() => refetch()}>
+              Try again
             </button>
           </div>
-        </div>
-
-        {/* Metric cards */}
-        <div className="card metric-card dashboard-kpi-card">
-          <div className="card-header dashboard-kpi-label">
-            <span className="card-title dashboard-kpi-label"><span className="dashboard-metric-label-content"><DashboardMetricIcon kind="money" /><span className="dashboard-metric-label-text">
-              Total revenue
-            </span></span></span>
-            <KpiMenu id="revenue" label="Total revenue" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={200} onGo={navigate} />
+        )}
+        {!isRefetchError && failed.length > 0 && (
+          <div className="stale-data-notice" role="status">
+            <span>Some figures couldn't load: {failed.join(", ")}.</span>
+            <button type="button" className="stale-data-notice__retry" onClick={() => refetch()}>
+              Try again
+            </button>
           </div>
-          <div className="metric-value dashboard-kpi-value">
-            {loading ? "..." : financeData ? formatCurrency(financeData.total_revenue || 0) : "—"}
-          </div>
-          {typeof financeData?.revenue_change_pct === "number" ? (
-            <div
-              className={`dashboard-kpi-context metric-delta ${financeData.revenue_change_pct >= 0 ? "delta-up" : "delta-down"}`}>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3">
-                <polyline
-                  points={
-                    financeData.revenue_change_pct >= 0
-                      ? "18 15 12 9 6 15"
-                      : "6 9 12 15 18 9"
-                  }
-                />
-              </svg>
-              <span>
-                {financeData.revenue_change_pct >= 0 ? "+" : ""}
-                {financeData.revenue_change_pct}% vs prev 30d
-              </span>
-            </div>
-          ) : (
-            <div className="metric-delta delta-neutral dashboard-kpi-context">
-              <span>last 30 days</span>
-            </div>
-          )}
-        </div>
+        )}
+      </div>
 
-        <div className="card metric-card dashboard-kpi-card">
-          <div className="card-header dashboard-kpi-label">
-            <span className="card-title dashboard-kpi-label"><span className="dashboard-metric-label-content"><DashboardMetricIcon kind="percent" /><span className="dashboard-metric-label-text">
-              Net margin
-            </span></span></span>
+      {/* KPI tiles: label, value, change against the previous period, trend. */}
+      <div className="ov-kpis">
+        <section className="ov-card ov-kpi" aria-label="Revenue received to date">
+          <div className="ov-kpi__head">
+            <h3 className="ov-kpi__label">Revenue received to date</h3>
+            <KpiMenu id="revenue" label="Revenue" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={200} onGo={navigate} />
+          </div>
+          <div className="ov-kpi__value">
+            {loading ? skeleton : financeData ? formatCurrency(financeData.total_revenue || 0) : "—"}
+          </div>
+          <div className="ov-kpi__context">
+            {typeof financeData?.revenue_change_pct === "number" ? (
+              <Delta value={financeData.revenue_change_pct} unit="%" period="last 30 days vs the 30 before" />
+            ) : financeData ? (
+              <span>No payments in the previous 30 days to compare</span>
+            ) : !loading ? <span>Unavailable</span> : null}
+          </div>
+          <Sparkline
+            values={revenueSeries}
+            labels={trendLabels}
+            format={(v) => formatCurrency(v)}
+            ariaLabel={`Revenue received per month, ${trendLabels[0] || ""} to ${trendLabels[trendLabels.length - 1] || ""}`}
+          />
+        </section>
+
+        <section className="ov-card ov-kpi" aria-label="Net margin">
+          <div className="ov-kpi__head">
+            <h3 className="ov-kpi__label">Net margin{marginBasis ? `, ${marginBasis}` : ""}</h3>
             <KpiMenu id="margin" label="Net margin" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={200} onGo={navigate} />
           </div>
-          <div
-            className="metric-value dashboard-kpi-value">
-            {loading
-              ? "..."
-              : financeData ? formatPercent(financeData.net_margin_percent || 0) : "—"}
+          <div className="ov-kpi__value">
+            {loading ? skeleton : financeData && marginBasis ? formatPercent(financeData.net_margin_percent || 0) : "—"}
           </div>
-          {typeof financeData?.margin_change_pts === "number" ? (
-            <div
-              className={`dashboard-kpi-context metric-delta ${financeData.margin_change_pts >= 0 ? "delta-up" : "delta-down"}`}>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3">
-                <polyline
-                  points={
-                    financeData.margin_change_pts >= 0
-                      ? "18 15 12 9 6 15"
-                      : "6 9 12 15 18 9"
-                  }
-                />
-              </svg>
-              <span>
-                {financeData.margin_change_pts >= 0 ? "+" : ""}
-                {financeData.margin_change_pts} pts vs prev 30d
-              </span>
-            </div>
-          ) : (
-            <div className="metric-delta delta-neutral dashboard-kpi-context">
-              <span>last 30 days</span>
-            </div>
-          )}
-        </div>
+          <div className="ov-kpi__context">
+            {typeof financeData?.margin_change_pts === "number" ? (
+              <Delta value={financeData.margin_change_pts} unit="pts" period="last 30 days vs the 30 before" />
+            ) : financeData ? (
+              <span>{marginBasis ? "Not enough revenue in both periods to compare" : "No revenue received yet"}</span>
+            ) : !loading ? <span>Unavailable</span> : null}
+          </div>
+          <Sparkline
+            values={marginSeries}
+            labels={trendLabels}
+            format={(v) => `${v.toFixed(1)}%`}
+            ariaLabel="Net margin per month. Months without revenue are gaps."
+          />
+        </section>
 
-        <div className="card metric-card dashboard-kpi-card">
-          <div className="card-header dashboard-kpi-label">
-            <span className="card-title dashboard-kpi-label"><span className="dashboard-metric-label-content"><DashboardMetricIcon kind="overdue" /><span className="dashboard-metric-label-text">
-              Outstanding
-            </span></span></span>
-            <KpiMenu id="outstanding" label="Outstanding" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={220} onGo={navigate} />
+        <section className="ov-card ov-kpi" aria-label="Owed to you">
+          <div className="ov-kpi__head">
+            <h3 className="ov-kpi__label">Owed to you</h3>
+            <KpiMenu id="outstanding" label="Owed to you" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={220} onGo={navigate} />
           </div>
-          <div
-            className="metric-value dashboard-kpi-value"
-            style={{ color: "var(--status-warning-text, var(--status-warning))" }}>
-            {loading
-              ? "..."
-              : financeData ? formatCurrency(financeData.outstanding_invoices_total || 0) : "—"}
+          <div className="ov-kpi__value">
+            {loading ? skeleton : financeData ? formatCurrency(outstanding) : "—"}
           </div>
-          <div className="metric-delta delta-neutral dashboard-kpi-context">
-            <span>
-              DSO: {loading || !financeData ? "—" : Math.round(financeData.dso || 0)} days
-            </span>
+          <div className="ov-kpi__context">
+            {financeData ? (
+              outstanding <= 0 ? (
+                <span>Every sent invoice is paid</span>
+              ) : (
+                <span className={overdue > 0 ? "ov-attention" : ""}>
+                  {overdue >= outstanding ? "All of it is past due" : overdue > 0 ? `${formatCurrency(overdue)} past due` : "None of it is past due"}
+                </span>
+              )
+            ) : !loading ? <span>Unavailable</span> : null}
           </div>
-        </div>
+          {financeData && <OwedStrip outstanding={outstanding} overdue={overdue} />}
+          <div className="ov-kpi__foot">
+            {financeData && outstanding > 0 && (financeData.dso > 0
+              ? `Customers take ${Math.round(financeData.dso)} days to pay on average`
+              : "Time to pay needs invoices issued in the last 90 days")}
+          </div>
+        </section>
 
-        {/* Chart card */}
-        <div className="card chart-card">
-          <div className="card-header">
-            <span className="card-title">
-              Revenue vs costs by month
-            </span>
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                fontSize: 13, lineHeight: "20px",
-                color: "var(--text-secondary)",
-              }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span
-                  style={{
-                    width: 20,
-                    height: 2,
-                    background: "var(--accent-primary)",
-                    display: "inline-block",
-                    borderRadius: 1,
-                  }}
-                />
-                Revenue
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span
-                  style={{
-                    width: 20,
-                    height: 2,
-                    background: "var(--status-danger)",
-                    display: "inline-block",
-                    borderRadius: 1,
-                  }}
-                />
-                Costs
-              </span>
-            </div>
+        <section className="ov-card ov-kpi" aria-label="Active loads">
+          <div className="ov-kpi__head">
+            <h3 className="ov-kpi__label">Active loads</h3>
+            <Link to="/bookings" className="ov-link">Bookings</Link>
           </div>
-          {(() => {
-            const trend = financeData?.monthly_trend || [];
-            const rev =
-              trend.length > 0 ? trend.map((m: any) => m.revenue / 1000) : [0];
-            const fuel =
-              trend.length > 0 ? trend.map((m: any) => m.expenses / 1000) : [0];
-            const maxV = Math.max(...rev, ...fuel, 1) * 1.1;
-            const pts = (arr: number[]) =>
-              arr
-                .map(
-                  (v, i) =>
-                    `${(i / Math.max(arr.length - 1, 1)) * 100},${100 - (v / maxV) * 100}`,
-                )
-                .join(" ");
-            const labels = trend.map((m: any) => MONTHS_SHORT[Number(m.month?.slice(5, 7)) - 1] || m.month || "");
-            return (
-              <>
-                <svg
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                  style={{
-                    width: "100%",
-                    height: 120,
-                    display: "block",
-                    marginTop: 8,
-                  }}>
-                  <defs>
-                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop
-                        offset="0%"
-                        stopColor="var(--accent-primary)"
-                        stopOpacity="0.15"
-                      />
-                      <stop
-                        offset="100%"
-                        stopColor="var(--accent-primary)"
-                        stopOpacity="0"
-                      />
-                    </linearGradient>
-                  </defs>
-                  <polygon
-                    points={`0,100 ${pts(rev)} 100,100`}
-                    fill="url(#revGrad)"
-                  />
-                  <polyline
-                    points={pts(rev)}
-                    fill="none"
-                    stroke="var(--accent-primary)"
-                    strokeWidth="1.5"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  <polyline
-                    points={pts(fuel)}
-                    fill="none"
-                    stroke="var(--status-danger)"
-                    strokeWidth="1.2"
-                    strokeDasharray="3,2"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </svg>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginTop: 4,
-                    fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                    fontSize: 13, lineHeight: "20px",
-                    color: "var(--text-secondary)",
-                  }}>
-                  {labels.map((l: string, i: number) => (
-                    <span key={i}>{l}</span>
-                  ))}
-                </div>
-              </>
-            );
-          })()}
-          <div
-            style={{
-              display: "flex",
-              gap: 20,
-              flexWrap: "wrap",
-              marginTop: 8,
-              color: "var(--text-secondary)",
-              fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-              fontSize: 13, lineHeight: "20px",
-            }}>
-            <span>
-              Net margin{" "}
-              <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
-                {financeData?.net_margin_percent != null
-                  ? `${(financeData.net_margin_percent || 0).toFixed(1)}%`
-                  : "—"}
-              </span>
-            </span>
-            <span>
-              Costs as % of revenue, latest month{" "}
-              <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
-                {financeData?.monthly_trend?.length > 0
-                  ? `${Math.round(((financeData.monthly_trend.at(-1)?.expenses || 0) / Math.max(financeData.monthly_trend.at(-1)?.revenue || 1, 1)) * 100)}%`
-                  : "—"}
-              </span>
-            </span>
+          <div className="ov-kpi__value">{loading ? skeleton : failed.includes("loads") ? "—" : activeLoadsCount}</div>
+          <div className="ov-kpi__context">
+            {data && !failed.includes("loads") && <span>{loads28} booked in the last 28 days</span>}
           </div>
-        </div>
+          <Sparkline
+            values={heatmapData}
+            labels={dayLabels28}
+            variant="bars"
+            format={(v) => `${v} ${v === 1 ? "load" : "loads"} booked`}
+            ariaLabel={`Loads booked per day, last 28 days: ${loads28} in total`}
+          />
+        </section>
+      </div>
 
-        {/* Utilization card */}
-        <div className="card utilization-card">
-          <div className="card-header">
-            <span className="card-title">Fleet utilisation</span>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-end",
-              marginBottom: 12,
-            }}>
-            <div>
-              <div
-                style={{
-                  fontSize: 28,
-                  lineHeight: "36px",
-                  fontWeight: 600,
-                  fontVariantNumeric: "tabular-nums",
-                  color: "var(--text-primary)",
-                }}>
-                {totalVehicles > 0
-                  ? `${Math.round((activeVehicles / totalVehicles) * 100)}%`
-                  : "—"}
-              </div>
-              <div
-                style={{
-                  fontSize: 13, lineHeight: "20px",
-                  color: "var(--text-secondary)",
-                  marginTop: 2,
-                }}>
-                {activeVehicles} of {totalVehicles} vehicles active
-              </div>
+      <div className="ov-columns">
+        <div className="ov-stack">
+          <section className="ov-card" aria-labelledby="ov-chart-title">
+            <div className="ov-card__head">
+              <h2 id="ov-chart-title" className="ov-card__title">Did revenue cover costs each month?</h2>
+              <p className="ov-card__desc">Each month shows revenue (invoices paid in the month) against costs (approved expenses dated in the month). The line between them is what was left over, or the shortfall.</p>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)" }}>
-                Active loads
-              </div>
-              <div
-                style={{
-                  fontSize: 16,
-                  lineHeight: "24px",
-                  fontWeight: 600,
-                  color: "var(--text-primary)",
-                  fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                }}>
-                {activeLoadsCount}
-              </div>
-            </div>
-          </div>
-          <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>
-            Loads created per day, last 28 days
-          </div>
-          <div className="heatmap-grid" role="img" aria-label={`Loads created per day over the last 28 days: ${heatmapData.reduce((a: number, b: number) => a + b, 0)} in total`}>
-            {(heatmapData.length > 0 ? heatmapData : new Array(28).fill(0)).map(
-              (count, i) => (
-                <div
-                  key={i}
-                  className={`heat-cell ${getHeatClass(count)}`}
-                  title={`${count} load${count !== 1 ? "s" : ""}`}
-                />
-              ),
+            {loading ? (
+              <div className="ov-skel-block" />
+            ) : trend.length === 0 ? (
+              <p className="ov-empty">{financeData ? "No monthly figures yet." : "Revenue and cost figures couldn't load."}</p>
+            ) : (
+              <CoverDumbbell
+                periods={trend.map((m, i) => ({
+                  label: monthLabel(m),
+                  revenue: Number(m.revenue) || 0,
+                  costs: Number(m.expenses) || 0,
+                  isCurrent: i === trend.length - 1,
+                }))}
+              />
             )}
-          </div>
-          <div
-            style={{
-              marginTop: 12,
-              fontSize: 13, lineHeight: "20px",
-              color: "var(--text-tertiary)",
-            }}>
-            {data
-              ? `${availableVehicles} vehicle${availableVehicles !== 1 ? "s" : ""} available`
-              : "Loading..."}
-          </div>
+          </section>
+
+          <section className="ov-card ov-card--table" aria-labelledby="ov-quotes-title">
+            <div className="ov-card__head ov-card__head--split">
+              <div>
+                <h2 id="ov-quotes-title" className="ov-card__title">How far do your quotes get?</h2>
+                <p className="ov-card__desc">
+                  {allQuotes.length > 0
+                    ? `Each stage counts quotes that reached it, from ${quotesTotal != null && quotesTotal > allQuotes.length ? `your ${allQuotes.length} most recent quotes (of ${quotesTotal})` : `all ${allQuotes.length} quotes`}, by current status. Invoicing and payment are not linked to quotes here.`
+                    : "Quotes by how far they progressed, then the five most recent."}
+                </p>
+              </div>
+              <Link to="/bookings/quotes" className="ov-link">View all</Link>
+            </div>
+            {!loading && allQuotes.length > 0 && (
+              <div className="ov-funnel">
+                <QuoteConversion quotes={allQuotes} />
+                <h3 className="ov-subhead">Latest five</h3>
+              </div>
+            )}
+            {loading ? (
+              <div className="ov-skel-block ov-skel-block--short" />
+            ) : recentQuotes.length > 0 ? (
+              <div className="ov-table-wrap">
+                <table className="ov-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Quote</th>
+                      <th scope="col">Customer</th>
+                      <th scope="col">Route</th>
+                      <th scope="col" className="num">Total</th>
+                      <th scope="col">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentQuotes.map((quote: any) => (
+                      <tr key={quote.id} onClick={() => navigate(`/bookings/quotes/${quote.id}`)}>
+                        <td><Link className="ov-id" to={`/bookings/quotes/${quote.id}`} onClick={(e) => e.stopPropagation()}>{quote.quote_number}</Link></td>
+                        <td>{quote.customer_name || "—"}</td>
+                        <td className="ov-muted">{shortPlace(quote.pickup_location)} to {shortPlace(quote.delivery_location)}</td>
+                        <td className="num">{formatCurrency(parseFloat(quote.total_amount || "0"))}</td>
+                        <td><StatusChip status={quote.status} positive={quote.status === "ACCEPTED"} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="ov-empty">{failed.includes("recent quotes") ? "Quotes couldn't load." : "No quotes yet."}</p>
+            )}
+          </section>
+
+          <section className="ov-card ov-card--table" aria-labelledby="ov-loads-title">
+            <div className="ov-card__head ov-card__head--split">
+              <div>
+                <h2 id="ov-loads-title" className="ov-card__title">Latest bookings</h2>
+                <p className="ov-card__desc">The five most recent loads and where each one stands.</p>
+              </div>
+              <Link to="/bookings" className="ov-link">View all</Link>
+            </div>
+            {loading ? (
+              <div className="ov-skel-block ov-skel-block--short" />
+            ) : recentLoads.length > 0 ? (
+              <div className="ov-table-wrap">
+                <table className="ov-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Load</th>
+                      <th scope="col">Customer</th>
+                      <th scope="col">Route</th>
+                      <th scope="col">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentLoads.map((load: any) => (
+                      <tr key={load.id} onClick={() => navigate(`/bookings/${load.id}`)}>
+                        <td><Link className="ov-id" to={`/bookings/${load.id}`} onClick={(e) => e.stopPropagation()}>{load.load_number || `LD-${load.id}`}</Link></td>
+                        <td>{load.customer_name || load.customer?.company_name || "—"}</td>
+                        <td className="ov-muted">
+                          {shortPlace(load.pickup_location || load.origin)} to {shortPlace(load.delivery_location || load.destination)}
+                        </td>
+                        <td><StatusChip status={load.status} positive={load.status === "DELIVERED"} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="ov-empty">{failed.includes("loads") ? "Bookings couldn't load." : "No bookings yet."}</p>
+            )}
+          </section>
         </div>
 
-        {/* Recent quotes */}
-        <div className="card table-card">
-          <div className="card-header">
-            <span className="card-title">Recent quotes</span>
-            <button
-              onClick={() => navigate("/bookings/quotes")}
-              style={{
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-                padding: "8px 16px",
-                minHeight: 40,
-                fontSize: 14, lineHeight: "20px",
-                fontFamily: "var(--font-sans)",
-                borderRadius: 6,
-                cursor: "pointer",
-              }}>
-              View all
-            </button>
-          </div>
-          {loading ? (
-            <div style={{ padding: 40, display: "flex", justifyContent: "center" }}>
-              <Loader size={24} />
+        <div className="ov-stack">
+          <section className="ov-card" aria-labelledby="ov-fleet-title">
+            <div className="ov-card__head">
+              <h2 id="ov-fleet-title" className="ov-card__title">Is the fleet working?</h2>
+              <p className="ov-card__desc">Each square is a day in the last 28. Filled means the truck had a load between pickup and delivery. Only loads with a truck assigned count.</p>
             </div>
-          ) : recentQuotes.length > 0 ? (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Quote #</th>
-                  <th>Customer</th>
-                  <th>Route</th>
-                  <th style={{ textAlign: "right" }}>Total</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentQuotes.map((quote: any) => (
-                  <tr
-                    key={quote.id}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => navigate(`/bookings/quotes/${quote.id}`)}>
-                    <td className="mono">{quote.quote_number}</td>
-                    <td>{quote.customer_name}</td>
-                    <td
-                      style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: "20px" }}>
-                      {quote.pickup_location?.split(" ").slice(0, 2).join(" ")}{" "}
-                      →{" "}
-                      {quote.delivery_location
-                        ?.split(" ")
-                        .slice(0, 2)
-                        .join(" ")}
-                    </td>
-                    <td
-                      style={{
-                        color: "var(--text-primary)",
-                        textAlign: "right",
-                        whiteSpace: "nowrap",
-                        fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
-                      }}>
-                      {formatCurrency(parseFloat(quote.total_amount || "0"))}
-                    </td>
-                    <td>
-                      <span
-                        style={{
-                          fontFamily: "var(--font-sans)",
-                          fontSize: 13, lineHeight: "20px",
-                          color:
-                            quote.status === "ACCEPTED"
-                              ? "var(--status-success-text, var(--status-success))"
-                              : quote.status === "SENT"
-                                ? "var(--status-warning-text, var(--status-warning))"
-                                : "var(--text-secondary)",
-                          padding: "2px 8px",
-                          background: "var(--bg-surface-hover)",
-                          borderRadius: 4,
-                          display: "inline-block",
-                          whiteSpace: "nowrap",
-                        }}>
-                        {titleCase(quote.status)}
-                      </span>
-                    </td>
-                  </tr>
+            {loading ? (
+              <div className="ov-skel-block ov-skel-block--short" />
+            ) : vehiclesFailed ? (
+              <p className="ov-empty">Vehicle figures couldn't load. Try again from the notice above.</p>
+            ) : totalVehicles === 0 ? (
+              <div className="ov-empty">
+                <p>No vehicles added yet.</p>
+                <Link to="/fleet" className="ov-link">Add vehicles</Link>
+              </div>
+            ) : (
+              <>
+                <FleetActivity
+                  loads={data?.loads ?? []}
+                  loadsTotal={data?.loadsTotal}
+                  vehicles={data?.vehicles ?? []}
+                  activeVehicles={activeVehicles}
+                  totalVehicles={totalVehicles}
+                />
+                <dl className="ov-dl">
+                  <div><dt>Available now</dt><dd>{availableVehicles}</dd></div>
+                  <div><dt>Active loads</dt><dd>{activeLoadsCount}</dd></div>
+                </dl>
+              </>
+            )}
+          </section>
+
+          <section className="ov-card" aria-labelledby="ov-signals-title">
+            <div className="ov-card__head">
+              <h2 id="ov-signals-title" className="ov-card__title">What needs your attention</h2>
+              <p className="ov-card__desc">Signals from your invoices, quotes and fleet.</p>
+            </div>
+            {loading ? (
+              <div className="ov-skel-block ov-skel-block--short" />
+            ) : insights.length > 0 ? (
+              <ul className="ov-signals">
+                {insights.slice(0, 5).map((insight: any, idx: number) => {
+                  const sev = String(insight.severity || "").toLowerCase();
+                  return (
+                    <li key={idx}>
+                      <div className="ov-signals__meta">
+                        <span>{titleCase(insight.category || "Signal")}</span>
+                        {insight.severity && (
+                          <span className={["high", "critical"].includes(sev) ? "ov-sev-high" : sev === "medium" ? "ov-sev-med" : ""}>
+                            {titleCase(String(insight.severity))} priority
+                          </span>
+                        )}
+                      </div>
+                      <div className="ov-signals__title">{cleanSignalText(insight.title || insight.message)}</div>
+                      {insight.body && insight.body !== insight.title && (
+                        <p className="ov-signals__body">{cleanSignalText(insight.body)}</p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="ov-empty">
+                <p>Nothing needs attention right now. Signals appear here as your quotes, invoices and fleet data grow.</p>
+                <button type="button" className="ov-btn" onClick={() => navigate("/copilot")}>Ask Copilot</button>
+              </div>
+            )}
+          </section>
+
+          <section className="ov-card" aria-labelledby="ov-activity-title">
+            <div className="ov-card__head">
+              <h2 id="ov-activity-title" className="ov-card__title">What changed recently</h2>
+              <p className="ov-card__desc">The latest events in your workspace.</p>
+            </div>
+            {loading ? (
+              <div className="ov-skel-block ov-skel-block--short" />
+            ) : activity.length === 0 ? (
+              <p className="ov-empty">{failed.includes("recent activity") ? "Activity couldn't load." : "No activity yet."}</p>
+            ) : (
+              <ul className="ov-activity">
+                {activity.slice(0, 5).map((e: any) => (
+                  <li key={e.id}>
+                    <span className="ov-activity__title">{e.title}</span>
+                    <span className="ov-activity__time">{timeAgo(e.created_at)}</span>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          ) : (
-            <div
-              style={{
-                padding: 40,
-                textAlign: "center",
-                color: "var(--text-tertiary)",
-              }}>
-              No recent quotes
-            </div>
-          )}
-        </div>
-
-        {/* Recent bookings */}
-        <div className="card table-card">
-          <div className="card-header">
-            <span className="card-title">Recent bookings</span>
-            <button
-              onClick={() => navigate("/bookings")}
-              style={{
-                background: "transparent",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-secondary)",
-                padding: "8px 16px",
-                minHeight: 40,
-                fontSize: 14, lineHeight: "20px",
-                fontFamily: "var(--font-sans)",
-                borderRadius: 6,
-                cursor: "pointer",
-              }}>
-              View all
-            </button>
-          </div>
-          {loading ? (
-            <div style={{ padding: 40, display: "flex", justifyContent: "center" }}>
-              <Loader size={24} />
-            </div>
-          ) : recentLoads.length > 0 ? (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Load #</th>
-                  <th>Customer</th>
-                  <th>Route</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentLoads.map((load: any) => (
-                  <tr
-                    key={load.id}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => navigate(`/bookings/${load.id}`)}>
-                    <td className="mono">
-                      {load.load_number || `LD-${load.id}`}
-                    </td>
-                    <td>
-                      {load.customer_name || load.customer?.company_name || "—"}
-                    </td>
-                    <td
-                      style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: "20px" }}>
-                      {(load.pickup_location || load.origin || "")
-                        .split(" ")
-                        .slice(0, 2)
-                        .join(" ") || "—"}{" "}
-                      →{" "}
-                      {(load.delivery_location || load.destination || "")
-                        .split(" ")
-                        .slice(0, 2)
-                        .join(" ") || "—"}
-                    </td>
-                    <td>
-                      <span
-                        style={{
-                          fontFamily: "var(--font-sans)",
-                          fontSize: 13, lineHeight: "20px",
-                          color:
-                            load.status === "DELIVERED"
-                              ? "var(--status-success-text, var(--status-success))"
-                              : load.status === "IN_TRANSIT"
-                                ? "var(--accent-primary)"
-                                : "var(--text-secondary)",
-                          padding: "2px 8px",
-                          background: "var(--bg-surface-hover)",
-                          borderRadius: 4,
-                          display: "inline-block",
-                          whiteSpace: "nowrap",
-                        }}>
-                        {titleCase(load.status)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div
-              style={{
-                padding: 40,
-                textAlign: "center",
-                color: "var(--text-tertiary)",
-              }}>
-              No recent bookings
-            </div>
-          )}
-        </div>
-
-        {/* Recent activity */}
-        <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>
-            Recent activity
-          </div>
-          {activityLoading ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
-              <Loader size={20} />
-            </div>
-          ) : activity.length === 0 ? (
-            <div
-              style={{
-                color: "var(--text-secondary)",
-                fontSize: 13,
-                padding: "16px 0",
-              }}>
-              No recent activity
-            </div>
-          ) : (
-            <div>
-              {activity.slice(0, 8).map((e: any) => (
-                <div
-                  key={e.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "10px 0",
-                    borderBottom: "1px solid var(--border-row)",
-                  }}>
-                  <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-primary)", minWidth: 0, overflowWrap: "anywhere" }}>
-                    {e.title}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 13, lineHeight: "20px",
-                      color: "var(--text-tertiary)",
-                      whiteSpace: "nowrap",
-                      marginLeft: 16,
-                    }}>
-                    {timeAgo(e.created_at)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-      {/* Agent Activity Stream — a regular grid card now, not a separate
-          full-height rail: that layout reserved a fixed-width column that
-          stayed mostly blank whenever there were only a couple of insights,
-          leaving a large empty strip down the right side of the page. As a
-          grid card it's only as tall as its own content. */}
-      <div className="card" style={{ padding: 0, background: "var(--bg-sidebar)" }}>
-        <div className="agent-header">
-          Alerts and signals
-        </div>
-        <div className="agent-feed">
-          {loading ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
-              <Loader size={20} />
-            </div>
-          ) : insights.length > 0 ? (
-            insights.slice(0, 5).map((insight: any, idx: number) => (
-              <div key={idx} className="feed-item">
-                <div className="feed-meta">
-                  <span>{titleCase(insight.category || "Insight")}</span>
-                  {insight.severity && (
-                    <span
-                      style={{
-                        color: ["high", "critical"].includes(String(insight.severity).toLowerCase())
-                          ? "var(--status-danger-text, var(--status-danger))"
-                          : String(insight.severity).toLowerCase() === "medium"
-                            ? "var(--status-warning-text, var(--status-warning))"
-                            : "var(--text-secondary)",
-                      }}>
-                      {titleCase(String(insight.severity))} priority
-                    </span>
-                  )}
-                </div>
-                <div className="feed-content">
-                  <span className="highlight-text">
-                    {insight.title || insight.message}
-                  </span>
-                  {insight.body && insight.body !== insight.title && (
-                    <span style={{ display: "block", color: "var(--text-secondary)" }}>{insight.body}</span>
-                  )}
-                </div>
-              </div>
-            ))
-          ) : (
-            // Honest empty state — the old fallback rendered hardcoded FAKE
-            // activity (Truck 42, INV-2024-09, LogiCorp, TRK-892) that looked
-            // live but matched no real record, so clicking "Ask Copilot" about it
-            // returned "no such record". Show nothing invented instead.
-            <div className="feed-item">
-              <div className="feed-meta">
-                <span>Alerts</span>
-              </div>
-              <div className="feed-content">
-                No alerts yet. As your quotes, invoices and fleet data grow,
-                signals will appear here.{" "}
-                <button
-                  className="btn-action"
-                  style={{ marginTop: 10 }}
-                  onClick={() => navigate("/copilot")}>
-                  Ask Copilot
-                </button>
-              </div>
-            </div>
-          )}
+              </ul>
+            )}
+          </section>
         </div>
       </div>
     </div>

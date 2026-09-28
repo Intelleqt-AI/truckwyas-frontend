@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader } from '@/components/Loader';
 import { toast } from '@/lib/toast';
 import { useAuth } from '@/lib/AuthContext';
-import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle } from './settingsUi';
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from './settingsUi';
 
 const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 const resolveLogoUrl = (url?: string) => {
@@ -42,6 +42,8 @@ export function CompanySettings() {
     cross_border_crossings_per_year: '',
     fuel_zone: 'INLAND',
     fuel_price_per_litre: '', fuel_price_petrol: '', fuel_price_electric: '', fuel_price_hybrid: '',
+    bank_name: '', bank_account_holder: '', bank_account_number: '', bank_branch_code: '',
+    bank_account_type: '', payment_reference_hint: '',
   });
   const [logoUrl, setLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -130,6 +132,12 @@ export function CompanySettings() {
           fuel_price_petrol: d.fuel_price_petrol != null ? String(d.fuel_price_petrol) : '',
           fuel_price_electric: d.fuel_price_electric != null ? String(d.fuel_price_electric) : '',
           fuel_price_hybrid: d.fuel_price_hybrid != null ? String(d.fuel_price_hybrid) : '',
+          bank_name: d.bank_name || '',
+          bank_account_holder: d.bank_account_holder || '',
+          bank_account_number: d.bank_account_number || '',
+          bank_branch_code: d.bank_branch_code || '',
+          bank_account_type: d.bank_account_type || '',
+          payment_reference_hint: d.payment_reference_hint || '',
         });
         // Only show a real uploaded logo, not the backend's default placeholder
         if (d.logo_url && !d.logo_url.endsWith('/brand/logo.svg')) setLogoUrl(d.logo_url);
@@ -203,6 +211,22 @@ export function CompanySettings() {
       toast.error('Border crossings per year must be between 1 and 5000');
       return;
     }
+    // Banking details: spaces/hyphens are fine (the server strips them), but
+    // what's left must be digits. Blank clears the field.
+    const accountDigits = form.bank_account_number.replace(/[\s-]/g, '');
+    if (accountDigits && !/^\d{6,20}$/.test(accountDigits)) {
+      toast.error('Account number must be 6–20 digits');
+      return;
+    }
+    const branchDigits = form.bank_branch_code.replace(/[\s-]/g, '');
+    if (branchDigits && !/^\d{4,10}$/.test(branchDigits)) {
+      toast.error('Branch code must be 4–10 digits');
+      return;
+    }
+    if (!!form.bank_name.trim() !== !!accountDigits) {
+      toast.error('Enter both a bank name and an account number, or leave both blank');
+      return;
+    }
     setSaving(true);
     try {
       await patchData({ url: '/api/v1/company/profile/', data: {
@@ -227,6 +251,12 @@ export function CompanySettings() {
         fuel_price_petrol: form.fuel_price_petrol ? parseFloat(form.fuel_price_petrol) : null,
         fuel_price_electric: form.fuel_price_electric ? parseFloat(form.fuel_price_electric) : null,
         fuel_price_hybrid: form.fuel_price_hybrid ? parseFloat(form.fuel_price_hybrid) : null,
+        bank_name: form.bank_name.trim() || null,
+        bank_account_holder: form.bank_account_holder.trim() || null,
+        bank_account_number: accountDigits || null,
+        bank_branch_code: branchDigits || null,
+        bank_account_type: form.bank_account_type || null,
+        payment_reference_hint: form.payment_reference_hint.trim() || null,
       } });
       // The quote builder reads these defaults through the shared
       // ["company-profile"] query, which has a 5 minute staleTime — so without
@@ -244,18 +274,15 @@ export function CompanySettings() {
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Company details</h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Your business information and branding</div>
-      </div>
+      <SettingsPageHeader title="Company details" description="Your business information and branding" />
 
       {/* Company Logo */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Company logo</h2></div>
-        <div style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 20 }}>
+        <div style={{ padding: 24, display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
           <div style={{
             width: 96, height: 96, flexShrink: 0,
-            border: '1px solid var(--border-subtle)', borderRadius: 4,
+            border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)',
             background: 'var(--input-bg)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
           }}>
@@ -281,11 +308,11 @@ export function CompanySettings() {
               style={{ display: 'none' }}
             />
             <button
-              className="btn-action settings-control"
+              className="settings-control"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingLogo || isDemo}
               title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+              style={{ ...settingsSecondaryButtonStyle, opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : 'pointer' }}
             >
               {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace logo' : 'Upload logo'}
             </button>
@@ -296,7 +323,7 @@ export function CompanySettings() {
       {/* Business Info */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Business information</h2></div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           <div style={{ ...grid2, marginBottom: 16 }}>
             <div>
               <label htmlFor="company-company-name" style={labelStyle}>Company name</label>
@@ -348,7 +375,7 @@ export function CompanySettings() {
       {/* Address */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Business address</h2></div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           <div style={{ marginBottom: 16 }}>
             <label htmlFor="company-street-address" style={labelStyle}>Street address</label>
             <input id="company-street-address" className="settings-control" style={inputStyle} value={form.street} onChange={e => set('street', e.target.value)} />
@@ -388,7 +415,7 @@ export function CompanySettings() {
       {/* Contact */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Contact details</h2></div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           <div style={{ ...grid3 }}>
             <div>
               <label htmlFor="company-phone" style={labelStyle}>Phone</label>
@@ -406,10 +433,66 @@ export function CompanySettings() {
         </div>
       </div>
 
+      {/* Banking details */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Banking details</h3></div>
+        <div style={{ padding: 20 }}>
+          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
+            Shown in a &ldquo;How to pay&rdquo; section on the invoices you send your customers
+            (PDF, invoice email and online invoice) once a bank name and account number are
+            filled in. Until then, invoices ask customers to contact you for banking details.
+          </div>
+          <div style={{ ...grid2, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>Bank name</label>
+              <input className="settings-control" style={inputStyle} value={form.bank_name} onChange={e => set('bank_name', e.target.value)} placeholder="e.g. FNB" maxLength={100} />
+            </div>
+            <div>
+              <label style={labelStyle}>Account holder</label>
+              <input className="settings-control" style={inputStyle} value={form.bank_account_holder} onChange={e => set('bank_account_holder', e.target.value)} placeholder={form.company_name || 'Registered account name'} maxLength={200} />
+              <div style={helpTextStyle}>Defaults to your company name if left blank.</div>
+            </div>
+          </div>
+          <div style={{ ...grid3, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>Account number</label>
+              <input className="settings-control" style={inputStyle} inputMode="numeric" autoComplete="off" value={form.bank_account_number} onChange={e => set('bank_account_number', e.target.value)} placeholder="Digits only" maxLength={30} />
+              <div style={helpTextStyle}>6–20 digits.</div>
+            </div>
+            <div>
+              <label style={labelStyle}>Branch code</label>
+              <input className="settings-control" style={inputStyle} inputMode="numeric" autoComplete="off" value={form.bank_branch_code} onChange={e => set('bank_branch_code', e.target.value)} placeholder="e.g. 250655" maxLength={14} />
+              <div style={helpTextStyle}>Universal branch code, 4–10 digits.</div>
+            </div>
+            <div>
+              <label style={labelStyle}>Account type</label>
+              <Select value={form.bank_account_type || 'none'} onValueChange={val => set('bank_account_type', val === 'none' ? '' : val)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not specified</SelectItem>
+                  <SelectItem value="CHEQUE">Cheque / current</SelectItem>
+                  <SelectItem value="SAVINGS">Savings</SelectItem>
+                  <SelectItem value="TRANSMISSION">Transmission</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Payment reference instructions (optional)</label>
+            <input className="settings-control" style={inputStyle} value={form.payment_reference_hint} onChange={e => set('payment_reference_hint', e.target.value)} placeholder="Please use the invoice number as your payment reference." maxLength={200} />
+            <div style={helpTextStyle}>
+              Replaces the default reference wording on your invoices.
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Quote Defaults */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Quote defaults</h2></div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           <div style={grid2}>
             <div>
               <label htmlFor="company-default-quote-validity-days" style={labelStyle}>Default quote validity (days)</label>
@@ -476,7 +559,7 @@ export function CompanySettings() {
                 onChange={e => set('default_toll_rate_per_km', e.target.value)}
               />
               <div style={helpTextStyle}>
-                Fallback only &mdash; used when the routing service can't itemise the
+                Fallback only. Used when the routing service can't itemise the
                 toll plazas on a route.
               </div>
             </div>
@@ -512,7 +595,7 @@ export function CompanySettings() {
                 onChange={e => set('cross_border_crossings_per_year', e.target.value)}
               />
               <div style={helpTextStyle}>
-                Count each leg separately &mdash; a return trip is two. A C-BRTA permit is
+                Count each leg separately: a return trip is two. A C-BRTA permit is
                 bought for a year, so a quote charges its share of one crossing: the more
                 you cross, the less each load carries.
               </div>
@@ -524,7 +607,7 @@ export function CompanySettings() {
       {/* Fuel Price Defaults */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Fuel price defaults</h2></div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
             Used as the default price when a vehicle type of that fuel type doesn't have
             its own fuel price set (Settings &gt; Vehicle types). Diesel already falls back
@@ -543,13 +626,13 @@ export function CompanySettings() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="INLAND">Inland &mdash; Gauteng and the interior</SelectItem>
-                  <SelectItem value="COASTAL">Coastal &mdash; Cape Town, Durban, Gqeberha, East London</SelectItem>
+                  <SelectItem value="INLAND">Inland: Gauteng and the interior</SelectItem>
+                  <SelectItem value="COASTAL">Coastal: Cape Town, Durban, Gqeberha, East London</SelectItem>
                 </SelectContent>
               </Select>
               <div style={helpTextStyle}>
                 Diesel is gazetted at two prices: it arrives at the coastal ports and costs
-                more inland once the transport differential is added &mdash; about R0.87/L
+                more inland once the transport differential is added, about R0.87/L
                 at the moment. Changing this fetches the current price for the zone and
                 updates Diesel below.
               </div>
@@ -560,6 +643,7 @@ export function CompanySettings() {
               <label htmlFor="company-diesel-r-l" style={labelStyle}>Diesel (R/L)</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input id="company-diesel-r-l"
+                  className="settings-control"
                   style={inputStyle}
                   type="number"
                   min={0}
@@ -573,10 +657,9 @@ export function CompanySettings() {
                   disabled={fetchingLivePrice}
                   className="settings-control"
                   style={{
-                    flexShrink: 0, background: 'none', border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)', padding: '0 12px', minHeight: 40,
-                    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-                    borderRadius: 6, cursor: fetchingLivePrice ? 'wait' : 'pointer',
+                    ...settingsSecondaryButtonStyle,
+                    flexShrink: 0, padding: '0 12px',
+                    cursor: fetchingLivePrice ? 'wait' : 'pointer',
                   }}
                 >
                   {fetchingLivePrice
@@ -608,6 +691,7 @@ export function CompanySettings() {
               <label htmlFor="company-petrol-r-l" style={labelStyle}>Petrol (R/L)</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input id="company-petrol-r-l"
+                  className="settings-control"
                   style={inputStyle}
                   type="number"
                   min={0}
@@ -621,10 +705,9 @@ export function CompanySettings() {
                   disabled={fetchingLivePrice}
                   className="settings-control"
                   style={{
-                    flexShrink: 0, background: 'none', border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)', padding: '0 12px', minHeight: 40,
-                    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-                    borderRadius: 6, cursor: fetchingLivePrice ? 'wait' : 'pointer',
+                    ...settingsSecondaryButtonStyle,
+                    flexShrink: 0, padding: '0 12px',
+                    cursor: fetchingLivePrice ? 'wait' : 'pointer',
                   }}
                 >
                   {fetchingLivePrice

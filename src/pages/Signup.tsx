@@ -13,9 +13,9 @@ const MONTHLY_FEE = "4,499";
 const TAKE_RATE_PCT = "0.25";
 
 const SIGNUP_STEPS = [
-  { label: "Create your account", detail: "Name, email, password — just below" },
+  { label: "Create your account", detail: "Name, email and password, just below" },
   { label: "Verify your email", detail: "We send a 6-digit code, valid for 10 minutes" },
-  { label: "Add a card & pay", detail: `R${MONTHLY_FEE}/month, charged via Paystack — your fleet goes live the moment it clears` },
+  { label: "Add a card & pay", detail: `R${MONTHLY_FEE}/month, charged via Paystack. Your fleet goes live the moment it clears` },
 ];
 
 // Same list BillingSettings.tsx shows for an active subscription — kept
@@ -23,7 +23,7 @@ const SIGNUP_STEPS = [
 const PLAN_FEATURES = [
   "Unlimited loads & invoices",
   "AI-powered quote optimisation",
-  "Fast Pay capital access",
+  "Fast Pay capital access (not live yet)",
   "Advanced analytics & reporting",
   "Fleet intelligence dashboard",
   "Multi-user access",
@@ -128,7 +128,7 @@ const Signup = () => {
     padding: '8px 12px',
     minHeight: 40,
     color: 'var(--text-primary)',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-control)',
     fontSize: 14,
     lineHeight: '20px',
     width: '100%',
@@ -149,10 +149,10 @@ const Signup = () => {
   const strength = formData.password ? getStrength(formData.password) : null;
 
   const formCard = (
-    <div style={{ width: '100%', maxWidth: 400, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 32, boxSizing: 'border-box' }}>
+    <div style={{ width: '100%', maxWidth: 400, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-card)', padding: 24, boxSizing: 'border-box' }}>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>Create an account</h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Step 1 of 3 — verification and payment come next</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Step 1 of 3. Verification and payment come next</div>
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -187,8 +187,8 @@ const Signup = () => {
           {/* Strength bar */}
           {formData.password && strength && (
             <div style={{ marginTop: 8 }}>
-              <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: strength.width, background: strength.color, borderRadius: 2, transition: 'width 0.2s, background 0.2s' }} />
+              <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: strength.width, background: strength.color, borderRadius: 999, transition: 'width 0.2s, background 0.2s' }} />
               </div>
               <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: strength.color, marginTop: 4, fontFamily: 'var(--font-sans)' }}>{strength.level.charAt(0).toUpperCase() + strength.level.slice(1)}</div>
               {/* Rule checklist */}
@@ -219,19 +219,19 @@ const Signup = () => {
         </div>
 
         {error && (
-          <div style={{ padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 6, color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, lineHeight: '20px' }}>
+          <div role="alert" style={{ padding: '12px 16px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 'var(--radius-nested)', color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, lineHeight: '20px' }}>
             {error}
           </div>
         )}
 
         <button type="submit" className="btn-action"
-          style={{ width: '100%', padding: '12px 16px', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', minHeight: 40, cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.6 : 1 }}
+          style={{ width: '100%', padding: '10px 16px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', minHeight: 40, cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.6 : 1 }}
           disabled={loading}>
           {loading ? "Creating account…" : "Sign up"}
         </button>
       </form>
 
-      <div style={{ marginTop: 24, textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
+      <div style={{ marginTop: 24, textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
         Already have an account?{" "}
         <Link to="/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>Sign in</Link>
       </div>
@@ -246,8 +246,8 @@ const Signup = () => {
     <>
       {/* Price card — the thing users currently only discover on step 3 */}
       <div style={{
-        border: '1px solid var(--border-active)', borderRadius: 'var(--card-radius)',
-        padding: 20, marginBottom: 20, background: 'var(--bg-surface-hover)',
+        border: '1px solid var(--border-active)', borderRadius: 'var(--radius-card)',
+        padding: 24, marginBottom: 24, background: 'var(--bg-surface-hover)',
       }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
           <span style={{ fontFamily: 'var(--font-sans)', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
@@ -259,7 +259,7 @@ const Signup = () => {
           + {TAKE_RATE_PCT}% of every delivered load's value
         </div>
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>
-          Cancel anytime — no long-term contract
+          Cancel anytime, no long-term contract
         </div>
       </div>
 
@@ -304,7 +304,7 @@ const Signup = () => {
     return (
       <MobileAuthLayout
         eyebrow="One flat price, no hidden tiers"
-        title={<>Everything your fleet needs — <span style={{ color: 'var(--accent-primary)' }}>one subscription</span>.</>}
+        title={<>Everything your fleet needs in <span style={{ color: 'var(--accent-primary)' }}>one subscription</span>.</>}
         footer={extraContent}
       >
         {formCard}
@@ -339,7 +339,7 @@ const Signup = () => {
       {/* Content side — what you're signing up for, before the form asks for anything */}
       <div className="signup-split__content" style={{
         position: 'relative', overflow: 'hidden',
-        background: `radial-gradient(120% 100% at 0% 0%, var(--glow-color), var(--glow-transparent)), var(--bg-surface)`,
+        background: 'var(--bg-surface)',
         borderRight: '1px solid var(--border-subtle)',
       }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
@@ -349,7 +349,7 @@ const Signup = () => {
             One flat price, no hidden tiers
           </div>
           <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', marginBottom: 28 }}>
-            Everything your fleet needs — <span style={{ color: 'var(--accent-primary)' }}>one subscription</span>.
+            Everything your fleet needs in <span style={{ color: 'var(--accent-primary)' }}>one subscription</span>.
           </div>
 
           {extraContent}

@@ -258,7 +258,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
           <div
             className="status-badge warning"
             style={{ cursor: 'default', fontWeight: 500, letterSpacing: 'normal' }}
-            title="Shared public demo account — actions like emailing customers are simulated, not real."
+            title="Shared public demo account. Actions like emailing customers are simulated, not real."
           >
             Demo
           </div>
@@ -298,8 +298,8 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
               <div className="os-header-popover" style={{
                 position: 'absolute', top: '100%', marginTop: 8,
                 width: 260, maxWidth: 'calc(100vw - 32px)', padding: 16, background: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)', borderRadius: 6,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.3)', zIndex: 1000,
+                border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-card)',
+                zIndex: 1000,
                 textAlign: 'left' as const, fontWeight: 400, whiteSpace: 'normal' as const,
               }}>
                 <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: '20px', marginBottom: (isSubscriptionBlocked(subStatus) || cancelAtPeriodEnd) ? 12 : 0 }}>
@@ -374,13 +374,12 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
                   marginTop: 8,
                   background: 'var(--bg-surface)',
                   border: '1px solid var(--border-subtle)',
-                  borderRadius: 6,
+                  borderRadius: 'var(--radius-card)',
                   width: 280,
                   maxHeight: 'calc(100dvh - 160px)',
                   overflowY: 'auto',
                   maxWidth: 'calc(100vw - 32px)',
                   zIndex: 1000,
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
                 }}
               >
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -406,22 +405,20 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
                     navigate('/settings');
                   }}
                   style={{
-                    padding: '8px 16px',
+                    padding: '10px 16px', minHeight: 40,
                     fontSize: 14, lineHeight: '20px',
                     fontFamily: 'var(--font-sans)',
                     color: 'var(--text-secondary)',
                     cursor: 'pointer',
                     letterSpacing: 'normal',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
                 >
                   Profile & settings
                 </button>
                 <button type="button" className="os-profile-action"
                   onClick={handleLogout}
                   style={{
-                    padding: '8px 16px',
+                    padding: '10px 16px', minHeight: 40,
                     fontSize: 14, lineHeight: '20px',
                     fontFamily: 'var(--font-sans)',
                     color: 'var(--status-danger-text, var(--status-danger))',
@@ -429,8 +426,6 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
                     letterSpacing: 'normal',
                     borderTop: '1px solid var(--border-subtle)',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   Sign out
                 </button>

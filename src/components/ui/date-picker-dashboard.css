@@ -32,7 +32,7 @@
      with every other 40px input in the same form. */
   min-height: calc(var(--date-picker-input-height) - 2px);
   align-self: stretch;
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
 }
 .dashboard-date-picker:focus-within {
   --date-picker-control-border: var(--accent-primary);
@@ -80,7 +80,7 @@
   height: 44px;
   padding: 8px;
   border: 1px solid var(--date-picker-control-border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: var(--text-primary);
   cursor: pointer;
@@ -105,7 +105,7 @@
   width: 40px;
   height: 40px;
   padding: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   font: inherit;
   font-weight: 400;
   letter-spacing: normal;
@@ -114,7 +114,7 @@
   cursor: pointer;
 }
 .dashboard-date-day:hover:not(:disabled), .dashboard-date-nav-button:hover {
-  background: var(--bg-surface-hover);
+  background: var(--surface-tint-hover);
 }
 .dashboard-date-today { box-shadow: inset 0 0 0 1px var(--accent-primary); }
 .dashboard-date-day.dashboard-date-selected {

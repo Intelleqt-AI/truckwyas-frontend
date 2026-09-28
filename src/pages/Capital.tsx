@@ -9,6 +9,8 @@ import { formatCurrency } from "@/lib/formatters";
 import { fetchData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { Loader } from "@/components/Loader";
+import SectionHeader from "@/components/layout/SectionHeader";
+import CapitalPrelaunch from "@/components/capital/CapitalPrelaunch";
 
 const RISK_BAND_TONE: Record<string, string> = {
   LOW: "success",
@@ -36,7 +38,16 @@ function saveAppliedId(id: string, current: Set<string>): Set<string> {
   return next;
 }
 
+/**
+ * Fast Pay has no funding partner yet (CAPITAL_LAUNCHED = false), so the page
+ * renders the pre-launch view: no facility, limit or availability is shown.
+ * Launching is the one-line flag flip; the launched view below is unchanged.
+ */
 export default function Capital() {
+  return CAPITAL_LAUNCHED ? <CapitalLaunched /> : <CapitalPrelaunch />;
+}
+
+function CapitalLaunched() {
   const navigate = useNavigate();
   const [showIneligible, setShowIneligible] = useState(false);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
@@ -57,7 +68,7 @@ export default function Capital() {
     },
   });
 
-  // Eligible invoices — shared cache with Invoices + InvoiceDetail pages
+  // Eligible invoices: shared cache with Invoices + InvoiceDetail pages
   const { data: eligibleData } = useQuery({
     queryKey: ["capital-eligible"],
     queryFn: () => fetchData("api/v1/capital/eligible/").catch(() => null),
@@ -93,24 +104,10 @@ export default function Capital() {
 
   return (
     <div className="capital-typography fin-page">
-      <header style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 13, lineHeight: "20px", fontWeight: 500, color: "var(--text-secondary)", marginBottom: 4 }}>
-          Capital
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 28 }}>
-          <h1 style={{ fontSize: 22, lineHeight: "28px", margin: 0, fontWeight: 600, color: "var(--text-primary)" }}>
-            Fast Pay facility
-          </h1>
-        </div>
-      </header>
-
-      {/* About Fast Pay — neutral, factual status */}
-      <section className="card fin-section" aria-labelledby="fast-pay-about" style={{ borderLeft: "3px solid var(--accent-primary)" }}>
-        <h2 id="fast-pay-about" className="fin-h2" style={{ marginBottom: 4 }}>Fast Pay</h2>
-        <p style={{ margin: 0, fontSize: 14, lineHeight: "20px", color: "var(--text-secondary)" }}>
-          Get paid early on eligible invoices. Fast Pay is being set up — you can check eligibility now.
-        </p>
-      </section>
+      <SectionHeader
+        title="Fast Pay"
+        description="Get paid early on eligible invoices. Each advance is repaid when your customer pays."
+      />
 
       {/* Facility overview */}
       <div className="fin-kpis">
@@ -261,7 +258,7 @@ export default function Capital() {
                         {blocked ? (
                           <span
                             className="fin-chip fin-chip--danger"
-                            title={`Customer risk ${riskPct}% — above the 70% Fast Pay limit`}>
+                            title={`Customer risk ${riskPct}%, above the 70% Fast Pay limit`}>
                             High risk
                           </span>
                         ) : applied ? (
@@ -282,7 +279,7 @@ export default function Capital() {
         )}
       </section>
 
-      {/* Ineligible invoices — collapsible */}
+      {/* Ineligible invoices, collapsible */}
       {ineligibleInvoices.length > 0 && (
         <section className="card fin-table-card" aria-labelledby="ineligible-title">
           <div className="fin-table-card__head" style={{ paddingBottom: showIneligible ? 12 : 20 }}>

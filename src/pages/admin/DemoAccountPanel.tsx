@@ -51,12 +51,12 @@ export default function DemoAccountPanel() {
         <div className="card" style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h2 style={sectionTitleStyle}>Demo account</h2>
-              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                No demo company exists yet — it normally self-creates on the scheduler's first run, or create it now.
+              <h2 style={{ ...sectionTitleStyle, marginBottom: 4 }}>Demo account</h2>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                No demo company exists yet. It normally self-creates on the scheduler's first run, or you can create it now.
               </div>
             </div>
-            <button className="btn-action admin-control" style={{ minHeight: 40, borderRadius: 6 }} disabled={resetting} onClick={doReset}>
+            <button className="btn-action admin-control" style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }} disabled={resetting} onClick={doReset}>
               {resetting ? 'Creating…' : 'Create demo company'}
             </button>
           </div>
@@ -69,7 +69,7 @@ export default function DemoAccountPanel() {
             <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Demo account</h2>
             <button
               className="btn-action admin-control"
-              style={{ minHeight: 40, borderRadius: 6 }}
+              style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }}
               onClick={() => setConfirmReset(true)}
             >
               Force reset now
@@ -87,8 +87,8 @@ export default function DemoAccountPanel() {
             </div>
             <div>
               <div style={metricLabelStyle}>Idle-eligible for auto-reset</div>
-              <div style={{ fontSize: 14, lineHeight: '20px', color: demoStatus.idle_eligible_for_auto_reset ? 'var(--status-warning)' : 'var(--text-primary)' }}>
-                {demoStatus.idle_eligible_for_auto_reset ? 'Yes — next 15-min check will reset it' : 'No'}
+              <div style={{ fontSize: 14, lineHeight: '20px', color: demoStatus.idle_eligible_for_auto_reset ? 'var(--status-warning-text, var(--status-warning))' : 'var(--text-primary)' }}>
+                {demoStatus.idle_eligible_for_auto_reset ? 'Yes. The next 15-min check will reset it' : 'No'}
               </div>
             </div>
           </div>
@@ -98,7 +98,7 @@ export default function DemoAccountPanel() {
       {confirmReset && (
         <ConfirmModal
           title="Reset demo company"
-          message="This immediately wipes and reseeds the shared demo company's fleet, quotes and orders back to the default dataset — anyone using it right now loses their in-progress quote. This can't be undone."
+          message="This immediately wipes and reseeds the shared demo company's fleet, quotes and orders back to the default dataset. Anyone using it right now loses their in-progress quote. This can't be undone."
           confirmLabel={resetting ? 'Resetting…' : 'Reset now'}
           danger
           onConfirm={doReset}

@@ -1,39 +1,47 @@
 import './insights-page-brand.css';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { localDateISO } from '@/lib/dates';
+import { useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency as formatCurrencyBase } from '@/lib/formatters';
-
-// Missing or non-numeric amounts render as an em dash (unavailable), never as a
-// fabricated R0.00. Valid numbers use the shared formatter unchanged.
-const formatCurrency = (amount: number | null | undefined, options?: Intl.NumberFormatOptions) =>
-  amount == null || !Number.isFinite(Number(amount)) ? '—' : formatCurrencyBase(amount, options);
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 import { DatePicker } from '@/components/ui/date-picker';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 import { Loader } from '@/components/Loader';
-import ExecutiveBriefing, { RecommendationGroups, type BriefingResponse, type RecommendationDetail } from '@/components/insights/ExecutiveBriefing';
+import ExecutiveBriefing, { RecommendationGroups, formatDay, type BriefingResponse, type RecommendationDetail } from '@/components/insights/ExecutiveBriefing';
+import InsightCard from '@/components/insights/InsightCard';
+import KpiTile from '@/components/insights/KpiTile';
+import RankedList, { type RankedRow } from '@/components/insights/RankedList';
+import { Waterfall, CashRunway, AgeingStrip, PaymentDotPlot, LaneScatter } from '@/components/viz';
+import { ageingBuckets, ageingByCustomer, paymentRows, lanePoints } from '@/components/insights/insight-series';
 
-// Brand text roles (presentation only — every value and calculation is untouched).
-const metricLabelTypography = { fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', textTransform: 'none' as const };
-const metricValueTypography = { fontFamily: 'var(--font-sans)', fontSize: 28, lineHeight: '36px', fontWeight: 600, fontVariantNumeric: 'tabular-nums' as const };
+/* Insights page. Presentation only: every API call, query key and calculation
+   below is unchanged from the previous version. Where the API returns decimal
+   strings, values are coerced with Number() so sums are numeric, not
+   concatenated text. Each panel states its basis in its description. */
 
-// Map chart/status swatches to readable text colours (page-scoped tokens with a
-// safe fallback). Chart fills, bars and severity dots keep the original variables.
-const statusTextColor = (value: string) => {
-  if (value === 'var(--status-success)') return 'var(--status-success-text, var(--status-success))';
-  if (value === 'var(--status-warning)') return 'var(--status-warning-text, var(--status-warning))';
-  if (value === 'var(--status-danger)') return 'var(--status-danger-text, var(--status-danger))';
-  return value;
-};
-const statusSurfaceColor = (value: string) => {
-  if (value === 'var(--status-success)') return 'var(--insights-success-surface)';
-  if (value === 'var(--status-warning)') return 'var(--insights-warning-surface)';
-  if (value === 'var(--status-danger)') return 'var(--insights-danger-surface)';
-  return 'var(--bg-surface-hover)';
-};
+// Missing or non-numeric amounts render as the unavailable placeholder, never as
+// a fabricated R 0,00. Valid numbers use the shared formatter unchanged.
+const formatCurrency = (amount: number | string | null | undefined, options?: Intl.NumberFormatOptions) =>
+  amount == null || amount === '' || !Number.isFinite(Number(amount)) ? '—' : formatCurrencyBase(Number(amount), options);
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+const tripsLabel = (n: number) => plural(n, 'trip', 'trips');
+/** Minimum sample before a lane, cargo type, band or driver is ranked. */
+const MIN_TRIPS = 3;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthName = (ym: string) => MONTHS[Number(ym.slice(5, 7)) - 1] || ym;
+// Display only: drop trailing punctuation left by the two-word cargo grouping ("Chemicals -").
+const cargoText = (s: string) => s.replace(/[\s&\-–:,/]+$/, '') || s;
+/** Names the sample behind a panel. The list endpoints return one page (20
+ *  rows today), so say so when there are more records than were loaded. */
+const sampleText = (shown: number, total: number | undefined, noun: string, recent = false) =>
+  total != null && total > shown
+    ? recent ? `your ${shown} most recent ${noun} (of ${total})` : `${shown} of your ${total} ${noun}`
+    : `all ${shown} ${noun}`;
 
+function Stack({ children }: { children: ReactNode }) {
+  return <div className="insights-stack">{children}</div>;
+}
 // ========== TYPES ==========
 
 interface KPIData {
@@ -213,7 +221,6 @@ const titleCase = (s?: string) =>
   s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
 
 export default function Insights() {
-  const navigate = useNavigate();
   const [tab, setTab] = useState<TabType>('briefing');
   const [period, setPeriod] = useState<PeriodType>('THIS_MONTH');
   const [customFrom, setCustomFrom] = useState('');
@@ -242,25 +249,25 @@ export default function Insights() {
     }
     const now = new Date();
     let from = '';
-    let to = new Date().toISOString().slice(0, 10);
+    let to = localDateISO();
 
     switch (period) {
       case 'THIS_MONTH':
-        from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+        from = localDateISO(new Date(now.getFullYear(), now.getMonth(), 1));
         break;
       case 'LAST_MONTH':
         const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        from = lastMonth.toISOString().slice(0, 10);
-        to = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0, 10);
+        from = localDateISO(lastMonth);
+        to = localDateISO(new Date(now.getFullYear(), now.getMonth(), 0));
         break;
       case 'LAST_3M':
-        from = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()).toISOString().slice(0, 10);
+        from = localDateISO(new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()));
         break;
       case 'LAST_6M':
-        from = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate()).toISOString().slice(0, 10);
+        from = localDateISO(new Date(now.getFullYear(), now.getMonth() - 6, now.getDate()));
         break;
       case 'LAST_12M':
-        from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString().slice(0, 10);
+        from = localDateISO(new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()));
         break;
     }
     return `from=${from}&to=${to}`;
@@ -279,7 +286,7 @@ export default function Insights() {
             fetchData('api/v1/dashboard/insights/').catch(() => ({ recommendations: [] })),
             fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
           ]);
-          return { kpiData: kpi, insightsData: insights, loads: loadsResp?.results || [] };
+          return { kpiData: kpi, insightsData: insights, loads: loadsResp?.results || [], loadsTotal: loadsResp?.count };
         }
         case 'margin': {
           const [finance, loadsData, expensesData] = await Promise.all([
@@ -287,7 +294,7 @@ export default function Insights() {
             fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
             fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
           ]);
-          return { financeData: finance, loads: loadsData?.results || [], expenses: expensesData?.results || [] };
+          return { financeData: finance, loads: loadsData?.results || [], expenses: expensesData?.results || [], loadsTotal: loadsData?.count, expensesTotal: expensesData?.count };
         }
         case 'cash': {
           const [cf, finData, invData] = await Promise.all([
@@ -295,7 +302,7 @@ export default function Insights() {
             fetchData(`api/v1/dashboard/finance/?${params}`).catch(() => null),
             fetchData('api/v1/invoices/?page_size=100').catch(() => ({ results: [] })),
           ]);
-          return { cashflowData: cf, financeData: finData, invoices: invData?.results || [] };
+          return { cashflowData: cf, financeData: finData, invoices: invData?.results || [], invoicesTotal: invData?.count };
         }
         case 'fleet': {
           const [veh, drv, exp] = await Promise.all([
@@ -313,6 +320,8 @@ export default function Insights() {
             })),
             drivers: drv?.results || [],
             expenses: exp?.results || [],
+            vehiclesTotal: veh?.count,
+            driversTotal: drv?.count,
           };
         }
         case 'lanes': {
@@ -320,7 +329,7 @@ export default function Insights() {
             fetchData('api/v1/loads/?page_size=100').catch(() => ({ results: [] })),
             fetchData('api/v1/expenses/?page_size=100').catch(() => ({ results: [] })),
           ]);
-          return { loads: lds?.results || [], expenses: exps?.results || [] };
+          return { loads: lds?.results || [], expenses: exps?.results || [], loadsTotal: lds?.count };
         }
         default:
           return {};
@@ -339,70 +348,34 @@ export default function Insights() {
   const expenses = (td?.expenses ?? []) as Expense[];
   const drivers = (td?.drivers ?? []) as Driver[];
   const vehicles = (td?.vehicles ?? []) as Vehicle[];
+  const loadsTotal = td?.loadsTotal as number | undefined;
+  const expensesTotal = td?.expensesTotal as number | undefined;
+  const invoicesTotal = td?.invoicesTotal as number | undefined;
+  const vehiclesTotal = td?.vehiclesTotal as number | undefined;
+  const driversTotal = td?.driversTotal as number | undefined;
 
-  // Helper functions
-  const getMarginColor = (pct: number) => {
-    if (pct > 50) return 'var(--status-success-text, var(--status-success))';
-    if (pct >= 30) return 'var(--status-warning-text, var(--status-warning))';
-    return 'var(--status-danger-text, var(--status-danger))';
-  };
-
-  const getDSOColor = (dso: number) => {
-    if (dso < 30) return 'var(--status-success-text, var(--status-success))';
-    if (dso <= 60) return 'var(--status-warning-text, var(--status-warning))';
-    return 'var(--status-danger-text, var(--status-danger))';
-  };
-
-  const SectionHeader = ({ children }: { children: string }) => (
-    <h2 style={{
-      margin: '0 0 16px',
-      fontSize: 16,
-      lineHeight: '24px',
-      fontWeight: 600,
-      fontFamily: 'var(--font-sans)',
-      letterSpacing: 'normal',
-      color: 'var(--text-primary)',
-    }}>
-      {children}
-    </h2>
-  );
-
-  const StatusBadge = ({ children }: { children: string }) => (
-    <div style={{
-      fontSize: 13,
-      lineHeight: '20px',
-      fontWeight: 500,
-      fontFamily: 'var(--font-sans)',
-      padding: '4px 8px',
-      borderRadius: 4,
-      background: 'var(--bg-surface-hover)',
-      color: 'var(--text-secondary)',
-      display: 'inline-block',
-      whiteSpace: 'nowrap',
-    }}>
-      {titleCase(children)}
-    </div>
-  );
+  // Length of the selected window, for naming the KPI comparison period. Read
+  // from the same params the API received, so the label matches the backend.
+  const periodDays = (() => {
+    const m = /from=(\d{4}-\d{2}-\d{2})&to=(\d{4}-\d{2}-\d{2})/.exec(getPeriodParams());
+    if (!m) return null;
+    const d = Math.round((Date.parse(m[2]) - Date.parse(m[1])) / 86400000) + 1;
+    return d > 0 ? d : null;
+  })();
+  const notFiltered = 'The period filter does not apply to this panel.';
+  const longerPeriod = period !== 'LAST_12M' ? () => setPeriod('LAST_12M') : undefined;
 
   return (
     <div className="insights-page-brand">
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{
-          fontSize: 13,
-          lineHeight: '20px',
-          fontFamily: 'var(--font-sans)',
-          color: 'var(--text-secondary)',
-          letterSpacing: 'normal',
-          marginBottom: 4
-        }}>
-          Intelligence
-        </div>
-        <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>Insights</h1>
+      <div className="insights-header">
+        <p className="insights-eyebrow">Intelligence</p>
+        <h1 className="insights-title">Insights</h1>
+        <p className="insights-intro">What your own records say about revenue, cash, the fleet and your lanes. Each panel states which records it uses.</p>
       </div>
 
       {/* Period filters */}
-      <div style={{ marginBottom: 20, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="insights-periods" role="group" aria-label="Period">
         {PERIOD_OPTIONS.map(p => (
           <button
             key={p.id}
@@ -421,7 +394,7 @@ export default function Insights() {
               placeholder="From"
               style={{ width: 160, maxWidth: '100%', padding: 0, fontSize: 14, lineHeight: '20px' }}
             />
-            <span style={{ color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>to</span>
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: '20px' }}>to</span>
             <DatePicker
               value={customTo}
               onChange={setCustomTo}
@@ -433,43 +406,28 @@ export default function Insights() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 0, marginBottom: 24, borderBottom: '1px solid var(--border-subtle)', overflowX: 'auto' }}>
+      <nav className="insights-tabs" aria-label="Insights sections">
         {TABS.map(t => (
           <button
             key={t.id}
+            type="button"
             className="insights-brand-tab"
+            aria-current={tab === t.id ? 'page' : undefined}
             onClick={() => setTab(t.id)}
-            style={{
-              background: 'none',
-              border: 'none',
-              borderBottom: tab === t.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
-              color: tab === t.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontFamily: 'var(--font-sans)',
-              fontSize: 14,
-              lineHeight: '20px',
-              letterSpacing: 'normal',
-              fontWeight: tab === t.id ? 500 : 400,
-              padding: '12px 0',
-              marginRight: 24,
-              cursor: 'pointer',
-              marginBottom: -1,
-              whiteSpace: 'nowrap',
-            }}
           >
             {t.label}
           </button>
         ))}
-      </div>
+      </nav>
 
       {/* Content */}
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Loader size={32} /></div>
       ) : (
         <>
-          {/* TAB 1: BRIEFING */}
+          {/* ============ BRIEFING ============ */}
           {tab === 'briefing' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {/* EXECUTIVE BRIEFING — structured, decision-first */}
+            <Stack>
               <ExecutiveBriefing
                 data={briefing}
                 isLoading={briefingLoading}
@@ -479,1343 +437,606 @@ export default function Insights() {
                 onShowLongerPeriod={period === 'THIS_MONTH' || period === 'LAST_MONTH' ? () => setPeriod('LAST_3M') : undefined}
               />
 
-              {/* SECTION 1: BUSINESS PULSE */}
-              <div>
-                <SectionHeader>Business pulse</SectionHeader>
-                <div className="insights-business-pulse">
-                  {/* Revenue MTD */}
-                  <div className="card">
-                    <div style={{ ...metricValueTypography, color: 'var(--text-primary)', marginBottom: 4 }}>
-                      {formatCurrency(kpiData?.revenue_mtd || 0)}
-                    </div>
-                    {kpiData?.revenue_change_pct !== undefined && (
-                      <div style={{
-                        fontSize: 13,
-                        fontFamily: 'var(--font-sans)',
-                        color: kpiData.revenue_change_pct >= 0 ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))',
-                        marginBottom: 8,
-                      }}>
-                        {kpiData.revenue_change_pct >= 0 ? '+' : ''}{kpiData.revenue_change_pct.toFixed(1)}% vs last month
-                      </div>
-                    )}
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Revenue MTD
-                    </div>
-                  </div>
-
-                  {/* Net Margin */}
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: getMarginColor(kpiData?.net_margin_pct || 0),
-                      marginBottom: 12,
-                    }}>
-                      {(kpiData?.net_margin_pct || 0).toFixed(1)}%
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Net margin
-                    </div>
-                  </div>
-
-                  {/* DSO */}
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: getDSOColor(kpiData?.dso || 0),
-                      marginBottom: 4,
-                    }}>
-                      {Math.round(kpiData?.dso || 0)}d
-                    </div>
-                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 8 }}>
-                      avg days to collect
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      DSO
-                    </div>
-                  </div>
-
-                  {/* Fleet Utilisation */}
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: 'var(--text-primary)',
-                      marginBottom: 4,
-                    }}>
-                      {(kpiData?.fleet_utilization_pct || 0).toFixed(1)}%
-                    </div>
-                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 8 }}>
-                      of fleet active
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Fleet utilisation
-                    </div>
-                  </div>
-
-                  {/* Cash in 30 Days */}
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: 'var(--text-primary)',
-                      marginBottom: 12,
-                    }}>
-                      {formatCurrency(kpiData?.total_advance_amount || 0)}
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Cash available
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 2: ALL RECOMMENDATIONS — same data/order, grouped by type */}
-              <div>
-                <SectionHeader>All recommendations</SectionHeader>
-                {insightsData?.recommendations && insightsData.recommendations.length > 0 ? (
-                  (() => {
-                    const sorted = [...insightsData.recommendations].sort((a, b) => (b.amount || 0) - (a.amount || 0));
-                    return (
-                      <RecommendationGroups
-                        recommendations={sorted}
-                        details={sorted as RecommendationDetail[]}
-                        initialRows={5}
-                        headingLevel={3}
+              {/* Revenue trend and collection speed: the two KPI figures the
+                  briefing does not already show. Net margin and outstanding
+                  are in the briefing; fleet availability is on the Fleet tab;
+                  Fast Pay advances are not live, so they are not shown. */}
+              {kpiData && (() => {
+                const rev = num(kpiData.revenue_mtd);
+                const prev = num(kpiData.revenue_prev_month);
+                const pct = num(kpiData.revenue_change_pct);
+                const dso = num(kpiData.dso);
+                const prevWindow = periodDays ? `the previous ${periodDays} days` : 'the previous period';
+                // The paid-revenue total itself is the briefing's "Collected"
+                // figure, so only its change is shown, and only when there is
+                // a previous window to compare with.
+                const hasDelta = prev > 0;
+                // Nothing measurable: omit the panel rather than show an empty tile.
+                if (!hasDelta && dso === 0) return null;
+                return (
+                  <InsightCard
+                    title={hasDelta ? 'Is revenue growing, and how fast do customers pay' : 'How fast do customers pay'}
+                    description={hasDelta
+                      ? `Revenue is paid invoices including VAT, by payment date, compared with ${prevWindow}. Days to collect is measured over the last 90 days.`
+                      : 'Measured over the last 90 days. There were no paid invoices in the window before this period, so revenue growth is not shown.'}
+                  >
+                    <dl className={hasDelta ? 'ic-kpis ic-kpis--2' : 'ic-kpis'}>
+                      {hasDelta && (
+                        <KpiTile
+                          label="Change in paid revenue"
+                          value={`${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`}
+                          tone={pct < 0 ? 'danger' : undefined}
+                          note={`${formatCurrency(rev)} against ${formatCurrency(prev)} in ${prevWindow}`}
+                        />
+                      )}
+                      <KpiTile
+                        label="Days to collect"
+                        value={`${Math.round(dso)} days`}
+                        empty={dso === 0 ? 'Not measured for the last 90 days.' : undefined}
+                        note={dso !== 0 ? 'Average time from invoice to payment' : undefined}
                       />
-                    );
-                  })()
-                ) : (
-                  <div className="card">
-                    <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                      No recommendations right now.
-                    </p>
-                  </div>
-                )}
-              </div>
+                    </dl>
+                  </InsightCard>
+                );
+              })()}
 
-              {/* SECTION 3: LIVE OPERATIONS */}
-              <div>
-                <SectionHeader>Operations snapshot</SectionHeader>
-                <div className="insights-brand-grid insights-brand-grid--3">
-                  {(() => {
-                    const inTransit = loads.filter(l => ['IN_TRANSIT', 'ASSIGNED'].includes(l.status.toUpperCase().replace(' ', '_')));
-                    const inTransitRevenue = inTransit.reduce((sum, l) => sum + l.total_amount, 0);
-
-                    const delivered = loads.filter(l => ['DELIVERED', 'INVOICED'].includes(l.status.toUpperCase()));
-                    const deliveredRevenue = delivered.reduce((sum, l) => sum + l.total_amount, 0);
-
-                    const routeMap = new Map<string, number>();
-                    loads.forEach(l => {
-                      const route = `${l.pickup_city} → ${l.delivery_city}`;
-                      routeMap.set(route, (routeMap.get(route) || 0) + 1);
-                    });
-                    const topRoute = Array.from(routeMap.entries()).sort((a, b) => b[1] - a[1])[0];
-
-                    return (
-                      <>
-                        <div className="card" style={{ borderLeft: '3px solid var(--accent-primary)' }}>
-                          <div style={{
-                            ...metricValueTypography,
-                            color: 'var(--text-primary)',
-                            marginBottom: 4,
-                          }}>
-                            {inTransit.length}
-                          </div>
-                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                            loads in motion
-                          </div>
-                          <div style={{
-                            fontSize: 13,
-                            fontFamily: 'var(--font-sans)',
-                            color: 'var(--accent-primary)',
-                          }}>
-                            {formatCurrency(inTransitRevenue)} revenue in transit
-                          </div>
-                        </div>
-
-                        <div className="card" style={{ borderLeft: '3px solid var(--status-success)' }}>
-                          <div style={{
-                            ...metricValueTypography,
-                            color: 'var(--text-primary)',
-                            marginBottom: 4,
-                          }}>
-                            {delivered.length}
-                          </div>
-                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                            loads completed
-                          </div>
-                          <div style={{
-                            fontSize: 13,
-                            lineHeight: '20px',
-                            fontFamily: 'var(--font-sans)',
-                            color: 'var(--status-success-text, var(--status-success))',
-                          }}>
-                            {formatCurrency(deliveredRevenue)} revenue realised
-                          </div>
-                        </div>
-
-                        <div className="card" style={{ borderLeft: '3px solid var(--text-secondary)' }}>
-                          <div style={{
-                            fontSize: 16,
-                            fontWeight: 500,
-                            color: 'var(--text-primary)',
-                            marginBottom: 4,
-                          }}>
-                            {topRoute ? topRoute[0] : 'No routes'}
-                          </div>
-                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                            most active route
-                          </div>
-                          <div style={{
-                            fontSize: 13,
-                            fontFamily: 'var(--font-sans)',
-                            color: 'var(--text-tertiary)',
-                          }}>
-                            {topRoute ? `${plural(topRoute[1], 'trip', 'trips')} this period` : ''}
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-            </div>
+              {/* Everything else that needs attention: the full list, minus the
+                  items the briefing already shows. */}
+              {(() => {
+                const all = insightsData?.recommendations || [];
+                const shownTitles = new Set((briefing?.metrics?.top_recommendations || []).map(r => r.title));
+                const rest = [...all].filter(r => !shownTitles.has(r.title)).sort((a, b) => (b.amount || 0) - (a.amount || 0));
+                if (rest.length === 0) return null;
+                const restTotal = rest.reduce((s, r) => s + num(r.amount), 0);
+                return (
+                  <InsightCard
+                    title="What else needs attention"
+                    description={`${plural(rest.length, 'more item', 'more items')} beyond the briefing above${restTotal > 0 ? `, worth ${formatCurrency(restTotal)} in total` : ''}. Largest amount first.`}
+                  >
+                    <RecommendationGroups
+                      recommendations={rest}
+                      details={rest as RecommendationDetail[]}
+                      initialRows={5}
+                      headingLevel={3}
+                    />
+                  </InsightCard>
+                );
+              })()}
+            </Stack>
           )}
 
-          {/* TAB 2: MARGIN ENGINE */}
+          {/* ============ MARGIN ENGINE ============ */}
           {tab === 'margin' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {/* SECTION 1: P&L SUMMARY */}
-              <div>
-                <SectionHeader>P&L summary</SectionHeader>
-                <div className="insights-brand-grid insights-brand-grid--4">
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: 'var(--text-primary)',
-                      marginBottom: 12,
-                    }}>
-                      {formatCurrency(financeData?.revenue_period || 0)}
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Revenue period
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: 'var(--text-primary)',
-                      marginBottom: 12,
-                    }}>
-                      {formatCurrency(financeData?.expenses_period || 0)}
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Total costs
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: (financeData?.net_margin_period || 0) > 0 ? 'var(--status-success-text, var(--status-success))' : (financeData?.net_margin_period || 0) < 0 ? 'var(--status-danger-text, var(--status-danger))' : 'var(--text-primary)',
-                      marginBottom: 12,
-                    }}>
-                      {formatCurrency(financeData?.net_margin_period || 0)}
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Net margin (R)
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: getMarginColor(financeData?.net_margin_percent_period || 0),
-                      marginBottom: 12,
-                    }}>
-                      {(financeData?.net_margin_percent_period || 0).toFixed(1)}%
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Net margin (%)
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 2: ROUTE PROFITABILITY RANKING */}
-              <div>
-                <SectionHeader>Route efficiency ranking — revenue per km driven</SectionHeader>
-                <p style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Percentages show revenue less the recorded fuel surcharge. All other costs are excluded; this is not net margin.</p>
-                <div className="card insights-brand-region" role="region" aria-label="Route efficiency ranking" tabIndex={0}>
-                  {(() => {
-                    const routeMap = new Map<string, {
-                      trips: number;
-                      total_revenue: number;
-                      total_distance: number;
-                      total_fuel: number;
-                    }>();
-
-                    loads.forEach(load => {
-                      const route = `${load.pickup_city} → ${load.delivery_city}`;
-                      const existing = routeMap.get(route) || {
-                        trips: 0,
-                        total_revenue: 0,
-                        total_distance: 0,
-                        total_fuel: 0,
-                      };
-                      routeMap.set(route, {
-                        trips: existing.trips + 1,
-                        total_revenue: existing.total_revenue + load.total_amount,
-                        total_distance: existing.total_distance + load.distance,
-                        total_fuel: existing.total_fuel + (load.fuel_surcharge || 0),
-                      });
-                    });
-
-                    const routes = Array.from(routeMap.entries())
-                      .map(([route, data]) => ({
-                        route,
-                        trips: data.trips,
-                        total_revenue: data.total_revenue,
-                        total_distance: data.total_distance,
-                        total_fuel: data.total_fuel,
-                        true_margin: data.total_revenue - data.total_fuel,
-                        margin_pct: data.total_revenue > 0 ? ((data.total_revenue - data.total_fuel) / data.total_revenue) * 100 : 0,
-                        rev_per_km: data.total_distance > 0 ? data.total_revenue / data.total_distance : 0,
-                      }))
-                      .sort((a, b) => b.rev_per_km - a.rev_per_km)
-                      .slice(0, 10);
-
-                    const maxRevPerKm = Math.max(...routes.map(r => r.rev_per_km), 1);
-
-                    return routes.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 900 }}>
-                        {routes.map((r, idx) => {
-                          const isTop3 = idx < 3;
-                          const isBottom2 = idx >= routes.length - 2 && routes.length >= 5;
-
-                          return (
-                            <div
-                              key={idx}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 12,
-                                padding: 12,
-                                background: 'var(--bg-surface)',
-                                borderRadius: 8,
-                                borderLeft: `3px solid ${isTop3 ? 'var(--status-success)' : isBottom2 ? 'var(--status-danger)' : 'transparent'}`,
-                              }}
-                            >
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                fontWeight: 600,
-                                color: 'var(--text-tertiary)',
-                                minWidth: 20,
-                              }}>
-                                #{idx + 1}
-                              </div>
-                              <div style={{ minWidth: 200, fontSize: 13, color: 'var(--text-primary)' }}>
-                                {r.route}
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                color: 'var(--text-secondary)',
-                                minWidth: 60,
-                              }}>
-                                {plural(r.trips, 'trip', 'trips')}
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                color: 'var(--text-primary)',
-                                minWidth: 100,
-                              }}>
-                                {formatCurrency(r.total_revenue)}
-                              </div>
-                              <div style={{
-                                fontSize: 14,
-                                fontFamily: 'var(--font-sans)',
-                                fontWeight: 600,
-                                color: 'var(--accent-primary)',
-                                minWidth: 100,
-                              }}>
-                                {formatCurrency(r.rev_per_km)}/km
-                              </div>
-                              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{
-                                  flex: 1,
-                                  height: 16,
-                                  background: 'var(--bg-surface-hover)',
-                                  borderRadius: 4,
-                                  overflow: 'hidden',
-                                }}>
-                                  <div style={{
-                                    width: `${r.margin_pct}%`,
-                                    height: '100%',
-                                    background: r.margin_pct > 50 ? 'var(--status-success)' : r.margin_pct > 30 ? 'var(--status-warning)' : 'var(--status-danger)',
-                                    borderRadius: 4,
-                                  }} />
-                                </div>
-                                <div style={{
-                                  fontSize: 13,
-                                  fontFamily: 'var(--font-sans)',
-                                  color: 'var(--text-secondary)',
-                                  minWidth: 50,
-                                }}>
-                                  {r.margin_pct.toFixed(1)}%
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
-                        No data for this period
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* SECTION 3: MONTHLY P&L TREND */}
-              {financeData?.monthly_trend && financeData.monthly_trend.length > 0 && (
-                <div>
-                  <SectionHeader>Monthly P&L trend</SectionHeader>
-                  <div className="card insights-brand-region" role="region" aria-label="Monthly P&L trend" tabIndex={0}>
-                    {(() => {
-                      const trend = [...financeData.monthly_trend].sort((a, b) => a.month.localeCompare(b.month)).slice(-6);
-                      const maxValue = Math.max(...trend.map(m => Math.max(m.revenue, m.expenses)));
-                      const isImproving = trend.length >= 2 && trend[trend.length - 1].margin > trend[trend.length - 2].margin;
-
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 520 }}>
-                          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 2, background: 'var(--accent-primary)' }} />Revenue</span>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 2, background: 'var(--status-danger)', opacity: 0.7 }} />Costs</span>
-                            <span style={{ marginLeft: 'auto' }}>Net margin</span>
-                          </div>
-                          {trend.map((m, idx) => {
-                            const revWidth = maxValue > 0 ? (m.revenue / maxValue) * 100 : 0;
-                            const expWidth = maxValue > 0 ? (m.expenses / maxValue) * 100 : 0;
-
-                            return (
-                              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                <div style={{
-                                  width: 40,
-                                  fontSize: 13,
-                                  lineHeight: '20px',
-                                  fontFamily: 'var(--font-sans)',
-                                  color: 'var(--text-tertiary)',
-                                }}>
-                                  {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(m.month.slice(5, 7)) - 1] || m.month}
-                                </div>
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                  <div style={{
-                                    height: 16,
-                                    background: 'var(--accent-primary)',
-                                    width: `${revWidth}%`,
-                                    borderRadius: 4,
-                                  }} />
-                                  <div style={{
-                                    height: 16,
-                                    background: 'var(--status-danger)',
-                                    width: `${expWidth}%`,
-                                    borderRadius: 4,
-                                    opacity: 0.7,
-                                  }} />
-                                </div>
-                                <div style={{
-                                  fontSize: 13,
-                                  fontFamily: 'var(--font-sans)',
-                                  fontWeight: 600,
-                                  color: m.margin > 0 ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))',
-                                  minWidth: 100,
-                                  textAlign: 'right',
-                                }}>
-                                  {formatCurrency(m.margin)}
-                                </div>
-                              </div>
-                            );
-                          })}
-                          <div style={{
-                            marginTop: 8,
-                            fontSize: 13,
-                            color: isImproving ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))',
-                          }}>
-                            {isImproving ? 'Margin improving vs previous month' : 'Margin declining vs previous month'}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                  {(() => {
-                    // Largest cost, computed from the loaded expenses (the API
-                    // doesn't return an expense_breakdown).
-                    const catMap = new Map<string, number>();
-                    expenses.forEach(exp => catMap.set(exp.category, (catMap.get(exp.category) || 0) + Number(exp.amount || 0)));
-                    const entries = Array.from(catMap.entries());
-                    if (entries.length === 0) return null;
-                    const largest = entries.reduce((max, [cat, amt]) => amt > max.amount ? { category: cat, amount: amt } : max, { category: '', amount: 0 });
-                    const revenue = financeData?.revenue_period || 0;
-                    const largestPct = revenue > 0 ? (largest.amount / revenue) * 100 : 0;
-                    return (
-                      <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-surface-hover)', borderRadius: 4, borderLeft: '3px solid var(--accent-primary)' }}>
-                        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                          <strong style={{ color: 'var(--text-primary)' }}>{titleCase(largest.category)}</strong> is your largest cost ({formatCurrency(largest.amount)}){revenue > 0
-                            ? <> at <strong style={{ color: 'var(--text-primary)' }}>{largestPct.toFixed(1)}%</strong> of revenue.</>
-                            : '. No revenue was recorded in this period, so no share of revenue is shown.'}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* SECTION 4: COST BREAKDOWN */}
-              <div>
-                <SectionHeader>Cost breakdown</SectionHeader>
-                <div className="card insights-brand-region" role="region" aria-label="Cost breakdown" tabIndex={0}>
-                  {(() => {
-                    const categoryMap = new Map<string, number>();
-                    expenses.forEach(exp => {
-                      const existing = categoryMap.get(exp.category) || 0;
-                      categoryMap.set(exp.category, existing + exp.amount);
-                    });
-
-                    const categories = Array.from(categoryMap.entries())
-                      .map(([category, amount]) => ({ category, amount }))
-                      .sort((a, b) => b.amount - a.amount)
-                      .slice(0, 6);
-
-                    const totalExpenses = categories.reduce((sum, c) => sum + c.amount, 0);
-                    const maxAmount = Math.max(...categories.map(c => c.amount), 1);
-
-                    return categories.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 560 }}>
-                        {categories.map((cat, idx) => {
-                          const widthPct = (cat.amount / maxAmount) * 100;
-                          const pct = totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0;
-
-                          return (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              <div style={{
-                                minWidth: 120,
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                color: 'var(--text-secondary)',
-                              }}>
-                                {titleCase(cat.category)}
-                              </div>
-                              <div style={{
-                                flex: 1,
-                                height: 20,
-                                background: 'var(--bg-surface-hover)',
-                                borderRadius: 4,
-                                overflow: 'hidden',
-                              }}>
-                                <div style={{
-                                  width: `${widthPct}%`,
-                                  height: '100%',
-                                  background: 'var(--accent-dim)',
-                                  borderRadius: 4,
-                                }} />
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                fontWeight: 600,
-                                color: 'var(--text-primary)',
-                                minWidth: 100,
-                                textAlign: 'right',
-                              }}>
-                                {formatCurrency(cat.amount)}
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                color: 'var(--text-secondary)',
-                                minWidth: 50,
-                                textAlign: 'right',
-                              }}>
-                                {pct.toFixed(1)}%
-                              </div>
-                            </div>
-                          );
-                        })}
-                        <div style={{
-                          marginTop: 8,
-                          paddingTop: 12,
-                          borderTop: '1px solid var(--border-subtle)',
-                          fontSize: 13,
-                          color: 'var(--text-secondary)',
-                        }}>
-                          Total expenses this period: <span style={{
-                            fontFamily: 'var(--font-sans)',
-                            fontWeight: 600,
-                            color: 'var(--text-primary)',
-                          }}>{formatCurrency(totalExpenses)}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
-                        No data for this period
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: CASH FLOW */}
-          {tab === 'cash' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {/* SECTION 1: CASH POSITION */}
-              <div>
-                <SectionHeader>Cash position</SectionHeader>
-                <div className="insights-brand-grid insights-brand-grid--3">
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: (financeData?.cash_flow_forecast?.next_30_days || 0) > 0 ? 'var(--status-success-text, var(--status-success))' : (financeData?.cash_flow_forecast?.next_30_days || 0) < 0 ? 'var(--status-danger-text, var(--status-danger))' : 'var(--text-primary)',
-                      marginBottom: 8,
-                    }}>
-                      {formatCurrency(financeData?.cash_flow_forecast?.next_30_days || 0)}
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                      Next 30 days
-                    </div>
-                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                      Expected net cash
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: 'var(--text-primary)',
-                      marginBottom: 8,
-                    }}>
-                      {formatCurrency(financeData?.cash_flow_forecast?.next_60_days || 0)}
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                      Next 60 days
-                    </div>
-                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                      Expected net cash
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: 'var(--text-primary)',
-                      marginBottom: 8,
-                    }}>
-                      {formatCurrency(financeData?.cash_flow_forecast?.next_90_days || 0)}
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                      Next 90 days
-                    </div>
-                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                      Expected net cash
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 2: CUSTOMER PAYMENT INTELLIGENCE */}
-              <div>
-                <SectionHeader>Who owes you and how long</SectionHeader>
-                <div className="card insights-brand-region" role="region" aria-label="Outstanding invoice aging" tabIndex={0}>
-                  {(() => {
-                    const customerMap = new Map<string, {
-                      total_outstanding: number;
-                      oldest_days: number;
-                      invoice_count: number;
-                    }>();
-
-                    const now = new Date();
-                    invoices.forEach(inv => {
-                      if (inv.status !== 'PAID' && inv.balance > 0) {
-                        const issueDate = new Date(inv.issue_date);
-                        const daysOld = Math.floor((now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24));
-
-                        const existing = customerMap.get(inv.customer_name) || {
-                          total_outstanding: 0,
-                          oldest_days: 0,
-                          invoice_count: 0,
-                        };
-
-                        customerMap.set(inv.customer_name, {
-                          total_outstanding: existing.total_outstanding + inv.balance,
-                          oldest_days: Math.max(existing.oldest_days, daysOld),
-                          invoice_count: existing.invoice_count + 1,
-                        });
-                      }
-                    });
-
-                    const customers = Array.from(customerMap.entries())
-                      .map(([name, data]) => ({
-                        customer_name: name,
-                        total_outstanding: data.total_outstanding,
-                        oldest_invoice_days: data.oldest_days,
-                        invoice_count: data.invoice_count,
-                      }))
-                      .sort((a, b) => b.total_outstanding - a.total_outstanding)
-                      .slice(0, 8);
-
-                    const top3sum = customers.slice(0, 3).reduce((sum, c) => sum + c.total_outstanding, 0);
-
-                    return customers.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 720 }}>
-                        {customers.map((c, idx) => {
-                          const risk = c.oldest_invoice_days > 60 ? 'High risk' : c.oldest_invoice_days > 30 ? 'Medium' : 'Current';
-                          const riskColor = c.oldest_invoice_days > 60 ? 'var(--status-danger)' : c.oldest_invoice_days > 30 ? 'var(--status-warning)' : 'var(--status-success)';
-
-                          return (
-                            <div key={idx} style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 12,
-                              padding: 12,
-                              background: 'var(--bg-surface)',
-                              borderRadius: 8,
-                            }}>
-                              <div style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
-                                {c.customer_name}
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                fontWeight: 600,
-                                color: 'var(--text-primary)',
-                                minWidth: 100,
-                              }}>
-                                {formatCurrency(c.total_outstanding)}
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                color: 'var(--text-secondary)',
-                                minWidth: 100,
-                              }}>
-                                Oldest: {c.oldest_invoice_days}d
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                color: 'var(--text-secondary)',
-                                minWidth: 80,
-                              }}>
-                                {plural(c.invoice_count, 'invoice', 'invoices')}
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                lineHeight: '20px',
-                                fontFamily: 'var(--font-sans)',
-                                padding: '4px 8px',
-                                borderRadius: 4,
-                                background: statusSurfaceColor(riskColor),
-                                color: statusTextColor(riskColor),
-                                display: 'inline-block',
-                                whiteSpace: 'nowrap',
-                              }}>
-                                {risk}
-                              </div>
-                            </div>
-                          );
-                        })}
-                        <div style={{
-                          marginTop: 8,
-                          padding: 12,
-                          background: 'var(--bg-surface)',
-                          borderRadius: 8,
-                          fontSize: 13,
-                          color: 'var(--text-secondary)',
-                        }}>
-                          {Number.isFinite(Number(top3sum)) ? (
-                            <>Collecting the top 3 accounts would unlock <span style={{
-                              fontFamily: 'var(--font-sans)',
-                              fontWeight: 600,
-                              color: 'var(--text-primary)',
-                            }}>{formatCurrency(top3sum)}</span> in cash</>
-                          ) : (
-                            <>The combined balance of the top 3 accounts is unavailable because one balance couldn't be read.</>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
-                        No outstanding invoices
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* SECTION 3: WEEKLY CASH FORECAST */}
-              <div>
-                <SectionHeader>Weekly cash forecast — next 8 weeks net position</SectionHeader>
-                <div className="card">
-                  {cashflowData?.forecast && cashflowData.forecast.length > 0 ? (() => {
-                    const data = cashflowData.forecast.slice(0, 8).map(f => ({
-                      week: f.period.replace('2026-', ''),
-                      net: Math.round(f.net),
-                      in: Math.round(f.expected_in),
-                      out: Math.round(f.expected_out),
-                    }));
-                    const runningBalance = data.reduce((sum, d) => sum + d.net, 0);
-                    return (
+            <Stack>
+              {(() => {
+                const f = financeData as (FinanceData & { from_date?: string; to_date?: string }) | null;
+                if (!f) {
+                  return (
+                    <InsightCard title="Did the business make money in this period">
+                      <p className="ic-note">The finance summary did not load. Your data is unchanged; choose the period again to retry.</p>
+                    </InsightCard>
+                  );
+                }
+                const rev = num(f.revenue_period);
+                const cost = num(f.expenses_period);
+                const margin = num(f.net_margin_period);
+                const range = f.from_date && f.to_date ? `${formatDay(f.from_date)} to ${formatDay(f.to_date)}` : 'the selected period';
+                return (
+                  <InsightCard
+                    title="Did the business make money in this period"
+                    description={`${range}. Revenue is paid invoices including VAT, by payment date. Costs are approved expenses, by expense date.`}
+                  >
+                    {rev === 0 && cost === 0 ? (
                       <div>
-                        <ResponsiveContainer width="100%" height={240}>
-                          <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
-                            <XAxis dataKey="week" tick={{ fontFamily: 'var(--font-sans)', fontSize: 13, fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontFamily: 'var(--font-sans)', fontSize: 13, fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R${Math.abs(v/1000).toFixed(0)}k`} />
-                            <Tooltip
-                              contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}
-                              formatter={(value: number) => [formatCurrency(value), 'Net position']}
-                              labelStyle={{ color: 'var(--text-secondary)', marginBottom: 4 }}
-                              itemStyle={{ color: 'var(--text-primary)', padding: 0 }}
-                              cursor={{ fill: 'var(--bg-surface-hover)' }}
-                            />
-                            <ReferenceLine y={0} stroke="var(--border-subtle)" strokeWidth={1} />
-                            <Bar dataKey="net" radius={[2, 2, 0, 0]}>
-                              {data.map((entry, index) => (
-                                <Cell key={index} fill={entry.net >= 0 ? 'var(--accent-primary)' : 'var(--status-danger)'} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                        <div className="insights-brand-grid insights-brand-grid--3" style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
-                          <div>
-                            <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 8 }}>8-week net</div>
-                            <div style={{ ...metricValueTypography, color: runningBalance >= 0 ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))' }}>{formatCurrency(runningBalance)}</div>
-                          </div>
-                          <div>
-                            <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 8 }}>Positive weeks</div>
-                            <div style={{ ...metricValueTypography, color: 'var(--status-success-text, var(--status-success))' }}>{data.filter(d => d.net >= 0).length} of {data.length}</div>
-                          </div>
-                          <div>
-                            <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 8 }}>Peak week</div>
-                            <div style={{ ...metricValueTypography, color: 'var(--accent-primary)' }}>{formatCurrency(Math.max(...data.map(d => d.net)))}</div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })() : (
-                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>No forecast data available</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {tab === 'fleet' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {/* SECTION 1: FLEET HEALTH SUMMARY */}
-              <div>
-                <SectionHeader>Fleet health summary</SectionHeader>
-                <div className="insights-brand-grid insights-brand-grid--4">
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: 'var(--text-primary)',
-                      marginBottom: 12,
-                    }}>
-                      {vehicles.filter(v => ['IN_USE', 'AVAILABLE'].includes(v.status.toUpperCase())).length}
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Active vehicles
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: 'var(--text-primary)',
-                      marginBottom: 12,
-                    }}>
-                      {vehicles.length > 0 ? (vehicles.reduce((sum, v) => sum + (v.ai_health_score || 0), 0) / vehicles.length).toFixed(0) : 0}
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Avg health score
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: 'var(--status-danger-text, var(--status-danger))',
-                      marginBottom: 12,
-                    }}>
-                      {vehicles.filter(v => (v.ai_health_score || 100) < 60).length}
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Vehicles at risk
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <div style={{
-                      ...metricValueTypography,
-                      color: 'var(--text-primary)',
-                      marginBottom: 12,
-                    }}>
-                      {vehicles.length > 0 ? formatCurrency(vehicles.reduce((sum, v) => sum + (v.cost_per_km || 0), 0) / vehicles.length) : formatCurrency(0)}
-                    </div>
-                    <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Avg cost/km
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 2: VEHICLE EFFICIENCY RANKING */}
-              <div>
-                <SectionHeader>Vehicle performance — revenue earned vs operational cost</SectionHeader>
-                <div className="card insights-brand-region" role="region" aria-label="Vehicle performance" tabIndex={0}>
-                  {vehicles.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 980 }}>
-                      {[...vehicles]
-                        .sort((a, b) => b.revenue_generated - a.revenue_generated)
-                        .map((v, idx) => {
-                          const healthColor = v.ai_health_score > 80 ? 'var(--status-success)' : v.ai_health_score > 60 ? 'var(--status-warning)' : 'var(--status-danger)';
-
-                          return (
-                            <div
-                              key={v.id}
-                              onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 12,
-                                padding: 12,
-                                background: 'var(--bg-surface)',
-                                borderRadius: 8,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                fontWeight: 600,
-                                color: 'var(--text-tertiary)',
-                                minWidth: 30,
-                              }}>
-                                #{idx + 1}
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                lineHeight: '20px',
-                                fontFamily: 'var(--font-mono)',
-                                fontWeight: 400,
-                                color: 'var(--text-primary)',
-                                minWidth: 100,
-                              }}>
-                                {v.plate}
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                color: 'var(--text-secondary)',
-                                minWidth: 150,
-                              }}>
-                                {v.make} {v.model}
-                              </div>
-                              <StatusBadge>{v.status}</StatusBadge>
-                              <div style={{ flex: 1 }} />
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                fontWeight: 600,
-                                color: 'var(--accent-primary)',
-                                minWidth: 100,
-                              }}>
-                                {v.revenue_generated > 0 ? formatCurrency(v.revenue_generated) : 'No revenue data'}
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                color: 'var(--text-secondary)',
-                                minWidth: 80,
-                              }}>
-                                {formatCurrency(v.cost_per_km)}/km
-                              </div>
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                minWidth: 100,
-                              }}>
-                                <div style={{
-                                  flex: 1,
-                                  height: 8,
-                                  background: 'var(--bg-surface-hover)',
-                                  borderRadius: 4,
-                                  overflow: 'hidden',
-                                }}>
-                                  <div style={{
-                                    width: `${v.ai_health_score}%`,
-                                    height: '100%',
-                                    background: healthColor,
-                                  }} />
-                                </div>
-                                <div style={{
-                                  fontSize: 13,
-                                  lineHeight: '20px',
-                                  fontFamily: 'var(--font-sans)',
-                                  color: statusTextColor(healthColor),
-                                }}>
-                                  {v.ai_health_score}
-                                </div>
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                color: 'var(--text-secondary)',
-                                minWidth: 60,
-                              }}>
-                                {v.uptime_percentage.toFixed(1)}%
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
-                      No data for this period
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* SECTION 3: DRIVER EFFICIENCY MATRIX */}
-              <div>
-                <SectionHeader>Driver performance — revenue generated and risk profile</SectionHeader>
-                <div className="card insights-brand-region" role="region" aria-label="Driver performance" tabIndex={0}>
-                  {drivers.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 860 }}>
-                      {[...drivers]
-                        .sort((a, b) => b.revenue_generated - a.revenue_generated)
-                        .map((d, idx) => (
-                          <div
-                            key={d.id}
-                            onClick={() => navigate(`/fleet/drivers/${d.id}/financial`)}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 12,
-                              padding: 12,
-                              background: 'var(--bg-surface)',
-                              borderRadius: 8,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <div style={{
-                              fontSize: 13,
-                              fontFamily: 'var(--font-sans)',
-                              fontWeight: 600,
-                              color: 'var(--text-tertiary)',
-                              minWidth: 30,
-                            }}>
-                              #{idx + 1}
-                            </div>
-                            <div style={{
-                              fontSize: 13,
-                              color: 'var(--text-primary)',
-                              fontWeight: 500,
-                              minWidth: 180,
-                            }}>
-                              {d.user_details.name}
-                            </div>
-                            <StatusBadge>{d.status}</StatusBadge>
-                            <div style={{ flex: 1 }} />
-                            <div style={{
-                              fontSize: 13,
-                              fontFamily: 'var(--font-sans)',
-                              fontWeight: 600,
-                              color: 'var(--accent-primary)',
-                              minWidth: 100,
-                            }}>
-                              {formatCurrency(d.revenue_generated)}
-                            </div>
-                            <div style={{
-                              fontSize: 13,
-                              fontFamily: 'var(--font-sans)',
-                              color: 'var(--text-secondary)',
-                              minWidth: 60,
-                            }}>
-                              {plural(d.total_trips, 'trip', 'trips')}
-                            </div>
-                            <div style={{
-                              fontSize: 13,
-                              fontFamily: 'var(--font-sans)',
-                              color: 'var(--text-secondary)',
-                              minWidth: 100,
-                            }}>
-                              {formatCurrency(d.avg_revenue_per_trip)}/trip
-                            </div>
-                            {(d.violation_count > 0 || d.accident_history > 0) && (
-                              <div style={{
-                                fontSize: 13,
-                                lineHeight: '20px',
-                                color: 'var(--status-danger-text, var(--status-danger))',
-                              }}>
-                                {d.violation_count > 0 && `⚠ ${d.violation_count} violations`}
-                                {d.violation_count > 0 && d.accident_history > 0 && ', '}
-                                {d.accident_history > 0 && `⚠ ${d.accident_history} accidents`}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
-                      No data for this period
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* SECTION 4: MAINTENANCE RISK ALERT */}
-              <div>
-                <SectionHeader>Maintenance risk alert</SectionHeader>
-                <div className="card insights-brand-region" role="region" aria-label="Maintenance risk alerts" tabIndex={0}>
-                  {(() => {
-                    const atRisk = vehicles.filter(v => (v.ai_health_score || 100) < 70).sort((a, b) => a.ai_health_score - b.ai_health_score);
-
-                    return atRisk.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 720 }}>
-                        {atRisk.map((v, idx) => {
-                          const recommendation = v.ai_health_score < 50 ? '⚠ High maintenance risk — schedule immediately' : 'Monitor closely';
-
-                          return (
-                            <div key={idx} style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 12,
-                              padding: 12,
-                              background: 'var(--bg-surface)',
-                              borderRadius: 8,
-                            }}>
-                              <div style={{
-                                fontSize: 13,
-                                lineHeight: '20px',
-                                fontFamily: 'var(--font-mono)',
-                                fontWeight: 400,
-                                color: 'var(--text-primary)',
-                                minWidth: 100,
-                              }}>
-                                {v.plate}
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                color: 'var(--text-secondary)',
-                                minWidth: 120,
-                              }}>
-                                {v.make}
-                              </div>
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                fontWeight: 600,
-                                color: v.ai_health_score < 50 ? 'var(--status-danger-text, var(--status-danger))' : 'var(--status-warning-text, var(--status-warning))',
-                                minWidth: 60,
-                              }}>
-                                {v.ai_health_score}
-                              </div>
-                              <StatusBadge>{v.status}</StatusBadge>
-                              <div style={{ flex: 1, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
-                                {recommendation}
-                              </div>
-                            </div>
-                          );
-                        })}
+                        <p className="ic-note">No invoices were paid and no expenses were approved in this period.</p>
+                        {longerPeriod && <button type="button" className="ic-text-button" onClick={longerPeriod}>Show the last 12 months</button>}
                       </div>
                     ) : (
-                      <div style={{
-                        padding: 20,
-                        textAlign: 'center',
-                        color: 'var(--status-success-text, var(--status-success))',
-                        fontSize: 13,
-                        lineHeight: '20px',
-                      }}>
-                        All vehicles within healthy operating range
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-            </div>
+                      <>
+                        <Waterfall
+                          height={240}
+                          maxWidth={560}
+                          labelAll
+                          valueHeader="Amount"
+                          caption="Revenue, approved costs and net margin for the period"
+                          ariaLabel={`Revenue ${formatCurrency(rev)}, minus approved costs ${formatCurrency(cost)}, leaves a net margin of ${formatCurrency(margin)}.`}
+                          steps={[
+                            { label: 'Revenue', value: rev, kind: 'total' },
+                            { label: 'Approved costs', value: -cost, kind: 'delta' },
+                            { label: 'Net margin', value: margin, kind: 'total' },
+                          ]}
+                        />
+                        <p className="ic-foot">
+                          {rev > 0
+                            ? <>Costs took <strong>{((cost / rev) * 100).toFixed(1)}%</strong> of revenue, leaving <strong>{num(f.net_margin_percent_period).toFixed(1)}%</strong>{margin < 0 ? <>, <span className="ic-text--danger">a loss</span></> : ''}.</>
+                            : <><span className="ic-text--danger">A loss</span>: costs with no paid revenue.</>}
+                        </p>
+                      </>
+                    )}
+                  </InsightCard>
+                );
+              })()}
+
+              {financeData?.monthly_trend && financeData.monthly_trend.length > 0 && (() => {
+                const trend = [...financeData.monthly_trend].sort((a, b) => a.month.localeCompare(b.month)).slice(-6);
+                const data = trend.map(m => ({ month: monthName(m.month), revenue: num(m.revenue), expenses: num(m.expenses), margin: num(m.margin) }));
+                const last = data[data.length - 1];
+                const prev = data[data.length - 2];
+                const summary = last && prev
+                  ? last.margin === prev.margin
+                    ? `Net margin in ${last.month} was ${formatCurrency(last.margin)}, level with ${prev.month}.`
+                    : `Net margin in ${last.month} was ${formatCurrency(last.margin)}, ${last.margin > prev.margin ? 'up' : 'down'} from ${formatCurrency(prev.margin)} in ${prev.month}.`
+                  : null;
+                const totalNet = data.reduce((sum, d) => sum + d.margin, 0);
+                return (
+                  <InsightCard
+                    title="Where did the last six months leave you?"
+                    description={`Each month's net margin (paid invoices including VAT, by payment date, less approved expenses, by expense date) added to the months before it. Calendar months. ${notFiltered}`}
+                  >
+                    <Waterfall
+                      height={260}
+                      valueHeader="Net margin"
+                      caption="Net margin per month and the running total"
+                      ariaLabel={`Net margin by month from ${data[0]?.month} to ${last?.month}, adding up to ${formatCurrency(totalNet)}.`}
+                      steps={[
+                        ...data.map(d => ({
+                          label: d.month,
+                          value: d.margin,
+                          kind: 'delta' as const,
+                          emptyText: d.revenue === 0 && d.expenses === 0 ? 'No paid revenue and no approved costs' : undefined,
+                          detail: `Revenue ${formatCurrency(d.revenue)}, costs ${formatCurrency(d.expenses)}`,
+                        })),
+                        { label: `${data.length} months`, value: totalNet, kind: 'total' as const },
+                      ]}
+                    />
+                    {<p className="ic-foot">{last && (last.revenue !== 0 || last.expenses !== 0) ? `${summary} ` : ''}Over the {data.length} months the business is <strong>{formatCurrency(Math.abs(totalNet))}</strong> {totalNet >= 0 ? 'ahead' : 'behind'}.</p>}
+                  </InsightCard>
+                );
+              })()}
+
+              {(() => {
+                // Same grouping as before; amounts coerced from decimal strings
+                // so the per-category sums are numeric.
+                const categoryMap = new Map<string, { amount: number; count: number }>();
+                expenses.forEach(exp => {
+                  const e = categoryMap.get(exp.category) || { amount: 0, count: 0 };
+                  categoryMap.set(exp.category, { amount: e.amount + num(exp.amount), count: e.count + 1 });
+                });
+                const rows: RankedRow[] = Array.from(categoryMap.entries()).map(([category, d]) => ({
+                  id: category,
+                  label: titleCase(category),
+                  value: d.amount,
+                  count: d.count,
+                }));
+                const total = rows.reduce((s, r) => s + num(r.value), 0);
+                return (
+                  <InsightCard
+                    title="Where does the money go"
+                    description={`Expenses by category from ${sampleText(expenses.length, expensesTotal, 'expenses', true)}, pending and approved. ${notFiltered}`}
+                  >
+                    <RankedList
+                      rows={rows}
+                      format={v => formatCurrency(v)}
+                      formatCount={n => plural(n, 'entry', 'entries')}
+                      showShare
+                      topN={6}
+                      ariaLabel="Expenses by category"
+                      empty="No expenses recorded yet."
+                    />
+                    {rows.length > 0 && <p className="ic-foot">These entries total <strong>{formatCurrency(total)}</strong>.</p>}
+                  </InsightCard>
+                );
+              })()}
+            </Stack>
           )}
 
-          {/* TAB 5: LANES */}
-          {tab === 'lanes' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* ============ CASH FLOW ============ */}
+          {tab === 'cash' && (
+            <Stack>
+              <InsightCard
+                title="Will you run short of cash in the next 8 weeks?"
+                description={`Each unpaid invoice is placed on the date that customer usually pays; expected costs are based on your approved expenses over the last 90 days. The line adds each week to the ones before, starting from zero today: it does not include your bank balance. Weeks start on Monday. ${notFiltered}`}
+              >
+                {cashflowData?.forecast && cashflowData.forecast.length > 0 ? (() => {
+                  const data = cashflowData.forecast.slice(0, 8).map(f => ({
+                    week: formatDay(f.start_date, false) || f.period,
+                    in: num(f.expected_in),
+                    out: num(f.expected_out),
+                  }));
+                  let pos = 0;
+                  const running = data.map(d => (pos += d.in - d.out));
+                  const shortWeeks = running.filter(v => v < 0).length;
+                  const lowIdx = running.reduce((m, v, i) => (v < running[m] ? i : m), 0);
+                  return (
+                    <>
+                      <CashRunway weeks={data.map(d => ({ label: d.week, in: d.in, out: d.out }))} />
+                      <p className="ic-foot">
+                        {shortWeeks > 0
+                          ? <><span className="ic-text--danger">Short in {shortWeeks} of {data.length} weeks.</span> The lowest point is <strong>{formatCurrency(running[lowIdx])}</strong> in the week of {data[lowIdx].week}, before your bank balance.</>
+                          : <>Expected receipts stay ahead of expected costs every week, ending <strong>{formatCurrency(running[running.length - 1])}</strong> up after {data.length} weeks.</>}
+                      </p>
+                    </>
+                  );
+                })() : (
+                  <p className="ic-note">No forecast yet. It appears once there are unpaid invoices or recent approved expenses.</p>
+                )}
+              </InsightCard>
 
-              {/* SECTION 1: CORRIDOR EFFICIENCY */}
-              <div>
-                <SectionHeader>Corridor efficiency — revenue per km driven</SectionHeader>
-                <p style={{ margin: '0 0 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Percentages show revenue less the recorded fuel surcharge. All other costs are excluded; this is not net margin.</p>
-                <div className="card insights-lanes-panel">
-                  {(() => {
-                    const routeMap = new Map<string, { trips: number; total_revenue: number; total_distance: number; total_fuel: number }>();
-                    loads.forEach(load => {
-                      if (!load.pickup_city || !load.delivery_city) return;
-                      const route = `${load.pickup_city} → ${load.delivery_city}`;
-                      const e = routeMap.get(route) || { trips: 0, total_revenue: 0, total_distance: 0, total_fuel: 0 };
-                      routeMap.set(route, {
-                        trips: e.trips + 1,
-                        total_revenue: e.total_revenue + (parseFloat(String(load.total_amount)) || 0),
-                        total_distance: e.total_distance + (parseFloat(String(load.distance)) || 0),
-                        total_fuel: e.total_fuel + (parseFloat(String(load.fuel_surcharge)) || 0),
-                      });
+              {(() => {
+                const cf = financeData?.cash_flow_forecast;
+                const d30 = num(cf?.next_30_days), d60 = num(cf?.next_60_days), d90 = num(cf?.next_90_days);
+                return (
+                  <InsightCard
+                    title="How much falls due in the next 90 days"
+                    description="Unpaid balances by invoice due date. Invoices already overdue are not counted here; they appear in who owes you, below."
+                  >
+                    {!cf ? (
+                      <p className="ic-note">The finance summary did not load. Your data is unchanged; choose the period again to retry.</p>
+                    ) : d30 === 0 && d60 === 0 && d90 === 0 ? (
+                      <p className="ic-note">No unpaid invoice falls due in the next 90 days.</p>
+                    ) : (
+                      <dl className="ic-kpis">
+                        <KpiTile label="Due in the next 30 days" value={formatCurrency(d30)} />
+                        <KpiTile label="Due in 31 to 60 days" value={formatCurrency(d60)} />
+                        <KpiTile label="Due in 61 to 90 days" value={formatCurrency(d90)} />
+                      </dl>
+                    )}
+                  </InsightCard>
+                );
+              })()}
+
+              {(() => {
+                // Same grouping as before; balances coerced from decimal strings.
+                const customerMap = new Map<string, { total_outstanding: number; oldest_days: number; invoice_count: number }>();
+                const now = new Date();
+                invoices.forEach(inv => {
+                  if (inv.status !== 'PAID' && num(inv.balance) > 0) {
+                    const issueDate = new Date(inv.issue_date);
+                    const daysOld = Math.floor((now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24));
+                    const existing = customerMap.get(inv.customer_name) || { total_outstanding: 0, oldest_days: 0, invoice_count: 0 };
+                    customerMap.set(inv.customer_name, {
+                      total_outstanding: existing.total_outstanding + num(inv.balance),
+                      oldest_days: Math.max(existing.oldest_days, daysOld),
+                      invoice_count: existing.invoice_count + 1,
                     });
-                    const routes = Array.from(routeMap.entries())
-                      .map(([route, d]) => ({
-                        route, trips: d.trips,
-                        total_revenue: d.total_revenue,
-                        rev_per_km: d.total_distance > 0 ? d.total_revenue / d.total_distance : 0,
-                        margin_pct: d.total_revenue > 0 ? ((d.total_revenue - d.total_fuel) / d.total_revenue) * 100 : 0,
-                      }))
-                      .filter(r => r.rev_per_km > 0)
-                      .sort((a, b) => b.rev_per_km - a.rev_per_km)
-                      .slice(0, 8);
-                    if (routes.length === 0) return <div className="insights-lanes-empty">No route data for this period</div>;
-                    return (
+                  }
+                });
+                const customers = Array.from(customerMap.entries())
+                  .map(([name, data]) => ({ customer_name: name, ...data }))
+                  .sort((a, b) => b.total_outstanding - a.total_outstanding);
+                const rows: RankedRow[] = customers.map(c => {
+                  const risk = c.oldest_days > 60 ? 'danger' : c.oldest_days > 30 ? 'warning' : null;
+                  return {
+                    id: c.customer_name,
+                    label: c.customer_name,
+                    value: c.total_outstanding,
+                    count: c.invoice_count,
+                    meta: (
+                      <span className={risk === 'danger' ? 'ic-text--danger' : risk === 'warning' ? 'ic-text--warning' : undefined}>
+                        Oldest invoice issued {plural(c.oldest_days, 'day', 'days')} ago
+                      </span>
+                    ),
+                  };
+                });
+                const total = customers.reduce((s, c) => s + c.total_outstanding, 0);
+                const top3sum = customers.slice(0, 3).reduce((sum, c) => sum + c.total_outstanding, 0);
+                const buckets = ageingBuckets(invoices);
+                const perCustomer = ageingByCustomer(invoices);
+                const maxOwed = Math.max(0, ...customers.map(c => c.total_outstanding));
+                const pastDue = buckets.filter(b => b.key !== 'current').reduce((s2, b) => s2 + b.amount, 0);
+                const agedTotal = buckets.reduce((s2, b) => s2 + b.amount, 0);
+                rows.forEach(r => {
+                  const b = perCustomer.get(r.id);
+                  if (b) r.bar = <AgeingStrip buckets={b} scaleTo={maxOwed} ariaLabel={`${r.id}: ${formatCurrency(Number(r.value))} owed, by how late it is`} />;
+                });
+                return (
+                  <InsightCard
+                    title="Where is your cash stuck, and with whom?"
+                    description={`Unpaid balances from ${sampleText(invoices.length, invoicesTotal, 'invoices')}, drafts included, split by how far past the due date they are today. Each customer's bar is their balance, shaded by the same lateness bands. ${notFiltered}`}
+                  >
+                    {agedTotal > 0 && (
                       <>
-                        <div className="insights-lanes-scroll" role="region" aria-label="Route performance table" tabIndex={0}>
-                          <table className="insights-lanes-table">
-                            <thead>
-                              <tr>
-                                {['Route', 'Trips', 'Revenue', 'Revenue/km', 'After fuel (%)'].map((h, hIdx) => (
-                                  <th key={h} scope="col" data-align={hIdx === 0 ? undefined : 'numeric'}>{h}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {routes.map((r, idx) => (
-                                <tr key={idx}>
-                                  <td style={{ borderLeft: idx < 2 ? '3px solid var(--status-success)' : idx >= routes.length - 2 ? '3px solid var(--status-danger)' : '3px solid transparent' }}>{r.route}</td>
-                                  <td data-align="numeric" style={{ color: 'var(--text-secondary)' }}>{r.trips}</td>
-                                  <td data-align="numeric">{formatCurrency(r.total_revenue)}</td>
-                                  <td data-align="numeric" style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{formatCurrency(r.rev_per_km)}</td>
-                                  <td data-align="numeric" style={{ color: r.margin_pct > 50 ? 'var(--status-success-text, var(--status-success))' : r.margin_pct > 30 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))' }}>{r.margin_pct.toFixed(1)}%</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        <div className="insights-lanes-legend">
-                          Blue edge: two most efficient corridors · Red edge: two least efficient
-                        </div>
+                        <AgeingStrip buckets={buckets} ariaLabel={`Of ${formatCurrency(agedTotal)} unpaid, ${Math.round((pastDue / agedTotal) * 100)}% is past its due date`} />
+                        <h3 className="insights-subhead">By customer</h3>
                       </>
-                    );
-                  })()}
-                </div>
-              </div>
+                    )}
+                    <RankedList
+                      rows={rows}
+                      format={v => formatCurrency(v)}
+                      formatCount={n => plural(n, 'invoice', 'invoices')}
+                      showShare
+                      topN={8}
+                      ariaLabel="Outstanding balance by customer"
+                      empty="No customer has an unpaid balance."
+                    />
+                    {customers.length > 3 && total > 0 && (
+                      <p className="ic-foot">
+                        Your 3 largest balances add up to <strong>{formatCurrency(top3sum)}</strong>, {((top3sum / total) * 100).toFixed(0)}% of the {formatCurrency(total)} listed.
+                      </p>
+                    )}
+                  </InsightCard>
+                );
+              })()}
 
-              {/* SECTION 2: CARGO PERFORMANCE */}
-              <div>
-                <SectionHeader>Cargo performance — avg revenue per trip by cargo type</SectionHeader>
-                <div className="card insights-lanes-panel">
-                  {(() => {
-                    const cargoMap = new Map<string, { count: number; total: number }>();
-                    loads.forEach(load => {
-                      const words = (load.cargo_description || 'Unknown').trim().split(/\s+/).slice(0, 2);
-                      const key = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-                      const e = cargoMap.get(key) || { count: 0, total: 0 };
-                      cargoMap.set(key, { count: e.count + 1, total: e.total + (parseFloat(String(load.total_amount)) || 0) });
-                    });
-                    const types = Array.from(cargoMap.entries())
-                      .map(([cargo, d]) => ({ cargo, trips: d.count, avg: d.total / d.count, total: d.total }))
-                      .sort((a, b) => b.avg - a.avg);
-                    if (types.length === 0) return <div className="insights-lanes-empty">No cargo data</div>;
-                    return (
-                      <div className="insights-lanes-scroll" role="region" aria-label="Cargo performance table" tabIndex={0}>
-                        <table className="insights-lanes-table">
-                          <thead>
-                            <tr>
-                              {['Cargo type', 'Avg/trip', 'Trips', 'Total'].map((h, hIdx) => (
-                                <th key={h} scope="col" data-align={hIdx === 0 ? undefined : 'numeric'}>{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {types.map((c, idx) => (
-                              <tr key={idx}>
-                                <td>{c.cargo}</td>
-                                <td data-align="numeric" style={{ fontWeight: 600, color: idx === 0 ? 'var(--accent-primary)' : 'var(--text-primary)' }}>{formatCurrency(c.avg)}</td>
-                                <td data-align="numeric" style={{ color: 'var(--text-secondary)' }}>{c.trips}</td>
-                                <td data-align="numeric" style={{ color: 'var(--text-secondary)' }}>{formatCurrency(c.total)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
+              {(() => {
+                const { rows: payRows, paid, open, drafts } = paymentRows(invoices);
+                const marks = paid + open;
+                return (
+                  <InsightCard
+                    title="Which customers pay late?"
+                    description={`Every sent invoice from ${sampleText(invoices.length, invoicesTotal, 'invoices')}, placed at the days since it was issued: paid ones at the day payment was recorded, unpaid ones at today. The tick is the customer's usual terms (due date less issue date). ${drafts > 0 ? `${plural(drafts, 'draft is', 'drafts are')} left out because they have not been sent. ` : ''}${notFiltered}`}
+                  >
+                    {marks === 0 ? (
+                      <p className="ic-note">No sent invoices to measure yet. Payment timing appears once invoices are sent.</p>
+                    ) : (
+                      <>
+                        <PaymentDotPlot rows={payRows} maxRows={10} />
+                        {paid < 3 && (
+                          <p className="ic-foot">Only {plural(paid, 'paid invoice', 'paid invoices')} in this sample, so typical payment times are not settled yet. Unpaid invoices are shown so late payers are visible now.</p>
+                        )}
+                      </>
+                    )}
+                  </InsightCard>
+                );
+              })()}
+            </Stack>
+          )}
 
-              {/* SECTION 3: LOAD STATUS */}
-              <div>
-                <SectionHeader>Load pipeline status</SectionHeader>
-                <div className="insights-brand-grid insights-brand-grid--3">
-                  {(() => {
-                    const pending = loads.filter(l => ['PENDING', 'ASSIGNED'].includes((l.status || '').toUpperCase()));
-                    const inMotion = loads.filter(l => ['IN_TRANSIT'].includes((l.status || '').toUpperCase().replace(' ', '_')));
-                    const completed = loads.filter(l => ['DELIVERED', 'INVOICED'].includes((l.status || '').toUpperCase()));
-                    const pRev = pending.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
-                    const mRev = inMotion.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
-                    const cRev = completed.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
-                    return [
-                      { label: 'Pipeline', count: pending.length, rev: pRev, sub: 'pending dispatch', color: 'var(--text-secondary)' },
-                      { label: 'In motion', count: inMotion.length, rev: mRev, sub: 'revenue in transit', color: 'var(--accent-primary)' },
-                      { label: 'Completed', count: completed.length, rev: cRev, sub: 'revenue realised', color: 'var(--status-success)' },
-                    ].map((item, idx) => (
-                      <div key={idx} className="card">
-                        <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 12 }}>{item.label}</div>
-                        <div style={{ ...metricValueTypography, color: statusTextColor(item.color), marginBottom: 6 }}>{item.count}</div>
-                        <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', marginBottom: 4 }}>{formatCurrency(item.rev)}</div>
-                        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{item.sub}</div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </div>
+          {/* ============ FLEET ============ */}
+          {tab === 'fleet' && (
+            <Stack>
+              {(() => {
+                const active = vehicles.filter(v => ['IN_USE', 'AVAILABLE'].includes(v.status.toUpperCase())).length;
+                const avgHealth = vehicles.length > 0 ? vehicles.reduce((sum, v) => sum + (v.ai_health_score || 0), 0) / vehicles.length : 0;
+                const atRisk = vehicles.filter(v => (v.ai_health_score || 100) < 60).length;
+                const avgCostKm = vehicles.length > 0 ? vehicles.reduce((sum, v) => sum + (v.cost_per_km || 0), 0) / vehicles.length : 0;
+                const unscored = vehicles.filter(v => !v.ai_health_score).length;
+                const noCost = vehicles.filter(v => !v.cost_per_km).length;
+                return (
+                  <InsightCard
+                    title="Is the fleet ready to work"
+                    description={`From ${sampleText(vehicles.length, vehiclesTotal, 'vehicles')}. Current status, not filtered by period.`}
+                  >
+                    {vehicles.length === 0 ? (
+                      <p className="ic-note">No vehicles yet. Add vehicles in Fleet to see availability and running costs.</p>
+                    ) : (
+                      <dl className="ic-kpis ic-kpis--4">
+                        <KpiTile label="Available or in use" value={`${active} of ${vehicles.length}`} note={`${vehicles.length - active} in maintenance or other status`} />
+                        <KpiTile label="Average health score" value={avgHealth.toFixed(0)} note={unscored > 0 ? `Out of 100. ${unscored} without a score count as 0` : 'Out of 100'} />
+                        <KpiTile label="Health score below 60" value={String(atRisk)} empty={atRisk === 0 ? 'None of the scored vehicles.' : undefined} note={unscored > 0 ? 'Vehicles without a score are not counted' : undefined} />
+                        <KpiTile label="Average cost per km" value={formatCurrency(avgCostKm)} note={noCost > 0 ? `${noCost} without a cost count as R 0` : undefined} />
+                      </dl>
+                    )}
+                  </InsightCard>
+                );
+              })()}
 
-              {/* SECTION 4: WEIGHT CLASS */}
-              <div>
-                <SectionHeader>Weight class analysis — avg revenue per trip by load size</SectionHeader>
-                <div className="insights-brand-grid insights-brand-grid--4">
-                  {(() => {
-                    const bins = [
-                      { label: 'Under 5t', filter: (w: number) => w < 5000 },
-                      { label: '5 – 10t', filter: (w: number) => w >= 5000 && w < 10000 },
-                      { label: '10 – 20t', filter: (w: number) => w >= 10000 && w < 20000 },
-                      { label: '20t+', filter: (w: number) => w >= 20000 },
-                    ].map(b => {
-                      const bl = loads.filter(l => b.filter(parseFloat(String(l.weight)) || 0));
-                      const avg = bl.length > 0 ? bl.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0) / bl.length : 0;
-                      return { ...b, count: bl.length, avg };
-                    });
-                    const maxAvg = Math.max(...bins.map(b => b.avg), 1);
-                    return bins.map((b, idx) => (
-                      <div key={idx} className="card" style={{ borderLeft: b.avg === maxAvg && b.avg > 0 ? '3px solid var(--accent-primary)' : '3px solid transparent' }}>
-                        <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)', marginBottom: 12 }}>{b.label}</div>
-                        <div style={{ ...metricValueTypography, color: b.avg === maxAvg && b.avg > 0 ? 'var(--accent-primary)' : 'var(--text-primary)', marginBottom: 6 }}>{b.avg > 0 ? formatCurrency(b.avg) : '—'}</div>
-                        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>avg/trip · {b.count} loads</div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </div>
+              <InsightCard
+                title="Which vehicles earn the most"
+                description={`Revenue recorded against each vehicle, from ${sampleText(vehicles.length, vehiclesTotal, 'vehicles')}. Trip counts are not available here, so compare with care.`}
+              >
+                <RankedList
+                  rows={vehicles.map(v => ({
+                    id: String(v.id),
+                    label: v.plate,
+                    labelText: v.plate,
+                    mono: true,
+                    value: num(v.revenue_generated),
+                    meta: [
+                      [v.make, v.model].filter(Boolean).join(' '),
+                      v.cost_per_km ? `${formatCurrency(v.cost_per_km)}/km` : null,
+                      v.ai_health_score ? `Health ${v.ai_health_score}` : null,
+                      v.uptime_percentage ? `Uptime ${v.uptime_percentage.toFixed(0)}%` : null,
+                    ].filter(Boolean).join(' · '),
+                    href: `/fleet/vehicles/${v.id}`,
+                  }))}
+                  format={v => formatCurrency(v)}
+                  zeroIsEmpty
+                  noValueLabel="No revenue recorded"
+                  showShare
+                  topN={8}
+                  ariaLabel="Revenue by vehicle"
+                  empty="No vehicles yet."
+                  noRankedMessage="No vehicle has revenue recorded yet."
+                />
+              </InsightCard>
 
-            </div>
+              <InsightCard
+                title="Which drivers bring in the most revenue"
+                description={`Revenue recorded per driver, from ${sampleText(drivers.length, driversTotal, 'drivers')}. Drivers with fewer than ${MIN_TRIPS} trips are not ranked.`}
+              >
+                <RankedList
+                  rows={drivers.map(d => {
+                    const flags = [
+                      d.violation_count > 0 ? plural(d.violation_count, 'violation', 'violations') : null,
+                      d.accident_history > 0 ? plural(d.accident_history, 'accident', 'accidents') : null,
+                    ].filter(Boolean).join(', ');
+                    return {
+                      id: String(d.id),
+                      label: d.user_details?.name || 'Unnamed driver',
+                      value: num(d.revenue_generated),
+                      count: num(d.total_trips),
+                      meta: (
+                        <>
+                          {titleCase(d.status)}
+                          {num(d.avg_revenue_per_trip) > 0 && <> · {formatCurrency(d.avg_revenue_per_trip)} per trip</>}
+                          {flags && <> · <span className="ic-text--danger">{flags}</span></>}
+                        </>
+                      ),
+                      href: `/fleet/drivers/${d.id}/financial`,
+                    };
+                  })}
+                  format={v => formatCurrency(v)}
+                  formatCount={tripsLabel}
+                  minCount={MIN_TRIPS}
+                  zeroIsEmpty
+                  thinLabel="Too few trips to rank"
+                  noValueLabel="No revenue recorded"
+                  showShare
+                  topN={8}
+                  ariaLabel="Revenue by driver"
+                  empty="No drivers yet."
+                  noRankedMessage={`No driver has ${MIN_TRIPS} or more trips with revenue recorded yet, so there is no ranking.`}
+                />
+              </InsightCard>
+
+              {(() => {
+                const atRisk = vehicles.filter(v => (v.ai_health_score || 100) < 70).sort((a, b) => a.ai_health_score - b.ai_health_score);
+                return (
+                  <InsightCard
+                    title="Which vehicles need a service check"
+                    description="Vehicles with a health score below 70, lowest first. Below 50 means book a service now. Vehicles without a score are not checked."
+                  >
+                    {atRisk.length > 0 ? (
+                      <ul className="ic-rows" aria-label="Vehicles with a low health score">
+                        {atRisk.map(v => {
+                          const urgent = v.ai_health_score < 50;
+                          return (
+                            <li key={v.id}>
+                              <Link className="ic-row" to={`/fleet/vehicles/${v.id}`}>
+                                <span className="ic-row__main">
+                                  <span className="ic-row__title ic-row__title--mono">{v.plate}</span>
+                                  <span className="ic-row__meta">{[[v.make, v.model].filter(Boolean).join(' '), titleCase(v.status)].filter(Boolean).join(' · ')}</span>
+                                </span>
+                                <span className="ic-row__value">Health {v.ai_health_score}</span>
+                                <span className={`ic-chip ${urgent ? 'ic-chip--danger' : 'ic-chip--warning'}`}>{urgent ? 'Book a service' : 'Keep an eye on it'}</span>
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="ic-note">No scored vehicle is below 70.</p>
+                    )}
+                  </InsightCard>
+                );
+              })()}
+            </Stack>
+          )}
+
+          {/* ============ LANES ============ */}
+          {tab === 'lanes' && (
+            <Stack>
+              {(() => {
+                const { points, overall, noDistance } = lanePoints(loads, MIN_TRIPS);
+                const evidenced = points.filter(p => !p.thin).length;
+                return (
+                  <InsightCard
+                    title="Which lanes are worth running?"
+                    description={`Revenue per kilometre against the length of a trip, from ${sampleText(loads.length, loadsTotal, 'loads', true)} with a recorded distance. Shorter trips usually earn more per kilometre, so compare a lane with lanes of similar length. Point size is the lane's total revenue.${noDistance > 0 ? ` ${plural(noDistance, 'lane', 'lanes')} without a distance ${noDistance === 1 ? 'is' : 'are'} left out.` : ''} ${notFiltered}`}
+                  >
+                    {points.length === 0 ? (
+                      <p className="ic-note">No loads with a pickup city, delivery city and distance yet.</p>
+                    ) : (
+                      <>
+                        <LaneScatter points={points} overallPerKm={overall} minTrips={MIN_TRIPS} />
+                        {evidenced === 0 && (
+                          <p className="ic-foot">No lane has {MIN_TRIPS} or more trips yet, so every lane is drawn hollow: read them as early signals, not a verdict.</p>
+                        )}
+                      </>
+                    )}
+                  </InsightCard>
+                );
+              })()}
+
+              {(() => {
+                const cargoMap = new Map<string, { count: number; total: number }>();
+                loads.forEach(load => {
+                  const words = (load.cargo_description || 'Unknown').trim().split(/\s+/).slice(0, 2);
+                  const key = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                  const e = cargoMap.get(key) || { count: 0, total: 0 };
+                  cargoMap.set(key, { count: e.count + 1, total: e.total + (parseFloat(String(load.total_amount)) || 0) });
+                });
+                const types = Array.from(cargoMap.entries())
+                  .map(([cargo, d]) => ({ cargo, trips: d.count, avg: d.total / d.count, total: d.total }));
+                return (
+                  <InsightCard
+                    title="Which cargo pays the most per trip"
+                    description={`Average revenue per trip, grouped by the first two words of the cargo description, from ${sampleText(loads.length, loadsTotal, 'loads', true)}. Types with fewer than ${MIN_TRIPS} trips are not ranked. ${notFiltered}`}
+                  >
+                    <RankedList
+                      rows={types.map(c => ({
+                        id: c.cargo,
+                        label: cargoText(c.cargo),
+                        value: c.avg,
+                        count: c.trips,
+                        meta: `${formatCurrency(c.total)} in total`,
+                      }))}
+                      format={v => formatCurrency(v)}
+                      formatCount={tripsLabel}
+                      minCount={MIN_TRIPS}
+                      thinLabel="Too few trips to rank"
+                      topN={8}
+                      ariaLabel="Cargo types by average revenue per trip"
+                      empty="No loads yet."
+                      noRankedMessage={`No cargo type has ${MIN_TRIPS} or more trips yet, so there is no ranking.`}
+                    />
+                  </InsightCard>
+                );
+              })()}
+
+              {(() => {
+                const pending = loads.filter(l => ['PENDING', 'ASSIGNED'].includes((l.status || '').toUpperCase()));
+                const inMotion = loads.filter(l => ['IN_TRANSIT'].includes((l.status || '').toUpperCase().replace(' ', '_')));
+                const completed = loads.filter(l => ['DELIVERED', 'INVOICED'].includes((l.status || '').toUpperCase()));
+                const pRev = pending.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
+                const mRev = inMotion.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
+                const cRev = completed.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0);
+                const other = loads.length - pending.length - inMotion.length - completed.length;
+                return (
+                  <InsightCard
+                    title="How much work is in the pipeline"
+                    description={`Load value by stage, from ${sampleText(loads.length, loadsTotal, 'loads', true)}.${other > 0 ? ` ${plural(other, 'load', 'loads')} in other statuses, such as loading or cancelled, ${other === 1 ? 'is' : 'are'} not counted.` : ''}`}
+                  >
+                    <dl className="ic-stages">
+                      {[
+                        { label: 'Waiting to dispatch', sub: 'Pending or assigned', count: pending.length, rev: pRev },
+                        { label: 'In transit', sub: 'On the road now', count: inMotion.length, rev: mRev },
+                        { label: 'Delivered', sub: 'Delivered or invoiced', count: completed.length, rev: cRev },
+                      ].map(s => (
+                        <div key={s.label} className="ic-stage">
+                          <dt className="ic-kpi__label">{s.label}</dt>
+                          <dd className="ic-kpi__value">{formatCurrency(s.rev)}</dd>
+                          <dd className="ic-kpi__note">{plural(s.count, 'load', 'loads')} · {s.sub.toLowerCase()}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </InsightCard>
+                );
+              })()}
+
+              {(() => {
+                const bins = [
+                  { label: 'Under 5 t', filter: (w: number) => w < 5000 },
+                  { label: '5 to 10 t', filter: (w: number) => w >= 5000 && w < 10000 },
+                  { label: '10 to 20 t', filter: (w: number) => w >= 10000 && w < 20000 },
+                  { label: '20 t and over', filter: (w: number) => w >= 20000 },
+                ].map(b => {
+                  const bl = loads.filter(l => b.filter(parseFloat(String(l.weight)) || 0));
+                  const avg = bl.length > 0 ? bl.reduce((s, l) => s + (parseFloat(String(l.total_amount)) || 0), 0) / bl.length : 0;
+                  return { ...b, count: bl.length, avg };
+                });
+                return (
+                  <InsightCard
+                    title="Do heavier loads pay more per trip"
+                    description={`Average revenue per trip by load weight, from ${sampleText(loads.length, loadsTotal, 'loads', true)}. Loads without a weight fall under 5 t. Bands with fewer than ${MIN_TRIPS} trips are shown without a bar. ${notFiltered}`}
+                  >
+                    <RankedList
+                      rows={bins.map(b => ({ id: b.label, label: b.label, value: b.count > 0 ? b.avg : null, count: b.count }))}
+                      format={v => formatCurrency(v)}
+                      formatCount={tripsLabel}
+                      minCount={MIN_TRIPS}
+                      preserveOrder
+                      thinLabel="Too few trips to compare"
+                      noValueLabel="No loads in this band"
+                      ariaLabel="Average revenue per trip by weight band"
+                      empty="No loads yet."
+                      noRankedMessage={`No weight band has ${MIN_TRIPS} or more trips yet.`}
+                    />
+                  </InsightCard>
+                );
+              })()}
+            </Stack>
           )}
         </>
       )}

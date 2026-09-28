@@ -39,7 +39,7 @@ export function MobileAuthLayout({ eyebrow, title, subtitle, children, footer }:
           background: var(--bg-deep);
           font-family: var(--font-sans);
           box-sizing: border-box;
-          padding: 24px 20px 32px;
+          padding: 24px 16px 32px;
         }
         .mobile-auth-layout__eyebrow {
           font-family: var(--font-sans);
@@ -62,8 +62,8 @@ export function MobileAuthLayout({ eyebrow, title, subtitle, children, footer }:
         .mobile-auth-layout__subtitle {
           font-size: 13px;
           color: var(--text-secondary);
-          line-height: 1.5;
-          margin-bottom: 18px;
+          line-height: 20px;
+          margin-bottom: 16px;
         }
         .mobile-auth-layout__footer {
           margin-top: 24px;
@@ -84,8 +84,9 @@ export function MobileAuthLayout({ eyebrow, title, subtitle, children, footer }:
           that's the normal, more readable way to present form fields and
           body copy). */}
       <div style={{ maxWidth: 440, width: '100%', margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: 14 }}>
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
           <img
+            className="tw-auth-logo"
             src="/brand/truckwys-logo-transparent.png"
             alt="TruckWys"
             style={{ display: 'inline-block', maxHeight: 30, width: 'auto', marginBottom: 16 }}

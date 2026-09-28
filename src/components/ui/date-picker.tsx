@@ -113,7 +113,8 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
           width: '100%',
           background: 'var(--bg-surface)',
           border: dashboard ? '1px solid var(--date-picker-control-border)' : '1px solid var(--border-subtle)',
-          borderRadius: 6,
+          borderRadius: 'var(--radius-control)',
+          minHeight: 40,
           ...style,
         }}
       >
@@ -129,7 +130,8 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
             background: 'transparent',
             border: 'none',
             color: inputVal ? 'var(--text-primary)' : 'var(--text-tertiary)',
-            padding: dashboard ? '8px 12px' : '10px 12px',
+            padding: '8px 12px',
+            lineHeight: '20px',
             /* Dates are body content, not identifiers: sans 14, both variants. */
             fontSize: dashboard ? 'var(--date-picker-input-font)' : 14,
             fontFamily: 'var(--font-sans)',
@@ -147,7 +149,7 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
               background: 'none',
               border: 'none',
               borderLeft: '1px solid var(--border-subtle)',
-              padding: dashboard ? 8 : '10px 10px',
+              padding: dashboard ? 8 : '8px 12px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -155,7 +157,7 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
               flexShrink: 0,
             }}
           >
-            <CalendarIcon size={dashboard ? 20 : 13} />
+            <CalendarIcon size={16} />
           </button>
         </PopoverTrigger>
       </div>
@@ -166,8 +168,8 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
         style={{
           background: 'var(--bg-surface)',
           border: dashboard ? '1px solid var(--border-active)' : '1px solid var(--border-subtle)',
-          borderRadius: 8,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+          borderRadius: 'var(--radius-card)',
+          boxShadow: 'none',
           color: 'var(--text-primary)',
         }}
       >

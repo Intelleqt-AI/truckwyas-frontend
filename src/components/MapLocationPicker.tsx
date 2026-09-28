@@ -357,7 +357,7 @@ export function MapLocationPicker({
     flex: 1,
     padding: '8px 12px',
     minHeight: 40,
-    borderRadius: 6,
+    borderRadius: 'var(--radius-control)',
     fontSize: 14,
     lineHeight: '20px',
     fontFamily: 'var(--font-sans)',
@@ -390,13 +390,13 @@ export function MapLocationPicker({
         ))}
       </div>
 
-      <div style={{ position: 'relative', border: '1px solid var(--border-subtle)', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)', overflow: 'hidden' }}>
         <div ref={mapRef} style={{ height: mapHeight, width: '100%' }} />
 
         <div style={{
           position: 'absolute', bottom: 8, left: 8, zIndex: 500,
           background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-          borderRadius: 4, padding: '2px 8px',
+          borderRadius: 'var(--radius-chip)', padding: '2px 8px',
           fontSize: 12, lineHeight: '16px', color: '#fff', fontFamily: 'var(--font-sans)',
           letterSpacing: 'normal', pointerEvents: 'none',
         }}>
@@ -407,7 +407,7 @@ export function MapLocationPicker({
           <div style={{
             position: 'absolute', top: 8, right: 8, zIndex: 500,
             background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            borderRadius: 4, padding: '2px 8px',
+            borderRadius: 'var(--radius-chip)', padding: '2px 8px',
             fontSize: 12, lineHeight: '16px', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)',
           }}>
             Locating…
@@ -423,7 +423,7 @@ export function MapLocationPicker({
             style={{
               position: 'absolute', top: 8, right: 8, zIndex: 500,
               background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-              border: 'none', borderRadius: 6, width: 44, height: 44,
+              border: 'none', borderRadius: 'var(--radius-control)', width: 44, height: 44,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', color: '#fff', fontSize: 14,
             }}
@@ -441,7 +441,7 @@ export function MapLocationPicker({
             style={{
               position: 'absolute', top: 8, right: 8, zIndex: 500,
               background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-              border: 'none', borderRadius: 6, width: 44, height: 44,
+              border: 'none', borderRadius: 'var(--radius-control)', width: 44, height: 44,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', color: '#fff', fontSize: 18, lineHeight: 1,
             }}
@@ -462,8 +462,8 @@ export function MapLocationPicker({
               style={{
                 background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
                 border: `1px solid ${showTraffic ? '#2EAB30' : 'transparent'}`,
-                borderRadius: 6, padding: '4px 8px', minHeight: 32, cursor: 'pointer',
-                fontSize: 12, lineHeight: '16px', fontFamily: 'var(--font-sans)', letterSpacing: 'normal',
+                borderRadius: 'var(--radius-control)', padding: '4px 12px', minHeight: 40, cursor: 'pointer',
+                fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', letterSpacing: 'normal',
                 color: showTraffic ? '#7CF07E' : '#E5E7EB', fontWeight: 500,
               }}
               aria-pressed={showTraffic}
@@ -473,7 +473,7 @@ export function MapLocationPicker({
             {showTraffic && (
               <div style={{
                 background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-                borderRadius: 4, padding: '2px 8px',
+                borderRadius: 'var(--radius-chip)', padding: '2px 8px',
                 fontSize: 12, lineHeight: '16px', fontFamily: 'var(--font-sans)', color: '#fff',
                 display: 'flex', gap: 8, alignItems: 'center', letterSpacing: 'normal',
               }}>

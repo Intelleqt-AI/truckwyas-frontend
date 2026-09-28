@@ -6,7 +6,7 @@ import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
 import { formatRelativeTime } from "@/lib/formatters";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/AuthContext";
-import { SettingsToggleRow, settingsBadgeStyle, settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle } from "./settingsUi";
+import { SettingsToggleRow, settingsBadgeStyle, settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsDangerButtonStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
 
 const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle = settingsCardHeaderStyle;
@@ -14,12 +14,7 @@ const sectionTitleStyle = settingsCardTitleStyle;
 const labelStyle = settingsLabelStyle;
 const inputStyle = settingsInputStyle;
 
-const dangerBtnStyle: React.CSSProperties = {
-  background: 'none', border: '1px solid var(--status-danger)',
-  color: 'var(--status-danger-text, var(--status-danger))', padding: '8px 12px',
-  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-  borderRadius: 6, minHeight: 40,
-};
+const dangerBtnStyle = settingsDangerButtonStyle;
 
 // Maps the activity endpoint's event subtypes to a row label + dot color.
 const ACTIVITY_META: Record<string, { label: string; color: string }> = {
@@ -154,7 +149,7 @@ export function SecuritySettings() {
         setBulkBusy(false);
       }
     } else {
-      if (!window.confirm('Sign out ALL sessions, including this one? You will be returned to the login screen.')) return;
+      if (!window.confirm('Sign out all sessions, including this one? You will be returned to the login screen.')) return;
       setBulkBusy(true);
       try {
         await deleteData({ url: 'api/v1/auth/sessions/?scope=all' });
@@ -225,21 +220,14 @@ export function SecuritySettings() {
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>
-          Security settings
-        </h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-          Manage your account security and authentication methods
-        </div>
-      </div>
+      <SettingsPageHeader title="Security settings" description="Manage your account security and authentication methods" />
 
       {/* Change Password */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <h2 style={sectionTitleStyle}>Change password</h2>
         </div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 16 }}>
             <div>
               <label htmlFor="pw-current" style={labelStyle}>Current password</label>
@@ -286,15 +274,15 @@ export function SecuritySettings() {
           <h2 style={sectionTitleStyle}>Active sessions</h2>
         </div>
         {loadingSessions ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading sessions…</div>
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading sessions…</div>
         ) : sessions.length === 0 ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No active sessions</div>
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No active sessions</div>
         ) : (
           <div>
           {sessions.map((s, i) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '12px 20px', gap: 16, borderBottom: i < sessions.length - 1 ? '1px solid var(--border-row)' : 'none',
+              padding: '12px 24px', gap: 16, borderBottom: i < sessions.length - 1 ? '1px solid var(--border-row)' : 'none',
             }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
@@ -322,7 +310,7 @@ export function SecuritySettings() {
           ))}
           <div style={{
             display: 'flex', justifyContent: 'flex-end',
-            padding: '12px 20px', borderTop: '1px solid var(--border-row)',
+            padding: '12px 24px', borderTop: '1px solid var(--border-row)',
           }}>
             <button
               className="settings-control"
@@ -346,9 +334,9 @@ export function SecuritySettings() {
           <h2 style={sectionTitleStyle}>Login activity</h2>
         </div>
         {loadingActivity ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading activity…</div>
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading activity…</div>
         ) : activity.length === 0 ? (
-          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No recent activity</div>
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>No recent activity</div>
         ) : (
           <div>
           {activity.map((a, i) => {
@@ -357,7 +345,7 @@ export function SecuritySettings() {
             return (
               <div key={a.id} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
-                padding: '12px 20px', borderBottom: i < activity.length - 1 ? '1px solid var(--border-row)' : 'none',
+                padding: '12px 24px', borderBottom: i < activity.length - 1 ? '1px solid var(--border-row)' : 'none',
               }}>
                 <span style={{
                   width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
@@ -382,7 +370,7 @@ export function SecuritySettings() {
           <h2 style={{ ...sectionTitleStyle, color: 'var(--status-danger-text, var(--status-danger))' }}>Danger zone</h2>
         </div>
         <div style={{
-          padding: 20, display: 'flex', alignItems: 'center',
+          padding: 24, display: 'flex', alignItems: 'center',
           justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
         }}>
           <div>
@@ -412,7 +400,7 @@ export function SecuritySettings() {
         <div
           style={{
             position: 'fixed', inset: 0, zIndex: 2000,
-            background: 'rgba(0,0,0,0.65)',
+            background: 'var(--modal-backdrop, rgba(0,0,0,0.65))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 24,
           }}
@@ -424,12 +412,12 @@ export function SecuritySettings() {
             aria-labelledby="delete-account-title"
             style={{
               background: 'var(--bg-surface)',
-              border: '1px solid var(--status-danger)',
-              borderRadius: 12,
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-dialog)',
               padding: 24,
               maxWidth: 440,
               width: '100%',
-              boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
+              boxSizing: 'border-box',
             }}
             onClick={e => e.stopPropagation()}
           >
@@ -438,7 +426,7 @@ export function SecuritySettings() {
             </h2>
             <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 20 }}>
               Your account will be deactivated and you'll be signed out on every device
-              immediately. This can be reversed by an admin — it does not erase your data.
+              immediately. This can be reversed by an admin. It does not erase your data.
             </div>
             <label htmlFor="delete-account-password" style={labelStyle}>Confirm your password</label>
             <input
@@ -461,10 +449,8 @@ export function SecuritySettings() {
                 onClick={closeDeleteModal}
                 disabled={deleting}
                 style={{
-                  padding: '8px 12px', minHeight: 40, background: 'transparent',
-                  border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-                  borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 500,
-                  fontFamily: 'var(--font-sans)', cursor: deleting ? 'default' : 'pointer',
+                  ...settingsSecondaryButtonStyle,
+                  cursor: deleting ? 'default' : 'pointer',
                 }}
               >
                 Cancel
@@ -475,8 +461,8 @@ export function SecuritySettings() {
                 disabled={!deletePassword || deleting}
                 style={{
                   padding: '8px 12px', minHeight: 40,
-                  background: 'var(--status-danger)',
-                  border: 'none', color: '#fff', borderRadius: 6,
+                  background: 'var(--status-danger-bg)',
+                  border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-control)',
                   fontSize: 14, lineHeight: '20px', fontWeight: 500,
                   fontFamily: 'var(--font-sans)',
                   cursor: (!deletePassword || deleting) ? 'default' : 'pointer',

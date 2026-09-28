@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
-import { settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsBadgeStyle } from "./settingsUi";
+import { settingsCardStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsBadgeStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
 
 interface VehicleType {
   id: number;
@@ -33,37 +33,24 @@ interface VehicleType {
 
 const FUEL_TYPE_OPTIONS = ['Diesel', 'Petrol', 'Electric', 'Hybrid'];
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 8,
-};
+const sectionStyle: React.CSSProperties = { ...settingsCardStyle, marginBottom: 0 };
 
 const labelStyle = settingsLabelStyle;
 const inputStyle = settingsInputStyle;
 
-const rowActionStyle: React.CSSProperties = {
-  background: 'none', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-secondary)', padding: '8px 12px',
-  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-  borderRadius: 6, minHeight: 40,
-};
+const rowActionStyle = settingsSecondaryButtonStyle;
 
 const drawerPrimaryBtnStyle: React.CSSProperties = {
   flex: 1, padding: '8px 12px', minHeight: 40, fontFamily: 'var(--font-sans)',
   fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'var(--accent-primary)',
-  color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6,
+  color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control)',
 };
 
-const drawerSecondaryBtnStyle: React.CSSProperties = {
-  padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)',
-  fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'none',
-  border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer',
-};
+const drawerSecondaryBtnStyle: React.CSSProperties = { ...settingsSecondaryButtonStyle, padding: '8px 20px' };
 
 const drawerErrorStyle: React.CSSProperties = {
-  padding: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)',
-  color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 8, marginBottom: 16, fontSize: 13, lineHeight: '20px',
+  padding: '8px 12px', background: 'var(--status-danger-bg, rgba(239,68,68,0.1))', border: '1px solid var(--status-danger)',
+  color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px',
 };
 
 export function VehicleTypesDirectory() {
@@ -200,20 +187,17 @@ export function VehicleTypesDirectory() {
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Vehicle types</h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Configure vehicle categories and rate settings</div>
-      </div>
+      <SettingsPageHeader title="Vehicle types" description="Configure vehicle categories and rate settings" />
 
       <div style={sectionStyle}>
         <div style={{
-          padding: '12px 20px', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)', gap: 12, flexWrap: 'wrap',
+          padding: '12px 24px', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)', gap: 12, flexWrap: 'wrap',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <h2 style={settingsCardTitleStyle}>
             Vehicle types <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>({types.length})</span>
           </h2>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             {selected.size > 0 && (
               <button
                 className="settings-control"
@@ -221,9 +205,10 @@ export function VehicleTypesDirectory() {
                 disabled={isDemo}
                 title={isDemo ? 'Not available in the demo' : undefined}
                 style={{
-                  background: 'var(--status-danger)', border: 'none', color: '#fff',
+                  /* AA danger text on the danger tint (white on the raw red fails 4.5:1). */
+                  background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))',
                   padding: '8px 12px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px',
-                  fontWeight: 500, borderRadius: 6, minHeight: 40,
+                  fontWeight: 500, borderRadius: 'var(--radius-control)', minHeight: 40,
                   cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                 }}
               >
@@ -236,19 +221,14 @@ export function VehicleTypesDirectory() {
               onChange={e => setSearch(e.target.value)}
               placeholder="Search…"
               aria-label="Search vehicle types"
-              style={{
-                background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)',
-                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px',
-                minHeight: 40, width: 160,
-              }}
+              style={{ ...settingsInputStyle, width: 160, maxWidth: '100%' }}
             />
             <button
               className="btn-action settings-control"
               onClick={() => { setShowAdd(true); setAddErr(''); }}
               disabled={isDemo}
               title={isDemo ? 'Not available in the demo' : undefined}
-              style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+              style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
             >
               Add type
             </button>
@@ -282,9 +262,9 @@ export function VehicleTypesDirectory() {
                 const isShared = t.company == null;
                 const isOverride = !isShared && !!t.overrides_shared_default;
                 const badgeTitle = isShared
-                  ? 'TruckWys platform default — editing it creates your own copy, used only by your company'
+                  ? 'TruckWys platform default. Editing it creates your own copy, used only by your company.'
                   : isOverride
-                    ? "Your company's own version of a shared default — Reset drops back to TruckWys's current version"
+                    ? "Your company's own version of a shared default. Reset drops back to TruckWys's current version."
                     : undefined;
                 const editDisabled = isDemo;
                 const deleteDisabled = isDemo || isShared; // nothing to delete/reset until this company has diverged
@@ -303,7 +283,7 @@ export function VehicleTypesDirectory() {
                   <td style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>
                     {t.name}
                     {(isShared || isOverride) && (
-                      <span style={{ ...settingsBadgeStyle, marginLeft: 8, fontWeight: 400 }} title={badgeTitle}>{isShared ? 'Platform default' : 'Customized'}</span>
+                      <span style={{ ...settingsBadgeStyle, marginLeft: 8, fontWeight: 400 }} title={badgeTitle}>{isShared ? 'Platform default' : 'Customised'}</span>
                     )}
                   </td>
                   <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', minWidth: 200 }}>
@@ -339,8 +319,8 @@ export function VehicleTypesDirectory() {
                         disabled={deleteDisabled}
                         title={isDemo ? 'Not available in the demo' : (isShared ? badgeTitle : undefined)}
                         style={{
+                          /* Neutral in the row; the confirmation carries the danger colour. */
                           ...rowActionStyle,
-                          border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))',
                           cursor: deleteDisabled ? 'not-allowed' : 'pointer', opacity: deleteDisabled ? 0.5 : 1,
                         }}
                       >{isOverride ? 'Reset' : 'Delete'}</button>
@@ -360,7 +340,7 @@ export function VehicleTypesDirectory() {
           title={deleteTarget.isReset ? 'Reset to shared default' : 'Delete vehicle type'}
           message={
             deleteTarget.isReset
-              ? `Discard your company's customized "${deleteTarget.name}" and go back to using TruckWys's current shared version? This can't be undone, but you can always customize it again later.`
+              ? `Discard your company's customised "${deleteTarget.name}" and go back to using TruckWys's current shared version? This can't be undone, but you can always customise it again later.`
               : `Are you sure you want to delete "${deleteTarget.name}"? This cannot be undone.`
           }
           confirmLabel={deleteTarget.isReset ? 'Reset' : 'Delete'}
@@ -394,7 +374,7 @@ export function VehicleTypesDirectory() {
                 className="settings-control"
                 aria-label="Close"
                 onClick={() => setShowAdd(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, minWidth: 44, minHeight: 44 }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, minWidth: 44, minHeight: 44, borderRadius: 'var(--radius-control)' }}
               >✕</button>
             </div>
             {addErr && (
@@ -432,7 +412,7 @@ export function VehicleTypesDirectory() {
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>Fuel type</label>
               <Select value={form.fuel_type} onValueChange={val => setForm(prev => ({ ...prev, fuel_type: val }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger style={inputStyle}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {FUEL_TYPE_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                 </SelectContent>
@@ -441,7 +421,7 @@ export function VehicleTypesDirectory() {
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>Status</label>
               <Select value={form.active} onValueChange={val => setForm(prev => ({ ...prev, active: val }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger style={inputStyle}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="true">Active</SelectItem>
                   <SelectItem value="false">Inactive</SelectItem>
@@ -481,7 +461,7 @@ export function VehicleTypesDirectory() {
                 className="settings-control"
                 aria-label="Close"
                 onClick={() => setEditType(null)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, minWidth: 44, minHeight: 44 }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, minWidth: 44, minHeight: 44, borderRadius: 'var(--radius-control)' }}
               >✕</button>
             </div>
             {editErr && (
@@ -517,7 +497,7 @@ export function VehicleTypesDirectory() {
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>Fuel type</label>
               <Select value={editForm.fuel_type} onValueChange={val => setEditForm(prev => ({ ...prev, fuel_type: val }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger style={inputStyle}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {FUEL_TYPE_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                 </SelectContent>
@@ -526,7 +506,7 @@ export function VehicleTypesDirectory() {
             <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>Status</label>
               <Select value={editForm.active} onValueChange={val => setEditForm(prev => ({ ...prev, active: val }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger style={inputStyle}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="true">Active</SelectItem>
                   <SelectItem value="false">Inactive</SelectItem>

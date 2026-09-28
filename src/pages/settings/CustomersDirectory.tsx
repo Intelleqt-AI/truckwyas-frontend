@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
-import { settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle } from "./settingsUi";
+import { settingsCardStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, SettingsPageHeader } from "./settingsUi";
 
 interface Customer {
   id: number;
@@ -30,11 +30,7 @@ const STATUS_COLOR: Record<string, string> = {
   PENDING: 'var(--status-warning-text, var(--status-warning))',
 };
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 'var(--card-radius)',
-};
+const sectionStyle: React.CSSProperties = { ...settingsCardStyle, marginBottom: 0 };
 
 const labelStyle = settingsLabelStyle;
 const inputStyle = settingsInputStyle;
@@ -144,14 +140,11 @@ export function CustomersDirectory() {
 
   return (
     <div className="customer-directory-controls" style={{ maxWidth: 960, minWidth: 0, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>Customers</h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Your customer directory</div>
-      </div>
+      <SettingsPageHeader title="Customers" description="Your customer directory" />
 
       <div style={sectionStyle}>
         <div style={{
-          padding: '12px 20px', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)',
+          padding: '12px 24px', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)',
           display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between',
         }}>
           <h2 style={settingsCardTitleStyle}>
@@ -186,7 +179,7 @@ export function CustomersDirectory() {
 
         {/* Add form */}
         {showAdd && (
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-deep)' }}>
+          <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-deep)' }}>
             <div className="customer-directory-add-grid" style={{ display: 'grid', gap: 12, marginBottom: 12 }}>
               {([
                 { k: 'name', ph: 'Name *' },
@@ -285,7 +278,7 @@ export function CustomersDirectory() {
                         style={{
                           background: 'none', border: '1px solid var(--border-subtle)',
                           color: 'var(--text-secondary)', padding: '4px 10px',
-                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer',
+                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 'var(--radius-control)', cursor: isDemo ? 'not-allowed' : 'pointer',
                           letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1,
                         }}
                       >Edit</button>
@@ -294,9 +287,10 @@ export function CustomersDirectory() {
                         disabled={isDemo}
                         title={isDemo ? 'Not available in the demo' : undefined}
                         style={{
-                          background: 'none', border: '1px solid var(--status-danger)',
-                          color: 'var(--status-danger-text, var(--status-danger))', padding: '4px 10px',
-                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer',
+                          /* Neutral in the row; the confirmation carries the danger colour. */
+                          background: 'none', border: '1px solid var(--border-subtle)',
+                          color: 'var(--text-secondary)', padding: '4px 10px',
+                          fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 'var(--radius-control)', cursor: isDemo ? 'not-allowed' : 'pointer',
                           letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1,
                         }}
                       >Delete</button>
@@ -328,10 +322,10 @@ export function CustomersDirectory() {
           <div style={{ position: 'relative', width: 'min(420px, 100vw)', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 24, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h2 style={{ ...settingsCardTitleStyle }}>Edit customer</h2>
-              <button type="button" className="settings-control" aria-label="Close" onClick={() => setEditCustomer(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 18, lineHeight: 1, width: 40, height: 40, borderRadius: 6 }}>✕</button>
+              <button type="button" className="settings-control" aria-label="Close" onClick={() => setEditCustomer(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 18, lineHeight: 1, width: 40, height: 40, borderRadius: 'var(--radius-control)' }}>✕</button>
             </div>
             {editErr && (
-              <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 6, marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
+              <div role="alert" style={{ padding: '8px 12px', background: 'var(--status-danger-bg, rgba(239,68,68,0.1))', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
                 {editErr}
               </div>
             )}
@@ -367,14 +361,14 @@ export function CustomersDirectory() {
                 onClick={handleEditSave}
                 title={isDemo ? 'Not available in the demo' : undefined}
                 className="settings-control"
-                style={{ flex: '1 1 140px', minHeight: 40, padding: '8px 16px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: isDemo ? 'not-allowed' : editSaving ? 'wait' : 'pointer', fontWeight: 500, textTransform: 'none', opacity: isDemo ? 0.5 : 1 }}
+                style={{ flex: '1 1 140px', minHeight: 40, padding: '8px 16px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control)', cursor: isDemo ? 'not-allowed' : editSaving ? 'wait' : 'pointer', fontWeight: 500, textTransform: 'none', opacity: isDemo ? 0.5 : 1 }}
               >
                 {editSaving ? 'Saving…' : 'Save changes'}
               </button>
               <button
                 className="settings-control"
                 onClick={() => setEditCustomer(null)}
-                style={{ minHeight: 40, padding: '8px 16px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer', textTransform: 'none' }}
+                style={{ minHeight: 40, padding: '8px 16px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-control)', cursor: 'pointer', textTransform: 'none' }}
               >
                 Cancel
               </button>

@@ -15,7 +15,7 @@ const sectionTitleStyle: React.CSSProperties = {
 };
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
+  padding: '8px 12px', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 400,
   fontFamily: 'var(--font-sans)', minHeight: 40, width: '100%', maxWidth: 360,
 };
 const thStyle: React.CSSProperties = { textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' };

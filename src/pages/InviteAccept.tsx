@@ -1,5 +1,4 @@
 import "./auth-brand.css";
-import { AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchData, postData } from "@/lib/Api";
@@ -71,7 +70,7 @@ export function InviteAccept() {
       localStorage.setItem('token', result.token);
       localStorage.setItem('user', JSON.stringify(result.user));
 
-      toast.success('Welcome to Truckwys!');
+      toast.success('Welcome to TruckWys!');
       navigate('/');
     } catch (err: any) {
       toast.error(err?.message || 'Failed to accept invite');
@@ -87,59 +86,60 @@ export function InviteAccept() {
       alignItems: 'center',
       justifyContent: 'center',
       background: 'var(--bg-deep)',
-      padding: 20,
+      padding: 16,
+      boxSizing: 'border-box',
     }}>
       <div style={{
         width: '100%',
         maxWidth: 440,
         background: 'var(--bg-surface)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--card-radius)',
-        padding: 40,
+        borderRadius: 'var(--radius-card)',
+        padding: 24,
+        boxSizing: 'border-box',
       }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Loading invite...</div>
+          <div style={{ textAlign: 'center', padding: 24 }}>
+            <div role="status" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>Loading invite…</div>
           </div>
         ) : error ? (
           <>
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <AlertTriangle aria-hidden="true" size={40} strokeWidth={1.5} style={{ color: 'var(--status-warning-text, var(--status-warning))', marginBottom: 16 }} />
               <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
                 Invalid invite
               </h1>
-              <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: '20px' }}>
                 {error}
               </div>
             </div>
             <button
               onClick={() => navigate('/login')}
               className="btn-action"
-              style={{ width: '100%' }}
+              style={{ width: '100%', borderRadius: 'var(--radius-control)' }}
             >
               Go to login
             </button>
           </>
         ) : (
           <>
-            <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
               <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
                 Join {inviteDetails?.company_name}
               </h1>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 16 }}>
                 <strong style={{ color: 'var(--text-primary)' }}>{inviteDetails?.inviter_name}</strong> has invited you to join their team
               </div>
               {inviteDetails?.role && (
                 <span style={{
                   display: 'inline-block',
                   fontFamily: 'var(--font-sans)',
-                  fontSize: 12,
-                  lineHeight: '16px',
+                  fontSize: 13,
+                  lineHeight: '20px',
                   fontWeight: 500,
                   padding: '2px 8px',
                   border: '1px solid currentColor',
                   color: 'var(--status-info-text, var(--accent-primary))',
-                  borderRadius: 4,
+                  borderRadius: 'var(--radius-chip)',
                 }}>
                   {/* Presentation only — the role enum is shown in sentence case. */}
                   {inviteDetails.role.charAt(0).toUpperCase() + inviteDetails.role.slice(1).toLowerCase()} role
@@ -171,7 +171,7 @@ export function InviteAccept() {
                     boxSizing: 'border-box',
                     background: 'var(--bg-deep)',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: 6,
+                    borderRadius: 'var(--radius-control)',
                     color: 'var(--text-tertiary)',
                     fontSize: 14,
                     lineHeight: '20px',
@@ -189,7 +189,7 @@ export function InviteAccept() {
                   color: 'var(--text-primary)',
                   marginBottom: 6,
                 }}>
-                  Full Name
+                  Full name
                 </label>
                 <input className="tw-auth-control" id="invite-full-name"
                   type="text"
@@ -204,7 +204,7 @@ export function InviteAccept() {
                     boxSizing: 'border-box',
                     background: 'var(--input-bg)',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: 6,
+                    borderRadius: 'var(--radius-control)',
                     color: 'var(--text-primary)',
                     fontSize: 14,
                     lineHeight: '20px',
@@ -236,7 +236,7 @@ export function InviteAccept() {
                     boxSizing: 'border-box',
                     background: 'var(--input-bg)',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: 6,
+                    borderRadius: 'var(--radius-control)',
                     color: 'var(--text-primary)',
                     fontSize: 14,
                     lineHeight: '20px',
@@ -254,7 +254,7 @@ export function InviteAccept() {
                   color: 'var(--text-primary)',
                   marginBottom: 6,
                 }}>
-                  Confirm Password
+                  Confirm password
                 </label>
                 <input className="tw-auth-control" id="invite-confirm-password"
                   type="password"
@@ -268,7 +268,7 @@ export function InviteAccept() {
                     boxSizing: 'border-box',
                     background: 'var(--input-bg)',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: 6,
+                    borderRadius: 'var(--radius-control)',
                     color: 'var(--text-primary)',
                     fontSize: 14,
                     lineHeight: '20px',
@@ -280,7 +280,7 @@ export function InviteAccept() {
                 type="submit"
                 disabled={submitting}
                 className="btn-action"
-                style={{ width: '100%', marginBottom: 16 }}
+                style={{ width: '100%', marginBottom: 16, borderRadius: 'var(--radius-control)' }}
               >
                 {submitting ? 'Creating account…' : 'Accept invite'}
               </button>

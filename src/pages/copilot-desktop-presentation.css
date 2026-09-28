@@ -21,7 +21,7 @@
   --cp-md-quote-inset: 4px 0 4px 12px;
   --cp-md-rule-margin: 12px 0;
   --cp-code-weight: 400;
-  --cp-starter-inset: 24px;
+  --cp-starter-inset: 16px;
   --cp-font: var(--font-sans);
   --cp-page-size: 22px;
   --cp-page-line: 28px;
@@ -34,7 +34,7 @@
   --cp-title-weight: 600;
   --cp-tracking: normal;
   --cp-case: none;
-  --cp-radius: 6px;
+  --cp-radius: 8px;
   --cp-space-2: 4px;
   --cp-space-3: 4px;
   --cp-space-5: 4px;
@@ -50,12 +50,12 @@
   font: 400 14px/20px var(--font-sans);
   letter-spacing: normal;
 }
-.copilot-page .cp-status { --cp-radius: 4px; }
+.copilot-page .cp-status { --cp-radius: 6px; }
 .copilot-page .cp-panel { --cp-radius: 8px; }
 .copilot-page button,
 .copilot-page textarea {
   min-height: 40px;
-  --cp-radius: 6px;
+  --cp-radius: 8px;
   --cp-control-size: 14px;
   --cp-control-weight: 500;
   font: 500 14px/20px var(--font-sans);
@@ -67,7 +67,7 @@
 .copilot-page .cp-del {
   min-width: 44px;
   min-height: 44px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   --cp-delete-opacity: 1;
 }
 .copilot-page button:focus-visible,

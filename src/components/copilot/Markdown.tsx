@@ -45,7 +45,7 @@ const components = {
     </pre>
   ),
   blockquote: ({ children }: any) => (
-    <blockquote style={{ margin: '0 0 8px', padding: "var(--cp-md-quote-inset, 2px 0 2px 10px)", borderLeft: '2px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+    <blockquote style={{ margin: '0 0 8px', padding: '8px 12px', background: 'var(--bg-surface-hover)', borderRadius: 6, color: 'var(--text-secondary)' }}>
       {children}
     </blockquote>
   ),

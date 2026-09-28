@@ -25,6 +25,46 @@ const STATUS: Record<string, { label: string; tone: '' | 'success' | 'warning' |
 const statusOf = (s?: string) =>
   STATUS[s || ''] || { label: s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : 'Issued', tone: '' as const };
 
+interface PaymentDetails {
+  bank_name: string;
+  account_holder: string;
+  account_number: string;
+  branch_code: string;
+  account_type: string;
+  account_type_label: string;
+  payment_reference_hint: string;
+}
+
+/** The company's own bank details — only sent by the API when the company
+ *  has set them (Settings > Company > Banking details). */
+function HowToPay({ details, invoiceNumber }: { details: PaymentDetails; invoiceNumber: string }) {
+  const rows = [
+    { label: 'Bank', value: details.bank_name },
+    { label: 'Account holder', value: details.account_holder },
+    { label: 'Account number', value: details.account_number },
+    { label: 'Branch code', value: details.branch_code },
+    { label: 'Account type', value: details.account_type_label },
+    { label: 'Reference', value: invoiceNumber },
+  ].filter(r => r.value);
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, auto) 1fr', rowGap: 6, columnGap: 16, marginBottom: 12 }}>
+        {rows.map(r => (
+          <div key={r.label} style={{ display: 'contents' }}>
+            <span className="pd-label">{r.label}</span>
+            <span style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, fontVariantNumeric: 'tabular-nums', wordBreak: 'break-all' }}>{r.value}</span>
+          </div>
+        ))}
+      </div>
+      <p className="pd-prose" style={{ color: 'var(--pd-muted)' }}>
+        {details.payment_reference_hint || (
+          <>Pay by EFT and use <strong>{invoiceNumber}</strong> as your payment reference.</>
+        )}
+      </p>
+    </>
+  );
+}
+
 export default function PublicInvoice() {
   const { id, token } = useParams<{ id: string; token: string }>();
 
@@ -176,8 +216,14 @@ export default function PublicInvoice() {
             {isOpen && (
               <section className="pd-section">
                 <h2 className="pd-h2">How to pay</h2>
-                <p className="pd-prose">Pay by EFT and use <strong>{data.invoice_number}</strong> as your payment reference.</p>
-                <p className="pd-prose" style={{ color: 'var(--pd-muted)' }}>For banking details, contact {data.company_name}{data.company_email ? ` at ${data.company_email}` : ''}{data.company_phone ? ` or ${data.company_phone}` : ''}.</p>
+                {data.payment_details ? (
+                  <HowToPay details={data.payment_details} invoiceNumber={data.invoice_number} />
+                ) : (
+                  <>
+                    <p className="pd-prose">Pay by EFT and use <strong>{data.invoice_number}</strong> as your payment reference.</p>
+                    <p className="pd-prose" style={{ color: 'var(--pd-muted)' }}>For banking details, contact {data.company_name}{data.company_email ? ` at ${data.company_email}` : ''}{data.company_phone ? ` or ${data.company_phone}` : ''}.</p>
+                  </>
+                )}
               </section>
             )}
           </article>

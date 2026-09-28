@@ -109,8 +109,11 @@ const STATUS_COLOR: Record<string, string> = {
 // Numeric columns are right aligned (header and cells) per the table standard.
 const NUMERIC_COLUMNS = new Set(['Revenue MTD', 'Trips MTD']);
 
-const formatZAR = (v: number) =>
-  'R ' + v.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+// The API sends amounts as decimal strings; coerce before formatting.
+const formatZAR = (v: number | string | null | undefined) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—';
+};
 
 // Sentence-case a status token for display: "IN_USE" → "In use".
 const formatStatus = (s?: string) =>

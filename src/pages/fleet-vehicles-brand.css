@@ -128,7 +128,7 @@
 .fleet-page .fleet-table th:last-child,
 .fleet-page .fleet-table td:last-child { padding-right: var(--fleet-card-inset); }
 .fleet-page .fleet-table .fleet-table__select { width: 56px; padding-right: 0; }
-.fleet-page .fleet-table .is-numeric { text-align: right; }
+.fleet-page .fleet-table .is-numeric { text-align: right; font-variant-numeric: tabular-nums; }
 .fleet-page .fleet-table__id {
   font: 400 13px/20px var(--font-mono);
   color: var(--text-primary);

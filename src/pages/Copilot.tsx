@@ -85,7 +85,7 @@ function Typewriter({ text, onDone }: { text: string; onDone?: () => void }) {
 }
 
 const labelStyle: React.CSSProperties = {
-  fontSize: "var(--cp-support-size, 11px)", lineHeight: "var(--cp-support-line, inherit)", fontFamily: 'var(--cp-font, var(--font-mono))', color: 'var(--text-tertiary)',
+  fontSize: "var(--cp-support-size, 11px)", lineHeight: "var(--cp-support-line, inherit)", fontFamily: 'var(--cp-font, var(--font-mono))', color: 'var(--text-secondary)',
   letterSpacing: "var(--cp-tracking, 0.1em)", textTransform: 'var(--cp-case, uppercase)' as React.CSSProperties['textTransform'], marginBottom: 4,
 };
 

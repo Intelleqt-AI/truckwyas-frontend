@@ -21,7 +21,7 @@ interface Driver {
   last_name?: string;
   status: string;
   total_trips?: number;
-  revenue_generated?: number;
+  revenue_generated?: number | string; // API sends a decimal string
   efficiency_score?: number;
   phone?: string;
   license_number?: string;
@@ -63,8 +63,11 @@ const STATUS_COLOR: Record<string, string> = {
 // Numeric columns are right aligned (header and cells) per the table standard.
 const NUMERIC_COLUMNS = new Set(['Trips MTD', 'Revenue generated']);
 
-const formatZAR = (v: number) =>
-  'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+// The API sends amounts as decimal strings; coerce before formatting.
+const formatZAR = (v: number | string | null | undefined) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—';
+};
 
 // Sentence-case a status token for display: "ON_LEAVE" → "On leave".
 const formatStatus = (s?: string) =>
@@ -348,7 +351,7 @@ export default function Drivers() {
                     {d.total_trips ?? 0}
                   </td>
                   <td className="is-numeric">
-                    {d.revenue_generated ? formatZAR(d.revenue_generated) : '—'}
+                    {d.revenue_generated != null && d.revenue_generated !== '' ? formatZAR(d.revenue_generated) : '—'}
                   </td>
                   <td>
                     {efficiencyScore > 0 ? (

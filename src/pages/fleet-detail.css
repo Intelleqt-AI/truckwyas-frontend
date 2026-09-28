@@ -133,7 +133,7 @@
 .fleet-detail .fd-table td:first-child { padding-left: var(--fd-inset); }
 .fleet-detail .fd-table th:last-child,
 .fleet-detail .fd-table td:last-child { padding-right: var(--fd-inset); }
-.fleet-detail .fd-table .is-numeric { text-align: right; }
+.fleet-detail .fd-table .is-numeric { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* Edit drawer */
 .fd-drawer { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; font-family: var(--font-sans); }

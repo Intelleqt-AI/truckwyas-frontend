@@ -36,29 +36,26 @@ export class ErrorBoundary extends React.Component<Props, State> {
         }}>
           <div style={{
             background: 'var(--bg-surface)',
-            borderRadius: 12,
+            borderRadius: 'var(--radius-card)',
             border: '1px solid var(--border-subtle)',
-            padding: 32,
+            padding: 24,
             maxWidth: 480,
             textAlign: 'center'
           }}>
-            <div style={{
-              fontSize: 48,
-              marginBottom: 16
-            }}>⚠️</div>
             <h2 style={{
-              fontSize: 20,
+              fontSize: 16,
+              lineHeight: '24px',
               fontWeight: 600,
               color: 'var(--text-primary)',
-              marginBottom: 12
+              margin: '0 0 4px'
             }}>
               Something went wrong
             </h2>
             <p style={{
-              fontSize: 14,
+              fontSize: 13,
               color: 'var(--text-secondary)',
-              marginBottom: 24,
-              lineHeight: 1.5
+              margin: '0 0 24px',
+              lineHeight: '20px'
             }}>
               {this.state.error?.message || 'An unexpected error occurred'}
             </p>
@@ -69,16 +66,18 @@ export class ErrorBoundary extends React.Component<Props, State> {
               }}
               style={{
                 background: 'var(--accent-primary)',
-                color: 'white',
+                color: 'var(--btn-action-color, #fff)',
                 border: 'none',
-                borderRadius: 6,
-                padding: '12px 24px',
+                borderRadius: 'var(--radius-control)',
+                padding: '8px 16px',
+                minHeight: 40,
                 fontSize: 14,
+                lineHeight: '20px',
                 fontWeight: 500,
                 cursor: 'pointer'
               }}
             >
-              Return to Dashboard
+              Return to dashboard
             </button>
           </div>
         </div>

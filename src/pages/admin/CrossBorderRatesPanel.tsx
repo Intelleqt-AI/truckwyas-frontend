@@ -15,7 +15,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 // Zimborders bridge toll). An edit here applies to every company's quotes
 // immediately, same reasoning as the Truck Types page.
 
-const cardStyle: React.CSSProperties = { padding: 24, marginBottom: 24 };
+const cardStyle: React.CSSProperties = { padding: 24, marginBottom: 16 };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 };
 const thStyle: React.CSSProperties = {
   textAlign: 'left', padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
@@ -27,15 +27,17 @@ const tdStyle: React.CSSProperties = {
 };
 const secondaryBtnStyle: React.CSSProperties = {
   padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-  borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer',
+  borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer',
 };
+// Cells holding 40px controls trim their vertical padding so the row stays 48px.
+const controlTdStyle: React.CSSProperties = { ...tdStyle, paddingTop: 4, paddingBottom: 4 };
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500,
   fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', marginBottom: 6,
 };
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)',
-  padding: '8px 12px', borderRadius: 6, minHeight: 40, fontSize: 14, lineHeight: '20px',
+  padding: '8px 12px', borderRadius: 'var(--radius-control)', minHeight: 40, fontSize: 14, lineHeight: '20px',
   fontFamily: 'var(--font-sans)', width: '100%', boxSizing: 'border-box',
 };
 
@@ -106,7 +108,7 @@ export default function CrossBorderRatesPanel() {
       await patchData({ url: `api/v1/admin/border-fees/${editFee.id}/`, data: {
         fee_zar: editFeeForm.fee_zar === '' ? 0 : Number(editFeeForm.fee_zar), notes: editFeeForm.notes.trim(), is_active: editFeeForm.is_active,
       }});
-      toast.success('Saved — every company sees the update immediately');
+      toast.success('Saved. Every company sees the update immediately');
       setEditFee(null);
       refreshFees();
     } catch (e: any) {
@@ -200,7 +202,7 @@ export default function CrossBorderRatesPanel() {
     setRateErr('');
     try {
       await patchData({ url: `api/v1/admin/transit-rates/${editRate.id}/`, data: rateToPayload(editRateForm) });
-      toast.success('Saved — every company sees the update immediately');
+      toast.success('Saved. Every company sees the update immediately');
       setEditRate(null);
       refreshRates();
     } catch (e: any) {
@@ -240,19 +242,19 @@ export default function CrossBorderRatesPanel() {
   return (
     <div>
       <div className="card" style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 4, flexWrap: 'wrap' }}>
           <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Border crossing fees {feesData ? `(${fees.length})` : ''}</h2>
           <button className="btn-action admin-control" onClick={() => { setShowAddFee(s => !s); setFeeErr(''); }}>
             {showAddFee ? 'Cancel' : 'Add fee'}
           </button>
         </div>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
-          One-way fee per country pair — feeds the "Border fees" line item on every quote.
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 16 }}>
+          One-way fee per country pair. Feeds the "Border fees" line item on every quote.
         </div>
 
         {showAddFee && (
-          <div style={{ padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))', border: '1px solid var(--border-subtle)', borderRadius: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-            {feeErr && <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 6, fontSize: 13, lineHeight: '20px' }}>{feeErr}</div>}
+          <div style={{ padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+            {feeErr && <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px' }}>{feeErr}</div>}
             <div><label style={labelStyle}>From country</label><input style={inputStyle} value={feeForm.from_country} onChange={e => setFeeForm(p => ({ ...p, from_country: e.target.value.toUpperCase() }))} placeholder="SA" /></div>
             <div><label style={labelStyle}>To country</label><input style={inputStyle} value={feeForm.to_country} onChange={e => setFeeForm(p => ({ ...p, to_country: e.target.value.toUpperCase() }))} placeholder="ZW" /></div>
             <div><label style={labelStyle}>Fee (R)</label><input type="number" style={inputStyle} value={feeForm.fee_zar} onChange={e => setFeeForm(p => ({ ...p, fee_zar: e.target.value }))} /></div>
@@ -273,11 +275,11 @@ export default function CrossBorderRatesPanel() {
                     <td className="num" style={tdStyle}>{fmtRand(f.fee_zar)}</td>
                     <td style={{ ...tdStyle, fontSize: 13, color: 'var(--text-tertiary)', maxWidth: 320 }}>{f.notes || '—'}</td>
                     <td style={tdStyle}><span className={`status-badge ${f.is_active ? 'active' : 'delayed'}`}>{f.is_active ? 'Active' : 'Inactive'}</span></td>
-                    <td style={tdStyle}>
+                    <td style={controlTdStyle}>
                       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                        <button style={secondaryBtnStyle} disabled={feePending === f.id} onClick={() => openEditFee(f)}>Edit</button>
-                        <button style={secondaryBtnStyle} disabled={feePending === f.id} onClick={() => toggleFeeActive(f)}>{f.is_active ? 'Deactivate' : 'Activate'}</button>
-                        <button style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }} disabled={feePending === f.id} onClick={() => setDeleteFee(f)}>Delete</button>
+                        <button className="admin-control" style={secondaryBtnStyle} disabled={feePending === f.id} onClick={() => openEditFee(f)}>Edit</button>
+                        <button className="admin-control" style={secondaryBtnStyle} disabled={feePending === f.id} onClick={() => toggleFeeActive(f)}>{f.is_active ? 'Deactivate' : 'Activate'}</button>
+                        <button className="admin-control" style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }} disabled={feePending === f.id} onClick={() => setDeleteFee(f)}>Delete</button>
                       </div>
                     </td>
                   </tr>
@@ -290,19 +292,19 @@ export default function CrossBorderRatesPanel() {
       </div>
 
       <div className="card" style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 4, flexWrap: 'wrap' }}>
           <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Country transit rates {ratesData ? `(${rates.length})` : ''}</h2>
           <button className="btn-action admin-control" onClick={() => { setShowAddRate(s => !s); setRateErr(''); }}>
             {showAddRate ? 'Cancel' : 'Add country'}
           </button>
         </div>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
-          Per-country weighbridge fee and in-country toll rate — feeds "Weighbridge" and "Non-SA tolls" line items.
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 16 }}>
+          Per-country weighbridge fee and in-country toll rate. Feeds the "Weighbridge" and "Non-SA tolls" line items.
         </div>
 
         {showAddRate && (
-          <div style={{ padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))', border: '1px solid var(--border-subtle)', borderRadius: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-            {rateErr && <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 6, fontSize: 13, lineHeight: '20px' }}>{rateErr}</div>}
+          <div style={{ padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+            {rateErr && <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px' }}>{rateErr}</div>}
             <div><label style={labelStyle}>Country code</label><input style={inputStyle} value={rateForm.country_code} onChange={e => setRateForm(p => ({ ...p, country_code: e.target.value.toUpperCase() }))} placeholder="ZW" /></div>
             <div><label style={labelStyle}>Country name</label><input style={inputStyle} value={rateForm.country_name} onChange={e => setRateForm(p => ({ ...p, country_name: e.target.value }))} placeholder="Zimbabwe" /></div>
             <div><label style={labelStyle}>Weighbridge (R)</label><input type="number" style={inputStyle} value={rateForm.weighbridge_fee_zar} onChange={e => setRateForm(p => ({ ...p, weighbridge_fee_zar: e.target.value }))} /></div>
@@ -324,11 +326,11 @@ export default function CrossBorderRatesPanel() {
                     <td className="num" style={tdStyle}>{fmtRand(r.toll_rate_per_km)}/km</td>
                     <td className="num" style={tdStyle}>{r.sa_border_distance_km}km</td>
                     <td style={tdStyle}><span className={`status-badge ${r.is_active ? 'active' : 'delayed'}`}>{r.is_active ? 'Active' : 'Inactive'}</span></td>
-                    <td style={tdStyle}>
+                    <td style={controlTdStyle}>
                       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                        <button style={secondaryBtnStyle} disabled={ratePending === r.id} onClick={() => openEditRate(r)}>Edit</button>
-                        <button style={secondaryBtnStyle} disabled={ratePending === r.id} onClick={() => toggleRateActive(r)}>{r.is_active ? 'Deactivate' : 'Activate'}</button>
-                        <button style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }} disabled={ratePending === r.id} onClick={() => setDeleteRate(r)}>Delete</button>
+                        <button className="admin-control" style={secondaryBtnStyle} disabled={ratePending === r.id} onClick={() => openEditRate(r)}>Edit</button>
+                        <button className="admin-control" style={secondaryBtnStyle} disabled={ratePending === r.id} onClick={() => toggleRateActive(r)}>{r.is_active ? 'Deactivate' : 'Activate'}</button>
+                        <button className="admin-control" style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }} disabled={ratePending === r.id} onClick={() => setDeleteRate(r)}>Delete</button>
                       </div>
                     </td>
                   </tr>
@@ -343,17 +345,17 @@ export default function CrossBorderRatesPanel() {
       {editFee && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditFee(null)} />
-          <div style={{ position: 'relative', width: 420, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+          <div style={{ position: 'relative', width: 420, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 24, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit {editFee.from_country} → {editFee.to_country} fee</h2>
-              <button onClick={() => setEditFee(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+              <button className="admin-control admin-tint-hover" aria-label="Close" onClick={() => setEditFee(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, width: 40, height: 40, borderRadius: 'var(--radius-control)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
-            {feeErr && <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>{feeErr}</div>}
-            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Fee (R)</label><input type="number" style={inputStyle} value={editFeeForm.fee_zar} onChange={e => setEditFeeForm(p => ({ ...p, fee_zar: e.target.value }))} /></div>
-            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Notes</label><input style={inputStyle} value={editFeeForm.notes} onChange={e => setEditFeeForm(p => ({ ...p, notes: e.target.value }))} /></div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-              <button disabled={feeSaving} onClick={handleEditFeeSave} style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: feeSaving ? 'wait' : 'pointer', fontWeight: 500 }}>{feeSaving ? 'Saving…' : 'Save changes'}</button>
-              <button onClick={() => setEditFee(null)} style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}>Cancel</button>
+            {feeErr && <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>{feeErr}</div>}
+            <div style={{ marginBottom: 16 }}><label style={labelStyle}>Fee (R)</label><input type="number" style={inputStyle} value={editFeeForm.fee_zar} onChange={e => setEditFeeForm(p => ({ ...p, fee_zar: e.target.value }))} /></div>
+            <div style={{ marginBottom: 16 }}><label style={labelStyle}>Notes</label><input style={inputStyle} value={editFeeForm.notes} onChange={e => setEditFeeForm(p => ({ ...p, notes: e.target.value }))} /></div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button className="admin-control" disabled={feeSaving} onClick={handleEditFeeSave} style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control)', cursor: feeSaving ? 'wait' : 'pointer', fontWeight: 500 }}>{feeSaving ? 'Saving…' : 'Save changes'}</button>
+              <button className="admin-control" onClick={() => setEditFee(null)} style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-control)', cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -362,19 +364,19 @@ export default function CrossBorderRatesPanel() {
       {editRate && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditRate(null)} />
-          <div style={{ position: 'relative', width: 420, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+          <div style={{ position: 'relative', width: 420, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 24, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
               <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit {editRate.country_name}</h2>
-              <button onClick={() => setEditRate(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+              <button className="admin-control admin-tint-hover" aria-label="Close" onClick={() => setEditRate(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, width: 40, height: 40, borderRadius: 'var(--radius-control)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
-            {rateErr && <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>{rateErr}</div>}
-            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Country name</label><input style={inputStyle} value={editRateForm.country_name} onChange={e => setEditRateForm(p => ({ ...p, country_name: e.target.value }))} /></div>
-            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Weighbridge (R)</label><input type="number" style={inputStyle} value={editRateForm.weighbridge_fee_zar} onChange={e => setEditRateForm(p => ({ ...p, weighbridge_fee_zar: e.target.value }))} /></div>
-            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Toll rate (R/km)</label><input type="number" style={inputStyle} value={editRateForm.toll_rate_per_km} onChange={e => setEditRateForm(p => ({ ...p, toll_rate_per_km: e.target.value }))} /></div>
-            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Border distance (km)</label><input type="number" style={inputStyle} value={editRateForm.sa_border_distance_km} onChange={e => setEditRateForm(p => ({ ...p, sa_border_distance_km: e.target.value }))} /></div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-              <button disabled={rateSaving} onClick={handleEditRateSave} style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: rateSaving ? 'wait' : 'pointer', fontWeight: 500 }}>{rateSaving ? 'Saving…' : 'Save changes'}</button>
-              <button onClick={() => setEditRate(null)} style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}>Cancel</button>
+            {rateErr && <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>{rateErr}</div>}
+            <div style={{ marginBottom: 16 }}><label style={labelStyle}>Country name</label><input style={inputStyle} value={editRateForm.country_name} onChange={e => setEditRateForm(p => ({ ...p, country_name: e.target.value }))} /></div>
+            <div style={{ marginBottom: 16 }}><label style={labelStyle}>Weighbridge (R)</label><input type="number" style={inputStyle} value={editRateForm.weighbridge_fee_zar} onChange={e => setEditRateForm(p => ({ ...p, weighbridge_fee_zar: e.target.value }))} /></div>
+            <div style={{ marginBottom: 16 }}><label style={labelStyle}>Toll rate (R/km)</label><input type="number" style={inputStyle} value={editRateForm.toll_rate_per_km} onChange={e => setEditRateForm(p => ({ ...p, toll_rate_per_km: e.target.value }))} /></div>
+            <div style={{ marginBottom: 16 }}><label style={labelStyle}>Border distance (km)</label><input type="number" style={inputStyle} value={editRateForm.sa_border_distance_km} onChange={e => setEditRateForm(p => ({ ...p, sa_border_distance_km: e.target.value }))} /></div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button className="admin-control" disabled={rateSaving} onClick={handleEditRateSave} style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control)', cursor: rateSaving ? 'wait' : 'pointer', fontWeight: 500 }}>{rateSaving ? 'Saving…' : 'Save changes'}</button>
+              <button className="admin-control" onClick={() => setEditRate(null)} style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-control)', cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>
         </div>

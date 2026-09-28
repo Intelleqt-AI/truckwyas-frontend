@@ -19,7 +19,7 @@ const DialogOverlay = React.forwardRef<
       // their whole content in a position:fixed, z-9999 shell to escape the
       // app root's overflow:hidden — a dialog at the default z-50 would
       // render behind that and just silently not be visible.
-      "fixed inset-0 z-[10000] bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-[10000] bg-[var(--modal-backdrop)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}

@@ -3,7 +3,7 @@
   min-width: 0;
   max-width: 100%;
   padding: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
 }
 .os-app-shell .dashboard-results-body {
   min-width: 0;
@@ -91,7 +91,7 @@
     --results-action-font-family: var(--font-sans);
     --results-action-letter-spacing: normal;
     --results-action-line-height: 20px;
-    --results-action-border-radius: 6px;
+    --results-action-border-radius: var(--radius-control);
     --results-action-min-height: 40px;
     --results-action-min-width: 0px;
     --results-control-padding: 8px 12px;
@@ -99,11 +99,11 @@
     --results-control-font-family: var(--font-sans);
     --results-control-letter-spacing: normal;
     --results-control-line-height: 20px;
-    --results-control-border-radius: 6px;
+    --results-control-border-radius: var(--radius-control);
     --results-control-min-height: 40px;
     min-height: 40px;
     min-width: 0;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     font-family: var(--font-sans);
     font-size: 14px;
     line-height: 20px;

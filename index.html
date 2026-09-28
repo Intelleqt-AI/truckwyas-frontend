@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Truckwys - AI-Powered Logistics Platform</title>
+    <title>TruckWys</title>
     <meta name="description" content="AI-powered logistics operations platform for fleet management, revenue optimisation, and supply chain intelligence." />
     <meta name="author" content="Truckwys" />
     
@@ -17,6 +17,15 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@truckwys" />
     <meta name="twitter:image" content="/brand/logo.png" />
+    <script>
+      /* Apply the saved theme before first paint so logged-out pages (login,
+         signup, reset) follow the same light/dark choice as the app and no
+         page flashes the wrong theme. OSLayout keeps it in sync after login. */
+      try {
+        var t = localStorage.getItem('tw-theme');
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    </script>
   </head>
 
   <body>

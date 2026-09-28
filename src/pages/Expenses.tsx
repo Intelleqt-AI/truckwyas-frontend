@@ -397,7 +397,7 @@ export default function Expenses() {
         </div>
       )}
 
-      {/* Filters — same toolbar layout as Invoices */}
+      {/* Filters: same toolbar layout as Invoices */}
       <div className="fin-toolbar expenses-filter-bar">
         <input
           type="search"
@@ -448,7 +448,7 @@ export default function Expenses() {
       {/* Table */}
       <div className="card fin-table-card fin-section">
         <div className="fin-table-scroll">
-          <table className="fin-table table-heading-roles">
+          <table className="fin-table fin-table--stack table-heading-roles">
             <thead>
               <tr>
                 <th>Date</th>
@@ -488,13 +488,16 @@ export default function Expenses() {
                 const busy = reviewingId === exp.id || deletingId === exp.id;
                 return (
                   <tr key={exp.id}>
-                    <td className="fin-date">{formatDate(exp.expense_date || exp.date)}</td>
-                    <td>{exp.expense_number ? <span className="fin-id">{exp.expense_number}</span> : '—'}</td>
-                    <td className="fin-strong"><div className="fin-truncate" title={exp.description}>{exp.description}</div></td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{catLabel(exp.category)}</td>
-                    <td><div className="fin-truncate" style={{ maxWidth: 220 }} title={vehicleLabel(exp)}>{vehicleLabel(exp)}</div></td>
-                    <td><span className={`fin-chip${tone ? ` fin-chip--${tone}` : ''}`}>{formatStatus(status)}</span></td>
-                    <td className="num">{formatCurrency(amountOf(exp))}</td>
+                    <td className="fin-date m-hide">{formatDate(exp.expense_date || exp.date)}</td>
+                    <td className="m-meta">
+                      <span className="fin-mobile-only">{formatDate(exp.expense_date || exp.date)} · {catLabel(exp.category)}</span>
+                      <span className="m-hide-inline">{exp.expense_number ? <span className="fin-id">{exp.expense_number}</span> : '—'}</span>
+                    </td>
+                    <td className="fin-strong m-party"><div className="fin-truncate" title={exp.description}>{exp.description}</div></td>
+                    <td className="m-hide" style={{ whiteSpace: 'nowrap' }}>{catLabel(exp.category)}</td>
+                    <td className="m-hide"><div className="fin-truncate" style={{ maxWidth: 220 }} title={vehicleLabel(exp)}>{vehicleLabel(exp)}</div></td>
+                    <td className="m-status"><span className={`fin-chip${tone ? ` fin-chip--${tone}` : ''}`}>{formatStatus(status)}</span></td>
+                    <td className="num m-amount">{formatCurrency(amountOf(exp))}</td>
                     <td className="actions" onKeyDown={e => { if (e.key === 'Escape') setOpenMenuId(null); }}>
                       <div className="expense-row-actions">
                         <button
@@ -515,11 +518,11 @@ export default function Expenses() {
                             <div className="expense-menu" role="menu">
                               {status === 'PENDING' && (
                                 <>
-                                  <button type="button" role="menuitem" className="expense-menu-item fin-text-success"
+                                  <button type="button" role="menuitem" className="expense-menu-item"
                                     onClick={() => { setOpenMenuId(null); handleReview(exp, 'approve'); }}>
                                     Approve
                                   </button>
-                                  <button type="button" role="menuitem" className="expense-menu-item fin-text-danger"
+                                  <button type="button" role="menuitem" className="expense-menu-item"
                                     onClick={() => { setOpenMenuId(null); handleReview(exp, 'reject'); }}>
                                     Reject
                                   </button>

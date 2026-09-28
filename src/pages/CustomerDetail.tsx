@@ -8,7 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDate } from "@/lib/formatters";
-import { ArrowLeft, Sparkles, X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
 
@@ -47,7 +47,7 @@ const fieldStyle: React.CSSProperties = {
   border: "1px solid var(--border-subtle)",
   color: "var(--text-primary)",
   padding: "8px 12px",
-  borderRadius: 6,
+  borderRadius: "var(--radius-control, 8px)",
   fontSize: 14,
   lineHeight: "20px",
   fontFamily: "var(--font-sans)",
@@ -110,6 +110,10 @@ export default function CustomerDetail() {
 
   const quotes = Array.isArray(quotesData) ? quotesData : (quotesData?.results || []);
   const totalQuotes = quotes.length;
+  // The quotes endpoint is paginated (page_size=50): every figure below is
+  // computed from the quotes actually loaded, and says so when that is not all of them.
+  const quotesOnServer: number = Array.isArray(quotesData) ? quotes.length : (quotesData?.count ?? quotes.length);
+  const basis = quotesOnServer > totalQuotes ? `the latest ${totalQuotes} of ${quotesOnServer} quotes` : `${totalQuotes} ${totalQuotes === 1 ? "quote" : "quotes"}`;
   const acceptedQuotes = quotes.filter((q: any) => q.status === "ACCEPTED").length;
   const totalRevenue = quotes
     .filter((q: any) => q.status === "ACCEPTED")
@@ -184,34 +188,47 @@ export default function CustomerDetail() {
         <div className="bk-detail-header__actions">
           <button
             type="button"
-            className="bk-btn bk-btn--secondary"
+            className="bk-btn bk-btn--quiet"
             disabled={updating}
             onClick={handleStatusToggle}
           >{updating ? "Updating…" : isActive ? "Mark inactive" : "Mark active"}</button>
-          <button type="button" className="bk-btn bk-btn--secondary" onClick={openEdit}>Edit customer</button>
           <button
             type="button"
-            className="bk-btn bk-btn--primary"
+            className="bk-btn bk-btn--secondary"
             onClick={() => navigate(`/customers/${id}/risk`)}
-            title="Open the AI risk profile for this customer"
-          ><Sparkles size={16} aria-hidden="true" /> AI analysis</button>
+          >Payment risk profile</button>
+          <button type="button" className="bk-btn bk-btn--primary" onClick={openEdit}>Edit customer</button>
         </div>
       </div>
 
-      {/* KPI strip */}
-      <div className="bk-metrics bk-metrics--money">
-        {[
-          { label: "Total quotes", value: totalQuotes },
-          { label: "Accepted quotes", value: acceptedQuotes },
-          { label: "Revenue from accepted quotes", value: formatZAR(totalRevenue) },
-          { label: "Credit limit", value: customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "—" },
-        ].map(m => (
-          <div key={m.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{m.label}</span></div>
-            <div className="metric-value" style={{ color: "var(--text-primary)" }}>{m.value}</div>
+      {/* Key figure first: what this customer is worth, from their own quotes. */}
+      {totalQuotes > 0 ? (
+        <section className="bk-summary" aria-label="Customer value">
+          <div className="bk-summary__cell">
+            <div className="bk-summary__label">Won from accepted quotes</div>
+            <div className="bk-summary__value">{formatZAR(totalRevenue)}</div>
+            <div className="bk-summary__note">Quote totals, from {basis}.</div>
           </div>
-        ))}
-      </div>
+          <div className="bk-summary__cell">
+            <div className="bk-summary__label">Quotes accepted</div>
+            <div className="bk-summary__value">{acceptedQuotes}<span className="bk-summary__of">of {totalQuotes}</span></div>
+            <div className="bk-summary__note">{Math.round((acceptedQuotes / totalQuotes) * 100)}% of their quotes, drafts included, were accepted.</div>
+          </div>
+          <div className="bk-summary__cell">
+            <div className="bk-summary__label">Credit limit</div>
+            <div className="bk-summary__value">{customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "—"}</div>
+            <div className="bk-summary__note">{customer.credit_limit ? `${paymentTermsLabel(customer.payment_terms_default)} payment terms.` : "No limit set. Add one under Edit customer."}</div>
+          </div>
+        </section>
+      ) : (
+        <div className="bk-notice">
+          <div>
+            <p className="bk-notice__text">You have not quoted {customer.name} yet.</p>
+            <p className="bk-notice__sub">Their value and win rate appear here once you send them a quote.</p>
+          </div>
+          <button type="button" className="bk-btn bk-btn--secondary" onClick={() => navigate("/bookings/quotes/new")}>New quote</button>
+        </div>
+      )}
 
       <div className="bk-detail-grid">
         {/* Contact Details */}
@@ -290,7 +307,7 @@ export default function CustomerDetail() {
                     <td>
                       <span className={`bk-status bk-status--${QUOTE_STATUS_TONE[q.status] || "neutral"}`}>{formatStatus(q.status)}</span>
                     </td>
-                    <td>
+                    <td className="is-date">
                       {q.created_at ? formatDate(q.created_at) : "—"}
                     </td>
                     <td className="is-money">

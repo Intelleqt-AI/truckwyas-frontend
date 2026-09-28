@@ -116,10 +116,10 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
       setFileName(file.name);
       const isPdf = /\.pdf$/i.test(file.name);
       setFromPdf(isPdf);
-      if (isPdf) toast.success(`Read ${file.name} — check the columns below before importing`);
+      if (isPdf) toast.success(`Read ${file.name}. Check the columns below before importing`);
       else toast.success(`Read ${file.name}`);
     } catch (e: any) {
-      toast.error(e?.message || "Couldn't read that file — try saving it as CSV or Excel");
+      toast.error(e?.message || "Couldn't read that file. Try saving it as CSV or Excel");
     }
     setBusy(false);
     if (fileRef.current) fileRef.current.value = '';
@@ -148,7 +148,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
         onImported(n);
         close();
       } else {
-        toast.error('Nothing was imported — every row needs attention');
+        toast.error('Nothing was imported. Every row needs attention');
         setBusy(false);
       }
     } catch (e: any) {
@@ -174,7 +174,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
             </div>
             {onClose && (
               <button onClick={close} aria-label="Close"
-                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 20, lineHeight: 1, width: 44, height: 44, margin: '-10px -10px 0 0', borderRadius: 6, flexShrink: 0 }}>
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 20, lineHeight: 1, width: 44, height: 44, margin: '-10px -10px 0 0', borderRadius: 'var(--radius-control)', flexShrink: 0 }}>
                 &times;
               </button>
             )}
@@ -191,13 +191,13 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
               onDrop={e => { e.preventDefault(); takeFile(e.dataTransfer.files?.[0]); }}
               onClick={() => fileRef.current?.click()}
               style={{
-                border: '1px dashed var(--border-subtle)', borderRadius: 6,
+                border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-nested)',
                 padding: '12px 16px', marginBottom: 16, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
               }}>
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                 {fileName
-                  ? <>Loaded <b>{fileName}</b> — check it below, or drop another file.</>
+                  ? <>Loaded <b>{fileName}</b>. Check it below, or drop another file.</>
                   : <>Drop an Excel, CSV or PDF file here, or <span style={{ color: 'var(--accent-primary)' }}>browse</span></>}
               </div>
               <span style={{ ...labelS, fontWeight: 400, flexShrink: 0 }}>XLSX · CSV · ODS · PDF</span>
@@ -213,11 +213,11 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
             {fromPdf && (
               <div style={{
                 border: '1px solid var(--status-warning)', background: 'var(--status-warning-bg)',
-                borderRadius: 6, padding: '12px 16px', marginBottom: 12,
+                borderRadius: 'var(--radius-nested)', padding: '12px 16px', marginBottom: 12,
                 fontSize: 13, color: 'var(--text-primary)', lineHeight: '20px',
               }}>
                 A PDF stores text and its position, not a table, so the columns below were
-                worked out from the layout. Check them — and fix any that ran together —
+                worked out from the layout. Check them, and fix any that ran together,
                 before importing.
               </div>
             )}
@@ -229,13 +229,13 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
               placeholder={sample.example}
               style={{
                 width: '100%', minHeight: 240, background: 'var(--input-bg)',
-                border: '1px solid var(--border-subtle)', borderRadius: 6, padding: 12,
+                border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-control)', padding: 12,
                 color: 'var(--text-primary)', fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)',
                 outline: 'none', whiteSpace: 'pre', overflowX: 'auto',
               }}
             />
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8, lineHeight: '20px' }}>
-              Include the heading row if you have one — we work out which column is which.
+              Include the heading row if you have one. We work out which column is which.
               <br />
               Columns we recognise: {sample.columns}
             </div>
@@ -257,7 +257,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
           <>
 
 
-            <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, overflow: 'hidden' }}>
+            <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-card)', overflow: 'hidden' }}>
               <div style={{ maxHeight: 380, overflow: 'auto' }} role="region" aria-label="Import preview" tabIndex={0}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums' }}>
                   <thead>
@@ -309,7 +309,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
 
             {preview.needs_attention > 0 && (
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8, lineHeight: '20px' }}>
-                Rows needing attention are skipped &mdash; the other {preview.ready} still
+                Rows needing attention are skipped. The other {preview.ready} still
                 import. Fix them in your spreadsheet and paste again.
                 {preview.unmapped_columns?.length > 0 && (
                   <> These columns were ignored because there is nowhere to put
@@ -372,7 +372,7 @@ const sentenceCase = (k: string) => {
 };
 
 const thS: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 12px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  textAlign: 'left', padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
   fontFamily: 'var(--font-sans)', textTransform: 'none', letterSpacing: 'normal',
   color: 'var(--text-secondary)', whiteSpace: 'nowrap',
   borderBottom: '1px solid var(--border-subtle)', position: 'sticky', top: 0,
@@ -380,7 +380,7 @@ const thS: React.CSSProperties = {
 };
 
 const tdS: React.CSSProperties = {
-  padding: '8px 12px', borderBottom: '1px solid var(--border-row)',
+  padding: '12px 16px', borderBottom: '1px solid var(--border-row)',
   color: 'var(--text-secondary)', verticalAlign: 'top',
 };
 

@@ -9,7 +9,7 @@ import { EditVehicleDrawer } from "@/components/EditVehicleDrawer";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
-import { settingsCardTitleStyle } from "./settingsUi";
+import { settingsCardStyle, settingsCardTitleStyle, settingsInputStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
 
 interface Vehicle {
   id: number;
@@ -55,18 +55,9 @@ const statusLabel = (s: string) =>
 const statusColor = (s: string) =>
   Object.prototype.hasOwnProperty.call(STATUS_COLOR, s) ? STATUS_COLOR[s] : 'var(--text-secondary)';
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 8,
-};
+const sectionStyle: React.CSSProperties = { ...settingsCardStyle, marginBottom: 0 };
 
-const rowActionStyle: React.CSSProperties = {
-  background: 'none', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-secondary)', padding: '8px 12px',
-  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-  borderRadius: 6, minHeight: 40,
-};
+const rowActionStyle = settingsSecondaryButtonStyle;
 
 export function VehiclesDirectory() {
   const { user: authUser } = useAuth();
@@ -108,32 +99,24 @@ export function VehiclesDirectory() {
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Vehicles</h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Fleet vehicle directory</div>
-      </div>
+      <SettingsPageHeader title="Vehicles" description="Fleet vehicle directory" />
 
       <div style={sectionStyle}>
         <div style={{
-          padding: '12px 20px', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)', gap: 12, flexWrap: 'wrap',
+          padding: '12px 24px', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)', gap: 12, flexWrap: 'wrap',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <h2 style={settingsCardTitleStyle}>
             Vehicles <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>({vehicles.length})</span>
           </h2>
-          <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <input
               className="settings-control"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search…"
               aria-label="Search vehicles"
-              style={{
-                background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)',
-                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px',
-                minHeight: 40, width: 180,
-              }}
+              style={{ ...settingsInputStyle, width: 180, maxWidth: '100%' }}
             />
             <button
               className="settings-control"
@@ -143,7 +126,7 @@ export function VehiclesDirectory() {
               style={{
                 ...secondaryButtonStyle,
                 fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-                letterSpacing: 'normal', borderRadius: 6, minHeight: 40, padding: '8px 12px',
+                letterSpacing: 'normal', borderRadius: 'var(--radius-control)', minHeight: 40, padding: '8px 12px',
                 cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
               }}
             >Import</button>
@@ -152,7 +135,7 @@ export function VehiclesDirectory() {
               onClick={() => setShowAddDrawer(true)}
               disabled={isDemo}
               title={isDemo ? 'Not available in the demo' : undefined}
-              style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+              style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
             >Add vehicle</button>
           </div>
         </div>
@@ -249,8 +232,8 @@ export function VehiclesDirectory() {
                         disabled={isDemo}
                         title={isDemo ? 'Not available in the demo' : undefined}
                         style={{
+                          /* Neutral in the row; the confirmation carries the danger colour. */
                           ...rowActionStyle,
-                          border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))',
                           cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                         }}
                       >Delete</button>

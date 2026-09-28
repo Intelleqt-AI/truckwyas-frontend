@@ -48,7 +48,7 @@ const fieldStyle: React.CSSProperties = {
   border: "1px solid var(--border-subtle)",
   color: "var(--text-primary)",
   padding: "10px 12px",
-  borderRadius: 6,
+  borderRadius: "var(--radius-control, 8px)",
   fontSize: 14,
   lineHeight: "20px",
   fontFamily: "var(--font-sans)",
@@ -128,6 +128,8 @@ export default function Customers() {
     },
   });
   const customers: Customer[] = Array.isArray(data) ? data : data?.results || [];
+  // The endpoint is paginated; count is the true total, results only the first page.
+  const totalCustomers: number = Array.isArray(data) ? customers.length : (data?.count ?? customers.length);
 
   useAutoRefresh(refetch);
 
@@ -201,23 +203,9 @@ export default function Customers() {
     <div className="customers-typography bookings-typography">
       {header}
 
-      {/* KPI strip */}
-      <div className="bk-metrics">
-        {[
-          { label: "Total customers", value: customers.length, color: "var(--text-primary)" },
-          { label: "With credit limit", value: customers.filter(c => c.credit_limit != null && Number(c.credit_limit) > 0).length, color: "var(--text-primary)" },
-          { label: "Cities covered", value: new Set(customers.map(c => c.city).filter(Boolean)).size, color: "var(--text-primary)" },
-          { label: "Net 30 clients", value: customers.filter(c => (c.payment_terms_default || "NET30") === "NET30").length, color: "var(--text-primary)" },
-        ].map(k => (
-          <div key={k.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{k.label}</span></div>
-            <div className="metric-value" style={{ color: k.color }}>{k.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Table */}
-      <div className="card" style={{ padding: 0, overflowX: "auto" }}>
+      {/* Table. No summary tiles: nothing on this directory drives a decision
+          except finding the customer, so the count sits in the toolbar. */}
+      <div className="card" style={{ padding: 0, overflowX: "auto", borderRadius: "var(--radius-card, 12px)" }}>
         {/* Sits above the toolbar so it never covers the rows being chosen. */}
         <div style={{ padding: selected.length ? "12px 16px 0" : 0 }}>
           <BulkDeleteBar
@@ -229,7 +217,7 @@ export default function Customers() {
         </div>
 
         {/* Table toolbar */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, padding: "12px 16px", borderBottom: "1px solid var(--border-subtle)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, padding: "16px 24px", borderBottom: "1px solid var(--border-subtle)" }}>
           <input
             type="search"
             className="bk-search"
@@ -239,6 +227,11 @@ export default function Customers() {
             onChange={e => setSearch(e.target.value)}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="bk-toolbar__end" style={{ marginRight: 8 }}>
+              {customers.length < totalCustomers
+                ? `Showing ${customers.length} of ${totalCustomers} customers`
+                : `${totalCustomers} ${totalCustomers === 1 ? "customer" : "customers"}`}
+            </span>
             <span id="customers-sort-label" style={{ fontSize: 13, lineHeight: "20px", fontWeight: 500, fontFamily: "var(--font-sans)", color: "var(--text-secondary)", letterSpacing: 0 }}>Sort</span>
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger aria-labelledby="customers-sort-label" style={{ minWidth: 160, minHeight: 40 }}>
@@ -257,7 +250,7 @@ export default function Customers() {
         <table className="table-heading-roles bk-table">
           <thead>
             <tr>
-              <th scope="col" style={{ padding: "12px 0 12px 16px", width: 32 }}>
+              <th scope="col" style={{ paddingRight: 0, width: 32 }}>
                 {filtered.length > 0 && (
                   <RowCheckbox
                     title="Select everything shown"
@@ -269,7 +262,7 @@ export default function Customers() {
               {["Name", "Company", "Email", "Phone", "City", "Payment terms", "Status"].map(h => (
                 <th key={h} scope="col">{h}</th>
               ))}
-              <th scope="col" className="is-num"><span className="sr-only" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Actions</span></th>
+              <th scope="col" className="is-num"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -317,7 +310,7 @@ export default function Customers() {
                   className="is-clickable"
                   onClick={() => navigate(`/customers/${c.id}`)}
                 >
-                  <td style={{ padding: "12px 0 12px 16px", width: 32 }}>
+                  <td style={{ paddingRight: 0, width: 32 }}>
                     <RowCheckbox
                       checked={selected.includes(c.id)}
                       onChange={on => toggleOne(c.id, on)}
@@ -344,12 +337,11 @@ export default function Customers() {
                   <td>
                     <span className={`bk-status bk-status--${status === "ACTIVE" ? "success" : "neutral"}`}>{status === "ACTIVE" ? "Active" : "Inactive"}</span>
                   </td>
-                  <td className="is-num" style={{ padding: "8px 16px" }}>
-                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <td className="is-num">
+                    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
                       <button
                         type="button"
-                        className="bk-btn bk-btn--secondary"
-                        style={{ padding: "8px 12px" }}
+                        className="bk-btn bk-btn--quiet bk-btn--sm"
                         aria-label={`Edit ${c.name}`}
                         onClick={e => { e.stopPropagation(); openEdit(c); }}
                         disabled={isDemo}
@@ -375,8 +367,7 @@ export default function Customers() {
                           });
                         }}
                         type="button"
-                        className="bk-btn bk-btn--danger-outline"
-                        style={{ padding: "8px 12px" }}
+                        className="bk-btn bk-btn--quiet-danger bk-btn--sm"
                         aria-label={`Delete ${c.name}`}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}

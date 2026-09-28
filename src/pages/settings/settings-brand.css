@@ -57,11 +57,16 @@
    text lines up with the 20px card header above the table. */
 table.settings-table { width: 100%; border-collapse: collapse; }
 table.settings-table th,
-table.settings-table td { padding: 12px 16px; vertical-align: middle; }
+table.settings-table td { padding: 12px 16px; vertical-align: middle; line-height: 20px; }
 table.settings-table th:first-child,
-table.settings-table td:first-child { padding-left: 20px; }
+table.settings-table td:first-child { padding-left: 24px; }
 table.settings-table th:last-child,
-table.settings-table td:last-child { padding-right: 20px; }
+table.settings-table td:last-child { padding-right: 24px; }
+/* Rows stay 44 to 48px: a cell carrying a 40px control trims its own
+   vertical padding instead of stretching the row to 64px. */
+table.settings-table td:has(> button, > select, > [role="combobox"], > div > button) { padding-top: 4px; padding-bottom: 4px; }
+table.settings-table tbody tr { transition: background-color 0.15s; }
+table.settings-table tbody tr:hover { background: var(--surface-tint-hover); }
 table.settings-table th { border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
 table.settings-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 
@@ -85,9 +90,34 @@ table.settings-table input[type="checkbox"] {
   accent-color: var(--accent-primary);
 }
 
-/* Tables nested inside an already-padded panel drop the outer 20px. */
+/* Tables nested inside an already-padded panel drop the outer 24px. */
 table.settings-table.is-inset :is(th, td):first-child { padding-left: 0; }
 table.settings-table.is-inset :is(th, td):last-child { padding-right: 0; }
 
 /* Toggle rows divide each other; the card border closes the last one. */
 .settings-toggle-row + .settings-toggle-row { border-top: 1px solid var(--border-row); }
+
+/* ---- Sidebar navigation --------------------------------------------------
+   Active item is a quiet neutral fill (no accent side rail, design
+   principles §1); hover is a lighter tint of the same surface. */
+.settings-nav-link {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  margin: 1px 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: normal;
+  text-decoration: none;
+  color: var(--text-secondary);
+  transition: background-color 0.15s, color 0.15s;
+}
+.settings-nav-link:hover { background: var(--surface-tint-hover); color: var(--text-primary); }
+.settings-nav-link[aria-current="page"] {
+  background: var(--surface-tint-active);
+  color: var(--text-primary);
+  font-weight: 500;
+}

@@ -347,7 +347,8 @@ export function RouteMapView({ pickup, delivery, pickupCoords, deliveryCoords, h
         width: '100%',
         height,
         overflow: 'hidden',
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--border-subtle, #e5e7eb)',
+        borderRadius: 'var(--radius-nested, 8px)',
       }}
     />
   );

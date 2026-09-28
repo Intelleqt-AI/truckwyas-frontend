@@ -17,7 +17,6 @@ import { BulkDeleteBar, RowCheckbox } from '@/components/BulkDeleteBar';
 import { EditVehicleDrawer } from '@/components/EditVehicleDrawer';
 import { Loader } from '@/components/Loader';
 import SectionHeader, { FLEET_TABS } from '@/components/layout/SectionHeader';
-import { secondaryButtonStyle } from '@/components/BulkDeleteBar';
 import { useAuth } from '@/lib/AuthContext';
 
 interface Vehicle {
@@ -98,17 +97,31 @@ interface FleetIntelligence {
   opportunities?: FleetInsight[];
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: 'var(--status-success-text, var(--status-success))',
-  AVAILABLE: 'var(--status-success-text, var(--status-success))',
-  IN_USE: 'var(--status-success-text, var(--status-success))',
-  MAINTENANCE: 'var(--status-warning-text, var(--status-warning))',
-  INACTIVE: 'var(--text-tertiary)',
-  OUT_OF_SERVICE: 'var(--text-tertiary)',
+// Status chip tone. Colour always sits next to the status word.
+const STATUS_TONE: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
+  ACTIVE: 'success',
+  AVAILABLE: 'success',
+  IN_USE: 'info',
+  MAINTENANCE: 'warning',
+  INACTIVE: 'neutral',
+  OUT_OF_SERVICE: 'neutral',
 };
 
-// Numeric columns are right aligned (header and cells) per the table standard.
-const NUMERIC_COLUMNS = new Set(['Revenue MTD', 'Trips MTD']);
+// Column headings. The API's revenue_generated / total_trips are all-time
+// sums over DELIVERED loads (see VehicleSerializer), so they are labelled as
+// such rather than "MTD". Health is the rule-based composite score
+// (maintenance, uptime, fuel, age), not a model output, so it is not called AI.
+const COLUMNS: { label: string; numeric?: boolean }[] = [
+  { label: 'Registration' },
+  { label: 'Make and model' },
+  { label: 'Type' },
+  { label: 'Driver' },
+  { label: 'Status' },
+  { label: 'Delivered revenue', numeric: true },
+  { label: 'Delivered loads', numeric: true },
+  { label: 'Health score', numeric: true },
+  { label: '' },
+];
 
 // The API sends amounts as decimal strings; coerce before formatting.
 const formatZAR = (v: number | string | null | undefined) => {
@@ -225,45 +238,23 @@ export default function Vehicles() {
     const minutes = Math.floor(ageMs / 60_000);
     const label = minutes < 1 ? 'just now' : minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`;
     return (
-      <span style={{
-        display: 'inline-flex', alignItems: 'center', gap: 4,
-        fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px',
-        color: isStale ? 'var(--text-tertiary)' : 'var(--status-success-text, var(--status-success))',
-        marginTop: 4,
-      }}>
-        <span style={{
-          width: 5, height: 5, borderRadius: '50%',
-          background: isStale ? 'var(--text-tertiary)' : 'var(--status-success)',
-          display: 'inline-block',
-        }} />
-        {label}
+      <span className="fleet-table__sub" style={{ color: isStale ? 'var(--text-tertiary)' : 'var(--status-success-text, var(--status-success))' }}>
+        {isStale ? `Seen ${label}` : `Live, ${label}`}
       </span>
     );
   };
 
-  const getStatusBadge = (status: string) => {
-    const color = STATUS_COLOR[status] || 'var(--text-secondary)';
-    return (
-      <span style={{
-        display: 'inline-block',
-        whiteSpace: 'nowrap',
-        fontFamily: 'var(--font-sans)',
-        fontSize: 13,
-        lineHeight: '20px',
-        color,
-        padding: '4px 8px',
-        background: 'var(--bg-surface-hover)',
-        borderRadius: 4,
-      }}>
-        {formatStatus(status)}
-      </span>
-    );
-  };
+  const getStatusBadge = (status: string) => (
+    <span className={`fleet-chip fleet-chip--${STATUS_TONE[status] || 'neutral'}`}>{formatStatus(status)}</span>
+  );
 
-  const secondaryHeaderButton: React.CSSProperties = {
-    background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-    padding: '8px 16px', borderRadius: 6, cursor: 'pointer',
-  };
+  // Summary figures: only what changes a decision today.
+  const readyCount = vehicles.filter(v => v.status === 'AVAILABLE' || v.status === 'ACTIVE').length;
+  const onJobCount = vehicles.filter(v => v.status === 'IN_USE').length;
+  const maintenanceCount = vehicles.filter(v => v.status === 'MAINTENANCE').length;
+  const deliveredRevenue = vehicles.reduce((sum, v) => sum + (Number(v.revenue_generated) || 0), 0);
+  const deliveredLoads = vehicles.reduce((sum, v) => sum + (Number(v.total_trips) || 0), 0);
+  const notEarning = vehicles.filter(v => !Number(v.total_trips)).length;
 
   return (
     <div className="fleet-page">
@@ -272,12 +263,12 @@ export default function Vehicles() {
         title="Fleet"
         tabs={FLEET_TABS}
         actions={<>
-          <button data-fleet-control onClick={() => navigate('/fleet/heatmap')} style={secondaryHeaderButton}>Heatmap</button>
+          <button data-fleet-control className="fleet-header-secondary" onClick={() => navigate('/fleet/heatmap')}>Activity heatmap</button>
           <button data-fleet-control
+            className="fleet-header-secondary"
             onClick={() => setShowImport(true)}
             disabled={isDemo}
             title={isDemo ? 'Fixed in demo mode' : 'Paste a fleet list from Excel'}
-            style={{ ...secondaryHeaderButton, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
           >Import from Excel</button>
           <button data-fleet-control
             className="btn-action"
@@ -290,35 +281,35 @@ export default function Vehicles() {
       />
       <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
 
-      {/* Fleet summary — always computed from real vehicle data. Same 4-card
-          grid, toolbar and table card as Drivers so switching tabs never moves the page. */}
-      <div className="fleet-summary fleet-summary--4">
-        {[
-          { label: 'Total vehicles', value: vehicles.length, color: 'var(--text-primary)' },
-          { label: 'Available', value: vehicles.filter(v => v.status === 'AVAILABLE' || v.status === 'ACTIVE' || v.status === 'IN_USE').length, color: 'var(--status-success-text, var(--status-success))' },
-          { label: 'In maintenance', value: vehicles.filter(v => v.status === 'MAINTENANCE').length, color: 'var(--status-warning-text, var(--status-warning))' },
-          {
-            label: 'Fleet health score',
-            value: (() => {
-              const scores = vehicles.filter(v => v.ai_health_score).map(v => v.ai_health_score || 0);
-              return scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : '—';
-            })(),
-            color: 'var(--accent-primary)',
-          },
-        ].map(k => (
-          <div key={k.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{k.label}</span></div>
-            <div className="metric-value" style={{ color: loading ? 'var(--text-tertiary)' : k.color }}>{loading ? '—' : k.value}</div>
+      {/* Fleet summary: one strip, same geometry as Drivers so switching tabs
+          never moves the page. Hidden when there is no fleet yet; the table's
+          empty state carries the next action instead of a row of zeros. */}
+      {(loading || vehicles.length > 0) && (
+        <section className="card fleet-kpis" aria-label="Fleet summary" aria-busy={loading}>
+          <div className="fleet-kpi">
+            <div className="fleet-kpi__label">Available now</div>
+            <div className="fleet-kpi__value">{loading ? '—' : readyCount}{!loading && <span className="fleet-kpi__of">of {vehicles.length}</span>}</div>
+            <div className="fleet-kpi__note">{loading ? 'Loading' : `${onJobCount} on a job, ${maintenanceCount} in maintenance.`}</div>
           </div>
-        ))}
-      </div>
+          <div className="fleet-kpi">
+            <div className="fleet-kpi__label">Delivered revenue</div>
+            <div className="fleet-kpi__value">{loading ? '—' : formatZAR(deliveredRevenue)}</div>
+            <div className="fleet-kpi__note">{loading ? 'Loading' : `From ${deliveredLoads} delivered ${deliveredLoads === 1 ? 'load' : 'loads'}, all time.`}</div>
+          </div>
+          <div className="fleet-kpi">
+            <div className="fleet-kpi__label">Not earning yet</div>
+            <div className="fleet-kpi__value">{loading ? '—' : notEarning}{!loading && <span className="fleet-kpi__of">of {vehicles.length}</span>}</div>
+            <div className="fleet-kpi__note">{loading ? 'Loading' : notEarning > 0 ? 'Vehicles with no delivered load yet.' : 'Every vehicle has delivered at least one load.'}</div>
+          </div>
+        </section>
+      )}
 
       {/* Search + status filter toolbar */}
       <div className="fleet-toolbar">
         <input data-fleet-control
           type="text"
           aria-label="Search vehicles"
-          placeholder="Search VIN, plate, make, model..."
+          placeholder="Search VIN, plate, make or model"
           value={search}
           onChange={e => handleSearchChange(e.target.value)}
           className="fleet-search"
@@ -362,8 +353,10 @@ export default function Vehicles() {
                   />
                 )}
               </th>
-              {['Registration', 'Make / model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency', ''].map(h => (
-                <th key={h} className={NUMERIC_COLUMNS.has(h) ? 'is-numeric' : undefined}>{h}</th>
+              {COLUMNS.map(c => (
+                <th key={c.label || 'actions'} className={c.numeric ? 'is-numeric' : undefined}>
+                  {c.label || <span className="sr-only">Actions</span>}
+                </th>
               ))}
             </tr>
           </thead>
@@ -396,7 +389,7 @@ export default function Vehicles() {
                         onClick={() => setShowAddForm(true)}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', borderRadius: 6, padding: '8px 16px', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+                        className="fleet-header-secondary"
                       >
                         Add one at a time
                       </button>
@@ -407,17 +400,14 @@ export default function Vehicles() {
               ) : (
                 <tr><td colSpan={10} className="fleet-table__no-match">No vehicles match your filters</td></tr>
               )
-            ) : sorted.map((v, idx) => {
-              const utilizationPercent = ((v.total_trips || 0) / 20) * 100;
-              const utilizationColor = utilizationPercent > 70 ? 'var(--status-success-text, var(--status-success))' : utilizationPercent >= 40 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))';
-
+            ) : sorted.map((v) => {
+              const vehicleName = [v.make, v.model].filter(Boolean).join(' ');
+              const lastSeen = formatLastSeen(v);
               return (
                 <tr
                   key={v.id}
-                  style={{ cursor: 'pointer', borderBottom: idx < sorted.length - 1 ? '1px solid var(--border-row)' : 'none' }}
+                  className="is-clickable"
                   onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   <td className="fleet-table__select">
                     <RowCheckbox
@@ -426,11 +416,11 @@ export default function Vehicles() {
                     />
                   </td>
                   <td>
-                    <div className="fleet-table__id">{v.plate || v.registration || '—'}</div>
-                    {formatLastSeen(v)}
+                    <span className="fleet-table__id">{v.plate || v.registration || '—'}</span>
+                    {lastSeen}
                   </td>
-                  <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={[v.make, v.model].filter(Boolean).join(' ')}>
-                    {[v.make, v.model].filter(Boolean).join(' ') || '—'}
+                  <td className="is-primary" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={vehicleName}>
+                    {vehicleName || '—'}
                   </td>
                   <td>
                     {v.vehicle_type_name || '—'}
@@ -440,42 +430,32 @@ export default function Vehicles() {
                       </span>
                     )}
                   </td>
+                  <td>{(v as any).driver_name || <span style={{ color: 'var(--text-tertiary)' }}>Unassigned</span>}</td>
                   <td>{getStatusBadge(v.status)}</td>
-                  <td>
-                    <span style={{
-                      fontFamily: 'var(--font-sans)',
-                      fontSize: 13,
-                      lineHeight: '20px',
-                      color: utilizationColor,
-                      padding: '4px 8px',
-                      background: 'var(--bg-surface-hover)',
-                      borderRadius: 4,
-                      fontWeight: 600
-                    }}>
-                      {Math.min(utilizationPercent, 100).toFixed(0)}%
-                    </span>
-                  </td>
-                  <td className="is-numeric">
+                  <td className="is-numeric" style={{ color: v.revenue_generated ? 'var(--text-primary)' : undefined }}>
                     {v.revenue_generated ? formatZAR(v.revenue_generated) : '—'}
                   </td>
                   <td className="is-numeric">
                     {v.total_trips ?? 0}
                   </td>
-                  <td>
-                    {v.fuel_efficiency_score ? `${parseFloat(v.fuel_efficiency_score as any).toFixed(0)}/100` : '—'}
+                  <td className="is-numeric" title="Composite of maintenance, uptime, fuel and age scores">
+                    {v.ai_health_score ? Math.round(v.ai_health_score) : '—'}
                   </td>
                   <td className="fleet-table__actions">
                     <div>
-                      <button data-fleet-control
+                      <button
+                        className="fleet-row-action"
+                        aria-label={`Edit ${v.plate || v.registration || 'vehicle'}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditVehicle(v);
                         }}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
                       >Edit</button>
-                      <button data-fleet-control
+                      <button
+                        className="fleet-row-action fleet-row-action--danger"
+                        aria-label={`Delete ${v.plate || v.registration || 'vehicle'}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setConfirmOpts({
@@ -496,7 +476,6 @@ export default function Vehicles() {
                         }}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
                       >Delete</button>
                     </div>
                   </td>

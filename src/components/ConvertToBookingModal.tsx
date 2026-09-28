@@ -24,7 +24,7 @@ interface VehicleOption {
 
 const overlayStyle: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 2000,
-  background: 'rgba(0,0,0,0.65)',
+  background: 'var(--modal-backdrop, rgba(0,0,0,0.65))',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   padding: 24,
 };
@@ -32,12 +32,11 @@ const overlayStyle: React.CSSProperties = {
 const boxStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
   border: '1px solid var(--border-subtle)',
-  borderRadius: 12,
+  borderRadius: 'var(--radius-dialog)',
   padding: 24,
   maxWidth: 420,
   fontFamily: 'var(--font-sans)',
   width: '100%',
-  boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
 };
 
 const titleStyle: React.CSSProperties = { margin: 0, fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 };
@@ -45,7 +44,7 @@ const messageStyle: React.CSSProperties = { fontSize: 14, color: 'var(--text-sec
 
 const cancelBtnStyle: React.CSSProperties = {
   padding: '8px 16px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-secondary)', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
+  color: 'var(--text-secondary)', borderRadius: 'var(--radius-control)', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
   fontWeight: 500, letterSpacing: 'normal', cursor: 'pointer',
 };
 
@@ -53,7 +52,7 @@ const selectStyle: React.CSSProperties = {
   width: '100%',
   background: 'var(--input-bg, var(--bg-surface))',
   border: '1px solid var(--border-subtle)',
-  borderRadius: 6,
+  borderRadius: 'var(--radius-control)',
   padding: '8px 12px',
   minHeight: 40,
   color: 'var(--text-primary)',
@@ -141,8 +140,8 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
               {vehicles.length === 0 && (
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning-text, var(--status-warning))', marginTop: 6 }}>
                   {vehicleType
-                    ? `No available ${vehicleType} vehicles — check the Fleet page.`
-                    : 'No available vehicles — check the Fleet page.'}
+                    ? `No available ${vehicleType} vehicles. Check the Fleet page.`
+                    : 'No available vehicles. Check the Fleet page.'}
                 </div>
               )}
             </div>
@@ -159,14 +158,14 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
               </select>
               {drivers.length === 0 && (
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning-text, var(--status-warning))', marginTop: 6 }}>
-                  No available drivers — check the Fleet page.
+                  No available drivers. Check the Fleet page.
                 </div>
               )}
             </div>
 
             {driverWithoutVehicle && (
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning-text, var(--status-warning))', marginBottom: 12 }}>
-                A driver needs a vehicle — select a vehicle too, or clear the driver.
+                A driver needs a vehicle. Select a vehicle too, or clear the driver.
               </div>
             )}
           </div>
@@ -183,7 +182,7 @@ export function ConvertToBookingModal({ quoteNumber, vehicleType, busy, onConfir
               background: 'var(--accent-primary)',
               border: 'none',
               color: 'var(--btn-action-color, #fff)',
-              borderRadius: 6,
+              borderRadius: 'var(--radius-control)',
               fontSize: 14,
               lineHeight: '20px',
               fontFamily: 'var(--font-sans)',

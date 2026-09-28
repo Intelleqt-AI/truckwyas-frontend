@@ -239,7 +239,7 @@ export default function FleetImport() {
       case "error":
         return <XCircle aria-hidden="true" style={style} />;
       case "processing":
-        return <AlertCircle aria-hidden="true" className="animate-pulse" style={style} />;
+        return <AlertCircle aria-hidden="true" style={style} />;
       default:
         return null;
     }
@@ -270,7 +270,7 @@ export default function FleetImport() {
         <div style={settingsCardHeaderStyle}>
           <h2 id="fleet-upload-title" style={settingsCardTitleStyle}>Upload file</h2>
         </div>
-        <div style={{ ...settingsCardBodyStyle, display: 'grid', gap: 20 }}>
+        <div style={{ ...settingsCardBodyStyle, display: 'grid', gap: 24 }}>
           {/* File upload zone — also reachable by keyboard (Enter/Space). */}
           <div
             role="button"
@@ -289,7 +289,7 @@ export default function FleetImport() {
             title={isDemo ? "Not available in the demo" : undefined}
             style={{
               border: `2px dashed ${dropBorder}`,
-              borderRadius: 8,
+              borderRadius: 'var(--radius-nested)',
               padding: 40,
               textAlign: 'center',
               cursor: isDemo ? 'not-allowed' : 'pointer',
@@ -370,7 +370,7 @@ export default function FleetImport() {
                   Download template
                 </a>
               </div>
-              <div className="settings-scroll-region" role="region" aria-label="Import preview" tabIndex={0} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, overflowX: 'auto' }}>
+              <div className="settings-scroll-region" role="region" aria-label="Import preview" tabIndex={0} style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)', overflowX: 'auto' }}>
                 <table className="table-heading-roles settings-table">
                   <thead>
                     <tr>
@@ -434,7 +434,7 @@ export default function FleetImport() {
                 key={item.id}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
-                  padding: '12px 20px',
+                  padding: '12px 24px',
                   borderBottom: i < importHistory.length - 1 ? '1px solid var(--border-row)' : 'none',
                 }}
               >
@@ -463,7 +463,7 @@ export default function FleetImport() {
             ))}
           </ul>
         ) : (
-          <div style={{ padding: '32px 20px', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+          <div style={{ padding: '32px 24px', textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
             No import history yet. Upload your first file to get started.
           </div>
         )}

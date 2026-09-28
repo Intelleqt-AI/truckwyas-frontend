@@ -10,7 +10,7 @@ const btnStyle: React.CSSProperties = {
   background: 'transparent',
   border: '1px solid var(--border-subtle)',
   color: 'var(--text-secondary)',
-  borderRadius: 6,
+  borderRadius: 'var(--radius-control)',
   fontSize: 14,
   lineHeight: '20px',
   fontWeight: 500,

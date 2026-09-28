@@ -481,7 +481,7 @@ export default function Drivers() {
                     placeholder={f.placeholder}
                     value={(addForm as any)[f.key]}
                     onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 6, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 'var(--radius-control, 8px)', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
                   />
                 )}
               </div>
@@ -516,7 +516,7 @@ export default function Drivers() {
                   placeholder={f.placeholder}
                   value={(addForm as any)[f.key]}
                   onChange={e => setAddForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 6, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
+                  style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 'var(--radius-control, 8px)', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
                 />
               </div>
             ))}
@@ -575,13 +575,13 @@ export default function Drivers() {
                   } catch (e: any) { toast.error(e?.message || 'Failed to create driver'); }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: saving ? 'wait' : canCreate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canCreate ? 1 : 0.5 }}
+                style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control, 8px)', cursor: saving ? 'wait' : canCreate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canCreate ? 1 : 0.5 }}
               >
                 {saving ? 'Saving…' : 'Create driver'}
               </button>
               <button
                 onClick={() => setShowAddForm(false)}
-                style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}
+                style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-control, 8px)', cursor: 'pointer' }}
               >
                 Cancel
               </button>
@@ -602,7 +602,7 @@ export default function Drivers() {
               <button onClick={() => setEditDriver(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {error && (
-              <div style={{ padding: 12, background: 'var(--status-danger-bg)', color: 'var(--status-danger-text, var(--status-danger))', border: '1px solid var(--status-danger)', borderRadius: 6, marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
+              <div style={{ padding: 12, background: 'var(--status-danger-bg)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-control, 8px)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
                 {error}
               </div>
             )}
@@ -630,7 +630,7 @@ export default function Drivers() {
                     placeholder={f.placeholder}
                     value={(editForm as any)[f.key] ?? ''}
                     onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 6, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 'var(--radius-control, 8px)', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
                   />
                 )}
               </div>
@@ -674,7 +674,7 @@ export default function Drivers() {
                     placeholder={f.placeholder}
                     value={(editForm as any)[f.key] ?? ''}
                     onChange={e => setEditForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
-                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 6, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 'var(--radius-control, 8px)', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box' }}
                   />
                 )}
               </div>
@@ -753,13 +753,13 @@ export default function Drivers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: saving ? 'wait' : canUpdate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canUpdate ? 1 : 0.5 }}
+                style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control, 8px)', cursor: saving ? 'wait' : canUpdate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canUpdate ? 1 : 0.5 }}
               >
                 {saving ? 'Saving…' : 'Update driver'}
               </button>
               <button
                 onClick={() => setEditDriver(null)}
-                style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}
+                style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-control, 8px)', cursor: 'pointer' }}
               >
                 Cancel
               </button>

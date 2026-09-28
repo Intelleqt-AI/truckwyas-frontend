@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader } from '@/components/Loader';
 import { toast } from '@/lib/toast';
 import { useAuth } from '@/lib/AuthContext';
-import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle } from './settingsUi';
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from './settingsUi';
 
 const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 const resolveLogoUrl = (url?: string) => {
@@ -244,18 +244,15 @@ export function CompanySettings() {
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Company details</h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Your business information and branding</div>
-      </div>
+      <SettingsPageHeader title="Company details" description="Your business information and branding" />
 
       {/* Company Logo */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Company logo</h2></div>
-        <div style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 20 }}>
+        <div style={{ padding: 24, display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
           <div style={{
             width: 96, height: 96, flexShrink: 0,
-            border: '1px solid var(--border-subtle)', borderRadius: 4,
+            border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-nested)',
             background: 'var(--input-bg)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
           }}>
@@ -281,11 +278,11 @@ export function CompanySettings() {
               style={{ display: 'none' }}
             />
             <button
-              className="btn-action settings-control"
+              className="settings-control"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingLogo || isDemo}
               title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+              style={{ ...settingsSecondaryButtonStyle, opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : 'pointer' }}
             >
               {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace logo' : 'Upload logo'}
             </button>
@@ -296,7 +293,7 @@ export function CompanySettings() {
       {/* Business Info */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Business information</h2></div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           <div style={{ ...grid2, marginBottom: 16 }}>
             <div>
               <label htmlFor="company-company-name" style={labelStyle}>Company name</label>
@@ -348,7 +345,7 @@ export function CompanySettings() {
       {/* Address */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Business address</h2></div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           <div style={{ marginBottom: 16 }}>
             <label htmlFor="company-street-address" style={labelStyle}>Street address</label>
             <input id="company-street-address" className="settings-control" style={inputStyle} value={form.street} onChange={e => set('street', e.target.value)} />
@@ -388,7 +385,7 @@ export function CompanySettings() {
       {/* Contact */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Contact details</h2></div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           <div style={{ ...grid3 }}>
             <div>
               <label htmlFor="company-phone" style={labelStyle}>Phone</label>
@@ -409,7 +406,7 @@ export function CompanySettings() {
       {/* Quote Defaults */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Quote defaults</h2></div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           <div style={grid2}>
             <div>
               <label htmlFor="company-default-quote-validity-days" style={labelStyle}>Default quote validity (days)</label>
@@ -476,7 +473,7 @@ export function CompanySettings() {
                 onChange={e => set('default_toll_rate_per_km', e.target.value)}
               />
               <div style={helpTextStyle}>
-                Fallback only &mdash; used when the routing service can't itemise the
+                Fallback only. Used when the routing service can't itemise the
                 toll plazas on a route.
               </div>
             </div>
@@ -512,7 +509,7 @@ export function CompanySettings() {
                 onChange={e => set('cross_border_crossings_per_year', e.target.value)}
               />
               <div style={helpTextStyle}>
-                Count each leg separately &mdash; a return trip is two. A C-BRTA permit is
+                Count each leg separately: a return trip is two. A C-BRTA permit is
                 bought for a year, so a quote charges its share of one crossing: the more
                 you cross, the less each load carries.
               </div>
@@ -524,7 +521,7 @@ export function CompanySettings() {
       {/* Fuel Price Defaults */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Fuel price defaults</h2></div>
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: 24 }}>
           <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
             Used as the default price when a vehicle type of that fuel type doesn't have
             its own fuel price set (Settings &gt; Vehicle types). Diesel already falls back
@@ -543,13 +540,13 @@ export function CompanySettings() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="INLAND">Inland &mdash; Gauteng and the interior</SelectItem>
-                  <SelectItem value="COASTAL">Coastal &mdash; Cape Town, Durban, Gqeberha, East London</SelectItem>
+                  <SelectItem value="INLAND">Inland: Gauteng and the interior</SelectItem>
+                  <SelectItem value="COASTAL">Coastal: Cape Town, Durban, Gqeberha, East London</SelectItem>
                 </SelectContent>
               </Select>
               <div style={helpTextStyle}>
                 Diesel is gazetted at two prices: it arrives at the coastal ports and costs
-                more inland once the transport differential is added &mdash; about R0.87/L
+                more inland once the transport differential is added, about R0.87/L
                 at the moment. Changing this fetches the current price for the zone and
                 updates Diesel below.
               </div>
@@ -560,6 +557,7 @@ export function CompanySettings() {
               <label htmlFor="company-diesel-r-l" style={labelStyle}>Diesel (R/L)</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input id="company-diesel-r-l"
+                  className="settings-control"
                   style={inputStyle}
                   type="number"
                   min={0}
@@ -573,10 +571,9 @@ export function CompanySettings() {
                   disabled={fetchingLivePrice}
                   className="settings-control"
                   style={{
-                    flexShrink: 0, background: 'none', border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)', padding: '0 12px', minHeight: 40,
-                    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-                    borderRadius: 6, cursor: fetchingLivePrice ? 'wait' : 'pointer',
+                    ...settingsSecondaryButtonStyle,
+                    flexShrink: 0, padding: '0 12px',
+                    cursor: fetchingLivePrice ? 'wait' : 'pointer',
                   }}
                 >
                   {fetchingLivePrice
@@ -608,6 +605,7 @@ export function CompanySettings() {
               <label htmlFor="company-petrol-r-l" style={labelStyle}>Petrol (R/L)</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input id="company-petrol-r-l"
+                  className="settings-control"
                   style={inputStyle}
                   type="number"
                   min={0}
@@ -621,10 +619,9 @@ export function CompanySettings() {
                   disabled={fetchingLivePrice}
                   className="settings-control"
                   style={{
-                    flexShrink: 0, background: 'none', border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)', padding: '0 12px', minHeight: 40,
-                    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-                    borderRadius: 6, cursor: fetchingLivePrice ? 'wait' : 'pointer',
+                    ...settingsSecondaryButtonStyle,
+                    flexShrink: 0, padding: '0 12px',
+                    cursor: fetchingLivePrice ? 'wait' : 'pointer',
                   }}
                 >
                   {fetchingLivePrice

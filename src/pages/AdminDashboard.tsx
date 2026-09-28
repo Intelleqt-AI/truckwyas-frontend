@@ -111,20 +111,21 @@ export default function AdminDashboard() {
                   <NavLink
                     key={item.id}
                     to={`/admin/${item.id}`}
-                    className="admin-control"
+                    className="admin-control admin-nav-link"
                     aria-current={active ? 'page' : undefined}
                     style={{
                       display: 'block',
-                      padding: '8px 20px',
+                      margin: '0 8px',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-control)',
                       fontFamily: 'var(--font-sans)',
                       fontSize: 14,
                       lineHeight: '20px',
                       letterSpacing: 'normal',
                       textDecoration: 'none',
                       fontWeight: active ? 500 : 400,
-                      color: active ? 'var(--status-info-text, var(--accent-primary))' : 'var(--text-secondary)',
-                      background: active ? 'rgba(var(--accent-primary-rgb, 37,99,235), 0.08)' : 'transparent',
-                      borderLeft: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                      color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                      background: active ? 'var(--surface-tint-active)' : 'transparent',
                       transition: 'color 0.15s, background 0.15s',
                     }}
                   >
@@ -139,7 +140,7 @@ export default function AdminDashboard() {
 
       {/* Content */}
       <div style={{ flex: 1, padding: '0 0 60px 32px', minWidth: 0 }}>
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 24 }}>
           <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)' }}>{current.label}</h1>
           <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>
             Cross-tenant visibility and controls, superuser only. Every write action is recorded in the audit log.

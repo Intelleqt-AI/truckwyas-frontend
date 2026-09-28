@@ -36,30 +36,6 @@ export default function CreateInvoice() {
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
 
-  const inputStyle: React.CSSProperties = {
-    background: 'var(--bg-surface)',
-    border: '1px solid var(--border-subtle)',
-    padding: '9px 12px',
-    color: 'var(--text-primary)',
-    borderRadius: 6,
-    fontSize: 14,
-    lineHeight: '20px',
-    minHeight: 40,
-    width: '100%',
-    fontFamily: 'var(--font-sans)',
-  };
-
-  // Label role: 13/20/500 sans, sentence case, 6px to its control.
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: 13,
-    lineHeight: '20px',
-    fontWeight: 500,
-    fontFamily: 'var(--font-sans)',
-    color: 'var(--text-secondary)',
-    marginBottom: 6,
-  };
-
   const today = new Date();
   today.setHours(23, 59, 59, 999);
 
@@ -83,89 +59,105 @@ export default function CreateInvoice() {
     });
   };
 
+  // The API stores the amount as the subtotal and adds VAT at 15% when it
+  // saves (Invoice.calculate_vat), so the preview shows the same split.
+  const subtotalPreview = parseFloat(form.amount || '0') || 0;
+  const vatPreview = Math.round(subtotalPreview * 0.15 * 100) / 100;
+  const totalPreview = subtotalPreview + vatPreview;
+  const selectedCustomer = customers.find((c: any) => String(c.id) === form.customer);
+
   return (
     <div className="fin-page">
-      <div style={{ marginBottom: 24 }}>
-        <button className="qi-action" onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, minHeight: 40, marginBottom: 8, padding: 0 }}>← Back to invoices</button>
-        <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 4 }}>Finance</div>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>New invoice</h1>
-      </div>
+      <button type="button" className="fin-back" onClick={() => navigate('/finance/invoices')}>
+        <span aria-hidden="true">←</span> Back to invoices
+      </button>
+      <header className="fin-detail-head">
+        <div style={{ minWidth: 0 }}>
+          <div className="fin-detail-head__eyebrow">Finance</div>
+          <div className="fin-detail-head__title-row"><h1>New invoice</h1></div>
+          <p className="fin-detail-head__sub">Delivered loads are invoiced automatically. Use this for a one-off charge.</p>
+        </div>
+      </header>
 
       <form onSubmit={handleSubmit}>
         <div className="fin-create-grid">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="card" style={{ padding: 24, borderRadius: 8 }}>
-              <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', margin: '0 0 16px' }}>Invoice details</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[
-                  { label: 'Invoice number', key: 'invoice_number', type: 'text' },
-                ].map(f => (
-                  <div key={f.key}>
-                    <label htmlFor={`create-invoice-${f.key}`} style={labelStyle}>{f.label}</label>
-                    <input id={`create-invoice-${f.key}`} className="qi-input" type={f.type} value={(form as any)[f.key]} onChange={set(f.key)} style={inputStyle} />
-                  </div>
-                ))}
-                <div>
-                  <label id="create-invoice-customer-label" htmlFor="create-invoice-customer" style={labelStyle}>Customer</label>
-                  <Select value={form.customer} onValueChange={val => setForm(f => ({ ...f, customer: val }))}>
-                    <SelectTrigger id="create-invoice-customer" aria-labelledby="create-invoice-customer-label">
-                      <SelectValue placeholder="Select customer..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label htmlFor="create-invoice-amount" style={labelStyle}>Amount (ZAR)</label>
-                    <input id="create-invoice-amount" className="qi-input" type="number" placeholder="0.00" value={form.amount} onChange={set('amount')} style={inputStyle} />
-                  </div>
-                  <div>
-                    <div style={labelStyle}>Due date</div>
-                    <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} maxDate={today} />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="create-invoice-description" style={labelStyle}>Description</label>
-                  <textarea id="create-invoice-description" className="qi-input" value={form.description} onChange={set('description')} rows={3} placeholder="Invoice description..." style={{ ...inputStyle, resize: 'vertical' }} />
-                </div>
+          <section className="card" aria-labelledby="create-invoice-details">
+            <div className="fin-panel-head">
+              <div className="fin-panel-head__text">
+                <h2 id="create-invoice-details" className="fin-panel-title">Who is it for, and what is it for?</h2>
               </div>
             </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="card" style={{ padding: 24, borderRadius: 8 }}>
-              <label id="create-invoice-status-label" htmlFor="create-invoice-status" style={{ ...labelStyle, marginBottom: 16 }}>Status</label>
-              <Select value={form.status} onValueChange={val => setForm(f => ({ ...f, status: val }))}>
-                <SelectTrigger id="create-invoice-status" aria-labelledby="create-invoice-status-label">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DRAFT">Draft</SelectItem>
-                  <SelectItem value="SENT">Send to customer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="card" style={{ padding: 24, borderRadius: 8, minWidth: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Total</span>
-                <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--text-primary)', minWidth: 0, overflowWrap: 'anywhere' }}>
-                  {formatCurrency(parseFloat(form.amount || '0') || 0)}
-                </span>
+            <div className="fin-form">
+              <div>
+                <label id="create-invoice-customer-label" htmlFor="create-invoice-customer" className="fin-label">Customer</label>
+                <Select value={form.customer} onValueChange={val => setForm(f => ({ ...f, customer: val }))}>
+                  <SelectTrigger id="create-invoice-customer" aria-labelledby="create-invoice-customer-label">
+                    <SelectValue placeholder="Select a customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="fin-form__row">
+                <div>
+                  <label htmlFor="create-invoice-amount" className="fin-label">Amount excl. VAT (ZAR)</label>
+                  <input id="create-invoice-amount" className="fin-control qi-input" type="number" inputMode="decimal" step="0.01" placeholder="0.00" value={form.amount} onChange={set('amount')} style={{ fontVariantNumeric: 'tabular-nums' }} />
+                </div>
+                <div>
+                  <div className="fin-label">Due date</div>
+                  <DatePicker value={form.due_date} onChange={val => setForm(f => ({ ...f, due_date: val }))} maxDate={today} />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="create-invoice-invoice_number" className="fin-label">Invoice number</label>
+                <input id="create-invoice-invoice_number" className="fin-control qi-input" type="text" value={form.invoice_number} onChange={set('invoice_number')} style={{ fontFamily: 'var(--font-mono)' }} />
+                <p className="fin-help">Suggested automatically. Change it if you number invoices yourself.</p>
+              </div>
+              <div>
+                <label htmlFor="create-invoice-description" className="fin-label">Description</label>
+                <textarea id="create-invoice-description" className="fin-control qi-input" value={form.description} onChange={set('description')} rows={3} placeholder="e.g. Standby charge, 2 days at Durban port" />
               </div>
             </div>
+          </section>
 
-            {error && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', padding: '12px 16px', background: 'var(--status-danger-bg)', borderRadius: 6 }}>{error}</div>}
+          <aside className="fin-stack fin-stack--16" style={{ minWidth: 0 }}>
+            <section className="card" aria-labelledby="create-invoice-summary">
+              <div className="fin-kpi__label" id="create-invoice-summary">Invoice total incl. VAT</div>
+              <p className="fin-hero-amount">{formatCurrency(totalPreview)}</p>
+              <p className="fin-kpi__sub" style={{ margin: 0 }}>{selectedCustomer ? `For ${selectedCustomer.name}` : 'No customer selected'}</p>
+              <dl className="fin-dl" style={{ marginTop: 12 }}>
+                <div className="fin-dl__row"><dt>Amount excl. VAT</dt><dd>{formatCurrency(subtotalPreview)}</dd></div>
+                <div className="fin-dl__row"><dt>VAT (15%)</dt><dd>{formatCurrency(vatPreview)}</dd></div>
+              </dl>
+              <div style={{ marginTop: 16 }}>
+                <label id="create-invoice-status-label" htmlFor="create-invoice-status" className="fin-label">When it is created</label>
+                <Select value={form.status} onValueChange={val => setForm(f => ({ ...f, status: val }))}>
+                  <SelectTrigger id="create-invoice-status" aria-labelledby="create-invoice-status-label">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DRAFT">Keep as draft</SelectItem>
+                    <SelectItem value="SENT">Mark as sent to customer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </section>
 
-            <button type="submit" className="btn-action qi-action" style={{ width: '100%', padding: '10px 12px', minHeight: 40, opacity: (!canSubmit || mutation.isPending) ? 0.45 : 1, cursor: (!canSubmit || mutation.isPending) ? 'not-allowed' : 'pointer' }} disabled={!canSubmit || mutation.isPending}>
-              {mutation.isPending ? 'Creating…' : 'Create invoice'}
-            </button>
-            <button type="button" className="qi-action" onClick={() => navigate('/finance/invoices')} style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '9px 12px', minHeight: 40, borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer', width: '100%' }}>
-              Cancel
-            </button>
-          </div>
+            {error && <div className="fin-inset fin-text-danger" role="alert" style={{ fontSize: 13, lineHeight: '20px' }}>{error}</div>}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button type="submit" className="btn-action qi-action" style={{ width: '100%' }} disabled={!canSubmit || mutation.isPending}>
+                {mutation.isPending ? 'Creating…' : 'Create invoice'}
+              </button>
+              <button type="button" className="btn-action fin-btn-secondary qi-action" style={{ width: '100%' }} onClick={() => navigate('/finance/invoices')}>
+                Cancel
+              </button>
+              {!canSubmit && (
+                <p className="fin-help" style={{ margin: 0 }}>Choose a customer, enter an amount above zero and pick a due date to continue.</p>
+              )}
+            </div>
+          </aside>
         </div>
       </form>
     </div>

@@ -146,7 +146,7 @@ export default function QuoteDetail() {
       // this stays optional — the render below falls back to inferring "demo
       // account" from authUser?.company?.is_demo when the reason is absent.
       setEmailStatus({ sent: !!data.email_sent, address: data.customer_email || null, reason: data.email_skipped_reason || null });
-      toast.success('Share link ready — copy and send to your customer');
+      toast.success('Share link ready. Copy it and send it to your customer.');
       queryClient.invalidateQueries({ queryKey: ['quote', id] });
       queryClient.setQueryData(['quotes'], (old: unknown) => {
         if (!old || typeof old !== 'object') return old;
@@ -268,7 +268,7 @@ export default function QuoteDetail() {
     border: '1px solid var(--border-subtle)',
     padding: '9px 12px',
     color: 'var(--text-primary)',
-    borderRadius: 6,
+    borderRadius: 'var(--radius-control, 8px)',
     fontSize: 14,
     lineHeight: '20px',
     minHeight: 40,
@@ -298,7 +298,7 @@ export default function QuoteDetail() {
       </button>
       <div className="bk-detail-header">
         <div className="bk-detail-header__titles">
-          <div className="bk-eyebrow">Bookings · Quote</div>
+          <div className="bk-eyebrow">Quote</div>
           <div className="bk-title-row">
             <h1 className="bk-title">{quote.quote_number}</h1>
             <span className={`bk-status bk-status--${STATUS_TONE[quote.status] || 'neutral'}`}>
@@ -317,7 +317,7 @@ export default function QuoteDetail() {
 
       {/* UPGRADE 2: Fuel Delta Alert */}
       {fuelAlert && fuelAlert.has_alert && (
-        <div role="status" style={{ padding: '16px 20px', background: 'var(--status-warning-bg)', border: '1px solid var(--status-warning)', borderRadius: 8, marginBottom: 24 }}>
+        <div role="status" style={{ padding: '16px 24px', background: 'var(--status-warning-bg)', borderRadius: 'var(--radius-card, 12px)', marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
             <AlertTriangle size={20} color="var(--status-warning-text, var(--status-warning))" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ flex: 1 }}>
@@ -341,7 +341,7 @@ export default function QuoteDetail() {
         {/* LEFT — Quote Details */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Customer */}
-          <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+          <div className="card" style={{ padding: 24 }}>
             <h2 style={{ ...sectionHeadingStyle, marginBottom: 14 }}>Customer</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px 24px' }}>
               <div>
@@ -376,10 +376,10 @@ export default function QuoteDetail() {
           </div>
 
           {/* Route */}
-          <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+          <div className="card" style={{ padding: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <h2 style={{ ...sectionHeadingStyle, marginBottom: 0 }}>
-                {quote.trip_type === 'ROUND_TRIP' ? 'Leg 1 — Outbound route' : 'Route'}
+                {quote.trip_type === 'ROUND_TRIP' ? 'Leg 1: outbound route' : 'Route'}
               </h2>
               {quote.trip_type === 'ROUND_TRIP' && (
                 <span className="bk-status bk-status--info">
@@ -387,26 +387,31 @@ export default function QuoteDetail() {
                 </span>
               )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                {label('Pickup location')}
-                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.pickup_location || '—'}</div>
-              </div>
-
-              {Array.isArray(quote.stops) && quote.stops.map((s: { location: string }, i: number) => (
-                <div key={i} style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16 }}>
-                  <div style={{ ...fieldLabelStyle, marginBottom: 2 }}>
-                    Stop {i + 1}
-                  </div>
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{s.location}</div>
+            <ol className="bk-route">
+              <li className="bk-route__stop">
+                <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
+                <div>
+                  <div className="bk-route__label">Pickup</div>
+                  <div className="bk-route__place">{quote.pickup_location || '—'}</div>
                 </div>
+              </li>
+              {Array.isArray(quote.stops) && quote.stops.map((s: { location: string }, i: number) => (
+                <li key={i} className="bk-route__stop">
+                  <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
+                  <div>
+                    <div className="bk-route__label">Stop {i + 1}</div>
+                    <div className="bk-route__place">{s.location}</div>
+                  </div>
+                </li>
               ))}
-
-              <div>
-                {label('Delivery location')}
-                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
-              </div>
-            </div>
+              <li className="bk-route__stop">
+                <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
+                <div>
+                  <div className="bk-route__label">Delivery</div>
+                  <div className="bk-route__place">{quote.delivery_location || '—'}</div>
+                </div>
+              </li>
+            </ol>
 
             {(quote.pickup_lat || quote.delivery_lat) && (
               <div style={{ marginTop: 16 }}>
@@ -418,7 +423,7 @@ export default function QuoteDetail() {
                   stops={Array.isArray(quote.stops) ? quote.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
                   geometry={Array.isArray(quote.route_geometry) && quote.route_geometry.length > 1 ? quote.route_geometry.map((p: { lat: number; lon: number }) => [Number(p.lat), Number(p.lon)] as [number, number]) : undefined}
                   height={220}
-                  dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 12, boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
+                  dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-dialog, 16px)', boxShadow: 'none' }}
                 />
               </div>
             )}
@@ -426,9 +431,9 @@ export default function QuoteDetail() {
 
           {/* Return Leg — visible only for ROUND_TRIP quotes */}
           {quote.trip_type === 'ROUND_TRIP' && (
-            <div className="card" style={{ padding: 24, borderRadius: 8, borderLeft: '3px solid var(--accent-primary)' }}>
+            <div className="card" style={{ padding: 24 }}>
               <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>
-                Leg 2 — Return route
+                Leg 2: return route
               </h2>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px 24px' }}>
                 <div>
@@ -472,7 +477,7 @@ export default function QuoteDetail() {
           )}
 
           {/* Cargo Details */}
-          <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+          <div className="card" style={{ padding: 24 }}>
             <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Cargo details</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px 24px' }}>
               <div>
@@ -485,11 +490,11 @@ export default function QuoteDetail() {
               </div>
               <div>
                 {label('Weight (kg)')}
-                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.weight ? parseFloat(quote.weight).toLocaleString() : '—'}</div>
+                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.weight ? parseFloat(quote.weight).toLocaleString('en-ZA') : '—'}</div>
               </div>
               <div>
                 {label('Distance (km)')}
-                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.distance ? Math.round(parseFloat(quote.distance)).toLocaleString() : '—'}</div>
+                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.distance ? Math.round(parseFloat(quote.distance)).toLocaleString('en-ZA') : '—'}</div>
               </div>
               {quote.vehicle_display && (
                 <div>
@@ -507,7 +512,7 @@ export default function QuoteDetail() {
           </div>
 
           {/* Cost Breakdown */}
-          <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+          <div className="card" style={{ padding: 24 }}>
             <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Cost breakdown</h2>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {(() => {
@@ -532,7 +537,7 @@ export default function QuoteDetail() {
                 ];
 
                 return rows.map((item) => (
-                  <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
                     <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{item.label}</span>
                     <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', textAlign: 'right' }}>
                       {formatCurrency(item.value)}
@@ -541,7 +546,7 @@ export default function QuoteDetail() {
                 ));
               })()}
               {quote.trip_type === 'ROUND_TRIP' && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed var(--accent-primary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
                   <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     Return leg ({quote.return_cargo ? 'with cargo' : 'empty return'})
                   </span>
@@ -563,7 +568,7 @@ export default function QuoteDetail() {
 
           {/* Notes */}
           {quote.notes && (
-            <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+            <div className="card" style={{ padding: 24 }}>
               <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Notes</h2>
               <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{quote.notes}</div>
             </div>
@@ -573,7 +578,7 @@ export default function QuoteDetail() {
         {/* RIGHT — Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Metadata */}
-          <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+          <div className="card" style={{ padding: 24 }}>
             <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Quote info</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
@@ -602,17 +607,17 @@ export default function QuoteDetail() {
                 </Select>
                 {billingBlocked && (
                   <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', marginTop: 4 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
-                    Status changes are blocked —{' '}
+                    Status changes are blocked.{' '}
                     <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>
-                      go to billing
+                      Go to billing
                     </button>
                   </div>
                 )}
               </div>
               <div>
                 {label('Confidence')}
-                <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: quote.confidence === 'HIGH' ? 'var(--status-success-text, var(--status-success))' : quote.confidence === 'LOW' ? 'var(--status-danger-text, var(--status-danger))' : 'var(--status-warning-text, var(--status-warning))' }}>
-                  {sentenceCase(quote.confidence)}
+                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
+                  {sentenceCase(quote.confidence) || '—'}
                 </div>
               </div>
               <div>
@@ -647,17 +652,17 @@ export default function QuoteDetail() {
 
           {/* UPGRADE 3: Win Probability Display */}
           {quote.win_probability && (quote.status === 'DRAFT' || quote.status === 'SENT') && (
-            <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+            <div className="card" style={{ padding: 24 }}>
               <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Win probability</h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                <div style={{ flex: 1, height: 8, background: 'var(--bg-deep)', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ flex: 1, height: 6, background: 'var(--border-subtle)', borderRadius: 3, overflow: 'hidden' }}>
                   <div style={{
                     // quote.win_probability is already stored 0-100 (QuoteBuilder
                     // converts the model's 0-1 fraction before saving) — do not
                     // multiply by 100 again here.
                     width: `${Math.min(Number(quote.win_probability), 100)}%`,
                     height: '100%',
-                    background: quote.win_probability >= 70 ? 'var(--status-success-text, var(--status-success))' : quote.win_probability >= 40 ? 'var(--status-warning)' : 'var(--status-danger)',
+                    background: 'var(--accent-primary)',
                   }} />
                 </div>
                 <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -672,7 +677,7 @@ export default function QuoteDetail() {
 
           {/* UPGRADE 1: Outcome Buttons */}
           {(quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome && (
-            <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+            <div className="card" style={{ padding: 24 }}>
               <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Mark outcome</h2>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button
@@ -703,7 +708,7 @@ export default function QuoteDetail() {
           )}
 
           {/* Actions — primary next step first, secondary tools, destructive last */}
-          <div className="card" style={{ padding: 24, borderRadius: 8 }}>
+          <div className="card" style={{ padding: 24 }}>
             <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Actions</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {quote.status === 'ACCEPTED' && (
@@ -735,7 +740,7 @@ export default function QuoteDetail() {
               {effectiveShareUrl && (
                 <div style={{
                   padding: 16,
-                  borderRadius: 8,
+                  borderRadius: 'var(--radius-nested, 8px)',
                   background: 'var(--bg-deep)',
                   border: '1px solid var(--border-subtle)',
                   fontSize: 13,
@@ -764,8 +769,8 @@ export default function QuoteDetail() {
                       {effectiveEmailStatus.sent
                         ? `Quote emailed to ${effectiveEmailStatus.address}`
                         : isDemoEmailSkip
-                          ? 'Demo mode — link generated, no real email is sent.'
-                          : 'Could not email the customer — no email on file. Share the link below instead.'}
+                          ? 'Demo mode: the link is ready, but no real email is sent.'
+                          : 'No email on file for this customer. Share the link instead.'}
                     </div>
                   )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -849,7 +854,7 @@ export default function QuoteDetail() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.65)',
+          background: 'var(--modal-backdrop, rgba(0,0,0,0.65))',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

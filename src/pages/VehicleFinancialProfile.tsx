@@ -14,6 +14,8 @@ const VEHICLE_STATUSES = ['AVAILABLE', 'IN_USE', 'MAINTENANCE', 'OUT_OF_SERVICE'
 const formatStatus = (s?: string) =>
   s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
 
+// Every score bar is the same 0 to 100 scale in one neutral accent; the
+// number carries the meaning, not a traffic-light colour.
 const ScoreBar = ({ label, value, max = 100, color = 'var(--accent-primary)' }: any) => (
   <div className="fd-score">
     <div className="fd-score__row">
@@ -21,7 +23,7 @@ const ScoreBar = ({ label, value, max = 100, color = 'var(--accent-primary)' }: 
       <span className="fd-row__value">{value ?? '—'}</span>
     </div>
     <div className="fd-score__track" aria-hidden="true">
-      <div style={{ height: 4, width: `${Math.min(100, ((value ?? 0) / max) * 100)}%`, background: color, borderRadius: 2, transition: 'width 0.5s ease' }} />
+      <div style={{ height: 6, width: `${Math.min(100, ((value ?? 0) / max) * 100)}%`, background: color, borderRadius: 3 }} />
     </div>
   </div>
 );
@@ -30,21 +32,20 @@ const ScoreBar = ({ label, value, max = 100, color = 'var(--accent-primary)' }: 
 const DetailRow = ({ label, value, mono, alert }: { label: string; value: any; mono?: boolean; alert?: boolean }) => (
   <div className="fd-row">
     <span className="fd-row__label">{label}</span>
-    <span className={`fd-row__value${mono ? ' fd-id' : ''}`} style={alert ? { color: 'var(--status-danger-text, var(--status-danger))' } : undefined}>{value ?? '—'}</span>
+    <span className={`fd-row__value${mono ? ' fd-id' : ''}`} style={alert ? { color: 'var(--status-danger-text, var(--status-danger))' } : undefined}>{value == null || value === '' ? '—' : value}</span>
   </div>
 );
 
-const STATUS_COLOR: Record<string, string> = {
-  AVAILABLE: 'var(--status-success-text, var(--status-success))',
-  IN_USE: 'var(--status-warning-text, var(--status-warning))',
-  MAINTENANCE: 'var(--status-danger-text, var(--status-danger))',
-  OUT_OF_SERVICE: 'var(--text-secondary)',
+const STATUS_TONE: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
+  AVAILABLE: 'success',
+  ACTIVE: 'success',
+  IN_USE: 'info',
+  MAINTENANCE: 'warning',
+  OUT_OF_SERVICE: 'neutral',
+  INACTIVE: 'neutral',
 };
 
-const healthColor = (score: number) =>
-  score >= 80 ? 'var(--status-success-text, var(--status-success))'
-    : score >= 60 ? 'var(--status-warning-text, var(--status-warning))'
-    : 'var(--status-danger-text, var(--status-danger))';
+const km = (n: number) => `${Math.round(n).toLocaleString('en-ZA')} km`;
 
 export default function VehicleFinancialProfile() {
   const { id } = useParams();
@@ -133,6 +134,11 @@ export default function VehicleFinancialProfile() {
     });
   };
 
+  // Shown as missing (not R 0.00) until the vehicle stats job has computed them.
+  const money = (v: any) => (Number(v) ? formatCurrency(parseFloat(v)) : '—');
+  const perKm = (v: any) => (Number(v) ? `R ${parseFloat(v).toFixed(2)}` : '—');
+  const loadsBasis = delivered.length === 1 ? '1 delivered load' : `${delivered.length} delivered loads`;
+
   const subtitle = [
     [vehicle.make, vehicle.model].filter(Boolean).join(' '),
     vehicle.vehicle_type_name, vehicle.year, vehicle.fuel_type,
@@ -145,17 +151,16 @@ export default function VehicleFinancialProfile() {
       <SectionHeader
         eyebrow="Vehicle"
         title={vehicle.plate || vehicle.registration || `Vehicle ${id}`}
+        titleAdornment={<span className={`fd-chip fd-chip--${STATUS_TONE[vehicle.status] || 'neutral'}`}>{formatStatus(vehicle.status)}</span>}
         description={subtitle || undefined}
         tabs={[
           { label: 'Overview', to: `/fleet/vehicles/${id}`, end: true },
           { label: 'Financial profile', to: `/fleet/vehicles/${id}/financial` },
         ]}
         actions={<>
-          <button className="fd-button" onClick={openEdit}>Edit</button>
-          <div className="fd-status-group" role="group" aria-label="Vehicle status">
+          <div className="fd-status-group" role="group" aria-label="Set vehicle status">
             {VEHICLE_STATUSES.map(s => {
               const isCurrentStatus = vehicle.status === s;
-              const btnColor = STATUS_COLOR[s] || 'var(--text-secondary)';
               return (
                 <button
                   key={s}
@@ -170,34 +175,42 @@ export default function VehicleFinancialProfile() {
                     } catch (e) { console.error(e); }
                     setUpdating(false);
                   }}
-                  style={isCurrentStatus ? { color: btnColor, borderColor: btnColor } : { opacity: updating ? 0.5 : 1 }}
+                  style={isCurrentStatus ? undefined : { opacity: updating ? 0.5 : 1 }}
                 >
                   {formatStatus(s)}
                 </button>
               );
             })}
           </div>
+          <button className="fd-button" onClick={openEdit}>Edit vehicle</button>
         </>}
       />
 
       {/* ── Overview tab ── */}
       {!isFinancial && (
         <>
-          <div className="fd-metrics">
-            {[
-              { label: 'AI health score', value: vehicle.ai_health_score ?? 0, suffix: '/100', color: healthColor(healthScore) },
-              { label: 'Fuel efficiency', value: vehicle.fuel_efficiency_score ?? 0, suffix: '/100' },
-              { label: 'Uptime', value: parseFloat(vehicle.uptime_percentage || '0').toFixed(1), suffix: '%' },
-              { label: 'Mileage', value: parseFloat(vehicle.mileage || '0').toLocaleString('en-ZA'), suffix: ' km' },
-            ].map(m => (
-              <div key={m.label} className="card metric-card">
-                <div className="card-header"><span className="card-title">{m.label}</span></div>
-                <div className="metric-value" style={{ color: m.color || 'var(--text-primary)' }}>
-                  {m.value}<span className="fd-suffix">{m.suffix}</span>
-                </div>
+          {/* Key figure first: what this truck has earned, then its condition. */}
+          <section className="card fd-kpis" aria-label="Vehicle summary">
+            <div className="fd-kpi fd-kpi--lead">
+              <div className="fd-kpi__label">Delivered revenue</div>
+              <div className="fd-kpi__value">{delivered.length > 0 ? formatCurrency(totalRevenue) : '—'}</div>
+              <div className="fd-kpi__note">{delivered.length > 0 ? `From ${loadsBasis}, ${formatCurrency(avgRevPerTrip)} per load.` : 'No delivered loads on this vehicle yet.'}</div>
+            </div>
+            <div className="fd-kpi">
+              <div className="fd-kpi__label">Health score</div>
+              <div className="fd-kpi__value">{healthScore ? <>{healthScore}<span className="fd-kpi__of">of 100</span></> : '—'}</div>
+              <div className="fd-kpi__note">{healthScore ? 'Maintenance, uptime, fuel use and age combined.' : 'Not scored yet.'}</div>
+            </div>
+            <div className="fd-kpi">
+              <div className="fd-kpi__label">Odometer</div>
+              <div className="fd-kpi__value">{Number(vehicle.mileage) ? km(parseFloat(vehicle.mileage)) : '—'}</div>
+              <div className="fd-kpi__note">
+                {kmUntilService !== null
+                  ? (kmUntilService > 0 ? `Next service in ${km(kmUntilService)}.` : 'Service is overdue.')
+                  : 'Set a service interval to track the next service.'}
               </div>
-            ))}
-          </div>
+            </div>
+          </section>
 
           <div className="fd-grid">
             <section className="card fd-card">
@@ -205,7 +218,7 @@ export default function VehicleFinancialProfile() {
               <DetailRow label="VIN" value={vehicle.vin} mono />
               <DetailRow label="Registration" value={vehicle.plate} mono />
               <DetailRow label="Type" value={vehicle.vehicle_type_name || '—'} />
-              <DetailRow label="Capacity" value={vehicle.capacity ? `${(parseFloat(vehicle.capacity) / 1000).toFixed(1)} ton` : '—'} />
+              <DetailRow label="Capacity" value={vehicle.capacity ? `${(parseFloat(vehicle.capacity) / 1000).toFixed(1)} t` : '—'} />
               <DetailRow label="Fuel type" value={vehicle.fuel_type} />
               <DetailRow label="Year" value={vehicle.year} />
               <DetailRow label="Driver" value={vehicle.driver_name || '—'} />
@@ -213,19 +226,19 @@ export default function VehicleFinancialProfile() {
 
             <div className="fd-stack">
               <section className="card fd-card">
-                <h2 className="fd-card__title">Economics</h2>
-                <DetailRow label="Cost per km" value={`R ${parseFloat(vehicle.cost_per_km || '0').toFixed(2)}`} />
-                <DetailRow label="Margin per trip" value={formatCurrency(parseFloat(vehicle.margin_per_trip || '0'))} />
-                <DetailRow label="Fuel consumption" value={`${parseFloat(vehicle.fuel_consumption_per_km || '0').toFixed(2)} L/km`} />
+                <h2 className="fd-card__title">What does it cost to run?</h2>
+                <DetailRow label="Cost per km" value={perKm(vehicle.cost_per_km)} />
+                <DetailRow label="Margin per load" value={money(vehicle.margin_per_trip)} />
+                <DetailRow label="Fuel consumption" value={Number(vehicle.fuel_consumption_per_km) ? `${parseFloat(vehicle.fuel_consumption_per_km).toFixed(2)} L/km` : '—'} />
               </section>
 
               <section className="card fd-card">
-                <h2 className="fd-card__title">Maintenance</h2>
+                <h2 className="fd-card__title">When is it due?</h2>
                 <DetailRow label="Last maintenance" value={vehicle.last_maintenance_date?.slice(0, 10) || '—'} />
                 <DetailRow label="Service interval" value={vehicle.service_interval_km ? `${Number(vehicle.service_interval_km).toLocaleString('en-ZA')} km` : '—'} />
                 <DetailRow label="Next service at" value={nextServiceKm ? `${nextServiceKm.toLocaleString('en-ZA')} km` : '—'} />
-                <DetailRow label="Km until service" value={kmUntilService !== null ? (kmUntilService > 0 ? `${Math.round(kmUntilService).toLocaleString('en-ZA')} km` : 'Overdue') : '—'} />
-                <DetailRow label="Registration expiry" value={vehicle.registration_expiry?.slice(0, 10) || '—'} />
+                <DetailRow label="Km until service" value={kmUntilService !== null ? (kmUntilService > 0 ? `${Math.round(kmUntilService).toLocaleString('en-ZA')} km` : 'Overdue') : '—'} alert={kmUntilService !== null && kmUntilService <= 0} />
+                <DetailRow label="Registration expiry" value={vehicle.registration_expiry?.slice(0, 10) || '—'} alert={!!(vehicle.registration_expiry && new Date(vehicle.registration_expiry) < new Date())} />
               </section>
             </div>
           </div>
@@ -235,46 +248,42 @@ export default function VehicleFinancialProfile() {
       {/* ── Financial tab ── */}
       {isFinancial && (
         <>
-          <div className="fd-metrics">
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Revenue generated</span></div>
-              <div className="metric-value">{formatCurrency(totalRevenue)}</div>
-              <div className="fd-metric-sub">{delivered.length} completed trips</div>
+          <section className="card fd-kpis" aria-label="Earnings summary">
+            <div className="fd-kpi fd-kpi--lead">
+              <div className="fd-kpi__label">Delivered revenue</div>
+              <div className="fd-kpi__value">{delivered.length > 0 ? formatCurrency(totalRevenue) : '—'}</div>
+              <div className="fd-kpi__note">{delivered.length > 0 ? `From ${loadsBasis}.` : 'No delivered loads on this vehicle yet.'}</div>
             </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Avg revenue per trip</span></div>
-              <div className="metric-value">{formatCurrency(avgRevPerTrip)}</div>
-              <div className="fd-metric-sub">Delivered loads</div>
+            <div className="fd-kpi">
+              <div className="fd-kpi__label">Revenue per load</div>
+              <div className="fd-kpi__value">{delivered.length > 0 ? formatCurrency(avgRevPerTrip) : '—'}</div>
+              <div className="fd-kpi__note">Average across delivered loads.</div>
             </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Revenue per km</span></div>
-              <div className="metric-value">R {(revPerKm || 0).toFixed(2)}</div>
-              <div className="fd-metric-sub">{(totalDistance || 0).toFixed(0)} km total</div>
+            <div className="fd-kpi">
+              <div className="fd-kpi__label">Revenue per km</div>
+              <div className="fd-kpi__value">{revPerKm > 0 ? `R ${revPerKm.toFixed(2)}` : '—'}</div>
+              <div className="fd-kpi__note">{totalDistance > 0 ? `Over ${km(totalDistance)} of delivered loads.` : 'No distance recorded on delivered loads.'}</div>
             </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">AI health score</span></div>
-              <div className="metric-value" style={{ color: healthColor(healthScore) }}>{healthScore}<span className="fd-suffix">/100</span></div>
-              <div className="fd-metric-sub">Fleet intelligence</div>
-            </div>
-          </div>
+          </section>
 
           <div className="fd-grid">
             <section className="card fd-card">
-              <h2 className="fd-card__title">Performance scores</h2>
-              <ScoreBar label="AI health score" value={healthScore} color={healthScore >= 80 ? 'var(--status-success)' : 'var(--status-warning)'} />
-              <ScoreBar label="Uptime score" value={vehicle.uptime_score ?? 0} color="var(--accent-primary)" />
-              <ScoreBar label="Fuel efficiency" value={vehicle.fuel_efficiency_score ?? 0} />
-              <ScoreBar label="Maintenance score" value={vehicle.maintenance_score ?? 0} color="var(--status-success)" />
+              <h2 className="fd-card__title">How healthy is it?</h2>
+              <p className="fd-card__desc">Scores out of 100. The health score weights maintenance 35%, uptime 25%, fuel 25% and age 15%.</p>
+              <ScoreBar label="Health score" value={healthScore || null} />
+              <ScoreBar label="Uptime score" value={vehicle.uptime_score || null} />
+              <ScoreBar label="Fuel efficiency" value={vehicle.fuel_efficiency_score || null} />
+              <ScoreBar label="Maintenance score" value={vehicle.maintenance_score || null} />
               <div className="fd-divider" />
               <DetailRow label="Uptime" value={`${parseFloat(vehicle.uptime_percentage || '0').toFixed(1)}%`} />
             </section>
 
             <section className="card fd-card">
-              <h2 className="fd-card__title">Cost analysis</h2>
-              <DetailRow label="Cost per km" value={vehicle.cost_per_km ? `R ${parseFloat(vehicle.cost_per_km).toFixed(2)}` : '—'} />
-              <DetailRow label="Margin per trip" value={vehicle.margin_per_trip ? formatCurrency(parseFloat(vehicle.margin_per_trip)) : '—'} />
+              <h2 className="fd-card__title">What does it cost to run?</h2>
+              <DetailRow label="Cost per km" value={perKm(vehicle.cost_per_km)} />
+              <DetailRow label="Margin per load" value={money(vehicle.margin_per_trip)} />
               <DetailRow label="Fuel consumption" value={vehicle.fuel_consumption_per_km ? `${vehicle.fuel_consumption_per_km} L/km` : '—'} />
-              <DetailRow label="Capacity" value={vehicle.capacity ? `${(parseFloat(vehicle.capacity) / 1000).toFixed(1)} ton` : '—'} />
+              <DetailRow label="Capacity" value={vehicle.capacity ? `${(parseFloat(vehicle.capacity) / 1000).toFixed(1)} t` : '—'} />
               <DetailRow label="Fuel type" value={vehicle.fuel_type || '—'} />
               <DetailRow label="Mileage" value={vehicle.mileage ? `${parseFloat(vehicle.mileage).toLocaleString('en-ZA')} km` : '—'} />
             </section>
@@ -308,7 +317,7 @@ export default function VehicleFinancialProfile() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div className="fd-row__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</div>
-                    <div className="fd-row__label" style={{ color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success-text, var(--status-success))' : undefined }}>{formatStatus(load.status)}</div>
+                    <div className="fd-row__label">{formatStatus(load.status)}</div>
                   </div>
                 </div>
               ))}
@@ -383,7 +392,7 @@ export default function VehicleFinancialProfile() {
                 onValueChange={val => setEditForm((prev: any) => ({ ...prev, driver: val }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="— No driver assigned —" />
+                  <SelectValue placeholder="No driver assigned" />
                 </SelectTrigger>
                 <SelectContent>
                   {driversList.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}

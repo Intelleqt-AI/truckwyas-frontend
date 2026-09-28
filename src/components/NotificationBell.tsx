@@ -95,10 +95,10 @@ export function NotificationBell() {
         </svg>
         {unread > 0 && (
           <span className="dashboard-notification-count" style={{
-            position: 'absolute', top: 0, right: 0, minWidth: 'var(--note-count-size, 15px)', height: 'var(--note-count-size, 15px)', padding: 'var(--note-count-padding, 0 3px)',
+            position: 'absolute', top: 0, right: 0, minWidth: 'var(--note-count-size, 18px)', height: 'var(--note-count-size, 18px)', padding: 'var(--note-count-padding, 0 3px)',
             borderRadius: 999, background: 'var(--note-danger-surface, var(--status-danger))', color: 'var(--note-danger-text, #fff)',
-            fontSize: 'var(--note-support-size, 9px)', fontWeight: 'var(--note-label-weight, 700)', display: 'grid', placeItems: 'center',
-            fontFamily: 'var(--note-font, var(--font-mono))', lineHeight: 'var(--note-line, 1)',
+            fontSize: 'var(--note-support-size, 12px)', fontWeight: 'var(--note-label-weight, 700)', display: 'grid', placeItems: 'center',
+            fontFamily: 'var(--note-font, var(--font-sans))', lineHeight: 'var(--note-line, 1)',
           }}>{unread > 99 ? '99+' : unread}</span>
         )}
       </button>
@@ -106,14 +106,14 @@ export function NotificationBell() {
       {open && (
         <div className="dashboard-notification-panel" style={{
           position: 'absolute', top: 'var(--note-panel-top, calc(100% + 10px))', right: 0, width: 340, maxHeight: 460,
-          background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--note-panel-radius, 12px)',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.35)', zIndex: 2000, overflow: 'hidden',
+          background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--note-panel-radius, var(--radius-card))',
+          zIndex: 2000, overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
         }}>
           <div className="dashboard-notification-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--note-header-padding, 12px 14px)', borderBottom: '1px solid var(--border-subtle)' }}>
-            <h2 className="dashboard-notification-title" style={{ fontSize: 'var(--note-title-size, 13px)', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Notifications</h2>
+            <h2 className="dashboard-notification-title" style={{ fontSize: 'var(--note-title-size, 16px)', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Notifications</h2>
             {unread > 0 && (
-              <button className="dashboard-notification-mark-read" onClick={markAllRead} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', fontFamily: 'var(--note-font, var(--font-mono))', fontSize: 'var(--note-body-size, 10px)', letterSpacing: 'var(--note-tracking, 0.04em)', textTransform: 'var(--note-case, uppercase)' as React.CSSProperties['textTransform'] }}>
+              <button className="dashboard-notification-mark-read" onClick={markAllRead} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', fontFamily: 'var(--note-font, var(--font-sans))', fontSize: 'var(--note-body-size, 14px)', letterSpacing: 'var(--note-tracking, normal)', textTransform: 'var(--note-case, none)' as React.CSSProperties['textTransform'] }}>
                 Mark all read
               </button>
             )}
@@ -129,14 +129,14 @@ export function NotificationBell() {
                 style={{
                   display: 'flex', gap: 'var(--note-row-gap, 10px)', padding: 'var(--note-row-padding, 11px 14px)', cursor: n.link ? 'pointer' : 'default',
                   borderBottom: '1px solid var(--border-row)',
-                  background: n.unread ? 'var(--note-unread-surface, color-mix(in srgb, var(--accent-primary) 7%, transparent))' : 'transparent',
+                  background: n.unread ? 'var(--note-unread-surface, color-mix(in srgb, var(--accent-primary) 7%, transparent))' : undefined,
                 }}
               >
                 <span style={{ marginTop: 'var(--note-dot-offset, 5px)', flexShrink: 0, width: 'var(--note-dot-size, 7px)', height: 'var(--note-dot-size, 7px)', borderRadius: '50%', background: n.unread ? (TYPE_COLOR[n.type || 'info'] || 'var(--accent-primary)') : 'var(--border-active)' }} />
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 'var(--note-body-size, 12.5px)', fontWeight: n.unread ? 'var(--note-unread-weight, 600)' : 'var(--note-read-weight, 500)', color: 'var(--text-primary)', marginBottom: 'var(--note-copy-gap, 2px)' }}>{n.title}</div>
                   {n.description && <div style={{ fontSize: 'var(--note-body-size, 11.5px)', color: 'var(--text-secondary)', marginBottom: 'var(--note-copy-gap, 3px)', lineHeight: 'var(--note-line, 1.4)' }}>{n.description}</div>}
-                  <div style={{ fontSize: 'var(--note-support-size, 10px)', color: 'var(--text-tertiary)', fontFamily: 'var(--note-font, var(--font-mono))' }}>{timeAgo(n.created_at)}</div>
+                  <div style={{ fontSize: 'var(--note-support-size, 10px)', color: 'var(--text-tertiary)', fontFamily: 'var(--note-font, var(--font-sans))' }}>{timeAgo(n.created_at)}</div>
                 </div>
               </div>
             ))}

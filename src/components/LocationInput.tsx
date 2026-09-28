@@ -230,9 +230,8 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
           background: 'var(--bg-surface)',
           border: '1px solid var(--border-subtle)',
           borderTop: 'none',
-          borderRadius: '0 0 6px 6px',
+          borderRadius: '0 0 var(--radius-control) var(--radius-control)',
           zIndex: 1100, maxHeight: 220, overflowY: 'auto',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         }}>
           {suggestions.map((s, i) => (
             <div
@@ -240,12 +239,12 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
               onMouseDown={() => handleSelect(s)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                padding: '8px 12px', fontSize: 14, cursor: 'pointer',
+                padding: '10px 12px', minHeight: 40, boxSizing: 'border-box', fontSize: 14, cursor: 'pointer',
                 color: 'var(--text-primary)', fontFamily: 'var(--font-sans)',
-                borderBottom: i < suggestions.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                borderBottom: i < suggestions.length - 1 ? '1px solid var(--border-row)' : 'none',
                 lineHeight: '20px',
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-tint-hover)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -254,10 +253,10 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
               </span>
               {s.cross_border && (
                 <span
-                  title={`Cross-border — ${s.country || 'outside South Africa'}`}
+                  title={`Cross-border: ${s.country || 'outside South Africa'}`}
                   style={{
-                    flexShrink: 0, fontSize: 12, lineHeight: '16px', fontWeight: 500, letterSpacing: 'normal',
-                    padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap',
+                    flexShrink: 0, fontSize: 13, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal',
+                    padding: '2px 8px', borderRadius: 'var(--radius-chip)', whiteSpace: 'nowrap',
                     color: 'var(--status-warning-text, var(--status-warning))',
                     background: 'color-mix(in srgb, var(--status-warning) 15%, transparent)',
                     border: '1px solid var(--status-warning)',
@@ -296,9 +295,9 @@ function ResolvedInfo({ text }: { text: string }) {
         <div style={{
           position: 'absolute', bottom: '100%', right: 0, zIndex: 20, marginBottom: 6,
           background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-          borderRadius: 6, padding: '8px 12px',
+          borderRadius: 'var(--radius-control)', padding: '8px 12px',
           fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)',
-          whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          whiteSpace: 'nowrap',
           pointerEvents: 'none',
         }}>
           {text}

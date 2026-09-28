@@ -78,6 +78,11 @@
   /* Card */
   --card-radius: 12px;
 
+  /* Neutral interaction tints (design principles §3: hover is a surface tint,
+     never a border change; active nav items are a quiet neutral fill). */
+  --surface-tint-hover: rgba(255, 255, 255, 0.04);
+  --surface-tint-active: rgba(255, 255, 255, 0.07);
+
   /* ===========================
      TYPE SCALE / WEIGHT / SPACING (theme-agnostic — same in light + dark)
      Single source of truth for sizing. Six steps only; nothing off-scale.
@@ -102,7 +107,7 @@
   --space-6: 24px;
   --space-8: 32px;
 
-  --pill-radius: 4px;
+  --pill-radius: var(--radius-chip, 6px);
 
   /* Nav item hover */
   --nav-hover-bg: rgba(77, 158, 255, 0.05);
@@ -194,9 +199,10 @@
   --scrollbar-thumb: #E5E7EB;
   --scrollbar-thumb-hover: #D1D5DB;
 
-  /* Shadows — give white cards/inputs a real lift off the grey page */
-  --shadow-card: 0 1px 3px rgba(17, 24, 39, 0.06), 0 1px 2px rgba(17, 24, 39, 0.04);
-  --shadow-card-hover: 0 4px 12px -2px rgba(17, 24, 39, 0.10);
+  /* Shadows: cards are separated from the grey page by their 1px border
+     alone (design principles §1: a border OR a shadow, never both). */
+  --shadow-card: none;
+  --shadow-card-hover: none;
 
   /* Input specific — white fill on the grey page so boxes read as distinct
      surfaces, not the same colour as the container. */
@@ -205,6 +211,9 @@
 
   /* Card */
   --card-radius: 12px;
+
+  --surface-tint-hover: rgba(17, 24, 39, 0.04);
+  --surface-tint-active: rgba(17, 24, 39, 0.07);
 
   /* Nav item hover */
   --nav-hover-bg: var(--bg-deep);
@@ -228,7 +237,7 @@
 
   /* Button action color */
   --btn-action-color: white;
-  --btn-action-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+  --btn-action-shadow: none;
 
   /* Pulse animation color */
   --pulse-color: rgba(37, 99, 235, 0.4);
@@ -287,7 +296,10 @@ button, input, select, textarea, optgroup {
    AMBIENT GLOW
    =========================== */
 
+/* Retired: gradient glows are a banned pattern (design principles §1). The
+   element is still rendered by the shell, so it is simply not painted. */
 .ambient-glow {
+  display: none;
   position: fixed;
   top: -20%;
   left: 50%;
@@ -397,7 +409,7 @@ button, input, select, textarea, optgroup {
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
   padding: 10px 16px 10px 40px;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   font-family: var(--font-mono);
   font-size: 13px;
   transition: all 0.2s var(--ease-out);
@@ -411,7 +423,7 @@ button, input, select, textarea, optgroup {
   outline: none;
   background: var(--input-bg-focus);
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 1px var(--accent-primary), 0 0 20px var(--accent-glow);
+  box-shadow: 0 0 0 1px var(--accent-primary);
 }
 
 .agent-icon {
@@ -423,8 +435,7 @@ button, input, select, textarea, optgroup {
   height: 14px;
   background: var(--accent-primary);
   border-radius: 50%;
-  box-shadow: 0 0 10px var(--pulse-color);
-  animation: pulse 2s infinite;
+  /* Static mark: pulsing dots are a banned pattern. */
 }
 
 @keyframes pulse {
@@ -456,9 +467,9 @@ button, input, select, textarea, optgroup {
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.15s, color 0.15s;
   position: relative;
 }
 
@@ -485,8 +496,9 @@ button, input, select, textarea, optgroup {
   background: var(--text-primary);
   color: var(--bg-deep);
   padding: 4px 8px;
-  border-radius: 2px;
-  font-size: 11px;
+  border-radius: var(--radius-chip);
+  font-size: 13px;
+  line-height: 20px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s;
@@ -523,19 +535,18 @@ button, input, select, textarea, optgroup {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   padding: 20px;
-  border-radius: var(--card-radius);
+  border-radius: var(--radius-card);
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: visible;
-  transition: border-color 0.2s, box-shadow 0.2s;
   box-shadow: none;
 }
 
-.card:hover {
-  border-color: var(--border-active);
-  box-shadow: var(--shadow-card-hover);
-}
+/* Static cards do not react to the pointer. Cards that ARE interactive opt in
+   with .card-interactive: a subtle surface tint, never a border change. */
+.card-interactive { cursor: pointer; transition: background-color 0.15s; }
+.card-interactive:hover { background-color: var(--bg-surface-hover); }
 
 .card-header {
   display: flex;
@@ -543,6 +554,9 @@ button, input, select, textarea, optgroup {
   align-items: flex-start;
   margin-bottom: 16px;
 }
+
+/* KPI tiles: label, then value directly beneath it (8px), then context. */
+.metric-card .card-header { margin-bottom: 8px; }
 
 /* Card / metric label: brand "Label" role — sans 13/20/500, sentence case. */
 .card-title {
@@ -728,34 +742,38 @@ button, input, select, textarea, optgroup {
    =========================== */
 
 .status-badge {
+  /* Chip role: 13/20 medium sans at the 6px chip radius. A tinted fill carries
+     the state; no border on top of it (one boundary treatment only). */
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 2px 8px;
-  border-radius: 100px;
+  border-radius: var(--radius-chip);
   background: var(--status-neutral-bg);
-  font-size: 11px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--text-secondary);
   font-weight: 500;
+  white-space: nowrap;
   border: 1px solid transparent;
 }
 
 .status-badge.active {
   background: var(--status-success-bg);
-  color: var(--accent-primary);
-  border-color: var(--status-badge-active-border);
+  color: var(--status-info-text, var(--accent-primary));
 }
 
 .status-badge.delayed {
   background: var(--status-danger-bg);
   color: var(--status-danger-text, var(--status-danger));
-  border-color: var(--status-badge-delayed-border);
 }
 
 .status-badge.warning {
   background: var(--status-warning-bg);
   color: var(--status-warning-text, var(--status-warning));
-  border-color: var(--status-warning);
 }
 
 /* ===========================
@@ -776,12 +794,13 @@ button, input, select, textarea, optgroup {
 .agent-header {
   padding: 20px;
   border-bottom: 1px solid var(--border-subtle);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -792,8 +811,7 @@ button, input, select, textarea, optgroup {
   height: 8px;
   background: var(--accent-primary);
   border-radius: 50%;
-  box-shadow: var(--live-dot-shadow);
-  animation: pulse-dot 2s infinite;
+  /* Static: pulsing dots are a banned pattern. */
 }
 
 @keyframes pulse-dot {
@@ -826,8 +844,9 @@ button, input, select, textarea, optgroup {
 .feed-meta {
   display: flex;
   justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
   font-weight: 500;
   color: var(--text-tertiary);
 }
@@ -848,15 +867,16 @@ button, input, select, textarea, optgroup {
   background: var(--alert-bg);
   border: 1px solid var(--alert-border);
   padding: 16px;
-  border-radius: 2px;
+  border-radius: var(--radius-nested);
   margin-top: 8px;
 }
 
 .alert-title {
   color: var(--accent-primary);
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 20px;
   font-weight: 600;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -872,7 +892,7 @@ button, input, select, textarea, optgroup {
   color: var(--btn-action-color);
   border: none;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   min-height: 40px;
   font-size: 14px;
   line-height: 20px;
@@ -885,12 +905,17 @@ button, input, select, textarea, optgroup {
   min-width: 120px;
   text-align: center;
   white-space: nowrap;
-  transition: opacity 0.2s;
-  box-shadow: var(--btn-action-shadow);
+  transition: opacity 0.15s;
+  box-shadow: none;
 }
 
 .btn-action:hover {
   opacity: 0.9;
+}
+
+.btn-action:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
 }
 
 .btn-action:disabled {
@@ -901,17 +926,19 @@ button, input, select, textarea, optgroup {
 
 .btn-ghost {
   background: transparent;
-  border: 1px solid var(--accent-primary);
-  color: var(--accent-primary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
 }
+.btn-ghost:hover { background: var(--surface-tint-hover); opacity: 1; }
 
 .btn-export {
   background: transparent;
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
   padding: 4px 8px;
-  font-size: 10px;
-  border-radius: 2px;
+  font-size: 13px;
+  line-height: 20px;
+  border-radius: var(--radius-control);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -930,7 +957,7 @@ button, input, select, textarea, optgroup {
 .heat-cell {
   aspect-ratio: 1;
   background: var(--heat-empty);
-  border-radius: 1px;
+  border-radius: 2px;
 }
 
 .heat-cell.low {
@@ -975,8 +1002,8 @@ button, input, select, textarea, optgroup {
   border: 1px solid var(--border-subtle);
   padding: 8px;
   color: var(--text-primary);
-  border-radius: 2px;
-  font-size: 11px;
+  border-radius: var(--radius-control);
+  font-size: 14px;
 }
 
 .quick-quote-input::placeholder {
@@ -1073,14 +1100,14 @@ button, input, select, textarea, optgroup {
   justify-content: center;
   color: var(--text-secondary);
   border: 1px solid var(--border-subtle);
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: transparent;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.15s, color 0.15s;
 }
 .theme-toggle:hover {
   color: var(--text-primary);
-  border-color: var(--border-active);
+  background: var(--surface-tint-hover);
 }
 
 /* Authenticated dashboard text roles. Public/auth defaults remain unchanged.
@@ -1137,13 +1164,13 @@ button, input, select, textarea, optgroup {
 
 .os-app-shell .card {
   padding: 24px;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
 }
 
 .os-app-shell .btn-action {
   min-width: 0;
   min-height: 40px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 
 @media (max-width: 767px) {
@@ -1198,16 +1225,17 @@ button, input, select, textarea, optgroup {
   letter-spacing: normal;
   padding: 8px 16px 8px 40px;
   min-height: 40px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 .os-app-shell > .os-header .status-badge {
   font: 500 13px/20px var(--font-sans);
   letter-spacing: normal;
   text-transform: none;
-  padding: 4px 8px;
+  padding: 4px 10px;
+  min-height: 32px;
   gap: 8px;
 }
-.os-app-shell .theme-toggle { width: 44px; height: 44px; flex-shrink: 0; border-radius: 6px; font-size: 14px; }
+.os-app-shell .theme-toggle { width: 44px; height: 44px; flex-shrink: 0; border-radius: var(--radius-control); font-size: 14px; }
 /* Icon-only header triggers: keep an on-scale font so any fallback text/count
    renders at a sanctioned size rather than the 13.333px browser default. */
 .os-app-shell .dashboard-notification-trigger { font-size: 14px; }
@@ -1220,7 +1248,10 @@ button, input, select, textarea, optgroup {
   background: transparent;
   text-align: left;
   font-weight: 400;
+  border-radius: var(--radius-control);
+  transition: background-color 0.15s;
 }
+.os-app-shell .os-profile-action:hover { background: var(--surface-tint-hover); }
 .os-app-shell .os-profile-action:focus-visible,
 .os-app-shell .os-profile-trigger:focus-visible,
 .os-app-shell .theme-toggle:focus-visible,
@@ -1229,8 +1260,8 @@ button, input, select, textarea, optgroup {
   outline-offset: 3px;
 }
 .os-app-shell > .os-nav { gap: 16px; }
-.os-app-shell .nav-item { width: 44px; height: 44px; border-radius: 6px; }
-.os-app-shell .nav-tooltip { font: 400 13px/20px var(--font-sans); letter-spacing: normal; border-radius: 4px; }
+.os-app-shell .nav-item { width: 44px; height: 44px; border-radius: var(--radius-control); }
+.os-app-shell .nav-tooltip { font: 400 13px/20px var(--font-sans); letter-spacing: normal; border-radius: var(--radius-chip); }
 @media (max-width: 768px) {
   .os-app-shell > .os-header { padding: 12px 16px; gap: 12px; }
   .os-app-shell .agent-command { margin: 0; }
@@ -1308,7 +1339,7 @@ button, input, select, textarea, optgroup {
     flex-direction: column;
     justify-content: center;
     gap: 2px;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     text-decoration: none;
   }
   .nav-item svg { width: 20px; height: 20px; }

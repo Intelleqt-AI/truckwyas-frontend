@@ -45,7 +45,7 @@ export function NotificationSettings() {
       .then((d: any) => setSettings(mergeSettings(d)))
       .catch(() => {
         setLoadFailed(true);
-        toast.error('Could not load your notification settings. Showing defaults — retry before saving.');
+        toast.error('Could not load your notification settings. Showing defaults, so retry before saving.');
       });
   };
 
@@ -73,7 +73,7 @@ export function NotificationSettings() {
             const status = await enablePush();
             setPushStatus(status);
             if (status === 'denied') {
-              toast.warn('Browser notifications are blocked for this site — enable them in your browser settings to receive push notifications.');
+              toast.warn('Browser notifications are blocked for this site. Enable them in your browser settings to receive push notifications.');
             }
           } else {
             await disablePush();
@@ -87,7 +87,7 @@ export function NotificationSettings() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
-      toast.error('Saving notification settings failed — your changes are NOT saved. Check your connection and try again.');
+      toast.error('Saving notification settings failed. Your changes are not saved. Check your connection and try again.');
     }
     setSaving(false);
   };
@@ -95,7 +95,7 @@ export function NotificationSettings() {
   const pushHint =
     !pushSupported() ? 'This browser does not support push notifications.'
     : pushStatus === 'denied' ? 'Notifications are blocked for this site in your browser settings.'
-    : pushStatus === 'server-not-configured' ? 'Browser push is not configured on the server yet — in-app toasts still follow these toggles.'
+    : pushStatus === 'server-not-configured' ? 'Browser push is not configured on the server yet. In-app toasts still follow these toggles.'
     : pushStatus === 'subscribed' ? 'This browser will receive push notifications, even when the tab is closed.'
     : undefined;
 
@@ -111,7 +111,7 @@ export function NotificationSettings() {
         {loadFailed && (
           <div style={{ marginTop: 8, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
             Settings failed to load.{' '}
-            <button onClick={load} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: '20px', textDecoration: 'underline' }}>
+            <button type="button" className="settings-control" onClick={load} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: '20px', textDecoration: 'underline' }}>
               Retry
             </button>
           </div>
@@ -143,7 +143,7 @@ export function NotificationSettings() {
           <ToggleRow label="Maintenance due" checked={settings.push.maintenance_due} onChange={v => setChannel('push', 'maintenance_due', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           <ToggleRow label="Driver status updates" checked={settings.push.driver_updates} onChange={v => setChannel('push', 'driver_updates', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           {pushHint && (
-            <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-row)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
+            <div style={{ padding: '12px 24px', borderTop: '1px solid var(--border-row)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
           )}
         </div>
       </div>

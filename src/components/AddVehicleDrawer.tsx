@@ -46,7 +46,7 @@ const labelStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 6,
+  color: 'var(--text-primary)', padding: '9px 12px', minHeight: 40, borderRadius: 'var(--radius-control)',
   fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', outline: 'none', boxSizing: 'border-box',
 };
 
@@ -140,10 +140,10 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}>
       <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={onClose} />
-      <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
+      <div style={{ position: 'relative', width: 440, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 24, overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Add vehicle</h2>
-          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, margin: '-13px -13px 0 0' }}>✕</button>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-control)', margin: '-13px -13px 0 0' }}>✕</button>
         </div>
 
         {submitError && (
@@ -152,7 +152,7 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
             padding: '12px 14px',
             background: 'var(--status-danger-bg, #fef2f2)',
             border: '1px solid var(--status-danger, #dc2626)',
-            borderRadius: 4,
+            borderRadius: 'var(--radius-nested)',
             display: 'flex',
             alignItems: 'flex-start',
             gap: 10,
@@ -240,7 +240,7 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
             <Select value={(form as any)[f.key]} onValueChange={val => set(f.key, val)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {f.options.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                {f.options.map(o => <SelectItem key={o} value={o}>{o.charAt(0) + o.slice(1).toLowerCase().replace(/_/g, ' ')}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -249,7 +249,7 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
         <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>Assigned driver</label>
           <Select value={form.driver} onValueChange={val => set('driver', val)}>
-            <SelectTrigger><SelectValue placeholder="— No driver assigned —" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="No driver assigned" /></SelectTrigger>
             <SelectContent>
               {drivers.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
             </SelectContent>
@@ -260,13 +260,13 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
           <button
             disabled={saving}
             onClick={handleCreate}
-            style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
+            style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control)', cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
           >
             {saving ? 'Saving…' : 'Create vehicle'}
           </button>
           <button
             onClick={onClose}
-            style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}
+            style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 'var(--radius-control)', cursor: 'pointer' }}
           >
             Cancel
           </button>

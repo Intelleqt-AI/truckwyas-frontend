@@ -34,7 +34,7 @@ type Tone = "success" | "warning" | "danger" | "info" | "neutral";
 
 const STATUS_TONE: Record<string, Tone> = {
   PAID: "success",
-  SENT: "warning",
+  SENT: "info",
   PARTIALLY_PAID: "warning",
   OVERDUE: "danger",
   DRAFT: "neutral",
@@ -79,8 +79,12 @@ async function loadInvoicesPage() {
     fetchData("/api/v1/invoices/stats/").catch(() => null),
   ]);
   // API returns paginated {count, results} — extract results
+  const invoices = Array.isArray(data) ? data : data?.results || [];
   return {
-    invoices: Array.isArray(data) ? data : data?.results || [],
+    invoices,
+    // The list endpoint is paginated; `count` is the tenant's full total, so
+    // the page can say how much of it the table is based on.
+    total: typeof data?.count === "number" ? data.count : invoices.length,
     stats: statsData,
   };
 }
@@ -114,6 +118,7 @@ export default function Invoices() {
   });
   const invoices: any[] = invoicesData?.invoices ?? [];
   const stats: any = invoicesData?.stats ?? null;
+  const totalInvoices: number = invoicesData?.total ?? invoices.length;
 
   // Capital-eligible invoices — fetched once, cached; silently ignored if no facility
   const { data: capitalData } = useQuery({
@@ -183,7 +188,7 @@ export default function Invoices() {
       flash("Reminder sent");
     } catch (error: any) {
       if (error?.response?.status === 404) {
-        flash("Reminder recorded — customer will be contacted");
+        flash("Reminder recorded. The customer will be contacted.");
       } else {
         flash("Could not send the reminder. Try again.");
       }
@@ -210,39 +215,48 @@ export default function Invoices() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const outstanding = allInvoices
-    .filter((i) => i.status === "SENT")
-    .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
-  const overdue = allInvoices
-    .filter((i) => i.status === "OVERDUE")
-    .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
-  const paid = allInvoices
-    .filter((i) => i.status === "PAID")
-    .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
+  // Headline figures come from the stats endpoint, which covers every invoice
+  // (not just the page loaded below). Bases, from the API:
+  //   invoiced this month  total incl. VAT, by issue date since the 1st
+  //   collected this month paid amount of PAID invoices issued this month
+  //   overdue              unpaid balance incl. VAT, due date passed
+  //   avg days to pay      issue date to paid date, all paid invoices
+  const now = new Date();
+  const monthName = now.toLocaleString("en-GB", { month: "long" });
+  const byStatus = stats?.by_status ?? {};
+  const draftCount: number = byStatus.DRAFT ?? 0;
+  const invoicedMtd: number = stats?.total_invoiced_mtd ?? 0;
+  const collectedMtd: number = stats?.total_collected_mtd ?? 0;
+  const monthActive = invoicedMtd > 0 || collectedMtd > 0;
+  const overdueCount: number = stats?.overdue_count ?? 0;
+  const paidCount: number = byStatus.PAID ?? 0;
+  const avgDays: number | null = paidCount > 0 && stats?.avg_days_to_pay ? stats.avg_days_to_pay : null;
+  const truncated = totalInvoices > allInvoices.length;
 
-  const kpis = [
-    {
-      label: "Total invoiced this month",
-      value: formatCurrency(stats?.total_invoiced_mtd ?? outstanding),
-      sub: "Month to date",
-    },
-    {
-      label: "Collected",
-      value: formatCurrency(stats?.total_collected_mtd ?? paid),
-      sub: "Month to date",
-    },
-    {
-      label: "Overdue",
-      value: formatCurrency(stats?.overdue_amount ?? overdue),
-      sub: `${stats?.overdue_count ?? 0} ${(stats?.overdue_count ?? 0) === 1 ? "invoice" : "invoices"}`,
-      tone: "fin-text-danger",
-    },
-    {
-      label: "Collection rate",
-      value: `${Math.round((stats?.collection_rate ?? 0) * 100)}%`,
-      sub: "Collected ÷ invoiced",
-    },
-  ];
+  // Previous-month comparison only when every invoice is loaded; a partial
+  // page would understate last month.
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const invoicedLastMonth = truncated
+    ? null
+    : allInvoices
+        .filter((i) => {
+          const d = new Date(i.issue_date || i.created_at);
+          return d >= lastMonthStart && d < monthStart;
+        })
+        .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
+  const lastMonthName = lastMonthStart.toLocaleString("en-GB", { month: "long" });
+  const invoicedDelta = (() => {
+    if (invoicedLastMonth == null) return null;
+    if (invoicedLastMonth === 0) return `Nothing invoiced in ${lastMonthName}`;
+    const pct = ((invoicedMtd - invoicedLastMonth) / invoicedLastMonth) * 100;
+    return `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(1)}% vs ${lastMonthName} (${formatCurrency(invoicedLastMonth)})`;
+  })();
+
+  const showStatus = (s: string) => {
+    setStatusFilter(s);
+    setPage(1);
+  };
 
   return (
     <div className="fin-page">
@@ -263,20 +277,78 @@ export default function Invoices() {
         }
       />
 
-      {/* KPIs */}
+      {/* Headline: tiles only where the number drives a decision */}
       {loading ? (
         <div style={{ display: "flex", justifyContent: "center", padding: "20px 0", marginBottom: 24 }}>
           <Loader size={28} />
         </div>
+      ) : !stats ? (
+        <div className="card fin-summary">
+          <div className="fin-summary__text">
+            <p className="fin-summary__title">Invoice totals are unavailable</p>
+            <p className="fin-summary__body">The summary didn’t load. The invoice list below is unaffected.</p>
+          </div>
+          <div className="fin-summary__actions">
+            <button className="btn-action fin-btn-secondary" onClick={() => refetchInvoices()}>
+              Retry loading
+            </button>
+          </div>
+        </div>
       ) : (
         <div className="fin-kpis">
-          {kpis.map((m) => (
-            <div key={m.label} className="card fin-kpi">
-              <span className="fin-kpi__label">{m.label}</span>
-              <span className={`fin-kpi__value ${m.tone ?? ""}`}>{m.value}</span>
-              <span className="fin-kpi__sub">{m.sub}</span>
+          {monthActive ? (
+            <>
+              <div className="card fin-kpi">
+                <span className="fin-kpi__label">Invoiced in {monthName}</span>
+                <span className="fin-kpi__value">{formatCurrency(invoicedMtd)}</span>
+                <span className="fin-kpi__delta">{invoicedDelta ?? "By issue date, incl. VAT"}</span>
+              </div>
+              <div className="card fin-kpi">
+                <span className="fin-kpi__label">Collected on {monthName} invoices</span>
+                <span className="fin-kpi__value">{formatCurrency(collectedMtd)}</span>
+                <span className="fin-kpi__sub">
+                  {invoicedMtd > 0
+                    ? `${Math.round((stats.collection_rate ?? 0) * 100)}% of the amount invoiced this month`
+                    : "Paid invoices issued this month"}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="card fin-kpi fin-kpi--wide">
+              <p className="fin-summary__title">Nothing invoiced in {monthName} yet</p>
+              <p className="fin-summary__body">
+                No invoice has an issue date this month, so there is nothing collected to compare.
+                {draftCount > 0 &&
+                  ` ${draftCount} ${draftCount === 1 ? "draft is" : "drafts are"} ready to send.`}
+              </p>
+              {draftCount > 0 && (
+                <div className="fin-kpi__action">
+                  <button type="button" className="fin-link" onClick={() => showStatus("DRAFT")}>
+                    Review drafts
+                  </button>
+                </div>
+              )}
             </div>
-          ))}
+          )}
+          <div className="card fin-kpi">
+            <span className="fin-kpi__label">Overdue balance</span>
+            <span className="fin-kpi__value">{formatCurrency(stats.overdue_amount ?? 0)}</span>
+            <span className={`fin-kpi__sub ${overdueCount > 0 ? "fin-text-danger" : ""}`}>
+              {overdueCount > 0
+                ? `${overdueCount} ${overdueCount === 1 ? "invoice" : "invoices"} past the due date`
+                : "No invoice is past its due date"}
+            </span>
+            <span className="fin-kpi__sub">Unpaid amount incl. VAT</span>
+          </div>
+          <div className="card fin-kpi">
+            <span className="fin-kpi__label">Average time to get paid</span>
+            <span className="fin-kpi__value">{avgDays == null ? "—" : `${avgDays} days`}</span>
+            <span className="fin-kpi__sub">
+              {avgDays == null
+                ? "Shown once an invoice is paid"
+                : `Issue date to payment, across ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}`}
+            </span>
+          </div>
         </div>
       )}
 
@@ -312,18 +384,25 @@ export default function Invoices() {
           {filtered.length} {filtered.length === 1 ? "invoice" : "invoices"}
         </span>
       </div>
+      {!loading && truncated && (
+        <p className="fin-coverage">
+          This list holds the {allInvoices.length} most recent of {totalInvoices} invoices; search and filters apply to
+          these. The totals above cover all {totalInvoices}.
+        </p>
+      )}
 
-      {/* Table — 10 per page, clickable */}
+      {/* Table: 10 per page, clickable */}
       <div className="card fin-table-card">
         <div className="fin-table-scroll">
-          <table className="fin-table table-heading-roles">
+          <table className="fin-table fin-table--stack table-heading-roles">
             <thead>
               <tr>
-                <th>Invoice #</th>
+                <th>Issued</th>
+                <th>Invoice</th>
                 <th>Customer</th>
-                <th className="num">Amount</th>
+                <th>Due</th>
                 <th>Status</th>
-                <th>Due date</th>
+                <th className="num">Amount incl. VAT</th>
                 <th className="actions">
                   <span className="sr-only" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
                     Actions
@@ -334,7 +413,7 @@ export default function Invoices() {
             <tbody>
               {rows.length === 0 ? (
                 <tr className="is-empty">
-                  <td colSpan={6} style={{ padding: 0 }}>
+                  <td colSpan={7} style={{ padding: 0 }}>
                     {loading ? (
                       <div className="fin-empty fin-empty--compact">Loading invoices…</div>
                     ) : isError ? (
@@ -365,13 +444,18 @@ export default function Invoices() {
                   const invNumber = inv.invoice_number || inv.invoiceNumber;
                   const custName = inv.customer_name || inv.customerName;
                   const dueDate = inv.due_date || inv.dueDate;
-                  // Aging indicator
+                  // Days relative to the due date, stated in words next to it.
                   const ageDays = dueDate
                     ? Math.floor((Date.now() - new Date(dueDate).getTime()) / 86400000)
                     : 0;
-                  const agingTone: Tone =
-                    ageDays <= 0 ? "success" : ageDays <= 30 ? "warning" : ageDays <= 60 ? "info" : "danger";
-                  const agingLabel = ageDays <= 0 ? `Due in ${Math.abs(ageDays)}d` : `${ageDays}d overdue`;
+                  const open = invStatus !== "PAID" && invStatus !== "DRAFT" && !!dueDate;
+                  const agingLabel = !open
+                    ? null
+                    : ageDays > 0
+                      ? `${ageDays} ${ageDays === 1 ? "day" : "days"} late`
+                      : ageDays === 0
+                        ? "due today"
+                        : `in ${Math.abs(ageDays)} ${Math.abs(ageDays) === 1 ? "day" : "days"}`;
 
                   const capitalEntry = eligibleById.get(String(inv.id));
                   const ineligibleEntry = !capitalEntry ? ineligibleById.get(String(inv.id)) : null;
@@ -385,17 +469,24 @@ export default function Invoices() {
                       key={inv.id}
                       className="is-clickable"
                       onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
-                      <td>
+                      <td className="fin-date m-hide">{safeDate(inv.issue_date)}</td>
+                      <td className="m-meta">
                         <span className="fin-id">{invNumber}</span>
                       </td>
-                      <td className="fin-strong">
+                      <td className="fin-strong m-party">
                         <div className="fin-truncate" title={custName}>
                           {custName}
                         </div>
                       </td>
-                      <td className="num">{formatCurrency(amount)}</td>
-                      <td>
-                        <span className="fin-inline-list">
+                      <td className={`fin-date m-due${agingLabel ? "" : " m-hide"}`}>
+                        <span className="fin-mobile-only">Due </span>
+                        {safeDate(dueDate)}
+                        {agingLabel && (
+                          <span className={ageDays > 0 ? "fin-text-danger" : "fin-text-muted"}> · {agingLabel}</span>
+                        )}
+                      </td>
+                      <td className="m-status">
+                        <span className="fin-inline-list" style={{ flexWrap: "nowrap" }}>
                           <span className={chipClass(STATUS_TONE[invStatus] ?? "neutral")}>
                             {formatStatus(invStatus)}
                           </span>
@@ -408,16 +499,7 @@ export default function Invoices() {
                           )}
                         </span>
                       </td>
-                      <td>
-                        <span className="fin-inline-list">
-                          <span className={`fin-date ${invStatus === "OVERDUE" ? "fin-text-danger" : ""}`}>
-                            {safeDate(dueDate)}
-                          </span>
-                          {invStatus !== "PAID" && dueDate && (
-                            <span className={chipClass(agingTone, true)}>{agingLabel}</span>
-                          )}
-                        </span>
-                      </td>
+                      <td className="num m-amount">{formatCurrency(amount)}</td>
                       <td
                         className="actions"
                         onClick={(e) => e.stopPropagation()}
@@ -524,7 +606,7 @@ export default function Invoices() {
         {totalPages > 1 && (
           <div className="fin-table-foot">
             <span>
-              Page {page} of {totalPages} · showing {rows.length} of {filtered.length}
+              {(page - 1) * PAGE_SIZE + 1} to {(page - 1) * PAGE_SIZE + rows.length} of {filtered.length}
             </span>
             <div className="fin-table-foot__nav">
               <button

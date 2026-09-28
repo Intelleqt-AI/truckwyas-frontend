@@ -6,6 +6,7 @@ import { toast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
 import { formatDateTime } from '@/lib/formatters';
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsSecondaryButtonStyle, settingsDangerButtonStyle, SettingsPageHeader } from './settingsUi';
 
 // Presentation only: the API sends a raw ISO timestamp; show it in the app's
 // date format, and anything unparseable verbatim.
@@ -15,50 +16,15 @@ const displayLastActive = (v?: string) => {
   return isNaN(d.getTime()) ? v : formatDateTime(d);
 };
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 8,
-  marginBottom: 16,
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: '14px 20px',
-  borderBottom: '1px solid var(--border-subtle)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  fontWeight: 600,
-  color: 'var(--text-primary)',
-  margin: 0,
-};
-
-const fieldLabelStyle: React.CSSProperties = {
-  display: 'block',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 13,
-  lineHeight: '20px',
-  fontWeight: 500,
-  color: 'var(--text-primary)',
-  marginBottom: 6,
-};
-
-const rowActionStyle: React.CSSProperties = {
-  background: 'none', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-secondary)', padding: '8px 12px',
-  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-  borderRadius: 6, minHeight: 40,
-};
+const sectionStyle = settingsCardStyle;
+const sectionHeaderStyle: React.CSSProperties = { ...settingsCardHeaderStyle, justifyContent: 'space-between' };
+const sectionTitleStyle = settingsCardTitleStyle;
+const fieldLabelStyle = settingsLabelStyle;
+const rowActionStyle = settingsSecondaryButtonStyle;
 
 const roleBadgeStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)', fontSize: 12, lineHeight: '16px', fontWeight: 500,
-  padding: '3px 8px', borderRadius: 4, display: 'inline-block',
+  fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  padding: '2px 8px', borderRadius: 'var(--radius-chip)', display: 'inline-block', whiteSpace: 'nowrap',
 };
 
 /* Badge text colours use the tested text roles — raw palette swatches
@@ -258,27 +224,19 @@ export function UsersPermissions() {
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Users & permissions</h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Manage team access and roles</div>
-      </div>
+      <SettingsPageHeader title="Users & permissions" description="Manage team access and roles" />
 
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <h2 style={sectionTitleStyle}>Team members</h2>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               className="settings-control"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search users…"
               aria-label="Search users"
-              style={{
-                background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)',
-                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px',
-                minHeight: 40, width: 180,
-              }}
+              style={{ ...settingsInputStyle, width: 180, maxWidth: '100%' }}
             />
             {isAdmin && (
               <button
@@ -286,7 +244,7 @@ export function UsersPermissions() {
                 onClick={() => setShowInvite(!showInvite)}
                 disabled={isDemo}
                 title={isDemo ? 'Fixed in demo mode' : undefined}
-                style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+                style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
               >Invite user</button>
             )}
           </div>
@@ -295,21 +253,17 @@ export function UsersPermissions() {
         {/* Invite form */}
         {showInvite && (
           <div style={{
-            padding: '16px 20px',
+            padding: '16px 24px',
             borderBottom: '1px solid var(--border-subtle)',
             background: 'var(--bg-surface-hover)',
-            display: 'flex', gap: 12, alignItems: 'flex-end',
+            display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap',
           }}>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
               <label htmlFor="invite-email" style={fieldLabelStyle}>Email</label>
               <input
                 id="invite-email"
                 className="settings-control"
-                style={{
-                  width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border-subtle)',
-                  borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)',
-                  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', minHeight: 40,
-                }}
+                style={settingsInputStyle}
                 type="email"
                 value={inviteEmail}
                 onChange={e => setInviteEmail(e.target.value)}
@@ -337,7 +291,7 @@ export function UsersPermissions() {
               onClick={handleInvite}
               disabled={inviting || isDemo}
               title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+              style={{ minHeight: 40, borderRadius: 'var(--radius-control)', ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
             >
               {inviting ? 'Sending…' : 'Send invite'}
             </button>
@@ -347,9 +301,9 @@ export function UsersPermissions() {
         {/* Table */}
         {loading ? (
           <div style={{ padding: 24 }}>
-            <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12, width: '60%' }} />
-            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, marginBottom: 12, width: '40%' }} />
-            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 4, width: '40%' }} />
+            <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', marginBottom: 12, width: '60%' }} />
+            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', marginBottom: 12, width: '40%' }} />
+            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', width: '40%' }} />
           </div>
         ) : (
           <div className="settings-scroll-region" role="region" aria-label="Team members" tabIndex={0} style={{ overflowX: 'auto' }}>
@@ -378,7 +332,7 @@ export function UsersPermissions() {
                       <div style={{
                         width: 30, height: 30, borderRadius: '50%',
                         background: 'var(--accent-dim)', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', fontFamily: 'var(--font-sans)', fontSize: 11,
+                        justifyContent: 'center', fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
                         color: 'var(--avatar-on-dim, var(--accent-primary))', flexShrink: 0,
                       }}>
                         {u.name?.charAt(0).toUpperCase() || '?'}
@@ -433,7 +387,9 @@ export function UsersPermissions() {
                       disabled={isDemo}
                       title={isDemo ? 'Fixed in demo mode' : undefined}
                       style={{
-                        ...rowActionStyle, color: 'var(--status-danger-text, var(--status-danger))',
+                        /* Neutral in the row; the danger colour belongs to the
+                           confirmation step, so a list of users is not a wall of red. */
+                        ...rowActionStyle, color: 'var(--text-secondary)',
                         cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                       }}
                     >Remove</button>
@@ -498,7 +454,9 @@ export function UsersPermissions() {
                           disabled={isDemo}
                           title={isDemo ? 'Fixed in demo mode' : undefined}
                           style={{
-                            ...rowActionStyle, color: 'var(--status-danger-text, var(--status-danger))',
+                            /* Neutral in the row; the danger colour belongs to the
+                           confirmation step, so a list of users is not a wall of red. */
+                        ...rowActionStyle, color: 'var(--text-secondary)',
                             cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                           }}
                         >Revoke</button>
@@ -518,7 +476,7 @@ export function UsersPermissions() {
         <div style={sectionHeaderStyle}>
           <h2 style={sectionTitleStyle}>Role permissions</h2>
         </div>
-        <div style={{ padding: '8px 0 4px' }}>
+        <div>
           {[
             { role: 'Admin', color: ROLE_COLORS.admin, desc: 'Full platform access including billing and user management' },
             { role: 'Manager', color: ROLE_COLORS.manager, desc: 'View and manage quotes, bookings, invoices, and fleet' },
@@ -528,7 +486,7 @@ export function UsersPermissions() {
           ].map((r, i, arr) => (
             <div key={r.role} style={{
               display: 'flex', alignItems: 'center', gap: 16,
-              padding: '12px 20px',
+              padding: '12px 24px',
               borderBottom: i < arr.length - 1 ? '1px solid var(--border-row)' : 'none',
             }}>
               <span style={{
@@ -546,15 +504,17 @@ export function UsersPermissions() {
       {deleteConfirm && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000,
+          background: 'var(--modal-backdrop, rgba(0,0,0,0.6))', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: 16,
         }} onClick={() => setDeleteConfirm(null)}>
           <div style={{
             background: 'var(--bg-surface)',
             border: '1px solid var(--border-subtle)',
-            borderRadius: 12,
+            borderRadius: 'var(--radius-dialog)',
             padding: 24,
             maxWidth: 420,
+            width: '100%',
+            boxSizing: 'border-box',
           }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 8 }}>
               Remove user?
@@ -563,22 +523,17 @@ export function UsersPermissions() {
               This will permanently remove this user's access. They will no longer be able to log in.
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <button className="settings-control" onClick={() => setDeleteConfirm(null)} style={{
-                background: 'none', border: '1px solid var(--border-subtle)',
-                color: 'var(--text-secondary)', padding: '8px 12px', minHeight: 40,
-                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-                borderRadius: 6, cursor: 'pointer',
-              }}>Cancel</button>
+              <button className="settings-control" onClick={() => setDeleteConfirm(null)} style={settingsSecondaryButtonStyle}>Cancel</button>
               <button
                 className="settings-control"
                 onClick={() => handleDeleteUser(deleteConfirm)}
                 disabled={isDemo}
                 title={isDemo ? 'Fixed in demo mode' : undefined}
                 style={{
-                  background: 'var(--status-danger)', border: 'none',
-                  color: '#fff', padding: '8px 12px', minHeight: 40,
-                  fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
-                  borderRadius: 6,
+                  /* Same destructive treatment as the shared ConfirmModal: danger
+                     tint with AA danger text (white on the raw red fails 4.5:1). */
+                  ...settingsDangerButtonStyle,
+                  background: 'var(--status-danger-bg)',
                   cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
                 }}
               >Remove</button>

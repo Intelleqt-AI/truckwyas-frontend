@@ -9,13 +9,13 @@
   background: var(--bg-surface) !important;
   color: var(--text-primary) !important;
   border: 1px solid var(--border-subtle) !important;
-  border-radius: 12px !important;
+  border-radius: var(--radius-card) !important;
   box-shadow: none !important;
   font-family: var(--font-sans) !important;
   font-size: 14px !important;
   letter-spacing: normal !important;
   min-height: 48px !important;
-  padding: 10px 14px !important;
+  padding: 12px 16px !important;
 }
 
 .Toastify__toast-body {
@@ -85,7 +85,11 @@ body {
 
 /* ── Themed Select (Radix) ──────────────────────────────────────────────────── */
 .tw-select-trigger:hover {
-  border-color: var(--accent-primary) !important;
+  border-color: var(--border-active) !important;
+}
+.tw-select-trigger:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
 }
 
 .tw-select-trigger[data-state="open"] {
@@ -98,10 +102,12 @@ body {
 
 .tw-select-item:hover,
 .tw-select-item[data-highlighted] {
-  background: var(--accent-glow) !important;
-  color: var(--accent-primary) !important;
+  /* Neutral surface tint on hover/keyboard highlight (design principles §3). */
+  background: var(--surface-tint-active) !important;
+  color: var(--text-primary) !important;
   outline: none !important;
 }
+.tw-select-item[data-state="checked"] { font-weight: 500; }
 
 /* ── react-day-picker: strip all injected borders/outlines ─────────────────── */
 .rdp-cell:not(.dashboard-date-cell),
@@ -126,7 +132,7 @@ body {
 }
 
 .rdp-day-btn:hover {
-  background: var(--border-subtle) !important;
+  background: var(--surface-tint-active) !important;
 }
 
 /* Today: subtle accent ring */
@@ -154,7 +160,7 @@ body {
 .rdp-day-selected {
   background: var(--accent-primary) !important;
   color: var(--btn-action-color, #ffffff) !important;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   font-weight: 600;
 }
 
@@ -174,7 +180,7 @@ body {
 }
 
 .step1-left {
-  padding: 20px;
+  padding: 24px;
   width: 560px;
   flex-shrink: 0;
 }

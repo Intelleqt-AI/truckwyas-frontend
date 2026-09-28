@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchData, postData } from "@/lib/Api";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
+import SectionHeader from "@/components/layout/SectionHeader";
 
 const TIER_TONE: Record<string, string> = {
   prime: 'success', standard: 'info',
@@ -98,10 +99,7 @@ export default function AdvanceRequest() {
   if (step === 4) {
     return (
       <div className="capital-typography fin-page">
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal', textTransform: 'none', marginBottom: 4 }}>Capital</div>
-          <h1 style={{ fontSize: 22, lineHeight: '28px', fontFamily: 'var(--font-sans)', margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>Request submitted</h1>
-        </div>
+        <SectionHeader eyebrow="Fast Pay" title="Request submitted" />
         <div className="card" style={{ padding: 40, textAlign: 'center', alignItems: 'center' }}>
           <CheckCircle2 size={48} aria-hidden="true" style={{ margin: '0 auto 16px', color: 'var(--accent-primary)' }} />
           <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8, fontVariantNumeric: 'tabular-nums' }}>
@@ -112,10 +110,10 @@ export default function AdvanceRequest() {
           </div>
           <button
             className="btn-action"
-            style={{ padding: '10px 24px', minHeight: 40, background: 'var(--accent-primary)', color: 'var(--btn-action-color)', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 14, lineHeight: '20px' }}
+            style={{ padding: '10px 24px', minHeight: 40, background: 'var(--accent-primary)', color: 'var(--btn-action-color)', border: 'none', borderRadius: 'var(--radius-control)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 14, lineHeight: '20px' }}
             onClick={() => navigate('/capital')}
           >
-            Back to capital
+            Back to Fast Pay
           </button>
         </div>
       </div>
@@ -125,38 +123,29 @@ export default function AdvanceRequest() {
   return (
     <div className="capital-typography fin-page">
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal', textTransform: 'none', marginBottom: 4 }}>Capital</div>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontFamily: 'var(--font-sans)', margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>Request advance</h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>
-          {CAPITAL_LAUNCHED ? 'Get paid early on an eligible invoice in three steps.' : CAPITAL_COMING_SOON}
-        </div>
-      </div>
+      <SectionHeader
+        eyebrow="Fast Pay"
+        title="Request advance"
+        titleAdornment={CAPITAL_LAUNCHED ? undefined : <span className="fin-chip" style={{ borderRadius: 'var(--radius-chip)' }}>Not live yet</span>}
+        description={CAPITAL_LAUNCHED ? 'Get paid early on an eligible invoice in three steps.' : CAPITAL_COMING_SOON}
+      />
 
-      {/* Step counter */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 24 }}>
-        {[1, 2, 3].map(s => (
-          <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: step >= s ? 'var(--accent-primary)' : 'var(--bg-surface)',
-              color: step >= s ? 'var(--btn-action-color)' : 'var(--text-tertiary)',
-              fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 600,
-              border: step === s ? '2px solid var(--accent-primary)' : 'none'
-            }}>
-              {s}
-            </div>
-            <span style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: step >= s ? 'var(--text-primary)' : 'var(--text-tertiary)', textTransform: 'none' }}>
-              {s === 1 ? 'Select' : s === 2 ? 'Review' : 'Confirm'}
-            </span>
-            {s < 3 && <div style={{ width: 40, height: 2, background: step > s ? 'var(--accent-primary)' : 'var(--border-subtle)' }} />}
-          </div>
-        ))}
-      </div>
+      {/* Step counter: a real sequence, so plain numerals; the current step is named for assistive tech. */}
+      <ol aria-label="Steps" style={{ listStyle: 'none', display: 'flex', flexWrap: 'wrap', gap: 24, margin: '0 0 16px', padding: 0 }}>
+        {['Select invoice', 'Review', 'Confirm'].map((label, i) => {
+          const s = i + 1;
+          return (
+            <li key={label} aria-current={step === s ? 'step' : undefined}
+              style={{ display: 'flex', gap: 8, fontSize: 14, lineHeight: '20px', fontWeight: step === s ? 600 : 400, color: step >= s ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+              <span style={{ color: step === s ? 'var(--accent-primary)' : 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{s}</span>
+              {label}
+            </li>
+          );
+        })}
+      </ol>
 
       {error && (
-        <div className="card" style={{ padding: '12px 16px', marginBottom: 16, background: 'var(--status-danger)', color: 'var(--btn-action-color)', fontSize: 13, lineHeight: '20px' }}>
+        <div role="alert" style={{ padding: '12px 16px', marginBottom: 16, background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 'var(--radius-control)', color: 'var(--status-danger-text, var(--status-danger))', fontSize: 14, lineHeight: '20px' }}>
           {error}
         </div>
       )}
@@ -171,7 +160,7 @@ export default function AdvanceRequest() {
           {invoices.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>
               <p style={{ margin: '0 0 16px' }}>No eligible invoices available.</p>
-              <button type="button" className="btn-action fin-btn-secondary" onClick={() => navigate('/capital')}>Back to Capital</button>
+              <button type="button" className="btn-action fin-btn-secondary" onClick={() => navigate('/capital')}>Back to Fast Pay</button>
             </div>
           ) : (
             <>
@@ -213,7 +202,7 @@ export default function AdvanceRequest() {
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 0 0' }}>
                 <button
                   className="btn-action"
-                  style={{ padding: '8px 16px', minHeight: 40, background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px' }}
+                  style={{ padding: '8px 16px', minHeight: 40, background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-control)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px' }}
                   onClick={() => navigate('/capital')}
                 >
                   Cancel
@@ -225,14 +214,14 @@ export default function AdvanceRequest() {
                     padding: '8px 16px',
                     background: selectedInvoiceId ? 'var(--accent-primary)' : 'var(--bg-surface)',
                     color: selectedInvoiceId ? 'var(--btn-action-color)' : 'var(--text-tertiary)',
-                    border: 'none', borderRadius: 6,
+                    border: 'none', borderRadius: 'var(--radius-control)',
                     cursor: selectedInvoiceId ? 'pointer' : 'not-allowed',
                     minHeight: 40,
                     fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 600
                   }}
                   onClick={() => selectedInvoiceId && setStep(2)}
                 >
-                  Continue →
+                  Continue
                 </button>
               </div>
             </>
@@ -246,7 +235,7 @@ export default function AdvanceRequest() {
           <div className="card-header" style={{ marginBottom: 16 }}>
             <h2 className="card-title" style={{ margin: 0 }}>Step 2: Fee breakdown</h2>
           </div>
-          <div style={{ marginBottom: 24, padding: 16, background: 'var(--bg-surface-hover)', borderRadius: 6 }}>
+          <div style={{ marginBottom: 24, padding: 16, background: 'var(--bg-surface-hover)', borderRadius: 'var(--radius-nested)' }}>
             <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Selected invoice</div>
             <div className="fin-id" style={{ fontSize: 16, lineHeight: '24px', fontWeight: 500 }}>{selectedInvoice.invoice_number}</div>
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 2 }}>{selectedInvoice.customer_name}</div>
@@ -263,6 +252,9 @@ export default function AdvanceRequest() {
                 {cap(tier)}
               </span>
             </div>
+            {/* No fee rates exist before launch: never show an estimated fee or payout. */}
+            {CAPITAL_LAUNCHED ? (
+              <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Fee ({(feeRate * 100).toFixed(1)}%)</span>
               <span style={{ fontSize: 16, lineHeight: '24px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>−{formatCurrency(feeAmount)}</span>
@@ -272,6 +264,13 @@ export default function AdvanceRequest() {
               <span style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>You receive</span>
               <span style={{ fontSize: 28, lineHeight: '36px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(netReceived)}</span>
             </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+                <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Fee and payout</span>
+                <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', textAlign: 'right' }}>Shown once Fast Pay is live</span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
               <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Estimated repayment date</span>
               <span style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>
@@ -287,17 +286,17 @@ export default function AdvanceRequest() {
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 24 }}>
             <button
               className="btn-action"
-              style={{ padding: '10px 20px', minHeight: 40, background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px' }}
+              style={{ padding: '10px 20px', minHeight: 40, background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-control)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px' }}
               onClick={() => setStep(1)}
             >
-              ← Back
+              Back
             </button>
             <button
               className="btn-action"
-              style={{ padding: '10px 20px', minHeight: 40, background: 'var(--accent-primary)', color: 'var(--btn-action-color)', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 600 }}
+              style={{ padding: '10px 20px', minHeight: 40, background: 'var(--accent-primary)', color: 'var(--btn-action-color)', border: 'none', borderRadius: 'var(--radius-control)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 600 }}
               onClick={() => setStep(3)}
             >
-              Continue →
+              Continue
             </button>
           </div>
         </div>
@@ -310,13 +309,13 @@ export default function AdvanceRequest() {
             <h2 className="card-title" style={{ margin: 0 }}>Step 3: Confirm request</h2>
           </div>
 
-          <div style={{ padding: 20, background: 'var(--bg-surface-hover)', borderRadius: 6, marginBottom: 24 }}>
-            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 12 }}>You are requesting an advance of:</div>
-            <div style={{ fontSize: 28, lineHeight: '36px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>{formatCurrency(netReceived)}</div>
+          <div style={{ padding: 20, background: 'var(--bg-surface-hover)', borderRadius: 'var(--radius-control)', marginBottom: 24 }}>
+            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 12 }}>{CAPITAL_LAUNCHED ? 'You are requesting an advance of' : 'You would be requesting an advance'}</div>
+            {CAPITAL_LAUNCHED && <div style={{ fontSize: 28, lineHeight: '36px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>{formatCurrency(netReceived)}</div>}
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>on invoice <span className="fin-id">{selectedInvoice.invoice_number}</span></div>
           </div>
 
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 24, padding: 16, background: 'var(--bg-surface)', borderRadius: 6 }}>
+          <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: '20px', marginBottom: 24, padding: 0 }}>
             By confirming, you request an advance of the net amount to your registered bank account.
             The advance is repaid automatically when the customer pays the invoice.
           </div>
@@ -330,14 +329,14 @@ export default function AdvanceRequest() {
                 background: 'var(--bg-surface)',
                 color: submitting ? 'var(--text-tertiary)' : 'var(--text-primary)',
                 border: '1px solid var(--border-subtle)',
-                borderRadius: 6,
+                borderRadius: 'var(--radius-control)',
                 cursor: submitting || !CAPITAL_LAUNCHED ? 'not-allowed' : 'pointer',
                 minHeight: 40,
                 fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px'
               }}
               onClick={() => !submitting && setStep(2)}
             >
-              ← Back
+              Back
             </button>
             <button
               className="btn-action"
@@ -347,7 +346,7 @@ export default function AdvanceRequest() {
                 padding: '10px 20px',
                 background: submitting || !CAPITAL_LAUNCHED ? 'var(--bg-surface)' : 'var(--accent-primary)',
                 color: submitting || !CAPITAL_LAUNCHED ? 'var(--text-tertiary)' : 'var(--btn-action-color)',
-                border: 'none', borderRadius: 6,
+                border: 'none', borderRadius: 'var(--radius-control)',
                 cursor: submitting ? 'not-allowed' : 'pointer',
                 minHeight: 40,
                 fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 600

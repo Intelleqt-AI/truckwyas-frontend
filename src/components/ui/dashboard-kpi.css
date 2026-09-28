@@ -2,7 +2,7 @@
 @media (min-width: 768px) {
   .os-app-shell .card.dashboard-kpi-card {
     --dashboard-kpi-card-padding: 24px;
-    --dashboard-kpi-card-border-radius: 8px;
+    --dashboard-kpi-card-border-radius: var(--radius-card);
     --dashboard-kpi-card-text-align: left;
     display: flex;
     flex-direction: column;
@@ -10,7 +10,7 @@
     min-width: 0;
     min-height: 0;
     padding: 24px;
-    border-radius: 8px;
+    border-radius: var(--radius-card);
     text-align: left;
   }
   .os-app-shell .card.dashboard-kpi-card .dashboard-kpi-label {

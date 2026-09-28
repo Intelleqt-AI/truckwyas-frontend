@@ -8,14 +8,21 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { Loader } from "@/components/Loader";
 import SectionHeader from "@/components/layout/SectionHeader";
 
-const STATUS_COLOR: Record<string, string> = {
-  IN_TRANSIT: 'var(--accent-primary)',
-  LOADING: 'var(--status-warning-text, var(--status-warning))',
-  IDLE: 'var(--text-secondary)',
-  MAINTENANCE: 'var(--status-danger-text, var(--status-danger))',
-  ACTIVE: 'var(--accent-primary)',
-  OFF: 'var(--text-tertiary)',
+const STATUS_TONE: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
+  AVAILABLE: 'success',
+  ACTIVE: 'success',
+  IN_USE: 'info',
+  IN_TRANSIT: 'info',
+  LOADING: 'warning',
+  MAINTENANCE: 'warning',
+  ON_LEAVE: 'warning',
 };
+const chip = (st?: string) => (
+  <span className={`fleet-chip fleet-chip--${STATUS_TONE[st || ''] || 'neutral'}`}>{st ? formatStatusToken(st) : '—'}</span>
+);
+function formatStatusToken(s: string) {
+  return s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase());
+}
 
 // Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
 const formatStatus = (s?: string) =>
@@ -111,21 +118,24 @@ export default function FleetDashboard() {
     <div className="fleet-page">
       {header}
 
-      {/* Stats — always visible */}
-      <div className="fleet-summary fleet-summary--5">
-        {[
-          { label: 'Total vehicles', value: vehicles.length, color: 'var(--text-primary)' },
-          { label: 'Active', value: activeVehicles, color: 'var(--accent-primary)' },
-          { label: 'Idle', value: idleVehicles, color: 'var(--text-secondary)' },
-          { label: 'Maintenance', value: inMaintenance, color: 'var(--status-danger-text, var(--status-danger))' },
-          { label: 'Drivers on duty', value: activeDrivers, color: 'var(--status-success-text, var(--status-success))' },
-        ].map(m => (
-          <div key={m.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{m.label}</span></div>
-            <div className="metric-value" style={{ color: m.color }}>{m.value}</div>
-          </div>
-        ))}
-      </div>
+      {/* Summary strip: what is working, what is free, what is off the road. */}
+      <section className="card fleet-kpis" aria-label="Fleet right now">
+        <div className="fleet-kpi">
+          <div className="fleet-kpi__label">On a job now</div>
+          <div className="fleet-kpi__value">{activeVehicles}<span className="fleet-kpi__of">of {vehicles.length}</span></div>
+          <div className="fleet-kpi__note">Vehicles with status In use.</div>
+        </div>
+        <div className="fleet-kpi">
+          <div className="fleet-kpi__label">Available</div>
+          <div className="fleet-kpi__value">{idleVehicles}</div>
+          <div className="fleet-kpi__note">{inMaintenance} in maintenance.</div>
+        </div>
+        <div className="fleet-kpi">
+          <div className="fleet-kpi__label">Active drivers</div>
+          <div className="fleet-kpi__value">{activeDrivers}<span className="fleet-kpi__of">of {drivers.length}</span></div>
+          <div className="fleet-kpi__note">Drivers with status Active.</div>
+        </div>
+      </section>
 
       {/* Sub-tabs */}
       <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 24, display: 'flex', overflowX: 'auto' }}>
@@ -139,7 +149,7 @@ export default function FleetDashboard() {
           <table className="data-table table-heading-roles">
             <thead>
               <tr>
-                <th>Registration</th><th>Vehicle</th><th>Driver</th><th>Status</th><th>Route</th><th className="text-right">Fuel</th>
+                <th>Registration</th><th>Vehicle</th><th>Driver</th><th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -147,18 +157,8 @@ export default function FleetDashboard() {
                 <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/vehicles/${v.id}`)}>
                   <td className="mono">{v.plate || v.registration || '—'}</td>
                   <td>{v.make || ''} {v.model || ''}</td>
-                  <td>{v.driver || '—'}</td>
-                  <td>
-                    <span style={{ display: 'inline-block', whiteSpace: 'nowrap', fontSize: 13, lineHeight: '20px', color: STATUS_COLOR[v.status] || 'var(--text-secondary)', padding: '2px 8px', background: 'var(--bg-surface-hover)', borderRadius: 4 }}>
-                      {v.status ? formatStatus(v.status) : '—'}
-                    </span>
-                  </td>
-                  <td style={{ color: 'var(--text-secondary)' }}>{v.route || '—'}</td>
-                  <td className="text-right">
-                    <span style={{ fontVariantNumeric: 'tabular-nums', color: v.fuel < 50 ? 'var(--status-danger-text, var(--status-danger))' : v.fuel < 70 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--text-primary)' }}>
-                      {v.fuel !== undefined ? `${v.fuel}%` : '—'}
-                    </span>
-                  </td>
+                  <td>{v.driver_name || '—'}</td>
+                  <td>{chip(v.status)}</td>
                 </tr>
               ))}
             </tbody>
@@ -172,7 +172,7 @@ export default function FleetDashboard() {
           <table className="data-table table-heading-roles">
             <thead>
               <tr>
-                <th>Name</th><th>Licence</th><th className="text-right">Trips</th><th className="text-right">On time</th><th className="text-right">Rating</th><th className="text-right">Status</th>
+                <th>Name</th><th>Licence</th><th className="text-right">Completed loads</th><th className="text-right">On time</th><th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -181,17 +181,10 @@ export default function FleetDashboard() {
                   <td>{(d.user_details ? `${d.user_details.first_name || ''} ${d.user_details.last_name || ''}`.trim() : '') || d.name || `Driver ${d.id}`}</td>
                   <td className="mono">{d.license_number || '—'}</td>
                   <td className="text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>{d.total_trips ?? '—'}</td>
-                  <td className="text-right" style={{ color: d.onTime >= 90 ? 'var(--accent-primary)' : d.onTime >= 80 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))', fontVariantNumeric: 'tabular-nums' }}>
-                    {d.onTime !== undefined ? `${d.onTime}%` : '—'}
+                  <td className="text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {Number(d.on_time_rate) ? `${d.on_time_rate}%` : '—'}
                   </td>
-                  <td className="text-right" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-                    {d.rating !== undefined ? `${d.rating}` : '—'}
-                  </td>
-                  <td className="text-right">
-                    <span style={{ display: 'inline-block', whiteSpace: 'nowrap', fontSize: 13, lineHeight: '20px', color: STATUS_COLOR[d.status] || 'var(--text-secondary)', padding: '2px 8px', background: 'var(--bg-surface-hover)', borderRadius: 4 }}>
-                      {d.status ? formatStatus(d.status) : '—'}
-                    </span>
-                  </td>
+                  <td>{chip(d.status)}</td>
                 </tr>
               ))}
             </tbody>

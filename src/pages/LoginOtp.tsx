@@ -62,8 +62,8 @@ export const LoginOtp = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-sans)' }}>
-      <div style={{ width: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-sans)', padding: 16, boxSizing: 'border-box' }}>
+      <div style={{ width: '100%', maxWidth: 420, padding: 24, boxSizing: 'border-box', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-card)' }}>
         {/* Logo */}
         <div style={{ marginBottom: 32, textAlign: 'center' }}>
           <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 28, width: 'auto', display: 'inline-block' }} />
@@ -72,7 +72,7 @@ export const LoginOtp = () => {
 
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>Enter your sign-in code</h1>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: '20px' }}>
             Two-factor authentication is on. We sent a 6-digit code to{' '}
             <strong style={{ color: 'var(--text-primary)' }}>{email || 'your email'}</strong>.
             Enter it below to finish signing in.
@@ -80,12 +80,12 @@ export const LoginOtp = () => {
         </div>
 
         {error && (
-          <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
+          <div role="alert" style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
             {error}
           </div>
         )}
         {resentMsg && (
-          <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-success-bg, rgba(34,197,94,0.1))', border: '1px solid var(--status-success)', borderRadius: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-success)' }}>
+          <div role="status" style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--status-success-bg, rgba(34,197,94,0.1))', border: '1px solid var(--status-success)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--status-success-text, var(--status-success))' }}>
             {resentMsg}
           </div>
         )}
@@ -93,7 +93,7 @@ export const LoginOtp = () => {
         <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
-              SIGN-IN CODE
+              Sign-in code
             </label>
             <input className="tw-auth-control tw-auth-code"
               type="text"
@@ -107,14 +107,14 @@ export const LoginOtp = () => {
               autoFocus
               style={{
                 width: '100%', padding: '14px 16px', background: 'var(--bg-deep)',
-                border: '1px solid var(--border-subtle)', borderRadius: 6,
-                color: 'var(--text-primary)', fontSize: 26,                 boxSizing: 'border-box', letterSpacing: '0.3em', fontFamily: 'var(--font-mono)',
+                border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-control)',
+                color: 'var(--text-primary)', fontSize: 26, boxSizing: 'border-box', letterSpacing: '0.3em', fontFamily: 'var(--font-mono)',
                 textAlign: 'center',
               }}
             />
           </div>
 
-          <button type="submit" className="btn-action" style={{ width: '100%' }} disabled={loading || code.length !== 6}>
+          <button type="submit" className="btn-action" style={{ width: '100%', borderRadius: 'var(--radius-control)' }} disabled={loading || code.length !== 6}>
             {loading ? 'Verifying…' : 'Verify & sign in'}
           </button>
         </form>

@@ -31,27 +31,14 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-// Distinct hue per pipeline stage so the board reads as progression
-// (the design system's --status-success and --accent-primary are the same blue,
-// which made Accepted / Declined indistinguishable from neutral).
-// IT/COMPLETED aren't pipeline columns anymore (that's the Order's delivery
-// status now — see convert_to_load) but the colors stay so any pre-existing
-// quote still carrying one of those statuses renders sensibly in the list view.
-const STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'var(--text-tertiary)',   // neutral grey
-  SENT: 'var(--status-warning-text, #F59E0B)', // amber — awaiting reply
-  ACCEPTED: 'var(--status-success-text, #22C55E)', // green — won
-  DECLINED: 'var(--status-danger-text, var(--status-danger))',
-  IT: 'var(--accent-primary)',     // blue — in motion (legacy)
-  COMPLETED: '#14B8A6',            // teal — done (legacy)
+
+// Pipeline stage -> dot/chip tone. Colour only ever sits next to its text label.
+const COLUMN_TONE: Record<string, 'neutral' | 'warning' | 'success' | 'danger'> = {
+  DRAFT: 'neutral',
+  SENT: 'warning',
+  ACCEPTED: 'success',
+  DECLINED: 'danger',
 };
-
-// Green stays distinct from the blue success token; the -text role keeps AA in both themes.
-const WON_GREEN = 'var(--status-success-text, #22C55E)';
-const WON_GREEN_BG = 'rgba(34,197,94,0.12)';
-
-const confidenceColor = (c?: string) =>
-  c === 'HIGH' ? WON_GREEN : c === 'LOW' ? 'var(--status-danger-text, var(--status-danger))' : 'var(--status-warning-text, var(--status-warning))';
 
 // Full route chain, stops included — same data the quote and its map show
 // elsewhere, not just the pickup/delivery pair. Shared by every place this
@@ -94,6 +81,30 @@ const QUOTE_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'd
   COMPLETED: 'success',
 };
 
+// Card body shared by the board card and its drag overlay.
+function QuoteCardBody({ quote }: { quote: any }) {
+  return (
+    <>
+      <div className="bk-qcard__top">
+        <span className="bk-qcard__id">{quote.quote_number}</span>
+        <span className="bk-qcard__flags">
+          {quote.fuel_alert && (
+            <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', color: 'var(--status-warning-text, var(--status-warning))' }}><Fuel size={16} aria-hidden="true" /></span>
+          )}
+          {quote.outcome === 'accepted' && <span className="bk-status bk-status--success">Won</span>}
+          {quote.outcome === 'rejected' && <span className="bk-status bk-status--danger">Lost</span>}
+        </span>
+      </div>
+      <div className="bk-qcard__customer" title={quote.customer_name || ''}>{quote.customer_name || '—'}</div>
+      <div className="bk-qcard__route" title={routeOf(quote)}>{routeOf(quote)}</div>
+      <div className="bk-qcard__foot">
+        <span className="bk-qcard__amount">{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
+        {quote.confidence && <span className="bk-qcard__meta">{sentenceCase(quote.confidence)} confidence</span>}
+      </div>
+    </>
+  );
+}
+
 // Draggable Quote Card Component
 function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, convertedLoad, dragDisabled }: { quote: any; onClick: () => void; onConvertToLoad?: (e: React.MouseEvent, quote: any) => void; onViewBooking?: (e: React.MouseEvent, load: any) => void; convertedLoad?: any; dragDisabled?: boolean }) {
   const {
@@ -105,76 +116,43 @@ function DraggableQuoteCard({ quote, onClick, onConvertToLoad, onViewBooking, co
     isDragging,
   } = useSortable({ id: String(quote.id), disabled: dragDisabled });
 
-  const accent = STATUS_COLOR[quote.status] || 'var(--border-subtle)';
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.4 : 1,
     cursor: dragDisabled ? 'pointer' : (isDragging ? 'grabbing' : 'grab'),
-    background: 'var(--bg-surface)',
-    border: '1px solid var(--border-subtle)',
-    borderRadius: 8,
-    boxShadow: isDragging ? '0 8px 16px rgba(0,0,0,0.25)' : 'none',
   };
 
   return (
     <div
       ref={setNodeRef}
+      className="bk-qcard"
       style={style}
       {...attributes}
       {...(dragDisabled ? {} : listeners)}
       onClick={onClick}
-      onMouseEnter={(e) => { if (!isDragging) e.currentTarget.style.background = 'var(--bg-surface-hover)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-surface)'; }}
     >
-      <div style={{ padding: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: 6, background: accent, flexShrink: 0 }} />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{quote.quote_number}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {quote.fuel_alert && (
-              <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', color: 'var(--status-warning-text, var(--status-warning))' }}><Fuel size={16} aria-hidden="true" /></span>
-            )}
-            {quote.outcome === 'accepted' && (
-              <span style={{ fontSize: 13, lineHeight: '20px', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: WON_GREEN_BG, color: WON_GREEN, border: `1px solid ${WON_GREEN}`, fontFamily: 'var(--font-sans)', fontWeight: 500 }}>Won</span>
-            )}
-            {quote.outcome === 'rejected' && (
-              <span style={{ fontSize: 13, lineHeight: '20px', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', background: 'var(--status-danger-bg)', color: 'var(--status-danger-text, var(--status-danger))', border: '1px solid var(--status-danger)', fontFamily: 'var(--font-sans)', fontWeight: 500 }}>Lost</span>
-            )}
-          </div>
-        </div>
-        <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{quote.customer_name || '—'}</div>
-        <div style={{
-          fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 12,
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden',
-        }} title={routeOf(quote)}>
-          {routeOf(quote)}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: quote.status === 'ACCEPTED' ? 12 : 0 }}>
-          <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 14, lineHeight: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
-          {quote.confidence && (
-            <span style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', color: confidenceColor(quote.confidence), border: `1px solid ${confidenceColor(quote.confidence)}` }}>{sentenceCase(quote.confidence)}</span>
-          )}
-        </div>
-        {quote.status === 'ACCEPTED' && convertedLoad && (
-          <button
-            onClick={(e) => onViewBooking?.(e, convertedLoad)}
-            style={{ width: '100%', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, padding: '8px 12px', minHeight: 40, background: WON_GREEN_BG, border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 6, cursor: 'pointer', pointerEvents: 'auto' }}
-          >
-            View booking
-          </button>
-        )}
-        {quote.status === 'ACCEPTED' && !convertedLoad && onConvertToLoad && (
-          <button
-            onClick={(e) => onConvertToLoad(e, quote)}
-            style={{ width: '100%', fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, padding: '8px 12px', minHeight: 40, background: 'transparent', border: `1px solid ${WON_GREEN}`, color: WON_GREEN, borderRadius: 6, cursor: 'pointer', pointerEvents: 'auto' }}
-          >
-            Convert to booking
-          </button>
-        )}
-      </div>
+      <QuoteCardBody quote={quote} />
+      {quote.status === 'ACCEPTED' && convertedLoad && (
+        <button
+          type="button"
+          className="bk-btn bk-btn--secondary bk-btn--block bk-qcard__action"
+          onClick={(e) => onViewBooking?.(e, convertedLoad)}
+          style={{ pointerEvents: 'auto' }}
+        >
+          View booking
+        </button>
+      )}
+      {quote.status === 'ACCEPTED' && !convertedLoad && onConvertToLoad && (
+        <button
+          type="button"
+          className="bk-btn bk-btn--secondary bk-btn--block bk-qcard__action"
+          onClick={(e) => onConvertToLoad(e, quote)}
+          style={{ pointerEvents: 'auto' }}
+        >
+          Convert to booking
+        </button>
+      )}
     </div>
   );
 }
@@ -193,8 +171,8 @@ function DroppableColumn({ columnId, items, children, isOver }: { columnId: stri
   return (
     <div ref={setNodeRef} style={{
       display: 'flex', flexDirection: 'column', gap: 8,
-      minHeight: 80, padding: 2, borderRadius: 4,
-      background: isOver ? 'var(--bg-surface)' : 'transparent',
+      minHeight: 80, padding: 2, borderRadius: 'var(--radius-nested, 8px)',
+      background: isOver ? 'var(--bg-surface-hover)' : 'transparent',
       outline: isOver ? '1px dashed var(--accent-primary)' : '1px solid transparent',
       transition: 'background 0.15s ease',
     }}>
@@ -501,16 +479,12 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
       </div>
 
       {billingBlocked && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, padding: 14,
-          borderRadius: 6, background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)',
-          flexShrink: 0,
-        }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 2 }}>Quoting is blocked</div>
-            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{subscriptionStatusDetail(authUser?.subscription_status)} Drag-and-drop status changes are disabled until then.</div>
+        <div className="bk-notice bk-notice--danger" role="status" style={{ flexShrink: 0, marginBottom: 16 }}>
+          <div>
+            <p className="bk-notice__text">Quoting is blocked</p>
+            <p className="bk-notice__sub">{subscriptionStatusDetail(authUser?.subscription_status)} Drag-and-drop status changes are disabled until then.</p>
           </div>
-          <button onClick={() => navigate('/settings/billing')} className="btn-action" style={{ flexShrink: 0 }}>
+          <button type="button" onClick={() => navigate('/settings/billing')} className="bk-btn bk-btn--primary">
             Go to billing
           </button>
         </div>
@@ -531,15 +505,14 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
               {COLUMNS.map(col => {
                 const { items: colItems, count: colCount, totalAmount: colTotal, hasNextPage, isLoading, isFetchingNextPage, fetchNextPage } = flattenColumn(columnQueries[col]);
                 return (
-                <div key={col} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '8px 4px 8px 8px' }}>
-                  <div style={{ borderTop: `2px solid ${STATUS_COLOR[col] || 'var(--border-subtle)'}`, paddingTop: 8, marginBottom: 10, marginRight: 4, flexShrink: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
-                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: col === 'DRAFT' ? 'var(--text-primary)' : (STATUS_COLOR[col] || 'var(--text-secondary)') }}>{COLUMN_LABELS[col]}</span>
-                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '0 8px', borderRadius: 999 }}>{colCount}</span>
-                    </div>
-                    {colTotal > 0 && (
-                      <div style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', padding: '4px 2px 0' }}>{formatCurrency(colTotal)}</div>
-                    )}
+                <section key={col} className="bk-col" aria-label={`${COLUMN_LABELS[col]} quotes`}>
+                  <div className="bk-col__head">
+                    <span className="bk-col__title">
+                      <span className={`bk-dot bk-dot--${COLUMN_TONE[col]}`} aria-hidden="true" />
+                      {COLUMN_LABELS[col]}
+                      <span className="bk-col__count">{colCount}</span>
+                    </span>
+                    {colTotal > 0 && <span className="bk-col__total">{formatCurrency(colTotal)}</span>}
                   </div>
                   <div className="kanban-col-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
                     {isLoading ? (
@@ -558,18 +531,14 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                           />
                         ))}
                         {colItems.length === 0 && (
-                          <div style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13, lineHeight: '20px', border: '1px dashed var(--border-subtle)', borderRadius: 8 }}>No quotes{billingBlocked ? '' : ' — drop a card here'}</div>
+                          <div className="bk-col__empty">{billingBlocked ? 'No quotes' : 'No quotes. Drag a card here to move it.'}</div>
                         )}
                         {hasNextPage && (
                           <button
+                            type="button"
+                            className="bk-btn bk-btn--quiet bk-btn--block"
                             onClick={() => fetchNextPage()}
                             disabled={isFetchingNextPage}
-                            style={{
-                              width: '100%', padding: '8px', marginTop: 2, minHeight: 40, fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)',
-                              background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                              color: 'var(--text-secondary)', borderRadius: 6, cursor: isFetchingNextPage ? 'default' : 'pointer',
-                              opacity: isFetchingNextPage ? 0.6 : 1,
-                            }}
                           >
                             {isFetchingNextPage ? 'Loading…' : `Load 10 more (${colCount - colItems.length} left)`}
                           </button>
@@ -577,7 +546,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       </DroppableColumn>
                     )}
                   </div>
-                </div>
+                </section>
                 );
               })}
             </div>
@@ -586,21 +555,8 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           {/* Drag Overlay */}
           <DragOverlay>
             {activeQuote ? (
-              <div style={{ padding: 12, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 6, boxShadow: '0 8px 16px rgba(0,0,0,0.25)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 6, background: STATUS_COLOR[activeQuote.status] || 'var(--border-subtle)', flexShrink: 0 }} />
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{activeQuote.quote_number}</span>
-                </div>
-                <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{activeQuote.customer_name || '—'}</div>
-                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 8 }}>
-                  {routeOf(activeQuote)}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(parseFloat(activeQuote.total_amount || '0'))}</span>
-                  {activeQuote.confidence && (
-                    <span style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', display: 'inline-block', color: confidenceColor(activeQuote.confidence), border: `1px solid ${confidenceColor(activeQuote.confidence)}` }}>{sentenceCase(activeQuote.confidence)}</span>
-                  )}
-                </div>
+              <div className="bk-qcard" style={{ borderColor: 'var(--border-active)', cursor: 'grabbing' }}>
+                <QuoteCardBody quote={activeQuote} />
               </div>
             ) : null}
           </DragOverlay>
@@ -637,7 +593,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                   <th scope="col">Outcome</th>
                   <th scope="col">Created</th>
                   <th scope="col" className="is-num">Amount</th>
-                  <th scope="col" className="is-center">Action</th>
+                  <th scope="col" className="is-num"><span className="sr-only">Action</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -665,18 +621,17 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {quote.outcome === 'rejected' && <span className="bk-status bk-status--danger">Lost</span>}
                       {(!quote.outcome || quote.outcome === 'pending') && <span>—</span>}
                     </td>
-                    <td>
+                    <td className="is-date">
                       {quote.created_at ? formatDate(quote.created_at) : '—'}
                     </td>
                     <td className="is-money">
                       {formatCurrency(parseFloat(quote.total_amount || '0'))}
                     </td>
-                    <td className="is-center" onClick={(e) => e.stopPropagation()}>
+                    <td className="is-num" onClick={(e) => e.stopPropagation()}>
                       {quote.status === 'ACCEPTED' && loadByQuoteId.has(String(quote.id)) && (
                         <button
                           type="button"
-                          className="bk-btn bk-btn--success"
-                          style={{ padding: '8px 12px' }}
+                          className="bk-btn bk-btn--secondary bk-btn--sm"
                           onClick={(e) => { e.stopPropagation(); navigate(`/bookings/${loadByQuoteId.get(String(quote.id)).id}`); }}
                         >
                           View booking
@@ -685,8 +640,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {quote.status === 'ACCEPTED' && !loadByQuoteId.has(String(quote.id)) && (
                         <button
                           type="button"
-                          className="bk-btn bk-btn--success-outline"
-                          style={{ padding: '8px 12px' }}
+                          className="bk-btn bk-btn--secondary bk-btn--sm"
                           onClick={(e) => handleConvertToLoad(e, quote)}
                         >
                           Convert to booking

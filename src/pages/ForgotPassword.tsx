@@ -1,5 +1,4 @@
 import "./auth-brand.css";
-import { Mail } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { postData } from "@/lib/Api";
@@ -40,37 +39,38 @@ export function ForgotPassword() {
       alignItems: 'center',
       justifyContent: 'center',
       background: 'var(--bg-deep)',
-      padding: 20,
+      padding: 16,
+      boxSizing: 'border-box',
     }}>
       <div style={{
         width: '100%',
         maxWidth: 400,
         background: 'var(--bg-surface)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--card-radius)',
-        padding: 40,
+        borderRadius: 'var(--radius-card)',
+        padding: 24,
+        boxSizing: 'border-box',
       }}>
         {submitted ? (
           <>
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <Mail aria-hidden="true" size={40} strokeWidth={1.5} style={{ color: 'var(--accent-primary)', marginBottom: 16 }} />
               <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
                 Check your email
               </h1>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: '20px' }}>
                 If an account exists for <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>,
                 you will receive a password reset link shortly.
               </div>
             </div>
             <Link to="/login" style={{ textDecoration: 'none' }}>
-              <button className="btn-action" style={{ width: '100%' }}>
+              <button className="btn-action" style={{ width: '100%', borderRadius: 'var(--radius-control)' }}>
                 Back to login
               </button>
             </Link>
           </>
         ) : (
           <>
-            <div style={{ marginBottom: 32 }}>
+            <div style={{ marginBottom: 24 }}>
               <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
                 Reset password
               </h1>
@@ -90,7 +90,7 @@ export function ForgotPassword() {
                   color: 'var(--text-primary)',
                   marginBottom: 6,
                 }}>
-                  Email Address
+                  Email address
                 </label>
                 <input className="tw-auth-control" id="forgot-email-address"
                   type="email"
@@ -105,7 +105,7 @@ export function ForgotPassword() {
                     boxSizing: 'border-box',
                     background: 'var(--input-bg)',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: 6,
+                    borderRadius: 'var(--radius-control)',
                     color: 'var(--text-primary)',
                     fontSize: 14,
                     lineHeight: '20px',
@@ -117,7 +117,7 @@ export function ForgotPassword() {
                 type="submit"
                 disabled={submitting}
                 className="btn-action"
-                style={{ width: '100%', marginBottom: 16 }}
+                style={{ width: '100%', marginBottom: 16, borderRadius: 'var(--radius-control)' }}
               >
                 {submitting ? 'Sending…' : 'Send reset link'}
               </button>

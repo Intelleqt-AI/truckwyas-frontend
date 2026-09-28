@@ -4,18 +4,18 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-sm border px-2 py-0.5 text-[13px] leading-5 font-normal transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center rounded-sm border px-2 py-0.5 text-[13px] leading-5 font-medium whitespace-nowrap transition-colors focus-visible:[outline:2px_solid_var(--accent-primary)] focus-visible:[outline-offset:2px]",
   {
     variants: {
       variant: {
         default:
-          "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
+          "border-transparent bg-[var(--accent-dim)] text-[color:var(--status-info-text,var(--accent-primary))]",
         secondary:
-          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "border-transparent bg-[var(--status-neutral-bg)] text-[color:var(--text-secondary)]",
         destructive:
-          "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
-        outline: "text-foreground border-border bg-background hover:bg-accent hover:text-accent-foreground",
-        subtle: "border-transparent bg-muted text-muted-foreground hover:bg-muted/80",
+          "border-transparent bg-[var(--status-danger-bg)] text-[color:var(--status-danger-text,var(--status-danger))]",
+        outline: "border-[color:var(--border-subtle)] bg-transparent text-[color:var(--text-secondary)]",
+        subtle: "border-transparent bg-[var(--status-neutral-bg)] text-[color:var(--text-tertiary)]",
       },
     },
     defaultVariants: {

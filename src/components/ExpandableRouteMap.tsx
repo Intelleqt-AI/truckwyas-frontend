@@ -19,9 +19,9 @@ const overlayBtnStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  width: 28,
-  height: 28,
-  borderRadius: 4,
+  width: 40,
+  height: 40,
+  borderRadius: "var(--radius-control, 8px)",
   cursor: "pointer",
   border: "1px solid rgba(255,255,255,0.4)",
   background: "rgba(17,24,39,0.72)",
@@ -38,16 +38,16 @@ export function ExpandableRouteMap({ height = 220, dialogStyle, ...mapProps }: P
       <RouteMapView {...mapProps} height={height} />
       <Dialog>
         <DialogTrigger asChild>
-          <button type="button" title="Expand map" style={overlayBtnStyle}>
-            <Maximize2 size={13} />
+          <button type="button" title="Expand map" aria-label="Expand map" style={overlayBtnStyle}>
+            <Maximize2 size={16} />
           </button>
         </DialogTrigger>
         <DialogContent hideClose style={{ width: "min(1400px, 95vw)", padding: 0, overflow: "hidden", ...dialogStyle }}>
           <div style={{ position: "relative" }}>
             <RouteMapView {...mapProps} height={typeof window !== "undefined" ? Math.round(Math.min(window.innerHeight * 0.78, 780)) : 600} />
             <DialogClose asChild>
-              <button type="button" title="Close" style={overlayBtnStyle}>
-                <X size={14} />
+              <button type="button" title="Close" aria-label="Close" style={overlayBtnStyle}>
+                <X size={16} />
               </button>
             </DialogClose>
           </div>

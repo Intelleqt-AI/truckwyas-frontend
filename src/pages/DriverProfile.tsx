@@ -10,34 +10,23 @@ import SectionHeader from "@/components/layout/SectionHeader";
 
 const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] as const;
 
-const ScoreBar = ({ label, value, max = 100, color = 'var(--accent-primary)' }: any) => (
-  <div className="fd-score">
-    <div className="fd-score__row">
-      <span className="fd-row__label">{label}</span>
-      <span className="fd-row__value">{value ?? '—'}</span>
-    </div>
-    <div className="fd-score__track" aria-hidden="true">
-      <div style={{ height: 4, width: `${Math.min(100, ((value ?? 0) / max) * 100)}%`, background: color, borderRadius: 2, transition: 'width 0.5s ease' }} />
-    </div>
-  </div>
-);
-
 /** Label/value row used by every detail card. `mono` only for identifiers. */
 const DetailRow = ({ label, value, mono, alert }: { label: string; value: any; mono?: boolean; alert?: boolean }) => (
   <div className="fd-row">
     <span className="fd-row__label">{label}</span>
-    <span className={`fd-row__value${mono ? ' fd-id' : ''}`} style={alert ? { color: 'var(--status-danger-text, var(--status-danger))' } : undefined}>{value ?? '—'}</span>
+    <span className={`fd-row__value${mono ? ' fd-id' : ''}`} style={alert ? { color: 'var(--status-danger-text, var(--status-danger))' } : undefined}>{value == null || value === '' ? '—' : value}</span>
   </div>
 );
 
 const formatZAR = (v: number) =>
   'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: 'var(--status-success-text, var(--status-success))',
-  INACTIVE: 'var(--text-secondary)',
-  ON_LEAVE: 'var(--status-warning-text, var(--status-warning))',
+const STATUS_TONE: Record<string, 'success' | 'warning' | 'neutral'> = {
+  ACTIVE: 'success',
+  INACTIVE: 'neutral',
+  ON_LEAVE: 'warning',
 };
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Sentence-case a status token for display: "ON_LEAVE" → "On leave".
 const formatStatus = (s?: string) =>
@@ -93,16 +82,15 @@ export default function DriverProfile() {
   const revPerKm = totalDistanceKm > 0 ? totalRevenue / totalDistanceKm : 0;
   const bestTripAmount = loads.length > 0 ? Math.max(...loads.map((l: any) => parseFloat(l.total_amount || '0'))) : 0;
 
-  // Performance scores
-  const onTimeRate = driver.on_time_rate ?? 0;
-  const safetyScore = Math.max(0, Math.min(100, 100 - (driver.violation_count ?? 0) * 10 - (driver.accident_history ?? 0) * 20));
-  const experienceScore = Math.min(100, ((driver.experience_years ?? 0) / 15) * 100);
-  const complianceScore = driver.license_expiry && new Date(driver.license_expiry) > new Date() ? 100 : 0;
-
-  const loadStatusColor = (st: string) =>
-    st === 'DELIVERED' || st === 'INVOICED' ? 'var(--status-success-text, var(--status-success))'
-      : st === 'IN_TRANSIT' ? 'var(--status-warning-text, var(--status-warning))'
-      : 'var(--text-secondary)';
+  // The driver stats job fills revenue_generated / avg_revenue_per_trip; until
+  // it has run the API sends 0.00, so fall back to the loads on this page
+  // rather than show a false R 0.
+  const recordedRevenue = Number(driver.revenue_generated) > 0 ? Number(driver.revenue_generated) : totalRevenue;
+  const recordedAvg = Number(driver.avg_revenue_per_trip) > 0 ? Number(driver.avg_revenue_per_trip) : avgRevPerTrip;
+  const licenceT = driver.license_expiry ? new Date(driver.license_expiry).getTime() : null;
+  const licenceExpired = licenceT !== null && licenceT < Date.now();
+  const licenceDays = licenceT !== null ? Math.ceil((licenceT - Date.now()) / DAY_MS) : null;
+  const loadsBasis = loadsData?.count && loadsData.count > loads.length ? `the latest ${loads.length} of ${loadsData.count} loads` : `${totalTrips} assigned ${totalTrips === 1 ? 'load' : 'loads'}`;
 
   return (
     <div className="fleet-detail">
@@ -111,6 +99,7 @@ export default function DriverProfile() {
       <SectionHeader
         eyebrow="Driver"
         title={name}
+        titleAdornment={<span className={`fd-chip fd-chip--${STATUS_TONE[driver.status] || 'neutral'}`}>{formatStatus(driver.status)}</span>}
         description={phone ? (
           driver.license_number
             ? <><span className="fd-id">{driver.license_number}</span> · {phone}</>
@@ -121,10 +110,9 @@ export default function DriverProfile() {
           { label: 'Financial profile', to: `/fleet/drivers/${driverId}/financial` },
         ]}
         actions={
-          <div className="fd-status-group" role="group" aria-label="Driver status">
+          <div className="fd-status-group" role="group" aria-label="Set driver status">
             {DRIVER_STATUSES.map(s => {
               const isCurrentStatus = driver.status === s;
-              const btnColor = STATUS_COLOR[s] || 'var(--text-secondary)';
               return (
                 <button
                   key={s}
@@ -139,7 +127,7 @@ export default function DriverProfile() {
                     } catch (e) { console.error(e); }
                     setUpdating(false);
                   }}
-                  style={isCurrentStatus ? { color: btnColor, borderColor: btnColor } : { opacity: updating ? 0.5 : 1 }}
+                  style={isCurrentStatus ? undefined : { opacity: updating ? 0.5 : 1 }}
                 >
                   {formatStatus(s)}
                 </button>
@@ -152,19 +140,26 @@ export default function DriverProfile() {
       {/* ── Overview tab ── */}
       {!isFinancial && (
         <>
-          <div className="fd-metrics">
-            {[
-              { label: 'Total revenue', value: formatZAR(totalRevenue) },
-              { label: 'Total trips', value: totalTrips },
-              { label: 'Avg revenue per trip', value: formatZAR(avgRevPerTrip) },
-              { label: 'Completed trips', value: completedTrips },
-            ].map(m => (
-              <div key={m.label} className="card metric-card">
-                <div className="card-header"><span className="card-title">{m.label}</span></div>
-                <div className="metric-value">{m.value}</div>
+          {/* Key figure first: what this driver has delivered, then compliance. */}
+          <section className="card fd-kpis" aria-label="Driver summary">
+            <div className="fd-kpi fd-kpi--lead">
+              <div className="fd-kpi__label">Revenue from completed loads</div>
+              <div className="fd-kpi__value">{completedTrips > 0 ? formatZAR(totalRevenue) : '—'}</div>
+              <div className="fd-kpi__note">{completedTrips > 0 ? `${formatZAR(avgRevPerTrip)} per load on average.` : 'No completed loads yet.'}</div>
+            </div>
+            <div className="fd-kpi">
+              <div className="fd-kpi__label">Completed loads</div>
+              <div className="fd-kpi__value">{completedTrips}<span className="fd-kpi__of">of {totalTrips}</span></div>
+              <div className="fd-kpi__note">Delivered or invoiced, from {loadsBasis}.</div>
+            </div>
+            <div className="fd-kpi">
+              <div className="fd-kpi__label">Licence valid until</div>
+              <div className={`fd-kpi__value${licenceExpired ? ' is-danger' : ''}`}>{driver.license_expiry ? new Date(driver.license_expiry).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</div>
+              <div className="fd-kpi__note">
+                {licenceDays === null ? 'No expiry date recorded.' : licenceExpired ? 'Expired. Renew before assigning loads.' : `${licenceDays} days from today.`}
               </div>
-            ))}
-          </div>
+            </div>
+          </section>
 
           <div className="fd-grid">
             <section className="card fd-card">
@@ -181,13 +176,13 @@ export default function DriverProfile() {
 
             <section className="card fd-card">
               <h2 className="fd-card__title">Performance</h2>
-              <DetailRow label="Efficiency score" value={driver.efficiency_score ?? '—'} />
-              <DetailRow label="On-time rate" value={driver.on_time_rate ? `${driver.on_time_rate}%` : '—'} />
-              <DetailRow label="Average rating" value={driver.avg_rating ? `${driver.avg_rating}` : '—'} />
+              <DetailRow label="Efficiency score" value={driver.efficiency_score || '—'} />
+              <DetailRow label="On-time rate" value={Number(driver.on_time_rate) ? `${Number(driver.on_time_rate).toFixed(0)}%` : '—'} />
+              <DetailRow label="Average rating" value={Number(driver.avg_rating) ? `${driver.avg_rating}` : '—'} />
               <DetailRow label="Trips this month" value={driver.trips_this_month ?? 0} />
               <DetailRow label="Total trips" value={driver.total_trips ?? totalTrips} />
-              <DetailRow label="Total distance" value={driver.total_distance ? `${parseFloat(driver.total_distance).toLocaleString('en-ZA')} km` : totalDistance > 0 ? `${Math.round(totalDistance).toLocaleString('en-ZA')} km` : '—'} />
-              <DetailRow label="Licence expiry" value={driver.license_expiry?.slice(0, 10) || '—'} alert={!!(driver.license_expiry && new Date(driver.license_expiry) < new Date())} />
+              <DetailRow label="Total distance" value={Number(driver.total_distance) ? `${parseFloat(driver.total_distance).toLocaleString('en-ZA')} km` : totalDistance > 0 ? `${Math.round(totalDistance).toLocaleString('en-ZA')} km` : '—'} />
+              
             </section>
           </div>
 
@@ -217,8 +212,8 @@ export default function DriverProfile() {
                         </td>
                         <td className="is-numeric">{load.distance ? `${parseFloat(load.distance).toFixed(0)} km` : '—'}</td>
                         <td className="is-numeric" style={{ color: 'var(--text-primary)' }}>{load.total_amount ? formatZAR(parseFloat(load.total_amount)) : '—'}</td>
-                        <td style={{ color: loadStatusColor(load.status) }}>{formatStatus(load.status)}</td>
-                        <td>{load.created_at?.slice(0, 10) || '—'}</td>
+                        <td>{formatStatus(load.status)}</td>
+                        <td>{load.created_at ? new Date(load.created_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -232,50 +227,49 @@ export default function DriverProfile() {
       {/* ── Financial profile tab ── */}
       {isFinancial && (
         <>
-          <div className="fd-metrics">
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Revenue generated</span></div>
-              <div className="metric-value">{formatCurrency(driver.revenue_generated ?? totalRevenue)}</div>
-              <div className="fd-metric-sub">{driver.total_trips ?? totalTrips} completed trips</div>
+          <section className="card fd-kpis" aria-label="Earnings summary">
+            <div className="fd-kpi fd-kpi--lead">
+              <div className="fd-kpi__label">Revenue generated</div>
+              <div className="fd-kpi__value">{recordedRevenue > 0 ? formatCurrency(recordedRevenue) : '—'}</div>
+              <div className="fd-kpi__note">{driver.total_trips ?? totalTrips} completed loads.</div>
             </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Avg revenue per trip</span></div>
-              <div className="metric-value">{formatCurrency(driver.avg_revenue_per_trip ?? avgRevPerTrip)}</div>
+            <div className="fd-kpi">
+              <div className="fd-kpi__label">Revenue per load</div>
+              <div className="fd-kpi__value">{recordedAvg > 0 ? formatCurrency(recordedAvg) : '—'}</div>
+              <div className="fd-kpi__note">Average across completed loads.</div>
             </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Revenue per km</span></div>
-              <div className="metric-value">R {(revPerKm || 0).toFixed(2)}</div>
-              <div className="fd-metric-sub">{(totalDistanceKm || 0).toFixed(0)} km total</div>
+            <div className="fd-kpi">
+              <div className="fd-kpi__label">Revenue per km</div>
+              <div className="fd-kpi__value">{revPerKm > 0 ? `R ${revPerKm.toFixed(2)}` : '—'}</div>
+              <div className="fd-kpi__note">{totalDistanceKm > 0 ? `Over ${Math.round(totalDistanceKm).toLocaleString('en-ZA')} km across all assigned loads.` : 'No distance recorded on these loads.'}</div>
             </div>
-            <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Experience</span></div>
-              <div className="metric-value">{driver.experience_years ?? 0}<span className="fd-suffix"> years</span></div>
-              <div className="fd-metric-sub">Hired {driver.hire_date?.slice(0, 10) || '—'}</div>
-            </div>
-          </div>
+          </section>
 
           <div className="fd-grid">
             <section className="card fd-card">
-              <h2 className="fd-card__title">Performance scores</h2>
-              <ScoreBar label="On-time rate" value={onTimeRate} color="var(--accent-primary)" />
-              <ScoreBar label="Safety score" value={safetyScore} color={safetyScore >= 80 ? 'var(--status-success)' : safetyScore >= 60 ? 'var(--status-warning)' : 'var(--status-danger)'} />
-              <ScoreBar label="Experience score" value={experienceScore} />
-              <ScoreBar label="Compliance" value={complianceScore} color={complianceScore === 100 ? 'var(--status-success)' : 'var(--status-danger)'} />
+              {/* Recorded facts only. The old safety, experience and compliance
+                  "scores" were invented formulas over these same fields. */}
+              <h2 className="fd-card__title">What is on their record?</h2>
+              <DetailRow label="On-time rate" value={Number(driver.on_time_rate) ? `${Number(driver.on_time_rate).toFixed(0)}%` : '—'} />
+              <DetailRow label="Violations" value={(driver.violation_count ?? 0).toString()} />
+              <DetailRow label="Accidents" value={(driver.accident_history ?? 0).toString()} />
+              <DetailRow label="Experience" value={driver.experience_years ? `${driver.experience_years} years` : '—'} />
+              <DetailRow label="Hire date" value={driver.hire_date?.slice(0, 10) || '—'} />
+              <DetailRow label="Licence expiry" value={driver.license_expiry?.slice(0, 10) || '—'} alert={licenceExpired} />
             </section>
 
             <section className="card fd-card">
               <h2 className="fd-card__title">Earnings breakdown</h2>
-              <DetailRow label="Total revenue" value={formatCurrency(driver.revenue_generated ?? totalRevenue)} />
-              <DetailRow label="Total trips" value={(driver.total_trips ?? totalTrips).toString()} />
-              <DetailRow label="Avg per trip" value={formatCurrency(driver.avg_revenue_per_trip ?? avgRevPerTrip)} />
-              <DetailRow label="Best trip" value={formatCurrency(bestTripAmount)} />
-              <DetailRow label="Total distance" value={`${(totalDistanceKm || 0).toFixed(0)} km`} />
-              <DetailRow label="Violations" value={(driver.violation_count ?? 0).toString()} />
-              <DetailRow label="Accidents" value={(driver.accident_history ?? 0).toString()} />
+              <DetailRow label="Total revenue" value={recordedRevenue > 0 ? formatCurrency(recordedRevenue) : '—'} />
+              <DetailRow label="Completed loads" value={(driver.total_trips ?? totalTrips).toString()} />
+              <DetailRow label="Average per load" value={recordedAvg > 0 ? formatCurrency(recordedAvg) : '—'} />
+              <DetailRow label="Highest load value" value={bestTripAmount > 0 ? formatCurrency(bestTripAmount) : '—'} />
+              <DetailRow label="Total distance" value={totalDistanceKm > 0 ? `${Math.round(totalDistanceKm).toLocaleString('en-ZA')} km` : '—'} />
             </section>
 
             <section className="card fd-card">
-              <h2 className="fd-card__title">Monthly earnings</h2>
+              <h2 className="fd-card__title">How much did they carry each month?</h2>
+              <p className="fd-card__desc">Load totals by month the load was created, last six months with loads.</p>
               {(() => {
                 const monthMap: Record<string, number> = {};
                 loads.forEach((l: any) => {
@@ -287,7 +281,7 @@ export default function DriverProfile() {
                 const months = Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0])).slice(-6);
                 const maxVal = Math.max(...months.map(([, v]) => v), 1);
                 if (months.length === 0) return (
-                  <div className="fd-empty">No data available</div>
+                  <div className="fd-empty">No loads assigned yet.</div>
                 );
                 return months.map(([key, val]) => {
                   const [yr, mo] = key.split('-');
@@ -300,7 +294,7 @@ export default function DriverProfile() {
                         <span className="fd-row__value">R {val.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                       </div>
                       <div className="fd-score__track" aria-hidden="true">
-                        <div style={{ height: 4, width: `${pct}%`, background: 'var(--accent-primary)', borderRadius: 2, transition: 'width 0.5s ease' }} />
+                        <div style={{ height: 6, width: `${pct}%`, background: 'var(--accent-primary)', borderRadius: 3 }} />
                       </div>
                     </div>
                   );
@@ -327,7 +321,7 @@ export default function DriverProfile() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div className="fd-row__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</div>
-                    <div className="fd-row__label" style={{ color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success-text, var(--status-success))' : undefined }}>{formatStatus(load.status)}</div>
+                    <div className="fd-row__label">{formatStatus(load.status)}</div>
                   </div>
                 </div>
               ))}

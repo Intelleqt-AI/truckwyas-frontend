@@ -14,14 +14,14 @@ const TAKE_RATE_PCT = "0.25";
 
 const SIGNUP_STEPS = [
   { label: "Create your account", detail: "Name, email, password" },
-  { label: "Verify your email", detail: "Enter the 6-digit code — you're here now" },
-  { label: "Add a card & pay", detail: `R${MONTHLY_FEE}/month, charged via Paystack — your fleet goes live the moment it clears` },
+  { label: "Verify your email", detail: "Enter the 6-digit code. You're here now" },
+  { label: "Add a card & pay", detail: `R${MONTHLY_FEE}/month, charged via Paystack. Your fleet goes live the moment it clears` },
 ];
 
 const PLAN_FEATURES = [
   "Unlimited loads & invoices",
   "AI-powered quote optimisation",
-  "Fast Pay capital access",
+  "Fast Pay capital access (not live yet)",
   "Advanced analytics & reporting",
   "Fleet intelligence dashboard",
   "Multi-user access",
@@ -93,8 +93,8 @@ export const EmailVerification = () => {
   const formBody = (
     <>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>Verify your email</h1>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>Verify your email</h1>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: '20px' }}>
           We sent a 6-digit verification code to{' '}
           <strong style={{ color: 'var(--text-primary)' }}>{email || 'your email'}</strong>.
           Enter it below to continue to payment and activate your account.
@@ -102,12 +102,12 @@ export const EmailVerification = () => {
       </div>
 
       {error && (
-        <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
+        <div role="alert" style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
           {error}
         </div>
       )}
       {resentMsg && (
-        <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-success-bg, rgba(34,197,94,0.1))', border: '1px solid var(--status-success)', borderRadius: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-success)' }}>
+        <div role="status" style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--status-success-bg, rgba(34,197,94,0.1))', border: '1px solid var(--status-success)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--status-success-text, var(--status-success))' }}>
           {resentMsg}
         </div>
       )}
@@ -129,14 +129,14 @@ export const EmailVerification = () => {
             autoFocus
             style={{
               width: '100%', padding: '14px 16px', background: 'var(--bg-deep)',
-              border: '1px solid var(--border-subtle)', borderRadius: 6,
-              color: 'var(--text-primary)', fontSize: 26,               boxSizing: 'border-box', letterSpacing: '0.3em', fontFamily: 'var(--font-mono)',
+              border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-control)',
+              color: 'var(--text-primary)', fontSize: 26, boxSizing: 'border-box', letterSpacing: '0.3em', fontFamily: 'var(--font-mono)',
               textAlign: 'center',
             }}
           />
         </div>
 
-        <button type="submit" className="btn-action" style={{ width: '100%' }} disabled={loading || code.length !== 6}>
+        <button type="submit" className="btn-action" style={{ width: '100%', borderRadius: 'var(--radius-control)' }} disabled={loading || code.length !== 6}>
           {loading ? 'Verifying…' : 'Verify email'}
         </button>
       </form>
@@ -157,7 +157,7 @@ export const EmailVerification = () => {
   );
 
   const desktopFormCard = (
-    <div style={{ width: '100%', maxWidth: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxSizing: 'border-box' }}>
+    <div style={{ width: '100%', maxWidth: 420, padding: 24, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-card)', boxSizing: 'border-box' }}>
       {/* The split layout already shows the logo in its content panel. */}
       {formBody}
     </div>
@@ -169,8 +169,8 @@ export const EmailVerification = () => {
   const extraContent = (
     <>
       <div style={{
-        border: '1px solid var(--border-active)', borderRadius: 'var(--card-radius)',
-        padding: 20, marginBottom: 20, background: 'var(--bg-surface-hover)',
+        border: '1px solid var(--border-active)', borderRadius: 'var(--radius-card)',
+        padding: 24, marginBottom: 24, background: 'var(--bg-surface-hover)',
       }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
           <span style={{ fontFamily: 'var(--font-sans)', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
@@ -182,7 +182,7 @@ export const EmailVerification = () => {
           + {TAKE_RATE_PCT}% of every delivered load's value
         </div>
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>
-          This is what step 3 will charge — nothing yet
+          This is what step 3 will charge. Nothing is charged yet
         </div>
       </div>
 
@@ -199,7 +199,7 @@ export const EmailVerification = () => {
               {i < 1 ? '✓' : i + 1}
             </div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: i <= 1 ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{step.label}</div>
+              <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: i <= 1 ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{step.label}</div>
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{step.detail}</div>
             </div>
           </div>
@@ -225,10 +225,10 @@ export const EmailVerification = () => {
     return (
       <MobileAuthLayout
         eyebrow="Step 2 of 3"
-        title={<>Almost there — <span style={{ color: 'var(--accent-primary)' }}>just confirm it's you</span>.</>}
+        title={<>Almost there. <span style={{ color: 'var(--accent-primary)' }}>Just confirm it's you</span>.</>}
         footer={extraContent}
       >
-        <div style={{ width: '100%', maxWidth: 420, padding: 32, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxSizing: 'border-box' }}>
+        <div style={{ width: '100%', maxWidth: 420, padding: 24, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-card)', boxSizing: 'border-box' }}>
           {formBody}
         </div>
       </MobileAuthLayout>
@@ -262,7 +262,7 @@ export const EmailVerification = () => {
       {/* Content side — the same steps/price Signup showed, step 2 now active */}
       <div className="verify-split__content" style={{
         position: 'relative', overflow: 'hidden',
-        background: `radial-gradient(120% 100% at 0% 0%, var(--glow-color), var(--glow-transparent)), var(--bg-surface)`,
+        background: 'var(--bg-surface)',
         borderRight: '1px solid var(--border-subtle)',
       }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
@@ -272,7 +272,7 @@ export const EmailVerification = () => {
             Step 2 of 3
           </div>
           <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', marginBottom: 28 }}>
-            Almost there — <span style={{ color: 'var(--accent-primary)' }}>just confirm it's you</span>.
+            Almost there. <span style={{ color: 'var(--accent-primary)' }}>Just confirm it's you</span>.
           </div>
 
           {extraContent}

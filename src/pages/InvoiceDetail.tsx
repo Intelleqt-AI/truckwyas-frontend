@@ -109,7 +109,7 @@ export default function InvoiceDetail() {
     setSending(true);
     try {
       await postData({ url: `api/v1/invoices/${id}/send_invoice/` });
-      setToast({ msg: 'Invoice sent!' });
+      setToast({ msg: 'Invoice sent' });
       setTimeout(() => setToast(null), 3000);
       refetch();
       queryClient.invalidateQueries({ queryKey: ['capital-eligible'] });
@@ -175,12 +175,12 @@ export default function InvoiceDetail() {
     setSendingReminder(true);
     try {
       await postData({ url: `api/v1/invoices/${id}/send_reminder/`, data: {} });
-      setToast({ msg: 'Reminder sent successfully!' });
+      setToast({ msg: 'Reminder sent' });
       setTimeout(() => setToast(null), 3000);
       refetch();
     } catch (error: any) {
       if (error?.response?.status === 404) {
-        setToast({ msg: 'Reminder recorded — customer will be contacted' });
+        setToast({ msg: 'Reminder recorded. The customer will be contacted.' });
       } else {
         setToast({ msg: error instanceof Error ? error.message : 'Failed to send reminder', isError: true });
       }
@@ -192,7 +192,7 @@ export default function InvoiceDetail() {
 
   const handleRecordPayment = async () => {
     if (!id || !paymentAmount || !paymentDate) {
-      setToast({ msg: 'Please fill in all required fields', isError: true });
+      setToast({ msg: 'Enter the amount and payment date', isError: true });
       setTimeout(() => setToast(null), 3000);
       return;
     }
@@ -209,7 +209,7 @@ export default function InvoiceDetail() {
           reference: paymentReference
         }
       });
-      setToast({ msg: 'Payment recorded!' });
+      setToast({ msg: 'Payment recorded' });
       setShowPaymentForm(false);
       setPaymentAmount('');
       setPaymentDate('');
@@ -250,86 +250,148 @@ export default function InvoiceDetail() {
   const canRemind = status === 'SENT' || status === 'VIEWED' || status === 'OVERDUE';
   const canRecordPayment = status === 'SENT' || status === 'VIEWED' || status === 'OVERDUE' || status === 'PARTIALLY_PAID';
   const totalPaid = (payments || []).reduce((sum: number, p: any) => sum + num(p.amount), 0);
+  const paidToDate = invoice.paid_amount != null ? num(invoice.paid_amount) : null;
+  const vat = (invoice.vat_amount ?? invoice.tax_amount) != null ? num(invoice.vat_amount ?? invoice.tax_amount) : null;
+  const taxRate = invoice.tax_rate != null ? num(invoice.tax_rate) : null;
+  const daysLate = invoice.due_date && showBalance
+    ? Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / 86400000)
+    : null;
+  const paidShare = showBalance && total > 0 ? Math.min(100, Math.max(0, ((total - balance) / total) * 100)) : 0;
+  const terms = invoice.payment_terms ? String(invoice.payment_terms).replace(/^NET(\d+)$/i, '$1 days') : null;
 
-  const details = [
-    { label: 'Invoice number', value: invoice.invoice_number, id: true },
-    { label: 'Customer', value: invoice.customer_name },
-    ...(invoice.load_number ? [{ label: 'Load', value: invoice.load_number, id: true }] : []),
-    { label: 'Status', value: formatStatus(status) },
-    { label: 'Total', value: formatCurrency(total), money: true },
-    { label: 'Due date', value: safeDate(invoice.due_date) },
+  const heroLabel = status === 'PAID' ? 'Paid in full' : showBalance ? 'Balance due' : 'Invoice total';
+
+  const activity = [
     { label: 'Created', value: safeDate(invoice.created_at) },
+    { label: 'Sent to customer', value: invoice.sent_at ? safeDate(invoice.sent_at) : 'Not sent' },
+    ...(invoice.viewed_at ? [{ label: 'Viewed by customer', value: safeDate(invoice.viewed_at) }] : []),
     {
-      label: 'Reminders sent',
+      label: 'Reminders',
       value: invoice.reminder_count
-        ? `${invoice.reminder_count} — last ${safeDate(invoice.last_reminder_at)}`
+        ? `${invoice.reminder_count} sent, last on ${safeDate(invoice.last_reminder_at)}`
         : 'None sent',
     },
+    ...(invoice.paid_at ? [{ label: 'Paid', value: safeDate(invoice.paid_at) }] : []),
   ];
+
+  const primary = canSend ? 'send' : canRecordPayment ? 'pay' : null;
 
   return (
     <div className="fin-page">
       {toast && (
-        <div className="fin-toast" role={toast.isError ? 'alert' : 'status'} style={toast.isError ? { borderLeftColor: 'var(--status-danger)' } : undefined}>
+        <div className={`fin-toast${toast.isError ? ' fin-toast--error' : ''}`} role={toast.isError ? 'alert' : 'status'}>
           {toast.msg}
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => navigate('/finance/invoices')}
-        className="fin-back"
-        style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 14, lineHeight: '20px', fontWeight: 500, minHeight: 40, marginBottom: 8, padding: 0 }}>
-        ← Back to invoices
+      <button type="button" onClick={() => navigate('/finance/invoices')} className="fin-back">
+        <span aria-hidden="true">←</span> Back to invoices
       </button>
 
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+      <header className="fin-detail-head">
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 4 }}>Invoice</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, margin: 0, color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>
-              {invoice.invoice_number}
-            </h1>
+          <div className="fin-detail-head__eyebrow">Invoice</div>
+          <div className="fin-detail-head__title-row">
+            <h1>{invoice.invoice_number}</h1>
             <span className={`fin-chip${tone === 'neutral' ? '' : ` fin-chip--${tone}`}`}>{formatStatus(status)}</span>
           </div>
-          <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>{invoice.customer_name}</div>
+          <p className="fin-detail-head__sub">
+            {invoice.customer_name}
+            {invoice.load_number && (
+              <>
+                {' · Load '}
+                <span className="fin-id">{invoice.load_number}</span>
+              </>
+            )}
+          </p>
+        </div>
+        <div className="fin-detail-head__actions">
+          <button className="btn-action fin-btn-secondary" onClick={handleDownloadPDF} disabled={downloading}>
+            {downloading ? 'Downloading…' : 'Download PDF'}
+          </button>
+          {canRemind && (
+            <button className="btn-action fin-btn-secondary" onClick={handleSendReminder} disabled={sendingReminder}>
+              {sendingReminder ? 'Sending…' : 'Send reminder'}
+            </button>
+          )}
+          {canRecordPayment && (
+            <button
+              onClick={() => setShowPaymentForm(true)}
+              className={`btn-action${primary === 'pay' ? '' : ' fin-btn-secondary'}`}
+              disabled={showPaymentForm}
+              aria-expanded={showPaymentForm}
+              aria-controls="record-payment">
+              Record payment
+            </button>
+          )}
+          {canSend && (
+            <button className="btn-action" onClick={handleSendInvoice} disabled={sending}>
+              {sending ? 'Sending…' : status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
+            </button>
+          )}
         </div>
       </header>
 
       <div className="fin-grid-2" style={{ alignItems: 'start' }}>
         {/* Main column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24, minWidth: 0 }}>
-          {/* Key amount */}
-          <section className="card" aria-label="Amount summary">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-end', justifyContent: 'space-between' }}>
-              <div style={{ minWidth: 0 }}>
-                <div className="fin-kpi__label">{showBalance ? 'Balance due' : 'Invoice total'}</div>
-                <div className="fin-kpi__value">{formatCurrency(showBalance ? balance : total)}</div>
-                {showBalance && balance !== total && (
-                  <div className="fin-kpi__sub">of {formatCurrency(total)} invoiced</div>
-                )}
-              </div>
-              <dl style={{ display: 'flex', gap: 32, margin: 0, flexWrap: 'wrap' }}>
-                <div>
-                  <dt className="fin-kpi__label">Due date</dt>
-                  <dd className={status === 'OVERDUE' ? 'fin-text-danger' : ''} style={{ margin: 0, fontSize: 16, lineHeight: '24px', fontWeight: 500 }}>{safeDate(invoice.due_date)}</dd>
-                </div>
-                <div>
-                  <dt className="fin-kpi__label">Issued</dt>
-                  <dd style={{ margin: 0, fontSize: 16, lineHeight: '24px', fontWeight: 500 }}>{safeDate(invoice.issue_date || invoice.created_at)}</dd>
-                </div>
-              </dl>
+        <div className="fin-stack" style={{ minWidth: 0 }}>
+          {/* Key amount first */}
+          <section className="card" aria-label="Amount">
+            <div className="fin-kpi__label">{heroLabel}</div>
+            <p className="fin-hero-amount">{formatCurrency(showBalance ? balance : total)}</p>
+            <div className="fin-kpi__sub">
+              {showBalance && balance !== total
+                ? `Of ${formatCurrency(total)} invoiced, incl. VAT`
+                : vat != null
+                  ? `Incl. ${formatCurrency(vat)} VAT`
+                  : 'Invoice total'}
             </div>
+            {showBalance && paidShare > 0 && (
+              <div className="fin-progress" role="img" aria-label={`${Math.round(paidShare)}% paid`}>
+                <div className="fin-progress__fill" style={{ width: `${paidShare}%` }} />
+              </div>
+            )}
+            <dl className="fin-facts">
+              <div>
+                <dt>Issued</dt>
+                <dd>{safeDate(invoice.issue_date || invoice.created_at)}</dd>
+              </div>
+              <div>
+                <dt>Due</dt>
+                <dd>
+                  {safeDate(invoice.due_date)}
+                  {daysLate != null && daysLate > 0 && (
+                    <span className="fin-text-danger" style={{ display: 'block', fontWeight: 400, fontSize: 13 }}>
+                      {daysLate} {daysLate === 1 ? 'day' : 'days'} late
+                    </span>
+                  )}
+                </dd>
+              </div>
+              {terms && (
+                <div>
+                  <dt>Terms</dt>
+                  <dd>{terms}</dd>
+                </div>
+              )}
+              {paidToDate != null && status !== 'DRAFT' && (
+                <div>
+                  <dt>Paid to date</dt>
+                  <dd>{formatCurrency(paidToDate)}</dd>
+                </div>
+              )}
+            </dl>
           </section>
 
-          {/* Line items */}
-          {invoice.line_items && invoice.line_items.length > 0 && (
+          {/* How the total is made up */}
+          {invoice.line_items && invoice.line_items.length > 0 ? (
             <section className="card fin-table-card" aria-labelledby="line-items-title">
-              <div className="fin-table-card__head">
-                <h2 id="line-items-title" className="fin-h2">Line items</h2>
-                <span className="fin-support">
-                  {invoice.line_items.length} item{invoice.line_items.length !== 1 ? 's' : ''}
-                </span>
+              <div className="fin-panel-head">
+                <div className="fin-panel-head__text">
+                  <h2 id="line-items-title" className="fin-panel-title">What is being charged?</h2>
+                  <p className="fin-panel-desc">
+                    {invoice.line_items.length} {invoice.line_items.length === 1 ? 'line' : 'lines'}, amounts excl. VAT; VAT is added in the total.
+                  </p>
+                </div>
               </div>
               <div className="fin-table-scroll">
                 <table className="fin-table table-heading-roles">
@@ -364,62 +426,82 @@ export default function InvoiceDetail() {
                         <td className="num">−{formatCurrency(num(invoice.discount))}</td>
                       </tr>
                     )}
-                    {(invoice.vat_amount ?? invoice.tax_amount) != null && (
+                    {vat != null && (
                       <tr>
-                        <td colSpan={3} className="num">VAT</td>
-                        <td className="num">{formatCurrency(num(invoice.vat_amount ?? invoice.tax_amount))}</td>
+                        <td colSpan={3} className="num">VAT{taxRate != null ? ` (${taxRate}%)` : ''}</td>
+                        <td className="num">{formatCurrency(vat)}</td>
                       </tr>
                     )}
-                    <tr>
-                      <td colSpan={3} className="num" style={{ fontWeight: 600, color: 'var(--text-primary)', borderTop: '1px solid var(--border-subtle)' }}>Total</td>
-                      <td className="num" style={{ fontWeight: 600, borderTop: '1px solid var(--border-subtle)' }}>
-                        {formatCurrency(total)}
-                      </td>
+                    <tr className="fin-total-row">
+                      <td colSpan={3} className="num">Total</td>
+                      <td className="num">{formatCurrency(total)}</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
+            </section>
+          ) : (invoice.subtotal != null || vat != null) && (
+            <section className="card" aria-labelledby="breakdown-title">
+              <div className="fin-panel-head">
+                <div className="fin-panel-head__text">
+                  <h2 id="breakdown-title" className="fin-panel-title">How is the total made up?</h2>
+                  <p className="fin-panel-desc">This invoice has no separate line items.</p>
+                </div>
+              </div>
+              <dl className="fin-dl">
+                {invoice.subtotal != null && (
+                  <div className="fin-dl__row"><dt>Subtotal, excl. VAT</dt><dd>{formatCurrency(num(invoice.subtotal))}</dd></div>
+                )}
+                {num(invoice.discount) > 0 && (
+                  <div className="fin-dl__row"><dt>Discount</dt><dd>−{formatCurrency(num(invoice.discount))}</dd></div>
+                )}
+                {vat != null && (
+                  <div className="fin-dl__row"><dt>VAT{taxRate != null ? ` (${taxRate}%)` : ''}</dt><dd>{formatCurrency(vat)}</dd></div>
+                )}
+                <div className="fin-dl__row is-total"><dt>Total</dt><dd>{formatCurrency(total)}</dd></div>
+              </dl>
+              {invoice.notes && <p className="fin-note" style={{ marginTop: 12 }}>Note: {invoice.notes}</p>}
             </section>
           )}
 
           {/* Payment history */}
           {payments && payments.length > 0 && (
             <section className="card fin-table-card" aria-labelledby="payments-title">
-              <div className="fin-table-card__head">
-                <h2 id="payments-title" className="fin-h2">Payment history</h2>
-                <span className="fin-support">
-                  {payments.length} payment{payments.length !== 1 ? 's' : ''}
-                </span>
+              <div className="fin-panel-head">
+                <div className="fin-panel-head__text">
+                  <h2 id="payments-title" className="fin-panel-title">What has been paid?</h2>
+                  <p className="fin-panel-desc">
+                    {payments.length} {payments.length === 1 ? 'payment' : 'payments'} recorded against this invoice, by payment date.
+                  </p>
+                </div>
               </div>
               <div className="fin-table-scroll">
                 <table className="fin-table table-heading-roles">
                   <thead>
                     <tr>
                       <th>Date</th>
-                      <th>Method</th>
                       <th>Reference</th>
+                      <th>Method</th>
                       <th className="num">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     {payments.map((payment: any, idx: number) => {
-                      const ref = payment.reference || payment.reference_number;
+                      const ref = payment.reference || payment.reference_number || payment.payment_number;
                       return (
                         <tr key={idx}>
                           <td className="fin-date">{safeDate(payment.payment_date || payment.date)}</td>
-                          <td><span className="fin-chip">{methodLabel(payment.payment_method || payment.method || 'EFT')}</span></td>
                           <td>{ref ? <span className="fin-id">{ref}</span> : '—'}</td>
+                          <td>{methodLabel(payment.payment_method || payment.method || 'EFT')}</td>
                           <td className="num">{formatCurrency(num(payment.amount))}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                   <tfoot>
-                    <tr>
-                      <td colSpan={3} className="num" style={{ fontWeight: 600, color: 'var(--text-primary)', borderTop: '1px solid var(--border-subtle)' }}>Total paid</td>
-                      <td className="num" style={{ fontWeight: 600, borderTop: '1px solid var(--border-subtle)' }}>
-                        {formatCurrency(totalPaid)}
-                      </td>
+                    <tr className="fin-total-row">
+                      <td colSpan={3} className="num">Total paid</td>
+                      <td className="num">{formatCurrency(totalPaid)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -429,33 +511,111 @@ export default function InvoiceDetail() {
         </div>
 
         {/* Side column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24, minWidth: 0 }}>
-          <section className="card" aria-labelledby="actions-title">
-            <h2 id="actions-title" className="fin-h2" style={{ marginBottom: 16 }}>Actions</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {canSend && (
-                <button className="btn-action" style={{ width: '100%' }} onClick={handleSendInvoice} disabled={sending}>
-                  {sending ? 'Sending…' : status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
-                </button>
-              )}
-              {canRecordPayment && !showPaymentForm && (
-                <button onClick={() => setShowPaymentForm(true)} className={`btn-action ${canSend ? 'fin-btn-secondary' : ''}`} style={{ width: '100%' }}>
-                  Record payment
-                </button>
-              )}
-              {canRemind && (
-                <button className="btn-action fin-btn-secondary" style={{ width: '100%' }} onClick={handleSendReminder} disabled={sendingReminder}>
-                  {sendingReminder ? 'Sending…' : 'Send reminder'}
-                </button>
-              )}
-              <button className="btn-action fin-btn-secondary" style={{ width: '100%' }} onClick={handleDownloadPDF} disabled={downloading}>
-                {downloading ? 'Downloading…' : 'Download PDF'}
-              </button>
+        <div className="fin-stack" style={{ minWidth: 0 }}>
+          {showPaymentForm && (
+            <section className="card" id="record-payment" aria-labelledby="record-payment-title">
+              <div className="fin-panel-head">
+                <div className="fin-panel-head__text">
+                  <h2 id="record-payment-title" className="fin-panel-title">Record a payment</h2>
+                  <p className="fin-panel-desc">Balance due {formatCurrency(balance)}, incl. VAT.</p>
+                </div>
+              </div>
+              <div className="fin-form" style={{ gap: 12 }}>
+                <div>
+                  <label className="fin-label" htmlFor="pay-amount">Amount (ZAR)</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      id="pay-amount"
+                      className="fin-control"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                      style={{ flex: 1, minWidth: 0, fontVariantNumeric: 'tabular-nums' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-action fin-btn-secondary"
+                      onClick={() => setPaymentAmount(String(invoice.balance))}
+                      aria-label="Use full balance"
+                    >
+                      Full balance
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="fin-label">Payment date</label>
+                  <DatePicker
+                    value={paymentDate}
+                    onChange={setPaymentDate}
+                    maxDate={new Date()}
+                  />
+                </div>
+                <div>
+                  <label className="fin-label" id="pay-method-label">Method</label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger aria-labelledby="pay-method-label">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EFT">EFT</SelectItem>
+                      <SelectItem value="CASH">Cash</SelectItem>
+                      <SelectItem value="CARD">Card</SelectItem>
+                      <SelectItem value="CHEQUE">Cheque</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="fin-label" htmlFor="pay-ref">Reference (optional)</label>
+                  <input
+                    id="pay-ref"
+                    className="fin-control"
+                    type="text"
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button onClick={() => setShowPaymentForm(false)} className="btn-action fin-btn-secondary">
+                    Cancel
+                  </button>
+                  <button onClick={handleRecordPayment} disabled={recordingPayment} className="btn-action">
+                    {recordingPayment ? 'Saving…' : 'Save payment'}
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          <section className="card" aria-labelledby="activity-title">
+            <div className="fin-panel-head" style={{ marginBottom: 4 }}>
+              <div className="fin-panel-head__text">
+                <h2 id="activity-title" className="fin-panel-title">Where is this invoice at?</h2>
+              </div>
+            </div>
+            <dl className="fin-dl">
+              {activity.map(r => (
+                <div key={r.label} className="fin-dl__row">
+                  <dt>{r.label}</dt>
+                  <dd>{r.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          {(capitalEntry || ineligibleEntry) && (
+            <section className="card" aria-labelledby="fastpay-title">
+              <div className="fin-panel-head">
+                <div className="fin-panel-head__text">
+                  <h2 id="fastpay-title" className="fin-panel-title">Fast Pay</h2>
+                  {!CAPITAL_LAUNCHED && <p className="fin-panel-desc">{CAPITAL_COMING_SOON}</p>}
+                </div>
+              </div>
               {capitalEntry && (
                 applied ? (
-                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '8px 12px' }}>
-                    <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>Applied for Fast Pay</div>
-                    Your earlier application is on record.
+                  <div className="fin-inset">
+                    <p className="fin-note"><strong>Applied for Fast Pay</strong>Your earlier application is on record.</p>
                   </div>
                 ) : (
                   <button type="button" className="btn-action fin-btn-secondary" style={{ width: '100%' }}
@@ -465,109 +625,12 @@ export default function InvoiceDetail() {
                 )
               )}
               {ineligibleEntry && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '8px 12px' }}>
-                  <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>Not eligible for Fast Pay</div>
-                  {ineligibleEntry.reason}
+                <div className="fin-inset">
+                  <p className="fin-note"><strong>This invoice would not qualify</strong>{ineligibleEntry.reason}</p>
                 </div>
               )}
-            </div>
-
-            {showPaymentForm && (
-              <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--border-subtle)' }}>
-                <h3 style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, margin: '0 0 12px' }}>Record payment</h3>
-                <div className="fin-form" style={{ gap: 12 }}>
-                  <div>
-                    <label className="fin-label" htmlFor="pay-amount">Amount (ZAR)</label>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <input
-                        id="pay-amount"
-                        className="fin-control"
-                        type="text"
-                        inputMode="decimal"
-                        placeholder={`Balance ${formatCurrency(invoice.balance)}`}
-                        value={paymentAmount}
-                        onChange={(e) => setPaymentAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                        style={{ flex: 1, minWidth: 0, fontVariantNumeric: 'tabular-nums' }}
-                      />
-                      <button
-                        type="button"
-                        className="btn-action fin-btn-secondary"
-                        onClick={() => setPaymentAmount(String(invoice.balance))}
-                        aria-label="Use full balance"
-                      >
-                        Full balance
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="fin-label">Payment date</label>
-                    <DatePicker
-                      value={paymentDate}
-                      onChange={setPaymentDate}
-                      maxDate={new Date()}
-                    />
-                  </div>
-                  <div>
-                    <label className="fin-label" id="pay-method-label">Method</label>
-                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger aria-labelledby="pay-method-label">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="EFT">EFT</SelectItem>
-                        <SelectItem value="CASH">Cash</SelectItem>
-                        <SelectItem value="CARD">Card</SelectItem>
-                        <SelectItem value="CHEQUE">Cheque</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="fin-label" htmlFor="pay-ref">Reference (optional)</label>
-                    <input
-                      id="pay-ref"
-                      className="fin-control"
-                      type="text"
-                      value={paymentReference}
-                      onChange={(e) => setPaymentReference(e.target.value)}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      onClick={() => setShowPaymentForm(false)}
-                      className="btn-action fin-btn-secondary"
-                      style={{ flex: 1 }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleRecordPayment}
-                      disabled={recordingPayment}
-                      className="btn-action"
-                      style={{ flex: 1 }}
-                    >
-                      {recordingPayment ? 'Recording…' : 'Save payment'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </section>
-
-          <section className="card" aria-labelledby="details-title">
-            <h2 id="details-title" className="fin-h2" style={{ marginBottom: 8 }}>Invoice details</h2>
-            <dl style={{ margin: 0 }}>
-              {details.map(r => (
-                <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                  <dt style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{r.label}</dt>
-                  <dd
-                    className={r.id ? 'fin-id' : undefined}
-                    style={{ margin: 0, fontSize: r.id ? 13 : 14, lineHeight: '20px', color: 'var(--text-primary)', textAlign: 'right', fontVariantNumeric: r.money ? 'tabular-nums' : undefined, overflowWrap: 'anywhere' }}>
-                    {r.value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
+            </section>
+          )}
         </div>
       </div>
     </div>

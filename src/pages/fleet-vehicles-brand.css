@@ -31,7 +31,7 @@
 .fleet-page .fleet-summary--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .fleet-page .fleet-summary--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .fleet-page .fleet-summary--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.fleet-page .fleet-summary > .card { min-width: 0; padding: 24px; border-radius: 8px; }
+.fleet-page .fleet-summary > .card { min-width: 0; padding: 24px; border-radius: var(--radius-card, 12px); }
 
 /* Shared metric classes carry legacy mono/uppercase — corrected inside this page only. */
 .fleet-page .fleet-summary .card-title {
@@ -57,7 +57,7 @@
   font-size: 14px;
   line-height: 20px;
   min-height: 40px;
-  border-radius: 6px;
+  border-radius: var(--radius-control, 8px);
   text-transform: none;
   letter-spacing: normal;
 }
@@ -90,17 +90,17 @@
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
-.fleet-page .fleet-filter:hover { color: var(--text-primary); }
+.fleet-page .fleet-filter:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
 .fleet-page .fleet-filter[aria-pressed="true"] {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: var(--btn-action-color);
+  background: var(--bg-surface-hover);
+  border-color: var(--border-active);
+  color: var(--text-primary);
   font-weight: 500;
 }
 
 /* Table card: intentional zero outer padding + local scroll region. */
 .fleet-page .fleet-table-region {
-  border-radius: 8px;
+  border-radius: var(--radius-card, 12px);
   padding: 0;
   overflow-x: auto;
   min-width: 0;
@@ -109,6 +109,7 @@
 .fleet-page .fleet-table { width: 100%; border-collapse: collapse; }
 .fleet-page .fleet-table th {
   height: 44px;
+  box-sizing: border-box;
   padding: 12px 16px;
   text-align: left;
   vertical-align: middle;
@@ -116,7 +117,9 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 .fleet-page .fleet-table td {
-  padding: 12px 16px;
+  height: 48px; /* 48px rows; 7px padding leaves room for 32px row controls */
+  box-sizing: border-box;
+  padding: 7px 16px;
   font: 400 14px/20px var(--font-sans);
   color: var(--text-secondary);
   white-space: nowrap;
@@ -174,7 +177,7 @@
 .fleet-page .fleet-secondary-button:hover { color: var(--text-primary); }
 .fleet-page .fleet-metric-sub { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); margin-top: 4px; }
 .fleet-page .fleet-muted { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
-.fleet-page .fleet-panel { padding: var(--fleet-card-inset); border-radius: 8px; min-width: 0; }
+.fleet-page .fleet-panel { padding: var(--fleet-card-inset); border-radius: var(--radius-card, 12px); min-width: 0; }
 .fleet-page .fleet-panel__title {
   margin: 0 0 16px;
   font: 600 16px/24px var(--font-sans);
@@ -231,3 +234,80 @@
   .fleet-page .fleet-summary--5,
   .fleet-page .fleet-summary--3 { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---- Design principles v2 ---- */
+/* Doubled class outranks the shell's `.os-app-shell .card` regardless of load order. */
+.fleet-page .card.card { border-radius: var(--radius-card, 12px); box-shadow: none; }
+.fleet-page .card.card:hover { border-color: var(--border-subtle); box-shadow: none; }
+
+/* Summary strip: one card, hairline-separated figures, each with its basis.
+   Vehicles and Drivers render the same strip so switching tabs never moves the page. */
+.fleet-page .card.fleet-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 24px;
+  padding: 0;
+  flex-direction: row;
+}
+.fleet-page .fleet-kpi { padding: 20px 24px; min-width: 0; }
+.fleet-page .fleet-kpi + .fleet-kpi { border-left: 1px solid var(--border-subtle); }
+.fleet-page .fleet-kpi__label { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-page .fleet-kpi__value {
+  margin-top: 4px;
+  font: 600 22px/28px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.fleet-page .fleet-kpi__value.is-attention { color: var(--status-warning-text, var(--status-warning)); }
+.fleet-page .fleet-kpi__of { font: 400 14px/20px var(--font-sans); color: var(--text-secondary); margin-left: 4px; }
+.fleet-page .fleet-kpi__note { margin-top: 4px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+@media (max-width: 720px) {
+  .fleet-page .card.fleet-kpis { grid-template-columns: minmax(0, 1fr); }
+  .fleet-page .fleet-kpi { padding: 16px; }
+  .fleet-page .fleet-kpi + .fleet-kpi { border-left: none; border-top: 1px solid var(--border-subtle); }
+}
+
+/* Rows: hover is a surface tint. */
+.fleet-page .fleet-table tbody tr.is-clickable { cursor: pointer; border-bottom: 1px solid var(--border-row); transition: background 0.15s ease; }
+.fleet-page .fleet-table tbody tr.is-clickable:last-child { border-bottom: none; }
+.fleet-page .fleet-table tbody tr.is-clickable:hover { background: var(--bg-surface-hover); }
+.fleet-page .fleet-table .is-primary { color: var(--text-primary); }
+.fleet-page .fleet-table__sub { display: block; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+
+/* Status chip: 6px, AA text role on a tinted surface, always a word. */
+.fleet-page .fleet-chip {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-chip, 6px);
+  font: 500 13px/20px var(--font-sans);
+  white-space: nowrap;
+  color: var(--text-secondary);
+  background: var(--status-neutral-bg);
+}
+.fleet-page .fleet-chip--success { color: var(--status-success-text); background: rgba(34, 197, 94, 0.12); }
+.fleet-page .fleet-chip--warning { color: var(--status-warning-text, var(--status-warning)); background: var(--status-warning-bg); }
+.fleet-page .fleet-chip--danger { color: var(--status-danger-text, var(--status-danger)); background: var(--status-danger-bg); }
+.fleet-page .fleet-chip--info { color: var(--status-info-text, var(--accent-primary)); background: var(--accent-glow); }
+
+/* Quiet row actions: 32px, neutral until hovered. */
+.fleet-page td button.fleet-row-action {
+  min-height: 32px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control, 8px);
+  color: var(--text-secondary);
+  font: 400 14px/20px var(--font-sans);
+  cursor: pointer;
+}
+.fleet-page td button.fleet-row-action:hover:not(:disabled) { background: var(--bg-surface-hover); color: var(--text-primary); }
+.fleet-page td button.fleet-row-action--danger:hover:not(:disabled) { background: var(--status-danger-bg); color: var(--status-danger-text, var(--status-danger)); }
+.fleet-page td button.fleet-row-action:disabled { opacity: 0.5; cursor: not-allowed; }
+.fleet-page td button.fleet-row-action:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.fleet-page .fleet-header-secondary {
+  background: none; border: 1px solid var(--border-subtle); color: var(--text-primary);
+  padding: 8px 16px; cursor: pointer;
+}
+.fleet-page .fleet-header-secondary:hover:not(:disabled) { background: var(--bg-surface-hover); }
+.fleet-page .fleet-header-secondary:disabled { opacity: 0.5; cursor: not-allowed; }

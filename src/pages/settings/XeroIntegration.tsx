@@ -184,7 +184,7 @@ export default function XeroIntegration() {
   const primaryBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 };
   const metaRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, lineHeight: '20px', flexWrap: 'wrap' };
   const iconMuted: React.CSSProperties = { width: 16, height: 16, color: 'var(--text-tertiary)', flexShrink: 0 };
-  const divider: React.CSSProperties = { borderTop: '1px solid var(--border-subtle)', paddingTop: 20, marginTop: 20 };
+  const divider: React.CSSProperties = { borderTop: '1px solid var(--border-subtle)', paddingTop: 24, marginTop: 24 };
 
   if (isLoading) {
     return (
@@ -341,8 +341,8 @@ export default function XeroIntegration() {
               <li
                 key={log.id}
                 style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-                  padding: '12px 20px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+                  padding: '12px 24px',
                   borderBottom: i < syncLogs.length - 1 ? '1px solid var(--border-row)' : 'none',
                 }}
               >

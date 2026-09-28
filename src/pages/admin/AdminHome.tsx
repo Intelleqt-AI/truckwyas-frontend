@@ -25,14 +25,14 @@ export default function AdminHome() {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-      <div className="card metric-card admin-control" role="link" tabIndex={0} style={{ cursor: 'pointer' }} onClick={() => navigate('/admin/companies')} onKeyDown={e => { if (e.key === 'Enter') navigate('/admin/companies'); }}>
+      <div className="card metric-card admin-control admin-tint-hover" role="link" tabIndex={0} style={{ cursor: 'pointer' }} onClick={() => navigate('/admin/companies')} onKeyDown={e => { if (e.key === 'Enter') navigate('/admin/companies'); }}>
         <div className="card-header"><span className="card-title">Companies</span></div>
         <div className="metric-value" style={metricStyle}>{overview.total_companies}</div>
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
           {overview.companies_by_status.active} active · {overview.companies_by_status.suspended} suspended · {overview.companies_by_status.cancelled} cancelled
         </div>
       </div>
-      <div className="card metric-card admin-control" role="link" tabIndex={0} style={{ cursor: 'pointer' }} onClick={() => navigate('/admin/users')} onKeyDown={e => { if (e.key === 'Enter') navigate('/admin/users'); }}>
+      <div className="card metric-card admin-control admin-tint-hover" role="link" tabIndex={0} style={{ cursor: 'pointer' }} onClick={() => navigate('/admin/users')} onKeyDown={e => { if (e.key === 'Enter') navigate('/admin/users'); }}>
         <div className="card-header"><span className="card-title">Users</span></div>
         <div className="metric-value" style={metricStyle}>{overview.total_users}</div>
       </div>
@@ -48,9 +48,16 @@ export default function AdminHome() {
       </div>
       <div className="card metric-card" style={{ gridColumn: '1 / -1' }}>
         <div className="card-header"><span className="card-title">Estimated MRR</span></div>
-        <div className="metric-value" style={metricStyle}>{formatCurrency(overview.mrr_estimate)}</div>
+        {/* Zero is a state to explain, not a headline number (design principles §1). */}
+        {Number(overview.mrr_estimate) > 0 ? (
+          <div className="metric-value" style={metricStyle}>{formatCurrency(overview.mrr_estimate)}</div>
+        ) : (
+          <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>
+            No recurring revenue yet.
+          </div>
+        )}
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
-          Active + grace-period companies × flat monthly fee — an estimate, not reconciled against actual Paystack charges.
+          Active + grace-period companies × flat monthly fee. This is an estimate, not reconciled against actual Paystack charges.
         </div>
       </div>
     </div>

@@ -22,19 +22,33 @@
   padding: 8px 16px;
   background: none;
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  color: var(--text-secondary);
+  border-radius: var(--radius-control, 8px);
+  color: var(--text-primary);
   font: 400 14px/20px var(--font-sans);
   letter-spacing: normal;
   text-transform: none;
   cursor: pointer;
   white-space: nowrap;
 }
-.fleet-detail .fd-button:hover:not(:disabled) { color: var(--text-primary); border-color: var(--border-active, var(--text-tertiary)); }
+.fleet-detail .fd-button:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-surface-hover); }
 .fleet-detail .fd-button:disabled { cursor: default; }
-.fleet-detail .fd-status-group { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Status is one segmented control, not four loose buttons. */
+.fleet-detail .fd-status-group {
+  display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control, 8px);
+  background: var(--bg-surface);
+}
+.fleet-detail .fd-status-group .fd-status {
+  min-height: 34px; padding: 6px 12px;
+  border: 1px solid transparent; border-radius: 6px;
+  color: var(--text-secondary);
+}
+.fleet-detail .fd-status-group .fd-status:hover:not(:disabled) { background: var(--bg-surface-hover); color: var(--text-primary); }
 .fleet-detail .fd-status[aria-pressed="true"] {
   background: var(--bg-surface-hover);
+  border-color: var(--border-active);
+  color: var(--text-primary);
   font-weight: 500;
   opacity: 1;
 }
@@ -53,7 +67,7 @@
   gap: 16px;
   margin-bottom: 24px;
 }
-.fleet-detail .fd-metrics > .card { min-width: 0; padding: var(--fd-inset); border-radius: 8px; }
+.fleet-detail .fd-metrics > .card { min-width: 0; padding: var(--fd-inset); border-radius: var(--radius-card, 12px); }
 .fleet-detail .fd-metrics .card-title {
   font: 500 13px/20px var(--font-sans);
   text-transform: none;
@@ -73,7 +87,8 @@
 /* Detail cards */
 .fleet-detail .fd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
 .fleet-detail .fd-stack { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
-.fleet-detail .fd-card { padding: var(--fd-inset); border-radius: 8px; min-width: 0; }
+.fleet-detail .fd-card { padding: var(--fd-inset); border-radius: var(--radius-card, 12px); min-width: 0; }
+.fleet-detail .fd-card__desc { margin: -12px 0 16px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
 .fleet-detail .fd-card__title {
   margin: 0 0 16px;
   font: 600 16px/24px var(--font-sans);
@@ -99,14 +114,14 @@
   overflow-wrap: anywhere;
 }
 .fleet-detail .fd-id { font: 400 13px/20px var(--font-mono); }
-.fleet-detail .fd-row--link { cursor: pointer; border-radius: 4px; }
+.fleet-detail .fd-row--link { cursor: pointer; border-radius: 6px; margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
 .fleet-detail .fd-row--link:hover { background: var(--bg-surface-hover); }
 .fleet-detail .fd-divider { height: 1px; background: var(--border-subtle); margin: 16px 0 8px; }
 .fleet-detail .fd-empty { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); text-align: center; padding: 24px 0; }
 
 .fleet-detail .fd-score { margin-bottom: 16px; }
 .fleet-detail .fd-score__row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-.fleet-detail .fd-score__track { height: 4px; background: var(--border-subtle); border-radius: 2px; }
+.fleet-detail .fd-score__track { height: 6px; background: var(--border-subtle); border-radius: 3px; overflow: hidden; }
 
 /* Recent-loads table */
 .fleet-detail .fd-table-card { padding-bottom: 8px; }
@@ -143,7 +158,7 @@
   width: 440px;
   max-width: 100%;
   background: var(--bg-surface);
-  border-left: 1px solid var(--border-subtle);
+  border-left: 1px solid var(--border-subtle); /* sheet edge, not an accent rail */
   padding: 24px;
   overflow-y: auto;
 }
@@ -153,7 +168,7 @@
   width: 44px; height: 44px;
   margin: -10px -10px -10px 0;
   display: inline-flex; align-items: center; justify-content: center;
-  background: none; border: none; border-radius: 6px;
+  background: none; border: none; border-radius: var(--radius-control, 8px);
   color: var(--text-secondary);
   font-size: 16px;
   cursor: pointer;
@@ -167,7 +182,7 @@
   padding: 8px 12px;
   background: var(--input-bg, var(--bg-surface));
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  border-radius: var(--radius-control, 8px);
   color: var(--text-primary);
   font: 400 14px/20px var(--font-sans);
   box-sizing: border-box;
@@ -176,17 +191,17 @@
 .fd-error {
   padding: 12px 16px;
   margin-bottom: 16px;
-  border: 1px solid var(--status-danger);
-  border-radius: 6px;
-  background: var(--bg-surface);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control, 8px);
+  background: var(--status-danger-bg);
   color: var(--status-danger-text, var(--status-danger));
   font: 400 14px/20px var(--font-sans);
 }
 .fd-drawer .fd-card__title { margin: 0; font: 600 16px/24px var(--font-sans); color: var(--text-primary); }
 .fd-drawer .fd-button {
   min-height: 40px; padding: 8px 16px;
-  background: none; border: 1px solid var(--border-subtle); border-radius: 6px;
-  color: var(--text-secondary); font: 400 14px/20px var(--font-sans); cursor: pointer;
+  background: none; border: 1px solid var(--border-subtle); border-radius: var(--radius-control, 8px);
+  color: var(--text-primary); font: 400 14px/20px var(--font-sans); cursor: pointer;
 }
 
 @media (max-width: 1100px) {
@@ -200,3 +215,39 @@
 @media (max-width: 480px) {
   .fleet-detail .fd-metrics { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---- Design principles v2 ---- */
+.fleet-detail .card.card { border-radius: var(--radius-card, 12px); box-shadow: none; }
+.fleet-detail .card.card:hover { border-color: var(--border-subtle); box-shadow: none; }
+
+/* Key figures strip: one card, hairline-separated, each figure with its basis. */
+.fleet-detail .card.fd-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0;
+  margin-bottom: 24px;
+}
+.fleet-detail .fd-kpi { padding: 20px var(--fd-inset); min-width: 0; }
+.fleet-detail .fd-kpi + .fd-kpi { border-left: 1px solid var(--border-subtle); }
+.fleet-detail .fd-kpi__label { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-kpi__value { margin-top: 4px; font: 600 22px/28px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); overflow-wrap: anywhere; }
+.fleet-detail .fd-kpi--lead .fd-kpi__value { font-size: 28px; line-height: 36px; }
+.fleet-detail .fd-kpi__value.is-attention { color: var(--status-warning-text, var(--status-warning)); }
+.fleet-detail .fd-kpi__value.is-danger { color: var(--status-danger-text, var(--status-danger)); }
+.fleet-detail .fd-kpi__of { font: 400 14px/20px var(--font-sans); color: var(--text-secondary); margin-left: 4px; }
+.fleet-detail .fd-kpi__note { margin-top: 4px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+@media (max-width: 720px) {
+  .fleet-detail .card.fd-kpis { grid-template-columns: minmax(0, 1fr); }
+  .fleet-detail .fd-kpi + .fd-kpi { border-left: none; border-top: 1px solid var(--border-subtle); }
+}
+.fleet-detail .fd-chip {
+  display: inline-flex; align-items: center; padding: 2px 8px;
+  border-radius: var(--radius-chip, 6px);
+  font: 500 13px/20px var(--font-sans); white-space: nowrap;
+  color: var(--text-secondary); background: var(--status-neutral-bg);
+}
+.fleet-detail .fd-chip--success { color: var(--status-success-text); background: rgba(34, 197, 94, 0.12); }
+.fleet-detail .fd-chip--warning { color: var(--status-warning-text, var(--status-warning)); background: var(--status-warning-bg); }
+.fleet-detail .fd-chip--info { color: var(--status-info-text, var(--accent-primary)); background: var(--accent-glow); }
+.fleet-detail .fd-table td { height: 48px; box-sizing: border-box; padding-top: 8px; padding-bottom: 8px; }
+.fleet-detail .fd-table th { height: 44px; box-sizing: border-box; }

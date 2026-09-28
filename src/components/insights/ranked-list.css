@@ -32,6 +32,7 @@
 }
 
 .rl-bar { display: block; height: 6px; border-radius: 3px; background: var(--ins-track, var(--bg-surface-hover)); overflow: hidden; }
+.rl-bar--custom { height: auto; background: none; overflow: visible; }
 .rl-bar-note { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
 .rl-row--muted .rl-label__text, .rl-row--muted .rl-value { color: var(--text-secondary); font-weight: 400; }
 .rl-bar__fill { display: block; height: 100%; border-radius: 3px; background: var(--accent-primary); }

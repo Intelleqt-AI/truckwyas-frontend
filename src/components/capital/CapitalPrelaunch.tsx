@@ -6,6 +6,7 @@ import { formatCurrency } from '@/lib/formatters';
 import { CAPITAL_COMING_SOON } from '@/lib/features';
 import SectionHeader from '@/components/layout/SectionHeader';
 import './capital-prelaunch.css';
+import { AgeingStrip } from '@/components/viz';
 
 /**
  * Fast Pay before launch. There is no funding partner yet, so this view shows
@@ -25,7 +26,22 @@ interface AgingReport {
     dso: number;
   };
   buckets: AgingBucket[];
+  customers?: AgingCustomer[];
 }
+interface AgingCustomer {
+  customer_id: number;
+  customer_name: string;
+  current: number;
+  days_1_30: number;
+  days_31_60: number;
+  days_61_90: number;
+  days_90_plus: number;
+  total_outstanding: number;
+  invoice_count: number;
+}
+const CUSTOMER_FIELDS: Record<string, keyof AgingCustomer> = {
+  current: 'current', '1-30': 'days_1_30', '31-60': 'days_31_60', '61-90': 'days_61_90', '90+': 'days_90_plus',
+};
 
 // Backend bucket keys (core/services/aging_service.py), in age order.
 const BUCKET_LABELS: Record<string, string> = {
@@ -105,6 +121,7 @@ function Skeleton({ rows = 3 }: { rows?: number }) {
 
 function WaitingCash() {
   const headId = useId();
+  const [allCustomers, setAllCustomers] = useState(false);
   const { data, isLoading, isError, refetch } = useQuery<AgingReport>({
     queryKey: ['invoice-aging'],
     queryFn: () => fetchData('api/v1/invoices/aging/'),
@@ -121,7 +138,18 @@ function WaitingCash() {
     });
     const pastDue = buckets.filter((b) => b.key !== 'current').reduce((s, b) => s + b.amount, 0);
     const pastDueCount = buckets.filter((b) => b.key !== 'current').reduce((s, b) => s + b.count, 0);
-    const maxAmount = Math.max(...buckets.map((b) => b.amount), 1);
+    const customerRows = (data.customers ?? [])
+      .map((c) => ({
+        id: String(c.customer_id),
+        name: c.customer_name,
+        total: Number(c.total_outstanding) || 0,
+        count: Number(c.invoice_count) || 0,
+        buckets: BUCKET_ORDER.map((key) => ({ key, label: BUCKET_LABELS[key], amount: Number(c[CUSTOMER_FIELDS[key]]) || 0 })),
+      }))
+      .filter((c) => c.total > 0)
+      .sort((a, b) => b.total - a.total);
+    const maxCustomer = Math.max(0, ...customerRows.map((c) => c.total));
+    const shownCustomers = allCustomers ? customerRows : customerRows.slice(0, 6);
 
     if (count === 0 || total <= 0) {
       body = (
@@ -165,21 +193,33 @@ function WaitingCash() {
 
           <div className="fp-outcome__breakdown">
             <h3 className="fp-subhead">How late it is</h3>
-            <ul className="fp-rank" aria-label="Unpaid balance by how late it is">
-              {buckets.map((b) => (
-                <li key={b.key} className={`fp-rank__row${b.amount === 0 ? ' is-empty' : ''}`}>
-                  <span className="fp-rank__label">{b.label}</span>
-                  <span className="fp-rank__bar" aria-hidden="true">
-                    <span style={{ width: `${(b.amount / maxAmount) * 100}%` }} />
-                  </span>
-                  <span className="fp-rank__value">{b.amount === 0 ? 'None' : formatCurrency(b.amount)}</span>
-                  <span className="fp-rank__meta">
-                    {b.amount === 0 ? '' : `${plural(b.count, 'invoice')} · ${pct(b.amount, total)}%`}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <AgeingStrip
+              buckets={buckets}
+              ariaLabel={`Unpaid balance by how late it is: ${buckets.filter((b) => b.amount > 0).map((b) => `${b.label} ${formatCurrency(b.amount)}`).join(', ')}`}
+            />
           </div>
+          {customerRows.length > 0 && (
+            <div className="fp-outcome__customers">
+              <h3 className="fp-subhead">Who it is waiting on</h3>
+              <ul className="fp-rank fp-rank--aged" aria-label="Unpaid balance by customer, shaded by how late it is">
+                {shownCustomers.map((c) => (
+                  <li key={c.id} className="fp-rank__row">
+                    <span className="fp-rank__label">{c.name}</span>
+                    <span className="fp-rank__aged">
+                      <AgeingStrip buckets={c.buckets} scaleTo={maxCustomer} ariaLabel={`${c.name}: ${formatCurrency(c.total)}, by how late it is`} />
+                    </span>
+                    <span className="fp-rank__value">{formatCurrency(c.total)}</span>
+                    <span className="fp-rank__meta">{plural(c.count, 'invoice')} · {pct(c.total, total)}%</span>
+                  </li>
+                ))}
+              </ul>
+              {customerRows.length > 6 && (
+                <button type="button" className="fp-btn fp-btn--quiet" onClick={() => setAllCustomers((v) => !v)}>
+                  {allCustomers ? 'Show the largest 6' : `Show all ${customerRows.length} customers`}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       );
     }

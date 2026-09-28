@@ -24,6 +24,8 @@ export interface RankedRow {
   meta?: ReactNode;
   /** Makes the row a link. */
   href?: string;
+  /** Custom bar (e.g. a segmented ageing bar). Must encode the same value the list is sorted by. */
+  bar?: ReactNode;
 }
 
 export interface RankedListProps {
@@ -131,9 +133,13 @@ export default function RankedList({
         {opts.muted && preserveOrder ? (
           <span className="rl-bar-note">{opts.muted}</span>
         ) : (
-          <span className="rl-bar" aria-hidden="true">
-            {!opts.muted && <span className="rl-bar__fill" style={{ width: `${pct}%` }} />}
-          </span>
+          r.bar && !opts.muted ? (
+            <span className="rl-bar rl-bar--custom">{r.bar}</span>
+          ) : (
+            <span className="rl-bar" aria-hidden="true">
+              {!opts.muted && <span className="rl-bar__fill" style={{ width: `${pct}%` }} />}
+            </span>
+          )
         )}
         <span className="rl-value">{v != null ? format(v) : ''}</span>
         {showShare && <span className="rl-share">{!opts.muted && v != null ? share(v) : ''}</span>}

@@ -111,3 +111,6 @@
   .insights-month-margins__label { grid-column: 1 / -1; }
   .insights-month-margin__m { display: block; }
 }
+
+/* Sub-heading inside a chart card (e.g. the per-customer list under the ageing strip). */
+.insights-subhead { margin: 8px 0 0; font: 600 14px/20px var(--font-sans); color: var(--text-primary); }

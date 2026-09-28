@@ -6,12 +6,13 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency as formatCurrencyBase } from '@/lib/formatters';
 import { DatePicker } from '@/components/ui/date-picker';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 import { Loader } from '@/components/Loader';
 import ExecutiveBriefing, { RecommendationGroups, formatDay, type BriefingResponse, type RecommendationDetail } from '@/components/insights/ExecutiveBriefing';
 import InsightCard from '@/components/insights/InsightCard';
 import KpiTile from '@/components/insights/KpiTile';
 import RankedList, { type RankedRow } from '@/components/insights/RankedList';
+import { Waterfall, CashRunway, AgeingStrip, PaymentDotPlot, LaneScatter } from '@/components/viz';
+import { ageingBuckets, ageingByCustomer, paymentRows, lanePoints } from '@/components/insights/insight-series';
 
 /* Insights page. Presentation only: every API call, query key and calculation
    below is unchanged from the previous version. Where the API returns decimal
@@ -29,34 +30,14 @@ const tripsLabel = (n: number) => plural(n, 'trip', 'trips');
 const MIN_TRIPS = 3;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthName = (ym: string) => MONTHS[Number(ym.slice(5, 7)) - 1] || ym;
-const routeText = (route: string) => route.replace(' → ', ' to ');
 // Display only: drop trailing punctuation left by the two-word cargo grouping ("Chemicals -").
 const cargoText = (s: string) => s.replace(/[\s&\-–:,/]+$/, '') || s;
-const shortMoney = (v: number) => {
-  const a = Math.abs(v);
-  const sign = v < 0 ? '-' : '';
-  if (a >= 1_000_000) return `${sign}R ${(a / 1_000_000).toFixed(1)}m`;
-  if (a >= 1_000) return `${sign}R ${(a / 1_000).toFixed(0)}k`;
-  return `${sign}R ${a.toFixed(0)}`;
-};
 /** Names the sample behind a panel. The list endpoints return one page (20
  *  rows today), so say so when there are more records than were loaded. */
 const sampleText = (shown: number, total: number | undefined, noun: string, recent = false) =>
   total != null && total > shown
     ? recent ? `your ${shown} most recent ${noun} (of ${total})` : `${shown} of your ${total} ${noun}`
     : `all ${shown} ${noun}`;
-
-// Chart series tokens (page-scoped in insights-page-brand.css).
-const SERIES_ACCENT = 'var(--accent-primary)';
-const SERIES_NEUTRAL = 'var(--ins-series-neutral)';
-const SERIES_DANGER = 'var(--status-danger)';
-const axisTick = { fontFamily: 'var(--font-sans)', fontSize: 13, fill: 'var(--text-secondary)' };
-const tooltipStyle = {
-  contentStyle: { background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', boxShadow: 'none' },
-  labelStyle: { color: 'var(--text-secondary)', marginBottom: 4 },
-  itemStyle: { color: 'var(--text-primary)', padding: 0 },
-  cursor: { fill: 'var(--bg-surface-hover)' },
-};
 
 function Stack({ children }: { children: ReactNode }) {
   return <div className="insights-stack">{children}</div>;
@@ -551,16 +532,26 @@ export default function Insights() {
                         {longerPeriod && <button type="button" className="ic-text-button" onClick={longerPeriod}>Show the last 12 months</button>}
                       </div>
                     ) : (
-                      <dl className="ic-kpis">
-                        <KpiTile label="Revenue" value={formatCurrency(rev)} />
-                        <KpiTile label="Approved costs" value={formatCurrency(cost)} note={rev > 0 ? `${((cost / rev) * 100).toFixed(1)}% of revenue` : undefined} />
-                        <KpiTile
-                          label="Net margin"
-                          value={formatCurrency(margin)}
-                          tone={margin < 0 ? 'danger' : undefined}
-                          note={rev > 0 ? `${num(f.net_margin_percent_period).toFixed(1)}% of revenue${margin < 0 ? ', a loss' : ''}` : margin < 0 ? 'A loss: costs with no paid revenue' : undefined}
+                      <>
+                        <Waterfall
+                          height={240}
+                          maxWidth={560}
+                          labelAll
+                          valueHeader="Amount"
+                          caption="Revenue, approved costs and net margin for the period"
+                          ariaLabel={`Revenue ${formatCurrency(rev)}, minus approved costs ${formatCurrency(cost)}, leaves a net margin of ${formatCurrency(margin)}.`}
+                          steps={[
+                            { label: 'Revenue', value: rev, kind: 'total' },
+                            { label: 'Approved costs', value: -cost, kind: 'delta' },
+                            { label: 'Net margin', value: margin, kind: 'total' },
+                          ]}
                         />
-                      </dl>
+                        <p className="ic-foot">
+                          {rev > 0
+                            ? <>Costs took <strong>{((cost / rev) * 100).toFixed(1)}%</strong> of revenue, leaving <strong>{num(f.net_margin_percent_period).toFixed(1)}%</strong>{margin < 0 ? <>, <span className="ic-text--danger">a loss</span></> : ''}.</>
+                            : <><span className="ic-text--danger">A loss</span>: costs with no paid revenue.</>}
+                        </p>
+                      </>
                     )}
                   </InsightCard>
                 );
@@ -576,45 +567,29 @@ export default function Insights() {
                     ? `Net margin in ${last.month} was ${formatCurrency(last.margin)}, level with ${prev.month}.`
                     : `Net margin in ${last.month} was ${formatCurrency(last.margin)}, ${last.margin > prev.margin ? 'up' : 'down'} from ${formatCurrency(prev.margin)} in ${prev.month}.`
                   : null;
+                const totalNet = data.reduce((sum, d) => sum + d.margin, 0);
                 return (
                   <InsightCard
-                    title="How revenue and costs moved over six months"
-                    description={`Paid invoices including VAT, by payment date, against approved expenses, by expense date. Calendar months. ${notFiltered}`}
+                    title="Where did the last six months leave you?"
+                    description={`Each month's net margin (paid invoices including VAT, by payment date, less approved expenses, by expense date) added to the months before it. Calendar months. ${notFiltered}`}
                   >
-                    <div className="ic-legend" aria-hidden="true">
-                      <span className="ic-legend__item"><span className="ic-legend__swatch" style={{ background: SERIES_ACCENT }} />Revenue</span>
-                      <span className="ic-legend__item"><span className="ic-legend__swatch" style={{ background: SERIES_NEUTRAL }} />Approved costs</span>
-                    </div>
-                    <div aria-hidden="true">
-                      <ResponsiveContainer width="100%" height={240}>
-                        <BarChart data={data} margin={{ top: 8, right: 0, left: 0, bottom: 0 }} barGap={4} barCategoryGap="28%">
-                          <CartesianGrid stroke="var(--border-row)" vertical={false} />
-                          <XAxis dataKey="month" tick={axisTick} axisLine={false} tickLine={false} />
-                          <YAxis tick={axisTick} axisLine={false} tickLine={false} width={80} tickFormatter={shortMoney} />
-                          <Tooltip
-                            {...tooltipStyle}
-                            formatter={(value: number, name: string) => [formatCurrency(value), name === 'revenue' ? 'Revenue' : 'Approved costs']}
-                          />
-                          <Bar dataKey="revenue" fill={SERIES_ACCENT} radius={[3, 3, 0, 0]} maxBarSize={28} />
-                          <Bar dataKey="expenses" fill={SERIES_NEUTRAL} radius={[3, 3, 0, 0]} maxBarSize={28} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <table className="ic-sr">
-                      <caption>Revenue, approved costs and net margin by month</caption>
-                      <thead><tr><th scope="col">Month</th><th scope="col">Revenue</th><th scope="col">Approved costs</th><th scope="col">Net margin</th></tr></thead>
-                      <tbody>{data.map(d => <tr key={d.month}><th scope="row">{d.month}</th><td>{formatCurrency(d.revenue)}</td><td>{formatCurrency(d.expenses)}</td><td>{formatCurrency(d.margin)}</td></tr>)}</tbody>
-                    </table>
-                    <div className="insights-month-margins" aria-hidden="true">
-                      <span className="insights-month-margins__label">Net margin</span>
-                      {data.map(d => (
-                        <div key={d.month} className="insights-month-margin">
-                          <span className="insights-month-margin__m">{d.month}</span>
-                          <strong className={d.margin < 0 ? 'ic-text--danger' : undefined}>{formatCurrency(d.margin)}</strong>
-                        </div>
-                      ))}
-                    </div>
-                    {summary && <p className="ic-foot">{summary}</p>}
+                    <Waterfall
+                      height={260}
+                      valueHeader="Net margin"
+                      caption="Net margin per month and the running total"
+                      ariaLabel={`Net margin by month from ${data[0]?.month} to ${last?.month}, adding up to ${formatCurrency(totalNet)}.`}
+                      steps={[
+                        ...data.map(d => ({
+                          label: d.month,
+                          value: d.margin,
+                          kind: 'delta' as const,
+                          emptyText: d.revenue === 0 && d.expenses === 0 ? 'No paid revenue and no approved costs' : undefined,
+                          detail: `Revenue ${formatCurrency(d.revenue)}, costs ${formatCurrency(d.expenses)}`,
+                        })),
+                        { label: `${data.length} months`, value: totalNet, kind: 'total' as const },
+                      ]}
+                    />
+                    {<p className="ic-foot">{last && (last.revenue !== 0 || last.expenses !== 0) ? `${summary} ` : ''}Over the {data.length} months the business is <strong>{formatCurrency(Math.abs(totalNet))}</strong> {totalNet >= 0 ? 'ahead' : 'behind'}.</p>}
                   </InsightCard>
                 );
               })()}
@@ -659,55 +634,27 @@ export default function Insights() {
           {tab === 'cash' && (
             <Stack>
               <InsightCard
-                title="How much cash should arrive over the next 8 weeks"
-                description={`Each unpaid invoice is placed on the date that customer usually pays, less expected costs based on your approved expenses over the last 90 days. Weeks start on Monday. ${notFiltered}`}
+                title="Will you run short of cash in the next 8 weeks?"
+                description={`Each unpaid invoice is placed on the date that customer usually pays; expected costs are based on your approved expenses over the last 90 days. The line adds each week to the ones before, starting from zero today: it does not include your bank balance. Weeks start on Monday. ${notFiltered}`}
               >
                 {cashflowData?.forecast && cashflowData.forecast.length > 0 ? (() => {
                   const data = cashflowData.forecast.slice(0, 8).map(f => ({
                     week: formatDay(f.start_date, false) || f.period,
-                    net: Math.round(f.net),
-                    in: Math.round(f.expected_in),
-                    out: Math.round(f.expected_out),
+                    in: num(f.expected_in),
+                    out: num(f.expected_out),
                   }));
-                  const runningBalance = data.reduce((sum, d) => sum + d.net, 0);
-                  const shortfalls = data.filter(d => d.net < 0).length;
-                  const peak = data.reduce((m, d) => (d.net > m.net ? d : m), data[0]);
+                  let pos = 0;
+                  const running = data.map(d => (pos += d.in - d.out));
+                  const shortWeeks = running.filter(v => v < 0).length;
+                  const lowIdx = running.reduce((m, v, i) => (v < running[m] ? i : m), 0);
                   return (
                     <>
-                      <div aria-hidden="true">
-                        <ResponsiveContainer width="100%" height={220}>
-                          <BarChart data={data} margin={{ top: 8, right: 0, left: 0, bottom: 0 }} barCategoryGap="30%">
-                            <CartesianGrid stroke="var(--border-row)" vertical={false} />
-                            <XAxis dataKey="week" tick={axisTick} axisLine={false} tickLine={false} />
-                            <YAxis tick={axisTick} axisLine={false} tickLine={false} width={56} tickFormatter={shortMoney} />
-                            <Tooltip
-                              {...tooltipStyle}
-                              labelFormatter={(l) => `Week of ${l}`}
-                              formatter={(value: number) => [formatCurrency(value), 'Net expected']}
-                            />
-                            <ReferenceLine y={0} stroke="var(--border-subtle)" strokeWidth={1} />
-                            <Bar dataKey="net" radius={[3, 3, 0, 0]} maxBarSize={40}>
-                              {data.map((entry, index) => (
-                                <Cell key={index} fill={entry.net < 0 ? SERIES_DANGER : SERIES_ACCENT} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <table className="ic-sr">
-                        <caption>Expected cash by week</caption>
-                        <thead><tr><th scope="col">Week of</th><th scope="col">Expected in</th><th scope="col">Expected out</th><th scope="col">Net</th></tr></thead>
-                        <tbody>{data.map(d => <tr key={d.week}><th scope="row">{d.week}</th><td>{formatCurrency(d.in)}</td><td>{formatCurrency(d.out)}</td><td>{formatCurrency(d.net)}</td></tr>)}</tbody>
-                      </table>
-                      <dl className="ic-kpis insights-divided">
-                        <KpiTile label="Net over 8 weeks" value={formatCurrency(runningBalance)} tone={runningBalance < 0 ? 'danger' : undefined} />
-                        <KpiTile
-                          label="Weeks with a shortfall"
-                          value={`${shortfalls} of ${data.length}`}
-                          note={shortfalls > 0 ? <span className="ic-text--danger">Costs expected to exceed receipts</span> : 'Receipts cover expected costs every week'}
-                        />
-                        <KpiTile label="Largest week" value={formatCurrency(peak?.net)} note={peak ? `Week of ${peak.week}` : undefined} />
-                      </dl>
+                      <CashRunway weeks={data.map(d => ({ label: d.week, in: d.in, out: d.out }))} />
+                      <p className="ic-foot">
+                        {shortWeeks > 0
+                          ? <><span className="ic-text--danger">Short in {shortWeeks} of {data.length} weeks.</span> The lowest point is <strong>{formatCurrency(running[lowIdx])}</strong> in the week of {data[lowIdx].week}, before your bank balance.</>
+                          : <>Expected receipts stay ahead of expected costs every week, ending <strong>{formatCurrency(running[running.length - 1])}</strong> up after {data.length} weeks.</>}
+                      </p>
                     </>
                   );
                 })() : (
@@ -773,11 +720,26 @@ export default function Insights() {
                 });
                 const total = customers.reduce((s, c) => s + c.total_outstanding, 0);
                 const top3sum = customers.slice(0, 3).reduce((sum, c) => sum + c.total_outstanding, 0);
+                const buckets = ageingBuckets(invoices);
+                const perCustomer = ageingByCustomer(invoices);
+                const maxOwed = Math.max(0, ...customers.map(c => c.total_outstanding));
+                const pastDue = buckets.filter(b => b.key !== 'current').reduce((s2, b) => s2 + b.amount, 0);
+                const agedTotal = buckets.reduce((s2, b) => s2 + b.amount, 0);
+                rows.forEach(r => {
+                  const b = perCustomer.get(r.id);
+                  if (b) r.bar = <AgeingStrip buckets={b} scaleTo={maxOwed} ariaLabel={`${r.id}: ${formatCurrency(Number(r.value))} owed, by how late it is`} />;
+                });
                 return (
                   <InsightCard
-                    title="Who owes you the most"
-                    description={`Unpaid balances by customer from ${sampleText(invoices.length, invoicesTotal, 'invoices')}, drafts included. Age is days since the invoice was issued. ${notFiltered}`}
+                    title="Where is your cash stuck, and with whom?"
+                    description={`Unpaid balances from ${sampleText(invoices.length, invoicesTotal, 'invoices')}, drafts included, split by how far past the due date they are today. Each customer's bar is their balance, shaded by the same lateness bands. ${notFiltered}`}
                   >
+                    {agedTotal > 0 && (
+                      <>
+                        <AgeingStrip buckets={buckets} ariaLabel={`Of ${formatCurrency(agedTotal)} unpaid, ${Math.round((pastDue / agedTotal) * 100)}% is past its due date`} />
+                        <h3 className="insights-subhead">By customer</h3>
+                      </>
+                    )}
                     <RankedList
                       rows={rows}
                       format={v => formatCurrency(v)}
@@ -791,6 +753,28 @@ export default function Insights() {
                       <p className="ic-foot">
                         Your 3 largest balances add up to <strong>{formatCurrency(top3sum)}</strong>, {((top3sum / total) * 100).toFixed(0)}% of the {formatCurrency(total)} listed.
                       </p>
+                    )}
+                  </InsightCard>
+                );
+              })()}
+
+              {(() => {
+                const { rows: payRows, paid, open, drafts } = paymentRows(invoices);
+                const marks = paid + open;
+                return (
+                  <InsightCard
+                    title="Which customers pay late?"
+                    description={`Every sent invoice from ${sampleText(invoices.length, invoicesTotal, 'invoices')}, placed at the days since it was issued: paid ones at the day payment was recorded, unpaid ones at today. The tick is the customer's usual terms (due date less issue date). ${drafts > 0 ? `${plural(drafts, 'draft is', 'drafts are')} left out because they have not been sent. ` : ''}${notFiltered}`}
+                  >
+                    {marks === 0 ? (
+                      <p className="ic-note">No sent invoices to measure yet. Payment timing appears once invoices are sent.</p>
+                    ) : (
+                      <>
+                        <PaymentDotPlot rows={payRows} maxRows={10} />
+                        {paid < 3 && (
+                          <p className="ic-foot">Only {plural(paid, 'paid invoice', 'paid invoices')} in this sample, so typical payment times are not settled yet. Unpaid invoices are shown so late payers are visible now.</p>
+                        )}
+                      </>
                     )}
                   </InsightCard>
                 );
@@ -934,49 +918,23 @@ export default function Insights() {
           {tab === 'lanes' && (
             <Stack>
               {(() => {
-                const routeMap = new Map<string, { trips: number; total_revenue: number; total_distance: number; total_fuel: number }>();
-                loads.forEach(load => {
-                  if (!load.pickup_city || !load.delivery_city) return;
-                  const route = `${load.pickup_city} → ${load.delivery_city}`;
-                  const e = routeMap.get(route) || { trips: 0, total_revenue: 0, total_distance: 0, total_fuel: 0 };
-                  routeMap.set(route, {
-                    trips: e.trips + 1,
-                    total_revenue: e.total_revenue + (parseFloat(String(load.total_amount)) || 0),
-                    total_distance: e.total_distance + (parseFloat(String(load.distance)) || 0),
-                    total_fuel: e.total_fuel + (parseFloat(String(load.fuel_surcharge)) || 0),
-                  });
-                });
-                const routes = Array.from(routeMap.entries())
-                  .map(([route, d]) => ({
-                    route, trips: d.trips,
-                    total_revenue: d.total_revenue,
-                    rev_per_km: d.total_distance > 0 ? d.total_revenue / d.total_distance : 0,
-                    margin_pct: d.total_revenue > 0 ? ((d.total_revenue - d.total_fuel) / d.total_revenue) * 100 : 0,
-                  }))
-                  .filter(r => r.rev_per_km > 0);
-                const noDistance = routeMap.size - routes.length;
+                const { points, overall, noDistance } = lanePoints(loads, MIN_TRIPS);
+                const evidenced = points.filter(p => !p.thin).length;
                 return (
                   <InsightCard
-                    title="Which lanes earn the most per kilometre"
-                    description={`Revenue divided by recorded distance, from ${sampleText(loads.length, loadsTotal, 'loads', true)}. Lanes with fewer than ${MIN_TRIPS} trips are not ranked${noDistance > 0 ? `; ${plural(noDistance, 'lane', 'lanes')} without a distance ${noDistance === 1 ? 'is' : 'are'} left out` : ''}. ${notFiltered}`}
+                    title="Which lanes are worth running?"
+                    description={`Revenue per kilometre against the length of a trip, from ${sampleText(loads.length, loadsTotal, 'loads', true)} with a recorded distance. Shorter trips usually earn more per kilometre, so compare a lane with lanes of similar length. Point size is the lane's total revenue.${noDistance > 0 ? ` ${plural(noDistance, 'lane', 'lanes')} without a distance ${noDistance === 1 ? 'is' : 'are'} left out.` : ''} ${notFiltered}`}
                   >
-                    <RankedList
-                      rows={routes.map(r => ({
-                        id: r.route,
-                        label: routeText(r.route),
-                        value: r.rev_per_km,
-                        count: r.trips,
-                        meta: `${formatCurrency(r.total_revenue)} revenue · ${r.margin_pct.toFixed(0)}% left after fuel surcharge`,
-                      }))}
-                      format={v => `${formatCurrency(v)}/km`}
-                      formatCount={tripsLabel}
-                      minCount={MIN_TRIPS}
-                      thinLabel="Too few trips to rank"
-                      topN={8}
-                      ariaLabel="Lanes by revenue per kilometre"
-                      empty="No loads with a pickup and delivery city yet."
-                      noRankedMessage={`No lane has ${MIN_TRIPS} or more trips with a recorded distance yet, so there is no ranking. Each lane's figures are listed below for reference.`}
-                    />
+                    {points.length === 0 ? (
+                      <p className="ic-note">No loads with a pickup city, delivery city and distance yet.</p>
+                    ) : (
+                      <>
+                        <LaneScatter points={points} overallPerKm={overall} minTrips={MIN_TRIPS} />
+                        {evidenced === 0 && (
+                          <p className="ic-foot">No lane has {MIN_TRIPS} or more trips yet, so every lane is drawn hollow: read them as early signals, not a verdict.</p>
+                        )}
+                      </>
+                    )}
                   </InsightCard>
                 );
               })()}

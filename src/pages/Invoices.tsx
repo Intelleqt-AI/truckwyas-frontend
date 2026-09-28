@@ -1,16 +1,17 @@
 import "./table-heading-roles.css";
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
-import "./expense-row-actions.css";
 import "./finance-brand.css";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ellipsis } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { fetchData, postData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { Loader } from "@/components/Loader";
 import SectionHeader, { FINANCE_TABS } from "@/components/layout/SectionHeader";
+import RowActions from "@/components/ui/RowActions";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { FinTile, FinTiles, wholeRand } from "@/components/finance/FinTile";
 
 // External Fast Pay application link. The applied-state key is unchanged so
 // invoices already marked "Applied" stay marked.
@@ -103,7 +104,6 @@ export default function Invoices() {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
 
   // Invoices + stats, cached across navigations.
@@ -146,8 +146,8 @@ export default function Invoices() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSendInvoice = async (e: React.MouseEvent, invoiceId: string) => {
-    e.stopPropagation();
+  const handleSendInvoice = async (e: React.MouseEvent | null, invoiceId: string) => {
+    e?.stopPropagation();
     setSendingId(invoiceId);
     try {
       await postData({ url: `/api/v1/invoices/${invoiceId}/send_invoice/` });
@@ -162,8 +162,8 @@ export default function Invoices() {
     }
   };
 
-  const handleDownloadPDF = async (e: React.MouseEvent, invoiceId: string) => {
-    e.stopPropagation();
+  const handleDownloadPDF = async (e: React.MouseEvent | null, invoiceId: string) => {
+    e?.stopPropagation();
     // generate_pdf is POST-only and returns a pdf_url; window.open(GET) 405s.
     try {
       const result = await postData({
@@ -177,8 +177,8 @@ export default function Invoices() {
     }
   };
 
-  const handleSendReminder = async (e: React.MouseEvent, invoiceId: string) => {
-    e.stopPropagation();
+  const handleSendReminder = async (e: React.MouseEvent | null, invoiceId: string) => {
+    e?.stopPropagation();
     setSendingReminderId(invoiceId);
     try {
       await postData({
@@ -250,7 +250,7 @@ export default function Invoices() {
     if (invoicedLastMonth == null) return null;
     if (invoicedLastMonth === 0) return `Nothing invoiced in ${lastMonthName}`;
     const pct = ((invoicedMtd - invoicedLastMonth) / invoicedLastMonth) * 100;
-    return `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(1)}% vs ${lastMonthName} (${formatCurrency(invoicedLastMonth)})`;
+    return `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(0)}% vs ${lastMonthName}`;
   })();
 
   const showStatus = (s: string) => {
@@ -295,61 +295,50 @@ export default function Invoices() {
           </div>
         </div>
       ) : (
-        <div className="fin-kpis">
+        <FinTiles label="Invoice figures">
           {monthActive ? (
             <>
-              <div className="card fin-kpi">
-                <span className="fin-kpi__label">Invoiced in {monthName}</span>
-                <span className="fin-kpi__value">{formatCurrency(invoicedMtd)}</span>
-                <span className="fin-kpi__delta">{invoicedDelta ?? "By issue date, incl. VAT"}</span>
-              </div>
-              <div className="card fin-kpi">
-                <span className="fin-kpi__label">Collected on {monthName} invoices</span>
-                <span className="fin-kpi__value">{formatCurrency(collectedMtd)}</span>
-                <span className="fin-kpi__sub">
-                  {invoicedMtd > 0
-                    ? `${Math.round((stats.collection_rate ?? 0) * 100)}% of the amount invoiced this month`
-                    : "Paid invoices issued this month"}
-                </span>
-              </div>
+              <FinTile
+                label={`Invoiced in ${monthName}`}
+                info={`Invoice totals incl. VAT, by issue date since the 1st. Covers all invoices.${invoicedLastMonth == null ? "" : ` Change compares ${lastMonthName}.`}`}
+                value={wholeRand(invoicedMtd)}
+                valueTitle={formatCurrency(invoicedMtd)}
+                sub={invoicedDelta ?? "By issue date"}
+              />
+              <FinTile
+                label="Collected"
+                info={`Paid amount of invoices issued in ${monthName}. Covers all invoices.`}
+                value={wholeRand(collectedMtd)}
+                valueTitle={formatCurrency(collectedMtd)}
+                sub={invoicedMtd > 0 ? `${Math.round((stats.collection_rate ?? 0) * 100)}% of ${monthName} invoiced` : `On ${monthName} invoices`}
+              />
             </>
           ) : (
-            <div className="card fin-kpi fin-kpi--wide">
-              <p className="fin-summary__title">Nothing invoiced in {monthName} yet</p>
-              <p className="fin-summary__body">
-                No invoice has an issue date this month, so there is nothing collected to compare.
-                {draftCount > 0 &&
-                  ` ${draftCount} ${draftCount === 1 ? "draft is" : "drafts are"} ready to send.`}
-              </p>
-              {draftCount > 0 && (
-                <div className="fin-kpi__action">
-                  <button type="button" className="fin-link" onClick={() => showStatus("DRAFT")}>
-                    Review drafts
-                  </button>
-                </div>
-              )}
-            </div>
+            <FinTile
+              label={`Invoiced in ${monthName}`}
+              info="Invoice totals incl. VAT, by issue date since the 1st. Covers all invoices."
+              value="None yet"
+              small
+              sub={draftCount > 0 ? `${draftCount} ${draftCount === 1 ? "draft" : "drafts"} ready` : "By issue date"}
+              action={draftCount > 0 ? { label: "Review drafts", onClick: () => showStatus("DRAFT") } : undefined}
+            />
           )}
-          <div className="card fin-kpi">
-            <span className="fin-kpi__label">Overdue balance</span>
-            <span className="fin-kpi__value">{formatCurrency(stats.overdue_amount ?? 0)}</span>
-            <span className={`fin-kpi__sub ${overdueCount > 0 ? "fin-text-danger" : ""}`}>
-              {overdueCount > 0
-                ? `${overdueCount} ${overdueCount === 1 ? "invoice" : "invoices"} past the due date`
-                : "No invoice is past its due date"}
-            </span>
-            <span className="fin-kpi__sub">Unpaid amount incl. VAT</span>
-          </div>
-          <div className="card fin-kpi">
-            <span className="fin-kpi__label">Average time to get paid</span>
-            <span className="fin-kpi__value">{avgDays == null ? "—" : `${avgDays} days`}</span>
-            <span className="fin-kpi__sub">
-              {avgDays == null
-                ? "Shown once an invoice is paid"
-                : `Issue date to payment, across ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}`}
-            </span>
-          </div>
-        </div>
+          <FinTile
+            label="Overdue"
+            info="Unpaid balance incl. VAT on invoices past their due date. Covers all invoices."
+            value={wholeRand(stats.overdue_amount ?? 0)}
+            valueTitle={formatCurrency(stats.overdue_amount ?? 0)}
+            sub={overdueCount > 0 ? `${overdueCount} ${overdueCount === 1 ? "invoice" : "invoices"} late` : "None late"}
+            subTone={overdueCount > 0 ? "danger" : undefined}
+            action={overdueCount > 0 && statusFilter !== "OVERDUE" ? { label: "Show", onClick: () => showStatus("OVERDUE") } : undefined}
+          />
+          <FinTile
+            label="Time to get paid"
+            info="Average from issue date to payment date, across all paid invoices."
+            value={avgDays == null ? "—" : <>{avgDays}<span className="fin-tile__unit">days</span></>}
+            sub={avgDays == null ? "After the first payment" : `Average, ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}`}
+          />
+        </FinTiles>
       )}
 
       {/* Filters */}
@@ -382,24 +371,26 @@ export default function Invoices() {
         </div>
         <span className="fin-toolbar__count">
           {filtered.length} {filtered.length === 1 ? "invoice" : "invoices"}
+          {!loading && truncated && (
+            <>
+              {` · latest ${allInvoices.length} of ${totalInvoices}`}
+              <InfoTip align="end">
+                This list holds the {allInvoices.length} most recent of {totalInvoices} invoices; search and filters apply to
+                these. The figures above cover all {totalInvoices}.
+              </InfoTip>
+            </>
+          )}
         </span>
       </div>
-      {!loading && truncated && (
-        <p className="fin-coverage">
-          This list holds the {allInvoices.length} most recent of {totalInvoices} invoices; search and filters apply to
-          these. The totals above cover all {totalInvoices}.
-        </p>
-      )}
 
       {/* Table: 10 per page, clickable */}
-      <div className="card fin-table-card">
+      <div className="card fin-table-card fin-table-card--fit">
         <div className="fin-table-scroll">
           <table className="fin-table fin-table--stack table-heading-roles">
             <thead>
               <tr>
-                <th>Issued</th>
-                <th>Invoice</th>
                 <th>Customer</th>
+                <th>Issued</th>
                 <th>Due</th>
                 <th>Status</th>
                 <th className="num">Amount incl. VAT</th>
@@ -413,7 +404,7 @@ export default function Invoices() {
             <tbody>
               {rows.length === 0 ? (
                 <tr className="is-empty">
-                  <td colSpan={7} style={{ padding: 0 }}>
+                  <td colSpan={6} style={{ padding: 0 }}>
                     {loading ? (
                       <div className="fin-empty fin-empty--compact">Loading invoices…</div>
                     ) : isError ? (
@@ -469,15 +460,15 @@ export default function Invoices() {
                       key={inv.id}
                       className="is-clickable"
                       onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
-                      <td className="fin-date m-hide">{safeDate(inv.issue_date)}</td>
-                      <td className="m-meta">
-                        <span className="fin-id">{invNumber}</span>
-                      </td>
-                      <td className="fin-strong m-party">
+                      <td className="fin-strong m-party m-span2 fin-cell-2">
                         <div className="fin-truncate" title={custName}>
                           {custName}
                         </div>
+                        <span className="fin-cell-sub">
+                          <span className="fin-id">{invNumber}</span>
+                        </span>
                       </td>
+                      <td className="fin-date m-hide">{safeDate(inv.issue_date)}</td>
                       <td className={`fin-date m-due${agingLabel ? "" : " m-hide"}`}>
                         <span className="fin-mobile-only">Due </span>
                         {safeDate(dueDate)}
@@ -500,99 +491,44 @@ export default function Invoices() {
                         </span>
                       </td>
                       <td className="num m-amount">{formatCurrency(amount)}</td>
-                      <td
-                        className="actions"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") setOpenDropdownId(null);
-                        }}>
-                        <div className="expense-row-actions">
-                          <button
-                            type="button"
-                            className="expense-menu-trigger"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenDropdownId(openDropdownId === inv.id ? null : inv.id);
-                            }}
-                            aria-label={`Invoice actions for ${invNumber}`}
-                            aria-haspopup="menu"
-                            aria-expanded={openDropdownId === inv.id}>
-                            <Ellipsis size={16} aria-hidden="true" />
-                          </button>
-
-                          {openDropdownId === inv.id && (
-                            <>
-                              {/* click-away overlay */}
-                              <div
-                                style={{ position: "fixed", inset: 0, zIndex: 99 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenDropdownId(null);
-                                }}
-                              />
-                              <div className="expense-menu" role="menu">
-                                {invStatus === "DRAFT" && (
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="expense-menu-item"
-                                    disabled={sendingId === inv.id}
-                                    onClick={(e) => {
-                                      setOpenDropdownId(null);
-                                      handleSendInvoice(e, inv.id);
-                                    }}>
-                                    {sendingId === inv.id ? "Sending…" : "Send to customer"}
-                                  </button>
-                                )}
-                                {invStatus === "OVERDUE" && (
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="expense-menu-item"
-                                    disabled={sendingReminderId === inv.id}
-                                    onClick={(e) => {
-                                      setOpenDropdownId(null);
-                                      handleSendReminder(e, inv.id);
-                                    }}>
-                                    {sendingReminderId === inv.id ? "Sending…" : "Send reminder"}
-                                  </button>
-                                )}
-                                {invStatus !== "DRAFT" && (
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="expense-menu-item"
-                                    onClick={(e) => {
-                                      setOpenDropdownId(null);
-                                      handleDownloadPDF(e, inv.id);
-                                    }}>
-                                    Download PDF
-                                  </button>
-                                )}
-                                {capitalEntry && (
-                                  applied ? (
-                                    <div className="fin-menu-note">
-                                      <strong>Applied for Fast Pay</strong>
-                                      Your earlier application is on record.
-                                    </div>
-                                  ) : (
-                                    <button type="button" role="menuitem" className="expense-menu-item"
-                                      disabled={!CAPITAL_LAUNCHED} aria-disabled={!CAPITAL_LAUNCHED}
-                                      title={CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON}>
-                                      {CAPITAL_LAUNCHED ? "Request Fast Pay" : "Request Fast Pay (coming soon)"}
-                                    </button>
-                                  )
-                                )}
-                                {ineligibleEntry && (
-                                  <div className="fin-menu-note">
-                                    <strong>Not eligible for Fast Pay</strong>
-                                    {ineligibleEntry.reason}
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </div>
+                      <td className="actions" onClick={(e) => e.stopPropagation()}>
+                        <RowActions
+                          label={`Invoice ${invNumber}`}
+                          items={[
+                            { label: "Open invoice", onSelect: () => navigate(`/finance/invoices/${inv.id}`) },
+                            ...(invStatus === "DRAFT"
+                              ? [{
+                                  label: sendingId === inv.id ? "Sending…" : "Send to customer",
+                                  onSelect: () => handleSendInvoice(null, inv.id),
+                                  disabled: sendingId === inv.id,
+                                }]
+                              : []),
+                            ...(invStatus === "OVERDUE"
+                              ? [{
+                                  label: sendingReminderId === inv.id ? "Sending…" : "Send reminder",
+                                  onSelect: () => handleSendReminder(null, inv.id),
+                                  disabled: sendingReminderId === inv.id,
+                                }]
+                              : []),
+                            ...(invStatus !== "DRAFT"
+                              ? [{ label: "Download PDF", onSelect: () => handleDownloadPDF(null, inv.id) }]
+                              : []),
+                            ...(capitalEntry
+                              ? applied
+                                ? [{ label: "Applied for Fast Pay", hint: "Your earlier application is on record.", onSelect: () => {}, disabled: true }]
+                                : [{
+                                    // No handler until Fast Pay launches (unchanged behaviour).
+                                    label: CAPITAL_LAUNCHED ? "Request Fast Pay" : "Request Fast Pay (coming soon)",
+                                    hint: CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON,
+                                    onSelect: () => {},
+                                    disabled: !CAPITAL_LAUNCHED,
+                                  }]
+                              : []),
+                            ...(ineligibleEntry
+                              ? [{ label: "Not eligible for Fast Pay", hint: String(ineligibleEntry.reason ?? ""), onSelect: () => {}, disabled: true }]
+                              : []),
+                          ]}
+                        />
                       </td>
                     </tr>
                   );

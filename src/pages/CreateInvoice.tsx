@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, fetchData } from "@/lib/Api";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FinTile } from '@/components/finance/FinTile';
 
 export default function CreateInvoice() {
   const navigate = useNavigate();
@@ -75,7 +76,7 @@ export default function CreateInvoice() {
         <div style={{ minWidth: 0 }}>
           <div className="fin-detail-head__eyebrow">Finance</div>
           <div className="fin-detail-head__title-row"><h1>New invoice</h1></div>
-          <p className="fin-detail-head__sub">Delivered loads are invoiced automatically. Use this for a one-off charge.</p>
+          <p className="fin-detail-head__sub">For one-off charges. Loads invoice themselves.</p>
         </div>
       </header>
 
@@ -84,7 +85,7 @@ export default function CreateInvoice() {
           <section className="card" aria-labelledby="create-invoice-details">
             <div className="fin-panel-head">
               <div className="fin-panel-head__text">
-                <h2 id="create-invoice-details" className="fin-panel-title">Who is it for, and what is it for?</h2>
+                <h2 id="create-invoice-details" className="fin-panel-title">Details</h2>
               </div>
             </div>
             <div className="fin-form">
@@ -112,25 +113,13 @@ export default function CreateInvoice() {
               <div>
                 <label htmlFor="create-invoice-invoice_number" className="fin-label">Invoice number</label>
                 <input id="create-invoice-invoice_number" className="fin-control qi-input" type="text" value={form.invoice_number} onChange={set('invoice_number')} style={{ fontFamily: 'var(--font-mono)' }} />
-                <p className="fin-help">Suggested automatically. Change it if you number invoices yourself.</p>
+                <p className="fin-help">Suggested. Change it if you use your own numbers.</p>
               </div>
               <div>
                 <label htmlFor="create-invoice-description" className="fin-label">Description</label>
                 <textarea id="create-invoice-description" className="fin-control qi-input" value={form.description} onChange={set('description')} rows={3} placeholder="e.g. Standby charge, 2 days at Durban port" />
               </div>
-            </div>
-          </section>
-
-          <aside className="fin-stack fin-stack--16" style={{ minWidth: 0 }}>
-            <section className="card" aria-labelledby="create-invoice-summary">
-              <div className="fin-kpi__label" id="create-invoice-summary">Invoice total incl. VAT</div>
-              <p className="fin-hero-amount">{formatCurrency(totalPreview)}</p>
-              <p className="fin-kpi__sub" style={{ margin: 0 }}>{selectedCustomer ? `For ${selectedCustomer.name}` : 'No customer selected'}</p>
-              <dl className="fin-dl" style={{ marginTop: 12 }}>
-                <div className="fin-dl__row"><dt>Amount excl. VAT</dt><dd>{formatCurrency(subtotalPreview)}</dd></div>
-                <div className="fin-dl__row"><dt>VAT (15%)</dt><dd>{formatCurrency(vatPreview)}</dd></div>
-              </dl>
-              <div style={{ marginTop: 16 }}>
+              <div>
                 <label id="create-invoice-status-label" htmlFor="create-invoice-status" className="fin-label">When it is created</label>
                 <Select value={form.status} onValueChange={val => setForm(f => ({ ...f, status: val }))}>
                   <SelectTrigger id="create-invoice-status" aria-labelledby="create-invoice-status-label">
@@ -142,7 +131,17 @@ export default function CreateInvoice() {
                   </SelectContent>
                 </Select>
               </div>
-            </section>
+            </div>
+          </section>
+
+          <aside className="fin-stack fin-stack--16" style={{ minWidth: 0 }}>
+            <FinTile
+              label="Total incl. VAT"
+              info={<>The amount is saved as the subtotal and VAT at 15% is added when the invoice is saved.</>}
+              value={formatCurrency(totalPreview)}
+              sub={`${formatCurrency(subtotalPreview)} + ${formatCurrency(vatPreview)} VAT`}
+            />
+            <p className="fin-help" style={{ margin: '-4px 0 0' }}>{selectedCustomer ? `For ${selectedCustomer.name}` : 'No customer selected'}</p>
 
             {error && <div className="fin-inset fin-text-danger" role="alert" style={{ fontSize: 13, lineHeight: '20px' }}>{error}</div>}
 
@@ -150,11 +149,11 @@ export default function CreateInvoice() {
               <button type="submit" className="btn-action qi-action" style={{ width: '100%' }} disabled={!canSubmit || mutation.isPending}>
                 {mutation.isPending ? 'Creating…' : 'Create invoice'}
               </button>
-              <button type="button" className="btn-action fin-btn-secondary qi-action" style={{ width: '100%' }} onClick={() => navigate('/finance/invoices')}>
+              <button type="button" className="btn-action fin-btn-secondary fin-btn-ghost qi-action" style={{ width: '100%' }} onClick={() => navigate('/finance/invoices')}>
                 Cancel
               </button>
               {!canSubmit && (
-                <p className="fin-help" style={{ margin: 0 }}>Choose a customer, enter an amount above zero and pick a due date to continue.</p>
+                <p className="fin-help" style={{ margin: 0 }}>Needs a customer, an amount and a due date.</p>
               )}
             </div>
           </aside>

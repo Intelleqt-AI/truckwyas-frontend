@@ -10,7 +10,7 @@ import KpiTile from '@/components/insights/KpiTile';
 import RankedList from '@/components/insights/RankedList';
 import FindingsFeed, { RETRY, useAllRows } from '@/components/insights/FindingsFeed';
 import type { ExpenseRec, InvoiceRec, LoadRec } from '@/components/insights/findings';
-import { Waterfall, CashRunway, PaymentDotPlot, LaneScatter, Funnel, rand } from '@/components/viz';
+import { Waterfall, PaymentDotPlot, LaneScatter, Funnel, rand } from '@/components/viz';
 import { paymentRows, lanePoints } from '@/components/insights/insight-series';
 
 /* Insights. The first tab is the findings feed: what to change and what it is
@@ -31,13 +31,13 @@ const formatDay = (iso?: string, withYear = true) => {
   return `${d.getDate()} ${MONTHS[d.getMonth()]}${withYear ? ` ${d.getFullYear()}` : ''}`;
 };
 
-type TabType = 'findings' | 'margin' | 'cash' | 'fleet' | 'lanes';
+type TabType = 'findings' | 'margin' | 'paid' | 'fleet' | 'lanes';
 type PeriodType = 'THIS_MONTH' | 'LAST_MONTH' | 'LAST_3M' | 'LAST_6M' | 'LAST_12M' | 'CUSTOM';
 
 const TABS: { id: TabType; label: string }[] = [
   { id: 'findings', label: 'Findings' },
   { id: 'margin', label: 'Margin' },
-  { id: 'cash', label: 'Cash flow' },
+  { id: 'paid', label: 'Getting paid' },
   { id: 'fleet', label: 'Fleet' },
   { id: 'lanes', label: 'Lanes' },
 ];
@@ -56,7 +56,6 @@ interface FinanceData {
   revenue_period: number; expenses_period: number; net_margin_period: number; net_margin_percent_period: number;
   from_date?: string; to_date?: string; monthly_trend?: MonthlyTrend[];
 }
-interface CashFlowPeriod { period: string; start_date: string; end_date: string; expected_in: number; expected_out: number; net: number }
 interface Vehicle { id: number; plate: string; make: string; model: string; status: string; revenue_generated: number | string }
 
 function periodRange(period: PeriodType, customFrom: string, customTo: string): { from: string; to: string } {
@@ -96,7 +95,10 @@ function TabState({ loading, error, onRetry }: { loading: boolean; error: boolea
 
 export default function Insights() {
   const [params, setParams] = useSearchParams();
-  const tabParam = params.get('tab') as TabType | null;
+  // The old Cash flow tab moved: actual cash is Finance > Reports > Cash movement,
+  // a predicted shortfall is a finding. Its payment panels live under Getting paid.
+  const rawTab = params.get('tab');
+  const tabParam = (rawTab === 'cash' ? 'paid' : rawTab) as TabType | null;
   const tab: TabType = TABS.some(t => t.id === tabParam) ? tabParam! : 'findings';
   const setTab = (t: TabType) => setParams(p => { const n = new URLSearchParams(p); if (t === 'findings') n.delete('tab'); else n.set('tab', t); return n; }, { replace: true });
 
@@ -117,7 +119,7 @@ export default function Insights() {
 
       {tab === 'findings' && <FindingsFeed />}
       {tab === 'margin' && <MarginTab />}
-      {tab === 'cash' && <CashTab />}
+      {tab === 'paid' && <PaidTab />}
       {tab === 'fleet' && <FleetTab />}
       {tab === 'lanes' && <LanesTab />}
     </div>
@@ -245,44 +247,15 @@ function MarginTab() {
   );
 }
 
-// -------------------------------------------------------------------- cash
+// ------------------------------------------------------------ getting paid
 
-function CashTab() {
-  const cashflow = useQuery<{ forecast: CashFlowPeriod[] }>({
-    queryKey: ['insights-cashflow'],
-    queryFn: () => fetchData('api/v1/dashboard/cashflow/'),
-    staleTime: 5 * 60_000,
-    ...RETRY,
-  });
+function PaidTab() {
   const invoices = useAllRows<InvoiceRec>('invoices', 'api/v1/invoices/');
   const inv = invoices.data?.rows ?? [];
   const partial = invoices.data && !invoices.data.complete ? ` Based on the first ${inv.length} of ${invoices.data.count} invoices.` : '';
 
   return (
     <Stack>
-      <InsightCard
-        title="Cash runway"
-        description="Next 8 weeks, before your bank balance"
-        info="Each unpaid invoice is placed on the date that customer usually pays. Expected costs come from your approved expenses over the last 90 days. The line adds each week to the ones before, starting from zero today. Weeks start on Monday."
-      >
-        {cashflow.isLoading || cashflow.isError ? (
-          <TabState loading={cashflow.isLoading} error={cashflow.isError} onRetry={() => cashflow.refetch()} />
-        ) : cashflow.data?.forecast?.length ? (() => {
-          const weeks = cashflow.data.forecast.slice(0, 8).map(w => ({ label: formatDay(w.start_date, false) || w.period, in: num(w.expected_in), out: num(w.expected_out) }));
-          let pos = 0;
-          const running = weeks.map(w => (pos += w.in - w.out));
-          const short = running.filter(v => v < 0).length;
-          return (
-            <>
-              <CashRunway weeks={weeks} />
-              {short > 0 && <p className="ic-foot"><span className="ic-text--danger">Short in {short} of {weeks.length} weeks.</span></p>}
-            </>
-          );
-        })() : (
-          <p className="ic-note">Nothing unpaid or recently spent to forecast.</p>
-        )}
-      </InsightCard>
-
       {invoices.isLoading || invoices.isError ? (
         <TabState loading={invoices.isLoading} error={invoices.isError} onRetry={() => invoices.refetch()} />
       ) : (() => {

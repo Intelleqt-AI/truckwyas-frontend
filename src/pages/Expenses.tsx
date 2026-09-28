@@ -1,10 +1,9 @@
 import './expenses-type-roles.css';
 import { localDateISO } from '@/lib/dates';
 import './table-heading-roles.css';
-import './expense-row-actions.css';
 import './finance-brand.css';
 import { useEffect, useState } from "react";
-import { X, Ellipsis } from "lucide-react";
+import { X } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData, putData, deleteData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
@@ -15,6 +14,9 @@ import { formatCurrency, formatDate } from '@/lib/formatters';
 import { Loader } from '@/components/Loader';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import SectionHeader, { FINANCE_TABS } from '@/components/layout/SectionHeader';
+import RowActions from '@/components/ui/RowActions';
+import { InfoTip } from '@/components/ui/InfoTip';
+import { FinTile, FinTiles, wholeRand } from '@/components/finance/FinTile';
 
 interface Expense {
   id: number;
@@ -116,7 +118,6 @@ export default function Expenses() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [reviewingId, setReviewingId] = useState<number | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [confirmOpts, setConfirmOpts] = useState<{
     title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
@@ -302,9 +303,9 @@ export default function Expenses() {
   const vsLastMonth = (current: number, previous: number) => {
     if (!lastMonthCovered) return null;
     const name = monthLong(nowKey - 1);
-    if (previous === 0) return current === 0 ? `Same as ${name} (none)` : `None in ${name}`;
+    if (previous === 0) return current === 0 ? `None in ${name} either` : `None in ${name}`;
     const pct = ((current - previous) / previous) * 100;
-    return `${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(1)}% vs ${name} (${formatCurrency(previous)})`;
+    return `${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(0)}% vs ${name}`;
   };
 
   // Last six calendar months, current month last. Months older than the
@@ -332,69 +333,67 @@ export default function Expenses() {
     <div className="fin-page expenses-type-roles">
       {header}
 
-      {/* Headline: this month's spend, or one sentence when there is none */}
+      {/* Headline figures: one per tile, like Today. */}
       {thisMonthExpenses.length === 0 ? (
-        <div className="fin-kpis fin-kpis--3">
-          <div className="card fin-kpi fin-kpi--wide">
-            <p className="fin-summary__title">No expenses recorded in {monthLong(nowKey)} yet</p>
-            <p className="fin-summary__body">
-              {newestLoaded
-                ? `The most recent expense is dated ${formatDate(newestLoaded)}. Add fuel, tolls and other costs as they happen so margins stay current.`
-                : 'Add fuel, tolls and other costs as they happen so margins stay current.'}
-            </p>
-            <div className="fin-kpi__action">
-              <button type="button" className="fin-link" onClick={() => setShowAdd(true)}>Add expense</button>
-            </div>
-          </div>
-          <div className="card fin-kpi">
-            <span className="fin-kpi__label">Waiting for approval</span>
-            <span className="fin-kpi__value">{pendingExpenses.length > 0 ? formatCurrency(pendingAmount) : 'None'}</span>
-            <span className="fin-kpi__sub">
-              {pendingExpenses.length > 0
-                ? `${pendingExpenses.length} ${pendingExpenses.length === 1 ? 'expense' : 'expenses'}${truncated ? ' in the loaded list' : ''}`
-                : 'Every loaded expense has been reviewed'}
-            </span>
-            {pendingExpenses.length > 0 && (
-              <div className="fin-kpi__action">
-                <button type="button" className="fin-link" onClick={() => { setStatusFilter('PENDING'); resetPage(); }}>Review pending</button>
-              </div>
-            )}
-          </div>
-        </div>
+        <FinTiles label="Expense figures">
+          <FinTile
+            label={`Spent in ${monthLong(nowKey)}`}
+            info="Expenses dated this calendar month, all statuses."
+            value="None yet"
+            small
+            sub={newestLoaded ? `Last expense ${formatDate(newestLoaded)}` : 'No expenses recorded'}
+            action={{ label: 'Add expense', onClick: () => setShowAdd(true) }}
+          />
+          <FinTile
+            label="Waiting for approval"
+            info={`Pending expenses${truncated ? ' in the loaded list' : ''}, amounts as entered.`}
+            value={pendingExpenses.length > 0 ? wholeRand(pendingAmount) : 'None'}
+            valueTitle={pendingExpenses.length > 0 ? formatCurrency(pendingAmount) : undefined}
+            small={pendingExpenses.length === 0}
+            sub={pendingExpenses.length > 0 ? `${pendingExpenses.length} ${pendingExpenses.length === 1 ? 'expense' : 'expenses'}` : 'All reviewed'}
+            action={pendingExpenses.length > 0 ? { label: 'Review', onClick: () => { setStatusFilter('PENDING'); resetPage(); } } : undefined}
+          />
+          <FinTile
+            label="Recorded"
+            info={`Total of ${basisLabel}, all statuses, amounts as entered.`}
+            value={wholeRand(totalExpenses)}
+            valueTitle={formatCurrency(totalExpenses)}
+            sub={truncated ? `Latest ${expenses.length} of ${totalExpenseCount}` : `${expenses.length} ${expenses.length === 1 ? 'expense' : 'expenses'}`}
+          />
+        </FinTiles>
       ) : (
-        <div className="fin-kpis">
-          <div className="card fin-kpi">
-            <span className="fin-kpi__label">Approved in {monthLong(nowKey)}</span>
-            <span className="fin-kpi__value">{formatCurrency(approvedMtd)}</span>
-            <span className="fin-kpi__delta">{vsLastMonth(approvedMtd, sumApproved(lastMonthExpenses)) ?? 'By expense date'}</span>
-          </div>
-          <div className="card fin-kpi">
-            <span className="fin-kpi__label">Waiting for approval</span>
-            <span className="fin-kpi__value">{pendingExpenses.length > 0 ? formatCurrency(pendingAmount) : 'None'}</span>
-            <span className="fin-kpi__sub">
-              {pendingExpenses.length > 0
-                ? `${pendingExpenses.length} ${pendingExpenses.length === 1 ? 'expense' : 'expenses'}`
-                : 'Every loaded expense has been reviewed'}
-            </span>
-            {pendingExpenses.length > 0 && (
-              <div className="fin-kpi__action">
-                <button type="button" className="fin-link" onClick={() => { setStatusFilter('PENDING'); resetPage(); }}>Review pending</button>
-              </div>
-            )}
-          </div>
-          <div className="card fin-kpi">
-            <span className="fin-kpi__label">Fuel in {monthLong(nowKey)}</span>
-            <span className="fin-kpi__value">{formatCurrency(fuelMtd)}</span>
-            <span className="fin-kpi__delta">{vsLastMonth(fuelMtd, sumFuel(lastMonthExpenses)) ?? 'All statuses, by expense date'}</span>
-          </div>
-          <div className="card fin-kpi">
-            <span className="fin-kpi__label">Largest cost in {monthLong(nowKey)}</span>
-            <span className="fin-kpi__value">{topMtd ? catLabel(topMtd[0]) : '—'}</span>
-            <span className="fin-kpi__sub">
-              {topMtd ? `${formatCurrency(topMtd[1])}, ${mtdTotal > 0 ? Math.round((topMtd[1] / mtdTotal) * 100) : 0}% of this month` : ''}
-            </span>
-          </div>
-        </div>
+        <FinTiles label="Expense figures">
+          <FinTile
+            label={`Approved in ${monthLong(nowKey)}`}
+            info={`Approved expenses dated this calendar month.${lastMonthCovered ? ` Change compares ${monthLong(nowKey - 1)}.` : ' No comparison: last month is not fully loaded.'}`}
+            value={wholeRand(approvedMtd)}
+            valueTitle={formatCurrency(approvedMtd)}
+            sub={vsLastMonth(approvedMtd, sumApproved(lastMonthExpenses)) ?? 'By expense date'}
+          />
+          <FinTile
+            label="Waiting for approval"
+            info={`Pending expenses${truncated ? ' in the loaded list' : ''}, amounts as entered.`}
+            value={pendingExpenses.length > 0 ? wholeRand(pendingAmount) : 'None'}
+            valueTitle={pendingExpenses.length > 0 ? formatCurrency(pendingAmount) : undefined}
+            small={pendingExpenses.length === 0}
+            sub={pendingExpenses.length > 0 ? `${pendingExpenses.length} ${pendingExpenses.length === 1 ? 'expense' : 'expenses'}` : 'All reviewed'}
+            action={pendingExpenses.length > 0 ? { label: 'Review', onClick: () => { setStatusFilter('PENDING'); resetPage(); } } : undefined}
+          />
+          <FinTile
+            label={`Fuel in ${monthLong(nowKey)}`}
+            info="Fuel expenses dated this calendar month, all statuses."
+            value={wholeRand(fuelMtd)}
+            valueTitle={formatCurrency(fuelMtd)}
+            sub={vsLastMonth(fuelMtd, sumFuel(lastMonthExpenses)) ?? 'By expense date'}
+          />
+          <FinTile
+            label="Largest cost"
+            info="The category with the most spend this calendar month, all statuses."
+            value={topMtd ? catLabel(topMtd[0]) : '—'}
+            small
+            sub={topMtd ? `${wholeRand(topMtd[1])}, ${mtdTotal > 0 ? Math.round((topMtd[1] / mtdTotal) * 100) : 0}% of ${monthLong(nowKey)}` : ''}
+          />
+        </FinTiles>
       )}
 
       {/* Filters: same toolbar layout as Invoices */}
@@ -436,26 +435,30 @@ export default function Expenses() {
             </button>
           ))}
         </div>
-        <span className="fin-toolbar__count">{sorted.length} {sorted.length === 1 ? 'expense' : 'expenses'}</span>
+        <span className="fin-toolbar__count">
+          {sorted.length} {sorted.length === 1 ? 'expense' : 'expenses'}
+          {truncated && (
+            <>
+              {` · latest ${expenses.length} of ${totalExpenseCount}`}
+              <InfoTip align="end">
+                This page holds the {expenses.length} most recent of {totalExpenseCount} expenses. Search, filters, totals and
+                charts use these {expenses.length}; Export CSV exports the filtered list.
+              </InfoTip>
+            </>
+          )}
+        </span>
       </div>
-      {truncated && (
-        <p className="fin-coverage">
-          This page holds the {expenses.length} most recent of {totalExpenseCount} expenses. Search, filters, totals and charts
-          on this page use these {expenses.length}; Export CSV exports the filtered list.
-        </p>
-      )}
 
       {/* Table */}
-      <div className="card fin-table-card fin-section">
+      <div className="card fin-table-card fin-table-card--fit fin-section">
         <div className="fin-table-scroll">
           <table className="fin-table fin-table--stack table-heading-roles">
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Reference</th>
-                <th>Description</th>
+                <th>Expense</th>
                 <th>Category</th>
-                <th>Vehicle</th>
+                <th className="fin-col-mid">Vehicle</th>
                 <th>Status</th>
                 <th className="num">Amount</th>
                 <th className="actions"><span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Actions</span></th>
@@ -464,7 +467,7 @@ export default function Expenses() {
             <tbody>
               {rows.length === 0 ? (
                 <tr className="is-empty">
-                  <td colSpan={8} style={{ padding: 0 }}>
+                  <td colSpan={7} style={{ padding: 0 }}>
                     {isError ? (
                       <div className="fin-empty">
                         <p className="fin-empty__title">Couldn’t load expenses</p>
@@ -489,57 +492,31 @@ export default function Expenses() {
                 return (
                   <tr key={exp.id}>
                     <td className="fin-date m-hide">{formatDate(exp.expense_date || exp.date)}</td>
-                    <td className="m-meta">
-                      <span className="fin-mobile-only">{formatDate(exp.expense_date || exp.date)} · {catLabel(exp.category)}</span>
-                      <span className="m-hide-inline">{exp.expense_number ? <span className="fin-id">{exp.expense_number}</span> : '—'}</span>
+                    <td className="fin-strong m-party m-span2 fin-cell-2">
+                      <div className="fin-truncate fin-truncate--expense" title={exp.description}>{exp.description}</div>
+                      <span className="fin-cell-sub">
+                        <span className="fin-mobile-only">{formatDate(exp.expense_date || exp.date)} · {catLabel(exp.category)}</span>
+                        <span className="m-hide-inline">{exp.expense_number ? <span className="fin-id">{exp.expense_number}</span> : 'No reference'}</span>
+                      </span>
                     </td>
-                    <td className="fin-strong m-party"><div className="fin-truncate" title={exp.description}>{exp.description}</div></td>
                     <td className="m-hide" style={{ whiteSpace: 'nowrap' }}>{catLabel(exp.category)}</td>
-                    <td className="m-hide"><div className="fin-truncate" style={{ maxWidth: 220 }} title={vehicleLabel(exp)}>{vehicleLabel(exp)}</div></td>
+                    <td className="m-hide fin-col-mid"><div className="fin-truncate fin-truncate--veh" style={{ maxWidth: 200 }} title={vehicleLabel(exp)}>{vehicleLabel(exp)}</div></td>
                     <td className="m-status"><span className={`fin-chip${tone ? ` fin-chip--${tone}` : ''}`}>{formatStatus(status)}</span></td>
                     <td className="num m-amount">{formatCurrency(amountOf(exp))}</td>
-                    <td className="actions" onKeyDown={e => { if (e.key === 'Escape') setOpenMenuId(null); }}>
-                      <div className="expense-row-actions">
-                        <button
-                          type="button"
-                          className="expense-menu-trigger"
-                          aria-label={`Expense actions for ${exp.expense_number || exp.description || exp.id}`}
-                          aria-haspopup="menu"
-                          aria-expanded={openMenuId === exp.id}
-                          disabled={busy}
-                          onClick={() => setOpenMenuId(openMenuId === exp.id ? null : exp.id)}
-                        >
-                          {busy ? <Loader size={14} /> : <Ellipsis size={16} aria-hidden="true" />}
-                        </button>
-                        {openMenuId === exp.id && (
-                          <>
-                            {/* click-away overlay */}
-                            <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setOpenMenuId(null)} />
-                            <div className="expense-menu" role="menu">
-                              {status === 'PENDING' && (
-                                <>
-                                  <button type="button" role="menuitem" className="expense-menu-item"
-                                    onClick={() => { setOpenMenuId(null); handleReview(exp, 'approve'); }}>
-                                    Approve
-                                  </button>
-                                  <button type="button" role="menuitem" className="expense-menu-item"
-                                    onClick={() => { setOpenMenuId(null); handleReview(exp, 'reject'); }}>
-                                    Reject
-                                  </button>
-                                </>
-                              )}
-                              <button type="button" role="menuitem" className="expense-menu-item"
-                                onClick={() => { setOpenMenuId(null); setEditingExpense(exp); }}>
-                                Edit
-                              </button>
-                              <button type="button" role="menuitem" className="expense-menu-item fin-text-danger"
-                                onClick={() => { setOpenMenuId(null); handleDelete(exp); }}>
-                                Delete
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
+                    <td className="actions">
+                      <RowActions
+                        label={`Expense ${exp.expense_number || exp.description || exp.id}`}
+                        onEdit={() => setEditingExpense(exp)}
+                        items={[
+                          ...(status === 'PENDING'
+                            ? [
+                                { label: 'Approve', onSelect: () => handleReview(exp, 'approve'), disabled: busy },
+                                { label: 'Reject', onSelect: () => handleReview(exp, 'reject'), disabled: busy },
+                              ]
+                            : []),
+                          { label: 'Delete', onSelect: () => handleDelete(exp), danger: true, disabled: busy },
+                        ]}
+                      />
                     </td>
                   </tr>
                 );
@@ -560,15 +537,18 @@ export default function Expenses() {
       </div>
 
       {/* Analytics: monthly trend + category ranking */}
-      <div className="fin-grid-2">
+      <div className="fin-grid-2 fin-grid-2--even">
         <section className="card" aria-labelledby="exp-month-title">
           <div className="fin-panel-head">
             <div className="fin-panel-head__text">
-              <h2 id="exp-month-title" className="fin-panel-title">How has spending moved over six months?</h2>
-              <p className="fin-panel-desc">
-                Total recorded per calendar month by expense date, all statuses, amounts as entered.
-                {monthlyTrend.some(m => m.state !== 'complete') && ' Faded months are only partly loaded on this page.'}
-              </p>
+              <h2 id="exp-month-title" className="fin-panel-title fin-panel-title--tip">
+                Spend by month
+                <InfoTip>
+                  Total recorded per calendar month by expense date, all statuses, amounts as entered.
+                  {monthlyTrend.some(m => m.state !== 'complete') && ' Faded months are only partly loaded on this page.'}
+                </InfoTip>
+              </h2>
+              <p className="fin-panel-desc">Last six months, all statuses</p>
             </div>
           </div>
           {expenses.length === 0 ? (
@@ -599,10 +579,11 @@ export default function Expenses() {
         <section className="card" aria-labelledby="exp-cat-title">
           <div className="fin-panel-head">
             <div className="fin-panel-head__text">
-              <h2 id="exp-cat-title" className="fin-panel-title">Where does the money go?</h2>
-              <p className="fin-panel-desc">
-                {formatCurrency(totalExpenses)} across {basisLabel}, all statuses, by category.
-              </p>
+              <h2 id="exp-cat-title" className="fin-panel-title fin-panel-title--tip">
+                Spend by category
+                <InfoTip align="end">{formatCurrency(totalExpenses)} across {basisLabel}, all statuses, amounts as entered.</InfoTip>
+              </h2>
+              <p className="fin-panel-desc">{truncated ? `Latest ${expenses.length} expenses` : 'All expenses'}, all statuses</p>
             </div>
           </div>
           {categoryBreakdown.length === 0 ? (

@@ -7,7 +7,7 @@ import FindingCard from './FindingCard';
 import InfoTip from './InfoTip';
 import {
   computeFindings, fetchAllPages, plural, randWhole, summarise,
-  type CompanyRec, type ExpenseRec, type FinanceRec, type FindingInputs, type FuelRec,
+  type CashflowRec, type CompanyRec, type ExpenseRec, type FinanceRec, type FindingInputs, type FuelRec,
   type InvoiceRec, type LoadRec, type PaymentRec, type QuoteRec, type Source,
 } from './findings';
 
@@ -41,8 +41,9 @@ export default function FindingsFeed() {
   const finance = useQuery<FinanceRec>({ queryKey: sourceKey('finance-all'), queryFn: () => fetchData('api/v1/dashboard/finance/'), staleTime: STALE, ...RETRY });
   const fuel = useQuery<FuelRec>({ queryKey: sourceKey('fuel'), queryFn: () => fetchData('api/v1/fuel-prices/current/'), staleTime: STALE, ...RETRY });
   const company = useQuery<CompanyRec>({ queryKey: sourceKey('company'), queryFn: () => fetchData('api/v1/company/profile/'), staleTime: STALE, ...RETRY });
+  const cashflow = useQuery<CashflowRec>({ queryKey: sourceKey('cashflow'), queryFn: () => fetchData('api/v1/dashboard/cashflow/'), staleTime: STALE, ...RETRY });
 
-  const all = [invoices, payments, expenses, loads, quotes, finance, fuel, company];
+  const all = [invoices, payments, expenses, loads, quotes, finance, fuel, company, cashflow];
   const loading = all.some(q => q.isLoading);
 
   const result = useMemo(() => {
@@ -56,10 +57,11 @@ export default function FindingsFeed() {
       finance: finance.data ?? null,
       fuel: fuel.data ?? null,
       company: company.data ?? null,
+      cashflow: cashflow.data ?? null,
     };
     const findings = computeFindings(input);
     return { input, findings, summary: summarise(findings, input) };
-  }, [invoices.data, payments.data, expenses.data, loads.data, quotes.data, finance.data, fuel.data, company.data]);
+  }, [invoices.data, payments.data, expenses.data, loads.data, quotes.data, finance.data, fuel.data, company.data, cashflow.data]);
 
   if (loading) return <FeedSkeleton />;
 
@@ -79,6 +81,7 @@ export default function FindingsFeed() {
     expenses.isError || finance.isError ? 'costs' : null,
     loads.isError ? 'loads' : null,
     quotes.isError || fuel.isError ? 'quotes' : null,
+    cashflow.isError ? 'the cash forecast' : null,
   ].filter(Boolean) as string[];
   const hasRecords = input.invoices.rows.length + (input.loads?.rows.length ?? 0) + (input.expenses?.rows.length ?? 0) > 0;
 

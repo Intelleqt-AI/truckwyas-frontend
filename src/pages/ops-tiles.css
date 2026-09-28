@@ -1,0 +1,82 @@
+/* Separate KPI tiles for the operational pages (Fleet, Bookings, Customers,
+   Admin). Same shape as the Today tiles (overview-typography.css .td-kpi):
+   each figure is its own card with a short label, a big figure and one short
+   sub-line. At most four per row; two per row on narrow screens. */
+.ops-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--card-gap, 16px);
+  margin-bottom: 24px;
+}
+.ops-tiles--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ops-tiles--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.ops-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 128px;
+  padding: 18px 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card, 16px);
+  box-shadow: none;
+}
+.ops-tile__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  margin: 0;
+  font: 500 13px/20px var(--font-sans);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text-secondary);
+}
+.ops-tile__value {
+  margin-top: 12px;
+  font: 700 var(--text-figure, 32px)/38px var(--font-sans);
+  letter-spacing: var(--tracking-figure, -0.03em);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.ops-tile__value.is-attention { color: var(--status-warning-text, var(--status-warning)); }
+.ops-tile__of {
+  margin-left: 6px;
+  font: 400 14px/20px var(--font-sans);
+  letter-spacing: normal;
+  color: var(--text-tertiary);
+}
+.ops-tile__sub {
+  margin-top: auto;
+  padding-top: 8px;
+  font: 500 12px/16px var(--font-sans);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+@media (max-width: 1280px) {
+  .ops-tiles--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .ops-tiles,
+  .ops-tiles--4,
+  .ops-tiles--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+  /* An odd last tile takes the full row rather than leaving a hole. */
+  .ops-tiles > .ops-tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .ops-tile { min-height: 0; padding: 14px; }
+  .ops-tile__value { margin-top: 8px; font-size: 22px; line-height: 28px; letter-spacing: -0.02em; }
+  .ops-tile__of { font-size: 13px; margin-left: 4px; }
+}
+
+/* A tile that opens the section it summarises. Hover is a surface tint. */
+.ops-tile--link { cursor: pointer; transition: background-color 0.12s; }
+.ops-tile--link:hover { background: var(--bg-surface-hover); }
+.ops-tile--link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }

@@ -8,6 +8,9 @@ import { formatCurrency, formatDate } from "@/lib/formatters";
 import "./finance-brand.css";
 import "./table-heading-roles.css";
 import { Loader } from "@/components/Loader";
+import RowActions from "@/components/ui/RowActions";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { FinTile, FinTiles, wholeRand } from "@/components/finance/FinTile";
 
 // External Fast Pay application link. The applied-state key is unchanged so
 // invoices already marked "Applied" stay marked.
@@ -275,6 +278,17 @@ export default function InvoiceDetail() {
   ];
 
   const primary = canSend ? 'send' : canRecordPayment ? 'pay' : null;
+  const moreActions = [
+    ...(primary !== 'pay' && canRecordPayment
+      ? [{ label: 'Record payment', onSelect: () => setShowPaymentForm(true), disabled: showPaymentForm }]
+      : []),
+    ...(canRemind
+      ? [{ label: sendingReminder ? 'Sending…' : 'Send reminder', onSelect: handleSendReminder, disabled: sendingReminder }]
+      : []),
+    ...(primary !== null
+      ? [{ label: downloading ? 'Downloading…' : 'Download PDF', onSelect: handleDownloadPDF, disabled: downloading }]
+      : []),
+  ];
 
   return (
     <div className="fin-page">
@@ -306,90 +320,75 @@ export default function InvoiceDetail() {
           </p>
         </div>
         <div className="fin-detail-head__actions">
-          <button className="btn-action fin-btn-secondary" onClick={handleDownloadPDF} disabled={downloading}>
-            {downloading ? 'Downloading…' : 'Download PDF'}
-          </button>
-          {canRemind && (
-            <button className="btn-action fin-btn-secondary" onClick={handleSendReminder} disabled={sendingReminder}>
-              {sendingReminder ? 'Sending…' : 'Send reminder'}
+          {/* One primary action; everything else sits behind one menu. */}
+          {primary === 'send' ? (
+            <button className="btn-action" onClick={handleSendInvoice} disabled={sending}>
+              {sending ? 'Sending…' : status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
             </button>
-          )}
-          {canRecordPayment && (
+          ) : primary === 'pay' ? (
             <button
               onClick={() => setShowPaymentForm(true)}
-              className={`btn-action${primary === 'pay' ? '' : ' fin-btn-secondary'}`}
+              className="btn-action"
               disabled={showPaymentForm}
               aria-expanded={showPaymentForm}
               aria-controls="record-payment">
               Record payment
             </button>
-          )}
-          {canSend && (
-            <button className="btn-action" onClick={handleSendInvoice} disabled={sending}>
-              {sending ? 'Sending…' : status === 'VIEWED' ? 'Resend to customer' : 'Send to customer'}
+          ) : (
+            <button className="btn-action fin-btn-secondary" onClick={handleDownloadPDF} disabled={downloading}>
+              {downloading ? 'Downloading…' : 'Download PDF'}
             </button>
           )}
+          {moreActions.length > 0 && <RowActions label={`Invoice ${invoice.invoice_number}`} items={moreActions} />}
         </div>
       </header>
+
+      <FinTiles label="Invoice figures">
+        <FinTile
+          label={heroLabel}
+          info={showBalance ? 'Invoice total incl. VAT, less payments recorded.' : 'Invoice total incl. VAT.'}
+          value={wholeRand(showBalance ? balance : total)}
+          valueTitle={formatCurrency(showBalance ? balance : total)}
+          sub={showBalance && balance !== total
+            ? `Of ${formatCurrency(total)} incl. VAT`
+            : vat != null
+              ? `Incl. ${formatCurrency(vat)} VAT`
+              : 'Invoice total'}
+        />
+        <FinTile
+          label="Issued"
+          value={safeDate(invoice.issue_date || invoice.created_at)}
+          small
+          sub={terms ? `${terms} terms` : undefined}
+        />
+        <FinTile
+          label="Due"
+          value={safeDate(invoice.due_date)}
+          small
+          sub={daysLate != null && daysLate > 0 ? `${daysLate} ${daysLate === 1 ? 'day' : 'days'} late` : undefined}
+          subTone={daysLate != null && daysLate > 0 ? 'danger' : undefined}
+        />
+        {paidToDate != null && status !== 'DRAFT' && (
+          <FinTile
+            label="Paid to date"
+            value={wholeRand(paidToDate)}
+            valueTitle={formatCurrency(paidToDate)}
+            sub={showBalance && paidShare > 0 ? `${Math.round(paidShare)}% of the total` : undefined}
+          />
+        )}
+      </FinTiles>
 
       <div className="fin-grid-2" style={{ alignItems: 'start' }}>
         {/* Main column */}
         <div className="fin-stack" style={{ minWidth: 0 }}>
-          {/* Key amount first */}
-          <section className="card" aria-label="Amount">
-            <div className="fin-kpi__label">{heroLabel}</div>
-            <p className="fin-hero-amount">{formatCurrency(showBalance ? balance : total)}</p>
-            <div className="fin-kpi__sub">
-              {showBalance && balance !== total
-                ? `Of ${formatCurrency(total)} invoiced, incl. VAT`
-                : vat != null
-                  ? `Incl. ${formatCurrency(vat)} VAT`
-                  : 'Invoice total'}
-            </div>
-            {showBalance && paidShare > 0 && (
-              <div className="fin-progress" role="img" aria-label={`${Math.round(paidShare)}% paid`}>
-                <div className="fin-progress__fill" style={{ width: `${paidShare}%` }} />
-              </div>
-            )}
-            <dl className="fin-facts">
-              <div>
-                <dt>Issued</dt>
-                <dd>{safeDate(invoice.issue_date || invoice.created_at)}</dd>
-              </div>
-              <div>
-                <dt>Due</dt>
-                <dd>
-                  {safeDate(invoice.due_date)}
-                  {daysLate != null && daysLate > 0 && (
-                    <span className="fin-text-danger" style={{ display: 'block', fontWeight: 400, fontSize: 13 }}>
-                      {daysLate} {daysLate === 1 ? 'day' : 'days'} late
-                    </span>
-                  )}
-                </dd>
-              </div>
-              {terms && (
-                <div>
-                  <dt>Terms</dt>
-                  <dd>{terms}</dd>
-                </div>
-              )}
-              {paidToDate != null && status !== 'DRAFT' && (
-                <div>
-                  <dt>Paid to date</dt>
-                  <dd>{formatCurrency(paidToDate)}</dd>
-                </div>
-              )}
-            </dl>
-          </section>
-
           {/* How the total is made up */}
           {invoice.line_items && invoice.line_items.length > 0 ? (
             <section className="card fin-table-card" aria-labelledby="line-items-title">
               <div className="fin-panel-head">
                 <div className="fin-panel-head__text">
-                  <h2 id="line-items-title" className="fin-panel-title">What is being charged?</h2>
+                  <h2 id="line-items-title" className="fin-panel-title">Charges</h2>
                   <p className="fin-panel-desc">
-                    {invoice.line_items.length} {invoice.line_items.length === 1 ? 'line' : 'lines'}, amounts excl. VAT; VAT is added in the total.
+                    {invoice.line_items.length} {invoice.line_items.length === 1 ? 'line' : 'lines'}, excl. VAT
                   </p>
                 </div>
               </div>
@@ -444,8 +443,8 @@ export default function InvoiceDetail() {
             <section className="card" aria-labelledby="breakdown-title">
               <div className="fin-panel-head">
                 <div className="fin-panel-head__text">
-                  <h2 id="breakdown-title" className="fin-panel-title">How is the total made up?</h2>
-                  <p className="fin-panel-desc">This invoice has no separate line items.</p>
+                  <h2 id="breakdown-title" className="fin-panel-title">Charges</h2>
+                  <p className="fin-panel-desc">No separate line items</p>
                 </div>
               </div>
               <dl className="fin-dl">
@@ -469,9 +468,9 @@ export default function InvoiceDetail() {
             <section className="card fin-table-card" aria-labelledby="payments-title">
               <div className="fin-panel-head">
                 <div className="fin-panel-head__text">
-                  <h2 id="payments-title" className="fin-panel-title">What has been paid?</h2>
+                  <h2 id="payments-title" className="fin-panel-title">Payments</h2>
                   <p className="fin-panel-desc">
-                    {payments.length} {payments.length === 1 ? 'payment' : 'payments'} recorded against this invoice, by payment date.
+                    {payments.length} recorded, by payment date
                   </p>
                 </div>
               </div>
@@ -591,7 +590,7 @@ export default function InvoiceDetail() {
           <section className="card" aria-labelledby="activity-title">
             <div className="fin-panel-head" style={{ marginBottom: 4 }}>
               <div className="fin-panel-head__text">
-                <h2 id="activity-title" className="fin-panel-title">Where is this invoice at?</h2>
+                <h2 id="activity-title" className="fin-panel-title">Activity</h2>
               </div>
             </div>
             <dl className="fin-dl">
@@ -608,8 +607,11 @@ export default function InvoiceDetail() {
             <section className="card" aria-labelledby="fastpay-title">
               <div className="fin-panel-head">
                 <div className="fin-panel-head__text">
-                  <h2 id="fastpay-title" className="fin-panel-title">Fast Pay</h2>
-                  {!CAPITAL_LAUNCHED && <p className="fin-panel-desc">{CAPITAL_COMING_SOON}</p>}
+                  <h2 id="fastpay-title" className="fin-panel-title fin-panel-title--tip">
+                    Fast Pay
+                    {!CAPITAL_LAUNCHED && <InfoTip align="end">{CAPITAL_COMING_SOON}</InfoTip>}
+                  </h2>
+                  {!CAPITAL_LAUNCHED && <p className="fin-panel-desc">Not live yet</p>}
                 </div>
               </div>
               {capitalEntry && (

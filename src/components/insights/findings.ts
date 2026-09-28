@@ -67,6 +67,8 @@ export interface QuoteRec {
 export interface FinanceRec { total_revenue?: number; total_expenses?: number }
 export interface FuelRec { inland_price?: number; coastal_price?: number; date?: string; last_updated?: string; source?: string }
 export interface CompanyRec { fuel_zone?: string; fuel_price_per_litre?: string | number | null }
+export interface CashflowWeek { period: string; start_date: string; end_date: string; expected_in: number | string; expected_out: number | string }
+export interface CashflowRec { forecast?: CashflowWeek[] }
 
 export interface Source<T> { rows: T[]; count: number; complete: boolean }
 
@@ -79,10 +81,12 @@ export interface FindingInputs {
   finance: FinanceRec | null;
   fuel: FuelRec | null;
   company: CompanyRec | null;
+  /** Weekly cash forecast (dashboard/cashflow). Optional: only the shortfall finding uses it. */
+  cashflow?: CashflowRec | null;
 }
 
 export type Severity = 'high' | 'medium' | 'low';
-export type Category = 'Get paid' | 'Know your margin' | 'Quote better' | 'Bill your work';
+export type Category = 'Get paid' | 'Know your margin' | 'Quote better' | 'Bill your work' | 'Cash ahead';
 
 export interface EvidenceRow {
   id: string;
@@ -97,7 +101,7 @@ export interface EvidenceRow {
 
 export interface Finding {
   id: string;
-  kind: 'never_sent' | 'stopped_paying' | 'never_chased' | 'short_paid' | 'no_pod' | 'pending_costs' | 'diesel' | 'open_loads' | 'expired_quotes';
+  kind: 'never_sent' | 'stopped_paying' | 'never_chased' | 'short_paid' | 'no_pod' | 'pending_costs' | 'diesel' | 'open_loads' | 'expired_quotes' | 'cash_shortfall';
   category: Category;
   severity: Severity;
   confidence: 'high' | 'medium' | 'low';
@@ -145,6 +149,11 @@ const isOpen = (i: InvoiceRec) => !CLOSED.has((i.status || '').toUpperCase()) &&
 const neverReminded = (i: InvoiceRec) => !num(i.reminder_count) && !i.last_reminder_at;
 
 const THRESHOLD = 1000;
+const SHORTFALL_WEEKS = 8;
+const SHORTFALL_MIN = 5000;
+const MONTH3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** "26 Oct" */
+const shortDay = (iso: string) => `${Number(iso.slice(8, 10))} ${MONTH3[Number(iso.slice(5, 7)) - 1] ?? ''}`;
 const invHref = (i: InvoiceRec) => `/finance/invoices/${i.id}`;
 
 // ---------------------------------------------------------------- findings
@@ -439,6 +448,42 @@ export function computeFindings(input: FindingInputs, now = new Date()): Finding
           note: `expired ${q.valid_until}`, amount: num(q.total_amount), href: `/bookings/quotes/${q.id}`,
         })),
         evidenceNoun: ['quote', 'quotes'],
+        invoiceIds: [], loadIds: [], cash: false,
+      });
+    }
+  }
+
+  // 10. Predicted cash shortfall (forecast, before the bank balance) ---------
+  // Same rule the Insights runway used: the next 8 weeks from the weekly
+  // forecast, added up from zero today. Fires only when that running position
+  // falls at least R 5 000 below zero, so small timing gaps stay quiet.
+  const weeks = (input.cashflow?.forecast ?? []).slice(0, SHORTFALL_WEEKS).map(w => ({
+    start: w.start_date, in: num(w.expected_in), out: num(w.expected_out),
+  }));
+  if (weeks.length) {
+    let pos = 0;
+    const run = weeks.map(w => ({ ...w, pos: (pos += w.in - w.out) }));
+    const firstIdx = run.findIndex(w => w.pos < 0);
+    const lowest = run.reduce((m, w) => (w.pos < m.pos ? w : m), run[0]);
+    if (firstIdx >= 0 && -lowest.pos >= SHORTFALL_MIN) {
+      const first = run[firstIdx];
+      const overdueOpen = invoices.filter(i => isOpen(i) && lateDays(i) > 0);
+      const weeksAway = Math.max(0, Math.round(daysBetween(today, first.start) / 7));
+      out.push({
+        id: 'cash_shortfall', kind: 'cash_shortfall', category: 'Cash ahead', basis: 'Estimated', confidence: 'medium',
+        severity: weeksAway <= 4 ? 'high' : 'medium',
+        amount: -lowest.pos,
+        headline: `Short of cash from ${shortDay(first.start)}`,
+        line: `Week of ${shortDay(first.start)}: expected costs pass receipts. Excludes your bank balance.`,
+        action: overdueOpen.length
+          ? { label: 'Chase overdue invoices', href: '/finance/invoices?status=OVERDUE' }
+          : { label: 'See cash movement', href: '/finance/reports?report=cash' },
+        method: `Forecast for the next ${weeks.length} weeks. Each unpaid invoice is placed on the date that customer usually pays; expected costs come from approved expenses over the last 90 days. Weeks are added up from zero today, so your bank balance is not included: check it covers the gap. Shows only when the running position falls R 5 000 or more below zero. Value is the lowest point. An estimate.`,
+        evidence: run.map(w => ({
+          id: `wk-${w.start}`, ref: `Week of ${shortDay(w.start)}`, label: `In ${randWhole(w.in)}, out ${randWhole(w.out)}`,
+          note: w.pos < 0 ? 'short' : 'covered', amount: w.pos, href: '/finance/reports?report=cash',
+        })),
+        evidenceNoun: ['week', 'weeks'],
         invoiceIds: [], loadIds: [], cash: false,
       });
     }

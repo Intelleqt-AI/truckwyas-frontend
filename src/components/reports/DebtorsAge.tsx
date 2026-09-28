@@ -1,0 +1,141 @@
+import { useSearchParams } from 'react-router-dom';
+import {
+  addMonths, day, daysBetween, isDraft, isIssued, isOpen, monthEnd, monthLabel, money, moneyWhole, num, pct, plural,
+  todayISO, ymNow, type Invoice, type Ledger,
+} from './data';
+import { Check, Empty, Info, ReportFrame, Seg, StatementTable, Tiles, statementCsv, type SRow, type Statement } from './ui';
+
+const BUCKETS = ['Current', '1 to 30 days', '31 to 60 days', '61 to 90 days', 'Over 90 days'] as const;
+const bucketOf = (daysOverdue: number) => (daysOverdue <= 0 ? 0 : daysOverdue <= 30 ? 1 : daysOverdue <= 60 ? 2 : daysOverdue <= 90 ? 3 : 4);
+
+export interface AgedInvoice { inv: Invoice; balance: number; days: number; bucket: number }
+
+/** Open balances as at a date. Today uses each invoice's balance; an earlier
+ *  date is rebuilt from the invoice total less payments recorded by then. */
+export function ageInvoices(d: Ledger, asAt: string | null): AgedInvoice[] {
+  const at = asAt ?? todayISO();
+  const paidBy = new Map<number, number>();
+  const hasPayments = new Set<number>();
+  d.payments.forEach(p => {
+    if (p.invoice == null) return;
+    hasPayments.add(p.invoice);
+    if (p.payment_date <= at) paidBy.set(p.invoice, (paidBy.get(p.invoice) || 0) + num(p.amount));
+  });
+  return d.invoices.flatMap(inv => {
+    let balance: number;
+    if (!asAt) {
+      if (!isOpen(inv)) return [];
+      balance = num(inv.balance);
+    } else {
+      if (!isIssued(inv) || !inv.issue_date || inv.issue_date > at) return [];
+      const paidInFull = (inv.status || '').toUpperCase() === 'PAID' && !hasPayments.has(inv.id) && !!inv.paid_at && inv.paid_at.slice(0, 10) <= at;
+      balance = paidInFull ? 0 : num(inv.total_amount) - (paidBy.get(inv.id) || 0);
+      if (balance <= 0.005) return [];
+    }
+    const days = inv.due_date ? daysBetween(inv.due_date, at) : 0;
+    return [{ inv, balance, days, bucket: bucketOf(days) }];
+  });
+}
+
+export default function DebtorsAge({ d, companyName }: { d: Ledger; companyName?: string }) {
+  const [params, setParams] = useSearchParams();
+  const asAtYm = /^\d{4}-\d{2}$/.test(params.get('asat') || '') ? params.get('asat') : null;
+  const asAt = asAtYm ? monthEnd(asAtYm) : null;
+  const view = params.get('view') === 'invoice' ? 'invoice' : 'customer';
+  const set = (k: string, v: string | null) => setParams(p => { const n = new URLSearchParams(p); if (v) n.set(k, v); else n.delete(k); return n; }, { replace: true });
+
+  const aged = ageInvoices(d, asAt);
+  const total = aged.reduce((s, a) => s + a.balance, 0);
+  const byBucket = BUCKETS.map((_, b) => aged.filter(a => a.bucket === b).reduce((s, a) => s + a.balance, 0));
+  const overdue = total - byBucket[0];
+  const over60 = byBucket[3] + byBucket[4];
+  const dateText = asAt ? day(asAt) : `today, ${day(todayISO())}`;
+
+  const custKey = (i: Invoice) => (i.customer != null ? `c${i.customer}` : `n${i.customer_name}`);
+  const customers = [...new Set(aged.map(a => custKey(a.inv)))].map(k => {
+    const list = aged.filter(a => custKey(a.inv) === k);
+    const b = BUCKETS.map((_, i) => list.filter(a => a.bucket === i).reduce((s, a) => s + a.balance, 0));
+    return { k, name: list[0].inv.customer_name, id: list[0].inv.customer, count: list.length, b, total: b.reduce((s, v) => s + v, 0) };
+  }).sort((a, b) => b.total - a.total);
+
+  const bucketCols = BUCKETS.map(l => ({ label: l, type: 'money' as const }));
+  const table: Statement = view === 'customer'
+    ? {
+      columns: [{ label: 'Customer' }, { label: 'Invoices', type: 'int' }, ...bucketCols, { label: 'Total', type: 'money' }],
+      rows: [
+        ...customers.map<SRow>(c => ({
+          key: c.k, cells: [c.name, c.count, ...c.b, c.total],
+          href: c.id != null ? `/finance/reports?report=statement&customer=${c.id}` : undefined,
+        })),
+        { key: 'tot', kind: 'grand', cells: ['Total', aged.length, ...byBucket, total] },
+        { key: 'share', kind: 'ratio', fmt: 'pct', cells: ['Share of total', '', ...byBucket.map(v => (total > 0 ? (v / total) * 100 : null)), total > 0 ? 100 : null] },
+      ],
+    }
+    : {
+      columns: [{ label: 'Invoice' }, { label: 'Customer' }, { label: 'Issued', type: 'date' }, { label: 'Due', type: 'date' }, { label: 'Days overdue', type: 'int' }, ...bucketCols, { label: 'Balance', type: 'money' }],
+      rows: [
+        ...[...aged].sort((a, b) => b.days - a.days).map<SRow>(a => ({
+          key: `i${a.inv.id}`, href: `/finance/invoices/${a.inv.id}`,
+          cells: [a.inv.invoice_number, a.inv.customer_name, a.inv.issue_date, a.inv.due_date, Math.max(0, a.days), ...BUCKETS.map((_, i) => (i === a.bucket ? a.balance : '')), a.balance],
+        })),
+        { key: 'tot', kind: 'grand', cells: ['Total', plural(aged.length, 'invoice'), '', '', '', ...byBucket, total] },
+      ],
+    };
+
+  // Reconcile to the invoice ledger (today only): every open balance, straight from the invoices.
+  const ledgerOpen = d.invoices.filter(isOpen);
+  const ledgerTotal = ledgerOpen.reduce((s, i) => s + num(i.balance), 0);
+  const drafts = d.invoices.filter(isDraft);
+  const draftTotal = drafts.reduce((s, i) => s + num(i.total_amount), 0);
+  const ties = Math.abs(ledgerTotal - total) < 0.01;
+
+  const now = ymNow();
+  const asAtOptions = [{ id: '', label: 'Today' }, ...[1, 2, 3, 4, 5, 6].map(n => { const m = addMonths(now, -n); return { id: m, label: `End ${monthLabel(m)}` }; })];
+
+  return (
+    <ReportFrame
+      title="Debtors age analysis"
+      sub={`As at ${dateText} · Incl. VAT, by due date`}
+      companyName={companyName}
+      info={<Info title="Debtors age analysis" lines={[
+        'Unpaid balances on issued invoices, including VAT. Drafts and cancelled invoices are not owed.',
+        'Aged by days past the due date: current means not yet due.',
+        'A month-end date is rebuilt from invoice totals less payments recorded by that date.',
+        'Select a customer to open their statement.',
+      ]} />}
+      controls={<>
+        <label className="fr-select">
+          <span className="fr-muted">As at</span>
+          <select className="fr-input" value={asAtYm ?? ''} onChange={e => set('asat', e.target.value || null)}>
+            {asAtOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+        </label>
+        <Seg label="View" value={view} onChange={v => set('view', v === 'customer' ? null : v)} options={[{ id: 'customer', label: 'By customer' }, { id: 'invoice', label: 'By invoice' }]} />
+      </>}
+      tiles={aged.length > 0 ? <Tiles tiles={[
+        { label: 'Owed to you', value: moneyWhole(total), title: money(total), note: `${plural(aged.length, 'invoice')}, ${plural(customers.length, 'customer')}` },
+        { label: 'Overdue', value: moneyWhole(overdue), title: money(overdue), note: total > 0 ? `${pct((overdue / total) * 100, 0)} of the total` : undefined },
+        { label: 'Over 60 days', value: moneyWhole(over60), title: money(over60), note: total > 0 ? `${pct((over60 / total) * 100, 0)} of the total` : undefined },
+        { label: 'Largest debtor', value: moneyWhole(customers[0]?.total ?? 0), title: money(customers[0]?.total ?? 0), note: customers[0]?.name },
+      ]} /> : undefined}
+      csv={() => statementCsv(`Debtors age analysis as at ${asAt ?? todayISO()}`, 'Incl. VAT, aged by due date', table)}
+      csvName={`debtors-age-${asAt ?? todayISO()}-${view}`}
+    >
+      {aged.length === 0 ? (
+        <Empty line={`Nobody owed you money on ${dateText}.`} action={{ label: 'See invoices', to: '/finance/invoices' }} />
+      ) : (
+        <StatementTable
+          table={table}
+          caption={`Debtors age analysis, ${view === 'customer' ? 'by customer' : 'by invoice'}`}
+          stickyFirst
+          footer={<>
+            {!asAt
+              ? <Check ok={ties}>Total {money(total)} {ties ? 'equals' : 'differs from'} the {plural(ledgerOpen.length, 'open invoice balance')} on the invoice ledger ({money(ledgerTotal)}).</Check>
+              : <Check>Rebuilt from invoices issued and payments recorded by {day(asAt)}.</Check>}
+            {drafts.length > 0 && <Check>{plural(drafts.length, 'draft invoice')} ({money(draftTotal)}) not issued, so not included.</Check>}
+          </>}
+        />
+      )}
+    </ReportFrame>
+  );
+}

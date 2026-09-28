@@ -11,28 +11,32 @@
 :root,
 [data-theme="dark"] {
   /* Base Surfaces */
-  --bg-deep: #060709;
-  --bg-surface: #101215;
-  --bg-surface-hover: #181B20;
+  /* v3 surfaces: near-black ground, one surface step for cards, one more
+     for raised chips and the active nav pill. Cool-biased neutrals. */
+  --bg-deep: #0A0B0D;
+  --bg-surface: #131519;
+  --bg-surface-hover: #1A1D22;
+  --bg-raised: #1F232A;
   --bg-panel: rgba(255, 255, 255, 0.035);
-  --bg-sidebar: rgba(16, 18, 21, 0.5);
+  --bg-sidebar: #0E1013;
   --modal-backdrop: rgba(0, 0, 0, 0.6);
 
   /* Borders */
-  --border-subtle: #2A2E34;
-  --border-active: #3C424A;
-  --border-row: #1E2126;
+  --border-subtle: #22262D;
+  --border-active: #30353D;
+  --border-row: #1E2127;
 
-  /* Accent - Blue */
-  --accent-primary: #4D9EFF;
-  --accent-bright: #4D9EFF;
+  /* Accent - Blue (used once per panel, for the thing that matters) */
+  --accent-primary: #5B9BFF;
+  --accent-bright: #5B9BFF;
   --accent-dim: #1A3A6B;
-  --accent-glow: rgba(77, 158, 255, 0.15);
+  --accent-glow: rgba(91, 155, 255, 0.15);
+  --on-accent: #0A0B0D;
 
   /* Text */
-  --text-primary: #EDEDED;
-  --text-secondary: #9AA1A9;
-  --text-tertiary: #6E757D;
+  --text-primary: #F2F4F7;
+  --text-secondary: #A3A9B3;
+  --text-tertiary: #8B919C;
 
   /* Status Colors */
   --status-success: #4D9EFF;
@@ -76,28 +80,51 @@
   --input-bg-focus: var(--bg-surface);
 
   /* Card */
-  --card-radius: 12px;
+  --card-radius: 16px;
 
   /* Neutral interaction tints (design principles §3: hover is a surface tint,
      never a border change; active nav items are a quiet neutral fill). */
   --surface-tint-hover: rgba(255, 255, 255, 0.04);
   --surface-tint-active: rgba(255, 255, 255, 0.07);
 
+  /* v3 shell + emphasis */
+  --nav-active-bg: #252A32;
+  --nav-active-fg: #FFFFFF;
+  --tip-bg: #F2F4F7;
+  --tip-fg: #0A0B0D;
+  --focus-ring: rgba(91, 155, 255, 0.28);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --status-ok-dot: #34D399;
+  /* Inverted emphasis tile: one per page, for the figure that needs action. */
+  --emphasis-bg: #1D4ED8;
+  --emphasis-fg: #FFFFFF;
+  --emphasis-fg-muted: #DCE4FB;
+  --emphasis-track: rgba(255, 255, 255, 0.22);
+  --chart-grid: #262A31;
+  --chart-muted: #3A404A;
+
   /* ===========================
-     TYPE SCALE / WEIGHT / SPACING (theme-agnostic — same in light + dark)
-     Single source of truth for sizing. Six steps only; nothing off-scale.
-     Uppercase belongs ONLY to --text-micro (11px mono) micro-labels.
+     v3 TYPE SCALE / WEIGHT / SPACING (theme-agnostic, same in light + dark)
+     Bold, tight titles; small grey labels; big figures with negative tracking.
+     Uppercase belongs ONLY to --text-micro group labels (sidebar, table eyebrows).
      =========================== */
-  --text-display: 28px;   /* page hero numbers */
-  --text-title: 20px;     /* page title */
-  --text-subhead: 16px;   /* section / card heading */
+  --text-figure: 32px;    /* KPI figures: 700, -0.03em, tabular */
+  --text-display: 28px;   /* page title: 700, -0.025em */
+  --text-title: 20px;     /* sheet / dialog title: 700, -0.015em */
+  --text-subhead: 15px;   /* card title: 600, -0.01em */
   --text-body: 14px;      /* default body + inputs */
   --text-small: 13px;     /* secondary text, table cells */
-  --text-micro: 11px;     /* mono UPPERCASE micro-labels only (eyebrows, th, stat labels) */
+  --text-label: 12px;     /* small grey labels, deltas, axis text */
+  --text-micro: 11px;     /* uppercase group labels, 600, +0.06em */
+
+  --tracking-figure: -0.03em;
+  --tracking-display: -0.025em;
+  --tracking-title: -0.01em;
 
   --weight-regular: 400;  /* body */
   --weight-medium: 500;   /* labels, table headers, active states */
-  --weight-semibold: 600; /* page/section headings + key figures only */
+  --weight-semibold: 600; /* card titles */
+  --weight-bold: 700;     /* page titles + KPI figures only */
 
   --space-1: 4px;
   --space-2: 8px;
@@ -106,14 +133,19 @@
   --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
+  --space-10: 40px;
+
+  /* v3 density: compact inside cards, generous between them. */
+  --card-pad: 20px;
+  --card-gap: 16px;
+  --section-gap: 24px;
 
   --pill-radius: var(--radius-chip, 6px);
 
   /* Nav item hover */
-  --nav-hover-bg: rgba(77, 158, 255, 0.05);
-  --nav-hover-color: var(--accent-primary);
-  --nav-active-bg: rgba(77, 158, 255, 0.05);
-  --nav-active-color: var(--accent-primary);
+  --nav-hover-bg: rgba(255, 255, 255, 0.05);
+  --nav-hover-color: var(--text-primary);
+  --nav-active-color: var(--nav-active-fg);
 
   /* Alert box */
   --alert-bg: rgba(77, 158, 255, 0.05);
@@ -143,28 +175,30 @@
 
 [data-theme="light"] {
   /* Base Surfaces */
-  --bg-deep: #F3F4F6;
+  --bg-deep: #F4F5F7;
   --bg-surface: #FFFFFF;
-  --bg-surface-hover: #F9FAFB;
+  --bg-surface-hover: #F7F8FA;
+  --bg-raised: #EFF1F4;
   --bg-panel: rgba(0, 0, 0, 0.025);
   --bg-sidebar: #FFFFFF;
-  --modal-backdrop: rgba(0, 0, 0, 0.5);
+  --modal-backdrop: rgba(15, 18, 22, 0.45);
 
   /* Borders */
-  --border-subtle: #E5E7EB;
-  --border-active: #D1D5DB;
-  --border-row: #E5E7EB;
+  --border-subtle: #E6E8EC;
+  --border-active: #D5D9DF;
+  --border-row: #EDEFF2;
 
   /* Accent - Blue */
   --accent-primary: #2563EB;
   --accent-bright: #3B82F6;
   --accent-dim: #EFF6FF;
   --accent-glow: rgba(37, 99, 235, 0.15);
+  --on-accent: #FFFFFF;
 
   /* Text */
-  --text-primary: #111827;
-  --text-secondary: #374151;
-  --text-tertiary: #6B7280;
+  --text-primary: #0F1216;
+  --text-secondary: #4B525D;
+  --text-tertiary: #646B76;
 
   /* Status Colors */
   --status-success: #2563EB;
@@ -210,16 +244,30 @@
   --input-bg-focus: #FFFFFF;
 
   /* Card */
-  --card-radius: 12px;
+  --card-radius: 16px;
 
-  --surface-tint-hover: rgba(17, 24, 39, 0.04);
-  --surface-tint-active: rgba(17, 24, 39, 0.07);
+  --surface-tint-hover: rgba(15, 18, 22, 0.04);
+  --surface-tint-active: rgba(15, 18, 22, 0.07);
+
+  /* v3 shell + emphasis */
+  --nav-active-bg: #0F1216;
+  --nav-active-fg: #FFFFFF;
+  --tip-bg: #0F1216;
+  --tip-fg: #FFFFFF;
+  --focus-ring: rgba(37, 99, 235, 0.2);
+  --shadow-pop: 0 12px 32px rgba(15, 18, 22, 0.12), 0 2px 6px rgba(15, 18, 22, 0.06);
+  --status-ok-dot: #10B981;
+  --emphasis-bg: #1D4ED8;
+  --emphasis-fg: #FFFFFF;
+  --emphasis-fg-muted: #DCE4FB;
+  --emphasis-track: rgba(255, 255, 255, 0.24);
+  --chart-grid: #E6E8EC;
+  --chart-muted: #CDD2DA;
 
   /* Nav item hover */
-  --nav-hover-bg: var(--bg-deep);
+  --nav-hover-bg: rgba(15, 18, 22, 0.045);
   --nav-hover-color: var(--text-primary);
-  --nav-active-bg: var(--accent-dim);
-  --nav-active-color: var(--accent-primary);
+  --nav-active-color: var(--nav-active-fg);
 
   /* Alert box */
   --alert-bg: var(--accent-dim);
@@ -255,14 +303,15 @@
   /* Tailwind radius scale (tailwind.config.ts) resolves from these: lg/xl = card 8,
      md = control 6, sm = badge 4, 2xl/sheet = dialog 12. Previously undefined,
      so every rounded-* utility collapsed to square corners. */
-  --radius: 12px;
-  --radius-sheet: 16px;
-  /* Design principles v2 shape scale (docs/brand/DESIGN-PRINCIPLES.md). */
-  --radius-card: 12px;
-  --radius-control: 8px;
-  --radius-chip: 6px;
-  --radius-dialog: 16px;
-  --radius-nested: 8px;
+  --radius: 16px;
+  --radius-sheet: 20px;
+  /* Design principles v3 shape scale (docs/brand/DESIGN-PRINCIPLES.md §3). */
+  --radius-card: 16px;
+  --radius-control: 10px;
+  --radius-chip: 8px;
+  --radius-pill: 999px;
+  --radius-dialog: 20px;
+  --radius-nested: 12px;
 }
 
 /* ===========================
@@ -345,170 +394,8 @@ button, input, select, textarea, optgroup {
   border-radius: 3px;
 }
 
-/* ===========================
-   OS LAYOUT CONTAINER
-   =========================== */
-
-.os-container {
-  display: grid;
-  grid-template-columns: 60px 1fr 320px;
-  grid-template-rows: 60px 1fr;
-  height: 100vh;
-  position: relative;
-  z-index: 1;
-  overflow: hidden;
-}
-
-/* ===========================
-   HEADER
-   =========================== */
-
-.os-header {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--header-bg);
-  backdrop-filter: blur(10px);
-  /* Keep the header (and its dropdowns: notifications, profile menu) above the
-     main content's cards, which otherwise paint over absolutely-positioned
-     children of the header. */
-  position: relative;
-  z-index: 100;
-}
-
-.logo {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: -0.05em;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  text-transform: uppercase;
-}
-
-.logo span {
-  color: var(--accent-primary);
-}
-
-/* Agent Command Bar */
-.agent-command {
-  flex: 1;
-  max-width: 600px;
-  margin: 0 40px;
-  position: relative;
-}
-
-.agent-input {
-  width: 100%;
-  background: var(--input-bg);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  padding: 10px 16px 10px 40px;
-  border-radius: var(--radius-control);
-  font-family: var(--font-mono);
-  font-size: 13px;
-  transition: all 0.2s var(--ease-out);
-}
-
-.agent-input::placeholder {
-  color: var(--text-tertiary);
-}
-
-.agent-input:focus {
-  outline: none;
-  background: var(--input-bg-focus);
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 1px var(--accent-primary);
-}
-
-.agent-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 14px;
-  height: 14px;
-  background: var(--accent-primary);
-  border-radius: 50%;
-  /* Static mark: pulsing dots are a banned pattern. */
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 var(--pulse-color); }
-  70% { box-shadow: 0 0 0 6px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
-
-/* ===========================
-   LEFT NAVIGATION
-   =========================== */
-
-.os-nav {
-  grid-column: 1 / 2;
-  grid-row: 2 / 3;
-  border-right: 1px solid var(--border-subtle);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 24px;
-  gap: 24px;
-  background: var(--bg-sidebar);
-}
-
-.nav-item {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  border-radius: var(--radius-control);
-  cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
-  position: relative;
-}
-
-.nav-item:hover {
-  color: var(--nav-hover-color);
-  background: var(--nav-hover-bg);
-}
-
-.nav-item.active {
-  color: var(--nav-active-color);
-  background: var(--nav-active-bg);
-}
-
-.nav-item svg {
-  width: 20px;
-  height: 20px;
-  stroke-width: 1.5;
-}
-
-/* Tooltip */
-.nav-tooltip {
-  position: absolute;
-  left: 50px;
-  background: var(--text-primary);
-  color: var(--bg-deep);
-  padding: 4px 8px;
-  border-radius: var(--radius-chip);
-  font-size: 13px;
-  line-height: 20px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s;
-  white-space: nowrap;
-  z-index: 10;
-}
-
-.nav-item:hover .nav-tooltip {
-  opacity: 1;
-}
+/* The authenticated shell (sidebar, top bar, phone tab bar) lives in
+   src/components/shell/shell.css. */
 
 /* ===========================
    WORKSPACE
@@ -1060,54 +947,11 @@ button, input, select, textarea, optgroup {
    RESPONSIVE LAYOUT
    =========================== */
 
-@media (max-width: 1200px) {
-  .os-container {
-    grid-template-columns: 60px 1fr;
-  }
-
-  .agent-sidebar {
-    display: none;
-  }
-}
-
 @media (max-width: 768px) {
-  .os-container {
-    grid-template-columns: 1fr;
-    grid-template-rows: 60px 1fr;
-  }
-
-  .os-nav {
-    display: none;
-  }
-
-  .workspace {
-    grid-template-columns: 1fr;
-  }
-
+  .workspace { grid-template-columns: 1fr; }
   .chart-card,
   .table-card,
-  .utilization-card {
-    grid-column: span 1;
-  }
-}
-
-/* Theme Toggle */
-.theme-toggle {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-control);
-  background: transparent;
-  cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
-}
-.theme-toggle:hover {
-  color: var(--text-primary);
-  background: var(--surface-tint-hover);
+  .utilization-card { grid-column: span 1; }
 }
 
 /* Authenticated dashboard text roles. Public/auth defaults remain unchanged.
@@ -1121,30 +965,31 @@ button, input, select, textarea, optgroup {
 
 .os-app-shell .card-title {
   font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 24px;
+  font-size: var(--text-subhead);
+  line-height: 22px;
   font-weight: 600;
   text-transform: none;
-  letter-spacing: normal;
+  letter-spacing: var(--tracking-title);
 }
 
 .os-app-shell .metric-card .card-title,
 .os-app-shell .ui-label {
   font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--text-label);
+  line-height: 16px;
   font-weight: 500;
+  color: var(--text-tertiary);
   text-transform: none;
   letter-spacing: normal;
 }
 
 .os-app-shell .metric-value {
   font-family: var(--font-sans);
-  font-size: 28px;
-  line-height: 36px;
-  font-weight: 600;
+  font-size: var(--text-figure);
+  line-height: 38px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: normal;
+  letter-spacing: var(--tracking-figure);
 }
 
 .os-app-shell .metric-delta {
@@ -1156,14 +1001,9 @@ button, input, select, textarea, optgroup {
   text-transform: none;
 }
 
-/* Authenticated shell geometry only; explicit page/inline overrides remain. */
-.os-app-shell > .os-app-main {
-  grid-column: 2 / -1;
-  padding: 32px;
-}
-
+/* Shell geometry lives in components/shell/shell.css. */
 .os-app-shell .card {
-  padding: 24px;
+  padding: var(--card-pad);
   border-radius: var(--radius-card);
 }
 
@@ -1174,7 +1014,6 @@ button, input, select, textarea, optgroup {
 }
 
 @media (max-width: 767px) {
-  .os-app-shell > .os-app-main { padding: 20px 16px; }
   .os-app-shell .card { padding: 16px; }
   .os-app-shell .btn-action { min-height: 48px; }
 }
@@ -1197,7 +1036,7 @@ button, input, select, textarea, optgroup {
   --status-danger-text: #B91C1C;
   --status-info-text: #1D4ED8;
   --avatar-on-dim: #1D4ED8;
-  --text-tertiary: #626975;
+  --text-tertiary: #646B76;
 }
 [data-theme="dark"] .os-app-shell,
 .os-app-shell[data-theme="dark"] {
@@ -1206,168 +1045,15 @@ button, input, select, textarea, optgroup {
   --status-danger-text: #FCA5A5;
   --status-info-text: #93C5FD;
   --avatar-on-dim: #93C5FD;
-  --text-tertiary: #8A8F98;
-}
-
-/* Authenticated shared chrome only; page content and body portals are excluded. */
-.os-app-shell .os-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.os-app-shell > .os-header {
-  gap: 16px;
-  padding: 8px 24px;
-}
-.os-app-shell .agent-command { min-width: 0; margin: 0 16px; }
-.os-app-shell .agent-input {
-  font: 400 14px/20px var(--font-sans);
-  letter-spacing: normal;
-  padding: 8px 16px 8px 40px;
-  min-height: 40px;
-  border-radius: var(--radius-control);
-}
-.os-app-shell > .os-header .status-badge {
-  font: 500 13px/20px var(--font-sans);
-  letter-spacing: normal;
-  text-transform: none;
-  padding: 4px 10px;
-  min-height: 32px;
-  gap: 8px;
-}
-.os-app-shell .theme-toggle { width: 44px; height: 44px; flex-shrink: 0; border-radius: var(--radius-control); font-size: 14px; }
-/* Icon-only header triggers: keep an on-scale font so any fallback text/count
-   renders at a sanctioned size rather than the 13.333px browser default. */
-.os-app-shell .dashboard-notification-trigger { font-size: 14px; }
-.os-app-shell .os-profile-trigger { padding: 0; flex-shrink: 0; font-family: var(--font-sans); }
-.os-app-shell .os-profile-action {
-  display: block;
-  width: 100%;
-  min-height: 40px;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  font-weight: 400;
-  border-radius: var(--radius-control);
-  transition: background-color 0.15s;
-}
-.os-app-shell .os-profile-action:hover { background: var(--surface-tint-hover); }
-.os-app-shell .os-profile-action:focus-visible,
-.os-app-shell .os-profile-trigger:focus-visible,
-.os-app-shell .theme-toggle:focus-visible,
-.os-app-shell .nav-item:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 3px;
-}
-.os-app-shell > .os-nav { gap: 16px; }
-.os-app-shell .nav-item { width: 44px; height: 44px; border-radius: var(--radius-control); }
-.os-app-shell .nav-tooltip { font: 400 13px/20px var(--font-sans); letter-spacing: normal; border-radius: var(--radius-chip); }
-@media (max-width: 768px) {
-  .os-app-shell > .os-header { padding: 12px 16px; gap: 12px; }
-  .os-app-shell .agent-command { margin: 0; }
-  .os-app-shell .agent-input { min-height: 48px; font-size: 16px; }
-  .os-app-shell .os-profile-action { min-height: 48px; }
-  .os-app-shell > .os-nav { gap: 4px; }
-  .os-app-shell .nav-item { width: auto; height: auto; min-height: 48px; padding: 8px; }
-  .os-app-shell .nav-tooltip { font-size: 14px; }
-}
-
-/* On phones, anchor dropdowns to the full header rather than a wrapped icon. */
-.os-app-shell .os-profile-anchor,
-.os-app-shell .os-subscription-trigger { position: relative; }
-.os-app-shell .os-header-popover { right: 0; }
-@media (max-width: 768px) {
-  .os-app-shell .os-profile-anchor,
-  .os-app-shell .os-subscription-trigger { position: static; }
-  .os-app-shell .os-header-popover { right: 16px; }
+  --text-tertiary: #8B919C;
 }
 
 /* Desktop dashboard token adoption. Legacy/public and chart aliases remain separate. */
 @media (min-width: 768px) {
   .os-app-shell {
     --input-bg: var(--bg-surface);
-    --btn-action-color: #060709;
-    --border-row: #2A2E34;
+    --btn-action-color: var(--on-accent);
   }
-  [data-theme="light"] .os-app-shell:not([data-theme]),
-  .os-app-shell[data-theme="light"] {
-    --btn-action-color: #FFFFFF;
-    --border-row: #E5E7EB;
-  }
-  [data-theme="dark"] .os-app-shell:not([data-theme]),
-  .os-app-shell[data-theme="dark"] {
-    --btn-action-color: #060709;
-    --border-row: #2A2E34;
-  }
-}
-
-/* ===========================
-   PHONE SHELL: bottom tab bar
-   The sidebar has no room below 768px, so the same nav items become a
-   bottom bar. Content takes the full width and clears the bar.
-   =========================== */
-@media (max-width: 768px) {
-  .os-app-shell.os-container,
-  .os-container {
-    grid-template-columns: 1fr;
-    grid-template-rows: 60px 1fr auto;
-  }
-  .os-app-shell > .os-nav,
-  .os-nav {
-    display: flex;
-    grid-column: 1 / -1;
-    grid-row: 3 / 4;
-    flex-direction: row;
-    align-items: stretch;
-    justify-content: flex-start;
-    gap: 0;
-    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
-    border-right: none;
-    border-top: 1px solid var(--border-subtle);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .os-nav::-webkit-scrollbar { display: none; }
-  .os-app-shell .nav-item,
-  .nav-item {
-    flex: 1 0 64px;
-    width: auto;
-    height: auto;
-    min-height: 52px;
-    margin: 0 !important;
-    padding: 6px 4px;
-    flex-direction: column;
-    justify-content: center;
-    gap: 2px;
-    border-radius: var(--radius-control);
-    text-decoration: none;
-  }
-  .nav-item svg { width: 20px; height: 20px; }
-  /* The hover tooltip becomes a permanent label under the icon. */
-  .os-app-shell .nav-item .nav-tooltip,
-  .nav-item .nav-tooltip {
-    position: static;
-    display: block;
-    opacity: 1;
-    visibility: visible;
-    transform: none;
-    background: none;
-    border: none;
-    box-shadow: none;
-    padding: 0;
-    font: 500 12px/16px var(--font-sans);
-    color: inherit;
-    white-space: nowrap;
-    pointer-events: none;
-  }
-  .os-container > main,
-  .os-app-shell > .os-app-main { grid-column: 1 / -1; grid-row: 2 / 3; min-width: 0; }
-}
-@media (max-width: 640px) {
-  /* Copilot stays reachable from the tab bar; the plan status lives in the profile menu. */
-  .os-app-shell .agent-command,
-  .os-app-shell .os-subscription-trigger { display: none; }
-  .os-app-shell .os-header-actions { margin-left: auto; gap: 8px; }
 }
 
 /* Compact row actions and inline link buttons are 24-32px with a mouse, where
@@ -1391,3 +1077,103 @@ button, input, select, textarea, optgroup {
     inset: -10px -6px;
   }
 }
+
+/* ===========================================================================
+   V3 PRIMITIVES (docs/brand/DESIGN-PRINCIPLES.md §3, §4, §9)
+   Shared building blocks for every page. Pages compose these instead of
+   inventing card, title, label and button styles of their own.
+   =========================================================================== */
+
+/* Page head: bold tight title, one short grey line, actions on the right. */
+.tw-page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 16px 0 24px; }
+.tw-page-head__titles { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tw-title { margin: 0; font: 700 var(--text-display)/34px var(--font-sans); letter-spacing: var(--tracking-display); color: var(--text-primary); }
+.tw-subtitle { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-tertiary); }
+.tw-page-head__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Cards: 16px radius, a hairline border in light, a surface step in dark. */
+.tw-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--card-pad);
+  min-width: 0;
+}
+.tw-card--flush { padding: 0; overflow: hidden; }
+.tw-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.tw-card__titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tw-card__title { margin: 0; display: inline-flex; align-items: center; gap: 6px; font: 600 var(--text-subhead)/22px var(--font-sans); letter-spacing: var(--tracking-title); color: var(--text-primary); }
+.tw-card__sub { margin: 0; font: 400 var(--text-label)/16px var(--font-sans); color: var(--text-tertiary); }
+
+/* Labels and figures */
+.tw-label { font: 500 var(--text-label)/16px var(--font-sans); color: var(--text-tertiary); }
+.tw-figure { font: 700 var(--text-figure)/38px var(--font-sans); letter-spacing: var(--tracking-figure); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.tw-figure__unit { font-size: 0.6em; font-weight: 600; letter-spacing: -0.01em; color: var(--text-tertiary); margin-right: 2px; }
+.tw-delta { display: inline-flex; align-items: center; gap: 4px; font: 500 var(--text-label)/16px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-tertiary); }
+.tw-delta.is-up { color: var(--status-success-text, var(--status-success)); }
+.tw-delta.is-down { color: var(--status-danger-text, var(--status-danger)); }
+.tw-delta__period { color: var(--text-tertiary); font-weight: 400; }
+
+/* Buttons */
+.tw-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 36px; padding: 0 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: 500 13px/20px var(--font-sans);
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s, filter 0.12s;
+}
+.tw-btn:hover { background: var(--bg-surface-hover); border-color: var(--border-active); }
+.tw-btn--primary { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--on-accent); }
+.tw-btn--primary:hover { background: var(--accent-primary); border-color: var(--accent-primary); filter: brightness(1.08); }
+.tw-btn--ghost { background: transparent; border-color: transparent; color: var(--text-secondary); }
+.tw-btn--ghost:hover { background: var(--nav-hover-bg); border-color: transparent; color: var(--text-primary); }
+.tw-btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+@media (max-width: 768px) { .tw-btn { height: 44px; } }
+
+/* Segmented control: only when it changes the data on screen. */
+.tw-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--radius-control); background: var(--bg-raised); }
+.tw-seg__opt {
+  height: 28px; padding: 0 12px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--text-secondary);
+  font: 500 12px/16px var(--font-sans); cursor: pointer; white-space: nowrap;
+}
+.tw-seg__opt:hover { color: var(--text-primary); }
+.tw-seg__opt.is-active { background: var(--bg-surface); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+[data-theme="dark"] .tw-seg__opt.is-active { background: #2A2F37; box-shadow: none; }
+.tw-seg__opt:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
+@media (pointer: coarse) { .tw-seg__opt { height: 40px; } }
+
+/* Small status pill (e.g. "Live", "Last 20 quotes"). */
+.tw-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 22px; padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font: 500 12px/16px var(--font-sans);
+  white-space: nowrap;
+}
+.tw-chip--ok { background: var(--status-success-bg); color: var(--status-success-text, var(--status-success)); }
+.tw-chip--warn { background: var(--status-warning-bg); color: var(--status-warning-text, var(--status-warning)); }
+.tw-chip--bad { background: var(--status-danger-bg); color: var(--status-danger-text, var(--status-danger)); }
+
+/* Methodology lives behind an info icon (§9). */
+.tw-info { position: relative; display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-tertiary); cursor: help; flex-shrink: 0; }
+.tw-info:hover, .tw-info:focus-visible, .tw-info[aria-expanded="true"] { color: var(--text-primary); }
+.tw-info:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
+.tw-info__pop {
+  position: absolute; z-index: 400; top: calc(100% + 8px); left: -8px;
+  width: max-content; max-width: 280px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--tip-bg); color: var(--tip-fg);
+  font: 400 12px/18px var(--font-sans); letter-spacing: normal; text-align: left; white-space: normal;
+  box-shadow: var(--shadow-pop);
+  pointer-events: none;
+}
+.tw-info__pop--end { left: auto; right: -8px; }
+@media (pointer: coarse) { .tw-info::after { content: ''; position: absolute; inset: -12px; } }

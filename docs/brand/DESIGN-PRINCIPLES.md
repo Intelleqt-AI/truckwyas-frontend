@@ -20,22 +20,28 @@ These read as generated UI. Never use them.
 
 ## 2. Layout and spacing
 
-- Page gutter 32px desktop, 16px phone. Section gap 24px. Gap between sibling cards 16px.
-- Card padding 24px. Card header: title (16/24, 600) with an optional one-line description directly beneath (13/20, secondary, 4px gap), both inside the card, 16px above the card body.
+- Page gutter 32px desktop, 16px phone. Section gap 24px. Gap between sibling cards 16px (`--card-gap`).
+- Card padding 20px (`--card-pad`), 16px on phones. Compact inside, generous between. Card header: title (15/22, 600, -0.01em) with an optional subtitle directly beneath (12/16, tertiary, 2px gap, at most 8 words), 16px above the card body. Methodology goes in an `InfoTip` next to the title.
 - A section title and its content are one unit. Never leave a description floating outside the card it describes.
 - List and table rows are 44 to 48px tall. Dense data never uses 80px rows.
 - Align to a shared grid: labels, values and bars in a list share column edges from row to row.
 
-## 3. Shape and surface
+## 3. Shape and surface (v3)
 
-- Radius: cards 12px, controls 8px, chips and badges 6px, dialogs 16px. Nested surfaces step down (a card inside a card uses 8px).
-- Light: page `#F3F4F6`, card `#FFFFFF` with `1px` border `#E5E7EB`. Dark: page `#060709`, card `#101215` with border `#2A2E34`.
-- Hover states on rows and interactive cards use a subtle surface tint, not a border change.
+- Radius: cards 16px (`--radius-card`), controls 10px, chips 8px, pills and segmented controls 999px, dialogs and sheets 20px, nested surfaces 12px.
+- Light: page `#F4F5F7`, sidebar and cards `#FFFFFF`, hairline border `#E6E8EC`, row rules `#EDEFF2`, raised chips `#EFF1F4`.
+- Dark: page `#0A0B0D`, sidebar `#0E1013`, card `#131519` (the surface step does the work), border `#22262D`, row rules `#1E2127`, raised chips and active pill `#1F232A` / `#252A32`.
+- Neutrals are cool-biased greys. Text: light `#0F1216` / `#4B525D` / `#646B76`; dark `#F2F4F7` / `#A3A9B3` / `#8B919C`. All pass AA on every surface they sit on (tertiary is 4.75:1 on the lightest raised chip, 4.98:1 on the darkest).
+- Hover states on rows and interactive cards use a subtle surface tint, not a border change. Popovers and menus are the only elements with a shadow (`--shadow-pop`), and they have no border-plus-shadow stacking beyond a hairline.
+- Type: page title 28/34 700 -0.025em; KPI figure 32/38 700 -0.03em tabular; card title 15/22 600 -0.01em; body 14/20; small 13/20; label 12/16 500 tertiary; sidebar group label 11/16 600 uppercase +0.06em (the only uppercase in the product).
 
-## 4. Colour and emphasis
+## 4. Colour and emphasis (v3)
 
 - Neutral by default. Numbers are primary text, not accent blue.
-- One accent use per panel, reserved for the single thing that needs attention or action.
+- Accent: `#2563EB` light, `#5B9BFF` dark (text on it: white in light, `#0A0B0D` in dark). One accent use per panel, reserved for the single thing that needs attention or action: the primary button, the current bar, the key funnel stage.
+- **One inverted emphasis tile per page** (`--emphasis-bg` `#1D4ED8`, white text 6.7:1, muted text `#DCE4FB` 5.3:1). Use it for the figure that needs action (on Today: Owed to you). Never two.
+- Active navigation is a filled pill: ink `#0F1216` with white text in light, `#252A32` with white text in dark. Section tabs underline in primary text, not accent.
+- Charts: one series in accent, comparison series neutral and hatched (`--chart-muted`), dotted grid (`--chart-grid`).
 - Semantic colours (success, warning, danger) only for state, always paired with a text label, always the AA `--status-*-text` tokens for text.
 - Charts: one series in accent, comparison series in a neutral grey, the current period emphasised.
 
@@ -61,7 +67,7 @@ These read as generated UI. Never use them.
 3. Do bars encode the metric the list is sorted by?
 4. Is the sample size visible, and is thin data kept out of rankings?
 5. Is every number real, labelled with its basis, and neutral unless it needs attention?
-6. Card padding 24, rows 44 to 48, gaps 16/24, radius 12/8/6?
+6. Card padding 20, rows 44 to 48, gaps 16/24, radius 16/10/8?
 7. Correct in light and dark, and at phone width?
 
 ## 8. Control sizes
@@ -78,3 +84,15 @@ These read as generated UI. Never use them.
 - **Let the number speak.** Big figure, short label, delta. No sentence that restates the figure.
 - **Empty states: one short line and one action.**
 - Reference density: the owner's references (Haulsight analytics, Vantage agent metrics, Close CRM reports, the Revenue sidebar app). Tight type, labelled grouped sidebar, restrained accent, generous whitespace between panels but compact inside them.
+
+## 10. Rolling v3 out to a page
+
+The shell (`src/components/shell/`) and the primitives at the end of `src/styles/theme.css` are the whole kit. For each page:
+
+1. **Head.** Use `SectionHeader` (already v3: 28px bold title, grey subtitle, neutral tab underline) or `.tw-page-head` + `.tw-title` + `.tw-subtitle`. Subtitle is one line, at most 8 words. Delete any paragraph under the title.
+2. **Cards.** `.tw-card` (16px radius, 20px padding). Head: `.tw-card__head` > `.tw-card__titles` > `.tw-card__title` (+ `<InfoTip>` from `components/ui/InfoTip`) and `.tw-card__sub`. Tables go in `.tw-card--flush` with the head padded.
+3. **Numbers.** Big figure `.tw-figure` (32px, whole rands on tiles, cents in the `title` attribute and tables). Change: `.tw-delta` with a trend glyph and a named period ("+8% vs prior 30 days"). Max four tiles per row; at most one inverted `--emphasis-bg` tile per page.
+4. **Controls.** `.tw-btn` (outline), `.tw-btn--primary` (one per page), `.tw-btn--ghost`; `.tw-seg` only when it changes the data on screen; `.tw-chip` for status and scope.
+5. **Words.** Apply §9. Every "Each month shows…" or "This list holds…" sentence moves into an `InfoTip` or is deleted.
+6. **No page-level colours.** Use tokens only (`--bg-*`, `--text-*`, `--border-*`, `--accent-primary`, `--status-*-text`). Do not redefine `--text-tertiary` per page; the shell value is AA.
+7. **Check** light and dark at 1440, 1024 (rail) and 390. The main column no longer has a fixed 60px rail; tables must scroll inside their own card wrapper, not the page.

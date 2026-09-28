@@ -1,154 +1,279 @@
-/* Fleet detail pages (vehicle + driver profiles). Scoped to .fleet-detail —
-   brand type roles: h1 22/28, card h2 16/24, labels 13/20, body 14/20,
-   headline metrics 28/36 tabular, mono only for identifiers. */
-.fleet-detail { min-width: 0; font-family: var(--font-sans); --fd-inset: 24px; }
-
-.fleet-detail .fd-back {
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  margin: -8px 0 8px;
-  padding: 0;
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font: 400 14px/20px var(--font-sans);
-  cursor: pointer;
+/* Fleet record pages: one page per vehicle and per driver
+   (VehicleFinancialProfile.tsx, DriverProfile.tsx, components/fleet-detail).
+   Tight type, big numbers with short labels, compact panels with generous
+   space between them. Theme tokens only; mono only for identifiers. */
+.fleet-detail {
+  --fd-gap: 24px;
+  --fd-pad: 24px;
+  --fd-panel-bg: var(--bg-surface);
+  --fd-line: var(--border-subtle);
+  --fd-row-line: var(--border-row);
+  min-width: 0;
+  max-width: 1480px;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
 }
-.fleet-detail .fd-back:hover { color: var(--text-primary); }
+.fleet-detail .fd-mono { font-family: var(--font-mono); font-size: 0.93em; letter-spacing: -0.01em; }
+.fleet-detail .fd-strong { color: var(--text-primary); font-weight: 500; }
 
+/* ---------------------------------------------------------------- header */
+.fleet-detail .fd-head { margin-bottom: 24px; }
+.fleet-detail .fd-crumb { display: flex; align-items: center; gap: 8px; min-width: 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); margin-bottom: 12px; }
+.fleet-detail .fd-crumb a { color: var(--text-secondary); text-decoration: none; display: inline-flex; align-items: center; min-height: 24px; }
+.fleet-detail .fd-crumb a:hover { color: var(--text-primary); }
+.fleet-detail .fd-crumb a:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
+.fleet-detail .fd-crumb [aria-current] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleet-detail .fd-head__row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; }
+.fleet-detail .fd-head__id { min-width: 0; }
+.fleet-detail .fd-head__title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fleet-detail .fd-head__title { margin: 0; font: 600 26px/32px var(--font-sans); letter-spacing: -0.02em; color: var(--text-primary); }
+.fleet-detail .fd-head__meta { margin: 4px 0 0; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-head__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.fleet-detail .fd-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px;
+  border-radius: var(--radius-chip, 6px);
+  font: 500 12px/16px var(--font-sans); white-space: nowrap;
+  color: var(--text-secondary); background: var(--status-neutral-bg);
+}
+.fleet-detail .fd-chip__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.fleet-detail .fd-chip--success { color: var(--status-success-text, var(--status-success)); background: var(--status-success-bg); }
+.fleet-detail .fd-chip--info { color: var(--status-info-text, var(--accent-primary)); background: var(--accent-glow); }
+.fleet-detail .fd-chip--warning { color: var(--status-warning-text, var(--status-warning)); background: var(--status-warning-bg); }
+.fleet-detail .fd-chip--danger { color: var(--status-danger-text, var(--status-danger)); background: var(--status-danger-bg); }
+
+/* Buttons and the segmented status control */
 .fleet-detail .fd-button {
-  min-height: 40px;
-  padding: 8px 16px;
-  background: none;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-control, 8px);
-  color: var(--text-primary);
-  font: 400 14px/20px var(--font-sans);
-  letter-spacing: normal;
-  text-transform: none;
-  cursor: pointer;
-  white-space: nowrap;
+  min-height: 36px; padding: 0 14px;
+  background: var(--fd-panel-bg); border: 1px solid var(--fd-line); border-radius: var(--radius-control, 8px);
+  color: var(--text-primary); font: 500 13px/20px var(--font-sans); cursor: pointer; white-space: nowrap;
 }
-.fleet-detail .fd-button:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-surface-hover); }
-.fleet-detail .fd-button:disabled { cursor: default; }
-/* Status is one segmented control, not four loose buttons. */
-.fleet-detail .fd-status-group {
-  display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-control, 8px);
-  background: var(--bg-surface);
+.fleet-detail .fd-button:hover:not(:disabled) { background: var(--bg-surface-hover); }
+.fleet-detail .fd-seg {
+  display: inline-flex; gap: 2px; padding: 2px; max-width: 100%; overflow-x: auto;
+  border: 1px solid var(--fd-line); border-radius: var(--radius-control, 8px); background: var(--fd-panel-bg);
+  scrollbar-width: none;
 }
-.fleet-detail .fd-status-group .fd-status {
-  min-height: 34px; padding: 6px 12px;
-  border: 1px solid transparent; border-radius: 6px;
-  color: var(--text-secondary);
+.fleet-detail .fd-seg::-webkit-scrollbar { display: none; }
+.fleet-detail .fd-seg__btn {
+  min-height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: none; cursor: pointer; white-space: nowrap;
+  color: var(--text-secondary); font: 500 13px/20px var(--font-sans);
 }
-.fleet-detail .fd-status-group .fd-status:hover:not(:disabled) { background: var(--bg-surface-hover); color: var(--text-primary); }
-.fleet-detail .fd-status[aria-pressed="true"] {
-  background: var(--bg-surface-hover);
-  border-color: var(--border-active);
-  color: var(--text-primary);
-  font-weight: 500;
-  opacity: 1;
-}
+.fleet-detail .fd-seg__btn:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-surface-hover); }
+.fleet-detail .fd-seg__btn:disabled { cursor: default; }
+.fleet-detail .fd-seg__btn:disabled:not([aria-pressed="true"]) { opacity: 0.5; }
+.fleet-detail .fd-seg__btn[aria-pressed="true"] { color: var(--text-primary); background: var(--bg-raised, var(--bg-surface-hover)); box-shadow: inset 0 0 0 1px var(--border-active); }
 .fleet-detail .fd-button:focus-visible,
-.fleet-detail .fd-back:focus-visible,
-.fleet-detail .fd-icon-button:focus-visible,
-.fleet-detail .fd-row--link:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 3px;
+.fleet-detail .fd-seg__btn:focus-visible,
+.fleet-detail .fd-link:focus-visible,
+.fleet-detail .fd-info__btn:focus-visible,
+.fleet-detail .fd-table tbody tr:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+/* ----------------------------------------------------------- money strip */
+.fleet-detail .fd-strip {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--fd-panel-bg); border: 1px solid var(--fd-line); border-radius: var(--radius-card, 12px);
+  margin-bottom: var(--fd-gap);
+}
+.fleet-detail .fd-kpi { display: flex; flex-direction: column; min-width: 0; padding: 20px var(--fd-pad) 18px; }
+.fleet-detail .fd-kpi + .fd-kpi { border-left: 1px solid var(--fd-line); }
+.fleet-detail .fd-kpi__head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; min-height: 20px; }
+.fleet-detail .fd-kpi__label { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fleet-detail .fd-kpi__value {
+  margin-top: 8px; font: 600 28px/34px var(--font-sans); letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fleet-detail .fd-kpi__value.is-empty { font: 400 15px/34px var(--font-sans); letter-spacing: normal; color: var(--text-tertiary); }
+.fleet-detail .fd-kpi__value.is-danger { color: var(--status-danger-text, var(--status-danger)); }
+.fleet-detail .fd-kpi__value.is-warning { color: var(--status-warning-text, var(--status-warning)); }
+.fleet-detail .fd-kpi__unit { margin-left: 4px; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); letter-spacing: normal; }
+.fleet-detail .fd-kpi__sub { margin-top: 2px; font: 400 13px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.fleet-detail .fd-kpi__spark { margin-top: auto; }
+.fleet-detail .fd-kpi__spark .viz-spark { padding-top: 12px; }
+.fleet-detail .fd-kpi__spark .viz-spark__axis { font-size: 11px; }
+
+/* Qualifier tag and the (i) methodology tip */
+.fleet-detail .fd-tag {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 6px; flex-shrink: 0;
+  border: 1px solid var(--fd-line); border-radius: 4px;
+  font: 500 11px/16px var(--font-sans); letter-spacing: 0.01em; color: var(--text-tertiary); white-space: nowrap;
+}
+.fd-info { position: relative; display: inline-flex; vertical-align: middle; }
+.fd-info__btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; padding: 0; margin: -2px 0; border: 0; border-radius: 50%;
+  background: none; color: var(--text-tertiary); cursor: help;
+}
+.fd-info__btn:hover, .fd-info__btn[aria-expanded="true"] { color: var(--text-primary); }
+@media (pointer: coarse) {
+  .fd-info__btn { width: 32px; height: 32px; margin: -8px -6px; }
+}
+.fd-info__pop {
+  position: fixed; z-index: 1100; width: min(280px, calc(100vw - 32px)); box-sizing: border-box;
+  padding: 10px 12px; border-radius: 8px;
+  background: var(--bg-raised, var(--bg-surface)); border: 1px solid var(--border-active, var(--border-subtle));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  font: 400 13px/20px var(--font-sans); color: var(--text-secondary); text-align: left;
+  letter-spacing: normal; text-transform: none; white-space: normal;
 }
 
-/* Headline metrics */
-.fleet-detail .fd-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
-}
-.fleet-detail .fd-metrics > .card { min-width: 0; padding: var(--fd-inset); border-radius: var(--radius-card, 12px); }
-.fleet-detail .fd-metrics .card-title {
-  font: 500 13px/20px var(--font-sans);
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--text-secondary);
-}
-.fleet-detail .fd-metrics .metric-value {
-  font: 600 28px/36px var(--font-sans);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: normal;
-  margin-bottom: 0;
-  overflow-wrap: anywhere;
-}
-.fleet-detail .fd-suffix { font: 400 14px/20px var(--font-sans); color: var(--text-secondary); margin-left: 2px; }
-.fleet-detail .fd-metric-sub { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); margin-top: 4px; }
+/* ------------------------------------------------------------------ body */
+.fleet-detail .fd-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 380px); gap: var(--fd-gap); align-items: start; }
+.fleet-detail .fd-main, .fleet-detail .fd-side { display: flex; flex-direction: column; gap: var(--fd-gap); min-width: 0; }
+.fleet-detail .fd-main { container-type: inline-size; container-name: fd-main; }
 
-/* Detail cards */
-.fleet-detail .fd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
-.fleet-detail .fd-stack { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
-.fleet-detail .fd-card { padding: var(--fd-inset); border-radius: var(--radius-card, 12px); min-width: 0; }
-.fleet-detail .fd-card__desc { margin: -12px 0 16px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
-.fleet-detail .fd-card__title {
-  margin: 0 0 16px;
-  font: 600 16px/24px var(--font-sans);
-  color: var(--text-primary);
-  letter-spacing: normal;
-  text-transform: none;
+.fleet-detail .fd-panel {
+  min-width: 0; padding: 20px var(--fd-pad) var(--fd-pad);
+  background: var(--fd-panel-bg); border: 1px solid var(--fd-line); border-radius: var(--radius-card, 12px);
 }
+.fleet-detail .fd-panel--flush { padding-bottom: 4px; }
+.fleet-detail .fd-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.fleet-detail .fd-panel__titles { min-width: 0; }
+.fleet-detail .fd-panel__title { display: flex; align-items: center; gap: 6px; margin: 0; font: 600 15px/22px var(--font-sans); letter-spacing: -0.005em; color: var(--text-primary); }
+.fleet-detail .fd-panel__sub { margin: 2px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-panel__aside { flex-shrink: 0; }
+.fleet-detail .fd-aside-figure { font: 600 15px/22px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.fleet-detail .fd-empty { margin: 0; padding: 16px 0 12px; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+
+.fleet-detail .fd-bars { margin: 0 -4px 0 0; }
+
+/* Mini figures under the chart */
+.fleet-detail .fd-mini {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px 24px;
+  margin: 16px calc(var(--fd-pad) * -1) 0; padding: 16px var(--fd-pad) 0; border-top: 1px solid var(--fd-row-line);
+}
+.fleet-detail .fd-mini__item { min-width: 0; }
+.fleet-detail .fd-mini dt { font: 400 12px/16px var(--font-sans); color: var(--text-secondary); white-space: nowrap; }
+.fleet-detail .fd-mini dd {
+  display: flex; align-items: center; gap: 6px; margin: 4px 0 0;
+  font: 600 16px/22px var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; color: var(--text-primary); white-space: nowrap;
+}
+.fleet-detail .fd-mini dd.is-missing { color: var(--text-tertiary); font-weight: 400; }
+
+/* Details: grouped, tight label/value rows */
+.fleet-detail .fd-group + .fd-group { margin-top: 20px; }
+.fleet-detail .fd-group__title {
+  display: flex; align-items: center; gap: 6px; margin: 0 0 4px;
+  font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
+}
+.fleet-detail .fd-rows { margin: 0; }
 .fleet-detail .fd-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border-row);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  min-height: 36px; border-bottom: 1px solid var(--fd-row-line);
 }
-.fleet-detail .fd-row:last-child { border-bottom: none; }
-.fleet-detail .fd-row__label { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
-.fleet-detail .fd-row__value {
-  font: 400 14px/20px var(--font-sans);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
-  text-align: right;
-  overflow-wrap: anywhere;
+.fleet-detail .fd-row:last-child { border-bottom: 0; }
+.fleet-detail .fd-row dt { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); white-space: nowrap; }
+.fleet-detail .fd-row dd {
+  display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; margin: 0;
+  font: 500 13px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary);
+  text-align: right; overflow-wrap: anywhere;
 }
-.fleet-detail .fd-id { font: 400 13px/20px var(--font-mono); }
-.fleet-detail .fd-row--link { cursor: pointer; border-radius: 6px; margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
-.fleet-detail .fd-row--link:hover { background: var(--bg-surface-hover); }
-.fleet-detail .fd-divider { height: 1px; background: var(--border-subtle); margin: 16px 0 8px; }
-.fleet-detail .fd-empty { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); text-align: center; padding: 24px 0; }
+.fleet-detail .fd-row dd.is-missing { color: var(--text-tertiary); font-weight: 400; }
+.fleet-detail .fd-row dd.is-danger { color: var(--status-danger-text, var(--status-danger)); }
+.fleet-detail .fd-row dd.is-warning { color: var(--status-warning-text, var(--status-warning)); }
+.fleet-detail .fd-row__note { display: inline-flex; }
+.fleet-detail .fd-row dd.fd-mono { font-family: var(--font-mono); font-weight: 400; font-size: 12.5px; }
+.fleet-detail .fd-missing {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  margin: 0; padding: 8px 0 0; font: 400 12px/18px var(--font-sans); color: var(--text-tertiary);
+}
+.fleet-detail .fd-rows + .fd-missing { border-top: 1px solid var(--fd-row-line); }
+.fleet-detail .fd-missing__lead { color: var(--text-secondary); }
+.fleet-detail .fd-link--inline { min-height: 24px; padding: 0 4px; margin-right: -4px; flex-shrink: 0; font-size: 12px; }
+@media (pointer: coarse) { .fleet-detail .fd-link--inline { min-height: 44px; margin: -10px -4px -10px 0; } }
 
-.fleet-detail .fd-score { margin-bottom: 16px; }
-.fleet-detail .fd-score__row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-.fleet-detail .fd-score__track { height: 6px; background: var(--border-subtle); border-radius: 3px; overflow: hidden; }
+/* Alerts: real issues only, dot + text + when */
+.fleet-detail .fd-alerts { padding-bottom: 12px; }
+.fleet-detail .fd-alerts .fd-panel__head { margin-bottom: 4px; }
+.fleet-detail .fd-alerts__list { list-style: none; margin: 0; padding: 0; }
+.fleet-detail .fd-alert { display: flex; align-items: center; gap: 10px; min-height: 40px; border-bottom: 1px solid var(--fd-row-line); font: 500 13px/20px var(--font-sans); color: var(--text-primary); }
+.fleet-detail .fd-alert:last-child { border-bottom: 0; }
+.fleet-detail .fd-alert__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.fleet-detail .fd-alert.is-danger .fd-alert__dot { background: var(--status-danger); }
+.fleet-detail .fd-alert.is-warning .fd-alert__dot { background: var(--status-warning); }
+.fleet-detail .fd-alert__text { flex: 1; min-width: 0; }
+.fleet-detail .fd-alert__when { font-weight: 400; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* Recent-loads table */
-.fleet-detail .fd-table-card { padding-bottom: 8px; }
-.fleet-detail .fd-table-scroll { overflow-x: auto; margin: 0 calc(var(--fd-inset) * -1); }
-.fleet-detail .fd-table { width: 100%; border-collapse: collapse; }
+/* ----------------------------------------------------------- loads table */
+.fleet-detail .fd-table-scroll { overflow-x: auto; margin: 0 calc(var(--fd-pad) * -1); }
+.fleet-detail .fd-table-scroll:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
+.fleet-detail .fd-table { width: 100%; border-collapse: collapse; table-layout: auto; }
 .fleet-detail .fd-table th {
-  padding: 12px 16px;
-  text-align: left;
-  white-space: nowrap;
-  border-bottom: 1px solid var(--border-subtle);
+  height: 36px; padding: 0 12px; text-align: left; white-space: nowrap;
+  font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
+  border-top: 1px solid var(--fd-row-line); border-bottom: 1px solid var(--fd-row-line);
 }
 .fleet-detail .fd-table td {
-  padding: 12px 16px;
-  font: 400 14px/20px var(--font-sans);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  border-bottom: 1px solid var(--border-row);
+  height: 48px; padding: 0 12px; box-sizing: border-box;
+  font: 400 13px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-secondary);
+  white-space: nowrap; border-bottom: 1px solid var(--fd-row-line);
 }
-.fleet-detail .fd-table tr:last-child td { border-bottom: none; }
+.fleet-detail .fd-table tbody tr:last-child td { border-bottom: 0; }
 .fleet-detail .fd-table tbody tr { cursor: pointer; }
 .fleet-detail .fd-table tbody tr:hover { background: var(--bg-surface-hover); }
-.fleet-detail .fd-table th:first-child,
-.fleet-detail .fd-table td:first-child { padding-left: var(--fd-inset); }
-.fleet-detail .fd-table th:last-child,
-.fleet-detail .fd-table td:last-child { padding-right: var(--fd-inset); }
-.fleet-detail .fd-table .is-numeric { text-align: right; font-variant-numeric: tabular-nums; }
+.fleet-detail .fd-table th:first-child, .fleet-detail .fd-table td:first-child { padding-left: var(--fd-pad); }
+.fleet-detail .fd-table th:last-child, .fleet-detail .fd-table td:last-child { padding-right: var(--fd-pad); }
+.fleet-detail .fd-table .is-num { text-align: right; }
+.fleet-detail .fd-table .fd-ellipsis { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.fleet-detail .fd-cell-sub { display: none; }
+.fleet-detail .fd-state { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.fleet-detail .fd-state i { width: 6px; height: 6px; border-radius: 50%; background: var(--text-tertiary); }
+.fleet-detail .fd-state--success i { background: var(--status-success); }
+.fleet-detail .fd-state--info i { background: var(--accent-primary); }
+.fleet-detail .fd-state--warning i { background: var(--status-warning); }
+.fleet-detail .fd-table-foot { display: flex; justify-content: center; border-top: 1px solid var(--fd-row-line); margin: 0 calc(var(--fd-pad) * -1); padding: 4px 0 0; }
+.fleet-detail .fd-link { min-height: 36px; padding: 0 12px; border: 0; background: none; cursor: pointer; font: 500 13px/20px var(--font-sans); color: var(--accent-primary); border-radius: 6px; }
+.fleet-detail .fd-link:hover { text-decoration: underline; }
+
+/* ---------------------------------------------------------------- states */
+.fleet-detail .fd-skel { border-radius: 6px; background: var(--bg-surface-hover); }
+.fleet-detail .fd-strip .fd-skel { background: var(--bg-surface-hover); }
+.fleet-detail .fd-message { max-width: 440px; margin: 64px auto; text-align: center; }
+.fleet-detail .fd-message__title { margin: 0 0 8px; font: 600 20px/28px var(--font-sans); letter-spacing: -0.01em; }
+.fleet-detail .fd-message__body { margin: 0 0 24px; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-detail .fd-message__actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+
+/* ------------------------------------------------------------ responsive */
+/* The loads table sheds its least useful columns as the main column narrows. */
+@container fd-main (max-width: 860px) {
+  .fleet-detail .fd-table .fd-col-customer { display: none; }
+}
+@container fd-main (max-width: 620px) {
+  .fleet-detail .fd-table .fd-col-dist { display: none; }
+}
+@media (max-width: 1100px) {
+  .fleet-detail .fd-body { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  .fleet-detail .fd-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fleet-detail .fd-kpi:nth-child(3) { border-left: 0; }
+  .fleet-detail .fd-kpi:nth-child(n + 3) { border-top: 1px solid var(--fd-line); }
+}
+@media (max-width: 640px) {
+  .fleet-detail { --fd-pad: 16px; --fd-gap: 16px; }
+  .fleet-detail .fd-head__title { font-size: 22px; line-height: 28px; }
+  .fleet-detail .fd-head__row { align-items: stretch; flex-direction: column; }
+  .fleet-detail .fd-head__actions { width: 100%; }
+  .fleet-detail .fd-head__actions .fd-seg { flex: 1 1 auto; }
+  .fleet-detail .fd-seg__btn { flex: 1 0 auto; min-height: 40px; }
+  .fleet-detail .fd-button { min-height: 44px; }
+  .fleet-detail .fd-kpi { padding: 16px; }
+  .fleet-detail .fd-kpi__value { font-size: 22px; line-height: 28px; }
+  .fleet-detail .fd-kpi__value.is-empty { font-size: 14px; line-height: 28px; white-space: normal; }
+  .fleet-detail .fd-kpi__spark { display: none; }
+  .fleet-detail .fd-kpi__head .fd-tag { order: 3; }
+  .fleet-detail .fd-panel { padding: 16px var(--fd-pad); }
+  .fleet-detail .fd-panel--flush { padding-bottom: 4px; }
+  /* Phone table: load + route stacked, revenue, status. */
+  .fleet-detail .fd-table .fd-col-opt,
+  .fleet-detail .fd-table .fd-col-route { display: none; }
+  .fleet-detail .fd-table td { height: 56px; }
+  .fleet-detail .fd-cell-sub { display: block; max-width: 44vw; overflow: hidden; text-overflow: ellipsis; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); }
+  .fleet-detail .fd-row dt { white-space: normal; }
+}
+@media (max-width: 767px) {
+  .fd-input { font-size: 16px; min-height: 48px; }
+}
 
 /* Edit drawer */
 .fd-drawer { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; font-family: var(--font-sans); }
@@ -204,50 +329,3 @@
   color: var(--text-primary); font: 400 14px/20px var(--font-sans); cursor: pointer;
 }
 
-@media (max-width: 1100px) {
-  .fleet-detail .fd-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .fleet-detail .fd-grid { grid-template-columns: minmax(0, 1fr); }
-}
-@media (max-width: 767px) {
-  .fleet-detail { --fd-inset: 16px; }
-  .fd-input { font-size: 16px; min-height: 48px; }
-}
-@media (max-width: 480px) {
-  .fleet-detail .fd-metrics { grid-template-columns: minmax(0, 1fr); }
-}
-
-/* ---- Design principles v2 ---- */
-.fleet-detail .card.card { border-radius: var(--radius-card, 12px); box-shadow: none; }
-.fleet-detail .card.card:hover { border-color: var(--border-subtle); box-shadow: none; }
-
-/* Key figures strip: one card, hairline-separated, each figure with its basis. */
-.fleet-detail .card.fd-kpis {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: 0;
-  margin-bottom: 24px;
-}
-.fleet-detail .fd-kpi { padding: 20px var(--fd-inset); min-width: 0; }
-.fleet-detail .fd-kpi + .fd-kpi { border-left: 1px solid var(--border-subtle); }
-.fleet-detail .fd-kpi__label { font: 500 13px/20px var(--font-sans); color: var(--text-secondary); }
-.fleet-detail .fd-kpi__value { margin-top: 4px; font: 600 22px/28px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); overflow-wrap: anywhere; }
-.fleet-detail .fd-kpi--lead .fd-kpi__value { font-size: 28px; line-height: 36px; }
-.fleet-detail .fd-kpi__value.is-attention { color: var(--status-warning-text, var(--status-warning)); }
-.fleet-detail .fd-kpi__value.is-danger { color: var(--status-danger-text, var(--status-danger)); }
-.fleet-detail .fd-kpi__of { font: 400 14px/20px var(--font-sans); color: var(--text-secondary); margin-left: 4px; }
-.fleet-detail .fd-kpi__note { margin-top: 4px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
-@media (max-width: 720px) {
-  .fleet-detail .card.fd-kpis { grid-template-columns: minmax(0, 1fr); }
-  .fleet-detail .fd-kpi + .fd-kpi { border-left: none; border-top: 1px solid var(--border-subtle); }
-}
-.fleet-detail .fd-chip {
-  display: inline-flex; align-items: center; padding: 2px 8px;
-  border-radius: var(--radius-chip, 6px);
-  font: 500 13px/20px var(--font-sans); white-space: nowrap;
-  color: var(--text-secondary); background: var(--status-neutral-bg);
-}
-.fleet-detail .fd-chip--success { color: var(--status-success-text); background: rgba(34, 197, 94, 0.12); }
-.fleet-detail .fd-chip--warning { color: var(--status-warning-text, var(--status-warning)); background: var(--status-warning-bg); }
-.fleet-detail .fd-chip--info { color: var(--status-info-text, var(--accent-primary)); background: var(--accent-glow); }
-.fleet-detail .fd-table td { height: 48px; box-sizing: border-box; padding-top: 8px; padding-bottom: 8px; }
-.fleet-detail .fd-table th { height: 44px; box-sizing: border-box; }

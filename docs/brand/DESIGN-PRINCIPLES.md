@@ -1,4 +1,4 @@
-# TruckWys design principles (v2)
+# TruckWys design principles (v3)
 
 The brand guide defines tokens. This document defines taste: what separates a world-class financial product from a generated-looking one. It is binding for every screen. Where it conflicts with `BRAND-GUIDELINES.md`, this document wins (it is newer and reflects the owner's direct review).
 
@@ -69,3 +69,12 @@ These read as generated UI. Never use them.
 - Standalone buttons and inputs: 40px tall on desktop, 48px on phones.
 - Row actions inside tables and inline link-style buttons may be 24 to 32px with a mouse so they sit inside 44 to 48px rows, but every one of them must reach a 44px target on touch screens (`@media (pointer: coarse)`, see `theme.css`).
 - Icon-only buttons: 44px target at every size.
+
+## 9. Words (v3, owner review 28 Sep 2026: "far too much text", "looks babyish")
+
+- **Titles: 2 to 6 words.** "Revenue vs costs", "Cash runway", "Who pays late". A question is fine only if it is that short.
+- **Subtitle: one line, at most 8 words, often a unit or scope.** "Monthly, paid invoices vs approved costs". Never a paragraph.
+- **Methodology lives behind an info icon** next to the title (tooltip or popover), never as body text in the card.
+- **Let the number speak.** Big figure, short label, delta. No sentence that restates the figure.
+- **Empty states: one short line and one action.**
+- Reference density: the owner's references (Haulsight analytics, Vantage agent metrics, Close CRM reports, the Revenue sidebar app). Tight type, labelled grouped sidebar, restrained accent, generous whitespace between panels but compact inside them.

@@ -8,6 +8,7 @@ import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/AuthContext";
 import RowActions from "@/components/ui/RowActions";
 import { SettingsToggleRow, settingsBadgeStyle, settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsDangerButtonStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
+import { StatusChip } from '@/components/ui/StatusChip';
 
 const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle = settingsCardHeaderStyle;
@@ -24,9 +25,9 @@ const dangerBtnStyle = settingsDangerButtonStyle;
 const ACTIVITY_META: Record<string, { label: string; color: string }> = {
   login: { label: 'Signed in', color: 'var(--status-success)' },
   logout: { label: 'Signed out', color: 'var(--text-tertiary)' },
-  revoked: { label: 'Session revoked', color: 'var(--status-danger-text, var(--status-danger))' },
-  revoked_others: { label: 'Other sessions revoked', color: 'var(--status-danger-text, var(--status-danger))' },
-  revoked_all: { label: 'All sessions revoked', color: 'var(--status-danger-text, var(--status-danger))' },
+  revoked: { label: 'Session revoked', color: 'var(--status-danger-text)' },
+  revoked_others: { label: 'Other sessions revoked', color: 'var(--status-danger-text)' },
+  revoked_all: { label: 'All sessions revoked', color: 'var(--status-danger-text)' },
 };
 
 function ToggleRow({ badge, ...props }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void; badge?: string; disabled?: boolean }) {
@@ -35,7 +36,7 @@ function ToggleRow({ badge, ...props }: { label: string; description?: string; c
       {...props}
       disabledTitle="Fixed in demo mode"
       badge={badge ? (
-        <span style={{ ...settingsBadgeStyle, color: 'var(--status-info-text, var(--accent-primary))', borderColor: 'currentColor' }}>{badge}</span>
+        <StatusChip tone="info" label={badge} size="sm" />
       ) : undefined}
     />
   );
@@ -230,7 +231,7 @@ export function SecuritySettings() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ maxWidth: 720 }}>
       <SettingsPageHeader title="Security settings" description="Manage your account security and authentication methods" />
 
       {/* Change Password */}
@@ -300,7 +301,7 @@ export function SecuritySettings() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                   <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{s.device}</span>
                   {s.current && (
-                    <span style={{ ...settingsBadgeStyle, color: 'var(--status-info-text, var(--accent-primary))', borderColor: 'currentColor' }}>Current</span>
+                    <StatusChip tone="success" label="This device" size="sm" />
                   )}
                 </div>
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{s.location} · {formatRelativeTime(s.time)}</div>
@@ -392,7 +393,7 @@ export function SecuritySettings() {
       {/* Danger Zone */}
       <div style={{ ...sectionStyle, borderColor: 'var(--status-danger)' }}>
         <div style={sectionHeaderStyle}>
-          <h2 style={{ ...sectionTitleStyle, color: 'var(--status-danger-text, var(--status-danger))' }}>Danger zone</h2>
+          <h2 style={{ ...sectionTitleStyle, color: 'var(--status-danger-text)' }}>Danger zone</h2>
         </div>
         <div style={{
           padding: 24, display: 'flex', alignItems: 'center',
@@ -466,7 +467,7 @@ export function SecuritySettings() {
               placeholder="Your current password"
             />
             {deleteError && (
-              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 12 }}>{deleteError}</div>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)', marginBottom: 12 }}>{deleteError}</div>
             )}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: deleteError ? 4 : 20 }}>
               <button
@@ -487,7 +488,7 @@ export function SecuritySettings() {
                 style={{
                   padding: '8px 12px', minHeight: 40,
                   background: 'var(--status-danger-bg)',
-                  border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-control)',
+                  border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-control)',
                   fontSize: 14, lineHeight: '20px', fontWeight: 500,
                   fontFamily: 'var(--font-sans)',
                   cursor: (!deletePassword || deleting) ? 'default' : 'pointer',

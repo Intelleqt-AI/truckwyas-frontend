@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import FindingCard from './FindingCard';
 import InfoTip from './InfoTip';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import {
   computeFindings, fetchAllPages, plural, randWhole, summarise,
   type CashflowRec, type CompanyRec, type ExpenseRec, type FinanceRec, type FindingInputs, type FuelRec,
@@ -100,36 +101,28 @@ export default function FindingsFeed() {
   return (
     <div className="ff">
       {main.length > 0 && (
-        <dl className="ff-summary" aria-label="Summary of findings">
-          <div className="ff-tile ff-tile--inverse">
-            <dt>
-              Cash held up
+        <KpiRow className="ff-summary">
+          <KpiTile
+            emphasis
+            aria-label="Cash held up"
+            label="Cash held up"
+            aside={(
               <InfoTip tone="inverse" label="How cash held up is calculated">
                 <p className="it__title">Cash held up</p>
                 <p>Money you have earned but not collected, across the findings below: unsent drafts, open balances and loads never closed. Each invoice and load is counted once, even if it is in two findings. Costs and estimates are not included.</p>
               </InfoTip>
-            </dt>
-            <dd className="ff-tile__value">{randWhole(summary.cash)}</dd>
-            <dd className="ff-tile__note">
-              {[summary.invoiceCount ? plural(summary.invoiceCount, 'invoice') : null, summary.loadCount ? plural(summary.loadCount, 'load') : null].filter(Boolean).join(', ')}
-            </dd>
-          </div>
-          <div className="ff-tile">
-            <dt>Findings</dt>
-            <dd className="ff-tile__value">{main.length}</dd>
-            <dd className="ff-tile__note">{high > 0 ? `${high} high severity` : 'None high severity'}</dd>
-          </div>
-          <div className="ff-tile">
-            <dt>Customers involved</dt>
-            <dd className="ff-tile__value">{summary.customerCount}</dd>
-            <dd className="ff-tile__note">in cash findings</dd>
-          </div>
-          <div className="ff-tile">
-            <dt>Overdue invoices chased</dt>
-            <dd className="ff-tile__value">{summary.reminded}<span className="ff-tile__of"> of {summary.overdueCount}</span></dd>
-            <dd className="ff-tile__note">{summary.reminded === 0 && summary.overdueCount > 0 ? 'No reminder recorded' : 'With a reminder recorded'}</dd>
-          </div>
-        </dl>
+            )}
+            figure={randWhole(summary.cash)}
+            note={[summary.invoiceCount ? plural(summary.invoiceCount, 'invoice') : null, summary.loadCount ? plural(summary.loadCount, 'load') : null].filter(Boolean).join(', ')}
+          />
+          <KpiTile label="Findings" figure={main.length} note={high > 0 ? `${high} high severity` : 'None high severity'} />
+          <KpiTile label="Customers involved" figure={summary.customerCount} note="in cash findings" />
+          <KpiTile
+            label="Overdue chased"
+            figure={<>{summary.reminded}<span className="ff-tile__of"> of {summary.overdueCount}</span></>}
+            note={summary.reminded === 0 && summary.overdueCount > 0 ? 'No reminder recorded' : 'With a reminder recorded'}
+          />
+        </KpiRow>
       )}
 
       <div className="ff-feed-head">
@@ -174,8 +167,8 @@ export default function FindingsFeed() {
 function FeedSkeleton() {
   return (
     <div className="ff" aria-busy="true" aria-label="Loading findings">
-      <div className="ff-summary ff-summary--skeleton">
-        {[0, 1, 2, 3].map(i => <div key={i} className="ff-tile ff-skel" />)}
+      <div className="tw-kpi-row ff-summary">
+        {[0, 1, 2, 3].map(i => <div key={i} className="tw-kpi ff-skel" />)}
       </div>
       <div className="ff-list">
         {[0, 1, 2].map(i => <div key={i} className="fc ff-skel ff-skel--card" />)}

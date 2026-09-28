@@ -161,7 +161,7 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
             alignItems: 'flex-start',
             gap: 10,
           }}>
-            <span style={{ color: 'var(--status-danger, #dc2626)', fontWeight: 700, fontSize: 15, lineHeight: 1 }}>!</span>
+            <span style={{ color: 'var(--status-danger, #dc2626)', fontWeight: 600, fontSize: 15, lineHeight: 1 }}>!</span>
             <div>
               <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 2 }}>
                 Failed to create vehicle

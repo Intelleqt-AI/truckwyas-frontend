@@ -26,30 +26,160 @@ These read as generated UI. Never use them.
 - List and table rows are 44 to 48px tall. Dense data never uses 80px rows.
 - Align to a shared grid: labels, values and bars in a list share column edges from row to row.
 
-## 3. Shape and surface (v3)
+## 3. Shape and surface (v3 final palette, 28 Sep 2026)
 
-- Radius: cards 16px (`--radius-card`), controls 10px, chips 8px, pills and segmented controls 999px, dialogs and sheets 20px, nested surfaces 12px.
-- Light: page `#F4F5F7`, sidebar and cards `#FFFFFF`, hairline border `#E6E8EC`, row rules `#EDEFF2`, raised chips `#EFF1F4`.
-- Dark: page `#0A0B0D`, sidebar `#0E1013`, card `#131519` (the surface step does the work), border `#22262D`, row rules `#1E2127`, raised chips and active pill `#1F232A` / `#252A32`.
-- Neutrals are cool-biased greys. Text: light `#0F1216` / `#4B525D` / `#646B76`; dark `#F2F4F7` / `#A3A9B3` / `#8B919C`. All pass AA on every surface they sit on (tertiary is 4.75:1 on the lightest raised chip, 4.98:1 on the darkest).
-- Hover states on rows and interactive cards use a subtle surface tint, not a border change. Popovers and menus are the only elements with a shadow (`--shadow-pop`), and they have no border-plus-shadow stacking beyond a hairline.
-- Type: page title 28/34 700 -0.025em; KPI figure 32/38 700 -0.03em tabular; card title 15/22 600 -0.01em; body 14/20; small 13/20; label 12/16 500 tertiary; sidebar group label 11/16 600 uppercase +0.06em (the only uppercase in the product).
+All values live in `src/styles/theme.css`, in the `:root, [data-theme="dark"]` block and the `[data-theme="light"]` block. Every token is global. Nothing is scoped to `.os-app-shell`, so portals (menus, popovers, toasts), auth pages and public documents get the same values. Each theme block sets `color-scheme` (`light` or `dark`), so native checkboxes, date inputs, scrollbars and select arrows follow the theme. `html { accent-color: var(--accent-primary) }` tints native controls.
 
-## 4. Colour and emphasis (v3)
+- **Radius:** cards 16px (`--radius-card`), controls 10px, chips 8px, pills 999px, dialogs and sheets 20px, nested surfaces 12px. The segmented control track is 8px, with 6px options.
+- **Neutrals** are cool greys, hue 214 to 220 degrees.
 
-- Neutral by default. Numbers are primary text, not accent blue.
-- Accent: `#2563EB` light, `#5B9BFF` dark (text on it: white in light, `#0A0B0D` in dark). One accent use per panel, reserved for the single thing that needs attention or action: the primary button, the current bar, the key funnel stage.
-- **One inverted emphasis tile per page** (`--emphasis-bg` `#1D4ED8`, white text 6.7:1, muted text `#DCE4FB` 5.3:1). Use it for the figure that needs action (on Today: Owed to you). Never two.
-- Active navigation is a filled pill: ink `#0F1216` with white text in light, `#252A32` with white text in dark. Section tabs underline in primary text, not accent.
-- Charts: one series in accent, comparison series neutral and hatched (`--chart-muted`), dotted grid (`--chart-grid`).
-- Semantic colours (success, warning, danger) only for state, always paired with a text label, always the AA `--status-*-text` tokens for text.
-- Charts: one series in accent, comparison series in a neutral grey, the current period emphasised.
+**Surfaces**
+
+| Role | Token | Light | Dark |
+|---|---|---|---|
+| Page | `--bg-deep` | `#F3F4F6` | `#0B0C0E` |
+| Sidebar | `--bg-sidebar` | `#FFFFFF` | `#0E0F12` |
+| Card | `--bg-surface` | `#FFFFFF` | `#131518` |
+| Row or card hover | `--bg-surface-hover` | `#F8F9FA` | `#181B1F` |
+| Raised (segmented track, skeleton, chip hover) | `--bg-raised` | `#EEF0F3` | `#1C1F24` |
+| Overlay (menu, popover, select, toast, sheet, date picker). Uses `--border-overlay` and `--shadow-pop`. | `--bg-overlay` | `#FFFFFF` | `#1C1F24` |
+| Input fill (inset in dark) | `--input-bg` | `#FFFFFF` | `#0F1114` |
+| Backdrop | `--modal-backdrop` | `rgba(14,17,22,.40)` | `rgba(0,0,0,.64)` |
+
+**Borders**
+
+| Role | Token | Light | Dark |
+|---|---|---|---|
+| Row rule | `--border-row` | `#EEF0F2` | `#1D2025` |
+| Card edge, divider | `--border-subtle` | `#E4E6EA` | `#23262C` |
+| Chips, outline buttons, overlay edge | `--border-default`, alias `--border-active` | `#D8DBE0` | `#2C3037` |
+| Hover on outline controls | `--border-strong` | `#C3C7CE` | `#3A3F47` |
+| **Form controls** (input, select, textarea, select trigger, search, date field) | `--border-control` | `#848B96` | `#6E7682` |
+| Form control hover | `--border-control-hover` | `#6B7280` | `#8B919C` |
+
+`--border-subtle` is a card colour. It is never a control boundary. `theme.css` re-points `--border-subtle`, `--border-default` and `--border-active` to the control tokens on the control elements themselves. As a result, any input still written as `1px solid var(--border-subtle)`, inline styles included, renders at 3:1 or better. New code uses `--border-control` directly.
+
+**Text:** `--text-primary`, `--text-secondary`, `--text-tertiary` and `--text-disabled`. Light is `#0E1116` / `#434A55` / `#636A75` / `#A3A8B1`. Dark is `#EDEFF2` / `#B4BAC3` / `#9BA1AB` / `#555B64`. The dark secondary and tertiary values also clear APCA Lc 60 and Lc 45. Disabled text is exempt from contrast rules and is used only on disabled controls.
+
+**Buttons.** The primary button is ink, not accent:
+
+| Token | Light | Dark |
+|---|---|---|
+| `--btn-primary-bg` / `--btn-primary-fg` | `#0E1116` / `#FFFFFF` | `#EDEFF2` / `#0B0C0E` |
+| `--btn-primary-hover` | `#262B33` | `#FFFFFF` |
+| `--btn-primary-pressed` | `#000000` | `#D5D9DF` |
+| `--btn-danger-bg` / `--btn-danger-hover` | `#C81E1E` / `#B91C1C` | `#D93036` / `#C4262C` |
+
+- **Disabled** is neutral in both themes: `--btn-disabled-bg` (= raised) with `--btn-disabled-fg` (= disabled text). Never a tinted accent.
+- **Hover and pressed** are colour tokens. Never use `opacity` or `filter: brightness()` for them: those lighten the fill, and white-on-blue then drops below AA.
+- **Hover** on rows and interactive cards is a surface tint, not a border change.
+- **Shadows:** popovers, menus and toasts use `--shadow-pop` with a hairline `--border-overlay`. Cards have a border and no shadow.
+
+**Type:** page title 28/34 700 -0.025em. KPI figure 28/34 700 -0.03em tabular on standard tiles, 32/38 for a lone hero figure. Card title 15/22 600. Body 14/20. Small 13/20. Label 12/16 500 tertiary. Sidebar group label 11/16 600, uppercase, +0.06em. That group label is the only uppercase in the product.
+
+## 4. Colour and emphasis (v3 final)
+
+- **Neutral by default.** Numbers are primary text, not accent blue.
+- **Accent** (`--accent-primary`: `#2563EB` light, `#6AA6FF` dark) is for data, links, focus and the key mark in a chart. It is not a button fill, a selected filter or an active tab.
+  - Hover is `--accent-primary-hover` (`#1D4ED8` / `#86B7FF`).
+  - Pressed is `--accent-pressed`.
+  - Link text is `--link` (`#1D4ED8` / `#7DB2FF`).
+  - A selected tint is `--accent-dim` (`#EFF5FF` / 10% blue, never a solid navy).
+- **One emphasis tile per page**, reading only the `--emphasis-*` tokens:
+  - **Light** is inverted: `#1D4ED8` with white text, muted text `#DCE4FB`, and a white progress fill on a 24% white track.
+  - **Dark** is a raised, faintly blue surface: `#16233A` with a `#25406B` border, `#EDEFF2` text, `#A9B9D3` muted text, and a `#6AA6FF` fill. Never a glowing blue block.
+  - **Focus** inside the tile uses `--emphasis-focus` (white). A blue ring on blue measures only 1.3:1.
+- **Active navigation** is a filled pill.
+  - Light: ink `#0E1116` with white text.
+  - Dark: `#262A31` with `#EDEFF2` text, weight 500.
+  - Secondary text on the pill (such as "Soon") uses `--nav-active-muted`.
+  - The phone tab bar's active tab is primary text, not accent.
+- **Status.** One neutral chip (see §12). The colour lives in a 6px dot.
+
+| State | `--status-X-text` (words) | `--status-X-dot` (dots, marks) | `--status-X-bg` (banners only) |
+|---|---|---|---|
+| success (green) | `#137A3A` / `#4CC38A` | `#15803D` / `#3DB87E` | `#ECFDF3` / 10% |
+| warning | `#A84C08` / `#EDB14F` | `#BA7607` / `#E09A2D` | `#FFF7E6` / 10% |
+| danger | `#C81E1E` / `#F47A7A` | `#DC2626` / `#E5534B` | `#FEF2F2` / 10% |
+| info | `#1D4ED8` / `#7DB2FF` | `#2563EB` / `#6AA6FF` | `#EFF5FF` / 10% |
+| neutral | `--text-secondary` | `#7D848F` / `#6B717B` | `--bg-raised` |
+
+The bare `--status-success/-warning/-danger` tokens are kept for old code. Success is now green. The bare tokens are safe as marks, but text always uses `-text`.
+
+- **Charts.**
+  - Series 1 is `--chart-series-1` (= accent).
+  - The comparison series is hatched. The stroke is `--chart-hatch` (`#838A95` / `#6B7280`, 3:1 or better), drawn over a 4% `--chart-bar` fill with a 1px outline in the same stroke.
+  - Muted marks use `--chart-muted` (same values). The grid is dotted `--chart-grid`, and the axis is `--chart-axis`.
+  - Hover draws a column band (`--chart-hover-band`) and never dims the other bars.
+  - The sequential ramp is `--heat-1` to `--heat-5`. The negative colour, used only when it means something, is `--chart-negative`.
+- **Notification badge:** `--badge-bg` (`#C81E1E` / `#D93036`) with white text.
+
+### 4.1 Verified contrast (WCAG 2.x, computed)
+
+Every pair the palette ships was computed with the WCAG relative-luminance formula. Text needs 4.5:1. Control boundaries, dots and chart marks need 3:1. The build was also measured in the running app on the shell, Home, Settings > Company, the new-invoice form, the date picker and the send-quote dialog, in both themes at 1440. That pass found 0 text failures and 0 control-boundary failures.
+
+| Token | Light | page / card / raised / overlay | Dark | page / card / raised / overlay | Need |
+|---|---|---|---|---|---|
+| `--text-primary` | `#0E1116` | 17.18 / 18.91 / 16.56 / 18.91 | `#EDEFF2` | 16.99 / 15.88 / 14.34 / 14.34 | 4.5 |
+| `--text-secondary` | `#434A55` | 8.12 / 8.94 / 7.83 / 8.94 | `#B4BAC3` | 10.02 / 9.36 / 8.46 / 8.46 | 4.5 |
+| `--text-tertiary` | `#636A75` | 4.96 / 5.46 / 4.78 / 5.46 | `#9BA1AB` | 7.53 / 7.04 / 6.36 / 6.36 | 4.5 |
+| `--accent-primary (link/data)` | `#2563EB` | 4.70 / 5.17 / 4.53 / 5.17 | `#6AA6FF` | 7.93 / 7.41 / 6.70 / 6.70 | 4.5 |
+| `--link` | `#1D4ED8` | 6.09 / 6.70 / 5.87 / 6.70 | `#7DB2FF` | 9.02 / 8.43 / 7.62 / 7.62 | 4.5 |
+| `--status-success-text` | `#137A3A` | 4.93 / 5.42 / 4.75 / 5.42 | `#4CC38A` | 8.83 / 8.26 / 7.46 / 7.46 | 4.5 |
+| `--status-warning-text` | `#A84C08` | 5.15 / 5.67 / 4.97 / 5.67 | `#EDB14F` | 10.25 / 9.58 / 8.66 / 8.66 | 4.5 |
+| `--status-danger-text` | `#C81E1E` | 5.21 / 5.74 / 5.03 / 5.74 | `#F47A7A` | 7.37 / 6.89 / 6.23 / 6.23 | 4.5 |
+| `--status-info-text` | `#1D4ED8` | 6.09 / 6.70 / 5.87 / 6.70 | `#7DB2FF` | 9.02 / 8.43 / 7.62 / 7.62 | 4.5 |
+| `--status-neutral` | `#5F6672` | 5.26 / 5.78 / 5.07 / 5.78 | `#9AA0AA` | 7.44 / 6.95 / 6.28 / 6.28 | 4.5 |
+| `--border-control` | `#848B96` | 3.12 / 3.43 / 3.01 / 3.43 | `#6E7682` | 4.26 / 3.99 / 3.60 / 3.60 | 3 |
+| `--border-control-hover` | `#6B7280` | 4.39 / 4.83 / 4.23 / 4.83 | `#8B919C` | 6.18 / 5.77 / 5.22 / 5.22 | 3 |
+| `--status-success-dot` | `#15803D` | 4.56 / 5.02 / 4.39 / 5.02 | `#3DB87E` | 7.79 / 7.28 / 6.58 / 6.58 | 3 |
+| `--status-warning-dot` | `#BA7607` | 3.36 / 3.70 / 3.24 / 3.70 | `#E09A2D` | 8.23 / 7.69 / 6.95 / 6.95 | 3 |
+| `--status-danger-dot` | `#DC2626` | 4.39 / 4.83 / 4.23 / 4.83 | `#E5534B` | 5.28 / 4.94 / 4.46 / 4.46 | 3 |
+| `--status-info-dot` | `#2563EB` | 4.70 / 5.17 / 4.53 / 5.17 | `#6AA6FF` | 7.93 / 7.41 / 6.70 / 6.70 | 3 |
+| `--status-neutral-dot` | `#7D848F` | 3.43 / 3.77 / 3.30 / 3.77 | `#6B717B` | 3.98 / 3.72 / 3.36 / 3.36 | 3 |
+| `--chart-series-1` | `#2563EB` | 4.70 / 5.17 / 4.53 / 5.17 | `#6AA6FF` | 7.93 / 7.41 / 6.70 / 6.70 | 3 |
+| `--chart-hatch / --chart-muted` | `#838A95` | 3.16 / 3.48 / 3.05 / 3.48 | `#6B7280` | 4.05 / 3.78 / 3.42 / 3.42 | 3 |
+
+| Pair | Light fg / bg | Ratio | Dark fg / bg | Ratio | Need |
+|---|---|---|---|---|---|
+| Primary button text on fill | `#FFFFFF` / `#0E1116` | 18.91 | `#0B0C0E` / `#EDEFF2` | 16.99 | 4.5 |
+| Primary button text on hover | `#FFFFFF` / `#262B33` | 14.23 | `#0B0C0E` / `#FFFFFF` | 19.57 | 4.5 |
+| Primary button text on pressed | `#FFFFFF` / `#000000` | 21.00 | `#0B0C0E` / `#D5D9DF` | 13.81 | 4.5 |
+| Danger button text | `#FFFFFF` / `#C81E1E` | 5.74 | `#FFFFFF` / `#D93036` | 4.74 | 4.5 |
+| Danger button hover | `#FFFFFF` / `#B91C1C` | 6.47 | `#FFFFFF` / `#C4262C` | 5.74 | 4.5 |
+| Notification badge | `#FFFFFF` / `#C81E1E` | 5.74 | `#FFFFFF` / `#D93036` | 4.74 | 4.5 |
+| Accent hover as text on card | `#1D4ED8` / `#FFFFFF` | 6.70 | `#86B7FF` / `#131518` | 8.91 | 4.5 |
+| Emphasis figure | `#FFFFFF` / `#1D4ED8` | 6.70 | `#EDEFF2` / `#16233A` | 13.65 | 4.5 |
+| Emphasis muted text | `#DCE4FB` / `#1D4ED8` | 5.28 | `#A9B9D3` / `#16233A` | 7.91 | 4.5 |
+| Emphasis focus ring (white) | `#FFFFFF` / `#1D4ED8` | 6.70 | `#FFFFFF` / `#16233A` | 15.72 | 3 |
+| Emphasis progress fill vs tile | `#FFFFFF` / `#1D4ED8` | 6.70 | `#6AA6FF` / `#16233A` | 6.37 | 3 |
+| Nav active text | `#FFFFFF` / `#0E1116` | 18.91 | `#EDEFF2` / `#262A31` | 12.50 | 4.5 |
+| "Soon" on active nav | `#C3C8D0` / `#0E1116` | 11.25 | `#B4BAC3` / `#262A31` | 7.37 | 4.5 |
+| Tooltip text | `#FFFFFF` / `#0E1116` | 18.91 | `#0B0C0E` / `#EDEFF2` | 16.99 | 4.5 |
+| Selected date (ink) | `#FFFFFF` / `#0E1116` | 18.91 | `#0B0C0E` / `#EDEFF2` | 16.99 | 4.5 |
+| Success text on success banner | `#137A3A` / `#ECFDF3` | 5.14 | `#4CC38A` / `#192623` | 7.06 | 4.5 |
+| Warning text on warning banner | `#A84C08` / `#FFF7E6` | 5.32 | `#EDB14F` / `#29251E` | 7.99 | 4.5 |
+| Danger text on danger banner | `#C81E1E` / `#FEF2F2` | 5.24 | `#F47A7A` / `#2A1F22` | 6.00 | 4.5 |
+| Info text on info banner | `#1D4ED8` / `#EFF5FF` | 6.12 | `#7DB2FF` / `#1C242F` | 7.21 | 4.5 |
+| Tertiary text on hover row | `#636A75` / `#F8F9FA` | 5.18 | `#9BA1AB` / `#181B1F` | 6.65 | 4.5 |
+| Tertiary on input fill | `#636A75` / `#FFFFFF` | 5.46 | `#9BA1AB` / `#0F1114` | 7.28 | 4.5 |
+| Control border on input fill | `#848B96` / `#FFFFFF` | 3.43 | `#6E7682` / `#0F1114` | 4.12 | 3 |
+
+**Failures: 0.**
+
+**Where the two v3 reviews disagreed, the shipped value passes both:**
+- `--border-control`: the theme review proposed `#878D96` (light) and `#646B76` (dark). Both measure 2.93 and 3.07 on the raised and overlay surfaces. The contrast review's `#848B96` / `#6E7682` measure 3.01 and 3.60 or better everywhere, so those ship.
+- Warning, success and neutral dots: the theme review proposed `#F59E0B`, `#16A34A` and `#9AA0A9`, which measure 2.1, 2.9 and 2.3 on the page. The shipped dots are `#BA7607`, `#15803D` and `#7D848F`, all 3:1 or better.
+- `--chart-muted` and hatch: the contrast review's `#838A95` / `#6B7280` (3:1 or better) ship, replacing the theme review's `#C9CED6` / `#3A4049` for muted marks.
+- Text: the light values come from the theme review (`#434A55` / `#636A75`), which widen the step between secondary and tertiary. The dark values come from the contrast review's APCA set (`#B4BAC3` / `#9BA1AB`). All are 4.5:1 or better on every surface.
+- Status text: the theme review's calmer set (`#137A3A`, `#A84C08`, `#C81E1E`; dark `#4CC38A`, `#EDB14F`, `#F47A7A`) ships, because it passes 4.5:1 on raised surfaces and on banners. The Tailwind 300-level pastels are retired.
+- Light accent hover: `#1D4ED8` (contrast review, 6.70:1 with white).
 
 ## 5. Data visualisation
 
 - **Ranked lists** (the reference "what causes exceptions" pattern): label, a thin bar (6px, rounded, muted track) that encodes the SAME metric the list is sorted by, the value right-aligned in tabular figures, then share of total. Show the top 5 to 8 with "Show all".
 - **Sample size is part of the truth.** Show the count behind every ranked row. Rows with too little data (e.g. fewer than 3 trips) are shown muted with "Too few trips to rank", never ranked above well-evidenced rows.
-- **KPI tiles** (the reference agent-metrics pattern): label, value, change versus the previous period with direction and period named ("+8.2% vs last month"), optional sparkline. Maximum four per row.
+- **KPI tiles** (the reference agent-metrics pattern): label, value, one line (change versus a named period, "+8.2% vs last month"), optional sparkline beside the figure. Maximum four per row, 96px tall (§11.6, §12).
 - **Funnels and outcomes** (the reference detection-to-resolution pattern) for any process: show each stage's count and rate, and where items dropped out.
 - Every chart states its basis in its description (date basis, VAT, what is excluded) in plain words.
 
@@ -69,6 +199,8 @@ These read as generated UI. Never use them.
 5. Is every number real, labelled with its basis, and neutral unless it needs attention?
 6. Card padding 20, rows 44 to 48, gaps 16/24, radius 16/10/8?
 7. Correct in light and dark, and at phone width?
+8. Measured at 1280, 1440, 1920 and 390: every chart is at least 95% of its card width, every card is less than 25% empty, no figure is repeated on screen, there is one segmented control, and there is no horizontal overflow.
+9. Primary button is ink, accent appears once per screen, every status is a `<StatusChip>`, every form control uses `--border-control`.
 
 ## 8. Control sizes
 
@@ -92,7 +224,139 @@ The shell (`src/components/shell/`) and the primitives at the end of `src/styles
 1. **Head.** Use `SectionHeader` (already v3: 28px bold title, grey subtitle, neutral tab underline) or `.tw-page-head` + `.tw-title` + `.tw-subtitle`. Subtitle is one line, at most 8 words. Delete any paragraph under the title.
 2. **Cards.** `.tw-card` (16px radius, 20px padding). Head: `.tw-card__head` > `.tw-card__titles` > `.tw-card__title` (+ `<InfoTip>` from `components/ui/InfoTip`) and `.tw-card__sub`. Tables go in `.tw-card--flush` with the head padded.
 3. **Numbers.** Big figure `.tw-figure` (32px, whole rands on tiles, cents in the `title` attribute and tables). Change: `.tw-delta` with a trend glyph and a named period ("+8% vs prior 30 days"). Max four tiles per row; at most one inverted `--emphasis-bg` tile per page.
-4. **Controls.** `.tw-btn` (outline), `.tw-btn--primary` (one per page), `.tw-btn--ghost`; `.tw-seg` only when it changes the data on screen; `.tw-chip` for status and scope.
+4. **Controls.** `.tw-btn` (outline), `.tw-btn--primary` (ink, one per page), `.tw-btn--ghost`; `<Segmented>` / `.tw-seg` for every filter and period (§11.4); `<StatusChip>` for every status (§12); `.tw-chip` only for a scope label ("Last 20 quotes").
 5. **Words.** Apply §9. Every "Each month shows…" or "This list holds…" sentence moves into an `InfoTip` or is deleted.
-6. **No page-level colours.** Use tokens only (`--bg-*`, `--text-*`, `--border-*`, `--accent-primary`, `--status-*-text`). Do not redefine `--text-tertiary` per page; the shell value is AA.
+6. **No page-level colours.** Use tokens only (`--bg-*`, `--text-*`, `--border-*`, `--accent-primary`, `--btn-primary-*`, `--status-*-text/-dot`, `--chart-*`, `--emphasis-*`). Do not redefine tokens per page or per shell; the global values are AA in both themes.
 7. **Check** light and dark at 1440, 1024 (rail) and 390. The main column no longer has a fixed 60px rail; tables must scroll inside their own card wrapper, not the page.
+
+## 11. Use of space (v3 layout review, 28 Sep 2026)
+
+1. **Charts fill their card.** A chart's plot area spans the card's inner width. Never put a fixed `maxWidth` on a chart. Narrow data gets wider bands (up to 160px), not a narrower chart.
+2. **A chart never repeats the KPI row above it.**
+   - If tiles show the figures, the chart shows the shape, and its values live in the tooltip and the table twin.
+   - If the chart is the breakdown, delete the tiles.
+3. **A figure appears once per screen.**
+   - Showing the same amount in a tile, a chart label and a table total is one time too many. Keep the one the reader acts on.
+   - Tiles with equal values collapse into one tile.
+4. **One segmented control per page, in the page head.**
+   - Filters and periods use `<Segmented>` / `.tw-seg`: 28px on desktop and 40px on touch, one track, a neutral active chip, never accent-filled, never separately boxed buttons.
+   - Counts go inside the options.
+   - Toolbars are 32px tall.
+5. **Accent appears once per screen**, on the key data mark or link. Primary buttons are ink. Filters, active tabs and chips are neutral.
+6. **Tiles are for decisions, not attributes.**
+   - At most 4 tiles, each 96px tall (`--kpi-height`), the same height on every page.
+   - Dates, distances, weights and limits go in definition lists.
+   - No tile shows a dash or "No data".
+7. **No card is more than 25% empty.** If the content is short, the card shrinks or merges with its neighbour. Peers align at the top, and rails are sticky rather than stretched. Trim trailing empty periods from charts and say so in the subtitle.
+8. **One content width.**
+   - Fill `main` up to 1600px (`--content-max`, applied by the shell), left-aligned.
+   - Forms and settings are 720px (`--form-max`).
+   - Prose is 72ch inside full-width cards.
+   - No page-specific caps and no centring offsets.
+9. **One page head.**
+   - H1 is 28px at the top of main, and tabs are 40px.
+   - Actions and the period control sit on the H1 row.
+   - First data by 150px on lists and analytics, by 200px on details, and by 400px at 390 wide.
+10. **Gutters are 16 or 24px.** Nothing else, at any width.
+11. **Phone grids never orphan.** Three items get 3 columns or 1, never 2 plus 1. `.tw-kpi-row` does this automatically.
+12. **Focus rings hug the control.**
+    - A text button's box is its line box, plus 4px.
+    - Touch targets grow through an invisible hit area (`::after`), not a bigger visible box.
+13. **Labels never touch lines.** Chart labels keep 4px from axes, zero lines and reference lines. Anything that cannot fit moves to the tooltip.
+14. **Columns size to content before truncating.**
+    - A table truncates only its widest free-text column, and only after the other columns have shrunk.
+    - No inline `maxWidth` on cells.
+
+## 12. Shared components (import these; do not rebuild them per page)
+
+### `<StatusChip>` (`src/components/ui/StatusChip.tsx`, styles `.tw-status` in theme.css)
+
+A neutral outline chip with a 6px coloured dot and a secondary-text label. The same word gets the same colour everywhere.
+
+```tsx
+import { StatusChip, statusMeta, statusTone } from '@/components/ui/StatusChip';
+<StatusChip status={invoice.status} />               // tone + label from the shared map ("SENT" -> info, "Sent")
+<StatusChip tone="warning" label="Service due" />    // explicit
+<StatusChip status="IN_TRANSIT" label="On the road" size="sm" />
+statusTone('overdue')  // 'danger', for a dot or bar elsewhere
+```
+
+Props:
+- `tone?`: `success`, `warning`, `danger`, `info` or `neutral`.
+- `label?`: the visible text.
+- `status?`: a raw API string. It is normalised: case-insensitive, and spaces or hyphens become `_`.
+- `size?`: `sm` (20px) or `md` (22px).
+- Any span attributes.
+
+An unknown status renders neutral with a sentence-case label.
+
+The map:
+
+| Tone | Statuses |
+|---|---|
+| neutral | Draft, Pending, Booked, Confirmed, Assigned, Scheduled, Expired, Cancelled, Void, Inactive, Invited |
+| info | Sent, Viewed, Quoted, Loading, Picked up, In transit, On a job |
+| success | Paid, Accepted, Approved, Won, Delivered, Completed, Active, Available, Connected |
+| warning | Partially paid, Delayed, Maintenance, Service due, Expiring |
+| danger | Overdue, Declined, Rejected, Lost, Failed, Suspended, Locked, Out of service, Error |
+
+The legacy `.status-badge` class renders the same neutral chip with a dot.
+
+### `<Segmented>` (`src/components/ui/Segmented.tsx`, styles `.tw-seg`)
+
+```tsx
+<Segmented label="Period" value={period} onChange={setPeriod}
+  options={[{ value: '1m', label: '1M' }, { value: '3m', label: '3M', count: 4 }]} />
+```
+
+Props:
+- `options`: each option is `{ value, label, count?, disabled?, ariaLabel? }`.
+- `value` and `onChange`: the type is inferred from `options`, so a `useState` setter works directly.
+- `label`: the group's accessible name.
+- `size?`: `sm` (24px) or `md` (28px).
+- `block?`: full width, with equal options.
+- `className?`
+
+It renders a `radiogroup` with roving focus (arrow keys, Home and End). Plain markup works too: `.tw-seg` > `button.tw-seg__opt.is-active` (or `aria-pressed`, `aria-checked` or `aria-selected` set to `true`), with an optional `span.tw-seg__count`.
+
+### `<KpiTile>` and `<KpiRow>` (`src/components/ui/KpiTile.tsx`, styles `.tw-kpi`, `.tw-kpi-row`)
+
+```tsx
+<KpiRow>
+  <KpiTile label="Owed to you" figure="R 542 140" note="12 invoices" emphasis />
+  <KpiTile label="Overdue" figure="R 88 200" note="3 late" tone="danger" aside={<InfoTip>…</InfoTip>} />
+</KpiRow>
+```
+
+`KpiTile` props:
+- `label`
+- `figure`
+- `note?`: the one supporting line.
+- `tone?`: `neutral`, `success`, `warning` or `danger`. It colours the note only.
+- `emphasis?`: the page's single emphasis tile.
+- `aside?`: slot in the label row.
+- `onClick?` or `href?`: makes the whole tile interactive.
+- `className?`
+
+The tile is 96px: 12/16 label, 28/34 figure, 12/16 note, 16px padding.
+
+`KpiRow` is a responsive grid with a 180px minimum column. On phones it uses 2 columns, and 3 compact columns when there are exactly 3 tiles.
+
+### Form controls
+
+- Use `.tw-input` / `.tw-control`, or any control that takes its border from `--border-control`.
+- Hover is `--border-control-hover`.
+- Focus is an accent border plus the `--focus-ring` halo.
+- Radix `SelectTrigger` and `DatePicker` already comply.
+
+### Shell
+
+- **Home.** The first nav item is **Home** (route `/`, unchanged).
+- **Company chip.** The top of the sidebar is a button showing the company logo (from the company profile) or its initial. It opens a menu:
+  - Admins see Company settings, Billing and plan, and Users.
+  - Other roles with settings access see Settings.
+  - Everyone sees Sign out.
+  - The menu supports Escape, the arrow keys and outside click.
+  - In the collapsed rail it opens to the right.
+- **Wordmark.** It is quieter: 16px at 72% opacity, full opacity on hover.
+

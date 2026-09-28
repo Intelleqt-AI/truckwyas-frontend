@@ -6,105 +6,181 @@
 
 /* ===========================
    DARK MODE (Default)
+   v3 final palette: docs/brand/DESIGN-PRINCIPLES.md §3 lists every value
+   with its measured contrast. Status, text and control tokens are defined
+   here (not under .os-app-shell) so portals, auth and public pages match.
    =========================== */
 
 :root,
 [data-theme="dark"] {
-  /* Base Surfaces */
-  /* v3 surfaces: near-black ground, one surface step for cards, one more
-     for raised chips and the active nav pill. Cool-biased neutrals. */
-  --bg-deep: #0A0B0D;
-  --bg-surface: #131519;
-  --bg-surface-hover: #1A1D22;
-  --bg-raised: #1F232A;
-  --bg-panel: rgba(255, 255, 255, 0.035);
-  --bg-sidebar: #0E1013;
-  --modal-backdrop: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
 
-  /* Borders */
-  --border-subtle: #22262D;
-  --border-active: #30353D;
-  --border-row: #1E2127;
+  /* Surfaces: page < sidebar < card < raised = overlay (overlay adds a border + shadow). */
+  --bg-deep: #0B0C0E;
+  --bg-sidebar: #0E0F12;
+  --bg-surface: #131518;
+  --bg-surface-hover: #181B1F;
+  --bg-raised: #1C1F24;
+  --bg-overlay: #1C1F24;
+  --bg-panel: rgba(255, 255, 255, 0.035); /* retired: alias only */
+  --modal-backdrop: rgba(0, 0, 0, 0.64);
 
-  /* Accent - Blue (used once per panel, for the thing that matters) */
-  --accent-primary: #5B9BFF;
-  --accent-bright: #5B9BFF;
-  --accent-dim: #1A3A6B;
-  --accent-glow: rgba(91, 155, 255, 0.15);
-  --on-accent: #0A0B0D;
+  /* Borders. --border-control is for every form control (1.4.11, >= 3:1). */
+  --border-row: #1D2025;
+  --border-subtle: #23262C;
+  --border-active: #2C3037;         /* = default: chips, outline buttons, overlay edge */
+  --border-default: #2C3037;
+  --border-strong: #3A3F47;
+  --border-overlay: #2C3037;
+  --border-control: #6E7682;
+  --border-control-hover: #8B919C;
+  --border-input: var(--border-control); /* alias (theme review name) */
+
+  /* Accent: data, links, focus and one emphasis per panel. Never a primary fill. */
+  --accent-primary: #6AA6FF;
+  --accent-primary-hover: #86B7FF;
+  --accent-hover: #86B7FF;
+  --accent-pressed: #5592EE;
+  --accent-bright: #86B7FF;         /* legacy alias of the hover step */
+  --accent-dim: rgba(106, 166, 255, 0.10);
+  --accent-glow: rgba(106, 166, 255, 0.15);
+  --link: #7DB2FF;
+  --on-accent: #0B0C0E;
 
   /* Text */
-  --text-primary: #F2F4F7;
-  --text-secondary: #A3A9B3;
-  --text-tertiary: #8B919C;
+  --text-primary: #EDEFF2;
+  --text-secondary: #B4BAC3;
+  --text-tertiary: #9BA1AB;
+  --text-disabled: #555B64;
 
-  /* Status Colors */
-  --status-success: #4D9EFF;
-  --status-success-bg: rgba(77, 158, 255, 0.1);
-  --status-warning: #F59E0B;
-  --status-warning-bg: rgba(245, 158, 11, 0.1);
-  --status-danger: #FF4949;
-  --status-danger-bg: rgba(255, 73, 73, 0.1);
-  --status-neutral: #888888;
-  --status-neutral-bg: #1B1E23;
+  /* Primary button: near-white ink, black text. */
+  --btn-primary-bg: #EDEFF2;
+  --btn-primary-fg: #0B0C0E;
+  --btn-primary-hover: #FFFFFF;
+  --btn-primary-pressed: #D5D9DF;
+  --btn-disabled-bg: var(--bg-raised);
+  --btn-disabled-fg: var(--text-disabled);
+  --btn-danger-bg: #D93036;
+  --btn-danger-hover: #C4262C;
+  --btn-danger-fg: #FFFFFF;
+
+  /* Status: -text for words, -dot for chip dots and marks, -bg for banners only.
+     The bare --status-X tokens are text-grade so legacy text uses still pass. */
+  --status-success: #4CC38A;
+  --status-success-text: #4CC38A;
+  --status-success-dot: #3DB87E;
+  --status-success-bg: rgba(76, 195, 138, 0.10);
+  --status-warning: #E09A2D;
+  --status-warning-text: #EDB14F;
+  --status-warning-dot: #E09A2D;
+  --status-warning-bg: rgba(237, 177, 79, 0.10);
+  --status-danger: #E5534B;
+  --status-danger-text: #F47A7A;
+  --status-danger-dot: #E5534B;
+  --status-danger-bg: rgba(244, 122, 122, 0.10);
+  --status-info: #6AA6FF;
+  --status-info-text: #7DB2FF;
+  --status-info-dot: #6AA6FF;
+  --status-info-bg: rgba(106, 166, 255, 0.10);
+  --status-neutral: #9AA0AA;
+  --status-neutral-text: var(--text-secondary);
+  --status-neutral-dot: #6B717B;
+  --status-neutral-bg: var(--bg-raised);
+  --status-ok-dot: var(--status-success-dot); /* legacy alias */
+  --avatar-on-dim: #7DB2FF;
+  --badge-bg: #D93036;
+  --badge-fg: #FFFFFF;
 
   /* Header */
-  --header-bg: rgba(6, 7, 9, 0.8);
+  --header-bg: rgba(11, 12, 14, 0.85);
 
-  /* Chart colors */
-  --chart-bar: #1E2126;
-  --chart-bar-highlight: var(--accent-primary);
-  --chart-bar-gradient: var(--accent-dim);
+  /* Charts */
+  --chart-series-1: #6AA6FF;
+  --chart-bar-highlight: var(--chart-series-1);
+  --chart-bar: rgba(255, 255, 255, 0.04);   /* comparison fill (under the hatch) */
+  --chart-hatch: #6B7280;                   /* 45deg stroke + 1px outline, >= 3:1 */
+  --chart-muted: #6B7280;                   /* muted / comparison marks, >= 3:1 */
+  --chart-grid: #262A30;
+  --chart-axis: #3A3F47;
+  --chart-hover-band: rgba(255, 255, 255, 0.04);
+  --chart-negative: #F0894F;
+  --chart-bar-gradient: transparent;
 
-  /* Heatmap */
-  --heat-empty: #1E2126;
-  --heat-low: #0D2A4A;
-  --heat-medium: #1A4A8A;
-  --heat-high: var(--accent-primary);
-  --heat-max: var(--accent-primary);
+  /* Heatmap / sequential ramp (5 steps) */
+  --heat-empty: #1A1D22;
+  --heat-1: #172338;
+  --heat-2: #1F3A66;
+  --heat-3: #2F5FAD;
+  --heat-4: #5592EE;
+  --heat-5: #9CC3FF;
+  --heat-low: var(--heat-2);
+  --heat-medium: var(--heat-3);
+  --heat-high: var(--heat-4);
+  --heat-max: var(--heat-5);
 
-  /* Ambient glow */
-  --glow-color: rgba(77, 158, 255, 0.08);
-  --glow-transparent: rgba(5, 5, 5, 0);
+  /* Ambient glow (retired: glows are banned; kept so old references resolve) */
+  --glow-color: transparent;
+  --glow-transparent: transparent;
 
   /* Scrollbar */
-  --scrollbar-thumb: #2A2E34;
-  --scrollbar-thumb-hover: #3C424A;
+  --scrollbar-thumb: #2C3037;
+  --scrollbar-thumb-hover: #3A3F47;
 
-  /* Shadows */
+  /* Shadows: cards use a border, overlays use border + shadow. */
   --shadow-card: none;
   --shadow-card-hover: none;
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.02);
 
-  /* Input specific */
-  --input-bg: #191C21;
-  --input-bg-focus: var(--bg-surface);
+  /* Inputs sit one step below the card (inset reads as editable in dark). */
+  --input-bg: #0F1114;
+  --input-bg-focus: #0F1114;
 
-  /* Card */
   --card-radius: 16px;
 
-  /* Neutral interaction tints (design principles §3: hover is a surface tint,
-     never a border change; active nav items are a quiet neutral fill). */
+  /* Neutral interaction tints (hover is a surface tint, never a border change). */
   --surface-tint-hover: rgba(255, 255, 255, 0.04);
   --surface-tint-active: rgba(255, 255, 255, 0.07);
 
-  /* v3 shell + emphasis */
-  --nav-active-bg: #252A32;
-  --nav-active-fg: #FFFFFF;
-  --tip-bg: #F2F4F7;
-  --tip-fg: #0A0B0D;
-  --focus-ring: rgba(91, 155, 255, 0.28);
-  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.5);
-  --status-ok-dot: #34D399;
-  /* Inverted emphasis tile: one per page, for the figure that needs action. */
-  --emphasis-bg: #1D4ED8;
-  --emphasis-fg: #FFFFFF;
-  --emphasis-fg-muted: #DCE4FB;
-  --emphasis-track: rgba(255, 255, 255, 0.22);
-  --chart-grid: #262A31;
-  --chart-muted: #3A404A;
+  /* Shell */
+  --nav-active-bg: #262A31;
+  --nav-active-fg: #EDEFF2;
+  --nav-active-muted: #B4BAC3;     /* "Soon" and counts on the active item */
+  --nav-hover-bg: rgba(255, 255, 255, 0.05);
+  --nav-hover-color: var(--text-primary);
+  --nav-active-color: var(--nav-active-fg);
+  --tip-bg: #EDEFF2;
+  --tip-fg: #0B0C0E;
+  --focus-ring: rgba(106, 166, 255, 0.35);
+  --focus-outline: var(--accent-primary);
 
+  /* Emphasis tile (one per page): dark is a raised, faintly blue surface. */
+  --emphasis-bg: #16233A;
+  --emphasis-border: #25406B;
+  --emphasis-fg: #EDEFF2;
+  --emphasis-fg-muted: #A9B9D3;
+  --emphasis-track: rgba(106, 166, 255, 0.18);
+  --emphasis-fill: #6AA6FF;
+  --emphasis-focus: #FFFFFF;
+
+  /* Alert box */
+  --alert-bg: var(--status-info-bg);
+  --alert-border: rgba(106, 166, 255, 0.25);
+
+  --status-badge-active-border: transparent;
+  --status-badge-delayed-border: transparent;
+  --bar-gradient-opacity: 0;
+  --live-dot-shadow: none;
+
+  /* Legacy: text colour on an accent fill. Primary buttons use --btn-primary-*. */
+  --btn-action-color: #0B0C0E;
+  --btn-action-shadow: none;
+  --pulse-color: rgba(106, 166, 255, 0.4);
+}
+
+/* Theme-agnostic scale (same in light + dark). */
+:root {
   /* ===========================
-     v3 TYPE SCALE / WEIGHT / SPACING (theme-agnostic, same in light + dark)
+     v3 TYPE SCALE / WEIGHT / SPACING
      Bold, tight titles; small grey labels; big figures with negative tracking.
      Uppercase belongs ONLY to --text-micro group labels (sidebar, table eyebrows).
      =========================== */
@@ -121,10 +197,10 @@
   --tracking-display: -0.025em;
   --tracking-title: -0.01em;
 
-  --weight-regular: 400;  /* body */
-  --weight-medium: 500;   /* labels, table headers, active states */
-  --weight-semibold: 600; /* card titles */
-  --weight-bold: 700;     /* page titles + KPI figures only */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -135,38 +211,16 @@
   --space-8: 32px;
   --space-10: 40px;
 
-  /* v3 density: compact inside cards, generous between them. */
   --card-pad: 20px;
   --card-gap: 16px;
   --section-gap: 24px;
 
+  /* One content width (DESIGN-PRINCIPLES §11.8). */
+  --content-max: 1600px;
+  --form-max: 720px;
+  --kpi-height: 96px;
+
   --pill-radius: var(--radius-chip, 6px);
-
-  /* Nav item hover */
-  --nav-hover-bg: rgba(255, 255, 255, 0.05);
-  --nav-hover-color: var(--text-primary);
-  --nav-active-color: var(--nav-active-fg);
-
-  /* Alert box */
-  --alert-bg: rgba(77, 158, 255, 0.05);
-  --alert-border: rgba(77, 158, 255, 0.2);
-
-  /* Status badge border */
-  --status-badge-active-border: transparent;
-  --status-badge-delayed-border: transparent;
-
-  /* Bar gradient opacity */
-  --bar-gradient-opacity: 0.3;
-
-  /* Live dot */
-  --live-dot-shadow: 0 0 8px var(--accent-primary);
-
-  /* Button action color */
-  --btn-action-color: black;
-  --btn-action-shadow: none;
-
-  /* Pulse animation color */
-  --pulse-color: rgba(77, 158, 255, 0.4);
 }
 
 /* ===========================
@@ -174,122 +228,153 @@
    =========================== */
 
 [data-theme="light"] {
-  /* Base Surfaces */
-  --bg-deep: #F4F5F7;
-  --bg-surface: #FFFFFF;
-  --bg-surface-hover: #F7F8FA;
-  --bg-raised: #EFF1F4;
-  --bg-panel: rgba(0, 0, 0, 0.025);
+  color-scheme: light;
+
+  --bg-deep: #F3F4F6;
   --bg-sidebar: #FFFFFF;
-  --modal-backdrop: rgba(15, 18, 22, 0.45);
+  --bg-surface: #FFFFFF;
+  --bg-surface-hover: #F8F9FA;
+  --bg-raised: #EEF0F3;
+  --bg-overlay: #FFFFFF;
+  --bg-panel: rgba(0, 0, 0, 0.025);
+  --modal-backdrop: rgba(14, 17, 22, 0.40);
 
-  /* Borders */
-  --border-subtle: #E6E8EC;
-  --border-active: #D5D9DF;
-  --border-row: #EDEFF2;
+  --border-row: #EEF0F2;
+  --border-subtle: #E4E6EA;
+  --border-active: #D8DBE0;
+  --border-default: #D8DBE0;
+  --border-strong: #C3C7CE;
+  --border-overlay: #E4E6EA;
+  --border-control: #848B96;
+  --border-control-hover: #6B7280;
+  --border-input: var(--border-control);
 
-  /* Accent - Blue */
   --accent-primary: #2563EB;
-  --accent-bright: #3B82F6;
-  --accent-dim: #EFF6FF;
+  --accent-primary-hover: #1D4ED8;
+  --accent-hover: #1D4ED8;
+  --accent-pressed: #1A45C2;
+  --accent-bright: #1D4ED8;
+  --accent-dim: #EFF5FF;
   --accent-glow: rgba(37, 99, 235, 0.15);
+  --link: #1D4ED8;
   --on-accent: #FFFFFF;
 
-  /* Text */
-  --text-primary: #0F1216;
-  --text-secondary: #4B525D;
-  --text-tertiary: #646B76;
+  --text-primary: #0E1116;
+  --text-secondary: #434A55;
+  --text-tertiary: #636A75;
+  --text-disabled: #A3A8B1;
 
-  /* Status Colors */
-  --status-success: #2563EB;
-  --status-success-bg: #EFF6FF;
-  --status-warning: #F59E0B;
-  --status-warning-bg: #FFFBEB;
-  --status-danger: #EF4444;
+  --btn-primary-bg: #0E1116;
+  --btn-primary-fg: #FFFFFF;
+  --btn-primary-hover: #262B33;
+  --btn-primary-pressed: #000000;
+  --btn-disabled-bg: var(--bg-raised);
+  --btn-disabled-fg: var(--text-disabled);
+  --btn-danger-bg: #C81E1E;
+  --btn-danger-hover: #B91C1C;
+  --btn-danger-fg: #FFFFFF;
+
+  --status-success: #137A3A;
+  --status-success-text: #137A3A;
+  --status-success-dot: #15803D;
+  --status-success-bg: #ECFDF3;
+  --status-warning: #BA7607;
+  --status-warning-text: #A84C08;
+  --status-warning-dot: #BA7607;
+  --status-warning-bg: #FFF7E6;
+  --status-danger: #DC2626;
+  --status-danger-text: #C81E1E;
+  --status-danger-dot: #DC2626;
   --status-danger-bg: #FEF2F2;
-  --status-neutral: #6B7280;
-  --status-neutral-bg: #F3F4F6;
+  --status-info: #2563EB;
+  --status-info-text: #1D4ED8;
+  --status-info-dot: #2563EB;
+  --status-info-bg: #EFF5FF;
+  --status-neutral: #5F6672;
+  --status-neutral-text: var(--text-secondary);
+  --status-neutral-dot: #7D848F;
+  --status-neutral-bg: var(--bg-raised);
+  --status-ok-dot: var(--status-success-dot);
+  --avatar-on-dim: #1D4ED8;
+  --badge-bg: #C81E1E;
+  --badge-fg: #FFFFFF;
 
-  /* Header */
   --header-bg: rgba(255, 255, 255, 0.9);
 
-  /* Chart colors */
-  --chart-bar: #E5E7EB;
-  --chart-bar-highlight: #3B82F6;
+  --chart-series-1: #2563EB;
+  --chart-bar-highlight: var(--chart-series-1);
+  --chart-bar: rgba(14, 17, 22, 0.04);
+  --chart-hatch: #838A95;
+  --chart-muted: #838A95;
+  --chart-grid: #E4E6EA;
+  --chart-axis: #C3C7CE;
+  --chart-hover-band: rgba(14, 17, 22, 0.04);
+  --chart-negative: #C2410C;
   --chart-bar-gradient: transparent;
 
-  /* Heatmap */
-  --heat-empty: #F3F4F6;
-  --heat-low: #DBEAFF;
-  --heat-medium: #93C5FD;
-  --heat-high: #3B82F6;
-  --heat-max: #1D4ED8;
+  --heat-empty: #F1F3F5;
+  --heat-1: #DCE7FD;
+  --heat-2: #AFC8FB;
+  --heat-3: #6F9EF5;
+  --heat-4: #2563EB;
+  --heat-5: #1A3FA8;
+  --heat-low: var(--heat-2);
+  --heat-medium: var(--heat-3);
+  --heat-high: var(--heat-4);
+  --heat-max: var(--heat-5);
 
-  /* Ambient glow */
-  --glow-color: rgba(59, 130, 246, 0.08);
-  --glow-transparent: rgba(243, 244, 246, 0);
+  --glow-color: transparent;
+  --glow-transparent: transparent;
 
-  /* Scrollbar */
-  --scrollbar-thumb: #E5E7EB;
-  --scrollbar-thumb-hover: #D1D5DB;
+  --scrollbar-thumb: #D8DBE0;
+  --scrollbar-thumb-hover: #C3C7CE;
 
-  /* Shadows: cards are separated from the grey page by their 1px border
-     alone (design principles §1: a border OR a shadow, never both). */
   --shadow-card: none;
   --shadow-card-hover: none;
+  --shadow-pop: 0 12px 32px rgba(14, 17, 22, 0.12), 0 2px 6px rgba(14, 17, 22, 0.06);
 
-  /* Input specific — white fill on the grey page so boxes read as distinct
-     surfaces, not the same colour as the container. */
   --input-bg: #FFFFFF;
   --input-bg-focus: #FFFFFF;
 
-  /* Card */
   --card-radius: 16px;
 
-  --surface-tint-hover: rgba(15, 18, 22, 0.04);
-  --surface-tint-active: rgba(15, 18, 22, 0.07);
+  --surface-tint-hover: rgba(14, 17, 22, 0.04);
+  --surface-tint-active: rgba(14, 17, 22, 0.07);
 
-  /* v3 shell + emphasis */
-  --nav-active-bg: #0F1216;
+  --nav-active-bg: #0E1116;
   --nav-active-fg: #FFFFFF;
-  --tip-bg: #0F1216;
+  --nav-active-muted: #C3C8D0;
+  --nav-hover-bg: rgba(14, 17, 22, 0.045);
+  --nav-hover-color: var(--text-primary);
+  --nav-active-color: var(--nav-active-fg);
+  --tip-bg: #0E1116;
   --tip-fg: #FFFFFF;
-  --focus-ring: rgba(37, 99, 235, 0.2);
-  --shadow-pop: 0 12px 32px rgba(15, 18, 22, 0.12), 0 2px 6px rgba(15, 18, 22, 0.06);
-  --status-ok-dot: #10B981;
+  --focus-ring: rgba(37, 99, 235, 0.28);
+  --focus-outline: var(--accent-primary);
+
   --emphasis-bg: #1D4ED8;
+  --emphasis-border: #1D4ED8;
   --emphasis-fg: #FFFFFF;
   --emphasis-fg-muted: #DCE4FB;
   --emphasis-track: rgba(255, 255, 255, 0.24);
-  --chart-grid: #E6E8EC;
-  --chart-muted: #CDD2DA;
+  --emphasis-fill: #FFFFFF;
+  --emphasis-focus: #FFFFFF;
 
-  /* Nav item hover */
-  --nav-hover-bg: rgba(15, 18, 22, 0.045);
-  --nav-hover-color: var(--text-primary);
-  --nav-active-color: var(--nav-active-fg);
-
-  /* Alert box */
-  --alert-bg: var(--accent-dim);
+  --alert-bg: var(--status-info-bg);
   --alert-border: rgba(37, 99, 235, 0.2);
 
-  /* Status badge border */
-  --status-badge-active-border: rgba(37, 99, 235, 0.2);
-  --status-badge-delayed-border: #FECACA;
-
-  /* Bar gradient opacity */
+  --status-badge-active-border: transparent;
+  --status-badge-delayed-border: transparent;
   --bar-gradient-opacity: 0;
+  --live-dot-shadow: none;
 
-  /* Live dot */
-  --live-dot-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-
-  /* Button action color */
-  --btn-action-color: white;
+  --btn-action-color: #FFFFFF;
   --btn-action-shadow: none;
-
-  /* Pulse animation color */
   --pulse-color: rgba(37, 99, 235, 0.4);
 }
+
+/* Native controls (checkboxes, radios, range, date inputs) follow the theme. */
+html { accent-color: var(--accent-primary); }
 
 /* ===========================
    FONTS
@@ -636,7 +721,7 @@ button, input, select, textarea, optgroup {
   gap: 6px;
   padding: 2px 8px;
   border-radius: var(--radius-chip);
-  background: var(--status-neutral-bg);
+  background: transparent;
   font-family: var(--font-sans);
   font-size: 13px;
   line-height: 20px;
@@ -645,23 +730,13 @@ button, input, select, textarea, optgroup {
   color: var(--text-secondary);
   font-weight: 500;
   white-space: nowrap;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-default);
 }
-
-.status-badge.active {
-  background: var(--status-success-bg);
-  color: var(--status-info-text, var(--accent-primary));
-}
-
-.status-badge.delayed {
-  background: var(--status-danger-bg);
-  color: var(--status-danger-text, var(--status-danger));
-}
-
-.status-badge.warning {
-  background: var(--status-warning-bg);
-  color: var(--status-warning-text, var(--status-warning));
-}
+/* Legacy class: same neutral chip as <StatusChip>, the dot carries the state. */
+.status-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--status-neutral-dot); flex-shrink: 0; }
+.status-badge.active::before { background: var(--status-success-dot); }
+.status-badge.delayed::before { background: var(--status-danger-dot); }
+.status-badge.warning::before { background: var(--status-warning-dot); }
 
 /* ===========================
    AGENT SIDEBAR
@@ -775,8 +850,8 @@ button, input, select, textarea, optgroup {
 
 .btn-action {
   margin-top: 0;
-  background: var(--accent-primary);
-  color: var(--btn-action-color);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
   border: none;
   padding: 8px 16px;
   border-radius: var(--radius-control);
@@ -792,12 +867,15 @@ button, input, select, textarea, optgroup {
   min-width: 120px;
   text-align: center;
   white-space: nowrap;
-  transition: opacity 0.15s;
+  transition: background-color 0.12s;
   box-shadow: none;
 }
 
 .btn-action:hover {
-  opacity: 0.9;
+  background: var(--btn-primary-hover);
+}
+.btn-action:active {
+  background: var(--btn-primary-pressed);
 }
 
 .btn-action:focus-visible {
@@ -806,21 +884,23 @@ button, input, select, textarea, optgroup {
 }
 
 .btn-action:disabled {
-  opacity: 0.4;
+  background: var(--btn-disabled-bg);
+  color: var(--btn-disabled-fg);
   cursor: not-allowed;
   pointer-events: none;
 }
 
 .btn-ghost {
   background: transparent;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   color: var(--text-primary);
 }
-.btn-ghost:hover { background: var(--surface-tint-hover); opacity: 1; }
+.btn-ghost:hover { background: var(--surface-tint-hover); border-color: var(--border-strong); }
+.btn-ghost:disabled { background: transparent; color: var(--text-disabled); }
 
 .btn-export {
   background: transparent;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   color: var(--text-secondary);
   padding: 4px 8px;
   font-size: 13px;
@@ -886,7 +966,7 @@ button, input, select, textarea, optgroup {
 
 .quick-quote-input {
   background: var(--input-bg);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-control);
   padding: 8px;
   color: var(--text-primary);
   border-radius: var(--radius-control);
@@ -987,7 +1067,7 @@ button, input, select, textarea, optgroup {
   font-family: var(--font-sans);
   font-size: var(--text-figure);
   line-height: 38px;
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--tracking-figure);
 }
@@ -1018,43 +1098,6 @@ button, input, select, textarea, optgroup {
   .os-app-shell .btn-action { min-height: 48px; }
 }
 
-/* Authenticated status text: keep chart/background status tokens unchanged.
-   --status-info-text / --avatar-on-dim come from tokens.json infoText: accent
-   blue reads at 4.1:1 on the dark accent-dim surface, so text on that surface
-   uses the info text role instead. */
-.os-app-shell {
-  --status-success-text: #86EFAC;
-  --status-warning-text: #FCD34D;
-  --status-danger-text: #FCA5A5;
-  --status-info-text: #93C5FD;
-  --avatar-on-dim: #93C5FD;
-}
-[data-theme="light"] .os-app-shell,
-.os-app-shell[data-theme="light"] {
-  --status-success-text: #166534;
-  --status-warning-text: #92400E;
-  --status-danger-text: #B91C1C;
-  --status-info-text: #1D4ED8;
-  --avatar-on-dim: #1D4ED8;
-  --text-tertiary: #646B76;
-}
-[data-theme="dark"] .os-app-shell,
-.os-app-shell[data-theme="dark"] {
-  --status-success-text: #86EFAC;
-  --status-warning-text: #FCD34D;
-  --status-danger-text: #FCA5A5;
-  --status-info-text: #93C5FD;
-  --avatar-on-dim: #93C5FD;
-  --text-tertiary: #8B919C;
-}
-
-/* Desktop dashboard token adoption. Legacy/public and chart aliases remain separate. */
-@media (min-width: 768px) {
-  .os-app-shell {
-    --input-bg: var(--bg-surface);
-    --btn-action-color: var(--on-accent);
-  }
-}
 
 /* Compact row actions and inline link buttons are 24-32px with a mouse, where
    they sit inside 48px rows. On touch screens every one gets a 44px target. */
@@ -1087,7 +1130,7 @@ button, input, select, textarea, optgroup {
 /* Page head: bold tight title, one short grey line, actions on the right. */
 .tw-page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 16px 0 24px; }
 .tw-page-head__titles { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.tw-title { margin: 0; font: 700 var(--text-display)/34px var(--font-sans); letter-spacing: var(--tracking-display); color: var(--text-primary); }
+.tw-title { margin: 0; font: 600 var(--text-display)/34px var(--font-sans); letter-spacing: var(--tracking-display); color: var(--text-primary); }
 .tw-subtitle { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-tertiary); }
 .tw-page-head__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
@@ -1107,7 +1150,7 @@ button, input, select, textarea, optgroup {
 
 /* Labels and figures */
 .tw-label { font: 500 var(--text-label)/16px var(--font-sans); color: var(--text-tertiary); }
-.tw-figure { font: 700 var(--text-figure)/38px var(--font-sans); letter-spacing: var(--tracking-figure); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.tw-figure { font: 600 var(--text-figure)/38px var(--font-sans); letter-spacing: var(--tracking-figure); font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .tw-figure__unit { font-size: 0.6em; font-weight: 600; letter-spacing: -0.01em; color: var(--text-tertiary); margin-right: 2px; }
 .tw-delta { display: inline-flex; align-items: center; gap: 4px; font: 500 var(--text-label)/16px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-tertiary); }
 .tw-delta.is-up { color: var(--status-success-text, var(--status-success)); }
@@ -1119,33 +1162,56 @@ button, input, select, textarea, optgroup {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 36px; padding: 0 14px;
   border-radius: var(--radius-control);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   background: var(--bg-surface);
   color: var(--text-primary);
   font: 500 13px/20px var(--font-sans);
   text-decoration: none; white-space: nowrap; cursor: pointer;
-  transition: background-color 0.12s, border-color 0.12s, filter 0.12s;
+  transition: background-color 0.12s, border-color 0.12s;
 }
-.tw-btn:hover { background: var(--bg-surface-hover); border-color: var(--border-active); }
-.tw-btn--primary { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--on-accent); }
-.tw-btn--primary:hover { background: var(--accent-primary); border-color: var(--accent-primary); filter: brightness(1.08); }
+.tw-btn:hover { background: var(--bg-surface-hover); border-color: var(--border-strong); }
+/* Primary is ink (black in light, near-white in dark). Accent is never a button fill. */
+.tw-btn--primary { background: var(--btn-primary-bg); border-color: var(--btn-primary-bg); color: var(--btn-primary-fg); }
+.tw-btn--primary:hover { background: var(--btn-primary-hover); border-color: var(--btn-primary-hover); }
+.tw-btn--primary:active { background: var(--btn-primary-pressed); border-color: var(--btn-primary-pressed); }
+.tw-btn:disabled, .tw-btn[aria-disabled="true"] { background: var(--btn-disabled-bg); border-color: transparent; color: var(--btn-disabled-fg); cursor: not-allowed; }
 .tw-btn--ghost { background: transparent; border-color: transparent; color: var(--text-secondary); }
 .tw-btn--ghost:hover { background: var(--nav-hover-bg); border-color: transparent; color: var(--text-primary); }
 .tw-btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 @media (max-width: 768px) { .tw-btn { height: 44px; } }
 
-/* Segmented control: only when it changes the data on screen. */
-.tw-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--radius-control); background: var(--bg-raised); }
+/* Segmented control (DESIGN-PRINCIPLES §11.4): THE filter/period control.
+   28px options on one raised track, neutral active chip, never accent-filled.
+   React wrapper: src/components/ui/Segmented.tsx. */
+.tw-seg { display: inline-flex; align-items: center; max-width: 100%; padding: 2px; gap: 2px; border-radius: 8px; background: var(--bg-raised); overflow-x: auto; scrollbar-width: none; vertical-align: middle; }
+.tw-seg::-webkit-scrollbar { display: none; }
 .tw-seg__opt {
-  height: 28px; padding: 0 12px; border: 0; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 28px; padding: 0 10px; border: 0; border-radius: 6px;
   background: transparent; color: var(--text-secondary);
-  font: 500 12px/16px var(--font-sans); cursor: pointer; white-space: nowrap;
+  font: 500 12px/16px var(--font-sans); cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: background-color 0.12s, color 0.12s;
 }
-.tw-seg__opt:hover { color: var(--text-primary); }
-.tw-seg__opt.is-active { background: var(--bg-surface); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
-[data-theme="dark"] .tw-seg__opt.is-active { background: #2A2F37; box-shadow: none; }
-.tw-seg__opt:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
-@media (pointer: coarse) { .tw-seg__opt { height: 40px; } }
+.tw-seg__opt:hover:not(.is-active):not(:disabled) { color: var(--text-primary); background: var(--surface-tint-hover); }
+.tw-seg__opt.is-active,
+.tw-seg__opt[aria-pressed="true"],
+.tw-seg__opt[aria-checked="true"],
+.tw-seg__opt[aria-selected="true"] {
+  background: var(--bg-surface); color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--border-default), 0 1px 2px rgba(14, 17, 22, 0.06);
+}
+[data-theme="dark"] .tw-seg__opt.is-active,
+[data-theme="dark"] .tw-seg__opt[aria-pressed="true"],
+[data-theme="dark"] .tw-seg__opt[aria-checked="true"],
+[data-theme="dark"] .tw-seg__opt[aria-selected="true"] { background: #2C3037; box-shadow: none; }
+.tw-seg__opt:disabled { color: var(--text-disabled); cursor: not-allowed; }
+.tw-seg__opt:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 1px; }
+.tw-seg__count { color: var(--text-tertiary); font-variant-numeric: tabular-nums; font-weight: 500; }
+.tw-seg__opt.is-active .tw-seg__count { color: var(--text-secondary); }
+.tw-seg--sm .tw-seg__opt { height: 24px; padding: 0 8px; }
+.tw-seg--block { display: flex; width: 100%; }
+.tw-seg--block .tw-seg__opt { flex: 1 1 0; }
+@media (pointer: coarse) { .tw-seg__opt, .tw-seg--sm .tw-seg__opt { height: 40px; padding: 0 12px; } }
 
 /* Small status pill (e.g. "Live", "Last 20 quotes"). */
 .tw-chip {
@@ -1157,9 +1223,76 @@ button, input, select, textarea, optgroup {
   font: 500 12px/16px var(--font-sans);
   white-space: nowrap;
 }
-.tw-chip--ok { background: var(--status-success-bg); color: var(--status-success-text, var(--status-success)); }
-.tw-chip--warn { background: var(--status-warning-bg); color: var(--status-warning-text, var(--status-warning)); }
-.tw-chip--bad { background: var(--status-danger-bg); color: var(--status-danger-text, var(--status-danger)); }
+.tw-chip--ok { background: var(--status-success-bg); color: var(--status-success-text); }
+.tw-chip--warn { background: var(--status-warning-bg); color: var(--status-warning-text); }
+.tw-chip--bad { background: var(--status-danger-bg); color: var(--status-danger-text); }
+
+/* Status chip (DESIGN-PRINCIPLES §4): neutral outline, coloured dot, grey label.
+   React: src/components/ui/StatusChip.tsx (tone + shared status map). */
+.tw-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 22px; padding: 0 8px 0 7px; max-width: 100%;
+  border: 1px solid var(--border-default); border-radius: var(--radius-pill);
+  background: transparent; color: var(--text-secondary);
+  font: 500 12px/16px var(--font-sans); letter-spacing: normal; text-transform: none;
+  white-space: nowrap; vertical-align: middle;
+}
+.tw-status__dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--status-neutral-dot); }
+.tw-status__label { overflow: hidden; text-overflow: ellipsis; }
+.tw-status--success .tw-status__dot { background: var(--status-success-dot); }
+.tw-status--warning .tw-status__dot { background: var(--status-warning-dot); }
+.tw-status--danger .tw-status__dot { background: var(--status-danger-dot); }
+.tw-status--info .tw-status__dot { background: var(--status-info-dot); }
+.tw-status--sm { height: 20px; padding: 0 7px 0 6px; font-size: 11px; }
+
+/* Standard KPI tile (DESIGN-PRINCIPLES §11.6): label, figure, one line. 96px.
+   React: src/components/ui/KpiTile.tsx. */
+.tw-kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+.tw-kpi {
+  display: flex; flex-direction: column; justify-content: space-between; gap: 0;
+  box-sizing: border-box; height: var(--kpi-height); min-width: 0; padding: 14px 16px;
+  background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card);
+  color: var(--text-primary); text-align: left; text-decoration: none; font: inherit;
+}
+.tw-kpi--link { cursor: pointer; transition: background-color 0.12s; }
+.tw-kpi--link:hover { background: var(--bg-surface-hover); }
+.tw-kpi--link:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 2px; }
+.tw-kpi__head { display: flex; align-items: center; height: 16px; justify-content: space-between; gap: 8px; min-width: 0; }
+.tw-kpi__label { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tw-kpi__figure { font: 600 28px/34px var(--font-sans); letter-spacing: var(--tracking-figure); font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tw-kpi__note { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.tw-kpi__note--success { color: var(--status-success-text); }
+.tw-kpi__note--warning { color: var(--status-warning-text); }
+.tw-kpi__note--danger { color: var(--status-danger-text); }
+.tw-kpi--emphasis { background: var(--emphasis-bg); border-color: var(--emphasis-border); }
+.tw-kpi--emphasis .tw-kpi__label,
+.tw-kpi--emphasis .tw-kpi__note { color: var(--emphasis-fg-muted); }
+.tw-kpi--emphasis .tw-kpi__figure { color: var(--emphasis-fg); }
+.tw-kpi--emphasis:focus-visible, .tw-kpi--emphasis :focus-visible { outline-color: var(--emphasis-focus); }
+.tw-kpi--emphasis.tw-kpi--link:hover { background: var(--emphasis-bg); filter: none; }
+/* Phone: 2 or 4 tiles in 2 columns; 3 tiles in 3 compact columns (never 2 + orphan). */
+@media (max-width: 767px) {
+  .tw-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .tw-kpi-row:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .tw-kpi-row:has(> :nth-child(3):last-child) .tw-kpi { padding: 12px; }
+  .tw-kpi-row:has(> :nth-child(3):last-child) .tw-kpi__figure { font-size: 18px; line-height: 24px; }
+  .tw-kpi-row:has(> :only-child) { grid-template-columns: 1fr; }
+}
+
+/* Form controls: the ONE boundary token for inputs, selects, textareas,
+   select triggers, search and date fields (WCAG 1.4.11, >= 3:1). Pages style
+   their own controls; these are the shared ones. */
+.tw-input, .tw-control {
+  height: 36px; padding: 0 12px; width: 100%;
+  background: var(--input-bg); color: var(--text-primary);
+  border: 1px solid var(--border-control); border-radius: var(--radius-control);
+  font: 400 14px/20px var(--font-sans);
+}
+textarea.tw-input { height: auto; padding: 8px 12px; }
+.tw-input::placeholder { color: var(--text-tertiary); }
+.tw-input:hover:not(:disabled), .tw-control:hover:not(:disabled) { border-color: var(--border-control-hover); }
+.tw-input:focus, .tw-control:focus { outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.tw-input:disabled { color: var(--text-disabled); background: var(--bg-raised); }
 
 /* Methodology lives behind an info icon (§9). */
 .tw-info { position: relative; display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-tertiary); cursor: help; flex-shrink: 0; }
@@ -1177,3 +1310,21 @@ button, input, select, textarea, optgroup {
 }
 .tw-info__pop--end { left: auto; right: -8px; }
 @media (pointer: coarse) { .tw-info::after { content: ''; position: absolute; inset: -12px; } }
+
+/* ===========================================================================
+   FORM-CONTROL BOUNDARY, TOKEN-LEVEL (DESIGN-PRINCIPLES §3, WCAG 1.4.11)
+   Many page controls are drawn with `border: 1px solid var(--border-subtle)`
+   (a card-edge colour, 1.1-1.3:1). Re-pointing the card tokens *on the
+   control element itself* makes every such border resolve to the control
+   boundary (>= 3:1) without touching page code, inline styles included.
+   Cards, dividers and wrappers keep the quiet values.
+   =========================================================================== */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+select,
+textarea,
+.tw-select-trigger,
+[role="combobox"] {
+  --border-subtle: var(--border-control);
+  --border-default: var(--border-control);
+  --border-active: var(--border-control-hover);
+}

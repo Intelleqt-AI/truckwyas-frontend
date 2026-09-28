@@ -46,7 +46,7 @@
 }
 .settings-switch[data-state="on"] .settings-switch-knob {
   left: 19px;
-  background: var(--btn-action-color, #fff);
+  background: var(--on-accent);
 }
 @media (prefers-reduced-motion: reduce) {
   .settings-switch, .settings-switch-knob { transition: none; }

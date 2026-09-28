@@ -1,16 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dateText, formatStatus, loadDate, num, randWhole, type Tone } from './parts';
+import { dateText, loadDate, num, randWhole } from './parts';
+import { StatusChip } from '@/components/ui/StatusChip';
 
-const LOAD_TONE: Record<string, Tone> = {
-  DELIVERED: 'success',
-  INVOICED: 'success',
-  IN_TRANSIT: 'info',
-  LOADING: 'info',
-  ASSIGNED: 'info',
-  PENDING: 'neutral',
-  CANCELLED: 'neutral',
-};
 
 /**
  * Recent loads: 48px rows, identifiers in mono, money right-aligned.
@@ -58,9 +50,7 @@ export function LoadsTable({ loads, showCustomer = true, initial = 10 }: { loads
                   <td className="is-num fd-col-opt fd-col-dist">{num(l.distance) ? `${Math.round(num(l.distance)).toLocaleString('en-ZA')} km` : '—'}</td>
                   <td className="is-num fd-strong">{amount ? randWhole(amount) : '—'}</td>
                   <td className="fd-col-status">
-                    <span className={`fd-state fd-state--${LOAD_TONE[l.status] || 'neutral'}`}>
-                      <i aria-hidden="true" />{formatStatus(l.status)}
-                    </span>
+                    <StatusChip status={l.status} size="sm" />
                   </td>
                   <td className="fd-col-opt" title={l.created_at ? `Created ${dateText(l.created_at)}` : undefined}>{dateText(loadDate(l)) || '—'}</td>
                 </tr>

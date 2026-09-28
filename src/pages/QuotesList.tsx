@@ -33,6 +33,8 @@ import { CSS } from "@dnd-kit/utilities";
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
 import { rowLink } from '@/lib/rowLink';
+import { StatusChip, statusTone } from '@/components/ui/StatusChip';
+import { Segmented } from '@/components/ui/Segmented';
 
 
 // Pipeline stage -> dot/chip tone. Colour only ever sits next to its text label.
@@ -92,10 +94,10 @@ function QuoteCardBody({ quote }: { quote: any }) {
         <span className="bk-qcard__id">{quote.quote_number}</span>
         <span className="bk-qcard__flags">
           {quote.fuel_alert && (
-            <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', color: 'var(--status-warning-text, var(--status-warning))' }}><Fuel size={16} aria-hidden="true" /></span>
+            <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', color: 'var(--status-warning-text)' }}><Fuel size={16} aria-hidden="true" /></span>
           )}
-          {quote.outcome === 'accepted' && <span className="bk-status bk-status--success">Won</span>}
-          {quote.outcome === 'rejected' && <span className="bk-status bk-status--danger">Lost</span>}
+          {quote.outcome === 'accepted' && <StatusChip status="WON" size="sm" />}
+          {quote.outcome === 'rejected' && <StatusChip status="LOST" size="sm" />}
         </span>
       </div>
       <div className="bk-qcard__customer" title={quote.customer_name || ''}>{quote.customer_name || '—'}</div>
@@ -480,17 +482,12 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <div className="bk-filters" role="group" aria-label="Quote view">
-          {(['board', 'list'] as const).map(v => (
-            <button
-              key={v}
-              type="button"
-              aria-pressed={view === v}
-              className={`bk-chip${view === v ? ' is-active' : ''}`}
-              onClick={() => setView(v)}
-            >{v === 'board' ? 'Board' : 'List'}</button>
-          ))}
-        </div>
+        <Segmented
+          label="Quote view"
+          value={view}
+          onChange={setView}
+          options={[{ value: 'board', label: 'Board' }, { value: 'list', label: 'List' }]}
+        />
         <span className="bk-toolbar__end">
           {view === 'board' && !billingBlocked ? 'Drag a card to change its status' : ''}
           {failedColumns.length === 0 && <>{view === 'board' && !billingBlocked ? ' · ' : ''}{totalQuotesCount} {totalQuotesCount === 1 ? 'quote' : 'quotes'}</>}
@@ -536,7 +533,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                 <section key={col} className="bk-col" aria-label={`${COLUMN_LABELS[col]} quotes`}>
                   <div className="bk-col__head">
                     <span className="bk-col__title">
-                      <span className={`bk-dot bk-dot--${COLUMN_TONE[col]}`} aria-hidden="true" />
+                      <span className={`bk-dot bk-dot--${statusTone(col)}`} aria-hidden="true" />
                       {COLUMN_LABELS[col]}
                       {!colFailed && <span className="bk-col__count">{colCount}</span>}
                     </span>
@@ -603,21 +600,19 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
            filter) — switching tabs reuses whatever's already loaded. */
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
           {/* Status filters */}
-          <div className="bk-filters" role="group" aria-label="Filter quotes by status" style={{ marginBottom: 16, flexShrink: 0 }}>
-            {['ALL', ...COLUMNS].map(status => (
-              <button
-                key={status}
-                type="button"
-                aria-pressed={statusFilter === status}
-                className={`bk-chip${statusFilter === status ? ' is-active' : ''}`}
-                onClick={() => setStatusFilter(status)}
-              >
-                {status === 'ALL' ? 'All' : COLUMN_LABELS[status]}
-                {(status === 'ALL' ? failedColumns.length === 0 : !failedColumns.includes(status)) && (
-                  <span className="bk-chip__count">{status === 'ALL' ? totalQuotesCount : flattenColumn(columnQueries[status]).count}</span>
-                )}
-              </button>
-            ))}
+          <div style={{ marginBottom: 16, flexShrink: 0, maxWidth: '100%', overflowX: 'auto' }}>
+            <Segmented
+              label="Filter quotes by status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={['ALL', ...COLUMNS].map(status => ({
+                value: status,
+                label: status === 'ALL' ? 'All' : COLUMN_LABELS[status],
+                count: (status === 'ALL' ? failedColumns.length === 0 : !failedColumns.includes(status))
+                  ? (status === 'ALL' ? totalQuotesCount : flattenColumn(columnQueries[status]).count)
+                  : undefined,
+              }))}
+            />
           </div>
 
           {loadFailed(activeListQuery) ? (
@@ -653,19 +648,17 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                     <td className="is-id">
                       {quote.quote_number}
                       {quote.fuel_alert && (
-                        <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 6, color: 'var(--status-warning-text, var(--status-warning))' }}><Fuel size={16} aria-hidden="true" /></span>
+                        <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 6, color: 'var(--status-warning-text)' }}><Fuel size={16} aria-hidden="true" /></span>
                       )}
                     </td>
                     <td className="is-primary">{quote.customer_name || '—'}</td>
                     <td className="is-truncate" title={routeOf(quote)}>{routeOf(quote)}</td>
                     <td>
-                      <span className={`bk-status bk-status--${QUOTE_TONE[quote.status] || 'neutral'}`}>
-                        {COLUMN_LABELS[quote.status] || sentenceCase(quote.status)}
-                      </span>
+                      <StatusChip status={quote.status === 'IT' ? 'IN_TRANSIT' : quote.status} label={COLUMN_LABELS[quote.status]} size="sm" />
                     </td>
                     <td>
-                      {quote.outcome === 'accepted' && <span className="bk-status bk-status--success">Won</span>}
-                      {quote.outcome === 'rejected' && <span className="bk-status bk-status--danger">Lost</span>}
+                      {quote.outcome === 'accepted' && <StatusChip status="WON" size="sm" />}
+                      {quote.outcome === 'rejected' && <StatusChip status="LOST" size="sm" />}
                       {(!quote.outcome || quote.outcome === 'pending') && <span>—</span>}
                     </td>
                     <td className="is-date">

@@ -4,16 +4,16 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card, 12px);
-  padding: 24px;
+  padding: 20px;
   box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 .ic-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; min-width: 0; }
-.ic-card__heading { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.ic-card__title { margin: 0; font: 600 16px/24px var(--font-sans); letter-spacing: normal; color: var(--text-primary); }
-.ic-card__desc { margin: 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); max-width: 90ch; }
+.ic-card__heading { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ic-card__title { margin: 0; font: 600 var(--text-subhead, 15px)/22px var(--font-sans); letter-spacing: var(--tracking-title, -0.01em); color: var(--text-primary); }
+.ic-card__desc { margin: 0; font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); max-width: 90ch; }
 .ic-card__action { flex-shrink: 0; }
 .ic-card__body { min-width: 0; }
 .ic-card__body--flush { margin: 0 -8px; }
@@ -76,7 +76,7 @@ a.ic-row:focus-visible { outline: 2px solid var(--accent-primary); outline-offse
 
 .ic-text-button {
   display: inline-flex; align-items: center; min-height: 40px; padding: 0; border: 0; background: none; cursor: pointer;
-  font: 500 14px/20px var(--font-sans); color: var(--accent-primary); text-decoration: none;
+  font: 500 14px/20px var(--font-sans); color: var(--link, var(--accent-primary)); text-decoration: none;
 }
 .ic-text-button:hover { text-decoration: underline; }
 .ic-text-button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; border-radius: 4px; }

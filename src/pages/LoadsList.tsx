@@ -3,6 +3,9 @@ import './table-heading-roles.css';
 import './bookings-section.css';
 import './ops-tiles.css';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { Segmented } from '@/components/ui/Segmented';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, Plus } from 'lucide-react';
@@ -30,17 +33,6 @@ interface Load {
   customer_name?: string;
   quote_number?: string;
 }
-
-// Status chip tone; each tone uses the tested -text role on a tinted surface.
-const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
-  PENDING: 'neutral',
-  ASSIGNED: 'warning',
-  IN_TRANSIT: 'info',
-  LOADING: 'warning',
-  DELIVERED: 'success',
-  INVOICED: 'info',
-  CANCELLED: 'danger',
-};
 
 // Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
 const formatStatus = (s?: string) =>
@@ -168,16 +160,14 @@ export default function LoadsList() {
               onClick={() => navigate(`/bookings/${load.id}`)}
             >
               <td className="is-id">{load.load_number}</td>
-              <td className="is-primary is-truncate" style={{ maxWidth: 180 }} title={load.customer_name || ''}>{load.customer_name || '—'}</td>
-              <td className="is-truncate" style={{ maxWidth: 220 }} title={`${load.pickup_location} → ${load.delivery_location}`}>
+              <td className="is-primary is-nowrap" title={load.customer_name || ''}>{load.customer_name || '—'}</td>
+              <td className="is-nowrap" title={`${load.pickup_location} → ${load.delivery_location}`}>
                 {load.pickup_location} → {load.delivery_location}
               </td>
-              <td className="is-truncate" style={{ maxWidth: 160 }} title={load.driver_name || ''}>{load.driver_name || '—'}</td>
-              <td className="is-truncate" style={{ maxWidth: 140 }} title={load.vehicle_info || ''}>{load.vehicle_info || '—'}</td>
+              <td className="is-nowrap" title={load.driver_name || ''}>{load.driver_name || '—'}</td>
+              <td className="is-nowrap" title={load.vehicle_info || ''}>{load.vehicle_info || '—'}</td>
               <td>
-                <span className={`bk-status bk-status--${STATUS_TONE[load.status] || 'neutral'}`}>
-                  {formatStatus(load.status)}
-                </span>
+                <StatusChip status={load.status} size="sm" />
               </td>
               <td className="is-money">
                 {formatCurrency(parseFloat(load.total_amount || '0'))}
@@ -220,18 +210,19 @@ export default function LoadsList() {
   // Summary tiles: only the numbers that tell you what to do next. Each is
   // its own card (label, figure, one short line); method sits in an InfoTip.
   const summary = (items: { label: string; value: React.ReactNode; title?: string; note: string; tip?: string; attention?: boolean }[]) => (
-    <section className="ops-tiles" aria-label="Summary">
+    <KpiRow className="bk-kpis">
       {items.map(m => (
-        <div key={m.label} className="ops-tile">
-          <h2 className="ops-tile__label">
-            {m.label}
-            {m.tip && <InfoTip>{m.tip}</InfoTip>}
-          </h2>
-          <div className={`ops-tile__value${m.attention ? ' is-attention' : ''}`} title={m.title}>{m.value}</div>
-          <div className="ops-tile__sub" title={m.note}>{m.note}</div>
-        </div>
+        <KpiTile
+          key={m.label}
+          aria-label={m.label}
+          label={m.label}
+          aside={m.tip ? <InfoTip>{m.tip}</InfoTip> : undefined}
+          figure={<span title={m.title}>{m.value}</span>}
+          note={m.note}
+          tone={m.attention ? 'warning' : 'neutral'}
+        />
       ))}
-    </section>
+    </KpiRow>
   );
   const wholeRand = (n: number) => 'R ' + Math.round(n).toLocaleString('en-ZA');
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -320,19 +311,12 @@ export default function LoadsList() {
           )}
 
           <div className="bk-toolbar">
-            <div className="bk-filters" role="group" aria-label="Filter orders by status">
-              {['All', 'PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].map(status => (
-                <button
-                  key={status}
-                  type="button"
-                  aria-pressed={orderFilter === status}
-                  className={`bk-chip${orderFilter === status ? ' is-active' : ''}`}
-                  onClick={() => setOrderFilter(status)}
-                >
-                  {status === 'All' ? 'All' : formatStatus(status)}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              label="Filter orders by status"
+              value={orderFilter}
+              onChange={setOrderFilter}
+              options={['All', 'PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].map(status => ({ value: status, label: status === 'All' ? 'All' : formatStatus(status) }))}
+            />
             <span className="bk-toolbar__end">{filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}</span>
           </div>
 
@@ -376,19 +360,12 @@ export default function LoadsList() {
               value={historySearch}
               onChange={e => setHistorySearch(e.target.value)}
             />
-            <div className="bk-filters" role="group" aria-label="Filter history by status">
-              {['All', 'DELIVERED', 'INVOICED', 'CANCELLED'].map(status => (
-                <button
-                  key={status}
-                  type="button"
-                  aria-pressed={historyFilter === status}
-                  className={`bk-chip${historyFilter === status ? ' is-active' : ''}`}
-                  onClick={() => setHistoryFilter(status)}
-                >
-                  {status === 'All' ? 'All' : formatStatus(status)}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              label="Filter history by status"
+              value={historyFilter}
+              onChange={setHistoryFilter}
+              options={['All', 'DELIVERED', 'INVOICED', 'CANCELLED'].map(status => ({ value: status, label: status === 'All' ? 'All' : formatStatus(status) }))}
+            />
             <span className="bk-toolbar__end">{filteredHistory.length} {filteredHistory.length === 1 ? 'record' : 'records'}</span>
           </div>
 

@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { formatDateTime } from '@/lib/formatters';
 import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsSecondaryButtonStyle, settingsDangerButtonStyle, SettingsPageHeader } from './settingsUi';
 import RowActions from '@/components/ui/RowActions';
+import { StatusChip } from '@/components/ui/StatusChip';
 
 // Presentation only: the API sends a raw ISO timestamp; show it in the app's
 // date format, and anything unparseable verbatim.
@@ -27,17 +28,9 @@ const roleBadgeStyle: React.CSSProperties = {
   padding: '2px 8px', borderRadius: 'var(--radius-chip)', display: 'inline-block', whiteSpace: 'nowrap',
 };
 
-/* Badge text colours use the tested text roles — raw palette swatches
-   (#3B82F6, #9CA3AF) measure under 4.5:1 on the light surface. */
-const ROLE_COLORS: Record<string, string> = {
-  admin: 'var(--status-danger-text, var(--status-danger))',
-  manager: 'var(--status-warning-text, var(--status-warning))',
-  operator: 'var(--status-info-text, #3B82F6)',
-  dispatcher: 'var(--status-info-text, #8B5CF6)',
-  viewer: 'var(--text-tertiary)',
-  driver: 'var(--status-success-text, var(--status-success))',
-  customer: 'var(--text-tertiary)',
-};
+/* Roles are not states: every role badge is the same neutral outline, so
+   colour stays reserved for status (DESIGN-PRINCIPLES §4). */
+const ROLE_COLORS: Record<string, string> = {};
 
 // Presentation-only labels for known payload values — unknown strings render
 // verbatim (own-property lookup; never restyles user data).
@@ -223,7 +216,7 @@ export function UsersPermissions() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ maxWidth: 960 }}>
       <SettingsPageHeader title="Users & permissions" description="Manage team access and roles" />
 
       <div style={sectionStyle}>
@@ -365,16 +358,13 @@ export function UsersPermissions() {
                   ) : (
                     <span style={{
                       ...roleBadgeStyle,
-                      border: `1px solid ${roleColor(u.role)}`,
-                      color: roleColor(u.role),
+                      border: '1px solid var(--border-active)',
+                      color: 'var(--text-secondary)',
                     }}>{roleDisplay(u.role)}</span>
                   )}
                 </td>
                 <td>
-                  <span style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                    color: u.status?.toLowerCase() === 'active' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                  }}>{statusDisplay(u.status)}</span>
+                  <StatusChip status={u.status} label={statusDisplay(u.status)} size="sm" />
                 </td>
                 <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
                   {displayLastActive(u.last_active)}
@@ -417,8 +407,8 @@ export function UsersPermissions() {
                   <td>
                     <span style={{
                       ...roleBadgeStyle,
-                      border: `1px solid ${roleColor(inv.role)}`,
-                      color: roleColor(inv.role),
+                      border: '1px solid var(--border-active)',
+                      color: 'var(--text-secondary)',
                     }}>{roleDisplay(inv.role)}</span>
                   </td>
                   <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>

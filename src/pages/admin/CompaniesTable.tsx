@@ -8,6 +8,10 @@ import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import PaginationControls from '@/pages/admin/PaginationControls';
 import RowActions from '@/components/ui/RowActions';
+import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
+
+/** Legacy badge class to the shared chip tone. */
+const badgeTone = (cls?: string): StatusTone => (cls === 'active' ? 'success' : cls === 'warning' ? 'warning' : cls === 'delayed' ? 'danger' : 'neutral');
 
 const PAGE_SIZE = 20;
 
@@ -250,8 +254,8 @@ export function CompaniesTable() {
                       <td style={tdStyle}>
                         <div>
                           {c.company_name}
-                          {c.is_demo && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-warning-text, var(--status-warning))' }}>Demo</span>}
-                          {c.is_deleted && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-danger-text, var(--status-danger))' }}>Deleted</span>}
+                          {c.is_demo && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-warning-text)' }}>Demo</span>}
+                          {c.is_deleted && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-danger-text)' }}>Deleted</span>}
                         </div>
                         {/* company_name alone is rarely unique — self-service signup
                             defaults it to "<first name>'s Transport", so the owner's
@@ -267,7 +271,7 @@ export function CompaniesTable() {
                         )}
                       </td>
                       <td style={tdStyle}>
-                        <span className={`status-badge ${STATUS_BADGE_CLASS[c.subscription_status] || ''}`}>{subscriptionStatusLabel(c.subscription_status)}</span>
+                        <StatusChip tone={badgeTone(STATUS_BADGE_CLASS[c.subscription_status])} label={subscriptionStatusLabel(c.subscription_status)} size="sm" />
                       </td>
                       <td style={tdStyle}>{fmtDate(c.next_billing_date)}</td>
                       <td className="num" style={tdStyle}>{c.user_count}</td>
@@ -405,7 +409,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
               padding: 16, background: 'var(--status-warning-bg, rgba(245,158,11,0.1))',
               border: '1px solid var(--status-warning)', borderRadius: 'var(--radius-nested)', fontSize: 14, lineHeight: '20px',
             }}>
-              <strong style={{ color: 'var(--status-warning-text, var(--status-warning))' }}>In grace period</strong>
+              <strong style={{ color: 'var(--status-warning-text)' }}>In grace period</strong>
               {company.grace_period_expires_at && <> until {fmtDate(company.grace_period_expires_at)}</>}.
               This is caused by a failed <em>subscription</em> charge, not a delivery-fee charge. Use{' '}
               <strong>Record payment</strong> below to resolve it. Marking a delivery-fee row as paid in the
@@ -435,7 +439,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                 </button>
               </div>
               {company.grace_period_expires_at && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning-text, var(--status-warning))', marginTop: 6 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-warning-text)', marginTop: 6 }}>
                   Grace period expires {fmtDate(company.grace_period_expires_at)}
                 </div>
               )}
@@ -511,7 +515,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                         <td style={tdStyle}>{ch.label}</td>
                         <td className="num" style={tdStyle}>{formatCurrency(ch.amount)}</td>
                         <td style={tdStyle}>
-                          <span className={`status-badge ${chargeStatusClass(ch.status)}`}>{chargeStatusLabel(ch.status)}</span>
+                          <StatusChip tone={badgeTone(chargeStatusClass(ch.status))} label={chargeStatusLabel(ch.status)} size="sm" />
                         </td>
                         <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)' }}>{ch.reference || '—'}</td>
                         <td style={tdStyle}>

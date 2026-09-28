@@ -99,11 +99,11 @@ export default function CustomerStatement({ d, company }: { d: Ledger; company?:
           </select>
         </label>
       </>}
-      tiles={<Tiles tiles={[
-        { label: 'Balance due', value: moneyWhole(closing), title: money(closing), note: plural(aged.length, 'open invoice') },
-        { label: 'Overdue', value: moneyWhole(closing - ageB[0]), title: money(closing - ageB[0]) },
-        { label: 'Invoiced', value: moneyWhole(invoiced), title: money(invoiced), note: plural(shown.filter(e => e.debit > 0).length, 'invoice') },
-        { label: 'Paid', value: moneyWhole(paid), title: money(paid), note: plural(shown.filter(e => e.credit > 0).length, 'payment') },
+      tiles={<Tiles table={[table, ageTable]} tiles={[
+        { label: 'Balance due', value: moneyWhole(closing), title: money(closing), note: plural(aged.length, 'open invoice'), amount: closing },
+        { label: 'Overdue', value: moneyWhole(closing - ageB[0]), title: money(closing - ageB[0]), amount: closing - ageB[0] },
+        { label: 'Invoiced', value: moneyWhole(invoiced), title: money(invoiced), note: plural(shown.filter(e => e.debit > 0).length, 'invoice'), amount: invoiced },
+        { label: 'Paid', value: moneyWhole(paid), title: money(paid), note: plural(shown.filter(e => e.credit > 0).length, 'payment'), amount: paid },
       ]} />}
       csv={() => [
         [`Statement for ${name}`], [`From ${company?.company_name || ''}${company?.vat_number ? `, VAT ${company.vat_number}` : ''}`], [`Statement date ${todayISO()}`], [],
@@ -134,7 +134,9 @@ export default function CustomerStatement({ d, company }: { d: Ledger; company?:
         table={table}
         caption={`Statement for ${name}`}
         stickyFirst={false}
-        footer={<Check ok={ties}>Closing balance {ties ? 'equals' : 'differs from'} the open invoice balances for {name} ({money(openLedger)}).</Check>}
+        footer={ties
+          ? <Check>Closing balance equals the open invoice balances for {name}.</Check>
+          : <Check ok={false}>Closing balance differs from the open invoice balances for {name} ({money(openLedger)}).</Check>}
       />
       <StatementTable table={ageTable} caption="Amount due by age" stickyFirst={false} />
     </ReportFrame>

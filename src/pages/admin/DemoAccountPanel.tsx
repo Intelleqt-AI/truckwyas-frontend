@@ -5,7 +5,7 @@ import { fetchData, postData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { InfoTip } from '@/components/ui/InfoTip';
-import '@/pages/ops-tiles.css';
+import { StatusChip } from '@/components/ui/StatusChip';
 
 const cardStyle: React.CSSProperties = { padding: 24 };
 const sectionTitleStyle: React.CSSProperties = {
@@ -74,31 +74,31 @@ export default function DemoAccountPanel() {
               Force reset now
             </button>
           </div>
-          <div className="ops-tiles">
-            <div className="ops-tile">
-              <h3 className="ops-tile__label">
+          {/* Facts about the demo, not KPIs: one card, label over value. */}
+          <dl className="card admin-facts">
+            <div>
+              <dt>
                 Quotes since reset
                 <InfoTip>Total across all visitors. Each visitor's own session gets 1 quote, independent of this total.</InfoTip>
-              </h3>
-              <div className="ops-tile__value">{demoStatus.demo_quota_used}</div>
-              <div className="ops-tile__sub">All visitors</div>
+              </dt>
+              <dd className="admin-facts__figure">{demoStatus.demo_quota_used}</dd>
             </div>
-            <div className="ops-tile">
-              <h3 className="ops-tile__label">Last reset</h3>
-              <div className="ops-tile__value" style={{ fontSize: 20, lineHeight: '28px', letterSpacing: '-0.01em' }} title={fmt(demoStatus.demo_last_reset_at)}>{fmt(demoStatus.demo_last_reset_at)}</div>
-              <div className="ops-tile__sub">Demo data reseeded</div>
+            <div>
+              <dt>Last reset</dt>
+              <dd title={fmt(demoStatus.demo_last_reset_at)}>{fmt(demoStatus.demo_last_reset_at)}</dd>
             </div>
-            <div className="ops-tile">
-              <h3 className="ops-tile__label">
-                Due for auto-reset
+            <div>
+              <dt>
+                Auto-reset
                 <InfoTip>An idle demo company is reset by the next 15-minute check.</InfoTip>
-              </h3>
-              <div className={`ops-tile__value${demoStatus.idle_eligible_for_auto_reset ? ' is-attention' : ''}`}>
-                {demoStatus.idle_eligible_for_auto_reset ? 'Yes' : 'No'}
-              </div>
-              <div className="ops-tile__sub">{demoStatus.idle_eligible_for_auto_reset ? 'Next 15-minute check' : 'Not idle'}</div>
+              </dt>
+              <dd>
+                {demoStatus.idle_eligible_for_auto_reset
+                  ? <StatusChip tone="warning" label="Due at the next check" />
+                  : <StatusChip tone="neutral" label="Not idle" />}
+              </dd>
             </div>
-          </div>
+          </dl>
         </section>
       )}
 

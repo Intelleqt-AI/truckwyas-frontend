@@ -21,6 +21,9 @@ import { useAuth } from '@/lib/AuthContext';
 import RowActions from '@/components/ui/RowActions';
 import { InfoTip } from '@/components/ui/InfoTip';
 import './ops-tiles.css';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { Segmented } from '@/components/ui/Segmented';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 
@@ -103,15 +106,6 @@ interface FleetIntelligence {
 }
 
 // Status chip tone. Colour always sits next to the status word.
-const STATUS_TONE: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
-  ACTIVE: 'success',
-  AVAILABLE: 'success',
-  IN_USE: 'info',
-  MAINTENANCE: 'warning',
-  INACTIVE: 'neutral',
-  OUT_OF_SERVICE: 'neutral',
-};
-
 // Column headings. The API's revenue_generated / total_trips are all-time
 // sums over DELIVERED loads (see VehicleSerializer), so they are labelled as
 // such rather than "MTD". Health is the rule-based composite score
@@ -247,14 +241,14 @@ export default function Vehicles() {
     const minutes = Math.floor(ageMs / 60_000);
     const label = minutes < 1 ? 'just now' : minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`;
     return (
-      <span className="fleet-table__sub" style={{ color: isStale ? 'var(--text-tertiary)' : 'var(--status-success-text, var(--status-success))' }}>
+      <span className="fleet-table__sub" style={{ color: isStale ? 'var(--text-tertiary)' : 'var(--status-success-text)' }}>
         {isStale ? `Seen ${label}` : `Live, ${label}`}
       </span>
     );
   };
 
   const getStatusBadge = (status: string) => (
-    <span className={`fleet-chip fleet-chip--${STATUS_TONE[status] || 'neutral'}`}>{formatStatus(status)}</span>
+    <StatusChip status={status} size="sm" />
   );
 
   // Summary figures: only what changes a decision today.
@@ -294,26 +288,27 @@ export default function Vehicles() {
           tabs never moves the page. Hidden when there is no fleet yet; the
           table's empty state carries the next action instead of zeros. */}
       {!failed && (loading || vehicles.length > 0) && (
-        <section className="ops-tiles" aria-label="Fleet summary" aria-busy={loading}>
-          <div className="ops-tile">
-            <h2 className="ops-tile__label">Available now</h2>
-            <div className="ops-tile__value">{loading ? '—' : readyCount}{!loading && <span className="ops-tile__of">of {vehicles.length}</span>}</div>
-            <div className="ops-tile__sub" title={`${onJobCount} on a job, ${maintenanceCount} in maintenance`}>{loading ? 'Loading' : `${onJobCount} on a job, ${maintenanceCount} in maintenance`}</div>
-          </div>
-          <div className="ops-tile">
-            <h2 className="ops-tile__label">
-              Delivered revenue
-              <InfoTip>Value of delivered loads per vehicle, summed across the fleet. All time.</InfoTip>
-            </h2>
-            <div className="ops-tile__value">{loading ? '—' : formatZAR(deliveredRevenue)}</div>
-            <div className="ops-tile__sub">{loading ? 'Loading' : `${deliveredLoads} ${deliveredLoads === 1 ? 'load' : 'loads'}, all time`}</div>
-          </div>
-          <div className="ops-tile">
-            <h2 className="ops-tile__label">Not earning yet</h2>
-            <div className="ops-tile__value">{loading ? '—' : notEarning}{!loading && <span className="ops-tile__of">of {vehicles.length}</span>}</div>
-            <div className="ops-tile__sub">{loading ? 'Loading' : notEarning > 0 ? 'No delivered load yet' : 'Every vehicle has earned'}</div>
-          </div>
-        </section>
+        <KpiRow className="fleet-kpis">
+          <KpiTile
+            aria-label="Available now"
+            label="Available now"
+            figure={loading ? '—' : <>{readyCount}<span className="tw-kpi__of"> of {vehicles.length}</span></>}
+            note={loading ? 'Loading' : `${onJobCount} on a job, ${maintenanceCount} in maintenance`}
+          />
+          <KpiTile
+            aria-label="Delivered revenue"
+            label="Delivered revenue"
+            aside={<InfoTip>Value of delivered loads per vehicle, summed across the fleet. All time.</InfoTip>}
+            figure={loading ? '—' : formatZAR(deliveredRevenue)}
+            note={loading ? 'Loading' : `${deliveredLoads} ${deliveredLoads === 1 ? 'load' : 'loads'}, all time`}
+          />
+          <KpiTile
+            aria-label="Not earning yet"
+            label="Not earning yet"
+            figure={loading ? '—' : <>{notEarning}<span className="tw-kpi__of"> of {vehicles.length}</span></>}
+            note={loading ? 'Loading' : notEarning > 0 ? 'No delivered load yet' : 'Every vehicle has earned'}
+          />
+        </KpiRow>
       )}
 
       {/* Search + status filter toolbar */}
@@ -326,21 +321,15 @@ export default function Vehicles() {
           onChange={e => handleSearchChange(e.target.value)}
           className="fleet-search"
         />
-        <div className="fleet-filters">
-          {['All', 'AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE'].map(status => {
-            const isActive = statusFilter === status;
-            return (
-              <button data-fleet-control
-                key={status}
-                aria-pressed={isActive}
-                onClick={() => setStatusFilter(status)}
-                className="fleet-filter"
-              >
-                {status === 'All' ? 'All' : formatStatus(status)}
-              </button>
-            );
-          })}
-        </div>
+        <Segmented
+          label="Vehicle status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={['All', 'AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE'].map(status => ({
+            value: status,
+            label: status === 'All' ? 'All' : formatStatus(status),
+          }))}
+        />
       </div>
 
       {/* Above the table so it never covers the rows being chosen. */}
@@ -440,7 +429,7 @@ export default function Vehicles() {
                     <span className="fleet-table__id">{v.plate || v.registration || '—'}</span>
                     {lastSeen}
                   </td>
-                  <td className="is-primary" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={vehicleName}>
+                  <td className="is-primary" title={vehicleName}>
                     {vehicleName || '—'}
                   </td>
                   <td>

@@ -6,14 +6,16 @@ import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { SettingsShell } from "./SettingsShell";
 import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
+import { Segmented } from '@/components/ui/Segmented';
+import { StatusChip } from '@/components/ui/StatusChip';
 
 const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle: React.CSSProperties = { ...settingsCardHeaderStyle, justifyContent: 'space-between' };
 const sectionTitleStyle = settingsCardTitleStyle;
 
 const STATUS_COLOR: Record<string, string> = {
-  complete: 'var(--status-success-text, var(--accent-primary))',
-  pending: 'var(--status-warning-text, var(--status-warning))',
+  complete: 'var(--status-success-text)',
+  pending: 'var(--status-warning-text)',
 };
 
 // Presentation-only labels for known status payload values — unknown strings
@@ -97,10 +99,7 @@ function HistoryTable({ title, rows }: { title: string; rows: BillingTransaction
                   {formatRand(tx.amount)}
                 </td>
                 <td>
-                  <span style={{
-                    fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                    color: STATUS_COLOR[tx.status] ?? 'var(--status-danger-text, var(--status-danger))',
-                  }}>{statusDisplay(tx.status)}</span>
+                  <StatusChip tone={tx.status === 'complete' ? 'success' : tx.status === 'pending' ? 'warning' : tx.status === 'refunded' ? 'neutral' : 'danger'} label={statusDisplay(tx.status)} size="sm" />
                 </td>
               </tr>
             ))}
@@ -135,12 +134,12 @@ export default function BillingHistoryPage() {
 
   return (
     <SettingsShell activeId="billing">
-    <div style={{ maxWidth: 960, margin: '0 auto' }}>
+    <div style={{ maxWidth: 960 }}>
       {/* Title block sits at the same y as every other settings section; the
           way back lives beside it instead of pushing the h1 down. */}
       <SettingsPageHeader
         title="Billing history"
-        description="Every charge to your card on file: the monthly plan and the per-delivery platform fee"
+        description="Plan and per-delivery fees charged to your card"
         actions={
           <button type="button" className="settings-control" onClick={() => navigate('/settings/billing')} style={{ ...settingsSecondaryButtonStyle, flexShrink: 0 }}>
             Back to billing
@@ -148,31 +147,8 @@ export default function BillingHistoryPage() {
         }
       />
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-        {PERIODS.map(p => (
-          <button
-            key={p}
-            className="settings-control"
-            onClick={() => setPeriod(p)}
-            aria-pressed={period === p}
-            style={{
-              background: period === p ? 'var(--accent-primary)' : 'var(--bg-surface)',
-              border: '1px solid var(--border-subtle)',
-              color: period === p ? 'var(--btn-action-color, var(--bg-deep))' : 'var(--text-secondary)',
-              padding: '8px 12px',
-              borderRadius: 'var(--radius-control)',
-              minHeight: 40,
-              fontSize: 14,
-              lineHeight: '20px',
-              fontFamily: 'var(--font-sans)',
-              cursor: 'pointer',
-              fontWeight: period === p ? 500 : 400,
-              transition: 'all 0.2s ease',
-            }}
-          >
-            {p}
-          </button>
-        ))}
+      <div style={{ marginBottom: 24, maxWidth: '100%', overflowX: 'auto' }}>
+        <Segmented label="Period" value={period} onChange={setPeriod} options={PERIODS.map(p => ({ value: p, label: p }))} />
       </div>
 
       {loading ? (

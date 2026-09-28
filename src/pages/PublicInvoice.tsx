@@ -1,4 +1,6 @@
 import './public-document.css';
+import { usePublicTheme } from './usePublicTheme';
+import { StatusChip } from '@/components/ui/StatusChip';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Loader } from '@/components/Loader';
@@ -26,6 +28,7 @@ const statusOf = (s?: string) =>
   STATUS[s || ''] || { label: s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : 'Issued', tone: '' as const };
 
 export default function PublicInvoice() {
+  usePublicTheme();
   const { id, token } = useParams<{ id: string; token: string }>();
 
   const { data, isLoading, isError } = useQuery({
@@ -90,7 +93,7 @@ export default function PublicInvoice() {
                     : data.due_date ? `Due ${fmtDate(data.due_date)}` : 'Payment terms as agreed'}
                 </div>
               </div>
-              <span className={`pd-chip${status.tone ? ` pd-chip--${status.tone}` : ''}`}>{status.label}</span>
+              <StatusChip tone={status.tone || 'neutral'} label={status.label} />
             </section>
 
             <section className="pd-section">

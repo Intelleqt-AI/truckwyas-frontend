@@ -1,5 +1,6 @@
 import SectionHeader from '@/components/layout/SectionHeader';
 import './insurance.css';
+import { StatusChip } from '@/components/ui/StatusChip';
 
 /**
  * Insurance is not live. The route stays so the nav item leads somewhere
@@ -11,7 +12,7 @@ export default function Insurance() {
     <div className="insurance-page">
       <SectionHeader
         title="Insurance"
-        titleAdornment={<span className="insurance-chip">Not live yet</span>}
+        titleAdornment={<StatusChip tone="neutral" label="Not live yet" />}
         description="Fleet insurance is not available in TruckWys yet."
       />
 

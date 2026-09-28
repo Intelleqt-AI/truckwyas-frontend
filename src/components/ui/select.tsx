@@ -20,7 +20,7 @@ const SelectTrigger = React.forwardRef<
       justifyContent: "space-between",
       width: "100%",
       background: "var(--input-bg, var(--bg-surface))",
-      border: "1px solid var(--border-subtle)",
+      border: "1px solid var(--border-control)",
       color: "var(--text-primary)",
       padding: "8px 12px",
       minHeight: 40,
@@ -36,7 +36,7 @@ const SelectTrigger = React.forwardRef<
     {...props}
   >
     {children}
-    <ChevronDown size={13} className="tw-select-chevron" style={{ opacity: 0.5, flexShrink: 0, transition: "transform 0.15s" }} />
+    <ChevronDown size={13} className="tw-select-chevron" style={{ color: "var(--text-tertiary)", flexShrink: 0, transition: "transform 0.15s" }} />
   </SelectPrimitive.Trigger>
 ))
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
@@ -52,9 +52,10 @@ const SelectContent = React.forwardRef<
       position={position}
       sideOffset={4}
       style={{
-        background: "var(--bg-surface)",
-        border: "1px solid var(--border-subtle)",
-        /* Menu surface: one boundary (the border), no elevation shadow. */
+        background: "var(--bg-overlay)",
+        border: "1px solid var(--border-overlay)",
+        /* Overlay elevation: one step above the card (border + pop shadow). */
+        boxShadow: "var(--shadow-pop)",
         borderRadius: "var(--radius-control)",
         zIndex: 9999,
         minWidth: "var(--radix-select-trigger-width)",

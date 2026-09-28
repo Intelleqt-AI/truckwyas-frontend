@@ -18,6 +18,9 @@ import { useAuth } from '@/lib/AuthContext';
 import RowActions from '@/components/ui/RowActions';
 import { InfoTip } from '@/components/ui/InfoTip';
 import './ops-tiles.css';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { Segmented } from '@/components/ui/Segmented';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
@@ -61,13 +64,6 @@ interface LeaderboardEntry {
   efficiency_score: number;
   rank: number;
 }
-
-// Status chip tone. Colour always sits next to the status word.
-const STATUS_TONE: Record<string, 'success' | 'warning' | 'neutral'> = {
-  ACTIVE: 'success',
-  INACTIVE: 'neutral',
-  ON_LEAVE: 'warning',
-};
 
 // total_trips is the all-time count of delivered or invoiced loads
 // (DriverSerializer.get_total_trips), so it is not labelled "MTD".
@@ -234,6 +230,8 @@ export default function Drivers() {
   const withExpiry = drivers.filter(d => d.license_expiry).map(d => ({ d, t: new Date(d.license_expiry as string).getTime() }));
   const expired = withExpiry.filter(x => x.t < now);
   const nextRenewal = withExpiry.filter(x => x.t >= now).sort((a, b) => a.t - b.t)[0];
+  // Renewals due in the next 90 days: a count the owner can act on (a date is not a KPI).
+  const renewSoon = withExpiry.filter(x => x.t >= now && x.t - now <= 90 * DAY_MS).length;
   // Score and revenue columns only appear once the driver stats job has
   // produced them; a column of dashes answers nothing.
   const hasEfficiency = drivers.some(d => (d.efficiency_score || 0) > 0);
@@ -265,34 +263,37 @@ export default function Drivers() {
       {/* Driver summary: separate tiles, same geometry as Vehicles so
           switching tabs never moves the page. Hidden when there are no drivers. */}
       {!failed && (loading || drivers.length > 0) && (
-        <section className="ops-tiles" aria-label="Driver summary" aria-busy={loading}>
-          <div className="ops-tile">
-            <h2 className="ops-tile__label">Active drivers</h2>
-            <div className="ops-tile__value">{loading ? '—' : activeCount}{!loading && <span className="ops-tile__of">of {overview?.total_drivers ?? drivers.length}</span>}</div>
-            <div className="ops-tile__sub">{loading ? 'Loading' : availabilityNote ? availabilityNote.replace(/^./, c => c.toUpperCase()) : 'Everyone is active'}</div>
-          </div>
-          <div className="ops-tile">
-            <h2 className="ops-tile__label">
-              Completed loads
-              <InfoTip>Loads delivered or invoiced, all time.</InfoTip>
-            </h2>
-            <div className="ops-tile__value">{loading ? '—' : completedLoads}</div>
-            <div className="ops-tile__sub">{loading ? 'Loading' : 'All time'}</div>
-          </div>
-          <div className="ops-tile">
-            <h2 className="ops-tile__label">{expired.length > 0 ? 'Expired licences' : 'Next licence renewal'}</h2>
-            <div className={`ops-tile__value${expired.length > 0 ? ' is-attention' : ''}`}>
-              {loading ? '—' : expired.length > 0 ? expired.length : nextRenewal ? formatDay(nextRenewal.d.license_expiry) : '—'}
-            </div>
-            {(() => {
-              const sub = loading ? 'Loading'
-                : expired.length > 0 ? `${expired.slice(0, 2).map(x => getDriverName(x.d)).join(', ')}${expired.length > 2 ? ` and ${expired.length - 2} more` : ''}`
-                : nextRenewal ? `${getDriverName(nextRenewal.d)}, in ${Math.ceil((nextRenewal.t - now) / DAY_MS)} days`
-                : 'No expiry dates recorded';
-              return <div className="ops-tile__sub" title={sub}>{sub}</div>;
-            })()}
-          </div>
-        </section>
+        <KpiRow className="fleet-kpis">
+          <KpiTile
+            aria-label="Active drivers"
+            label="Active drivers"
+            figure={loading ? '—' : <>{activeCount}<span className="tw-kpi__of"> of {overview?.total_drivers ?? drivers.length}</span></>}
+            note={loading ? 'Loading' : availabilityNote ? availabilityNote.replace(/^./, c => c.toUpperCase()) : 'Everyone is active'}
+          />
+          <KpiTile
+            aria-label="Completed loads"
+            label="Completed loads"
+            aside={<InfoTip>Loads delivered or invoiced, all time.</InfoTip>}
+            figure={loading ? '—' : completedLoads}
+            note={loading ? 'Loading' : 'All time'}
+          />
+          {(() => {
+            const hasExpired = expired.length > 0;
+            const note = loading ? 'Loading'
+              : hasExpired ? `${expired.slice(0, 2).map(x => getDriverName(x.d)).join(', ')}${expired.length > 2 ? ` and ${expired.length - 2} more` : ''}`
+              : nextRenewal ? `Next: ${getDriverName(nextRenewal.d)}, in ${Math.ceil((nextRenewal.t - now) / DAY_MS)} days`
+              : 'No expiry dates recorded';
+            return (
+              <KpiTile
+                aria-label={hasExpired ? 'Expired licences' : 'Licence renewals'}
+                label={hasExpired ? 'Expired licences' : 'Renewals in 90 days'}
+                figure={loading ? '—' : hasExpired ? expired.length : renewSoon}
+                note={note}
+                tone={hasExpired ? 'danger' : 'neutral'}
+              />
+            );
+          })()}
+        </KpiRow>
       )}
 
       {/* Search + status filter toolbar */}
@@ -305,21 +306,15 @@ export default function Drivers() {
           onChange={e => setSearch(e.target.value)}
           className="fleet-search"
         />
-        <div className="fleet-filters">
-          {['All', 'ACTIVE', 'INACTIVE', 'ON_LEAVE'].map(status => {
-            const isActive = statusFilter === status;
-            return (
-              <button data-fleet-control
-                key={status}
-                aria-pressed={isActive}
-                onClick={() => setStatusFilter(status)}
-                className="fleet-filter"
-              >
-                {status === 'All' ? 'All' : formatStatus(status)}
-              </button>
-            );
-          })}
-        </div>
+        <Segmented
+          label="Driver status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={['All', 'ACTIVE', 'INACTIVE', 'ON_LEAVE'].map(status => ({
+            value: status,
+            label: status === 'All' ? 'All' : formatStatus(status),
+          }))}
+        />
       </div>
 
       {/* Table */}
@@ -396,11 +391,11 @@ export default function Drivers() {
                   <td>
                     <span className="fleet-table__id">{d.license_number || '—'}</span>
                   </td>
-                  <td style={{ color: isExpired ? 'var(--status-danger-text, var(--status-danger))' : undefined }}>
+                  <td style={{ color: isExpired ? 'var(--status-danger-text)' : undefined }}>
                     {formatDay(d.license_expiry)}{isExpired ? ', expired' : ''}
                   </td>
                   <td>
-                    <span className={`fleet-chip fleet-chip--${STATUS_TONE[d.status] || 'neutral'}`}>{formatStatus(d.status)}</span>
+                    <StatusChip status={d.status} size="sm" />
                   </td>
                   <td className="is-numeric">
                     {d.total_trips ?? 0}
@@ -493,7 +488,7 @@ export default function Drivers() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text)' }}> *</span>}
                 </label>
                 {f.type === 'date' ? (
                   <DatePicker
@@ -516,7 +511,7 @@ export default function Drivers() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text)' }}> *</span>}
                 </label>
                 <Select value={(addForm as any)[f.key]} onValueChange={val => setAddForm(prev => ({ ...prev, [f.key]: val }))}>
                   <SelectTrigger>
@@ -600,7 +595,7 @@ export default function Drivers() {
                   } catch (e: any) { toast.error(e?.message || 'Failed to create driver'); }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control, 8px)', cursor: saving ? 'wait' : canCreate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canCreate ? 1 : 0.5 }}
+                style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control, 8px)', cursor: saving ? 'wait' : canCreate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canCreate ? 1 : 0.5 }}
               >
                 {saving ? 'Saving…' : 'Create driver'}
               </button>
@@ -627,7 +622,7 @@ export default function Drivers() {
               <button onClick={() => setEditDriver(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {error && (
-              <div style={{ padding: 12, background: 'var(--status-danger-bg)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-control, 8px)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
+              <div style={{ padding: 12, background: 'var(--status-danger-bg)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-control, 8px)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
                 {error}
               </div>
             )}
@@ -642,7 +637,7 @@ export default function Drivers() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text)' }}> *</span>}
                 </label>
                 {f.type === 'date' ? (
                   <DatePicker
@@ -665,7 +660,7 @@ export default function Drivers() {
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 6 }}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text)' }}> *</span>}
                 </label>
                 <Select value={(editForm as any)[f.key]} onValueChange={val => setEditForm((prev: any) => ({ ...prev, [f.key]: val }))}>
                   <SelectTrigger>
@@ -778,7 +773,7 @@ export default function Drivers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control, 8px)', cursor: saving ? 'wait' : canUpdate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canUpdate ? 1 : 0.5 }}
+                style={{ flex: 1, padding: '8px 16px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control, 8px)', cursor: saving ? 'wait' : canUpdate ? 'pointer' : 'not-allowed', fontWeight: 500, opacity: canUpdate ? 1 : 0.5 }}
               >
                 {saving ? 'Saving…' : 'Update driver'}
               </button>

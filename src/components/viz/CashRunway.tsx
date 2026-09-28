@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Legend, TableTwin, Tip, TipRow, VIZ, linear, localPoint, niceTicks, rand, randCompact, useTip, useWidth } from './core';
+import { HatchDef, Legend, TableTwin, Tip, TipRow, VIZ, useSvgId, linear, localPoint, niceTicks, rand, randCompact, useTip, useWidth } from './core';
 
 /**
  * "Will I run short of cash?" One rand axis. Weekly money expected in rises
@@ -14,6 +14,7 @@ export interface RunwayWeek { label: string; in: number; out: number }
 
 export function CashRunway({ weeks, height = 260 }: { weeks: RunwayWeek[]; height?: number }) {
   const [ref, W] = useWidth<HTMLDivElement>(720);
+  const hatchId = useSvgId('runway-hatch');
   const svgRef = useRef<SVGSVGElement>(null);
   const figRef = useRef<HTMLDivElement>(null);
   const { tip, show, hide } = useTip();
@@ -61,7 +62,7 @@ export function CashRunway({ weeks, height = 260 }: { weeks: RunwayWeek[]; heigh
     <div className="viz" ref={figRef}>
       <Legend items={[
         { label: 'Running position', color: VIZ.accent, shape: 'line' },
-        { label: 'Expected in', color: VIZ.neutral, shape: 'rect' },
+        { label: 'Expected in', shape: 'hatch' },
         { label: 'Expected out', color: VIZ.warm, shape: 'rect' },
         ...(shortCount > 0 ? [{ label: 'Short of cash', shape: 'wash' as const }] : []),
       ]} />
@@ -77,6 +78,8 @@ export function CashRunway({ weeks, height = 260 }: { weeks: RunwayWeek[]; heigh
             if (e.key === 'ArrowLeft') { e.preventDefault(); tipAt(Math.max(0, i - 1)); }
             if (e.key === 'Escape') hide();
           }}>
+          <HatchDef id={hatchId} />
+          {hoverIdx != null && <rect className="viz-hover-band" x={axisW + band * hoverIdx} y={padT} width={band} height={height - padT - padB} />}
           {/* Shortfall weeks: a warm wash the full plot height, named once. */}
           {rows.map((r, i) => r.pos < 0 && (
             <rect key={`s${i}`} x={axisW + band * i} y={padT} width={band} height={height - padT - padB} fill="var(--viz-wash-warm)" />
@@ -93,10 +96,9 @@ export function CashRunway({ weeks, height = 260 }: { weeks: RunwayWeek[]; heigh
             const rr = Math.min(4, bw / 2);
             const hIn = y(0) - y(r.in);
             const hOut = y(-r.out) - y(0);
-            const dim = hoverIdx != null && hoverIdx !== i;
             return (
-              <g key={r.label + i} opacity={dim ? 0.5 : 1}>
-                {hIn >= 1 && <path d={`M${x},${y(0) - 1} V${y(r.in) + Math.min(rr, hIn / 2)} Q${x},${y(r.in)} ${x + rr},${y(r.in)} H${x + bw - rr} Q${x + bw},${y(r.in)} ${x + bw},${y(r.in) + Math.min(rr, hIn / 2)} V${y(0) - 1} Z`} fill={VIZ.neutral} />}
+              <g key={r.label + i}>
+                {hIn >= 1 && <path d={`M${x},${y(0) - 1} V${y(r.in) + Math.min(rr, hIn / 2)} Q${x},${y(r.in)} ${x + rr},${y(r.in)} H${x + bw - rr} Q${x + bw},${y(r.in)} ${x + bw},${y(r.in) + Math.min(rr, hIn / 2)} V${y(0) - 1} Z`} fill={`url(#${hatchId})`} stroke={VIZ.hatch} strokeWidth={1} />}
                 {hOut >= 1 && <path d={`M${x},${y(0) + 1} V${y(-r.out) - Math.min(rr, hOut / 2)} Q${x},${y(-r.out)} ${x + rr},${y(-r.out)} H${x + bw - rr} Q${x + bw},${y(-r.out)} ${x + bw},${y(-r.out) - Math.min(rr, hOut / 2)} V${y(0) + 1} Z`} fill={VIZ.warm} />}
                 {i % labelEvery === 0 && <text x={cx(i)} y={height - 8} textAnchor="middle">{r.label}</text>}
               </g>

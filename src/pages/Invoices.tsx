@@ -11,7 +11,10 @@ import { Loader } from "@/components/Loader";
 import SectionHeader, { FINANCE_TABS } from "@/components/layout/SectionHeader";
 import RowActions from "@/components/ui/RowActions";
 import { InfoTip } from "@/components/ui/InfoTip";
-import { FinTile, FinTiles, wholeRand } from "@/components/finance/FinTile";
+import { wholeRand } from "@/components/finance/FinTile";
+import { KpiRow, KpiTile } from "@/components/ui/KpiTile";
+import { Segmented } from "@/components/ui/Segmented";
+import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
 import LoadError, { loadFailed } from "@/components/data/LoadError";
 import InvoiceSendPreview, { type InvoiceMessageKind } from "@/components/finance/InvoiceSendPreview";
 import { canSendReminder, invoiceBalance, isInvoiceOverdue } from "@/lib/invoiceStatus";
@@ -35,25 +38,14 @@ function saveAppliedId(id: string, current: Set<string>): Set<string> {
   return next;
 }
 
-type Tone = "success" | "warning" | "danger" | "info" | "neutral";
-
-const STATUS_TONE: Record<string, Tone> = {
-  PAID: "success",
-  SENT: "info",
-  PARTIALLY_PAID: "warning",
-  OVERDUE: "danger",
-  DRAFT: "neutral",
-};
-
-const TIER_TONE: Record<string, Tone> = {
+// Invoice statuses use the product-wide StatusChip map (Sent is info
+// everywhere). Fast Pay risk tiers keep their own tone.
+const TIER_TONE: Record<string, StatusTone> = {
   prime: "success",
   standard: "info",
   elevated: "warning",
   high: "danger",
 };
-
-const chipClass = (tone: Tone, outline = false) =>
-  `fin-chip${tone === "neutral" ? "" : ` fin-chip--${tone}`}${outline ? " fin-chip--outline" : ""}`;
 
 // Sentence-case a status/token for display: "PARTIALLY_PAID" → "Partially paid".
 const formatStatus = (s?: string) =>
@@ -228,13 +220,15 @@ export default function Invoices() {
   // Never fall back to mock data — show empty state if API returns nothing
   const allInvoices = invoices;
 
+  // "Overdue" uses the one shared definition (unpaid, sent, past due),
+  // whatever the status string says, so it matches the Overdue tile.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const statusMatches = (inv: any, status: string) =>
+    status === "All" ||
+    (status === "OVERDUE" ? isInvoiceOverdue(inv) : inv.status?.toUpperCase() === status);
+
   const filtered = allInvoices.filter((inv) => {
-    const invStatus = inv.status?.toUpperCase();
-    // "Overdue" uses the one shared definition (unpaid, sent, past due),
-    // whatever the status string says, so it matches the Overdue tile.
-    const matchStatus =
-      statusFilter === "All" ||
-      (statusFilter === "OVERDUE" ? isInvoiceOverdue(inv) : invStatus === statusFilter);
+    const matchStatus = statusMatches(inv, statusFilter);
     const invNumber = inv.invoice_number || inv.invoiceNumber || "";
     const custName = inv.customer_name || inv.customerName || "";
     const matchSearch =
@@ -360,54 +354,52 @@ export default function Invoices() {
           </div>
         </div>
       ) : (
-        <FinTiles label="Invoice figures">
-          {monthActive ? (
+        // The standard tile: only figures that drive a decision, never a dash.
+        (monthActive || overdueCount > 0 || avgDays != null) && (
+        <KpiRow className="fin-kpi-row">
+          {monthActive && (
             <>
-              <FinTile
+              <KpiTile
                 label={`Invoiced in ${monthName}`}
-                info={`Invoice totals incl. VAT, by issue date since the 1st. Covers all invoices.${invoicedLastMonth == null ? "" : ` Change compares ${lastMonthName}.`}`}
-                value={wholeRand(invoicedMtd)}
-                valueTitle={formatCurrency(invoicedMtd)}
-                sub={invoicedDelta ?? "By issue date"}
+                aside={<InfoTip>{`Invoice totals incl. VAT, by issue date since the 1st. Covers all invoices.${invoicedLastMonth == null ? "" : ` Change compares ${lastMonthName}.`}`}</InfoTip>}
+                figure={<span title={formatCurrency(invoicedMtd)}>{wholeRand(invoicedMtd)}</span>}
+                note={invoicedDelta ?? "By issue date"}
               />
-              <FinTile
+              <KpiTile
                 label="Collected"
-                info={`Paid amount of invoices issued in ${monthName}. Covers all invoices.`}
-                value={wholeRand(collectedMtd)}
-                valueTitle={formatCurrency(collectedMtd)}
-                sub={invoicedMtd > 0 ? `${Math.round((stats.collection_rate ?? 0) * 100)}% of ${monthName} invoiced` : `On ${monthName} invoices`}
+                aside={<InfoTip>{`Paid amount of invoices issued in ${monthName}. Covers all invoices.`}</InfoTip>}
+                figure={<span title={formatCurrency(collectedMtd)}>{wholeRand(collectedMtd)}</span>}
+                note={invoicedMtd > 0 ? `${Math.round((stats.collection_rate ?? 0) * 100)}% of ${monthName} invoiced` : `On ${monthName} invoices`}
               />
             </>
-          ) : (
-            <FinTile
-              label={`Invoiced in ${monthName}`}
-              info="Invoice totals incl. VAT, by issue date since the 1st. Covers all invoices."
-              value="None yet"
-              small
-              sub={draftCount > 0 ? `${draftCount} ${draftCount === 1 ? "draft" : "drafts"} ready` : "By issue date"}
-              action={draftCount > 0 ? { label: "Review drafts", onClick: () => showStatus("DRAFT") } : undefined}
+          )}
+          {overdueCount > 0 && (
+            <KpiTile
+              label="Overdue"
+              aside={
+                <InfoTip>
+                  {overdueFromList
+                    ? "Unpaid balance incl. VAT on sent invoices past their due date, including part-paid ones. Covers all invoices. Select to show them."
+                    : "Unpaid balance incl. VAT on invoices past their due date, from the server's count of all invoices. Select to show them."}
+                </InfoTip>
+              }
+              figure={<span title={formatCurrency(overdueAmount)}>{wholeRand(overdueAmount)}</span>}
+              note={`${overdueCount} ${overdueCount === 1 ? "invoice" : "invoices"} late`}
+              tone="danger"
+              onClick={statusFilter !== "OVERDUE" ? () => showStatus("OVERDUE") : undefined}
+              aria-label={`Overdue: ${formatCurrency(overdueAmount)}, ${overdueCount} late. Show overdue invoices`}
             />
           )}
-          <FinTile
-            label="Overdue"
-            info={
-              overdueFromList
-                ? "Unpaid balance incl. VAT on sent invoices past their due date, including part-paid ones. Covers all invoices."
-                : "Unpaid balance incl. VAT on invoices past their due date, from the server's count of all invoices."
-            }
-            value={wholeRand(overdueAmount)}
-            valueTitle={formatCurrency(overdueAmount)}
-            sub={overdueCount > 0 ? `${overdueCount} ${overdueCount === 1 ? "invoice" : "invoices"} late` : "None late"}
-            subTone={overdueCount > 0 ? "danger" : undefined}
-            action={overdueCount > 0 && statusFilter !== "OVERDUE" ? { label: "Show", onClick: () => showStatus("OVERDUE") } : undefined}
-          />
-          <FinTile
-            label="Time to get paid"
-            info="Average from issue date to payment date, across all paid invoices."
-            value={avgDays == null ? "—" : <>{avgDays}<span className="fin-tile__unit">days</span></>}
-            sub={avgDays == null ? "After the first payment" : `Average, ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}`}
-          />
-        </FinTiles>
+          {avgDays != null && (
+            <KpiTile
+              label="Time to get paid"
+              aside={<InfoTip>Average from issue date to payment date, across all paid invoices.</InfoTip>}
+              figure={<>{avgDays}<span className="fin-tile__unit">days</span></>}
+              note={`Average, ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}`}
+            />
+          )}
+        </KpiRow>
+        )
       )}
 
       {/* Filters */}
@@ -423,21 +415,18 @@ export default function Invoices() {
             setPage(1);
           }}
         />
-        <div className="fin-toolbar__group" role="group" aria-label="Filter by status">
-          {STATUSES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className="fin-chip-filter"
-              aria-pressed={statusFilter === s}
-              onClick={() => {
-                setStatusFilter(s);
-                setPage(1);
-              }}>
-              {s === "All" ? "All" : formatStatus(s)}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label="Filter by status"
+          className="fin-seg"
+          value={statusFilter}
+          onChange={showStatus}
+          options={STATUSES.map((s) => ({
+            value: s,
+            label: s === "All" ? "All" : formatStatus(s),
+            // Counts over the loaded list, with the same rules as the filter.
+            count: loading ? undefined : allInvoices.filter((inv) => statusMatches(inv, s)).length,
+          }))}
+        />
         <span className="fin-toolbar__count">
           {filtered.length} {filtered.length === 1 ? "invoice" : "invoices"}
           {!loading && truncated && (
@@ -458,7 +447,7 @@ export default function Invoices() {
           <table className="fin-table fin-table--stack table-heading-roles">
             <thead>
               <tr>
-                <th>Customer</th>
+                <th className="fin-cell-fill">Customer</th>
                 <th>Issued</th>
                 <th>Due</th>
                 <th>Status</th>
@@ -522,8 +511,8 @@ export default function Invoices() {
                       className="is-clickable"
                       {...rowLink(() => navigate(`/finance/invoices/${inv.id}`))}
                       onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
-                      <td className="fin-strong m-party m-span2 fin-cell-2">
-                        <div className="fin-truncate" title={custName}>
+                      <td className="fin-strong m-party m-span2 fin-cell-2 fin-cell-fill">
+                        <div className="fin-truncate fin-truncate--fill" title={custName}>
                           {custName}
                         </div>
                         <span className="fin-cell-sub">
@@ -540,15 +529,14 @@ export default function Invoices() {
                       </td>
                       <td className="m-status">
                         <span className="fin-inline-list" style={{ flexWrap: "nowrap" }}>
-                          <span className={chipClass(STATUS_TONE[invStatus] ?? "neutral")}>
-                            {formatStatus(invStatus)}
-                          </span>
+                          <StatusChip status={invStatus} size="sm" />
                           {capitalEntry && tier && (
-                            <span
-                              className={chipClass(TIER_TONE[tier] ?? "neutral", true)}
-                              title="Fast Pay risk tier">
-                              {formatStatus(tier)}
-                            </span>
+                            <StatusChip
+                              tone={TIER_TONE[tier] ?? "neutral"}
+                              label={formatStatus(tier)}
+                              size="sm"
+                              title="Fast Pay risk tier"
+                            />
                           )}
                         </span>
                       </td>

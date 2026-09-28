@@ -35,7 +35,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'home',
     items: [
-      { id: 'today', key: '/', label: 'Today', to: '/', match: [], icon: House },
+      { id: 'today', key: '/', label: 'Home', to: '/', match: [], icon: House },
     ],
   },
   {

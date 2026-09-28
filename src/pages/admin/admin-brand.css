@@ -59,3 +59,26 @@ table.admin-table .num { text-align: right !important; font-variant-numeric: tab
   .tw-admin-shell .admin-nav-link { white-space: nowrap; flex-shrink: 0; margin: 0 !important; }
   .tw-admin-shell > .tw-admin-shell__content { padding: 0 0 24px !important; }
 }
+
+/* Platform health: job table beside a narrower integrations rail. minmax(0, …)
+   stops the table's min-content width from pushing the rail off-screen; both
+   cards keep their own height (no stretched, empty rail). */
+.admin-health-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.admin-health-grid > * { min-width: 0; }
+@media (max-width: 1100px) {
+  .admin-health-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Demo account facts: label over value in one card (dates are not KPIs). */
+.admin-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 16px 24px;
+  margin: 0; padding: 20px;
+}
+.admin-facts dt { display: inline-flex; align-items: center; gap: 4px; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.admin-facts dd { margin: 6px 0 0; font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.admin-facts dd.admin-facts__figure { font: 600 28px/34px var(--font-sans); letter-spacing: var(--tracking-figure, -0.03em); }

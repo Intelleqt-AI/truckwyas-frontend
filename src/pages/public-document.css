@@ -6,25 +6,30 @@
    link keeps the app theme (index.html sets html[data-theme] from tw-theme).
    Print is always light. */
 .pd {
-  --pd-page: #F3F4F6;
-  --pd-surface: #FFFFFF;
-  --pd-sunken: #F9FAFB;
-  --pd-border: #E5E7EB;
-  --pd-row: #EEF0F3;
-  --pd-text: #111827;
-  --pd-muted: #4B5563;
-  --pd-faint: #6B7280;
-  --pd-accent: #2563EB;
-  --pd-on-accent: #FFFFFF;
-  --pd-success-text: #166534;
-  --pd-success-bg: #F0FDF4;
-  --pd-warning-text: #92400E;
-  --pd-warning-bg: #FFFBEB;
-  --pd-danger-text: #B91C1C;
-  --pd-danger-bg: #FEF2F2;
-  --pd-neutral-bg: #F3F4F6;
-  --pd-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --pd-mono: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, monospace;
+  /* Document roles mapped onto the app's theme tokens. The page sets
+     html[data-theme] from the viewer's OS when the app has not (see
+     usePublicTheme), so light and dark both resolve through theme.css. */
+  --pd-page: var(--bg-deep);
+  --pd-surface: var(--bg-surface);
+  --pd-sunken: var(--bg-surface-hover);
+  --pd-border: var(--border-subtle);
+  --pd-row: var(--border-row);
+  --pd-text: var(--text-primary);
+  --pd-muted: var(--text-secondary);
+  --pd-faint: var(--text-tertiary);
+  --pd-accent: var(--accent-primary);
+  --pd-btn-bg: var(--btn-primary-bg);
+  --pd-btn-hover: var(--btn-primary-hover);
+  --pd-on-accent: var(--btn-primary-fg);
+  --pd-success-text: var(--status-success-text);
+  --pd-success-bg: var(--status-success-bg);
+  --pd-warning-text: var(--status-warning-text);
+  --pd-warning-bg: var(--status-warning-bg);
+  --pd-danger-text: var(--status-danger-text);
+  --pd-danger-bg: var(--status-danger-bg);
+  --pd-neutral-bg: var(--bg-raised);
+  --pd-sans: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif);
+  --pd-mono: var(--font-mono, ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, monospace);
 
   position: fixed;
   inset: 0;
@@ -36,46 +41,6 @@
   font-size: 14px;
   line-height: 20px;
   -webkit-font-smoothing: antialiased;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .pd {
-    --pd-page: #060709;
-    --pd-surface: #101215;
-    --pd-sunken: #0B0D10;
-    --pd-border: #2A2E34;
-    --pd-row: #1E2126;
-    --pd-text: #EDEDED;
-    --pd-muted: #9AA1A9;
-    --pd-faint: #8A8F98;
-    --pd-accent: #4D9EFF;
-    --pd-on-accent: #060709;
-    --pd-success-text: #86EFAC;
-    --pd-success-bg: rgba(34, 197, 94, 0.12);
-    --pd-warning-text: #FCD34D;
-    --pd-warning-bg: rgba(245, 158, 11, 0.12);
-    --pd-danger-text: #FCA5A5;
-    --pd-danger-bg: rgba(255, 73, 73, 0.12);
-    --pd-neutral-bg: #1B1E23;
-  }
-}
-:root[data-theme="dark"] .pd {
-  --pd-page: #060709;
-  --pd-surface: #101215;
-  --pd-sunken: #0B0D10;
-  --pd-border: #2A2E34;
-  --pd-row: #1E2126;
-  --pd-text: #EDEDED;
-  --pd-muted: #9AA1A9;
-  --pd-faint: #8A8F98;
-  --pd-accent: #4D9EFF;
-  --pd-on-accent: #060709;
-  --pd-success-text: #86EFAC;
-  --pd-success-bg: rgba(34, 197, 94, 0.12);
-  --pd-warning-text: #FCD34D;
-  --pd-warning-bg: rgba(245, 158, 11, 0.12);
-  --pd-danger-text: #FCA5A5;
-  --pd-danger-bg: rgba(255, 73, 73, 0.12);
-  --pd-neutral-bg: #1B1E23;
 }
 
 .pd-page { max-width: 720px; margin: 0 auto; padding: 40px 24px 64px; }
@@ -183,8 +148,8 @@
 }
 .pd-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .pd-btn:focus-visible { outline: 2px solid var(--pd-accent); outline-offset: 3px; }
-.pd-btn--primary { background: var(--pd-accent); color: var(--pd-on-accent); }
-.pd-btn--primary:hover:not(:disabled) { filter: brightness(1.06); }
+.pd-btn--primary { background: var(--pd-btn-bg); color: var(--pd-on-accent); }
+.pd-btn--primary:hover:not(:disabled) { background: var(--pd-btn-hover); }
 .pd-btn--secondary { background: var(--pd-surface); border-color: var(--pd-border); color: var(--pd-text); }
 .pd-btn--secondary:hover:not(:disabled) { background: var(--pd-sunken); }
 
@@ -211,12 +176,13 @@
 }
 
 @media print {
+  /* Print is always light: the document's light roles, whatever the screen theme. */
   .pd {
     position: static; overflow: visible;
-    --pd-page: #FFFFFF; --pd-surface: #FFFFFF; --pd-sunken: #F9FAFB; --pd-border: #E5E7EB; --pd-row: #EEF0F3;
-    --pd-text: #111827; --pd-muted: #4B5563; --pd-faint: #6B7280; --pd-accent: #2563EB;
-    --pd-success-text: #166534; --pd-success-bg: #F0FDF4; --pd-warning-text: #92400E; --pd-warning-bg: #FFFBEB;
-    --pd-danger-text: #B91C1C; --pd-danger-bg: #FEF2F2; --pd-neutral-bg: #F3F4F6;
+    --pd-page: #FFFFFF; --pd-surface: #FFFFFF; --pd-sunken: #F8F9FA; --pd-border: #E4E6EA; --pd-row: #EEF0F2;
+    --pd-text: #0E1116; --pd-muted: #434A55; --pd-faint: #636A75; --pd-accent: #2563EB;
+    --pd-success-text: #137A3A; --pd-success-bg: #ECFDF3; --pd-warning-text: #A84C08; --pd-warning-bg: #FFF7E6;
+    --pd-danger-text: #C81E1E; --pd-danger-bg: #FEF2F2; --pd-neutral-bg: #EEF0F3;
   }
   .pd-page { padding: 0; max-width: none; }
   .pd-doc { border: none; }

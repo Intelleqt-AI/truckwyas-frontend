@@ -102,12 +102,12 @@ export const EmailVerification = () => {
       </div>
 
       {error && (
-        <div role="alert" style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
+        <div role="alert" style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>
           {error}
         </div>
       )}
       {resentMsg && (
-        <div role="status" style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--status-success-bg, rgba(34,197,94,0.1))', border: '1px solid var(--status-success)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--status-success-text, var(--status-success))' }}>
+        <div role="status" style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--status-success-bg, rgba(34,197,94,0.1))', border: '1px solid var(--status-success)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--status-success-text)' }}>
           {resentMsg}
         </div>
       )}
@@ -143,7 +143,7 @@ export const EmailVerification = () => {
 
       <div style={{ marginTop: 20, textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
         Didn't receive the code?{' '}
-        <button onClick={handleResend} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: 13, lineHeight: '20px', padding: 0, fontFamily: 'var(--font-sans)' }}>
+        <button onClick={handleResend} style={{ background: 'none', border: 'none', color: 'var(--link)', cursor: 'pointer', fontSize: 13, lineHeight: '20px', padding: 0, fontFamily: 'var(--font-sans)' }}>
           Resend code
         </button>
       </div>
@@ -191,8 +191,8 @@ export const EmailVerification = () => {
           <div key={step.label} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <div style={{
               flex: 'none', width: 22, height: 22, borderRadius: '50%',
-              border: `1px solid ${i <= 1 ? 'var(--accent-primary)' : 'var(--border-active)'}`,
-              color: i <= 1 ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+              border: `1px solid ${i <= 1 ? 'var(--text-primary)' : 'var(--border-active)'}`,
+              color: i <= 1 ? 'var(--text-primary)' : 'var(--text-tertiary)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 600, marginTop: 1, fontVariantNumeric: 'tabular-nums',
             }}>
@@ -209,7 +209,7 @@ export const EmailVerification = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px 16px' }}>
         {PLAN_FEATURES.map(f => (
           <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-            <Check size={16} aria-hidden="true" style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: 2 }} />
+            <Check size={16} aria-hidden="true" style={{ color: 'var(--text-primary)', flexShrink: 0, marginTop: 2 }} />
             {f}
           </div>
         ))}
@@ -225,7 +225,7 @@ export const EmailVerification = () => {
     return (
       <MobileAuthLayout
         eyebrow="Step 2 of 3"
-        title={<>Almost there. <span style={{ color: 'var(--accent-primary)' }}>Just confirm it's you</span>.</>}
+        title={<>Almost there. <span style={{ color: 'var(--text-tertiary)' }}>Just confirm it's you</span>.</>}
         footer={extraContent}
       >
         <div style={{ width: '100%', maxWidth: 420, padding: 24, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-card)', boxSizing: 'border-box' }}>
@@ -268,11 +268,11 @@ export const EmailVerification = () => {
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
           <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
 
-          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-info-text, var(--accent-primary))', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-info-text)', marginBottom: 10 }}>
             Step 2 of 3
           </div>
           <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', marginBottom: 28 }}>
-            Almost there. <span style={{ color: 'var(--accent-primary)' }}>Just confirm it's you</span>.
+            Almost there. <span style={{ color: 'var(--text-tertiary)' }}>Just confirm it's you</span>.
           </div>
 
           {extraContent}

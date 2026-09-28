@@ -11,6 +11,7 @@ import {
 } from '@/components/fleet-detail/parts';
 import { MonthlyBars } from '@/components/fleet-detail/MonthlyBars';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
+import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
@@ -41,6 +42,7 @@ export default function VehicleFinancialProfile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(false);
+  const railRef = useStickyRail<HTMLElement>();
   const [showEditForm, setShowEditForm] = useState(false);
   useFocusTrap(latestModal, showEditForm);
   const [editForm, setEditForm] = useState<any>({});
@@ -177,6 +179,8 @@ export default function VehicleFinancialProfile() {
   const title = vehicle.plate || vehicle.registration || `Vehicle ${id}`;
   const score = (v: any) => (Number(v) ? `${v}` : null);
   const regDays = daysUntil(vehicle.registration_expiry);
+  const hasDelivered = delivered.length > 0;
+  const wideLayout = !hasDelivered || loads.length < 6;
 
   return (
     <div className="fleet-detail">
@@ -184,7 +188,7 @@ export default function VehicleFinancialProfile() {
         crumb="Vehicles"
         crumbTo="/fleet/vehicles"
         title={title}
-        chip={<StatusChip tone={STATUS_TONE[vehicle.status] || 'neutral'}>{formatStatus(vehicle.status)}</StatusChip>}
+        chip={<StatusChip status={vehicle.status} />}
         meta={meta || undefined}
         actions={<>
           <StatusControl label="Set vehicle status" options={VEHICLE_STATUSES} current={vehicle.status} busy={updating} onPick={setStatus} />
@@ -192,6 +196,7 @@ export default function VehicleFinancialProfile() {
         </>}
       />
 
+      {hasDelivered ? (
       <KpiStrip label="Truck economics">
         <Kpi
           label="Revenue"
@@ -199,7 +204,6 @@ export default function VehicleFinancialProfile() {
           empty="No delivered loads"
           sub={delivered.length > 0 ? <>{randWhole(avgRevPerTrip)} per load</> : undefined}
           info={<>Delivered loads on this truck{partial ? `, latest ${loads.length} of ${loadsTotal}` : ''}. Invoiced and in-progress loads are not counted.</>}
-          spark={delivered.length > 0 ? { values: months.map(m => m.revenue), labels: monthLabels, format: randWhole, ariaLabel: 'Delivered revenue by month, last 12 months' } : undefined}
         />
         <Kpi
           label="Cost per km"
@@ -224,9 +228,20 @@ export default function VehicleFinancialProfile() {
           sub={<>of {plural(loads.length, 'load')}{partial ? ` (latest of ${loadsTotal})` : ''}</>}
         />
       </KpiStrip>
+      ) : (
+        <section className="fd-panel fd-empty-line" aria-label="Truck economics">
+          <p className="fd-empty-line__text">No delivered loads yet. Assign {title} to a load to see what it earns.</p>
+          <button type="button" className="fd-button" onClick={() => navigate('/bookings/orders')}>Open orders</button>
+        </section>
+      )}
 
-      <div className="fd-body">
+      {/* Few loads: one column, with Details laid out across the width, so the
+          two columns never end hundreds of pixels apart. Otherwise the side
+          rail is sticky beside the longer main column. */}
+      <div className={`fd-body${wideLayout ? ' fd-body--wide' : ''}`}>
+        {(hasDelivered || loads.length > 0) && (
         <div className="fd-main">
+          {hasDelivered && (
           <Panel
             title="Revenue by month"
             sub="Delivered loads, last 12 months"
@@ -243,13 +258,17 @@ export default function VehicleFinancialProfile() {
               { label: 'Fuel use', value: lPerKm ? `${lPerKm.toFixed(2)} L/km` : null, note: defaultFuel ? <Tag>Default</Tag> : undefined },
             ]} />
           </Panel>
+          )}
 
-          <Panel title="Recent loads" sub={loads.length ? plural(loadsTotal, 'load') : undefined} flush>
+          {loads.length > 0 && (
+          <Panel title="Recent loads" sub={plural(loadsTotal, 'load')} flush>
             <LoadsTable loads={loads} />
           </Panel>
+          )}
         </div>
+        )}
 
-        <aside className="fd-side">
+        <aside ref={railRef} className="fd-side">
           <AlertsPanel items={alerts} />
 
           <Panel title="Details">

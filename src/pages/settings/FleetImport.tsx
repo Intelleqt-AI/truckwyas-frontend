@@ -1,3 +1,4 @@
+import { StatusChip } from '@/components/ui/StatusChip';
 import { useState, useRef } from "react";
 import useFetch from "@/hooks/useFetch";
 import { usePost } from "@/hooks/usePost";
@@ -226,9 +227,9 @@ export default function FleetImport() {
   };
 
   const STATUS_TEXT: Record<string, string> = {
-    success: 'var(--status-success-text, var(--accent-primary))',
-    error: 'var(--status-danger-text, var(--status-danger))',
-    processing: 'var(--status-warning-text, var(--status-warning))',
+    success: 'var(--status-success-text)',
+    error: 'var(--status-danger-text)',
+    processing: 'var(--status-warning-text)',
   };
 
   const getStatusIcon = (status: string) => {
@@ -249,9 +250,7 @@ export default function FleetImport() {
   const getStatusBadge = (status: string) => {
     if (!STATUS_LABEL[status]) return null;
     return (
-      <span style={{ ...settingsBadgeStyle, color: STATUS_TEXT[status], borderColor: 'currentColor' }}>
-        {STATUS_LABEL[status]}
-      </span>
+      <StatusChip tone={status === 'success' ? 'success' : status === 'error' ? 'danger' : 'warning'} label={STATUS_LABEL[status]} size="sm" />
     );
   };
 
@@ -259,7 +258,7 @@ export default function FleetImport() {
 
   return (
     <SettingsShell activeId="integrations">
-    <div style={{ maxWidth: 960, margin: '0 auto' }}>
+    <div style={{ maxWidth: 960 }}>
       <SettingsPageHeader
         title="Import trip data"
         description="Upload CSV or Excel files to import trip data into your fleet"
@@ -294,7 +293,7 @@ export default function FleetImport() {
               textAlign: 'center',
               cursor: isDemo ? 'not-allowed' : 'pointer',
               opacity: isDemo ? 0.6 : 1,
-              background: isDragging ? 'rgba(var(--accent-primary-rgb, 37,99,235), 0.05)' : 'transparent',
+              background: isDragging ? 'var(--accent-dim)' : 'transparent',
               transition: 'border-color 0.15s, background 0.15s',
             }}
           >
@@ -310,7 +309,7 @@ export default function FleetImport() {
               <div style={{
                 width: 48, height: 48, borderRadius: '50%', marginBottom: 4,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(var(--accent-primary-rgb, 37,99,235), 0.1)', color: 'var(--accent-primary)',
+                background: 'var(--accent-dim)', color: 'var(--accent-primary)',
               }}>
                 {selectedFile ? (
                   <FileSpreadsheet aria-hidden="true" style={{ width: 24, height: 24 }} />
@@ -364,7 +363,7 @@ export default function FleetImport() {
                   href="/assets/fleet-import-template.csv"
                   download
                   className="settings-control"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, lineHeight: '20px', color: 'var(--status-info-text, var(--accent-primary))', textDecoration: 'none', minHeight: 40 }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, lineHeight: '20px', color: 'var(--status-info-text)', textDecoration: 'none', minHeight: 40 }}
                 >
                   <Download aria-hidden="true" style={{ width: 16, height: 16 }} />
                   Download template
@@ -444,7 +443,7 @@ export default function FleetImport() {
                     <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>
                       {item.filename}
                     </p>
-                    <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: item.status === 'error' ? 'var(--status-danger-text, var(--status-danger))' : 'var(--text-tertiary)' }}>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: '20px', color: item.status === 'error' ? 'var(--status-danger-text)' : 'var(--text-tertiary)' }}>
                       {item.status === "success"
                         ? `${item.records_imported} records imported`
                         : item.status === "error"

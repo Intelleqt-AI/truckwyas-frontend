@@ -243,7 +243,7 @@ export function CompanySettings() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ maxWidth: 720 }}>
       <SettingsPageHeader title="Company details" description="Your business information and branding" />
 
       {/* Company Logo */}
@@ -584,7 +584,7 @@ export function CompanySettings() {
                 </button>
               </div>
               {livePrice?.success !== false && (livePrice?.inland_price != null || livePrice?.stale_warning) && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: livePrice.is_stale ? 'var(--status-warning-text, var(--status-warning))' : 'var(--text-tertiary)', marginTop: 6 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: livePrice.is_stale ? 'var(--status-warning-text)' : 'var(--text-tertiary)', marginTop: 6 }}>
                   {livePrice.inland_price != null ? (
                     <>
                       Live national price: R{Number(livePrice.inland_price).toFixed(2)}/L
@@ -632,7 +632,7 @@ export function CompanySettings() {
                 </button>
               </div>
               {livePrice?.success !== false && (livePrice?.petrol_95 != null || livePrice?.stale_warning) && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: livePrice.is_stale ? 'var(--status-warning-text, var(--status-warning))' : 'var(--text-tertiary)', marginTop: 6 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: livePrice.is_stale ? 'var(--status-warning-text)' : 'var(--text-tertiary)', marginTop: 6 }}>
                   {livePrice.petrol_95 != null ? (
                     <>
                       Live national price (95 unleaded): R{Number(livePrice.petrol_95).toFixed(2)}/L

@@ -8,6 +8,7 @@ import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
 import { settingsCardStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsBadgeStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
 import RowActions from '@/components/ui/RowActions';
+import { StatusChip } from '@/components/ui/StatusChip';
 
 interface VehicleType {
   id: number;
@@ -42,15 +43,15 @@ const inputStyle = settingsInputStyle;
 
 const drawerPrimaryBtnStyle: React.CSSProperties = {
   flex: 1, padding: '8px 12px', minHeight: 40, fontFamily: 'var(--font-sans)',
-  fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'var(--accent-primary)',
-  color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control)',
+  fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'var(--btn-primary-bg)',
+  color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control)',
 };
 
 const drawerSecondaryBtnStyle: React.CSSProperties = { ...settingsSecondaryButtonStyle, padding: '8px 20px' };
 
 const drawerErrorStyle: React.CSSProperties = {
-  padding: '8px 12px', background: 'var(--status-danger-bg, rgba(239,68,68,0.1))', border: '1px solid var(--status-danger)',
-  color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px',
+  padding: '8px 12px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)',
+  color: 'var(--status-danger-text)', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px',
 };
 
 export function VehicleTypesDirectory() {
@@ -186,7 +187,7 @@ export function VehicleTypesDirectory() {
   const formatRate = (v: any) => v ? `R ${parseFloat(v).toLocaleString('en-ZA', { minimumFractionDigits: 0 })}` : '—';
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ maxWidth: 960 }}>
       <SettingsPageHeader title="Vehicle types" description="Configure vehicle categories and rate settings" />
 
       <div style={sectionStyle}>
@@ -206,7 +207,7 @@ export function VehicleTypesDirectory() {
                 title={isDemo ? 'Not available in the demo' : undefined}
                 style={{
                   /* AA danger text on the danger tint (white on the raw red fails 4.5:1). */
-                  background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))',
+                  background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)',
                   padding: '8px 12px', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px',
                   fontWeight: 500, borderRadius: 'var(--radius-control)', minHeight: 40,
                   cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
@@ -296,10 +297,7 @@ export function VehicleTypesDirectory() {
                     {formatRate(t.base_rate)}<span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>/km</span>
                   </td>
                   <td>
-                    <span style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                      color: t.active ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                    }}>{t.active ? 'Active' : 'Inactive'}</span>
+                    <StatusChip status={t.active ? 'ACTIVE' : 'INACTIVE'} size="sm" />
                   </td>
                   <td style={{ textAlign: 'right' as const }} title={isDemo ? 'Not available in the demo' : (isShared ? badgeTitle : undefined)}>
                     <RowActions
@@ -376,7 +374,7 @@ export function VehicleTypesDirectory() {
             ] as const).map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>
-                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text, var(--status-danger))' }}> *</span>}
+                  {f.label}{f.required && <span style={{ color: 'var(--status-danger-text)' }}> *</span>}
                 </label>
                 <input
                   className="settings-control"

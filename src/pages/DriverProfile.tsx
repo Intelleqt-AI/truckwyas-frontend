@@ -10,6 +10,7 @@ import {
 } from '@/components/fleet-detail/parts';
 import { MonthlyBars } from '@/components/fleet-detail/MonthlyBars';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
+import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 
 const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] as const;
@@ -32,6 +33,7 @@ export default function DriverProfile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(false);
+  const railRef = useStickyRail<HTMLElement>();
 
   const driverQuery = useQuery({
     queryKey: ['driver', driverId],
@@ -118,6 +120,9 @@ export default function DriverProfile() {
     setUpdating(false);
   };
 
+  const hasCompleted = completedTrips > 0 || recordedRevenue > 0;
+  const wideLayout = !hasCompleted || loads.length < 6;
+
   const emergency = [driver.emergency_contact, driver.emergency_phone].filter(Boolean).join(' · ');
 
   return (
@@ -126,7 +131,7 @@ export default function DriverProfile() {
         crumb="Drivers"
         crumbTo="/fleet/drivers"
         title={name}
-        chip={<StatusChip tone={STATUS_TONE[driver.status] || 'neutral'}>{formatStatus(driver.status)}</StatusChip>}
+        chip={<StatusChip status={driver.status} />}
         meta={(driver.license_number || phone) ? <>
           {driver.license_number && <span className="fd-mono">{driver.license_number}</span>}
           {driver.license_number && phone && ' · '}
@@ -135,6 +140,7 @@ export default function DriverProfile() {
         actions={<StatusControl label="Set driver status" options={DRIVER_STATUSES} current={driver.status} busy={updating} onPick={setStatus} />}
       />
 
+      {hasCompleted ? (
       <KpiStrip label="Driver summary">
         <Kpi
           label="Revenue"
@@ -144,7 +150,6 @@ export default function DriverProfile() {
           info={statsRevenue
             ? <>Recorded by the driver stats job across all their completed loads. The chart below uses the latest {loads.length} loads.</>
             : <>Delivered and invoiced loads{partial ? `, latest ${loads.length} of ${loadsTotal}` : ''}.</>}
-          spark={completedTrips > 0 ? { values: months.map(m => m.revenue), labels: monthLabels, format: randWhole, ariaLabel: 'Completed-load revenue by month, last 12 months' } : undefined}
         />
         <Kpi
           label="Loads completed"
@@ -159,17 +164,21 @@ export default function DriverProfile() {
           sub={onTime ? 'Of completed loads' : undefined}
           info="Completed loads with an actual delivery time on or before the planned date. Needs actual delivery times to be recorded."
         />
-        <Kpi
-          label="Licence valid until"
-          value={driver.license_expiry ? dateText(driver.license_expiry) : null}
-          empty="No expiry recorded"
-          tone={licenceExpired ? 'danger' : licenceSoon ? 'warning' : undefined}
-          sub={licenceDays === null ? undefined : licenceExpired ? 'Expired' : licenceDays === 0 ? 'Expires today' : `${plural(licenceDays, 'day')} left`}
-        />
       </KpiStrip>
+      ) : (
+        <section className="fd-panel fd-empty-line" aria-label="Driver summary">
+          <p className="fd-empty-line__text">No completed loads yet. {loads.length > 0 ? `${plural(loads.length, 'load')} in progress.` : `Assign ${firstName || name} to a load to track their work.`}</p>
+          <button type="button" className="fd-button" onClick={() => navigate('/bookings/orders')}>Open orders</button>
+        </section>
+      )}
 
-      <div className="fd-body">
+      {/* Few loads: one column, with Details laid out across the width, so the
+          two columns never end hundreds of pixels apart. Otherwise the side
+          rail is sticky beside the longer main column. */}
+      <div className={`fd-body${wideLayout ? ' fd-body--wide' : ''}`}>
+        {(hasCompleted || loads.length > 0) && (
         <div className="fd-main">
+          {hasCompleted && (
           <Panel
             title="Revenue by month"
             sub="Completed loads, last 12 months"
@@ -187,13 +196,17 @@ export default function DriverProfile() {
               { label: 'Highest load', value: bestTripAmount > 0 ? randWhole(bestTripAmount) : null },
             ]} />
           </Panel>
+          )}
 
-          <Panel title="Recent loads" sub={loads.length ? plural(loadsTotal, 'load') : undefined} flush>
+          {loads.length > 0 && (
+          <Panel title="Recent loads" sub={plural(loadsTotal, 'load')} flush>
             <LoadsTable loads={loads} />
           </Panel>
+          )}
         </div>
+        )}
 
-        <aside className="fd-side">
+        <aside ref={railRef} className="fd-side">
           <AlertsPanel items={alerts} />
 
           <Panel title="Details">

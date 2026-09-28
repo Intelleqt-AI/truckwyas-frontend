@@ -3,6 +3,9 @@ import './table-heading-roles.css';
 import './bookings-typography.css';
 import './bookings-section.css';
 import './ops-tiles.css';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
+import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -79,6 +82,7 @@ export default function CustomerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const railRef = useStickyRail<HTMLElement>();
   const [showEdit, setShowEdit] = useState(false);
   useFocusTrap(latestModal, showEdit);
   const [editForm, setEditForm] = useState<any>({});
@@ -201,7 +205,7 @@ export default function CustomerDetail() {
           <div className="bk-eyebrow">Customer</div>
           <div className="bk-title-row">
             <h1 className="bk-title">{customer.name}</h1>
-            <span className={`bk-status bk-status--${isActive ? "success" : "neutral"}`}>{isActive ? "Active" : "Inactive"}</span>
+            <StatusChip status={isActive ? "ACTIVE" : "INACTIVE"} />
           </div>
           {customer.company_name && customer.company_name !== customer.name && (
             <p className="bk-subtitle">{customer.company_name}</p>
@@ -223,62 +227,60 @@ export default function CustomerDetail() {
         </div>
       </div>
 
-      {/* Key figure first: what this customer is worth, from their own quotes. */}
-      {totalQuotes > 0 ? (
-        <section className="ops-tiles" aria-label="Customer value">
-          <div className="ops-tile">
-            <h2 className="ops-tile__label">
-              Won from quotes
-              <InfoTip>Totals of accepted quotes, from {basis}.</InfoTip>
-            </h2>
-            <div className="ops-tile__value" title={formatZAR(totalRevenue)}>{wholeRand(totalRevenue)}</div>
-            <div className="ops-tile__sub">Accepted quotes</div>
-          </div>
-          <div className="ops-tile">
-            <h2 className="ops-tile__label">
-              Quotes accepted
-              <InfoTip>Share of all their quotes, drafts included, that were accepted.</InfoTip>
-            </h2>
-            <div className="ops-tile__value">{acceptedQuotes}<span className="ops-tile__of">of {totalQuotes}</span></div>
-            <div className="ops-tile__sub">{Math.round((acceptedQuotes / totalQuotes) * 100)}% win rate</div>
-          </div>
-          <div className="ops-tile">
-            <h2 className="ops-tile__label">Credit limit</h2>
-            <div className="ops-tile__value" title={customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : undefined}>{customer.credit_limit ? wholeRand(parseFloat(customer.credit_limit)) : "—"}</div>
-            <div className="ops-tile__sub">{customer.credit_limit ? `${paymentTermsLabel(customer.payment_terms_default)} terms` : "No limit set"}</div>
-          </div>
-        </section>
-      ) : (
-        <div className="bk-notice">
-          <div>
-            <p className="bk-notice__text">You have not quoted {customer.name} yet.</p>
-          </div>
-          <button type="button" className="bk-btn bk-btn--secondary" onClick={() => navigate("/bookings/quotes/new")}>New quote</button>
-        </div>
-      )}
-
-      <div className="bk-detail-grid">
-        {/* Contact Details */}
-        <section className="bk-card" aria-labelledby="cd-contact-title">
-          <div className="bk-card__head"><h2 className="bk-card__title" id="cd-contact-title">Contact details</h2></div>
-          {[
-            { label: "Email", value: customer.email },
-            { label: "Phone", value: customer.phone },
-            { label: "City", value: customer.city },
-            { label: "Province", value: customer.state },
-            { label: "Postal code", value: customer.zip_code },
-            { label: "Address", value: customer.address },
-            { label: "Billing address", value: customer.billing_address || customer.address },
-          ].map(r => (
-            <div key={r.label} className="bk-kv">
-              <span className="bk-kv__label">{r.label}</span>
-              <span className="bk-kv__value">{r.value || "—"}</span>
+      <div className="bk-detail-grid bk-detail-grid--rail">
+        <div className="bk-stack">
+          {/* Key figure first: what this customer is worth, from their own quotes. */}
+          {totalQuotes > 0 ? (
+            <KpiRow>
+              <KpiTile
+                aria-label="Won from quotes"
+                label="Won from quotes"
+                aside={<InfoTip>Totals of accepted quotes, from {basis}.</InfoTip>}
+                figure={<span title={formatZAR(totalRevenue)}>{wholeRand(totalRevenue)}</span>}
+                note="Accepted quotes"
+              />
+              <KpiTile
+                aria-label="Quotes accepted"
+                label="Quotes accepted"
+                aside={<InfoTip>Share of all their quotes, drafts included, that were accepted.</InfoTip>}
+                figure={<>{acceptedQuotes}<span className="tw-kpi__of"> of {totalQuotes}</span></>}
+                note={`${Math.round((acceptedQuotes / totalQuotes) * 100)}% win rate`}
+              />
+            </KpiRow>
+          ) : (
+            <div className="bk-notice" style={{ marginBottom: 0 }}>
+              <div>
+                <p className="bk-notice__text">You have not quoted {customer.name} yet.</p>
+              </div>
+              <button type="button" className="bk-btn bk-btn--secondary" onClick={() => navigate("/bookings/quotes/new")}>New quote</button>
             </div>
-          ))}
-        </section>
+          )}
 
-        {/* Account Details */}
-        <section className="bk-card" aria-labelledby="cd-account-title">
+          {/* Contact details: a definition grid across the column, not
+              label/value rows with the value 700px from its label. */}
+          <section className="bk-card" aria-labelledby="cd-contact-title">
+            <div className="bk-card__head"><h2 className="bk-card__title" id="cd-contact-title">Contact details</h2></div>
+            <dl className="bk-facts bk-facts--auto">
+              {[
+                { label: "Email", value: customer.email },
+                { label: "Phone", value: customer.phone },
+                { label: "City", value: customer.city },
+                { label: "Province", value: customer.state },
+                { label: "Postal code", value: customer.zip_code },
+                { label: "Address", value: customer.address },
+                { label: "Billing address", value: customer.billing_address || customer.address },
+              ].map(r => (
+                <div key={r.label}>
+                  <dt className="bk-fact__label">{r.label}</dt>
+                  <dd className="bk-fact__value">{r.value || "—"}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
+
+        {/* Account Details: sticky rail */}
+        <section ref={railRef} className="bk-card" aria-labelledby="cd-account-title">
           <div className="bk-card__head"><h2 className="bk-card__title" id="cd-account-title">Account details</h2></div>
           {[
             { label: "Payment terms", value: paymentTermsLabel(customer.payment_terms_default) },
@@ -333,7 +335,7 @@ export default function CustomerDetail() {
                       {q.pickup_location || "—"} → {q.delivery_location || "—"}
                     </td>
                     <td>
-                      <span className={`bk-status bk-status--${QUOTE_STATUS_TONE[q.status] || "neutral"}`}>{formatStatus(q.status)}</span>
+                      <StatusChip status={q.status === "IT" ? "IN_TRANSIT" : q.status} size="sm" />
                     </td>
                     <td className="is-date">
                       {q.created_at ? formatDate(q.created_at) : "—"}

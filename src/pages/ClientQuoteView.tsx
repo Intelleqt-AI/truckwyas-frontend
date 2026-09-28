@@ -1,4 +1,6 @@
 import './public-document.css';
+import { usePublicTheme } from './usePublicTheme';
+import { StatusChip } from '@/components/ui/StatusChip';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -27,6 +29,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function ClientQuoteView() {
+  usePublicTheme();
   const { quoteId, token } = useParams<{ quoteId: string; token: string }>();
   const [responded, setResponded] = useState(false);
   const [responseMessage, setResponseMessage] = useState('');
@@ -94,7 +97,7 @@ export default function ClientQuoteView() {
       <PublicShell>
         <div className="pd-state">
           <div className="pd-doc">
-            <span className={`pd-chip ${accepted ? 'pd-chip--success' : ''}`} style={{ marginBottom: 16 }}>{accepted ? 'Accepted' : 'Declined'}</span>
+            <StatusChip status={accepted ? 'ACCEPTED' : 'DECLINED'} style={{ marginBottom: 16 }} />
             <h1 className="pd-state__title">{responseMessage}</h1>
             <p className="pd-state__text">
               {accepted ? 'The freight company will be in touch to confirm arrangements.' : 'Thank you for letting us know.'}
@@ -138,10 +141,10 @@ export default function ClientQuoteView() {
             <div className="pd-hero__line">Excluding VAT. Prepared for {quote.customer_name}.</div>
           </div>
           {alreadyActioned
-            ? <span className={`pd-chip ${quote.status === 'ACCEPTED' ? 'pd-chip--success' : 'pd-chip--danger'}`}>{quote.status === 'ACCEPTED' ? 'Accepted' : 'Declined'}</span>
+            ? <StatusChip status={quote.status === 'ACCEPTED' ? 'ACCEPTED' : 'DECLINED'} />
             : isExpired
-            ? <span className="pd-chip pd-chip--danger">Expired</span>
-            : <span className={`pd-chip${isExpiringSoon ? ' pd-chip--warning' : ''}`}>{isExpiringSoon ? `Expires in ${hoursLeft}h` : `Valid until ${fmtDay(quote.valid_until)}`}</span>}
+            ? <StatusChip tone="danger" label="Expired" />
+            : <StatusChip tone={isExpiringSoon ? 'warning' : 'neutral'} label={isExpiringSoon ? `Expires in ${hoursLeft}h` : `Valid until ${fmtDay(quote.valid_until)}`} />}
         </section>
 
         <section className="pd-section">
@@ -172,7 +175,7 @@ export default function ClientQuoteView() {
                 deliveryCoords={quote.delivery_lat ? { lat: Number(quote.delivery_lat), lon: Number(quote.delivery_lng) } : undefined}
                 stops={Array.isArray(quote.stops) ? quote.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
                 geometry={Array.isArray(quote.route_geometry) && quote.route_geometry.length > 1 ? quote.route_geometry.map((p: { lat: number; lon: number }) => [Number(p.lat), Number(p.lon)] as [number, number]) : undefined}
-                dialogStyle={{ background: 'var(--pd-surface, #FFFFFF)', border: '1px solid var(--pd-border, #E5E7EB)', borderRadius: 16, boxShadow: 'none' }}
+                dialogStyle={{ background: 'var(--pd-surface)', border: '1px solid var(--pd-border)', borderRadius: 16, boxShadow: 'none' }}
               />
             </div>
           )}

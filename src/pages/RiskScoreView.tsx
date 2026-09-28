@@ -7,23 +7,22 @@ import { fetchData } from '@/lib/Api';
 import { formatDate } from '@/lib/formatters';
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
 import { Loader } from '@/components/Loader';
+import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 
 
 // Sentence-case a single token for display: "PRIME" → "Prime".
 const cap = (s?: string) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
 
-const TIER_TONE: Record<string, string> = {
+const TIER_TONE: Record<string, StatusTone> = {
   PRIME: 'success',
   STANDARD: 'info',
   ELEVATED: 'warning',
   HIGH: 'danger',
   INELIGIBLE: 'neutral',
 };
-const tierChip = (t?: string) => {
-  const tone = TIER_TONE[t || ''] || 'neutral';
-  return `fin-chip${tone === 'neutral' ? '' : ` fin-chip--${tone}`}`;
-};
+// Risk tiers use the shared neutral chip with a tone dot.
+const TierChip = ({ t }: { t?: string }) => <StatusChip size="sm" tone={TIER_TONE[t || ''] || 'neutral'} label={cap(t) || '—'} />;
 
 export default function RiskScoreView() {
   const navigate = useNavigate();
@@ -140,7 +139,7 @@ export default function RiskScoreView() {
             </div>
             {tiers.map(t => (
               <div key={t} className={`fin-rank__row${(tierCounts[t] || 0) === 0 ? ' is-thin' : ''}`} role="row">
-                <span className="fin-rank__label" role="cell"><span className={tierChip(t)}>{cap(t)}</span></span>
+                <span className="fin-rank__label" role="cell"><TierChip t={t} /></span>
                 <span className="fin-rank__track" aria-hidden="true">
                   <span className="fin-rank__bar" style={{ display: 'block', width: `${maxTier > 0 ? ((tierCounts[t] || 0) / maxTier) * 100 : 0}%` }} />
                 </span>
@@ -216,7 +215,7 @@ export default function RiskScoreView() {
                           </div>
                         </div>
                       </td>
-                      <td><span className={tierChip(cs.tier)}>{cap(cs.tier)}</span></td>
+                      <td><TierChip t={cs.tier} /></td>
                       <td className="fin-date">
                         {scoredOn(cs)}
                         {expired && <span className="fin-text-muted"> · expired</span>}

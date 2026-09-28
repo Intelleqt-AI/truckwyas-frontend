@@ -16,7 +16,10 @@ import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import SectionHeader, { FINANCE_TABS } from '@/components/layout/SectionHeader';
 import RowActions from '@/components/ui/RowActions';
 import { InfoTip } from '@/components/ui/InfoTip';
-import { FinTile, FinTiles, wholeRand } from '@/components/finance/FinTile';
+import { wholeRand } from '@/components/finance/FinTile';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
+import { Segmented } from '@/components/ui/Segmented';
+import { StatusChip } from '@/components/ui/StatusChip';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
@@ -79,7 +82,6 @@ const DATE_FILTERS = [
 ];
 
 const STATUS_FILTERS = ['ALL', 'PENDING', 'APPROVED', 'REJECTED'];
-const STATUS_TONE: Record<string, string> = { APPROVED: 'success', PENDING: 'warning', REJECTED: 'danger' };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const expenseDate = (e: Expense) => new Date(e.expense_date || e.date);
@@ -312,10 +314,6 @@ export default function Expenses() {
   const fuelMtd = sumFuel(thisMonthExpenses);
   const pendingExpenses = expenses.filter(e => e.status === 'PENDING');
   const pendingAmount = pendingExpenses.reduce((s, e) => s + amountOf(e), 0);
-  const mtdCategoryTotals: Record<string, number> = {};
-  thisMonthExpenses.forEach(e => { mtdCategoryTotals[e.category] = (mtdCategoryTotals[e.category] || 0) + amountOf(e); });
-  const topMtd = Object.entries(mtdCategoryTotals).sort((a, b) => b[1] - a[1])[0];
-  const mtdTotal = thisMonthExpenses.reduce((s, e) => s + amountOf(e), 0);
 
   // A previous-month comparison is only honest when last month is fully loaded.
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -339,7 +337,8 @@ export default function Expenses() {
     return { key, label: `${MONTHS[key % 12]} ${String(Math.floor(key / 12)).slice(2)}`, amount, count, state };
   });
   const maxMonthlyAmount = Math.max(1, ...monthlyTrend.map(m => m.amount));
-  const compactRand = (n: number) => n >= 1000 ? `R${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : formatCurrency(n);
+  // "R 7.8k", with the same space as "R 7 759".
+  const compactRand = (n: number) => n >= 1000 ? `R ${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : formatCurrency(n);
 
   const categoryCounts = expenses.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + 1; return acc; }, {} as Record<string, number>);
   const maxCategory = categoryBreakdown[0]?.total || 1;
@@ -354,67 +353,44 @@ export default function Expenses() {
       {header}
 
       {/* Headline figures: one per tile, like Today. */}
-      {thisMonthExpenses.length === 0 ? (
-        <FinTiles label="Expense figures">
-          <FinTile
-            label={`Spent in ${monthLong(nowKey)}`}
-            info="Expenses dated this calendar month, all statuses."
-            value="None yet"
-            small
-            sub={newestLoaded ? `Last expense ${formatDate(newestLoaded)}` : 'No expenses recorded'}
-            action={{ label: 'Add expense', onClick: () => setShowAdd(true) }}
-          />
-          <FinTile
-            label="Waiting for approval"
-            info={`Pending expenses${truncated ? ' in the loaded list' : ''}, amounts as entered.`}
-            value={pendingExpenses.length > 0 ? wholeRand(pendingAmount) : 'None'}
-            valueTitle={pendingExpenses.length > 0 ? formatCurrency(pendingAmount) : undefined}
-            small={pendingExpenses.length === 0}
-            sub={pendingExpenses.length > 0 ? `${pendingExpenses.length} ${pendingExpenses.length === 1 ? 'expense' : 'expenses'}` : 'All reviewed'}
-            action={pendingExpenses.length > 0 ? { label: 'Review', onClick: () => { setStatusFilter('PENDING'); resetPage(); } } : undefined}
-          />
-          <FinTile
+      {/* Headline figures: the standard tile, only real KPIs, never a dash
+          or "None yet" (the header already offers Add expense). */}
+      <KpiRow className="fin-kpi-row">
+        {thisMonthExpenses.length === 0 ? (
+          <KpiTile
             label="Recorded"
-            info={`Total of ${basisLabel}, all statuses, amounts as entered.`}
-            value={wholeRand(totalExpenses)}
-            valueTitle={formatCurrency(totalExpenses)}
-            sub={truncated ? `Latest ${expenses.length} of ${totalExpenseCount}` : `${expenses.length} ${expenses.length === 1 ? 'expense' : 'expenses'}`}
+            aside={<InfoTip>{`Total of ${basisLabel}, all statuses, amounts as entered. Nothing is dated in ${monthLong(nowKey)} yet${newestLoaded ? `; the last expense is dated ${formatDate(newestLoaded)}` : ''}.`}</InfoTip>}
+            figure={<span title={formatCurrency(totalExpenses)}>{wholeRand(totalExpenses)}</span>}
+            note={truncated ? `Latest ${expenses.length} of ${totalExpenseCount}` : `${expenses.length} ${expenses.length === 1 ? 'expense' : 'expenses'}`}
           />
-        </FinTiles>
-      ) : (
-        <FinTiles label="Expense figures">
-          <FinTile
+        ) : (
+          <KpiTile
             label={`Approved in ${monthLong(nowKey)}`}
-            info={`Approved expenses dated this calendar month.${lastMonthCovered ? ` Change compares ${monthLong(nowKey - 1)}.` : ' No comparison: last month is not fully loaded.'}`}
-            value={wholeRand(approvedMtd)}
-            valueTitle={formatCurrency(approvedMtd)}
-            sub={vsLastMonth(approvedMtd, sumApproved(lastMonthExpenses)) ?? 'By expense date'}
+            aside={<InfoTip>{`Approved expenses dated this calendar month.${lastMonthCovered ? ` Change compares ${monthLong(nowKey - 1)}.` : ' No comparison: last month is not fully loaded.'}`}</InfoTip>}
+            figure={<span title={formatCurrency(approvedMtd)}>{wholeRand(approvedMtd)}</span>}
+            note={vsLastMonth(approvedMtd, sumApproved(lastMonthExpenses)) ?? 'By expense date'}
           />
-          <FinTile
+        )}
+        {pendingExpenses.length > 0 && (
+          <KpiTile
             label="Waiting for approval"
-            info={`Pending expenses${truncated ? ' in the loaded list' : ''}, amounts as entered.`}
-            value={pendingExpenses.length > 0 ? wholeRand(pendingAmount) : 'None'}
-            valueTitle={pendingExpenses.length > 0 ? formatCurrency(pendingAmount) : undefined}
-            small={pendingExpenses.length === 0}
-            sub={pendingExpenses.length > 0 ? `${pendingExpenses.length} ${pendingExpenses.length === 1 ? 'expense' : 'expenses'}` : 'All reviewed'}
-            action={pendingExpenses.length > 0 ? { label: 'Review', onClick: () => { setStatusFilter('PENDING'); resetPage(); } } : undefined}
+            aside={<InfoTip>{`Pending expenses${truncated ? ' in the loaded list' : ''}, amounts as entered. Select to review them.`}</InfoTip>}
+            figure={<span title={formatCurrency(pendingAmount)}>{wholeRand(pendingAmount)}</span>}
+            note={`${pendingExpenses.length} ${pendingExpenses.length === 1 ? 'expense' : 'expenses'} to review`}
+            tone="warning"
+            onClick={statusFilter !== 'PENDING' ? () => { setStatusFilter('PENDING'); resetPage(); } : undefined}
+            aria-label={`Waiting for approval: ${formatCurrency(pendingAmount)}. Show pending expenses`}
           />
-          <FinTile
+        )}
+        {thisMonthExpenses.length > 0 && fuelMtd > 0 && (
+          <KpiTile
             label={`Fuel in ${monthLong(nowKey)}`}
-            info="Fuel expenses dated this calendar month, all statuses."
-            value={wholeRand(fuelMtd)}
-            valueTitle={formatCurrency(fuelMtd)}
-            sub={vsLastMonth(fuelMtd, sumFuel(lastMonthExpenses)) ?? 'By expense date'}
+            aside={<InfoTip>Fuel expenses dated this calendar month, all statuses.</InfoTip>}
+            figure={<span title={formatCurrency(fuelMtd)}>{wholeRand(fuelMtd)}</span>}
+            note={vsLastMonth(fuelMtd, sumFuel(lastMonthExpenses)) ?? 'By expense date'}
           />
-          <FinTile
-            label="Largest cost"
-            info="The category with the most spend this calendar month, all statuses."
-            value={topMtd ? catLabel(topMtd[0]) : '—'}
-            small
-            sub={topMtd ? `${wholeRand(topMtd[1])}, ${mtdTotal > 0 ? Math.round((topMtd[1] / mtdTotal) * 100) : 0}% of ${monthLong(nowKey)}` : ''}
-          />
-        </FinTiles>
-      )}
+        )}
+      </KpiRow>
 
       {/* Filters: same toolbar layout as Invoices */}
       <div className="fin-toolbar expenses-filter-bar">
@@ -442,19 +418,17 @@ export default function Expenses() {
             <input type="date" className="fin-control" aria-label="To date" value={customTo} onChange={e => { setCustomTo(e.target.value); resetPage(); }} />
           </>
         )}
-        <div className="fin-toolbar__group" role="group" aria-label="Filter by status">
-          {STATUS_FILTERS.map(s => (
-            <button
-              key={s}
-              type="button"
-              className="fin-chip-filter"
-              aria-pressed={statusFilter === s}
-              onClick={() => { setStatusFilter(s); resetPage(); }}
-            >
-              {s === 'ALL' ? 'All' : formatStatus(s)}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label="Filter by status"
+          className="fin-seg"
+          value={statusFilter}
+          onChange={s => { setStatusFilter(s); resetPage(); }}
+          options={STATUS_FILTERS.map(s => ({
+            value: s,
+            label: s === 'ALL' ? 'All' : formatStatus(s),
+            count: expenses.filter(e => s === 'ALL' || (e.status || 'PENDING').toUpperCase() === s).length,
+          }))}
+        />
         <span className="fin-toolbar__count">
           {sorted.length} {sorted.length === 1 ? 'expense' : 'expenses'}
           {truncated && (
@@ -476,7 +450,7 @@ export default function Expenses() {
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Expense</th>
+                <th className="fin-cell-fill">Expense</th>
                 <th>Category</th>
                 <th className="fin-col-mid">Vehicle</th>
                 <th>Status</th>
@@ -507,21 +481,20 @@ export default function Expenses() {
                 </tr>
               ) : rows.map(exp => {
                 const status = (exp.status || 'PENDING').toUpperCase();
-                const tone = STATUS_TONE[status];
                 const busy = reviewingId === exp.id || deletingId === exp.id;
                 return (
                   <tr key={exp.id}>
                     <td className="fin-date m-hide">{formatDate(exp.expense_date || exp.date)}</td>
-                    <td className="fin-strong m-party m-span2 fin-cell-2">
-                      <div className="fin-truncate fin-truncate--expense" title={exp.description}>{exp.description}</div>
+                    <td className="fin-strong m-party m-span2 fin-cell-2 fin-cell-fill">
+                      <div className="fin-truncate fin-truncate--fill" title={exp.description}>{exp.description}</div>
                       <span className="fin-cell-sub">
                         <span className="fin-mobile-only">{formatDate(exp.expense_date || exp.date)} · {catLabel(exp.category)}</span>
                         <span className="m-hide-inline">{exp.expense_number ? <span className="fin-id">{exp.expense_number}</span> : 'No reference'}</span>
                       </span>
                     </td>
                     <td className="m-hide" style={{ whiteSpace: 'nowrap' }}>{catLabel(exp.category)}</td>
-                    <td className="m-hide fin-col-mid"><div className="fin-truncate fin-truncate--veh" style={{ maxWidth: 200 }} title={vehicleLabel(exp)}>{vehicleLabel(exp)}</div></td>
-                    <td className="m-status"><span className={`fin-chip${tone ? ` fin-chip--${tone}` : ''}`}>{formatStatus(status)}</span></td>
+                    <td className="m-hide fin-col-mid fin-nowrap">{vehicleLabel(exp)}</td>
+                    <td className="m-status"><StatusChip status={status} size="sm" /></td>
                     <td className="num m-amount">{formatCurrency(amountOf(exp))}</td>
                     <td className="actions">
                       <RowActions
@@ -584,7 +557,7 @@ export default function Expenses() {
                   title={m.state === 'unloaded' ? 'Not loaded on this page' : `${formatCurrency(m.amount)} · ${m.count} ${m.count === 1 ? 'expense' : 'expenses'}`}
                 >
                   <span className="fin-months__val" aria-hidden="true">
-                    {m.state === 'unloaded' ? '—' : m.amount > 0 ? compactRand(m.amount) : 'R0'}
+                    {m.state === 'unloaded' ? '—' : m.amount > 0 ? compactRand(m.amount) : 'R 0'}
                   </span>
                   {m.state !== 'unloaded' && (
                     <div className="fin-months__bar" style={{ height: `${Math.max(2, (m.amount / maxMonthlyAmount) * 120)}px` }} />

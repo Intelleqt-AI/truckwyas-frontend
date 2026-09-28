@@ -35,7 +35,7 @@
 }
 .ops-tile__value {
   margin-top: 12px;
-  font: 700 var(--text-figure, 32px)/38px var(--font-sans);
+  font: 600 var(--text-figure, 32px)/38px var(--font-sans);
   letter-spacing: var(--tracking-figure, -0.03em);
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
@@ -44,7 +44,7 @@
   text-overflow: ellipsis;
   min-width: 0;
 }
-.ops-tile__value.is-attention { color: var(--status-warning-text, var(--status-warning)); }
+.ops-tile__value.is-attention { color: var(--status-warning-text); }
 .ops-tile__of {
   margin-left: 6px;
   font: 400 14px/20px var(--font-sans);
@@ -80,3 +80,16 @@
 .ops-tile--link { cursor: pointer; transition: background-color 0.12s; }
 .ops-tile--link:hover { background: var(--bg-surface-hover); }
 .ops-tile--link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+
+/* "of 20" after a KpiTile figure (<KpiTile figure={<>12<span className="tw-kpi__of"> of 20</span></>} />). */
+.tw-kpi__of {
+  font: 400 14px/20px var(--font-sans);
+  letter-spacing: normal;
+  color: var(--text-tertiary);
+}
+
+/* Space between a page's KPI row and the toolbar or table below it. */
+.fleet-kpis, .bk-kpis, .ops-kpis { margin-bottom: 24px; }
+@media (max-width: 767px) {
+  .fleet-kpis, .bk-kpis, .ops-kpis { margin-bottom: 16px; }
+}

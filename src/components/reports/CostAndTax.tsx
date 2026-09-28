@@ -77,11 +77,11 @@ export function ExpenseReport({ d, companyName }: { d: Ledger; companyName?: str
         <PeriodControl period={period} onChange={setPeriod} />
         <Seg label="View" value={view} onChange={setView} options={[{ id: 'category', label: 'By category' }, { id: 'vehicle', label: 'By vehicle' }, { id: 'register', label: 'Register' }]} />
       </>}
-      tiles={list.length ? <Tiles tiles={[
-        { label: 'Approved', value: moneyWhole(aTotal), title: money(aTotal), note: plural(approved.length, 'expense') },
-        { label: 'Pending approval', value: moneyWhole(pTotal), title: money(pTotal), note: plural(pending.length, 'expense') },
-        { label: 'Largest category', value: moneyWhole(topCat?.a ?? 0), title: money(topCat?.a ?? 0), note: topCat ? `${topCat.label}, ${pct(aTotal > 0 ? (topCat.a / aTotal) * 100 : 0, 0)}` : undefined },
-        { label: 'Not linked to a vehicle', value: moneyWhole(sum(noVehicle)), title: money(sum(noVehicle)), note: plural(noVehicle.length, 'approved expense') },
+      tiles={list.length ? <Tiles table={table} tiles={[
+        { label: 'Approved', value: moneyWhole(aTotal), title: money(aTotal), note: plural(approved.length, 'expense'), amount: aTotal },
+        { label: 'Pending approval', value: moneyWhole(pTotal), title: money(pTotal), note: plural(pending.length, 'expense'), amount: pTotal },
+        { label: 'Largest category', value: moneyWhole(topCat?.a ?? 0), title: money(topCat?.a ?? 0), note: topCat ? `${topCat.label}, ${pct(aTotal > 0 ? (topCat.a / aTotal) * 100 : 0, 0)}` : undefined, amount: topCat?.a ?? 0 },
+        { label: 'Not linked to a vehicle', value: moneyWhole(sum(noVehicle)), title: money(sum(noVehicle)), note: plural(noVehicle.length, 'approved expense'), amount: sum(noVehicle) },
       ]} /> : undefined}
       gaps={['VAT on expenses is not captured.']}
       csv={() => statementCsv(`Expense report, ${periodText(period)}`, view === 'register' ? 'Register' : `By ${view}`, table)}
@@ -89,7 +89,7 @@ export function ExpenseReport({ d, companyName }: { d: Ledger; companyName?: str
     >
       {list.length === 0 ? <Empty line={`No expenses dated in ${periodText(period)}.`} action={{ label: 'See expenses', to: '/finance/expenses' }} /> : (
         <StatementTable table={table} caption={`Expenses ${view === 'register' ? 'register' : `by ${view}`}`} stickyFirst={view !== 'register'}
-          footer={<Check>Approved {money(aTotal)} equals the approved costs in the profit and loss for {periodText(period)}.</Check>} />
+          footer={<Check>Approved total equals the approved costs in the profit and loss for {periodText(period)}.</Check>} />
       )}
     </ReportFrame>
   );
@@ -161,10 +161,10 @@ export function VatReport({ d, companyName, vatNumber }: { d: Ledger; companyNam
         <Seg label="Basis" value={basis} onChange={b => set('basis', b === 'invoice' ? null : b)} options={[{ id: 'invoice', label: 'Invoice basis' }, { id: 'payments', label: 'Payments basis' }]} />
         <Seg label="View" value={view} onChange={x => set('view', x === 'month' ? null : x)} options={[{ id: 'month', label: 'By month' }, { id: 'invoice', label: 'By line' }]} />
       </>}
-      tiles={lines.length ? <Tiles tiles={[
-        { label: 'Output VAT', value: moneyWhole(vat), title: money(vat), note: basisText },
-        { label: 'Supplies excl. VAT', value: moneyWhole(incl - vat), title: money(incl - vat) },
-        { label: 'Supplies incl. VAT', value: moneyWhole(incl), title: money(incl), note: plural(lines.length, basis === 'invoice' ? 'invoice' : 'payment') },
+      tiles={lines.length ? <Tiles table={table} tiles={[
+        { label: 'Output VAT', value: moneyWhole(vat), title: money(vat), note: basisText, amount: vat },
+        { label: 'Supplies excl. VAT', value: moneyWhole(incl - vat), title: money(incl - vat), amount: incl - vat },
+        { label: 'Supplies incl. VAT', value: moneyWhole(incl), title: money(incl), note: plural(lines.length, basis === 'invoice' ? 'invoice' : 'payment'), amount: incl },
       ]} /> : undefined}
       gaps={['Input VAT is not captured on expenses, so only output VAT is shown.']}
       csv={() => statementCsv(`VAT report, ${periodText(period)}`, `Output VAT, ${basisText}`, table)}
@@ -173,7 +173,7 @@ export function VatReport({ d, companyName, vatNumber }: { d: Ledger; companyNam
       {lines.length === 0 ? <Empty line={`No ${basis === 'invoice' ? 'invoices issued' : 'payments received'} in ${periodText(period)}.`} /> : (
         <StatementTable table={table} caption="Output VAT"
           footer={<>
-            <Check>Excl. VAT {money(incl - vat)} plus output VAT {money(vat)} equals {money(incl)} across {plural(lines.length, basis === 'invoice' ? 'invoice' : 'payment')}.</Check>
+            <Check>Total excl. VAT plus output VAT equals the total incl. VAT across {plural(lines.length, basis === 'invoice' ? 'invoice' : 'payment')}.</Check>
             {zeroRated.length > 0 && <Check ok={false}>{plural(zeroRated.length, 'line')} carry no VAT. Check they are zero-rated.</Check>}
           </>} />
       )}

@@ -9,6 +9,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import PaginationControls from '@/pages/admin/PaginationControls';
 import UserActivityDrawer from '@/pages/admin/UserActivityDrawer';
 import RowActions from '@/components/ui/RowActions';
+import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 
 const PAGE_SIZE = 20;
 
@@ -278,7 +279,7 @@ export default function UsersTable() {
                   <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.55 }}>
                     <td style={tdStyle}>
                       {u.name || '—'}
-                      {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-warning-text, var(--status-warning))' }}>Superuser</span>}
+                      {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-warning-text)' }}>Superuser</span>}
                     </td>
                     <td style={tdStyle}>{u.email}</td>
                     <td style={tdStyle}>{u.company_name || '—'}</td>
@@ -298,7 +299,7 @@ export default function UsersTable() {
                       </select>
                     </td>
                     <td style={tdStyle}>
-                      <span className={`status-badge ${u.is_active ? 'active' : 'delayed'}`}>{u.is_active ? 'Active' : 'Inactive'}</span>
+                      <StatusChip status={u.is_active ? 'ACTIVE' : 'INACTIVE'} size="sm" />
                     </td>
                     <td style={tdStyle}>{fmt(u.last_login)}</td>
                     <td style={actionTdStyle}>

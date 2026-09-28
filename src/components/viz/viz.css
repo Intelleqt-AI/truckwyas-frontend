@@ -1,60 +1,42 @@
-/* TruckWys chart system (src/components/viz). One set of roles, selected per
-   mode and validated with the dataviz six-checks validator against the card
-   surfaces (#FFFFFF light, #101215 dark). Dark is the app default; light is
-   stamped with [data-theme="light"]. Marks wear these roles; text never does.
+/* TruckWys chart system (src/components/viz). One set of roles, read from the
+   theme's chart tokens (src/styles/theme.css) so light and dark are designed
+   there, once. Marks wear these roles; text never does.
 
-   Categorical (2 slots, adjacent + all pairs PASS both modes):
-     accent  light #2563EB  dark #3B82F6   the series the panel is about / money in / above zero
-     warm    light #C2410C  dark #D4541A   the opposite pole / money out / below zero
-   De-emphasis (comparison series, not a hue):  light #9CA3AF  dark #5B626B
-   Ordinal ramp for lateness (validated --ordinal, later = stronger):
-     light #7DB3F8 #4F8FF4 #2563EB #1E40AF #172554
-     dark  #1E40AF #2563EB #3B82F6 #60A5FA #93C5FD */
+     accent        --chart-series-1   the series the panel is about / money in / above zero
+     warm          --chart-negative   the opposite pole / money out / below zero
+     neutral       --chart-muted      comparison marks, >= 3:1 on the card
+     hatch         --chart-hatch      45-degree comparison hatch and its outline, >= 3:1
+     hover band    --chart-hover-band column behind the hovered step; siblings are never dimmed
+     ordinal ramp  --heat-2..5        lateness, later = stronger (5th step mixed toward ink) */
 
 .viz {
-  --viz-accent: #3B82F6;
-  --viz-warm: #D4541A;
-  --viz-neutral: #5B626B;
-  --viz-neutral-strong: #8A8F98;
-  --viz-grid: #1E2126;
-  --viz-axis: #3A3F46;
-  --viz-zero: #9AA1A9;
-  --viz-track: #1E2227;
-  --viz-surface: var(--bg-surface, #101215);
-  --viz-wash-warm: rgba(212, 84, 26, 0.14);
-  --viz-wash-accent: rgba(59, 130, 246, 0.12);
-  --viz-ord-1: #1E40AF;
-  --viz-ord-2: #2563EB;
-  --viz-ord-3: #3B82F6;
-  --viz-ord-4: #60A5FA;
-  --viz-ord-5: #93C5FD;
-  --viz-ink-on-ord-low: #FFFFFF;
-  --viz-ink-on-ord-high: #0B1220;
+  --viz-accent: var(--chart-series-1, var(--accent-primary));
+  --viz-warm: var(--chart-negative);
+  --viz-neutral: var(--chart-muted);
+  --viz-neutral-strong: var(--text-tertiary);
+  --viz-hatch: var(--chart-hatch);
+  --viz-hatch-fill: var(--chart-bar);
+  --viz-hover-band: var(--chart-hover-band);
+  --viz-grid: var(--chart-grid);
+  --viz-axis: var(--chart-axis);
+  --viz-zero: var(--text-tertiary);
+  --viz-track: var(--bg-raised);
+  --viz-surface: var(--bg-surface);
+  --viz-wash-warm: color-mix(in srgb, var(--chart-negative) 10%, transparent);
+  --viz-wash-accent: var(--accent-dim);
+  --viz-ord-1: var(--heat-2);
+  --viz-ord-2: var(--heat-3);
+  --viz-ord-3: var(--heat-4);
+  --viz-ord-4: var(--heat-5);
+  --viz-ord-5: color-mix(in srgb, var(--heat-5) 62%, var(--text-primary));
+  /* Text on a ramp step: the first two steps take primary ink, the rest the on-accent ink. */
+  --viz-ink-on-ord-low: var(--text-primary);
+  --viz-ink-on-ord-high: var(--on-accent);
 
   position: relative;
   min-width: 0;
   font: 400 13px/20px var(--font-sans);
   color: var(--text-secondary);
-}
-[data-theme="light"] .viz {
-  --viz-accent: #2563EB;
-  --viz-warm: #C2410C;
-  --viz-neutral: #9CA3AF;
-  --viz-neutral-strong: #6B7280;
-  --viz-grid: #EEF0F3;
-  --viz-axis: #D1D5DB;
-  --viz-zero: #6B7280;
-  --viz-track: #EEF0F3;
-  --viz-surface: var(--bg-surface, #FFFFFF);
-  --viz-wash-warm: rgba(194, 65, 12, 0.08);
-  --viz-wash-accent: rgba(37, 99, 235, 0.08);
-  --viz-ord-1: #7DB3F8;
-  --viz-ord-2: #4F8FF4;
-  --viz-ord-3: #2563EB;
-  --viz-ord-4: #1E40AF;
-  --viz-ord-5: #172554;
-  --viz-ink-on-ord-low: #0B1220;
-  --viz-ink-on-ord-high: #FFFFFF;
 }
 
 .viz svg { display: block; overflow: visible; }
@@ -66,6 +48,9 @@
 .viz .viz-zero { stroke: var(--viz-zero); stroke-width: 1.5; shape-rendering: crispEdges; }
 .viz .viz-hit { fill: transparent; cursor: default; outline: none; }
 .viz .viz-hit:focus-visible { stroke: var(--accent-primary); stroke-width: 2; }
+.viz .viz-connector { stroke: var(--viz-axis); stroke-width: 1; shape-rendering: crispEdges; }
+.viz .viz-hover-band { fill: var(--viz-hover-band); pointer-events: none; }
+.viz text.viz-on-mark { fill: var(--on-accent); font-weight: 600; }
 .viz .viz-cross { stroke: var(--text-tertiary); stroke-width: 1; shape-rendering: crispEdges; pointer-events: none; }
 
 /* Legend: mirrors the mark (rect for bars, line for lines, ring for hollow). */
@@ -76,6 +61,7 @@
 .viz-key--line { width: 14px; height: 2px; border-radius: 1px; }
 .viz-key--dot { width: 8px; height: 8px; border-radius: 50%; }
 .viz-key--ring { width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid var(--viz-neutral-strong); }
+.viz-key--hatch { width: 12px; height: 12px; border-radius: 2px; background: repeating-linear-gradient(45deg, var(--viz-hatch) 0 1.5px, var(--viz-hatch-fill) 1.5px 4px); box-shadow: inset 0 0 0 1px var(--viz-hatch); }
 .viz-key--wash { width: 12px; height: 12px; border-radius: 2px; background: var(--viz-wash-warm); }
 
 /* Tooltip: value leads, label follows. Never the only route to a value. */
@@ -83,8 +69,8 @@
   position: absolute; z-index: 5; pointer-events: none;
   min-width: 140px; max-width: 260px;
   padding: 8px 12px; border-radius: 8px;
-  background: var(--bg-surface); border: 1px solid var(--border-subtle);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  background: var(--bg-overlay, var(--bg-surface)); border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-pop);
   font: 400 13px/20px var(--font-sans); color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
@@ -98,11 +84,16 @@
 .viz-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; flex-wrap: wrap; }
 .viz-foot__note { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
 .viz-table-toggle {
-  min-height: 32px; padding: 0; border: 0; background: none; cursor: pointer;
-  font: 500 13px/20px var(--font-sans); color: var(--accent-primary);
+  position: relative; min-height: 0; padding: 0; border: 0; background: none; cursor: pointer;
+  font: 500 13px/20px var(--font-sans); color: var(--link, var(--accent-primary));
 }
 .viz-table-toggle:hover { text-decoration: underline; }
-.viz-table-toggle:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
+/* The ring hugs the text (about 90x24); the touch target comes from ::after, not the box. */
+.viz-table-toggle:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 2px; border-radius: 6px; }
+@media (pointer: coarse) {
+  .viz .viz-table-toggle, .viz-foot .viz-table-toggle { min-height: 0 !important; min-width: 0 !important; }
+  .viz-table-toggle::after { content: ''; position: absolute; inset: -12px -8px; }
+}
 .viz-table-wrap { margin-top: 8px; overflow-x: auto; }
 .viz-table { width: 100%; border-collapse: collapse; font: 400 13px/20px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .viz-table caption { text-align: left; color: var(--text-secondary); padding-bottom: 4px; }
@@ -123,7 +114,7 @@
 .viz-strip--thin { height: 8px; border-radius: 4px; }
 .viz-strip__seg { position: relative; min-width: 2px; display: flex; align-items: center; justify-content: center; font: 600 12px/16px var(--font-sans); font-variant-numeric: tabular-nums; outline: none; }
 .viz-strip__seg:focus-visible { box-shadow: inset 0 0 0 2px var(--text-primary); }
-.viz-strip__seg:hover { filter: brightness(1.12); }
+.viz-strip__seg:hover { box-shadow: inset 0 0 0 2px var(--viz-surface); }
 .viz-strip-labels { display: grid; gap: 8px 16px; margin-top: 12px; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
 .viz-strip-label { display: flex; flex-direction: column; min-width: 0; }
 .viz-strip-label__name { display: flex; align-items: baseline; gap: 6px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }

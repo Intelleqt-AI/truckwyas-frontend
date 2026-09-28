@@ -1,4 +1,5 @@
 import '@/pages/settings/settings-brand.css';
+import '@/components/layout/section-header.css';
 
 // Shared presentation roles for every settings section (see
 // docs/brand/BRAND-GUIDELINES.md). Each section used to carry its own copy of
@@ -79,7 +80,7 @@ export const settingsHelpStyle: React.CSSProperties = {
 
 export const settingsErrorStyle: React.CSSProperties = {
   ...settingsHelpStyle,
-  color: 'var(--status-danger-text, var(--status-danger))',
+  color: 'var(--status-danger-text)',
 };
 
 /** Right-aligned action row that closes a card (Save changes etc.). */
@@ -187,18 +188,24 @@ export const settingsSecondaryButtonStyle: React.CSSProperties = {
 export const settingsDangerButtonStyle: React.CSSProperties = {
   ...settingsSecondaryButtonStyle,
   border: '1px solid var(--status-danger)',
-  color: 'var(--status-danger-text, var(--status-danger))',
+  color: 'var(--status-danger-text)',
 };
 
-/** Standard settings section title block (one h1 + supporting line). */
+/** Standard settings section title block (one h1 + supporting line). Same
+ * geometry and type as the shared SectionHeader (28/34 title, one grey line,
+ * actions on the title row), so every page head in the product matches. */
 export function SettingsPageHeader({ title, description, actions }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-      <div style={{ minWidth: 0 }}>
-        <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: description ? 4 : 0 }}>{title}</h1>
-        {description && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{description}</div>}
+    <header className="section-header settings-page-head">
+      <div className="section-header__top">
+        <div className="section-header__titles">
+          <div className="section-header__title-row">
+            <h1 className="section-header__title">{title}</h1>
+          </div>
+          {description && <p className="section-header__description">{description}</p>}
+        </div>
+        <div className="section-header__actions">{actions}</div>
       </div>
-      {actions && <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', flexShrink: 0 }}>{actions}</div>}
-    </div>
+    </header>
   );
 }

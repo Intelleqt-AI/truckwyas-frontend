@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Legend, TableTwin, Tip, TipRow, VIZ, linear, localPoint, niceTicks, plural, rand, useTip, useWidth } from './core';
+import { Legend, TableTwin, Tip, TipRow, VIZ, hLine, overlaps, textBox, type Box, linear, localPoint, niceTicks, plural, rand, useTip, useWidth } from './core';
 
 /**
  * "Which lanes are worth it?" Revenue per kilometre (y) against the average
@@ -46,7 +46,14 @@ export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
   const byRate = [...points].sort((a, b) => b.perKm - a.perKm);
   const byRev = [...points].sort((a, b) => b.revenue - a.revenue);
   const want = [...points.filter((p) => !p.thin), byRate[0], byRate[byRate.length - 1], ...byRev].filter(Boolean);
-  const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  // The fleet-average rule and its own label are obstacles: lane labels keep 4px clear of both.
+  const avgY = overallPerKm != null && overallPerKm > 0 ? y(overallPerKm) : null;
+  const avgText = overallPerKm != null ? `Average ${rand(overallPerKm)}/km` : '';
+  const avgBox = avgY != null && W >= 520 ? textBox(avgText, W - padR, avgY - 6, 'end') : null;
+  const placed: Box[] = [
+    ...(avgY != null ? [hLine(axisW, W - padR, avgY)] : []),
+    ...(avgBox ? [avgBox] : []),
+  ];
   const labels: { p: LanePoint; lx: number; ly: number; anchor: 'start' | 'end' }[] = [];
   for (const p of want) {
     if (labels.some((l) => l.p.id === p.id)) continue;
@@ -54,14 +61,21 @@ export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
     const py = y(p.perKm);
     const max = W < 520 ? 18 : 30;
     const text = p.label.length > max ? p.label.slice(0, max - 1) + '…' : p.label;
-    const tw = text.length * 6.4;
-    const right = px + r(p.revenue) + 6 + tw < W - padR;
-    const lx = right ? px + r(p.revenue) + 6 : px - r(p.revenue) - 6;
-    const box = { x0: right ? lx : lx - tw, x1: right ? lx + tw : lx, y0: py - 8, y1: py + 8 };
-    const hitsPoint = points.some((q) => q.id !== p.id && Math.abs(x(q.kmPerTrip) - (box.x0 + box.x1) / 2) < tw / 2 + r(q.revenue) && Math.abs(y(q.perKm) - py) < 8 + r(q.revenue));
-    if (placed.some((b) => b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1) || hitsPoint) continue;
-    placed.push(box);
-    labels.push({ p: { ...p, label: text }, lx, ly: py, anchor: right ? 'start' : 'end' });
+    const pr = r(p.revenue);
+    // Try right of the point, then left; each must clear the average rule, other labels and points.
+    const tries: { lx: number; anchor: 'start' | 'end' }[] = [{ lx: px + pr + 6, anchor: 'start' }, { lx: px - pr - 6, anchor: 'end' }];
+    let done = false;
+    for (const t of tries) {
+      const box = textBox(text, t.lx, py + 4, t.anchor);
+      if (box.x0 < 0 || box.x1 > W - padR + 2 || box.y0 < padT - 8) continue;
+      const hitsPoint = points.some((q) => { const qr = r(q.revenue); const qx = x(q.kmPerTrip); const qy = y(q.perKm); return overlaps(box, { x0: qx - qr, x1: qx + qr, y0: qy - qr, y1: qy + qr }, q.id === p.id ? -1 : 1); });
+      if (placed.some((b) => overlaps(box, b, 4)) || hitsPoint) continue;
+      placed.push(box);
+      labels.push({ p: { ...p, label: text }, lx: t.lx, ly: py + 4, anchor: t.anchor });
+      done = true;
+      break;
+    }
+    if (!done) continue;
   }
 
   const offsetY = () => (figRef.current && svgRef.current ? svgRef.current.getBoundingClientRect().top - figRef.current.getBoundingClientRect().top : 0);
@@ -120,19 +134,19 @@ export function LaneScatter({ points, overallPerKm, minTrips, height = 320 }: {
           {overallPerKm != null && overallPerKm > 0 && (
             <g>
               <line x1={axisW} x2={W - padR} y1={y(overallPerKm)} y2={y(overallPerKm)} stroke="var(--text-secondary)" strokeWidth={1} shapeRendering="crispEdges" />
-              {W >= 520 && <text x={W - padR} y={y(overallPerKm) - 6} textAnchor="end" className="viz-halo">Average {rand(overallPerKm)}/km</text>}
+              {avgBox && <text x={W - padR} y={y(overallPerKm) - 6} textAnchor="end" className="viz-halo">{avgText}</text>}
             </g>
           )}
           {order.map((p) => {
-            const dim = active != null && active !== p.id;
+            const on = active === p.id;
             return p.thin ? (
-              <circle key={p.id} cx={x(p.kmPerTrip)} cy={y(p.perKm)} r={r(p.revenue)} fill="var(--viz-surface)" fillOpacity={0.6} stroke={VIZ.neutralStrong} strokeWidth={active === p.id ? 2.5 : 1.5} opacity={dim ? 0.5 : 1} />
+              <circle key={p.id} cx={x(p.kmPerTrip)} cy={y(p.perKm)} r={r(p.revenue)} fill="var(--viz-surface)" fillOpacity={0.6} stroke={on ? 'var(--text-primary)' : VIZ.neutralStrong} strokeWidth={on ? 2.5 : 1.5} />
             ) : (
-              <circle key={p.id} cx={x(p.kmPerTrip)} cy={y(p.perKm)} r={r(p.revenue)} fill={VIZ.accent} fillOpacity={0.85} stroke="var(--viz-surface)" strokeWidth={2} opacity={dim ? 0.5 : 1} />
+              <circle key={p.id} cx={x(p.kmPerTrip)} cy={y(p.perKm)} r={r(p.revenue)} fill={VIZ.accent} fillOpacity={0.85} stroke={on ? 'var(--text-primary)' : 'var(--viz-surface)'} strokeWidth={2} />
             );
           })}
           {labels.map(({ p, lx, ly, anchor }) => (
-            <text key={`l${p.id}`} x={lx} y={ly} dy="0.32em" textAnchor={anchor} className={p.thin ? 'viz-halo' : 'viz-strong viz-halo'} style={p.thin ? undefined : { fontWeight: 500 }}>{p.label}</text>
+            <text key={`l${p.id}`} x={lx} y={ly} textAnchor={anchor} className={p.thin ? 'viz-halo' : 'viz-strong viz-halo'} style={p.thin ? undefined : { fontWeight: 500 }}>{p.label}</text>
           ))}
         </svg>
       </div>

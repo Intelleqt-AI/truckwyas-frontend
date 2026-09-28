@@ -110,7 +110,7 @@ export function TipRow({ color, value, label, keyShape = 'line' }: { color?: str
 
 // ------------------------------------------------------------------- legend
 
-export interface LegendItem { label: string; color?: string; shape: 'rect' | 'line' | 'dot' | 'ring' | 'wash' }
+export interface LegendItem { label: string; color?: string; shape: 'rect' | 'line' | 'dot' | 'ring' | 'wash' | 'hatch' }
 
 export function Legend({ items }: { items: LegendItem[] }) {
   if (items.length === 0) return null;
@@ -191,10 +191,64 @@ export const boxIn = (container: Element, el: Element) => {
   return { x: b.left - a.left + b.width / 2, y: b.top - a.top };
 };
 
+// --------------------------------------------------------- label placement
+
+/** A box in SVG user units. */
+export interface Box { x0: number; x1: number; y0: number; y1: number }
+
+/** Estimated width of 12px chart text (tabular figures run ~7px a glyph). */
+export const textW = (s: string, px = 12) => s.length * px * 0.58 + 2;
+
+/** Box of a 12px text label drawn with `textAnchor` at (x, baseline y). */
+export function textBox(s: string, x: number, y: number, anchor: 'start' | 'middle' | 'end' = 'middle', px = 12): Box {
+  const w = textW(s, px);
+  const x0 = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
+  return { x0, x1: x0 + w, y0: y - px * 0.92, y1: y + px * 0.3 };
+}
+
+export const overlaps = (a: Box, b: Box, gap = 0) =>
+  a.x0 < b.x1 + gap && b.x0 < a.x1 + gap && a.y0 < b.y1 + gap && b.y0 < a.y1 + gap;
+
+/** First candidate that stays inside `bounds` and keeps `gap` px clear of every obstacle, or null. */
+export function placeLabel<T extends { box: Box }>(candidates: T[], obstacles: Box[], bounds: Box, gap = 4): T | null {
+  for (const c of candidates) {
+    const b = c.box;
+    if (b.x0 < bounds.x0 || b.x1 > bounds.x1 || b.y0 < bounds.y0 || b.y1 > bounds.y1) continue;
+    if (obstacles.some((o) => overlaps(b, o, gap))) continue;
+    return c;
+  }
+  return null;
+}
+
+/** A stable id usable inside url(#…) references. */
+export function useSvgId(prefix: string) {
+  return `${prefix}-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+}
+
+/**
+ * Hatch for a comparison series: 45-degree strokes at 3:1 over a faint fill.
+ * Pair the filled shape with a 1px outline in `VIZ.hatch` so its edge reads too.
+ */
+export function HatchDef({ id }: { id: string }) {
+  return (
+    <defs>
+      <pattern id={id} width={6} height={6} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width={6} height={6} fill="var(--viz-hatch-fill)" />
+        <line x1={1} y1={0} x2={1} y2={6} stroke="var(--viz-hatch)" strokeWidth={1.5} />
+      </pattern>
+    </defs>
+  );
+}
+
+/** A horizontal rule as an obstacle box (1px tall). */
+export const hLine = (x0: number, x1: number, y: number): Box => ({ x0: Math.min(x0, x1), x1: Math.max(x0, x1), y0: y - 0.75, y1: y + 0.75 });
+
 export const VIZ = {
   accent: 'var(--viz-accent)',
   warm: 'var(--viz-warm)',
   neutral: 'var(--viz-neutral)',
   neutralStrong: 'var(--viz-neutral-strong)',
+  hatch: 'var(--viz-hatch)',
+  hoverBand: 'var(--viz-hover-band)',
   ord: ['var(--viz-ord-1)', 'var(--viz-ord-2)', 'var(--viz-ord-3)', 'var(--viz-ord-4)', 'var(--viz-ord-5)'],
 };

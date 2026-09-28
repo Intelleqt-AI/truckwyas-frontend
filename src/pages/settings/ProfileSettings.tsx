@@ -88,7 +88,7 @@ export function ProfileSettings() {
   };
 
   return (
-    <div className="tw-profile-settings" style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div className="tw-profile-settings" style={{ maxWidth: 720 }}>
       <SettingsPageHeader title="Profile settings" description="Manage your personal information and account preferences" />
 
       {/* Profile picture */}

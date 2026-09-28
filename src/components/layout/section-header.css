@@ -24,7 +24,7 @@
 /* v3: bold, tight title; one short grey subtitle line (§9: at most 8 words). */
 .section-header__title {
   margin: 0;
-  font-size: var(--text-display, 28px); line-height: 34px; font-weight: 700;
+  font-size: var(--text-display, 28px); line-height: 34px; font-weight: 600;
   color: var(--text-primary);
   letter-spacing: var(--tracking-display, -0.025em);
 }

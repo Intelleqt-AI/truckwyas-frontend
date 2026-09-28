@@ -12,6 +12,7 @@ import PlatformHealth from '@/pages/admin/PlatformHealth';
 import AuditLogPanel from '@/pages/admin/AuditLogPanel';
 import VehicleTypesPanel from '@/pages/admin/VehicleTypesPanel';
 import CrossBorderRatesPanel from '@/pages/admin/CrossBorderRatesPanel';
+import '@/components/layout/section-header.css';
 
 type SectionItem = { id: string; label: string; component: () => JSX.Element };
 type Section = { group: string; items: SectionItem[] };
@@ -151,12 +152,18 @@ export default function AdminDashboard() {
 
       {/* Content */}
       <div className="tw-admin-shell__content" style={{ flex: 1, padding: '0 0 60px 32px', minWidth: 0 }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)' }}>{current.label}</h1>
-          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>
-            Superuser only. Every change is audited.
+        {/* Same page head as every other section (SectionHeader geometry). */}
+        <header className="section-header settings-page-head">
+          <div className="section-header__top">
+            <div className="section-header__titles">
+              <div className="section-header__title-row">
+                <h1 className="section-header__title">{current.label}</h1>
+              </div>
+              <p className="section-header__description">Superuser only. Every change is audited.</p>
+            </div>
+            <div className="section-header__actions" />
           </div>
-        </div>
+        </header>
         <CurrentComponent />
       </div>
     </div>

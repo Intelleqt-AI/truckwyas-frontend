@@ -97,7 +97,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
               onClick={() => { window.location.href = '/'; }}
               style={{ minHeight: 40 }}
             >
-              Go to Today
+              Back to Home
             </button>
           </div>
         </div>

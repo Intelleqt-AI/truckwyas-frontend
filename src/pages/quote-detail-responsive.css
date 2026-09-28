@@ -2,10 +2,14 @@
 .quote-detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 20px;
+  gap: 24px;
+  align-items: start;
 }
+/* The rail sticks beside the longer quote column (top set by useStickyRail). */
+.quote-detail-grid > .quote-detail-rail { position: sticky; top: 24px; }
 .quote-detail-grid > * { min-width: 0; }
 .quote-detail-grid .card { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 900px) {
   .quote-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .quote-detail-grid > .quote-detail-rail { position: static; }
 }

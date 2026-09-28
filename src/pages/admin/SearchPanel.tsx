@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { Loader } from '@/components/Loader';
+import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 
 // Cross-tenant lookup for support: "does quote/order #X exist, and whose is
 // it" — no navigation, this app has no cross-tenant deep-links from an admin
@@ -55,7 +56,7 @@ function ResultTable({ title, rows, numberKey }: { title: string; rows: any[]; n
                 <tr key={r.id}>
                   <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)' }}>{r[numberKey]}</td>
                   <td style={tdStyle}>
-                    <span className={`status-badge ${STATUS_BADGE_CLASS[String(r.status).toLowerCase()] || ''}`}>{r.status}</span>
+                    <StatusChip status={String(r.status)} size="sm" />
                   </td>
                   <td style={tdStyle}>{r.company_name || '—'}</td>
                 </tr>

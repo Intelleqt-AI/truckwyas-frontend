@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { postData, fetchData } from "@/lib/Api";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FinTile } from '@/components/finance/FinTile';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 export default function CreateInvoice() {
   const navigate = useNavigate();
@@ -88,17 +88,26 @@ export default function CreateInvoice() {
                 <h2 id="create-invoice-details" className="fin-panel-title">Details</h2>
               </div>
             </div>
+            {/* Paired rows keep the form short, so it ends near the summary rail. */}
             <div className="fin-form">
-              <div>
-                <label id="create-invoice-customer-label" htmlFor="create-invoice-customer" className="fin-label">Customer</label>
-                <Select value={form.customer} onValueChange={val => setForm(f => ({ ...f, customer: val }))}>
-                  <SelectTrigger id="create-invoice-customer" aria-labelledby="create-invoice-customer-label">
-                    <SelectValue placeholder="Select a customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <div className="fin-form__row">
+                <div>
+                  <label id="create-invoice-customer-label" htmlFor="create-invoice-customer" className="fin-label">Customer</label>
+                  <Select value={form.customer} onValueChange={val => setForm(f => ({ ...f, customer: val }))}>
+                    <SelectTrigger id="create-invoice-customer" aria-labelledby="create-invoice-customer-label">
+                      <SelectValue placeholder="Select a customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label htmlFor="create-invoice-invoice_number" className="fin-label">
+                    Invoice number <span className="fin-label__hint">Suggested, you can change it</span>
+                  </label>
+                  <input id="create-invoice-invoice_number" className="fin-control qi-input" type="text" value={form.invoice_number} onChange={set('invoice_number')} style={{ fontFamily: 'var(--font-mono)' }} />
+                </div>
               </div>
               <div className="fin-form__row">
                 <div>
@@ -111,51 +120,54 @@ export default function CreateInvoice() {
                 </div>
               </div>
               <div>
-                <label htmlFor="create-invoice-invoice_number" className="fin-label">Invoice number</label>
-                <input id="create-invoice-invoice_number" className="fin-control qi-input" type="text" value={form.invoice_number} onChange={set('invoice_number')} style={{ fontFamily: 'var(--font-mono)' }} />
-                <p className="fin-help">Suggested. Change it if you use your own numbers.</p>
-              </div>
-              <div>
                 <label htmlFor="create-invoice-description" className="fin-label">Description</label>
-                <textarea id="create-invoice-description" className="fin-control qi-input" value={form.description} onChange={set('description')} rows={3} placeholder="e.g. Standby charge, 2 days at Durban port" />
+                <textarea id="create-invoice-description" className="fin-control qi-input" value={form.description} onChange={set('description')} rows={2} placeholder="e.g. Standby charge, 2 days at Durban port" />
               </div>
-              <div>
-                <label id="create-invoice-status-label" htmlFor="create-invoice-status" className="fin-label">When it is created</label>
-                <Select value={form.status} onValueChange={val => setForm(f => ({ ...f, status: val }))}>
-                  <SelectTrigger id="create-invoice-status" aria-labelledby="create-invoice-status-label">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DRAFT">Keep as draft</SelectItem>
-                    <SelectItem value="SENT">Mark as sent to customer</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="fin-form__row">
+                <div>
+                  <label id="create-invoice-status-label" htmlFor="create-invoice-status" className="fin-label">When it is created</label>
+                  <Select value={form.status} onValueChange={val => setForm(f => ({ ...f, status: val }))}>
+                    <SelectTrigger id="create-invoice-status" aria-labelledby="create-invoice-status-label">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="DRAFT">Keep as draft</SelectItem>
+                      <SelectItem value="SENT">Mark as sent to customer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </section>
 
-          <aside className="fin-stack fin-stack--16" style={{ minWidth: 0 }}>
-            <FinTile
-              label="Total incl. VAT"
-              info={<>The amount is saved as the subtotal and VAT at 15% is added when the invoice is saved.</>}
-              value={formatCurrency(totalPreview)}
-              sub={`${formatCurrency(subtotalPreview)} + ${formatCurrency(vatPreview)} VAT`}
-            />
-            <p className="fin-help" style={{ margin: '-4px 0 0' }}>{selectedCustomer ? `For ${selectedCustomer.name}` : 'No customer selected'}</p>
+          {/* Summary rail: sticky, one card with the total and the actions. */}
+          <aside className="fin-rail" aria-label="Invoice summary">
+            <section className="card" aria-labelledby="create-invoice-total">
+              <p id="create-invoice-total" className="fin-summary-card__label">
+                Total incl. VAT
+                <InfoTip>The amount is saved as the subtotal and VAT at 15% is added when the invoice is saved.</InfoTip>
+              </p>
+              <p className="fin-summary-card__figure">{formatCurrency(totalPreview)}</p>
+              <dl className="fin-dl fin-summary-card__split">
+                <div className="fin-dl__row"><dt>Amount excl. VAT</dt><dd>{formatCurrency(subtotalPreview)}</dd></div>
+                <div className="fin-dl__row"><dt>VAT at 15%</dt><dd>{formatCurrency(vatPreview)}</dd></div>
+                <div className="fin-dl__row"><dt>Customer</dt><dd>{selectedCustomer ? selectedCustomer.name : 'Not selected'}</dd></div>
+              </dl>
 
-            {error && <div className="fin-inset fin-text-danger" role="alert" style={{ fontSize: 13, lineHeight: '20px' }}>{error}</div>}
+              {error && <div className="fin-inset fin-text-danger" role="alert" style={{ fontSize: 13, lineHeight: '20px', marginTop: 12 }}>{error}</div>}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button type="submit" className="btn-action qi-action" style={{ width: '100%' }} disabled={!canSubmit || mutation.isPending}>
-                {mutation.isPending ? 'Creating…' : 'Create invoice'}
-              </button>
-              <button type="button" className="btn-action fin-btn-secondary fin-btn-ghost qi-action" style={{ width: '100%' }} onClick={() => navigate('/finance/invoices')}>
-                Cancel
-              </button>
-              {!canSubmit && (
-                <p className="fin-help" style={{ margin: 0 }}>Needs a customer, an amount and a due date.</p>
-              )}
-            </div>
+              <div className="fin-summary-card__actions">
+                <button type="submit" className="btn-action qi-action" style={{ width: '100%' }} disabled={!canSubmit || mutation.isPending}>
+                  {mutation.isPending ? 'Creating…' : 'Create invoice'}
+                </button>
+                <button type="button" className="btn-action fin-btn-secondary fin-btn-ghost qi-action" style={{ width: '100%' }} onClick={() => navigate('/finance/invoices')}>
+                  Cancel
+                </button>
+                {!canSubmit && (
+                  <p className="fin-help" style={{ margin: 0 }}>Needs a customer, an amount and a due date.</p>
+                )}
+              </div>
+            </section>
           </aside>
         </div>
       </form>

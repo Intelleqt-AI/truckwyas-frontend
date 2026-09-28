@@ -65,7 +65,7 @@ export function Sparkline({ values, labels, format, ariaLabel, variant = 'line',
       const top = v === 0 ? base - 1 : y(v);
       return (
         <rect key={i} x={i * step + (step - bw) / 2} y={Math.min(top, base)} width={bw} height={Math.max(1, Math.abs(base - top))} rx={Math.min(2, bw / 2)}
-          fill={i === last ? VIZ.accent : VIZ.neutral} opacity={hoverIdx != null && hoverIdx !== i ? 0.6 : 1} />
+          fill={i === last ? VIZ.accent : VIZ.neutral} />
       );
     });
   } else {
@@ -105,6 +105,7 @@ export function Sparkline({ values, labels, format, ariaLabel, variant = 'line',
         }}
         onPointerMove={(e) => showAt(nearest(localPoint(svgRef.current!, e).x))}
         style={{ outline: 'none' }}>
+        {hoverIdx != null && variant === 'bars' && <rect className="viz-hover-band" x={hoverIdx * step} y={0} width={step} height={H} rx={2} />}
         {min < 0 && <line x1={0} x2={W} y1={y(0)} y2={y(0)} className="viz-baseline" />}
         {body}
         {hoverIdx != null && variant === 'line' && <line x1={x(hoverIdx)} x2={x(hoverIdx)} y1={0} y2={H} className="viz-cross" />}

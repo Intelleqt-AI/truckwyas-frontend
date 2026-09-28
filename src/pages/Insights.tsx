@@ -5,6 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Segmented } from '@/components/ui/Segmented';
 import InsightCard from '@/components/insights/InsightCard';
 import KpiTile from '@/components/insights/KpiTile';
 import RankedList from '@/components/insights/RankedList';
@@ -42,14 +43,20 @@ const TABS: { id: TabType; label: string }[] = [
   { id: 'lanes', label: 'Lanes' },
 ];
 
-const PERIOD_OPTIONS: { id: PeriodType; label: string }[] = [
-  { id: 'THIS_MONTH', label: 'This month' },
-  { id: 'LAST_MONTH', label: 'Last month' },
-  { id: 'LAST_3M', label: 'Last 3M' },
-  { id: 'LAST_6M', label: 'Last 6M' },
-  { id: 'LAST_12M', label: 'Last 12M' },
-  { id: 'CUSTOM', label: 'Custom' },
+const PERIOD_OPTIONS: { value: PeriodType; label: string; ariaLabel?: string }[] = [
+  { value: 'THIS_MONTH', label: 'This month' },
+  { value: 'LAST_MONTH', label: 'Last month' },
+  { value: 'LAST_3M', label: '3M', ariaLabel: 'Last 3 months' },
+  { value: 'LAST_6M', label: '6M', ariaLabel: 'Last 6 months' },
+  { value: 'LAST_12M', label: '12M', ariaLabel: 'Last 12 months' },
+  { value: 'CUSTOM', label: 'Custom' },
 ];
+
+interface PeriodState {
+  period: PeriodType; setPeriod: (p: PeriodType) => void;
+  customFrom: string; setCustomFrom: (v: string) => void;
+  customTo: string; setCustomTo: (v: string) => void;
+}
 
 interface MonthlyTrend { month: string; revenue: number; expenses: number; margin: number }
 interface FinanceData {
@@ -101,12 +108,33 @@ export default function Insights() {
   const tabParam = (rawTab === 'cash' ? 'paid' : rawTab) as TabType | null;
   const tab: TabType = TABS.some(t => t.id === tabParam) ? tabParam! : 'findings';
   const setTab = (t: TabType) => setParams(p => { const n = new URLSearchParams(p); if (t === 'findings') n.delete('tab'); else n.set('tab', t); return n; }, { replace: true });
+  // The Margin period lives in the page head: one segmented control per page, never in a card.
+  const [period, setPeriod] = useState<PeriodType>('LAST_12M');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const periodState: PeriodState = { period, setPeriod, customFrom, setCustomFrom, customTo, setCustomTo };
 
   return (
     <div className="insights-page-brand">
-      <header className="insights-header">
-        <h1 className="insights-title">Insights</h1>
-        <p className="insights-intro">Findings worth money, each with one next step.</p>
+      <header className="tw-page-head insights-header">
+        <div className="tw-page-head__titles">
+          <h1 className="tw-title">Insights</h1>
+          <p className="tw-subtitle">Findings worth money, each with one next step.</p>
+        </div>
+        {tab === 'margin' && (
+          <div className="tw-page-head__actions insights-head-actions">
+            <div className="insights-seg-scroll">
+              <Segmented label="Period" value={period} onChange={setPeriod} options={PERIOD_OPTIONS} />
+            </div>
+            {period === 'CUSTOM' && (
+              <div className="insights-custom">
+                <DatePicker value={customFrom} onChange={setCustomFrom} placeholder="From" style={{ width: 150, maxWidth: '100%', padding: 0, fontSize: 14, lineHeight: '20px' }} />
+                <span className="insights-custom__to">to</span>
+                <DatePicker value={customTo} onChange={setCustomTo} placeholder="To" style={{ width: 150, maxWidth: '100%', padding: 0, fontSize: 14, lineHeight: '20px' }} />
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       <nav className="insights-tabs" aria-label="Insights sections">
@@ -118,7 +146,7 @@ export default function Insights() {
       </nav>
 
       {tab === 'findings' && <FindingsFeed />}
-      {tab === 'margin' && <MarginTab />}
+      {tab === 'margin' && <MarginTab {...periodState} />}
       {tab === 'paid' && <PaidTab />}
       {tab === 'fleet' && <FleetTab />}
       {tab === 'lanes' && <LanesTab />}
@@ -128,10 +156,7 @@ export default function Insights() {
 
 // ------------------------------------------------------------------ margin
 
-function MarginTab() {
-  const [period, setPeriod] = useState<PeriodType>('LAST_12M');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+function MarginTab({ period, setPeriod, customFrom, customTo }: PeriodState) {
   const { from, to } = periodRange(period, customFrom, customTo);
   const finance = useQuery<FinanceData | null>({
     queryKey: ['insights-finance', from, to],
@@ -148,19 +173,6 @@ function MarginTab() {
 
   return (
     <Stack>
-      <div className="insights-periods" role="group" aria-label="Period">
-        {PERIOD_OPTIONS.map(p => (
-          <button key={p.id} type="button" onClick={() => setPeriod(p.id)} className="insights-period-control" aria-pressed={period === p.id}>{p.label}</button>
-        ))}
-        {period === 'CUSTOM' && (
-          <>
-            <DatePicker value={customFrom} onChange={setCustomFrom} placeholder="From" style={{ width: 160, maxWidth: '100%', padding: 0, fontSize: 14, lineHeight: '20px' }} />
-            <span className="insights-periods__to">to</span>
-            <DatePicker value={customTo} onChange={setCustomTo} placeholder="To" style={{ width: 160, maxWidth: '100%', padding: 0, fontSize: 14, lineHeight: '20px' }} />
-          </>
-        )}
-      </div>
-
       {(finance.isLoading || finance.isError) ? (
         <TabState loading={finance.isLoading} error={finance.isError} onRetry={() => finance.refetch()} />
       ) : !f ? null : (() => {
@@ -195,10 +207,10 @@ function MarginTab() {
                       ? <KpiTile label="With pending costs" value={rand(withPending, 0)} tone={withPending < 0 ? 'danger' : undefined} note={`${rand(pendingInPeriod, 0)} not approved`} />
                       : <KpiTile label="Pending costs" value="None" note="Every cost is approved" />}
                   </dl>
+                  {/* The tiles above carry every figure; the bridge shows the shape, values live in the tooltip and table. */}
                   <Waterfall
-                    height={240}
-                    maxWidth={640}
-                    labelAll
+                    height={220}
+                    values="none"
                     valueHeader="Amount"
                     caption="Revenue, costs and net margin for the period"
                     ariaLabel={`Revenue ${rand(rev)}, minus approved costs ${rand(cost)}, leaves ${rand(margin)}.${pendingInPeriod > 0 ? ` Pending costs of ${rand(pendingInPeriod)} would leave ${rand(withPending)}.` : ''}`}
@@ -341,16 +353,17 @@ function FleetTab() {
   const partial = vehicles.data && !vehicles.data.complete ? ` Based on the first ${list.length} of ${vehicles.data.count} trucks.` : '';
   return (
     <Stack>
-      <dl className="ic-kpis insights-tiles">
-        <KpiTile label="Trucks" value={String(list.length)} />
-        <KpiTile label="Available or in use" value={`${working}`} note={`${list.length - working} in maintenance or other`} />
-        <KpiTile label="With revenue recorded" value={`${earning.length}`} note={`${list.length - earning.length} with none yet`} />
-      </dl>
       <InsightCard
         title="Revenue by truck"
         description="Revenue recorded against each truck"
         info={`Revenue recorded on each truck's profile. Trip counts and costs are not included, so compare with care.${partial}`}
       >
+        {/* Fleet counts are attributes, not decisions: one line in the card, not three tiles. */}
+        <dl className="insights-stats insights-stats--head">
+          <div><dt>Trucks</dt><dd>{list.length}</dd></div>
+          <div><dt>Available or in use</dt><dd>{working}<span className="insights-stats__note">{list.length - working} in maintenance or other</span></dd></div>
+          <div><dt>With revenue recorded</dt><dd>{earning.length}<span className="insights-stats__note">{list.length - earning.length} with none yet</span></dd></div>
+        </dl>
         <RankedList
           rows={list.map(v => ({
             id: String(v.id),

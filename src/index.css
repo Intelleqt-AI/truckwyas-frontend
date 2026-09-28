@@ -7,11 +7,11 @@
    toast surface must follow the active theme — no dark toasts in light mode.
    Body text is sans 14/20 per the brand type roles; mono is identifiers only. */
 .Toastify__toast {
-  background: var(--bg-surface) !important;
+  background: var(--bg-overlay) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border-subtle) !important;
+  border: 1px solid var(--border-overlay) !important;
   border-radius: var(--radius-card) !important;
-  box-shadow: none !important;
+  box-shadow: var(--shadow-pop) !important;
   font-family: var(--font-sans) !important;
   font-size: 14px !important;
   letter-spacing: normal !important;
@@ -27,10 +27,10 @@
 }
 
 
-.Toastify__progress-bar--success { background: #22c55e !important; }
-.Toastify__progress-bar--error   { background: #ef4444 !important; }
-.Toastify__progress-bar--warning { background: #f59e0b !important; }
-.Toastify__progress-bar--info    { background: #4d9eff !important; }
+.Toastify__progress-bar--success { background: var(--status-success-dot) !important; }
+.Toastify__progress-bar--error   { background: var(--status-danger-dot) !important; }
+.Toastify__progress-bar--warning { background: var(--status-warning-dot) !important; }
+.Toastify__progress-bar--info    { background: var(--status-info-dot) !important; }
 .Toastify__progress-bar          { opacity: 0.6 !important; height: 2px !important; }
 
 .Toastify__close-button {
@@ -42,6 +42,7 @@
   align-self: center !important;
 }
 .Toastify__close-button:hover { color: var(--text-primary) !important; }
+.Toastify__close-button:focus-visible { outline: 2px solid var(--focus-outline) !important; outline-offset: 2px; border-radius: 4px; }
 
 .Toastify__toast-icon svg { width: 16px !important; height: 16px !important; }
 
@@ -85,8 +86,12 @@ body {
 }
 
 /* ── Themed Select (Radix) ──────────────────────────────────────────────────── */
+/* Triggers use the form-control boundary (>= 3:1), stronger on hover. */
+.tw-select-trigger {
+  border-color: var(--border-control) !important;
+}
 .tw-select-trigger:hover {
-  border-color: var(--border-active) !important;
+  border-color: var(--border-control-hover) !important;
 }
 .tw-select-trigger:focus-visible {
   outline: 2px solid var(--accent-primary);
@@ -155,19 +160,24 @@ body {
   background: var(--accent-primary);
 }
 
-/* Selected: solid accent fill. Text on the accent follows the theme:
-   white on the light-mode blue, near-black on the brighter dark-mode blue
-   (white on #4D9EFF measures only 2.7:1). */
+/* Selected: the ink fill of the primary button (black in light, near-white
+   in dark). Accent stays for "today" and focus. */
 .rdp-day-selected {
-  background: var(--accent-primary) !important;
-  color: var(--btn-action-color, #ffffff) !important;
+  background: var(--btn-primary-bg) !important;
+  color: var(--btn-primary-fg) !important;
   border-radius: var(--radius-control);
   font-weight: 600;
 }
 
 .rdp-day-selected:hover {
-  background: var(--accent-primary) !important;
-  opacity: 0.9;
+  background: var(--btn-primary-hover) !important;
+}
+
+/* Days from the neighbouring months: tertiary text (>= 4.5:1), not faded. */
+.rdp-day_outside,
+.rdp-day-outside {
+  color: var(--text-tertiary) !important;
+  opacity: 1 !important;
 }
 
 /* ── Step 1: two-column responsive layout ─────────────────────────────────── */

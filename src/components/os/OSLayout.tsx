@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, MessageSquareText, Sun, Moon, ChevronDown } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LiveEvents } from '@/components/LiveEvents';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useAuth } from '@/lib/AuthContext';
@@ -128,6 +128,24 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   const canAsk = ['ADMIN', 'MANAGER', 'OPERATOR', 'DISPATCHER', 'VIEWER'].includes(userRole);
   const roleLabel = userRole.charAt(0) + userRole.slice(1).toLowerCase();
   const companyName = (authUser?.company_name as string) || 'Your company';
+  const isAdmin = userRole === 'ADMIN';
+  // Company logo for the sidebar chip. Same query key and endpoint the quote
+  // builder already uses, so the cache is shared and Company settings'
+  // invalidation refreshes it. Failure just falls back to the initial.
+  const { data: companyProfile } = useQuery<any>({
+    queryKey: ['company-profile'],
+    queryFn: () => fetchData('api/v1/company/profile/'),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const companyLogo = (() => {
+    const url: string | undefined = companyProfile?.logo_url || companyProfile?.logo;
+    // The backend returns a placeholder when nothing was uploaded; show the initial then.
+    if (!url || typeof url !== 'string' || url.endsWith('/brand/logo.svg')) return undefined;
+    if (/^https?:/.test(url)) return url;
+    const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    return `${apiBase}/${url.replace(/^\//, '')}`;
+  })();
   const status = {
     label: subscriptionStatusLabel(subStatus, cancelAtPeriodEnd),
     tone: statusTone,
@@ -183,9 +201,12 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
       <Sidebar
         allowed={allowed}
         canAccessSettings={canAccessSettings}
+        isAdmin={isAdmin}
         collapsed={railed}
         onToggle={toggleCollapsed}
         companyName={companyName}
+        companyLogo={companyLogo}
+        onSignOut={handleLogout}
         theme={theme}
         status={status}
       />
@@ -193,7 +214,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
       {/* TOP BAR */}
       <header className="os-header tw-top">
         <a href="/" className="tw-top__mark" aria-label="TruckWys home" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
-          <img src="/brand/truckwys-logo.png" alt="" style={{ filter: theme === 'dark' ? 'invert(1) brightness(2)' : 'none' }} />
+          <img src="/brand/truckwys-logo.png" alt="" style={{ filter: theme === 'dark' ? 'invert(1)' : 'none' }} />
         </a>
 
         {canAsk && (

@@ -6,6 +6,7 @@ import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import RowActions from '@/components/ui/RowActions';
+import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 
 // Platform-wide vehicle type catalog (company=None rows) — every company's
 // New Quote / Add Vehicle pickers show these plus whatever custom types that
@@ -213,7 +214,7 @@ export default function VehicleTypesPanel() {
           display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12,
         }}>
           {formErr && (
-            <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px' }}>
+            <div style={{ gridColumn: '1 / -1', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px' }}>
               {formErr}
             </div>
           )}
@@ -252,7 +253,7 @@ export default function VehicleTypesPanel() {
                   <td className="num" style={tdStyle}>{fmtRate(t.base_rate)}<span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>/km</span></td>
                   <td className="num" style={tdStyle}>{t.fuel_consumption_l_per_100km}L/100km</td>
                   <td style={tdStyle}>
-                    <span className={`status-badge ${t.active ? 'active' : 'delayed'}`}>{t.active ? 'Active' : 'Inactive'}</span>
+                    <StatusChip status={t.active ? 'ACTIVE' : 'INACTIVE'} size="sm" />
                   </td>
                   <td style={actionTdStyle}>
                     <RowActions
@@ -283,7 +284,7 @@ export default function VehicleTypesPanel() {
               <button className="admin-control admin-tint-hover" aria-label="Close" onClick={() => setEditTarget(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, width: 40, height: 40, borderRadius: 'var(--radius-control)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
             {formErr && (
-              <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
+              <div style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text)', borderRadius: 'var(--radius-nested)', marginBottom: 16, fontSize: 13, lineHeight: '20px' }}>
                 {formErr}
               </div>
             )}
@@ -293,7 +294,7 @@ export default function VehicleTypesPanel() {
                 className="admin-control"
                 disabled={saving}
                 onClick={handleEditSave}
-                style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 'var(--radius-control)', cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
+                style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control)', cursor: saving ? 'wait' : 'pointer', fontWeight: 500 }}
               >
                 {saving ? 'Saving…' : 'Save changes'}
               </button>

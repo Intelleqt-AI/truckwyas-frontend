@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader } from '@/components/Loader';
 import { useAuth } from '@/lib/AuthContext';
 import RowActions from '@/components/ui/RowActions';
+import { StatusChip } from '@/components/ui/StatusChip';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
 interface Customer {
@@ -342,13 +343,13 @@ export default function Customers() {
                       onChange={on => toggleOne(c.id, on)}
                     />
                   </td>
-                  <td className="is-primary is-truncate" style={{ fontWeight: 500, maxWidth: 220 }} title={c.name}>
+                  <td className="is-primary is-nowrap" style={{ fontWeight: 500 }} title={c.name}>
                     {c.name}
                   </td>
-                  <td className="is-truncate" style={{ maxWidth: 200 }} title={c.company_name || ""}>
+                  <td className="is-nowrap" title={c.company_name || ""}>
                     {c.company_name || "—"}
                   </td>
-                  <td className="is-truncate" style={{ maxWidth: 220 }} title={c.email}>
+                  <td className="is-nowrap" title={c.email}>
                     {c.email}
                   </td>
                   <td>
@@ -361,7 +362,7 @@ export default function Customers() {
                     {paymentTermsLabel(c.payment_terms_default)}
                   </td>
                   <td>
-                    <span className={`bk-status bk-status--${status === "ACTIVE" ? "success" : "neutral"}`}>{status === "ACTIVE" ? "Active" : "Inactive"}</span>
+                    <StatusChip status={status === "ACTIVE" ? "ACTIVE" : "INACTIVE"} size="sm" />
                   </td>
                   <td className="is-num">
                     <RowActions
@@ -428,7 +429,7 @@ export default function Customers() {
               { key: "billing_address", label: "Billing address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text, var(--status-danger))", marginLeft: 2 }}>*</span>}</label>
+                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text)", marginLeft: 2 }}>*</span>}</label>
                 <input
                   className="qi-input"
                   aria-label={f.label}
@@ -529,7 +530,7 @@ export default function Customers() {
               { key: "billing_address", label: "Billing address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text, var(--status-danger))", marginLeft: 2 }}>*</span>}</label>
+                <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text)", marginLeft: 2 }}>*</span>}</label>
                 <input
                   className="qi-input"
                   aria-label={f.label}

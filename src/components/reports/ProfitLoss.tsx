@@ -73,14 +73,6 @@ export default function ProfitLoss({ d, companyName }: { d: Ledger; companyName?
         <PeriodControl period={period} onChange={setPeriod} />
         <Seg label="Basis" value={basis} onChange={setBasis} options={[{ id: 'cash', label: 'Cash basis' }, { id: 'invoice', label: 'Invoice basis' }]} />
       </>}
-      tiles={<Tiles tiles={[
-        { label: 'Revenue', value: moneyWhole(t.rev), title: money(t.rev), delta: changeText(t.rev, t.prevRev, t.priorLabel) },
-        { label: 'Gross profit', value: moneyWhole(t.gross), title: money(t.gross), note: t.rev > 0 ? `${pct((t.gross / t.rev) * 100)} gross margin` : undefined },
-        { label: 'Net profit', value: moneyWhole(t.net), title: money(t.net), note: t.rev > 0 ? `${pct((t.net / t.rev) * 100)} net margin` : undefined, delta: changeText(t.net, t.prevNet, t.priorLabel) },
-        t.pending > 0
-          ? { label: 'Pending costs', value: moneyWhole(t.pending), title: money(t.pending), note: `${plural(t.pendingCount, 'expense')}, not deducted` }
-          : { label: 'Total costs', value: moneyWhole(t.costs), title: money(t.costs) },
-      ]} />}
       gaps={['VAT on expenses is not captured, so costs are shown as entered.']}
       csv={() => statementCsv(`Profit and loss, ${periodText(period)}`, basisText, t.table)}
       csvName={`profit-and-loss-${period.from}-to-${period.to}-${basis}`}
@@ -164,8 +156,8 @@ function build(d: Ledger, period: Period, basis: Basis) {
   };
 
   const check = basis === 'cash'
-    ? <Check>Revenue {money(rNow.excl)} plus VAT {money(rNow.vat)} equals {money(rNow.incl)} received, {plural(rNow.count, 'payment')}.</Check>
-    : <Check>Revenue {money(rNow.excl)} plus VAT {money(rNow.vat)} equals {money(rNow.incl)} invoiced, {plural(rNow.count, 'invoice')}.</Check>;
+    ? <Check>Total revenue plus VAT {money(rNow.vat)} equals {money(rNow.incl)} received, {plural(rNow.count, 'payment')}.</Check>
+    : <Check>Total revenue plus VAT {money(rNow.vat)} equals {money(rNow.incl)} invoiced, {plural(rNow.count, 'invoice')}.</Check>;
 
   const pending = pendingList.reduce((s, e) => s + num(e.amount), 0);
   return {

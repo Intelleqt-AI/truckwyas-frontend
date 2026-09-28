@@ -73,7 +73,8 @@ export function RevenueCostBars({ months }: { months: MonthPoint[] }) {
   const top = ticks[ticks.length - 1] || maxV;
   const y = (v: number) => padT + plotH - (v / top) * plotH;
   const band = plotW / Math.max(1, months.length);
-  const bw = Math.min(22, band * 0.26);
+  // Narrow data gets wider bars, not a narrower chart (§11.1).
+  const bw = Math.max(6, Math.min(40, band * 0.28));
   const last = months.length - 1;
 
   const showAt = (i: number) => {
@@ -82,8 +83,8 @@ export function RevenueCostBars({ months }: { months: MonthPoint[] }) {
     show(padL + band * i + band / 2, y(Math.max(m.revenue, m.costs)), (
       <>
         <div className="viz-tip__title">{m.full}</div>
-        <TipRow color="var(--accent-primary)" value={rand(m.revenue, 0)} label="revenue" />
-        <TipRow color="var(--chart-muted)" value={rand(m.costs, 0)} label="costs" />
+        <TipRow color="var(--chart-series-1)" value={rand(m.revenue, 0)} label="revenue" />
+        <TipRow color="var(--chart-hatch)" value={rand(m.costs, 0)} label="costs" />
         <TipRow keyShape="none" value={`${m.revenue - m.costs < 0 ? '−' : ''}${rand(Math.abs(m.revenue - m.costs), 0)}`} label={m.revenue - m.costs < 0 ? 'short' : 'left over'} />
       </>
     ));
@@ -123,9 +124,9 @@ export function RevenueCostBars({ months }: { months: MonthPoint[] }) {
         {months.map((m, i) => {
           const cx = padL + band * i + band / 2;
           const isCur = i === last;
-          const dim = hover != null && hover !== i;
+          // Hover draws a column band; the other months keep full value (no dimming).
           return (
-            <g key={m.full} opacity={dim ? 0.45 : 1} style={{ transition: 'opacity 0.12s' }}>
+            <g key={m.full}>
               {hover === i && <rect x={padL + band * i + 2} y={padT} width={band - 4} height={plotH} rx={8} className="td-hover-band" />}
               <rect x={cx - bw - 2} y={y(m.revenue)} width={bw} height={Math.max(0, y(0) - y(m.revenue))} rx={4} className={`td-bar-rev${isCur ? ' is-current' : ''}`} />
               <rect x={cx + 2} y={y(m.costs)} width={bw} height={Math.max(0, y(0) - y(m.costs))} rx={4} fill="url(#td-hatch)" className="td-bar-cost" />

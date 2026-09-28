@@ -92,10 +92,10 @@ export default function CashMovement({ d, companyName }: { d: Ledger; companyNam
         <PeriodControl period={period} onChange={setPeriod} />
         <Seg label="View" value={view} onChange={setView} options={[{ id: 'summary', label: 'By month' }, { id: 'book', label: 'Cash book' }]} />
       </>}
-      tiles={<Tiles tiles={[
-        { label: 'Money in', value: moneyWhole(totalIn), title: money(totalIn), note: plural(receipts.length, 'receipt') },
-        { label: 'Money out', value: moneyWhole(totalOut), title: money(totalOut), note: plural(outs.length, 'approved expense') },
-        { label: 'Net movement', value: moneyWhole(totalIn - totalOut), title: money(totalIn - totalOut), note: periodText(period) },
+      tiles={<Tiles table={table} tiles={[
+        { label: 'Money in', value: moneyWhole(totalIn), title: money(totalIn), note: plural(receipts.length, 'receipt'), amount: totalIn },
+        { label: 'Money out', value: moneyWhole(totalOut), title: money(totalOut), note: plural(outs.length, 'approved expense'), amount: totalOut },
+        { label: 'Net movement', value: moneyWhole(totalIn - totalOut), title: money(totalIn - totalOut), note: periodText(period), amount: totalIn - totalOut },
       ]} />}
       gaps={['Bank balance is not recorded in TruckWys, so there is no opening or closing balance.']}
       csv={() => statementCsv(`Cash movement, ${periodText(period)}`, view === 'book' ? 'Cash book' : 'By month', table)}
@@ -107,7 +107,13 @@ export default function CashMovement({ d, companyName }: { d: Ledger; companyNam
         stickyFirst={view !== 'book'}
         scrollEnd={view !== 'book'}
         footer={receipts.length > 0 ? (
-          <Check>Money in {money(totalIn)}: {money(toPaidSum)} on {plural(paidInvoices, 'invoice')} now paid in full, {money(totalIn - toPaidSum)} part-payments on open invoices.</Check>
+          <Check>
+            {Math.abs(totalIn - toPaidSum) < 0.005
+              ? <>All money in was on {plural(paidInvoices, 'invoice')} now paid in full.</>
+              : toPaidSum < 0.005
+                ? <>All money in was part-payments on open invoices.</>
+                : <>Money in: {money(toPaidSum)} on {plural(paidInvoices, 'invoice')} now paid in full, {money(totalIn - toPaidSum)} part-payments on open invoices.</>}
+          </Check>
         ) : undefined}
       />
     </ReportFrame>

@@ -79,7 +79,7 @@ export default function IntegrationsPanel() {
       {isLoading ? (
         <Loader size={24} />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 24 }}>
           <IntegrationTable
             title="Xero"
             count={data?.xero_connected_count ?? 0}

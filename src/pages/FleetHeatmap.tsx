@@ -5,7 +5,6 @@ import { formatCurrency } from '@/lib/formatters';
 import { Loader } from '@/components/Loader';
 import SectionHeader from '@/components/layout/SectionHeader';
 import './fleet-vehicles-brand.css';
-import './ops-tiles.css';
 import { InfoTip } from '@/components/ui/InfoTip';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 
@@ -137,25 +136,8 @@ export default function FleetHeatmap() {
         }
       />
 
-      {/* Summary tiles: how much of the fleet is working right now. */}
-      <section className="ops-tiles" aria-label="Fleet right now">
-        <div className="ops-tile">
-          <h2 className="ops-tile__label">On a job now</h2>
-          <div className="ops-tile__value">{statusMap['IN_USE'] || 0}<span className="ops-tile__of">of {vehicles.length}</span></div>
-          <div className="ops-tile__sub">{utilRate}% of the fleet</div>
-        </div>
-        <div className="ops-tile">
-          <h2 className="ops-tile__label">Available</h2>
-          <div className="ops-tile__value">{statusMap['AVAILABLE'] || 0}</div>
-          <div className="ops-tile__sub">Ready for a load</div>
-        </div>
-        <div className="ops-tile">
-          <h2 className="ops-tile__label">In maintenance</h2>
-          <div className="ops-tile__value">{statusMap['MAINTENANCE'] || 0}</div>
-          <div className="ops-tile__sub">Off the road</div>
-        </div>
-      </section>
-
+      {/* The fleet's right-now status counts live on Fleet overview and
+          Vehicles; this page is about when and where the work happens. */}
       <div className="fleet-heatmap-grid">
         {/* Heatmap */}
         <section className="card fleet-panel">
@@ -197,7 +179,7 @@ export default function FleetHeatmap() {
                 <div key={day} className="fleet-heatmap__row">
                   <div className="fleet-heatmap__day">{day}</div>
                   {heatmap[di].map((val, hi) => (
-                    <div key={hi} title={`${day} ${String(hi).padStart(2, '0')}:00, ${pickupCounts[di][hi]} ${pickupCounts[di][hi] === 1 ? 'pickup' : 'pickups'}`} aria-label={`${day} ${hi}:00, ${pickupCounts[di][hi]} pickups`} style={{ aspectRatio: '1', background: getUtilColor(val), borderRadius: 2, minHeight: 0 }} />
+                    <div key={hi} title={`${day} ${String(hi).padStart(2, '0')}:00, ${pickupCounts[di][hi]} ${pickupCounts[di][hi] === 1 ? 'pickup' : 'pickups'}`} aria-label={`${day} ${hi}:00, ${pickupCounts[di][hi]} pickups`} className="fleet-heatmap__cell" style={{ background: getUtilColor(val) }} />
                   ))}
                 </div>
               ))}
@@ -206,7 +188,7 @@ export default function FleetHeatmap() {
         </section>
 
         {/* Top routes */}
-        <section className="card fleet-panel">
+        <section className="card fleet-panel fleet-routes-panel">
           <h2 className="fleet-panel__title" style={{ marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             Top routes
             <InfoTip>Top {Math.min(8, topRoutes.length)} routes by number of loads, with order totals. {sampleNote}</InfoTip>
@@ -214,9 +196,13 @@ export default function FleetHeatmap() {
           <p className="fleet-muted" style={{ margin: '0 0 16px' }}>By number of loads</p>
           {topRoutes.length === 0 ? (
             <div className="fleet-muted" style={{ textAlign: 'center', padding: '20px 0' }}>No loads yet.</div>
-          ) : topRoutes.map(([route, data]) => (
-            <RouteBar key={route} route={route} count={data.count} revenue={data.revenue} maxCount={maxRouteCount} total={loads.length} />
-          ))}
+          ) : (
+            <div className="fleet-routes">
+              {topRoutes.map(([route, data]) => (
+                <RouteBar key={route} route={route} count={data.count} revenue={data.revenue} maxCount={maxRouteCount} total={loads.length} />
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>

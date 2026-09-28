@@ -169,7 +169,7 @@ const Login = () => {
             }}
           />
           {validationErrors.username && (
-            <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
+            <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>
               {validationErrors.username}
             </div>
           )}
@@ -185,7 +185,7 @@ const Login = () => {
                 fontSize: 13,
                 lineHeight: '20px',
                 fontWeight: 500,
-                color: 'var(--status-info-text, var(--accent-primary))',
+                color: 'var(--status-info-text)',
                 textDecoration: 'none',
               }}
             >
@@ -218,7 +218,7 @@ const Login = () => {
             </button>
           </div>
           {validationErrors.password && (
-            <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
+            <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>
               {validationErrors.password}
             </div>
           )}
@@ -230,7 +230,7 @@ const Login = () => {
             background: 'var(--status-danger-bg)',
             border: '1px solid var(--status-danger)',
             borderRadius: 'var(--radius-nested)',
-            color: 'var(--status-danger-text, var(--status-danger))',
+            color: 'var(--status-danger-text)',
             fontSize: 13,
             lineHeight: '20px',
           }} role="alert">
@@ -268,7 +268,7 @@ const Login = () => {
               border: 'none',
               padding: 0,
               font: 'inherit',
-              color: 'var(--accent-primary)',
+              color: 'var(--link)',
               fontWeight: 500,
               textDecoration: 'none',
               cursor: isPending ? 'wait' : 'pointer',
@@ -288,7 +288,7 @@ const Login = () => {
         color: 'var(--text-secondary)'
       }}>
         Don't have an account?{" "}
-        <Link to="/signup" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>
+        <Link to="/signup" style={{ color: 'var(--link)', textDecoration: 'none', fontWeight: 500 }}>
           Sign up
         </Link>
       </div>
@@ -304,7 +304,7 @@ const Login = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px 16px' }}>
         {PLAN_FEATURES.map(f => (
           <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-            <Check size={16} aria-hidden="true" style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: 2 }} />
+            <Check size={16} aria-hidden="true" style={{ color: 'var(--text-primary)', flexShrink: 0, marginTop: 2 }} />
             {f}
           </div>
         ))}
@@ -329,7 +329,7 @@ const Login = () => {
     return (
       <MobileAuthLayout
         eyebrow="Welcome back"
-        title={<>Your fleet, right where <span style={{ color: 'var(--accent-primary)' }}>you left it</span>.</>}
+        title={<>Your fleet, right where <span style={{ color: 'var(--text-tertiary)' }}>you left it</span>.</>}
         subtitle="Loads, quotes, invoices, and fleet intelligence, all in one dashboard, updated in real time."
         footer={extraContent}
       >
@@ -371,11 +371,11 @@ const Login = () => {
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
           <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
 
-          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-info-text, var(--accent-primary))', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-info-text)', marginBottom: 10 }}>
             Welcome back
           </div>
           <p style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', margin: '0 0 16px', letterSpacing: 'normal' }}>
-            Your fleet, right where <span style={{ color: 'var(--accent-primary)' }}>you left it</span>.
+            Your fleet, right where <span style={{ color: 'var(--text-tertiary)' }}>you left it</span>.
           </p>
           <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: '22px', marginBottom: 32 }}>
             Loads, quotes, invoices, and fleet intelligence, all in one dashboard, updated in real time.

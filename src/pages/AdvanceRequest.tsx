@@ -110,7 +110,7 @@ export default function AdvanceRequest() {
           </div>
           <button
             className="btn-action"
-            style={{ padding: '10px 24px', minHeight: 40, background: 'var(--accent-primary)', color: 'var(--btn-action-color)', border: 'none', borderRadius: 'var(--radius-control)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 14, lineHeight: '20px' }}
+            style={{ padding: '10px 24px', minHeight: 40, background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 14, lineHeight: '20px' }}
             onClick={() => navigate('/capital')}
           >
             Back to Fast Pay
@@ -212,8 +212,8 @@ export default function AdvanceRequest() {
                   disabled={!selectedInvoiceId}
                   style={{
                     padding: '8px 16px',
-                    background: selectedInvoiceId ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    color: selectedInvoiceId ? 'var(--btn-action-color)' : 'var(--text-tertiary)',
+                    background: selectedInvoiceId ? 'var(--btn-primary-bg)' : 'var(--bg-surface)',
+                    color: selectedInvoiceId ? 'var(--btn-primary-fg)' : 'var(--text-tertiary)',
                     border: 'none', borderRadius: 'var(--radius-control)',
                     cursor: selectedInvoiceId ? 'pointer' : 'not-allowed',
                     minHeight: 40,
@@ -293,7 +293,7 @@ export default function AdvanceRequest() {
             </button>
             <button
               className="btn-action"
-              style={{ padding: '10px 20px', minHeight: 40, background: 'var(--accent-primary)', color: 'var(--btn-action-color)', border: 'none', borderRadius: 'var(--radius-control)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 600 }}
+              style={{ padding: '10px 20px', minHeight: 40, background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: 'var(--radius-control)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 600 }}
               onClick={() => setStep(3)}
             >
               Continue
@@ -344,8 +344,8 @@ export default function AdvanceRequest() {
               title={CAPITAL_LAUNCHED ? undefined : CAPITAL_COMING_SOON}
               style={{
                 padding: '10px 20px',
-                background: submitting || !CAPITAL_LAUNCHED ? 'var(--bg-surface)' : 'var(--accent-primary)',
-                color: submitting || !CAPITAL_LAUNCHED ? 'var(--text-tertiary)' : 'var(--btn-action-color)',
+                background: submitting || !CAPITAL_LAUNCHED ? 'var(--bg-surface)' : 'var(--btn-primary-bg)',
+                color: submitting || !CAPITAL_LAUNCHED ? 'var(--text-tertiary)' : 'var(--btn-primary-fg)',
                 border: 'none', borderRadius: 'var(--radius-control)',
                 cursor: submitting ? 'not-allowed' : 'pointer',
                 minHeight: 40,

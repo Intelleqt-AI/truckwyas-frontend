@@ -10,12 +10,14 @@ import { Tip, TipRow, VIZ, boxIn, plural, rand, useTip, useWidth } from './core'
  */
 export interface AgeBucket { key: string; label: string; amount: number; count?: number }
 
-export function AgeingStrip({ buckets, ariaLabel, scaleTo, showLabels = true, countNoun = 'invoice' }: {
+export function AgeingStrip({ buckets, ariaLabel, scaleTo, showLabels = true, hideEmptyLabels = false, countNoun = 'invoice' }: {
   buckets: AgeBucket[];
   ariaLabel: string;
   /** Row mode: draw the strip at amount / scaleTo of the full width, thin, no labels. */
   scaleTo?: number;
   showLabels?: boolean;
+  /** Label only the bands that hold money, so empty bands do not take the legend's width. */
+  hideEmptyLabels?: boolean;
   countNoun?: string;
 }) {
   const [ref, W] = useWidth<HTMLDivElement>(600);
@@ -68,13 +70,13 @@ export function AgeingStrip({ buckets, ariaLabel, scaleTo, showLabels = true, co
       </div>
       {!rowMode && showLabels && (
         <div className="viz-strip-labels">
-          {buckets.map((b, i) => (
+          {buckets.map((b, i) => (hideEmptyLabels && b.amount <= 0 ? null : (
             <div key={b.key} className={`viz-strip-label${b.amount <= 0 ? ' is-zero' : ''}`}>
               <span className="viz-strip-label__name"><i className="viz-key viz-key--rect" style={{ background: color(i) }} aria-hidden="true" />{b.label}</span>
               <span className="viz-strip-label__value">{b.amount <= 0 ? 'None' : rand(b.amount, 0)}</span>
               {b.amount > 0 && <span className="viz-strip-label__meta">{share(b.amount)}%{b.count != null ? ` · ${plural(b.count, countNoun)}` : ''}</span>}
             </div>
-          ))}
+          )))}
         </div>
       )}
       <Tip tip={tip} width={W} />

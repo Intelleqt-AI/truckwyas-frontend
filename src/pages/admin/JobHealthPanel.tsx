@@ -3,6 +3,7 @@ import '@/pages/admin/admin-brand.css';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { Loader } from '@/components/Loader';
+import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 
 // "Is Celery beat actually running" at a glance. A task that has never
 // started, or whose last_started_at looks old, is the signal that matters —
@@ -31,11 +32,11 @@ interface JobHealthRow {
 
 function StatusPill({ row }: { row: JobHealthRow }) {
   if (row.last_started_at === null) {
-    return <span className="status-badge warning">Never run</span>;
+    return <StatusChip tone="warning" label="Never run" size="sm" />;
   }
-  if (row.last_success === true) return <span className="status-badge active">OK</span>;
-  if (row.last_success === false) return <span className="status-badge delayed">Failed</span>;
-  return <span className="status-badge warning">Unknown</span>;
+  if (row.last_success === true) return <StatusChip tone="success" label="OK" size="sm" />;
+  if (row.last_success === false) return <StatusChip tone="danger" label="Failed" size="sm" />;
+  return <StatusChip tone="neutral" label="Unknown" size="sm" />;
 }
 
 export default function JobHealthPanel() {
@@ -69,11 +70,11 @@ export default function JobHealthPanel() {
                 <tr key={row.task_name}>
                   <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)' }}>{row.task_name}</td>
                   <td style={tdStyle}><StatusPill row={row} /></td>
-                  <td style={{ ...tdStyle, color: row.last_started_at ? 'var(--text-primary)' : 'var(--status-warning-text, var(--status-warning))' }}>
+                  <td style={{ ...tdStyle, color: row.last_started_at ? 'var(--text-primary)' : 'var(--status-warning-text)' }}>
                     {fmt(row.last_started_at)}
                   </td>
                   <td style={tdStyle}>{fmt(row.last_finished_at)}</td>
-                  <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', maxWidth: 320 }}>
+                  <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', maxWidth: 320, overflowWrap: 'anywhere' }}>
                     {row.last_error || ''}
                   </td>
                 </tr>

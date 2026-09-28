@@ -59,7 +59,6 @@ export function ActivityStrip({ rows, dayLabels, maxRows = 12 }: { rows: Activit
                 {r.days.map((v, d) => (
                   <rect key={d} x={x(d)} y={cy} width={cell} height={cell} rx={Math.min(3, cell / 4)}
                     fill={v > 0 ? VIZ.accent : 'var(--viz-track)'}
-                    opacity={active && active !== `${r.id}:${d}` && active.startsWith(`${r.id}:`) ? 0.7 : 1}
                     stroke={active === `${r.id}:${d}` ? 'var(--text-primary)' : 'none'} strokeWidth={1.5}
                     onPointerEnter={() => open(r, d, x(d) + cell / 2, cy + off())} />
                 ))}

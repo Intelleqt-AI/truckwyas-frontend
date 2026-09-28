@@ -3,7 +3,7 @@ import { toast } from "react-toastify";
 import { fetchData, patchData } from "@/lib/Api";
 import { enablePush, disablePush, pushSupported, PushStatus } from "@/lib/push";
 import { useAuth } from "@/lib/AuthContext";
-import { SettingsToggleRow, settingsBadgeStyle, settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle } from "./settingsUi";
+import { SettingsToggleRow, settingsBadgeStyle, settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, SettingsPageHeader } from "./settingsUi";
 
 const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle = settingsCardHeaderStyle;
@@ -100,16 +100,12 @@ export function NotificationSettings() {
     : undefined;
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
-          Notifications
-        </h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-          Choose what you get notified about and how
-        </div>
+    // Settings forms cap at 720px so each toggle sits near its label.
+    <div style={{ maxWidth: 720 }}>
+      <SettingsPageHeader title="Notifications" description="Choose what you get notified about and how" />
+      <div>
         {loadFailed && (
-          <div style={{ marginTop: 8, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
+          <div style={{ marginTop: 8, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>
             Settings failed to load.{' '}
             <button type="button" className="settings-control" onClick={load} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: '20px', textDecoration: 'underline' }}>
               Retry

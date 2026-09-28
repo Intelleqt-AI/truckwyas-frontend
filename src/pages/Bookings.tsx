@@ -1,6 +1,7 @@
 import "./bookings-typography.css";
 import "./bookings-section.css";
-import "./ops-tiles.css";
+import { StatusChip } from "@/components/ui/StatusChip";
+import { useStickyRail } from "@/components/fleet-detail/useStickyRail";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { useState, useRef } from "react";
 import { ArrowLeft, Upload, X } from "lucide-react";
@@ -51,6 +52,7 @@ export default function Bookings() {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const podModalFileRef = useRef<HTMLInputElement>(null);
+  const railRef = useStickyRail<HTMLDivElement>();
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
 
@@ -335,7 +337,7 @@ export default function Bookings() {
           <div className="bk-eyebrow">Order</div>
           <div className="bk-title-row">
             <h1 className="bk-title">{load.load_number}</h1>
-            <span className={`bk-status bk-status--${STATUS_TONE[load.status] || 'neutral'}`}>{titleCase(load.status)}</span>
+            <StatusChip status={load.status} />
           </div>
           <p className="bk-subtitle">{load.customer_name}</p>
         </div>
@@ -432,36 +434,9 @@ export default function Bookings() {
         );
       })()}
 
-      {/* The job in three figures. A zero means the value was never captured,
-          so it shows as missing rather than as 0 km or 0 kg. */}
-      {(() => {
-        const distance = parseFloat(load.distance || '0');
-        const weight = parseFloat(load.weight || '0');
-        return (
-          <section className="ops-tiles" aria-label="Job figures">
-            <div className="ops-tile">
-              <h2 className="ops-tile__label">Distance</h2>
-              <div className="ops-tile__value">{distance > 0 ? `${Math.round(distance).toLocaleString('en-ZA')} km` : '—'}</div>
-              <div className="ops-tile__sub">{distance > 0 ? 'Planned route' : 'Not recorded'}</div>
-            </div>
-            <div className="ops-tile">
-              <h2 className="ops-tile__label">
-                Base rate per km
-                <InfoTip>Base rate divided by distance, before surcharges.</InfoTip>
-              </h2>
-              <div className="ops-tile__value">{distance > 0 ? `R ${(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)).toFixed(2)}` : '—'}</div>
-              <div className="ops-tile__sub">Before surcharges</div>
-            </div>
-            <div className="ops-tile">
-              <h2 className="ops-tile__label">Cargo weight</h2>
-              <div className="ops-tile__value">{weight > 0 ? `${Math.round(weight).toLocaleString('en-ZA')} kg` : '—'}</div>
-              <div className="ops-tile__sub" title={load.cargo_description || undefined}>{load.cargo_description || (weight > 0 ? 'As on the order' : 'Not recorded')}</div>
-            </div>
-          </section>
-        );
-      })()}
 
-      <div className="bk-detail-grid">
+      {/* Main column plus a sticky rail, so unequal heights read as a rail. */}
+      <div className="bk-detail-grid bk-detail-grid--rail">
         {/* Route */}
         <section className="bk-card" aria-labelledby="bk-route-title">
           <div className="bk-card__head"><h2 className="bk-card__title" id="bk-route-title">Route</h2></div>
@@ -492,6 +467,32 @@ export default function Bookings() {
               </div>
             </li>
           </ol>
+
+          {/* The job's attributes: facts, not KPIs. A zero means the value was
+              never captured, so it shows as missing rather than 0 km or 0 kg. */}
+          {(() => {
+            const distance = parseFloat(load.distance || '0');
+            const weight = parseFloat(load.weight || '0');
+            return (
+              <dl className="bk-facts bk-facts--3" aria-label="Job figures">
+                <div>
+                  <dt className="bk-fact__label">Distance</dt>
+                  <dd className="bk-fact__value">{distance > 0 ? `${Math.round(distance).toLocaleString('en-ZA')} km` : 'Not recorded'}</dd>
+                </div>
+                <div>
+                  <dt className="bk-fact__label" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    Base rate per km
+                    <InfoTip>Base rate divided by distance, before surcharges.</InfoTip>
+                  </dt>
+                  <dd className="bk-fact__value">{distance > 0 ? `R ${(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)).toFixed(2)}` : '—'}</dd>
+                </div>
+                <div>
+                  <dt className="bk-fact__label">Cargo</dt>
+                  <dd className="bk-fact__value">{[weight > 0 ? `${Math.round(weight).toLocaleString('en-ZA')} kg` : '', load.cargo_description || ''].filter(Boolean).join(', ') || 'Not recorded'}</dd>
+                </div>
+              </dl>
+            );
+          })()}
 
           {/* Live map — pickup, delivery, and (if the assigned vehicle is CtrlFleet-linked) its last known position */}
           <div style={{ marginTop: 16 }}>
@@ -539,8 +540,8 @@ export default function Bookings() {
           </div>
         </section>
 
-        {/* Right column */}
-        <div className="bk-stack">
+        {/* Right column: sticky rail */}
+        <div ref={railRef} className="bk-stack">
           {/* Financials */}
           <section className="bk-card" aria-labelledby="bk-fin-title">
             <div className="bk-card__head"><h2 className="bk-card__title" id="bk-fin-title">Financials</h2></div>

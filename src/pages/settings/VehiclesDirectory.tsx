@@ -11,6 +11,7 @@ import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
 import RowActions from "@/components/ui/RowActions";
 import { settingsCardStyle, settingsCardTitleStyle, settingsInputStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
+import { StatusChip } from '@/components/ui/StatusChip';
 
 interface Vehicle {
   id: number;
@@ -36,10 +37,10 @@ interface Vehicle {
 
 const STATUS_COLOR: Record<string, string> = {
   AVAILABLE: 'var(--accent-primary)',
-  MAINTENANCE: 'var(--status-warning-text, var(--status-warning))',
+  MAINTENANCE: 'var(--status-warning-text)',
   IN_USE: 'var(--accent-primary)',
   IN_TRANSIT: 'var(--accent-primary)',
-  OUT_OF_SERVICE: 'var(--status-danger-text, var(--status-danger))',
+  OUT_OF_SERVICE: 'var(--status-danger-text)',
 };
 
 // Presentation-only labels for known status payload values — unknown strings
@@ -98,7 +99,7 @@ export function VehiclesDirectory() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ maxWidth: 960 }}>
       <SettingsPageHeader title="Vehicles" description="Fleet vehicle directory" />
 
       <div style={sectionStyle}>
@@ -191,10 +192,7 @@ export function VehiclesDirectory() {
                     )}
                   </td>
                   <td>
-                    <span style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                      color: statusColor(v.status),
-                    }}>{statusLabel(v.status)}</span>
+                    <StatusChip status={v.status} label={statusLabel(v.status)} size="sm" />
                   </td>
                   <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {v.driver_name || '—'}

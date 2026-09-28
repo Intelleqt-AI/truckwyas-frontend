@@ -39,12 +39,13 @@ const rules = [
   { key: 'special',   label: 'Special character',test: (p: string) => /[^A-Za-z0-9]/.test(p) },
 ];
 
+// Bar fills use the status dot roles; the label uses the AA -text roles.
 function getStrength(password: string) {
   const passed = rules.filter(r => r.test(password)).length;
-  if (passed <= 2) return { level: 'Weak',   color: 'var(--status-danger-text, var(--status-danger))',  width: '20%' };
-  if (passed === 3) return { level: 'Fair',   color: '#f59e0b',               width: '50%' };
-  if (passed === 4) return { level: 'Good',   color: '#84cc16',               width: '75%' };
-  return             { level: 'Strong', color: 'var(--status-success)',  width: '100%' };
+  if (passed <= 2) return { level: 'Weak',   fill: 'var(--status-danger-dot)',  color: 'var(--status-danger-text)',  width: '20%' };
+  if (passed === 3) return { level: 'Fair',   fill: 'var(--status-warning-dot)', color: 'var(--status-warning-text)', width: '50%' };
+  if (passed === 4) return { level: 'Good',   fill: 'var(--status-success-dot)', color: 'var(--status-success-text)', width: '75%' };
+  return             { level: 'Strong', fill: 'var(--status-success-dot)', color: 'var(--status-success-text)', width: '100%' };
 }
 
 const Signup = () => {
@@ -161,7 +162,7 @@ const Signup = () => {
           <label htmlFor="name" style={labelStyle}>Full name</label>
           <input className="tw-auth-control" id="name" name="name" type="text" placeholder="John Doe" required value={formData.name} onChange={handleChange}
             style={{ ...inputStyle, borderColor: validationErrors.name ? 'var(--status-danger)' : 'var(--border-subtle)' }} />
-          {validationErrors.name && <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>{validationErrors.name}</div>}
+          {validationErrors.name && <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>{validationErrors.name}</div>}
         </div>
 
         {/* Email */}
@@ -169,7 +170,7 @@ const Signup = () => {
           <label htmlFor="email" style={labelStyle}>Email</label>
           <input className="tw-auth-control" id="email" name="email" type="email" placeholder="name@example.com" required value={formData.email} onChange={handleChange}
             style={{ ...inputStyle, borderColor: validationErrors.email ? 'var(--status-danger)' : 'var(--border-subtle)' }} />
-          {validationErrors.email && <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>{validationErrors.email}</div>}
+          {validationErrors.email && <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>{validationErrors.email}</div>}
         </div>
 
         {/* Password */}
@@ -188,20 +189,20 @@ const Signup = () => {
           {formData.password && strength && (
             <div style={{ marginTop: 8 }}>
               <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 999, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: strength.width, background: strength.color, borderRadius: 999, transition: 'width 0.2s, background 0.2s' }} />
+                <div style={{ height: '100%', width: strength.width, background: strength.fill, borderRadius: 999, transition: 'width 0.2s, background 0.2s' }} />
               </div>
               <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: strength.color, marginTop: 4, fontFamily: 'var(--font-sans)' }}>{strength.level.charAt(0).toUpperCase() + strength.level.slice(1)}</div>
               {/* Rule checklist */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginTop: 6 }}>
                 {rules.map(r => (
-                  <span key={r.key} style={{ fontSize: 13, lineHeight: '20px', color: r.test(formData.password) ? 'var(--status-success-text, var(--status-success))' : 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span key={r.key} style={{ fontSize: 13, lineHeight: '20px', color: r.test(formData.password) ? 'var(--status-success-text)' : 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span>{r.test(formData.password) ? '✓' : '·'}</span> {r.label}
                   </span>
                 ))}
               </div>
             </div>
           )}
-          {validationErrors.password && <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>{validationErrors.password}</div>}
+          {validationErrors.password && <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>{validationErrors.password}</div>}
         </div>
 
         {/* Confirm Password */}
@@ -215,11 +216,11 @@ const Signup = () => {
               {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-          {validationErrors.confirmPassword && <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>{validationErrors.confirmPassword}</div>}
+          {validationErrors.confirmPassword && <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)' }}>{validationErrors.confirmPassword}</div>}
         </div>
 
         {error && (
-          <div role="alert" style={{ padding: '12px 16px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 'var(--radius-nested)', color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, lineHeight: '20px' }}>
+          <div role="alert" style={{ padding: '12px 16px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 'var(--radius-nested)', color: 'var(--status-danger-text)', fontSize: 13, lineHeight: '20px' }}>
             {error}
           </div>
         )}
@@ -233,7 +234,7 @@ const Signup = () => {
 
       <div style={{ marginTop: 24, textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
         Already have an account?{" "}
-        <Link to="/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: 500 }}>Sign in</Link>
+        <Link to="/login" style={{ color: 'var(--link)', textDecoration: 'none', fontWeight: 500 }}>Sign in</Link>
       </div>
     </div>
   );
@@ -270,8 +271,8 @@ const Signup = () => {
           <div key={step.label} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <div style={{
               flex: 'none', width: 22, height: 22, borderRadius: '50%',
-              border: `1px solid ${i === 0 ? 'var(--accent-primary)' : 'var(--border-active)'}`,
-              color: i === 0 ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+              border: `1px solid ${i === 0 ? 'var(--text-primary)' : 'var(--border-active)'}`,
+              color: i === 0 ? 'var(--text-primary)' : 'var(--text-tertiary)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 600, marginTop: 1, fontVariantNumeric: 'tabular-nums',
             }}>
@@ -288,7 +289,7 @@ const Signup = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px 16px' }}>
         {PLAN_FEATURES.map(f => (
           <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-            <Check size={16} aria-hidden="true" style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: 2 }} />
+            <Check size={16} aria-hidden="true" style={{ color: 'var(--text-primary)', flexShrink: 0, marginTop: 2 }} />
             {f}
           </div>
         ))}
@@ -304,7 +305,7 @@ const Signup = () => {
     return (
       <MobileAuthLayout
         eyebrow="One flat price, no hidden tiers"
-        title={<>Everything your fleet needs in <span style={{ color: 'var(--accent-primary)' }}>one subscription</span>.</>}
+        title={<>Everything your fleet needs in <span style={{ color: 'var(--text-tertiary)' }}>one subscription</span>.</>}
         footer={extraContent}
       >
         {formCard}
@@ -345,11 +346,11 @@ const Signup = () => {
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
           <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
 
-          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-info-text, var(--accent-primary))', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-info-text)', marginBottom: 10 }}>
             One flat price, no hidden tiers
           </div>
           <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', marginBottom: 28 }}>
-            Everything your fleet needs in <span style={{ color: 'var(--accent-primary)' }}>one subscription</span>.
+            Everything your fleet needs in <span style={{ color: 'var(--text-tertiary)' }}>one subscription</span>.
           </div>
 
           {extraContent}

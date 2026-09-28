@@ -11,6 +11,12 @@
 }
 .qb-controls input[type="date"] { height: 40px; }
 
+/* One content width (DESIGN-PRINCIPLES §11.8): the builder fills main up to
+   1600px, left-aligned with the top bar like every other page, instead of a
+   1080px column centred with a dead band on the left at 1920. Its internal
+   grids are fractional, so they keep their proportions. */
+.qb-controls { max-width: 1600px; margin: 0; }
+
 /* ---- One price, next to Send (behaviour fix 2) ------------------------- */
 .qb-pricebar {
   position: sticky;
@@ -39,7 +45,7 @@
 }
 .qb-pricebar__num { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .qb-pricebar__muted { color: var(--text-tertiary); }
-.qb-pricebar__warn { color: var(--status-warning-text, var(--status-warning)); }
+.qb-pricebar__warn { color: var(--status-warning-text); }
 .qb-pricebar__use { height: 32px; }
 .qb-pricebar__actions { display: flex; gap: 10px; justify-content: flex-end; }
 .qb-pricebar__actions .tw-btn { height: 40px; padding: 0 16px; font-size: 14px; }

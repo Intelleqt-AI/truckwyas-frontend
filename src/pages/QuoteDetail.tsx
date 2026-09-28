@@ -18,6 +18,8 @@ import { AlertTriangle, ArrowLeft, Download } from 'lucide-react';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   DRAFT: 'neutral',
@@ -72,6 +74,7 @@ export default function QuoteDetail() {
   const queryClient = useQueryClient();
   const { user: authUser } = useAuth();
   const billingBlocked = isSubscriptionBlocked(authUser?.subscription_status);
+  const railRef = useStickyRail<HTMLDivElement>();
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [emailStatus, setEmailStatus] = useState<{ sent: boolean; address: string | null; reason?: string | null } | null>(null);
 
@@ -322,11 +325,9 @@ export default function QuoteDetail() {
           <div className="bk-eyebrow">Quote</div>
           <div className="bk-title-row">
             <h1 className="bk-title">{quote.quote_number}</h1>
-            <span className={`bk-status bk-status--${STATUS_TONE[quote.status] || 'neutral'}`}>
-              {STATUS_LABEL[quote.status] || sentenceCase(quote.status)}
-            </span>
-            {quote.outcome === 'accepted' && <span className="bk-status bk-status--success">Won</span>}
-            {quote.outcome === 'rejected' && <span className="bk-status bk-status--danger">Lost</span>}
+            <StatusChip status={quote.status === 'IT' ? 'IN_TRANSIT' : quote.status} label={STATUS_LABEL[quote.status]} />
+            {quote.outcome === 'accepted' && <StatusChip status="WON" />}
+            {quote.outcome === 'rejected' && <StatusChip status="LOST" />}
           </div>
           <p className="bk-subtitle">{quote.customer_name}</p>
         </div>
@@ -340,9 +341,9 @@ export default function QuoteDetail() {
       {fuelAlert && fuelAlert.has_alert && (
         <div role="status" style={{ padding: '16px 24px', background: 'var(--status-warning-bg)', borderRadius: 'var(--radius-card, 12px)', marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
-            <AlertTriangle size={20} color="var(--status-warning-text, var(--status-warning))" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
+            <AlertTriangle size={20} color="var(--status-warning-text)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--status-warning-text, var(--status-warning))', marginBottom: 4 }}>
+              <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--status-warning-text)', marginBottom: 4 }}>
                 Fuel price alert
               </div>
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 8 }}>
@@ -364,7 +365,7 @@ export default function QuoteDetail() {
           {/* Customer */}
           <div className="card" style={{ padding: 24 }}>
             <h2 style={{ ...sectionHeadingStyle, marginBottom: 14 }}>Customer</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px 24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px 24px' }}>
               <div>
                 <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Name</div>
                 <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>{quote.customer_name || '—'}</div>
@@ -403,9 +404,7 @@ export default function QuoteDetail() {
                 {quote.trip_type === 'ROUND_TRIP' ? 'Leg 1: outbound route' : 'Route'}
               </h2>
               {quote.trip_type === 'ROUND_TRIP' && (
-                <span className="bk-status bk-status--info">
-                  Round trip
-                </span>
+                <StatusChip tone="neutral" label="Round trip" />
               )}
             </div>
             <ol className="bk-route">
@@ -456,7 +455,7 @@ export default function QuoteDetail() {
               <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>
                 Leg 2: return route
               </h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px 24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px 24px' }}>
                 <div>
                   {label('Returns from')}
                   <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
@@ -500,7 +499,7 @@ export default function QuoteDetail() {
           {/* Cargo Details */}
           <div className="card" style={{ padding: 24 }}>
             <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Cargo details</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px 24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px 24px' }}>
               <div>
                 {label('Description')}
                 <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.cargo_description || '—'}</div>
@@ -596,8 +595,8 @@ export default function QuoteDetail() {
           )}
         </div>
 
-        {/* RIGHT — Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* RIGHT — Actions: a sticky rail, so it never ends in a dead band. */}
+        <div ref={railRef} className="quote-detail-rail" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Metadata */}
           <div className="card" style={{ padding: 24 }}>
             <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Quote info</h2>
@@ -631,7 +630,7 @@ export default function QuoteDetail() {
                   </SelectContent>
                 </Select>
                 {billingBlocked && (
-                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', marginTop: 4 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)', marginTop: 4 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
                     Status changes are blocked.{' '}
                     <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>
                       Go to billing
@@ -655,7 +654,7 @@ export default function QuoteDetail() {
                   <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
                     {formatDate(quote.valid_until)}
                     {new Date(quote.valid_until).getTime() - Date.now() < 48 * 60 * 60 * 1000 && (
-                      <span style={{ color: 'var(--status-danger-text, var(--status-danger))', marginLeft: 8 }}>
+                      <span style={{ color: 'var(--status-danger-text)', marginLeft: 8 }}>
                         {new Date(quote.valid_until).getTime() <= Date.now()
                           ? '(expired)'
                           : `(${Math.ceil((new Date(quote.valid_until).getTime() - Date.now()) / (1000 * 60 * 60))}h left)`}
@@ -786,7 +785,7 @@ export default function QuoteDetail() {
                   </div>
                   {effectiveEmailStatus && (
                     <div style={{
-                      color: effectiveEmailStatus.sent ? 'var(--status-success-text, var(--status-success))' : 'var(--status-warning-text, var(--status-warning))',
+                      color: effectiveEmailStatus.sent ? 'var(--status-success-text)' : 'var(--status-warning-text)',
                       marginBottom: 12,
                       fontSize: 13,
                       lineHeight: '20px',

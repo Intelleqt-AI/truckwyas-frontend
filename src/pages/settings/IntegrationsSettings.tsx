@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { settingsBadgeStyle, settingsCardStyle, settingsInputStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
 import { formatDate } from "@/lib/formatters";
 import RowActions from '@/components/ui/RowActions';
+import { StatusChip } from '@/components/ui/StatusChip';
 
 const cardStyle: React.CSSProperties = { ...settingsCardStyle, padding: 24 };
 
@@ -35,15 +36,7 @@ const sectionTitleStyle: React.CSSProperties = {
 /** Connection state as text + dot, never colour alone. Not connected is a
  *  neutral state, not an error. */
 function ConnectionPill({ connected }: { connected: boolean }) {
-  return (
-    <span style={{
-      ...settingsBadgeStyle, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
-      color: connected ? 'var(--status-success-text, var(--accent-primary))' : 'var(--text-secondary)',
-    }}>
-      <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
-      {connected ? 'Connected' : 'Not connected'}
-    </span>
-  );
+  return <StatusChip status={connected ? 'CONNECTED' : 'DISCONNECTED'} />;
 }
 
 interface XeroStatus {
@@ -438,7 +431,7 @@ export function IntegrationsSettings() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ maxWidth: 720 }}>
       <SettingsPageHeader title="Integrations" description="Connect TruckWys to your existing tools" />
 
       {/* Xero Integration Card */}
@@ -740,7 +733,7 @@ export function IntegrationsSettings() {
                         {cf.matched_vehicle_id ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{
-                              fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-success-text, var(--status-success))',
+                              fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-success-text)',
                             }}>
                               Linked → {cf.matched_vehicle_plate}
                             </span>

@@ -112,11 +112,23 @@ export default function DebtorsAge({ d, companyName }: { d: Ledger; companyName?
         </label>
         <Seg label="View" value={view} onChange={v => set('view', v === 'customer' ? null : v)} options={[{ id: 'customer', label: 'By customer' }, { id: 'invoice', label: 'By invoice' }]} />
       </>}
-      tiles={aged.length > 0 ? <Tiles tiles={[
-        { label: 'Owed to you', value: moneyWhole(total), title: money(total), note: `${plural(aged.length, 'invoice')}, ${plural(customers.length, 'customer')}` },
-        { label: 'Overdue', value: moneyWhole(overdue), title: money(overdue), note: total > 0 ? `${pct((overdue / total) * 100, 0)} of the total` : undefined },
-        { label: 'Over 60 days', value: moneyWhole(over60), title: money(over60), note: total > 0 ? `${pct((over60 / total) * 100, 0)} of the total` : undefined },
-        { label: 'Largest debtor', value: moneyWhole(customers[0]?.total ?? 0), title: money(customers[0]?.total ?? 0), note: customers[0]?.name },
+      tiles={aged.length > 0 && total > 0 ? <Tiles table={table} tiles={[
+        // Shares, not rands: the rand figures are the table's own total and buckets.
+        {
+          label: 'Overdue', value: pct((overdue / total) * 100, 0), title: money(overdue),
+          note: Math.abs(overdue - total) < 0.005
+            ? (Math.abs(over60 - total) < 0.005 ? 'All of it, all over 60 days' : 'All of the total')
+            : `${moneyWhole(overdue)} of the total`,
+          noteAmount: Math.abs(overdue - total) < 0.005 ? undefined : overdue,
+          noteFallback: 'Of the total, past the due date',
+        },
+        ...(Math.abs(over60 - overdue) < 0.005 || over60 < 0.005 ? [] : [{
+          label: 'Over 60 days', value: pct((over60 / total) * 100, 0), title: money(over60),
+          note: `${moneyWhole(over60)} of the total`,
+          noteAmount: over60,
+          noteFallback: 'Of the total',
+        }]),
+        ...(customers[0] ? [{ label: 'Largest debtor share', value: pct((customers[0].total / total) * 100, 0), note: customers[0].name }] : []),
       ]} /> : undefined}
       csv={() => statementCsv(`Debtors age analysis as at ${asAt ?? todayISO()}`, 'Incl. VAT, aged by due date', table)}
       csvName={`debtors-age-${asAt ?? todayISO()}-${view}`}
@@ -130,7 +142,9 @@ export default function DebtorsAge({ d, companyName }: { d: Ledger; companyName?
           stickyFirst
           footer={<>
             {!asAt
-              ? <Check ok={ties}>Total {money(total)} {ties ? 'equals' : 'differs from'} the {plural(ledgerOpen.length, 'open invoice balance')} on the invoice ledger ({money(ledgerTotal)}).</Check>
+              ? (ties
+                ? <Check>Total equals the {plural(ledgerOpen.length, 'open invoice balance')} on the invoice ledger.</Check>
+                : <Check ok={false}>Total {money(total)} differs from the {plural(ledgerOpen.length, 'open invoice balance')} on the invoice ledger ({money(ledgerTotal)}).</Check>)
               : <Check>Rebuilt from invoices issued and payments recorded by {day(asAt)}.</Check>}
             {drafts.length > 0 && <Check>{plural(drafts.length, 'draft invoice')} ({money(draftTotal)}) not issued, so not included.</Check>}
           </>}

@@ -33,11 +33,11 @@
 .fin-btn-secondary.btn-action,
 .fin-btn-secondary {
   background: transparent;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default, var(--border-subtle));
   color: var(--text-primary);
   box-shadow: none;
 }
-.fin-btn-secondary:hover { background: var(--bg-surface-hover); opacity: 1; }
+.fin-btn-secondary:hover { background: var(--bg-surface-hover); border-color: var(--border-strong, var(--border-subtle)); opacity: 1; }
 .fin-page .btn-action:focus-visible,
 .fin-btn-secondary:focus-visible {
   outline: 2px solid var(--accent-primary);
@@ -132,9 +132,9 @@ select.fin-control { cursor: pointer; padding-right: 8px; }
 }
 .fin-chip-filter:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
 .fin-chip-filter[aria-pressed="true"] {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: var(--btn-action-color);
+  background: var(--bg-raised);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
   font-weight: 500;
 }
 .fin-chip-filter:focus-visible {
@@ -280,23 +280,20 @@ table.fin-table td.actions { text-align: right; width: 1%; white-space: nowrap; 
   background: var(--status-neutral-bg);
   color: var(--text-secondary);
 }
-.fin-chip--success { background: rgba(34, 197, 94, 0.12); color: var(--status-success-text, #86EFAC); }
-.fin-chip--warning { background: rgba(245, 158, 11, 0.12); color: var(--status-warning-text, #FCD34D); }
-.fin-chip--danger  { background: rgba(239, 68, 68, 0.12); color: var(--status-danger-text, #FCA5A5); }
-.fin-chip--info    { background: rgba(77, 158, 255, 0.12); color: var(--status-info-text, #93C5FD); }
+/* Legacy tinted chip, still used by the Capital pages. Finance pages use the
+   shared <StatusChip>. Tokens only, so both themes come from theme.css. */
+.fin-chip--success { background: var(--status-success-bg); color: var(--status-success-text); }
+.fin-chip--warning { background: var(--status-warning-bg); color: var(--status-warning-text); }
+.fin-chip--danger  { background: var(--status-danger-bg); color: var(--status-danger-text); }
+.fin-chip--info    { background: var(--status-info-bg); color: var(--status-info-text); }
 .fin-chip--outline { background: transparent; border-color: currentColor; }
-[data-theme="light"] .fin-chip--success { background: #DCFCE7; }
-[data-theme="light"] .fin-chip--warning { background: #FEF3C7; }
-[data-theme="light"] .fin-chip--danger  { background: #FEE2E2; }
-[data-theme="light"] .fin-chip--info    { background: #DBEAFE; }
-[data-theme="light"] .fin-chip--outline { background: transparent; }
 button.fin-chip { cursor: pointer; }
 button.fin-chip:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 
 /* Semantic text colours (AA in both themes). */
-.fin-text-success { color: var(--status-success-text, #86EFAC); }
-.fin-text-warning { color: var(--status-warning-text, #FCD34D); }
-.fin-text-danger  { color: var(--status-danger-text, #FCA5A5); }
+.fin-text-success { color: var(--status-success-text); }
+.fin-text-warning { color: var(--status-warning-text); }
+.fin-text-danger  { color: var(--status-danger-text); }
 .fin-text-muted   { color: var(--text-tertiary); }
 
 /* ---- Row menu (shared with expense-row-actions.css trigger/menu) ---- */
@@ -309,7 +306,7 @@ button.fin-chip:focus-visible { outline: 2px solid var(--accent-primary); outlin
   color: var(--text-tertiary);
   white-space: normal;
 }
-.fin-menu-note strong { display: block; font-weight: 500; color: var(--status-danger-text, #FCA5A5); }
+.fin-menu-note strong { display: block; font-weight: 500; color: var(--status-danger-text); }
 a.expense-menu-item { text-decoration: none; box-sizing: border-box; }
 
 /* ---- Cards / sections ---- */
@@ -426,7 +423,7 @@ a.expense-menu-item { text-decoration: none; box-sizing: border-box; }
   font-weight: 500;
   box-shadow: none;
 }
-.fin-toast--error { color: var(--status-danger-text, #FCA5A5); }
+.fin-toast--error { color: var(--status-danger-text); }
 
 /* ---- Horizontal bar chart (expenses trend) ---- */
 .fin-bars {
@@ -448,7 +445,7 @@ a.expense-menu-item { text-decoration: none; box-sizing: border-box; }
 .fin-legend__amt { color: var(--text-primary); font-variant-numeric: tabular-nums; text-align: right; }
 .fin-legend__pct { color: var(--text-tertiary); font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; }
 .fin-meter { height: 8px; background: var(--bg-surface-hover); border-radius: 4px; overflow: hidden; }
-[data-theme="light"] .fin-meter { background: #E5E7EB; }
+[data-theme="light"] .fin-meter { background: var(--border-subtle); }
 .fin-meter__fill { height: 100%; border-radius: 4px; }
 
 /* ---- Phone ---- */
@@ -475,8 +472,6 @@ a.expense-menu-item { text-decoration: none; box-sizing: border-box; }
 .fin-subnav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 24px; }
 .fin-subnav__meta { margin-left: auto; font-size: 13px; line-height: 20px; color: var(--text-tertiary); }
 @media (max-width: 767px) { .fin-subnav__meta { margin-left: 0; width: 100%; } }
-.fin-create-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; }
-@media (max-width: 900px) { .fin-create-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 767px) { .fin-page .btn-action { min-height: 48px; } }
 
 /* ==== Design principles v2 (docs/brand/DESIGN-PRINCIPLES.md) ==== */
@@ -553,14 +548,13 @@ table.fin-table tfoot tr.fin-total-row td { color: var(--text-primary); font-wei
   font-size: 13px;
   line-height: 20px;
   font-weight: 500;
-  color: var(--accent-primary);
+  color: var(--link, var(--accent-primary));
   cursor: pointer;
   text-decoration: none;
   min-height: 24px;
 }
 .fin-link:hover { text-decoration: underline; }
 .fin-link:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
-[data-theme="light"] .fin-link { color: var(--status-info-text, #1D4ED8); }
 
 /* Summary line: replaces a row of zero tiles with one sentence and an action. */
 .fin-summary.card {
@@ -595,7 +589,7 @@ table.fin-table tfoot tr.fin-total-row td { color: var(--text-primary); font-wei
 .fin-rank__label { min-width: 0; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fin-rank__label small { display: block; font-size: 13px; line-height: 20px; color: var(--text-tertiary); }
 .fin-rank__track { height: 6px; border-radius: 3px; background: var(--status-neutral-bg); overflow: hidden; }
-[data-theme="light"] .fin-rank__track { background: #E5E7EB; }
+[data-theme="light"] .fin-rank__track { background: var(--border-subtle); }
 .fin-rank__bar { height: 100%; border-radius: 3px; background: var(--text-tertiary); }
 .fin-rank__bar--accent { background: var(--accent-primary); }
 .fin-rank__bar--danger { background: var(--status-danger); }
@@ -684,7 +678,7 @@ table.fin-table tfoot tr.fin-total-row td { color: var(--text-primary); font-wei
 .fin-facts dt { font-size: 13px; line-height: 20px; color: var(--text-secondary); margin: 0 0 2px; }
 .fin-facts dd { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--text-primary); margin: 0; font-variant-numeric: tabular-nums; }
 .fin-progress { height: 6px; border-radius: 3px; background: var(--status-neutral-bg); overflow: hidden; margin-top: 12px; }
-[data-theme="light"] .fin-progress { background: #E5E7EB; }
+[data-theme="light"] .fin-progress { background: var(--border-subtle); }
 .fin-progress__fill { height: 100%; background: var(--accent-primary); border-radius: 3px; }
 .fin-note { font-size: 13px; line-height: 20px; color: var(--text-secondary); margin: 0; }
 .fin-note strong { display: block; font-weight: 500; color: var(--text-primary); margin-bottom: 2px; }
@@ -701,7 +695,7 @@ table.fin-table .fin-chip { padding-top: 0; padding-bottom: 0; }
 .fin-rank__row--compact { grid-template-columns: minmax(96px, 1.2fr) minmax(48px, 1fr) 112px 40px; }
 @media (max-width: 560px) { .fin-rank__row--compact { grid-template-columns: minmax(0, 1fr) auto 40px; } }
 .fin-rank__row.is-thin .fin-rank__bar { opacity: 0.5; }
-table.fin-table td.fin-text-danger, table.fin-table td .fin-text-danger { color: var(--status-danger-text, #FCA5A5); }
+table.fin-table td.fin-text-danger, table.fin-table td .fin-text-danger { color: var(--status-danger-text); }
 table.fin-table td.fin-text-muted { color: var(--text-tertiary); }
 
 /* Phone: invoice/expense rows become a two-line list so the amount stays
@@ -779,7 +773,7 @@ table.fin-table td.fin-text-muted { color: var(--text-tertiary); }
 }
 .fin-tile__value {
   margin-top: 12px;
-  font: 700 var(--text-figure, 32px)/38px var(--font-sans);
+  font: 600 var(--text-figure, 32px)/38px var(--font-sans);
   letter-spacing: var(--tracking-figure, -0.03em);
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
@@ -800,7 +794,7 @@ table.fin-table td.fin-text-muted { color: var(--text-tertiary); }
   min-height: 26px;
 }
 .fin-tile__sub { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums; min-width: 0; }
-.fin-tile__sub.fin-text-danger { color: var(--status-danger-text, #FCA5A5); }
+.fin-tile__sub.fin-text-danger { color: var(--status-danger-text); }
 .fin-tile .fin-tile__action { font-size: 12px; line-height: 16px; min-height: 16px; }
 @media (max-width: 767px) {
   .fin-tile { min-height: 112px; padding: 14px; }
@@ -822,10 +816,13 @@ table.fin-table td.fin-cell-2 { padding-top: 6px; padding-bottom: 6px; }
 .fin-table-card--fit { container-type: inline-size; container-name: fin-table; }
 @container fin-table (max-width: 1040px) { table.fin-table .fin-col-wide { display: none; } }
 @container fin-table (max-width: 900px) { table.fin-table .fin-col-mid { display: none; } }
-.fin-truncate--expense { max-width: 320px; }
+/* Columns size to their content; only the free-text column (.fin-cell-fill)
+   takes the slack and truncates, with the full text in its title. */
+table.fin-table th.fin-cell-fill, table.fin-table td.fin-cell-fill { width: 100%; }
+table.fin-table td.fin-cell-fill { max-width: 0; }
+.fin-truncate.fin-truncate--fill { max-width: none; }
+table.fin-table td.fin-nowrap { white-space: nowrap; }
 @container fin-table (max-width: 1040px) {
-  .fin-truncate--expense { max-width: 240px; }
-  .fin-truncate--veh { max-width: 160px !important; }
   table.fin-table th, table.fin-table td { padding-left: 12px; padding-right: 12px; }
   table.fin-table th:first-child, table.fin-table td:first-child { padding-left: 20px; }
   table.fin-table th:last-child, table.fin-table td:last-child { padding-right: 16px; }
@@ -844,3 +841,103 @@ table.fin-table td.fin-cell-2 { padding-top: 6px; padding-bottom: 6px; }
 .fin-btn-ghost.btn-action { border-color: transparent; color: var(--text-secondary); }
 .fin-btn-ghost.btn-action:hover { color: var(--text-primary); }
 .fin-tile__unit { margin-left: 6px; font-size: 0.56em; font-weight: 600; letter-spacing: -0.01em; color: var(--text-tertiary); }
+
+/* ==== v3 final: standard tiles, segmented filters, 32px toolbar ==== */
+.fin-page .fin-kpi-row { margin-bottom: 24px; }
+.fin-page .fin-kpi-row .tw-kpi__head .tw-info { flex: none; }
+@media (min-width: 768px) {
+  /* Four equal columns at most; one to three tiles keep the standard width. */
+  .fin-page .fin-kpi-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .fin-toolbar { gap: 8px 12px; }
+  .fin-page .fin-toolbar .fin-control { min-height: 32px; height: 32px; font-size: 13px; }
+  .fin-page .fin-toolbar .fin-control--search { width: 240px; }
+}
+@media (min-width: 768px) and (max-width: 1100px) {
+  .fin-page .fin-kpi-row { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+}
+.fin-toolbar .fin-seg { flex: none; }
+/* The segmented control sizes itself (28px, 40px on touch). */
+.fin-page .fin-toolbar .fin-seg .tw-seg__opt { min-height: 0; }
+@media (max-width: 767px) {
+  .fin-toolbar .fin-seg { width: 100%; }
+  table.fin-table--stack td.fin-cell-fill { max-width: none; width: auto; }
+}
+/* Peers align at the top; the shorter chart card does not stretch. */
+.fin-grid-2--even { align-items: start; }
+
+/* ---- Detail and create pages: main column + sticky 320px rail ---- */
+.fin-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.fin-detail-grid,
+.fin-create-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+}
+.fin-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  position: sticky;
+  top: 24px;
+}
+@media (max-width: 1100px) {
+  .fin-detail-grid, .fin-create-grid { grid-template-columns: minmax(0, 1fr); }
+  .fin-rail { position: static; }
+}
+
+/* Invoice document: facts, lines and totals in one card. */
+.fin-page .card.fin-doc { padding: 0; overflow: hidden; }
+.fin-doc__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-row);
+}
+.fin-doc__facts > div { min-width: 0; }
+.fin-doc__facts dt { margin: 0 0 2px; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fin-doc__facts dd { margin: 0; font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-doc__late { display: block; font: 500 12px/16px var(--font-sans); }
+.fin-doc__head { padding: 20px 24px 8px; }
+.fin-doc__lines--padded { padding: 0 24px 8px; }
+.fin-doc__lines--padded .fin-doc__head { padding-left: 0; padding-right: 0; }
+table.fin-table tfoot tr.fin-doc__rule td { border-top: 1px solid var(--border-subtle); }
+table.fin-table tfoot tr.fin-doc__grand td { font-size: 16px; line-height: 24px; font-weight: 600; color: var(--text-primary); }
+.fin-doc__note { padding: 0 24px 20px; }
+.fin-dl__row.is-total:last-child dd { font-size: 16px; }
+
+/* Payments in the rail: date + method over the amount, compact. */
+.fin-paylist { list-style: none; margin: 0; padding: 0 0 4px; }
+.fin-paylist__row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 44px; padding: 8px 24px; border-top: 1px solid var(--border-row);
+  font-size: 14px; line-height: 20px; color: var(--text-primary);
+}
+.fin-paylist__main { display: flex; flex-direction: column; min-width: 0; }
+.fin-paylist__sub { font-size: 12px; line-height: 16px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-paylist__sub .fin-id { font-size: 12px; line-height: 16px; color: var(--text-tertiary); }
+.fin-paylist__amt { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fin-paylist__row--total { font-weight: 600; border-top-color: var(--border-subtle); }
+.fin-table-card > .fin-panel-head + .fin-paylist { margin-top: -4px; }
+@media (max-width: 767px) {
+  .fin-doc__facts, .fin-doc__head { padding-left: 16px; padding-right: 16px; }
+  .fin-doc__lines--padded { padding: 0 16px 8px; }
+  .fin-doc__note { padding: 0 16px 16px; }
+  .fin-paylist__row { padding-left: 16px; padding-right: 16px; }
+}
+
+/* New invoice summary in the rail. */
+.fin-summary-card__label { display: inline-flex; align-items: center; gap: 4px; margin: 0; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); }
+.fin-summary-card__figure { margin: 4px 0 0; font: 600 28px/34px var(--font-sans); letter-spacing: var(--tracking-figure, -0.03em); font-variant-numeric: tabular-nums; color: var(--text-primary); overflow-wrap: anywhere; }
+.fin-summary-card__split { margin: 12px 0 0; }
+.fin-summary-card__split .fin-dl__row { min-height: 36px; padding: 8px 0; }
+.fin-summary-card__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.fin-label__hint { font-weight: 400; color: var(--text-tertiary); }
+/* A unit inside a tile figure ("31.9 days") must not grow the line box. */
+.tw-kpi__figure .fin-tile__unit { line-height: 1; }
+.fin-kpi-row .tw-kpi__head .tw-info { height: 16px; }
+/* 96px tile: label 16 + figure 34 + note 16 fill the 68px inner height
+   exactly, so no extra flex gap (it squeezed the figure and note). */

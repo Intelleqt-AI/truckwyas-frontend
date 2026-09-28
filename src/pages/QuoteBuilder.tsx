@@ -1282,7 +1282,7 @@ export default function QuoteBuilder() {
   );
 
   return (
-    <div className={`qi-form qb-controls${!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 ? " qb-has-pricebar" : ""}`} style={{ maxWidth: 1080, margin: "0 auto" }}>
+    <div className={`qi-form qb-controls${!billingBlocked && ready && !isDemoQuotaExceeded && !routeBlockedMessage && !weightBlockedMessage && total > 0 ? " qb-has-pricebar" : ""}`}>
       {/* header */}
       <div className="qb-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
         <div>
@@ -1465,7 +1465,7 @@ export default function QuoteBuilder() {
       </div>
 
       {/* 2 — map + cost */}
-      <div className="qb-grid qb-grid--mapcost" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 14, marginBottom: 14 }}>
+      <div className="qb-grid qb-grid--mapcost" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 16, marginBottom: 16 }}>
           <div style={{ ...cardS, overflow: "hidden" }}>
             {renderMapPanel(300, (
               <Dialog>

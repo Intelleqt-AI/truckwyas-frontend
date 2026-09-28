@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
@@ -7,6 +7,8 @@ import { CAPITAL_COMING_SOON } from '@/lib/features';
 import SectionHeader from '@/components/layout/SectionHeader';
 import './capital-prelaunch.css';
 import { AgeingStrip } from '@/components/viz';
+import { StatusChip } from '@/components/ui/StatusChip';
+import InfoTip from '@/components/insights/InfoTip';
 
 /**
  * Fast Pay before launch. There is no funding partner yet, so this view shows
@@ -91,11 +93,17 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 
 // ---- Shared bits ----------------------------------------------------------
 
-function CardHead({ id, title, description }: { id: string; title: string; description?: string }) {
+function CardHead({ id, title, description, info, aside }: { id: string; title: string; description?: string; info?: string; aside?: ReactNode }) {
   return (
     <div className="fp-card__head">
-      <h2 id={id} className="fp-card__title">{title}</h2>
-      {description && <p className="fp-card__desc">{description}</p>}
+      <div className="fp-card__titles">
+        <h2 id={id} className="fp-card__title">
+          {title}
+          {info && <InfoTip label={`How "${title}" is worked out`}><p className="it__title">How this is worked out</p><p>{info}</p></InfoTip>}
+        </h2>
+        {description && <p className="fp-card__desc">{description}</p>}
+      </div>
+      {aside && <div className="fp-card__aside">{aside}</div>}
     </div>
   );
 }
@@ -168,12 +176,15 @@ function WaitingCash() {
             <dl className="fp-facts">
               <div>
                 <dt>Past its due date</dt>
-                <dd>
-                  {formatCurrency(pastDue)}
-                  <span className="fp-muted">
-                    {' · '}{pastDueCount === count ? 'every invoice is past due' : `${plural(pastDueCount, 'invoice')}, ${pct(pastDue, total)}% of the total`}
-                  </span>
-                </dd>
+                {/* When all of it is late, the figure above already says how much: don't repeat it. */}
+                {pastDueCount === count ? (
+                  <dd>All of it<span className="fp-muted">{' · '}every invoice is past due</span></dd>
+                ) : (
+                  <dd>
+                    {formatCurrency(pastDue)}
+                    <span className="fp-muted">{' · '}{plural(pastDueCount, 'invoice')}, {pct(pastDue, total)}% of the total</span>
+                  </dd>
+                )}
               </div>
               <div>
                 <dt>Average time to get paid</dt>
@@ -195,6 +206,7 @@ function WaitingCash() {
             <h3 className="fp-subhead">How late it is</h3>
             <AgeingStrip
               buckets={buckets}
+              hideEmptyLabels
               ariaLabel={`Unpaid balance by how late it is: ${buckets.filter((b) => b.amount > 0).map((b) => `${b.label} ${formatCurrency(b.amount)}`).join(', ')}`}
             />
           </div>
@@ -230,7 +242,8 @@ function WaitingCash() {
       <CardHead
         id={headId}
         title="How much cash is waiting on your customers"
-        description="Unpaid balances on invoices you have sent, as of today. Lateness is counted from each invoice's due date."
+        description="Unpaid balances on sent invoices, as of today"
+        info="Unpaid balances on invoices you have sent, as of today. Lateness is counted from each invoice's due date."
       />
       {body}
     </section>
@@ -248,6 +261,7 @@ function HoldingBack() {
   });
 
   let body;
+  let aside: ReactNode = null;
   if (isLoading) body = <Skeleton rows={3} />;
   else if (!data) body = <LoadError what="the invoice checks" onRetry={() => refetch()} />;
   else {
@@ -277,8 +291,27 @@ function HoldingBack() {
         .sort((a, b) => b.value - a.value);
       const blocked = withChecks.filter((w) => w.keys.length > 0);
       const clear = checkedCount - blocked.length;
-      const maxValue = Math.max(...rows.map((r) => r.value), 1);
+      // Bars are the share of checked value, the same percentage the row prints.
+      const barScale = Math.max(checkedValue, ...rows.map((r) => r.value), 1);
 
+      // The pass count and the invoice list toggle sit in the card head, beside the title.
+      aside = (
+        <>
+          <p className="fp-muted">
+            {clear} of {plural(checkedCount, 'checked invoice')} {clear === 1 ? 'passes' : 'pass'} every invoice check.
+          </p>
+          {blocked.length > 0 && (
+            <button
+              type="button"
+              className="fp-btn fp-btn--quiet"
+              aria-expanded={showInvoices}
+              aria-controls={tableId}
+              onClick={() => setShowInvoices((v) => !v)}>
+              {showInvoices ? 'Hide invoices' : `Show ${plural(blocked.length, 'invoice')}`}
+            </button>
+          )}
+        </>
+      );
       body = (
         <>
           {rows.length === 0 ? (
@@ -289,7 +322,7 @@ function HoldingBack() {
                 <li key={r.key} className="fp-rank__row">
                   <span className="fp-rank__label">{r.label}</span>
                   <span className="fp-rank__bar" aria-hidden="true">
-                    <span style={{ width: `${(r.value / maxValue) * 100}%` }} />
+                    <span style={{ width: `${(r.value / barScale) * 100}%` }} />
                   </span>
                   <span className="fp-rank__value">{formatCurrency(r.value)}</span>
                   <span className="fp-rank__meta">{r.count} of {checkedCount} · {pct(r.value, checkedValue)}%</span>
@@ -298,21 +331,6 @@ function HoldingBack() {
             </ul>
           )}
 
-          <div className="fp-card__foot">
-            <p className="fp-muted">
-              {clear} of {plural(checkedCount, 'checked invoice')} {clear === 1 ? 'passes' : 'pass'} every invoice check.
-            </p>
-            {blocked.length > 0 && (
-              <button
-                type="button"
-                className="fp-btn fp-btn--quiet"
-                aria-expanded={showInvoices}
-                aria-controls={tableId}
-                onClick={() => setShowInvoices((v) => !v)}>
-                {showInvoices ? 'Hide invoices' : `Show ${plural(blocked.length, 'invoice')}`}
-              </button>
-            )}
-          </div>
 
           {showInvoices && (
             <div className="fp-table-wrap" id={tableId}>
@@ -350,7 +368,9 @@ function HoldingBack() {
       <CardHead
         id={headId}
         title="What would stop your invoices qualifying"
-        description="The invoice checks Fast Pay runs, applied to your most recent sent invoices that are not yet paid. Part-paid invoices are not checked, and one invoice can fail more than one check. Bars show invoice value."
+        description="Checks on your latest unpaid invoices, by value"
+        aside={aside}
+        info="The invoice checks Fast Pay runs, applied to your most recent sent invoices that are not yet paid. Part-paid invoices are not checked, and one invoice can fail more than one check. Each bar is the value that fails the check, as a share of all checked invoice value."
       />
       {body}
     </section>
@@ -408,7 +428,7 @@ export default function CapitalPrelaunch() {
     <div className="fp-page">
       <SectionHeader
         title="Fast Pay"
-        titleAdornment={<span className="fp-chip">Not live yet</span>}
+        titleAdornment={<StatusChip tone="neutral" label="Not live yet" />}
         description="Get paid for delivered loads without waiting for your customers to settle their invoices."
       />
       <div className="fp-stack">

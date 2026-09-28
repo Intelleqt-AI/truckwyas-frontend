@@ -13,27 +13,19 @@
   --ins-track: var(--surface-tint-active);
 }
 
-/* Page intro sits on the page ground, not in a card. */
-.insights-header { margin-bottom: 16px; }
-.insights-title { margin: 0; font: 600 var(--text-title, 20px)/28px var(--font-sans); color: var(--text-primary); }
-.insights-intro { margin: 4px 0 0; font: 400 14px/20px var(--font-sans); color: var(--text-secondary); }
+/* Page head: the standard .tw-page-head (28px title, one-line subtitle). The
+   Margin period control sits on the title row, right-aligned. */
+.insights-header { margin: 0 0 16px; }
+.insights-head-actions { justify-content: flex-end; min-width: 0; max-width: 100%; }
+/* Six periods do not fit a phone: the one track scrolls locally, never the page. */
+.insights-seg-scroll { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.insights-seg-scroll::-webkit-scrollbar { display: none; }
+.insights-custom { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.insights-custom__to { color: var(--text-secondary); font-size: 13px; line-height: 20px; }
 
 .insights-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
-/* Period filters (Margin only): 40px desktop / 48px phone. */
-.insights-periods { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.insights-periods__to { color: var(--text-secondary); font-size: 13px; line-height: 20px; }
-.insights-period-control {
-  min-height: 40px; padding: 8px 12px;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-control, 8px);
-  background: var(--bg-surface); color: var(--text-secondary);
-  font: 500 14px/20px var(--font-sans); letter-spacing: normal; text-transform: none; white-space: nowrap; cursor: pointer;
-}
-.insights-period-control:hover { background: var(--surface-tint-hover); color: var(--text-primary); }
-.insights-period-control[aria-pressed="true"] { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--btn-action-color); }
-.insights-period-control:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
-
-/* Section tabs: 2px active underline. Scroll locally on phones. */
+/* Section tabs: 40px, 2px underline in primary text (not accent). Scroll locally on phones. */
 .insights-tabs {
   display: flex; gap: 24px; margin-bottom: 24px;
   border-bottom: 1px solid var(--border-subtle);
@@ -41,26 +33,19 @@
 }
 .insights-tabs::-webkit-scrollbar { display: none; }
 .insights-brand-tab {
-  flex-shrink: 0; min-height: 44px; padding: 12px 0; margin-bottom: -1px;
+  flex-shrink: 0; min-height: 40px; padding: 10px 0; margin-bottom: -1px;
   background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer;
   font: 400 14px/20px var(--font-sans); letter-spacing: normal; white-space: nowrap;
   color: var(--text-secondary);
 }
 .insights-brand-tab:hover { color: var(--text-primary); }
-.insights-brand-tab[aria-current="page"] { color: var(--text-primary); font-weight: 500; border-bottom-color: var(--accent-primary); }
-.insights-brand-tab:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; border-radius: 4px; }
+.insights-brand-tab[aria-current="page"] { color: var(--text-primary); font-weight: 500; border-bottom-color: var(--text-primary); }
+.insights-brand-tab:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: -2px; border-radius: 4px; }
 
 /* KPI row inside the margin card, separated from the chart beneath. */
 .insights-kpis { padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border-row); }
 
-/* Standalone KPI tiles (Fleet). */
-.insights-tiles { gap: 12px; }
-.insights-tiles > .ic-kpi {
-  padding: 20px 24px; background: var(--bg-surface);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px);
-}
-
-/* Small stats under a funnel: where items dropped out. */
+/* Small stats: under a funnel (where items dropped out) or at the head of a card. */
 .insights-stats {
   margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--border-row);
   display: flex; flex-wrap: wrap; gap: 8px 32px;
@@ -68,6 +53,8 @@
 .insights-stats > div { display: flex; align-items: baseline; gap: 8px; }
 .insights-stats dt { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
 .insights-stats dd { margin: 0; font: 600 16px/24px var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.insights-stats__note { margin-left: 8px; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); }
+.insights-stats--head { margin: 0 0 12px; padding: 0 0 12px; border-top: 0; border-bottom: 1px solid var(--border-row); }
 
 /* Empty, error and loading states: one line and one action. */
 .insights-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
@@ -79,14 +66,17 @@
 .insights-state p { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-primary); }
 .insights-state__action {
   display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: var(--radius-control, 8px);
-  background: var(--accent-primary); color: var(--btn-action-color); font: 500 14px/20px var(--font-sans); text-decoration: none; cursor: pointer;
+  background: var(--btn-primary-bg); color: var(--btn-primary-fg); font: 500 14px/20px var(--font-sans); text-decoration: none; cursor: pointer;
 }
-.insights-state__action:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
+.insights-state__action:hover { background: var(--btn-primary-hover, var(--btn-primary-bg)); }
+.insights-state__action:active { background: var(--btn-primary-pressed, var(--btn-primary-bg)); }
+.insights-state__action:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 3px; }
 .insights-skel { min-height: 240px; border-radius: var(--radius-card, 12px); background: var(--surface-tint-hover); }
 
 @media (max-width: 767px) {
-  .insights-period-control, .insights-brand-tab, .insights-state__action { min-height: 48px; }
-  .insights-tiles > .ic-kpi { padding: 16px; }
+  .insights-head-actions { justify-content: flex-start; width: 100%; }
+  .insights-brand-tab, .insights-state__action { min-height: 48px; }
   .ic-kpis.insights-kpis { --ic-cols: 2; }
   .insights-kpis .ic-kpi__value { font-size: 22px; line-height: 28px; }
+  .insights-stats { gap: 4px 24px; }
 }

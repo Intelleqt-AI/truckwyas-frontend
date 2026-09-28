@@ -90,10 +90,9 @@ export function CoverDumbbell({ periods, height = 220, periodNoun = 'month', rev
             const yr = y(p.revenue);
             const yc = y(p.costs);
             const x = cx(i);
-            const dim = active != null && active !== i;
             return (
-              <g key={p.label + i} opacity={dim ? 0.45 : 1}>
-                {active === i && <rect x={x - band / 2 + 2} y={padT - 18} width={band - 4} height={plotH + 18} rx={6} fill="var(--viz-wash-accent)" />}
+              <g key={p.label + i}>
+                {active === i && <rect className="viz-hover-band" x={x - band / 2 + 2} y={padT - 18} width={band - 4} height={plotH + 18} rx={6} />}
                 {has ? (
                   <>
                     {Math.abs(yr - yc) > 0.5 && <line x1={x} x2={x} y1={yr} y2={yc} stroke={ok ? VIZ.accent : VIZ.warm} strokeWidth={4} strokeLinecap="round" />}

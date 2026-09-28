@@ -1,7 +1,9 @@
 import { Fragment, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Check as CheckIcon, Download, Printer } from 'lucide-react';
+import { Check as CheckIcon, ChevronRight, Download, Printer } from 'lucide-react';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { Segmented } from '@/components/ui/Segmented';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import LoadError from '@/components/data/LoadError';
 import {
   PERIODS, day, downloadCsv, int, money, pct, resolvePeriod, slug,
@@ -48,13 +50,21 @@ export function PeriodControl({ period, onChange, options }: {
 export function Seg<T extends string>({ label, value, options, onChange }: {
   label: string; value: T; options: { id: T; label: string }[]; onChange: (id: T) => void;
 }) {
+  // The product-standard segmented control (neutral active chip, one track).
+  // On a phone the track scrolls sideways; keep the chosen option in view.
+  const wrap = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const track = wrap.current?.querySelector<HTMLElement>('.tw-seg');
+    const active = track?.querySelector<HTMLElement>('.is-active');
+    if (!track || !active || track.scrollWidth <= track.clientWidth) return;
+    const left = active.getBoundingClientRect().left - track.getBoundingClientRect().left + track.scrollLeft;
+    if (left < track.scrollLeft || left + active.offsetWidth > track.scrollLeft + track.clientWidth) {
+      track.scrollLeft = Math.max(0, left - (track.clientWidth - active.offsetWidth) / 2);
+    }
+  }, [value]);
   return (
-    <div className="tw-seg fr-seg" role="group" aria-label={label}>
-      {options.map(o => (
-        <button key={o.id} type="button" className={`tw-seg__opt${value === o.id ? ' is-active' : ''}`} aria-pressed={value === o.id} onClick={() => onChange(o.id)}>
-          {o.label}
-        </button>
-      ))}
+    <div ref={wrap} className="fr-seg-wrap">
+      <Segmented<T> label={label} value={value} className="fr-seg" options={options.map(o => ({ value: o.id, label: o.label }))} onChange={onChange} />
     </div>
   );
 }
@@ -81,6 +91,8 @@ export function ReportFrame({ title, sub, info, controls, tiles, gaps, csv, csvN
   const [params] = useSearchParams();
   const back = new URLSearchParams(params); back.delete('report'); back.delete('customer'); back.delete('view'); back.delete('basis'); back.delete('asat');
   const qs = back.toString();
+  // One heading level under the Finance header: "Reports › Title", with the
+  // basis on the same line and the controls, Export and Print on the right.
   return (
     <article className="fr-report" aria-labelledby="fr-report-title">
       <div className="fr-print-head">
@@ -88,59 +100,97 @@ export function ReportFrame({ title, sub, info, controls, tiles, gaps, csv, csvN
         <span>{printTitle || title} · {sub}</span>
         <span>Printed {day(new Date().toISOString())}</span>
       </div>
-      <Link className="fr-back fr-noprint" to={`/finance/reports${qs ? `?${qs}` : ''}`}>
-        <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />
-        All reports
-      </Link>
       <header className="fr-head">
         <div className="fr-head__titles">
           <h2 id="fr-report-title" className="fr-head__title">
-            {title}
+            <Link className="fr-crumb fr-noprint" to={`/finance/reports${qs ? `?${qs}` : ''}`}>Reports</Link>
+            <ChevronRight className="fr-crumb__sep fr-noprint" size={16} strokeWidth={1.75} aria-hidden="true" />
+            <span className="fr-head__name">{title}</span>
             <InfoTip label={`How the ${title.toLowerCase()} is built`}>{info}</InfoTip>
           </h2>
           <p className="fr-head__sub">{sub}</p>
         </div>
         <div className="fr-head__actions fr-noprint">
+          {controls}
           {csv && (
-            <button type="button" className="tw-btn" onClick={() => downloadCsv(`truckwys-${csvName || slug(title)}.csv`, csv())}>
+            <button type="button" className="tw-btn fr-head__btn" onClick={() => downloadCsv(`truckwys-${csvName || slug(title)}.csv`, csv())}>
               <Download size={16} strokeWidth={1.75} aria-hidden="true" />
               Export CSV
             </button>
           )}
-          <button type="button" className="tw-btn" onClick={() => window.print()}>
+          <button type="button" className="tw-btn fr-head__btn" onClick={() => window.print()}>
             <Printer size={16} strokeWidth={1.75} aria-hidden="true" />
             Print
           </button>
         </div>
       </header>
-      {controls && <div className="fr-controls fr-noprint">{controls}</div>}
       {tiles}
+      {children}
+      {/* What TruckWys does not capture: a note under the figures, beside the
+          reconciliation lines, so the data starts right under the head. */}
       {gaps && gaps.length > 0 && (
         <ul className="fr-gaps">
           {gaps.map(g => <li key={g}>{g}</li>)}
         </ul>
       )}
-      {children}
     </article>
   );
 }
 
 // ------------------------------------------------------------------- tiles
 
-export interface Tile { label: string; value: string; title?: string; delta?: { text: string; tone?: 'up' | 'down' }; note?: string }
+export interface Tile {
+  label: string; value: string; title?: string; delta?: { text: string; tone?: 'up' | 'down' }; note?: string;
+  /** The money figure the tile shows, so a figure already in the table is not repeated. */
+  amount?: number;
+  /** The money figure inside the note, if any (same rule). */
+  noteAmount?: number;
+  /** Shown instead of the note when the note's figure is already on the page. */
+  noteFallback?: string;
+}
 
-export function Tiles({ tiles }: { tiles: Tile[] }) {
+const whole = (v: number) => Math.round(v);
+
+/** Every money figure a statement shows, in whole rands. */
+export function tableFigures(tables?: Statement | Statement[]): Set<number> {
+  const out = new Set<number>();
+  const list = !tables ? [] : Array.isArray(tables) ? tables : [tables];
+  list.forEach(t => t.rows.forEach(r => {
+    if (r.kind === 'section') return;
+    r.cells.forEach((v, i) => {
+      const type = i > 0 && r.fmt ? r.fmt : t.columns[i]?.type;
+      if (type === 'money' && typeof v === 'number' && Math.abs(v) >= 0.5) out.add(whole(Math.abs(v)));
+    });
+  }));
+  return out;
+}
+
+/** Tiles only carry figures the table below does not: a tile whose figure is
+ *  already in the table (or in an earlier tile) is left out, and a note that
+ *  repeats one is dropped. Nothing renders when no tile is left. */
+export function Tiles({ tiles, table }: { tiles: Tile[]; table?: Statement | Statement[] }) {
+  const seen = tableFigures(table);
+  const kept = tiles.flatMap(t => {
+    // No zero tiles, and no figure the table (or an earlier tile) already shows.
+    if (t.amount != null && (Math.abs(t.amount) < 0.5 || seen.has(whole(Math.abs(t.amount))))) return [];
+    if (t.amount != null) seen.add(whole(Math.abs(t.amount)));
+    const noteRepeats = t.noteAmount != null && seen.has(whole(Math.abs(t.noteAmount)));
+    if (t.noteAmount != null && !noteRepeats) seen.add(whole(Math.abs(t.noteAmount)));
+    return [noteRepeats ? { ...t, note: t.noteFallback } : t];
+  });
+  if (!kept.length) return null;
   return (
-    <dl className={`fr-tiles fr-tiles--${Math.min(4, tiles.length)}`}>
-      {tiles.map(t => (
-        <div key={t.label} className="fr-tile">
-          <dt className="tw-label">{t.label}</dt>
-          <dd className="fr-tile__value" title={t.title}>{t.value}</dd>
-          {t.delta && <dd className={`tw-delta${t.delta.tone === 'up' ? ' is-up' : t.delta.tone === 'down' ? ' is-down' : ''}`}>{t.delta.text}</dd>}
-          {t.note && <dd className="fr-tile__note">{t.note}</dd>}
-        </div>
+    <KpiRow className={`fr-tiles fr-tiles--${Math.min(4, kept.length)}`}>
+      {kept.map(t => (
+        <KpiTile
+          key={t.label}
+          label={t.label}
+          figure={<span title={t.title}>{t.value}</span>}
+          note={t.delta ? t.delta.text : t.note}
+          tone={t.delta?.tone === 'down' ? 'danger' : t.delta?.tone === 'up' ? 'success' : 'neutral'}
+        />
       ))}
-    </dl>
+    </KpiRow>
   );
 }
 
@@ -164,7 +214,8 @@ export interface Statement { columns: Col[]; rows: SRow[] }
 function cell(v: CsvCell, type: ColType = 'text') {
   if (v === '') return '';
   if (v == null) return type === 'text' ? '' : '—';
-  if (typeof v === 'string') return type === 'date' ? day(v) : v;
+  // Only ISO dates are formatted; a label such as "Total" in a date column stays as written.
+  if (typeof v === 'string') return type === 'date' && /^\d{4}-\d{2}-\d{2}/.test(v) ? day(v) : v;
   switch (type) {
     case 'money': return Math.abs(v) < 0.005 ? '0,00' : money(v);
     case 'int': return int(v);
@@ -232,12 +283,12 @@ export function StatementTable({ table, caption, stickyFirst = true, footer, scr
                     const cls = [numeric ? 'is-num' : '', isZero ? 'is-zero' : '', typeof v === 'number' && v < -0.004 && type === 'money' ? 'is-neg' : '', i === 0 && r.indent ? 'is-indent' : ''].filter(Boolean).join(' ') || undefined;
                     if (i === 0) {
                       return (
-                        <th key={i} scope="row" className={cls}>
+                        <th key={i} scope="row" className={cls} title={!numeric && typeof content === 'string' ? content : undefined}>
                           {r.href ? <Link to={r.href} className="fr-link">{content}</Link> : content}
                         </th>
                       );
                     }
-                    return <td key={i} className={cls}>{content}</td>;
+                    return <td key={i} className={cls} title={!numeric && typeof content === 'string' && content.length > 24 ? content : undefined}>{content}</td>;
                   })}
                 </tr>
               );
@@ -276,7 +327,6 @@ export function ReportState({ loading, error, onRetry }: { loading: boolean; err
     return (
       <div className="fr-report" aria-busy="true" aria-label="Loading report">
         <div className="fr-skel fr-skel--head" />
-        <div className="fr-tiles fr-tiles--4">{[0, 1, 2, 3].map(i => <div key={i} className="fr-tile fr-skel" />)}</div>
         <div className="fr-skel fr-skel--table" />
       </div>
     );

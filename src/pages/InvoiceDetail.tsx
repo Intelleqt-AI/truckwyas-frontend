@@ -10,7 +10,7 @@ import "./table-heading-roles.css";
 import { Loader } from "@/components/Loader";
 import RowActions from "@/components/ui/RowActions";
 import { InfoTip } from "@/components/ui/InfoTip";
-import { FinTile, FinTiles, wholeRand } from "@/components/finance/FinTile";
+import { StatusChip } from "@/components/ui/StatusChip";
 import LoadError, { loadFailed } from "@/components/data/LoadError";
 import InvoiceSendPreview, { type InvoiceMessageKind } from "@/components/finance/InvoiceSendPreview";
 import { canSendReminder, invoiceBalance, REMINDER_STATUSES } from "@/lib/invoiceStatus";
@@ -35,15 +35,6 @@ function saveAppliedId(id: string, current: Set<string>): Set<string> {
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-
-const STATUS_TONE: Record<string, string> = {
-  PAID: 'success',
-  SENT: 'warning',
-  VIEWED: 'info',
-  OVERDUE: 'danger',
-  PARTIALLY_PAID: 'warning',
-  DRAFT: 'neutral',
-};
 
 // "BANK_TRANSFER" → "Bank transfer"; short acronyms (EFT) stay as-is.
 const methodLabel = (m: string) => (m.length <= 4 ? m : formatStatus(m));
@@ -262,7 +253,6 @@ export default function InvoiceDetail() {
   }
 
   const status: string = invoice.status || '';
-  const tone = STATUS_TONE[status] ?? 'neutral';
   const total = parseFloat(invoice.total_amount || invoice.amount || '0');
   const hasBalance = invoice.balance !== undefined && invoice.balance !== null;
   const balance = num(invoice.balance);
@@ -280,10 +270,13 @@ export default function InvoiceDetail() {
   const daysLate = invoice.due_date && showBalance
     ? Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / 86400000)
     : null;
-  const paidShare = showBalance && total > 0 ? Math.min(100, Math.max(0, ((total - balance) / total) * 100)) : 0;
-  const terms = invoice.payment_terms ? String(invoice.payment_terms).replace(/^NET(\d+)$/i, '$1 days') : null;
+  // Part-paid: the document ends with "Paid to date" and "Balance due".
+  const partPaid = showBalance && Math.abs(balance - total) > 0.005;
+  const paidInDoc = partPaid ? (paidToDate ?? total - balance) : null;
+  const terms = invoice.payment_terms ? String(invoice.payment_terms).replace(/^(?:NET)?\s*(\d+)$/i, '$1 days') : null;
+  // The API may store the rate as a fraction (0.15) or a percentage (15).
+  const vatRateText = taxRate != null ? `${Number((taxRate > 0 && taxRate <= 1 ? taxRate * 100 : taxRate).toFixed(2))}%` : null;
 
-  const heroLabel = status === 'PAID' ? 'Paid in full' : showBalance ? 'Balance due' : 'Invoice total';
 
   const activity = [
     { label: 'Created', value: safeDate(invoice.created_at) },
@@ -347,7 +340,7 @@ export default function InvoiceDetail() {
           <div className="fin-detail-head__eyebrow">Invoice</div>
           <div className="fin-detail-head__title-row">
             <h1>{invoice.invoice_number}</h1>
-            <span className={`fin-chip${tone === 'neutral' ? '' : ` fin-chip--${tone}`}`}>{formatStatus(status)}</span>
+            <StatusChip status={status} />
           </div>
           <p className="fin-detail-head__sub">
             {invoice.customer_name}
@@ -387,60 +380,51 @@ export default function InvoiceDetail() {
         </div>
       </header>
 
-      <FinTiles label="Invoice figures">
-        <FinTile
-          label={heroLabel}
-          info={showBalance ? 'Invoice total incl. VAT, less payments recorded.' : 'Invoice total incl. VAT.'}
-          value={wholeRand(showBalance ? balance : total)}
-          valueTitle={formatCurrency(showBalance ? balance : total)}
-          sub={showBalance && balance !== total
-            ? `Of ${formatCurrency(total)} incl. VAT`
-            : vat != null
-              ? `Incl. ${formatCurrency(vat)} VAT`
-              : 'Invoice total'}
-        />
-        <FinTile
-          label="Issued"
-          value={safeDate(invoice.issue_date || invoice.created_at)}
-          small
-          sub={terms ? `${terms} terms` : undefined}
-        />
-        <FinTile
-          label="Due"
-          value={safeDate(invoice.due_date)}
-          small
-          sub={daysLate != null && daysLate > 0 ? `${daysLate} ${daysLate === 1 ? 'day' : 'days'} late` : undefined}
-          subTone={daysLate != null && daysLate > 0 ? 'danger' : undefined}
-        />
-        {paidToDate != null && status !== 'DRAFT' && (
-          <FinTile
-            label="Paid to date"
-            value={wholeRand(paidToDate)}
-            valueTitle={formatCurrency(paidToDate)}
-            sub={showBalance && paidShare > 0 ? `${Math.round(paidShare)}% of the total` : undefined}
-          />
-        )}
-      </FinTiles>
+      {/* One invoice document (party, dates, lines, totals) and a sticky side
+          rail, so the two columns read as document + rail, not as a gap.
+          Dates are facts in the document, not KPI tiles; each figure once. */}
+      <div className="fin-detail-grid">
+        <section className="card fin-table-card fin-doc" aria-labelledby="invoice-doc-title">
+          <h2 id="invoice-doc-title" className="fin-sr">Invoice {invoice.invoice_number}</h2>
+          <dl className="fin-doc__facts">
+            <div>
+              <dt>Bill to</dt>
+              <dd title={invoice.customer_name}>{invoice.customer_name || '—'}</dd>
+            </div>
+            <div>
+              <dt>Issued</dt>
+              <dd>{safeDate(invoice.issue_date || invoice.created_at)}</dd>
+            </div>
+            <div>
+              <dt>Due</dt>
+              <dd>
+                {safeDate(invoice.due_date)}
+                {daysLate != null && daysLate > 0 && (
+                  <span className="fin-doc__late fin-text-danger">{daysLate} {daysLate === 1 ? 'day' : 'days'} late</span>
+                )}
+              </dd>
+            </div>
+            {terms && (
+              <div>
+                <dt>Terms</dt>
+                <dd>{terms}</dd>
+              </div>
+            )}
+          </dl>
 
-      <div className="fin-grid-2" style={{ alignItems: 'start' }}>
-        {/* Main column */}
-        <div className="fin-stack" style={{ minWidth: 0 }}>
-          {/* How the total is made up */}
           {invoice.line_items && invoice.line_items.length > 0 ? (
-            <section className="card fin-table-card" aria-labelledby="line-items-title">
-              <div className="fin-panel-head">
-                <div className="fin-panel-head__text">
-                  <h2 id="line-items-title" className="fin-panel-title">Charges</h2>
-                  <p className="fin-panel-desc">
-                    {invoice.line_items.length} {invoice.line_items.length === 1 ? 'line' : 'lines'}, excl. VAT
-                  </p>
-                </div>
+            <div className="fin-doc__lines">
+              <div className="fin-doc__head">
+                <h3 className="fin-panel-title">Charges</h3>
+                <p className="fin-panel-desc">
+                  {invoice.line_items.length} {invoice.line_items.length === 1 ? 'line' : 'lines'}, excl. VAT
+                </p>
               </div>
               <div className="fin-table-scroll">
                 <table className="fin-table table-heading-roles">
                   <thead>
                     <tr>
-                      <th>Description</th>
+                      <th className="fin-cell-fill">Description</th>
                       <th className="num">Quantity</th>
                       <th className="num">Unit price</th>
                       <th className="num">Total</th>
@@ -449,7 +433,7 @@ export default function InvoiceDetail() {
                   <tbody>
                     {invoice.line_items.map((item: any, idx: number) => (
                       <tr key={idx}>
-                        <td className="fin-strong"><div className="fin-truncate" style={{ maxWidth: 360 }} title={item.description || item.item_description || ''}>{item.description || item.item_description || '—'}</div></td>
+                        <td className="fin-strong fin-cell-fill"><div className="fin-truncate fin-truncate--fill" title={item.description || item.item_description || ''}>{item.description || item.item_description || '—'}</div></td>
                         <td className="num">{item.quantity || 1}</td>
                         <td className="num">{formatCurrency(item.unit_price || item.price || 0)}</td>
                         <td className="num">{formatCurrency((item.quantity || 1) * (item.unit_price || item.price || 0))}</td>
@@ -458,9 +442,9 @@ export default function InvoiceDetail() {
                   </tbody>
                   <tfoot>
                     {invoice.subtotal != null && (
-                      <tr>
-                        <td colSpan={3} className="num" style={{ borderTop: '1px solid var(--border-subtle)' }}>Subtotal</td>
-                        <td className="num" style={{ borderTop: '1px solid var(--border-subtle)' }}>{formatCurrency(num(invoice.subtotal))}</td>
+                      <tr className="fin-doc__rule">
+                        <td colSpan={3} className="num">Subtotal</td>
+                        <td className="num">{formatCurrency(num(invoice.subtotal))}</td>
                       </tr>
                     )}
                     {num(invoice.discount) > 0 && (
@@ -471,25 +455,35 @@ export default function InvoiceDetail() {
                     )}
                     {vat != null && (
                       <tr>
-                        <td colSpan={3} className="num">VAT{taxRate != null ? ` (${taxRate}%)` : ''}</td>
+                        <td colSpan={3} className="num">VAT{vatRateText ? ` (${vatRateText})` : ''}</td>
                         <td className="num">{formatCurrency(vat)}</td>
                       </tr>
                     )}
-                    <tr className="fin-total-row">
-                      <td colSpan={3} className="num">Total</td>
+                    <tr className={`fin-total-row${partPaid ? '' : ' fin-doc__grand'}`}>
+                      <td colSpan={3} className="num">{showBalance && !partPaid ? 'Total due' : 'Total'}</td>
                       <td className="num">{formatCurrency(total)}</td>
                     </tr>
+                    {partPaid && (
+                      <>
+                        <tr>
+                          <td colSpan={3} className="num">Paid to date</td>
+                          <td className="num">−{formatCurrency(paidInDoc ?? 0)}</td>
+                        </tr>
+                        <tr className="fin-total-row fin-doc__grand">
+                          <td colSpan={3} className="num">Balance due</td>
+                          <td className="num">{formatCurrency(balance)}</td>
+                        </tr>
+                      </>
+                    )}
                   </tfoot>
                 </table>
               </div>
-            </section>
-          ) : (invoice.subtotal != null || vat != null) && (
-            <section className="card" aria-labelledby="breakdown-title">
-              <div className="fin-panel-head">
-                <div className="fin-panel-head__text">
-                  <h2 id="breakdown-title" className="fin-panel-title">Charges</h2>
-                  <p className="fin-panel-desc">No separate line items</p>
-                </div>
+            </div>
+          ) : (
+            <div className="fin-doc__lines fin-doc__lines--padded">
+              <div className="fin-doc__head">
+                <h3 className="fin-panel-title">Charges</h3>
+                <p className="fin-panel-desc">No separate line items</p>
               </div>
               <dl className="fin-dl">
                 {invoice.subtotal != null && (
@@ -499,62 +493,23 @@ export default function InvoiceDetail() {
                   <div className="fin-dl__row"><dt>Discount</dt><dd>−{formatCurrency(num(invoice.discount))}</dd></div>
                 )}
                 {vat != null && (
-                  <div className="fin-dl__row"><dt>VAT{taxRate != null ? ` (${taxRate}%)` : ''}</dt><dd>{formatCurrency(vat)}</dd></div>
+                  <div className="fin-dl__row"><dt>VAT{vatRateText ? ` (${vatRateText})` : ''}</dt><dd>{formatCurrency(vat)}</dd></div>
                 )}
-                <div className="fin-dl__row is-total"><dt>Total</dt><dd>{formatCurrency(total)}</dd></div>
+                <div className="fin-dl__row is-total"><dt>{showBalance && !partPaid ? 'Total due' : 'Total'}</dt><dd>{formatCurrency(total)}</dd></div>
+                {partPaid && (
+                  <>
+                    <div className="fin-dl__row"><dt>Paid to date</dt><dd>−{formatCurrency(paidInDoc ?? 0)}</dd></div>
+                    <div className="fin-dl__row is-total"><dt>Balance due</dt><dd>{formatCurrency(balance)}</dd></div>
+                  </>
+                )}
               </dl>
-              {invoice.notes && <p className="fin-note" style={{ marginTop: 12 }}>Note: {invoice.notes}</p>}
-            </section>
+            </div>
           )}
+          {invoice.notes && <p className="fin-note fin-doc__note">Note: {invoice.notes}</p>}
+        </section>
 
-          {/* Payment history */}
-          {payments && payments.length > 0 && (
-            <section className="card fin-table-card" aria-labelledby="payments-title">
-              <div className="fin-panel-head">
-                <div className="fin-panel-head__text">
-                  <h2 id="payments-title" className="fin-panel-title">Payments</h2>
-                  <p className="fin-panel-desc">
-                    {payments.length} recorded, by payment date
-                  </p>
-                </div>
-              </div>
-              <div className="fin-table-scroll">
-                <table className="fin-table table-heading-roles">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Reference</th>
-                      <th>Method</th>
-                      <th className="num">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payments.map((payment: any, idx: number) => {
-                      const ref = payment.reference || payment.reference_number || payment.payment_number;
-                      return (
-                        <tr key={idx}>
-                          <td className="fin-date">{safeDate(payment.payment_date || payment.date)}</td>
-                          <td>{ref ? <span className="fin-id">{ref}</span> : '—'}</td>
-                          <td>{methodLabel(payment.payment_method || payment.method || 'EFT')}</td>
-                          <td className="num">{formatCurrency(num(payment.amount))}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="fin-total-row">
-                      <td colSpan={3} className="num">Total paid</td>
-                      <td className="num">{formatCurrency(totalPaid)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </section>
-          )}
-        </div>
-
-        {/* Side column */}
-        <div className="fin-stack" style={{ minWidth: 0 }}>
+        {/* Side rail: sticky, same top as the document. */}
+        <aside className="fin-rail" aria-label="Payments and activity">
           {showPaymentForm && (
             <section className="card" id="record-payment" aria-labelledby="record-payment-title">
               <div className="fin-panel-head">
@@ -631,6 +586,41 @@ export default function InvoiceDetail() {
             </section>
           )}
 
+          {payments && payments.length > 0 && (
+            <section className="card fin-table-card" aria-labelledby="payments-title">
+              <div className="fin-panel-head">
+                <div className="fin-panel-head__text">
+                  <h2 id="payments-title" className="fin-panel-title">Payments</h2>
+                  <p className="fin-panel-desc">{payments.length} recorded, by payment date</p>
+                </div>
+              </div>
+              <ul className="fin-paylist">
+                {payments.map((payment: any, idx: number) => {
+                  const ref = payment.reference || payment.reference_number || payment.payment_number;
+                  return (
+                    <li key={idx} className="fin-paylist__row">
+                      <span className="fin-paylist__main">
+                        <span className="fin-date">{safeDate(payment.payment_date || payment.date)}</span>
+                        <span className="fin-paylist__sub">
+                          {methodLabel(payment.payment_method || payment.method || 'EFT')}
+                          {ref && <> · <span className="fin-id">{ref}</span></>}
+                        </span>
+                      </span>
+                      <span className="fin-paylist__amt">{formatCurrency(num(payment.amount))}</span>
+                    </li>
+                  );
+                })}
+                {/* The total only when the document does not already show it. */}
+                {payments.length > 1 && (paidInDoc == null || Math.abs(totalPaid - paidInDoc) > 0.005) && (
+                  <li className="fin-paylist__row fin-paylist__row--total">
+                    <span>Total paid</span>
+                    <span className="fin-paylist__amt">{formatCurrency(totalPaid)}</span>
+                  </li>
+                )}
+              </ul>
+            </section>
+          )}
+
           <section className="card" aria-labelledby="activity-title">
             <div className="fin-panel-head" style={{ marginBottom: 4 }}>
               <div className="fin-panel-head__text">
@@ -677,7 +667,7 @@ export default function InvoiceDetail() {
               )}
             </section>
           )}
-        </div>
+        </aside>
       </div>
     </div>
   );

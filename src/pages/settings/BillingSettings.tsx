@@ -7,6 +7,7 @@ import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { useAuth } from "@/lib/AuthContext";
 import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
+import { StatusChip } from '@/components/ui/StatusChip';
 
 const sectionStyle = settingsCardStyle;
 const sectionHeaderStyle = settingsCardHeaderStyle;
@@ -144,7 +145,7 @@ function NextPaymentCountdown({ nextBillingAt, mode = 'charge' }: { nextBillingA
 
   return (
     <div style={{
-      fontSize: 13, lineHeight: '20px', color: mode === 'cancel' ? 'var(--status-warning-text, var(--status-warning))' : 'var(--accent-primary)', marginTop: 2,
+      fontSize: 13, lineHeight: '20px', color: mode === 'cancel' ? 'var(--status-warning-text)' : 'var(--accent-primary)', marginTop: 2,
       fontVariantNumeric: 'tabular-nums' as const,
     }}>
       {label} · {new Date(nextBillingAt).toLocaleDateString('en-ZA')}
@@ -382,7 +383,7 @@ export function BillingSettings() {
   const showLoading = loading || confirming;
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ maxWidth: 960 }}>
       <SettingsPageHeader title="Billing" description="Manage your subscription and payment history" />
 
       {confirming && (
@@ -412,22 +413,13 @@ export function BillingSettings() {
                     {isPaid ? (billingStatus?.item_name || 'TruckWys Fleet') : 'Free plan'}
                   </span>
                   {isPaid && !billingStatus?.cancel_at_period_end && (
-                    <span style={{
-                      ...planBadgeStyle,
-                      background: 'var(--status-success-bg)', color: 'var(--accent-primary)',
-                    }}>Active</span>
+                    <StatusChip status="ACTIVE" />
                   )}
                   {isPaid && billingStatus?.cancel_at_period_end && (
-                    <span style={{
-                      ...planBadgeStyle,
-                      background: 'var(--status-warning-bg)', color: 'var(--status-warning-text, var(--status-warning))',
-                    }}>Cancelling</span>
+                    <StatusChip tone="warning" label="Cancelling" />
                   )}
                   {subStatus === 'cancelled' && (
-                    <span style={{
-                      ...planBadgeStyle,
-                      background: 'var(--status-danger-bg)', color: 'var(--status-danger-text, var(--status-danger))',
-                    }}>Cancelled</span>
+                    <StatusChip tone="danger" label="Cancelled" />
                   )}
                 </div>
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
@@ -508,7 +500,7 @@ export function BillingSettings() {
               <div style={{
                 marginBottom: 16, padding: 16,
                 background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)',
-                borderRadius: 'var(--radius-nested)', fontSize: 14, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))',
+                borderRadius: 'var(--radius-nested)', fontSize: 14, lineHeight: '20px', color: 'var(--status-danger-text)',
               }}>
                 <strong>Your account is suspended.</strong> You can still view existing data and manage
                 drivers/vehicles, but can't create quotes or invoices until you update your payment method.
@@ -524,7 +516,7 @@ export function BillingSettings() {
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>
                   We couldn't charge your card
                 </div>
-                <div style={{ color: 'var(--status-warning-text, var(--status-warning))', fontWeight: 500 }}>
+                <div style={{ color: 'var(--status-warning-text)', fontWeight: 500 }}>
                   {grace.days_remaining > 0
                     ? `${grace.days_remaining} day${grace.days_remaining === 1 ? '' : 's'} left to resolve this before your account is suspended.`
                     : 'Grace period has ended. A successful charge is needed to avoid suspension.'}
@@ -555,7 +547,7 @@ export function BillingSettings() {
                         Failed {new Date(item.failed_at).toLocaleDateString('en-ZA')}
                       </div>
                     </div>
-                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--status-warning-text, var(--status-warning))' }}>{formatRand(item.amount)}</span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--status-warning-text)' }}>{formatRand(item.amount)}</span>
                   </div>
                 ))}
                 <div style={{
@@ -647,10 +639,7 @@ export function BillingSettings() {
                       {formatRand(tx.amount)}
                     </td>
                     <td>
-                      <span style={{
-                        fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                        color: tx.status === 'complete' ? 'var(--status-success-text, var(--accent-primary))' : tx.status === 'pending' ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))',
-                      }}>{statusDisplay(tx.status)}</span>
+                      <StatusChip tone={tx.status === 'complete' ? 'success' : tx.status === 'pending' ? 'warning' : 'danger'} label={statusDisplay(tx.status)} size="sm" />
                     </td>
                   </tr>
                 ))}

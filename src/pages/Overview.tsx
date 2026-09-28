@@ -10,6 +10,7 @@ import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { CircleAlert, ArrowUpRight, TrendingUp, TrendingDown } from "lucide-react";
 import { InfoTip } from "@/components/ui/InfoTip";
+import { StatusChip } from "@/components/ui/StatusChip";
 import { MicroBars, RevenueCostBars, PipelineBars, usePipeline } from "@/components/overview/today";
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
@@ -237,11 +238,6 @@ function Delta({ value, unit, period }: { value: number; unit: "%" | "pts"; peri
   );
 }
 
-const POSITIVE = ["ACCEPTED", "DELIVERED", "COMPLETED", "PAID"];
-function StatusChip({ status }: { status?: string }) {
-  const s = String(status || "").toUpperCase();
-  return <span className={`tw-chip${POSITIVE.includes(s) ? " tw-chip--ok" : ""}`}>{titleCase(status)}</span>;
-}
 
 export default function Overview() {
   const navigate = useNavigate();
@@ -277,7 +273,7 @@ export default function Overview() {
   const pipeline = usePipeline(allQuotes);
 
   useEffect(() => {
-    document.title = "Today - TruckWys";
+    document.title = "Home - TruckWys";
   }, []);
 
   useAutoRefresh(refetch);
@@ -292,9 +288,19 @@ export default function Overview() {
   })();
 
   // ---- Derived presentation values (no new calculations of business figures) ----
-  const trend: any[] = financeData?.monthly_trend || [];
+  const trendAll: any[] = financeData?.monthly_trend || [];
+  // Layout rule §11.7: do not reserve half a chart for months with no data.
+  // Trailing months with neither revenue nor costs are trimmed from the
+  // chart (kept if that would leave fewer than 2) and named in a note.
+  const lastActive = (() => {
+    for (let i = trendAll.length - 1; i >= 0; i--) {
+      if ((Number(trendAll[i].revenue) || 0) !== 0 || (Number(trendAll[i].expenses) || 0) !== 0) return i;
+    }
+    return -1;
+  })();
+  const trend: any[] = lastActive >= 1 ? trendAll.slice(0, lastActive + 1) : trendAll;
+  const trimmedMonths: any[] = trendAll.slice(trend.length);
   const monthLabel = (m: any) => MONTHS_SHORT[Number(String(m.month).slice(5, 7)) - 1] || m.month || "";
-  const revenueSeries = trend.map((m) => Number(m.revenue) || 0);
   const marginSeries = trend.map((m) => (m.revenue > 0 ? ((m.revenue - m.expenses) / m.revenue) * 100 : null));
   const marginBasis = financeData
     ? financeData.revenue_mtd > 0 ? "this month" : financeData.total_revenue > 0 ? "all time" : null
@@ -312,7 +318,7 @@ export default function Overview() {
     <div className="overview-typography ov-page">
       <header className="tw-page-head">
         <div className="tw-page-head__titles">
-          <h1 className="tw-title">Today</h1>
+          <h1 className="tw-title">Home</h1>
           <p className="tw-subtitle">{today}</p>
         </div>
         <div className="tw-page-head__actions">
@@ -349,12 +355,24 @@ export default function Overview() {
           <div className="td-kpi__head">
             <h2 className="td-kpi__label">
               Owed to you
-              <InfoTip>Sent invoices not yet paid. Past due means after the invoice due date.</InfoTip>
+              <InfoTip>
+                Sent invoices not yet paid. Past due means after the invoice due date.
+                {financeData && outstanding > 0 && (financeData.dso > 0
+                  ? ` Customers take ${Math.round(financeData.dso)} days to pay, on average.`
+                  : " Time to pay needs recent invoices.")}
+              </InfoTip>
             </h2>
             <KpiMenu id="outstanding" label="Owed to you" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={220} onGo={navigate} />
           </div>
-          <div className="td-kpi__value" title={financeData ? formatCurrency(outstanding) : undefined}>
-            {loading ? skeleton : financeData ? wholeRand(outstanding) : "—"}
+          <div className="td-kpi__body">
+            <div className="td-kpi__value" title={financeData ? formatCurrency(outstanding) : undefined}>
+              {loading ? skeleton : financeData ? wholeRand(outstanding) : "—"}
+            </div>
+            {financeData && outstanding > 0 && (
+              <div className="td-kpi__strip" role="img" aria-label={`${Math.round(pastShare * 100)}% of what you are owed is past due`}>
+                <span style={{ width: `${pastShare * 100}%` }} />
+              </div>
+            )}
           </div>
           <div className="td-kpi__meta">
             {financeData ? (
@@ -362,36 +380,25 @@ export default function Overview() {
                 : <span>{overdue >= outstanding ? "All past due" : overdue > 0 ? `${wholeRand(overdue)} past due` : "None past due"}</span>
             ) : unavailable ? <span>Unavailable</span> : null}
           </div>
-          {financeData && outstanding > 0 && (
-            <div className="td-kpi__strip" role="img" aria-label={`${Math.round(pastShare * 100)}% of what you are owed is past due`}>
-              <span style={{ width: `${pastShare * 100}%` }} />
-            </div>
-          )}
-          <div className="td-kpi__foot">
-            {financeData && outstanding > 0 && (financeData.dso > 0
-              ? `${Math.round(financeData.dso)} days to pay, on average`
-              : "Time to pay needs recent invoices")}
-          </div>
         </section>
 
         <section className="td-kpi" aria-label="Revenue received">
           <div className="td-kpi__head">
             <h2 className="td-kpi__label">
               Revenue received
-              <InfoTip>Invoices paid, all time. Change compares the last 30 days with the 30 before. Bars show each month.</InfoTip>
+              <InfoTip>Invoices paid, all time. Change compares the last 30 days with the 30 before. Revenue per month is in the chart below.</InfoTip>
             </h2>
             <KpiMenu id="revenue" label="Revenue" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={200} onGo={navigate} />
           </div>
-          <div className="td-kpi__value" title={financeData ? formatCurrency(financeData.total_revenue || 0) : undefined}>
+          <div className="td-kpi__body">
+            <div className="td-kpi__value" title={financeData ? formatCurrency(financeData.total_revenue || 0) : undefined}>
               {loading ? skeleton : financeData ? wholeRand(financeData.total_revenue || 0) : "—"}
             </div>
-          <div className="td-kpi__row">
-            <div className="td-kpi__meta">
+          </div>
+          <div className="td-kpi__meta">
             {typeof financeData?.revenue_change_pct === "number" ? (
               <Delta value={financeData.revenue_change_pct} unit="%" period="vs prior 30 days" />
             ) : financeData ? <span>No prior 30 days</span> : unavailable ? <span>Unavailable</span> : null}
-            </div>
-            <MicroBars values={revenueSeries} ariaLabel="Revenue received per month" />
           </div>
         </section>
 
@@ -403,16 +410,16 @@ export default function Overview() {
             </h2>
             <KpiMenu id="margin" label="Net margin" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={200} onGo={navigate} />
           </div>
-          <div className="td-kpi__value">
+          <div className="td-kpi__body">
+            <div className="td-kpi__value">
               {loading ? skeleton : financeData && marginBasis ? formatPercent(financeData.net_margin_percent || 0) : "—"}
             </div>
-          <div className="td-kpi__row">
-            <div className="td-kpi__meta">
+            <MicroBars values={marginSeries} ariaLabel="Net margin per month" />
+          </div>
+          <div className="td-kpi__meta">
             {typeof financeData?.margin_change_pts === "number" ? (
               <Delta value={financeData.margin_change_pts} unit="pts" period="vs prior 30 days" />
             ) : financeData ? <span>{marginBasis ? "Too little revenue" : "No revenue yet"}</span> : unavailable ? <span>Unavailable</span> : null}
-            </div>
-            <MicroBars values={marginSeries} ariaLabel="Net margin per month" />
           </div>
         </section>
 
@@ -420,24 +427,26 @@ export default function Overview() {
           <div className="td-kpi__head">
             <h2 className="td-kpi__label">
               Active loads
-              <InfoTip>Loads not yet delivered, invoiced or cancelled. Bars show loads booked per day, last 28 days. Available trucks come from your vehicle list.</InfoTip>
+              <InfoTip align="end">
+                Loads not yet delivered, invoiced or cancelled. Bars show loads booked per day, last 28 days.
+                {!loading && !vehiclesFailed && totalVehicles > 0 && ` ${availableVehicles} of ${totalVehicles} trucks are available now.`}
+              </InfoTip>
             </h2>
             <Link to="/bookings" className="td-kpi__go" aria-label="Open loads"><ArrowUpRight size={16} strokeWidth={1.75} /></Link>
           </div>
-          <div className="td-kpi__value">{loading ? skeleton : failed.includes("loads") ? "—" : activeLoadsCount}</div>
-          <div className="td-kpi__row">
-            <div className="td-kpi__meta">
-            {data && !failed.includes("loads") && <span>{loads28} booked in 28 days</span>}
-            </div>
+          <div className="td-kpi__body">
+            <div className="td-kpi__value">{loading ? skeleton : failed.includes("loads") ? "—" : activeLoadsCount}</div>
             <MicroBars values={heatmapData} ariaLabel={`Loads booked per day, last 28 days: ${loads28} in total`} />
           </div>
-          <div className="td-kpi__foot">
-            {!loading && !vehiclesFailed && totalVehicles > 0 && `${availableVehicles} of ${totalVehicles} trucks available`}
+          <div className="td-kpi__meta">
+            {data && !failed.includes("loads") && <span>{loads28} booked in 28 days</span>}
           </div>
         </section>
       </div>
 
+      {/* Two independent columns so a tall card never leaves a gap beside a short one (§11.7). */}
       <div className="td-grid">
+        <div className="td-col td-col--main">
         <section className="tw-card td-chart-card" aria-labelledby="td-chart-title">
           <div className="tw-card__head">
             <div className="tw-card__titles">
@@ -445,7 +454,10 @@ export default function Overview() {
                 Revenue vs costs
                 <InfoTip>Revenue: invoices paid in the month. Costs: approved expenses dated in the month.</InfoTip>
               </h2>
-              <p className="tw-card__sub">Per month, last {trend.length || 6}</p>
+              <p className="tw-card__sub">
+                Per month{trend.length ? `, ${monthLabel(trend[0])} to ${monthLabel(trend[trend.length - 1])}` : ""}
+                {trimmedMonths.length > 0 && `. Nothing recorded since ${monthLabel(trend[trend.length - 1])}`}
+              </p>
             </div>
             <div className="td-legend" aria-hidden="true">
               <span><i className="td-legend__rev" />Revenue</span>
@@ -465,43 +477,6 @@ export default function Overview() {
                 costs: Number(m.expenses) || 0,
               }))}
             />
-          )}
-        </section>
-
-        <section className="tw-card td-needs" aria-labelledby="td-needs-title">
-          <div className="tw-card__head">
-            <div className="tw-card__titles">
-              <h2 id="td-needs-title" className="tw-card__title">Needs you</h2>
-              <p className="tw-card__sub">Invoices, quotes and fleet</p>
-            </div>
-            {insights.length > 0 && <span className="tw-chip">{insights.length}</span>}
-          </div>
-          {loading ? (
-            <div className="ov-skel-block ov-skel-block--short" />
-          ) : insights.length > 0 ? (
-            <ul className="td-needs__list">
-              {insights.slice(0, 5).map((insight: any, idx: number) => {
-                const sev = String(insight.severity || "").toLowerCase();
-                const tone = ["high", "critical"].includes(sev) ? "bad" : sev === "medium" ? "warn" : "info";
-                return (
-                  <li key={idx} className="td-needs__row">
-                    <span className={`td-needs__icon is-${tone}`} aria-hidden="true"><CircleAlert size={16} strokeWidth={1.75} /></span>
-                    <div className="td-needs__text">
-                      <div className="td-needs__title">{cleanSignalText(insight.title || insight.message)}</div>
-                      {insight.body && insight.body !== insight.title && (
-                        <div className="td-needs__body" title={cleanSignalText(insight.body)}>{cleanSignalText(insight.body)}</div>
-                      )}
-                    </div>
-                    <span className="ov-sr-only">{titleCase(String(insight.severity || "low"))} priority</span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <div className="td-empty">
-              <p>Nothing needs you right now.</p>
-              <button type="button" className="tw-btn" onClick={() => navigate("/copilot")}>Ask Copilot</button>
-            </div>
           )}
         </section>
 
@@ -579,9 +554,47 @@ export default function Overview() {
             <p className="td-empty td-recent__empty">{failed.includes("loads") ? "Loads couldn't load." : "No loads yet."}</p>
           )}
         </section>
+        </div>
 
-        <div className="td-side">
-          <section className="tw-card" aria-labelledby="td-pipe-title">
+        <div className="td-col td-side">
+        <section className="tw-card td-needs" aria-labelledby="td-needs-title">
+          <div className="tw-card__head">
+            <div className="tw-card__titles">
+              <h2 id="td-needs-title" className="tw-card__title">Needs you</h2>
+              <p className="tw-card__sub">Invoices, quotes and fleet</p>
+            </div>
+            {insights.length > 0 && <span className="tw-chip">{insights.length}</span>}
+          </div>
+          {loading ? (
+            <div className="ov-skel-block ov-skel-block--short" />
+          ) : insights.length > 0 ? (
+            <ul className="td-needs__list">
+              {insights.slice(0, 5).map((insight: any, idx: number) => {
+                const sev = String(insight.severity || "").toLowerCase();
+                const tone = ["high", "critical"].includes(sev) ? "bad" : sev === "medium" ? "warn" : "info";
+                return (
+                  <li key={idx} className="td-needs__row">
+                    <span className={`td-needs__icon is-${tone}`} aria-hidden="true"><CircleAlert size={16} strokeWidth={1.75} /></span>
+                    <div className="td-needs__text">
+                      <div className="td-needs__title">{cleanSignalText(insight.title || insight.message)}</div>
+                      {insight.body && insight.body !== insight.title && (
+                        <div className="td-needs__body" title={cleanSignalText(insight.body)}>{cleanSignalText(insight.body)}</div>
+                      )}
+                    </div>
+                    <span className="ov-sr-only">{titleCase(String(insight.severity || "low"))} priority</span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="td-empty">
+              <p>Nothing needs you right now.</p>
+              <button type="button" className="tw-btn" onClick={() => navigate("/copilot")}>Ask Copilot</button>
+            </div>
+          )}
+        </section>
+
+          <section className="tw-card td-pipe-card" aria-labelledby="td-pipe-title">
             <div className="tw-card__head">
               <div className="tw-card__titles">
                 <h2 id="td-pipe-title" className="tw-card__title">

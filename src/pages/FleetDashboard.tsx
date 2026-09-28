@@ -8,19 +8,10 @@ import { fetchData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { Loader } from "@/components/Loader";
 import SectionHeader from "@/components/layout/SectionHeader";
+import { StatusChip } from "@/components/ui/StatusChip";
+import { KpiRow, KpiTile } from "@/components/ui/KpiTile";
 
-const STATUS_TONE: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
-  AVAILABLE: 'success',
-  ACTIVE: 'success',
-  IN_USE: 'info',
-  IN_TRANSIT: 'info',
-  LOADING: 'warning',
-  MAINTENANCE: 'warning',
-  ON_LEAVE: 'warning',
-};
-const chip = (st?: string) => (
-  <span className={`fleet-chip fleet-chip--${STATUS_TONE[st || ''] || 'neutral'}`}>{st ? formatStatusToken(st) : '—'}</span>
-);
+const chip = (st?: string) => <StatusChip status={st} size="sm" />;
 function formatStatusToken(s: string) {
   return s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase());
 }
@@ -32,7 +23,7 @@ const formatStatus = (s?: string) =>
 const tabStyle = (active: boolean): React.CSSProperties => ({
   background: 'none',
   border: 'none',
-  borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
+  borderBottom: active ? '2px solid var(--text-primary)' : '2px solid transparent',
   color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
   fontFamily: 'var(--font-sans)',
   fontSize: 14,
@@ -108,35 +99,26 @@ export default function FleetDashboard() {
     return (
       <div className="fleet-page">
         {header}
-        <div className="card" role="alert" style={{ padding: 24, color: 'var(--status-danger-text, var(--status-danger))', fontSize: 14, lineHeight: '20px' }}>
+        <div className="card" role="alert" style={{ padding: 24, color: 'var(--status-danger-text)', fontSize: 14, lineHeight: '20px' }}>
           {error}
         </div>
       </div>
     );
   }
 
+  // A driver column that reads "—" on every row answers nothing: hide it.
+  const hasDrivers = vehicles.some((v: any) => v.driver_name);
+
   return (
     <div className="fleet-page">
       {header}
 
       {/* Summary tiles: what is working, what is free, who is on. */}
-      <section className="ops-tiles" aria-label="Fleet right now">
-        <div className="ops-tile">
-          <h2 className="ops-tile__label">On a job now</h2>
-          <div className="ops-tile__value">{activeVehicles}<span className="ops-tile__of">of {vehicles.length}</span></div>
-          <div className="ops-tile__sub">Status In use</div>
-        </div>
-        <div className="ops-tile">
-          <h2 className="ops-tile__label">Available</h2>
-          <div className="ops-tile__value">{idleVehicles}</div>
-          <div className="ops-tile__sub">{inMaintenance} in maintenance</div>
-        </div>
-        <div className="ops-tile">
-          <h2 className="ops-tile__label">Active drivers</h2>
-          <div className="ops-tile__value">{activeDrivers}<span className="ops-tile__of">of {drivers.length}</span></div>
-          <div className="ops-tile__sub">Status Active</div>
-        </div>
-      </section>
+      <KpiRow className="ops-kpis">
+        <KpiTile aria-label="On a job now" label="On a job now" figure={<>{activeVehicles}<span className="tw-kpi__of"> of {vehicles.length}</span></>} note="Status In use" />
+        <KpiTile aria-label="Available" label="Available" figure={idleVehicles} note={`${inMaintenance} in maintenance`} />
+        <KpiTile aria-label="Active drivers" label="Active drivers" figure={<>{activeDrivers}<span className="tw-kpi__of"> of {drivers.length}</span></>} note="Status Active" />
+      </KpiRow>
 
       {/* Sub-tabs */}
       <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 24, display: 'flex', overflowX: 'auto' }}>
@@ -150,7 +132,7 @@ export default function FleetDashboard() {
           <table className="data-table table-heading-roles">
             <thead>
               <tr>
-                <th>Registration</th><th>Vehicle</th><th>Driver</th><th>Status</th>
+                <th>Registration</th><th>Vehicle</th>{hasDrivers && <th>Driver</th>}<th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -158,7 +140,7 @@ export default function FleetDashboard() {
                 <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/vehicles/${v.id}`)}>
                   <td className="mono">{v.plate || v.registration || '—'}</td>
                   <td>{v.make || ''} {v.model || ''}</td>
-                  <td>{v.driver_name || '—'}</td>
+                  {hasDrivers && <td>{v.driver_name || 'Unassigned'}</td>}
                   <td>{chip(v.status)}</td>
                 </tr>
               ))}

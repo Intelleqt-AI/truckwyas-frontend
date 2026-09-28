@@ -1,6 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkline } from '@/components/viz';
+import { StatusChip as SharedStatusChip } from '@/components/ui/StatusChip';
+import { Segmented } from '@/components/ui/Segmented';
+import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 
 /* Building blocks for the one-page vehicle and driver records
    (src/pages/VehicleFinancialProfile.tsx, src/pages/DriverProfile.tsx).
@@ -154,11 +156,9 @@ export const Tag = ({ children }: { children: ReactNode }) => <span className="f
 
 export type Tone = 'success' | 'info' | 'warning' | 'danger' | 'neutral';
 
-export const StatusChip = ({ tone, children }: { tone: Tone; children: ReactNode }) => (
-  <span className={`fd-chip fd-chip--${tone}`}>
-    <i className="fd-chip__dot" aria-hidden="true" />
-    {children}
-  </span>
+/** The product-wide status chip (components/ui/StatusChip), tone from the shared map. */
+export const StatusChip = ({ status, label }: { status?: string | null; label?: string }) => (
+  <SharedStatusChip status={status} label={label} />
 );
 
 export function RecordHeader({ crumb, crumbTo, title, chip, meta, actions }: {
@@ -185,21 +185,18 @@ export function RecordHeader({ crumb, crumbTo, title, chip, meta, actions }: {
   );
 }
 
-/** Segmented status control. Keeps the old buttons' PATCH-per-click behaviour. */
+/** Segmented status control (the shared .tw-seg). Keeps the PATCH-per-click behaviour. */
 export function StatusControl({ label, options, current, busy, onPick }: {
   label: string; options: readonly string[]; current?: string; busy: boolean; onPick: (s: string) => void;
 }) {
   return (
-    <div className="fd-seg" role="group" aria-label={label}>
-      {options.map((s) => {
-        const on = current === s;
-        return (
-          <button key={s} type="button" className="fd-seg__btn" aria-pressed={on} disabled={on || busy} onClick={() => onPick(s)}>
-            {formatStatus(s)}
-          </button>
-        );
-      })}
-    </div>
+    <Segmented
+      className="fd-status-seg"
+      label={label}
+      value={current ?? ''}
+      onChange={(s) => { if (!busy) onPick(s); }}
+      options={options.map((s) => ({ value: s, label: formatStatus(s), disabled: busy && current !== s }))}
+    />
   );
 }
 
@@ -207,40 +204,34 @@ export function StatusControl({ label, options, current, busy, onPick }: {
 
 export interface KpiProps {
   label: string;
-  /** Headline figure; `null` renders the muted `empty` text instead. */
+  /** Headline figure; `null` leaves the tile out (a tile never shows "No data"). */
   value: ReactNode | null;
+  /** Kept for call-site compatibility; empty tiles are not rendered. */
   empty?: string;
   unit?: ReactNode;
   tag?: ReactNode;
   info?: ReactNode;
   sub?: ReactNode;
   tone?: 'danger' | 'warning';
-  spark?: { values: number[]; labels: string[]; format: (v: number) => string; ariaLabel: string };
 }
 
-export function Kpi({ label, value, empty = 'Not enough data', unit, tag, info, sub, tone, spark }: KpiProps) {
+/** One standard KPI tile (components/ui/KpiTile). Renders nothing without a value. */
+export function Kpi({ label, value, unit, tag, info, sub, tone }: KpiProps) {
+  if (value == null) return null;
   return (
-    <div className="fd-kpi">
-      <div className="fd-kpi__head">
-        <span className="fd-kpi__label">{label}</span>
-        {tag}
-        {info && <InfoTip label={label}>{info}</InfoTip>}
-      </div>
-      {value == null
-        ? <div className="fd-kpi__value is-empty">{empty}</div>
-        : <div className={`fd-kpi__value${tone ? ` is-${tone}` : ''}`}>{value}{unit && <span className="fd-kpi__unit">{unit}</span>}</div>}
-      {sub && <div className="fd-kpi__sub">{sub}</div>}
-      {spark && (
-        <div className="fd-kpi__spark">
-          <Sparkline variant="bars" height={28} minPoints={2} {...spark} />
-        </div>
-      )}
-    </div>
+    <KpiTile
+      aria-label={label}
+      label={<>{label}{tag}</>}
+      aside={info ? <InfoTip label={label}>{info}</InfoTip> : undefined}
+      figure={<>{value}{unit && <span className="tw-kpi__of"> {unit}</span>}</>}
+      note={sub}
+      tone={tone}
+    />
   );
 }
 
 export const KpiStrip = ({ label, children }: { label: string; children: ReactNode }) => (
-  <section className="fd-strip" aria-label={label}>{children}</section>
+  <section className="fd-strip" aria-label={label}><KpiRow>{children}</KpiRow></section>
 );
 
 // ----------------------------------------------------------------- panels
@@ -377,12 +368,11 @@ export function DetailSkeleton() {
       <div className="fd-skel" style={{ width: 260, height: 28, marginBottom: 8 }} />
       <div className="fd-skel" style={{ width: 200, height: 16, marginBottom: 32 }} />
       <div className="fd-strip">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="fd-kpi">
-            <div className="fd-skel" style={{ width: 90, height: 14 }} />
-            <div className="fd-skel" style={{ width: 140, height: 28, marginTop: 12 }} />
-          </div>
-        ))}
+        <KpiRow>
+          {[0, 1, 2].map((i) => (
+            <KpiTile key={i} label={<span className="fd-skel" style={{ display: 'block', width: 90, height: 14 }} />} figure={<span className="fd-skel" style={{ display: 'block', width: 140, height: 28 }} />} />
+          ))}
+        </KpiRow>
       </div>
       <div className="fd-body">
         <div className="fd-main">

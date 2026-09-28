@@ -1,5 +1,8 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { TableTwin, Tip, TipRow, VIZ, boxIn, linear, niceTicks, rand, randCompact, useTip, useWidth } from './core';
+import {
+  TableTwin, Tip, TipRow, VIZ, boxIn, hLine, linear, niceTicks, placeLabel, rand, randCompact, textBox, textW, useTip, useWidth,
+  type Box,
+} from './core';
 
 /**
  * Waterfall / bridge. Each step floats from where the previous one ended, so
@@ -8,6 +11,11 @@ import { TableTwin, Tip, TipRow, VIZ, boxIn, linear, niceTicks, rand, randCompac
  * connectors carry the running level from step to step. Used for the period
  * margin bridge (revenue, minus costs, = net) and for the month-by-month net
  * that builds up to a multi-month result.
+ *
+ * The plot always fills its container. Value labels are placed by a collision
+ * pass: outside the bar end first, then the other end, then inside a tall bar,
+ * and dropped to the tooltip and table when none of those is clear of the zero
+ * line, the connectors and the other labels by 4px.
  */
 export interface WaterfallStep {
   label: string;
@@ -20,21 +28,26 @@ export interface WaterfallStep {
   emptyText?: string;
 }
 
-export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, caption, valueHeader = 'Change', maxWidth }: {
+export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, values, caption, valueHeader = 'Change' }: {
   steps: WaterfallStep[];
   height?: number;
   ariaLabel: string;
   /** Label every step (short bridges). Otherwise totals and extremes only. */
   labelAll?: boolean;
+  /**
+   * Which bars carry a value label. 'none' when the same figures already sit
+   * in a KPI row above the chart: the axis, tooltip and table carry them.
+   * Defaults to 'all' with labelAll, otherwise 'auto' (totals and extremes).
+   */
+  values?: 'all' | 'auto' | 'none';
   caption: string;
   valueHeader?: string;
-  /** Cap the plot width so a short bridge does not stretch into thin, distant bars. */
-  maxWidth?: number;
 }) {
   const [ref, W] = useWidth<HTMLDivElement>(640);
   const figRef = useRef<HTMLDivElement>(null);
   const { tip, show, hide } = useTip();
   const [active, setActive] = useState<number | null>(null);
+  const mode = values ?? (labelAll ? 'all' : 'auto');
 
   // Running levels.
   let level = 0;
@@ -45,11 +58,12 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, ca
   const lo = Math.min(0, ...geo.flatMap((g) => [g.from, g.to]));
   const hi = Math.max(0, ...geo.flatMap((g) => [g.from, g.to]));
   const ticks = niceTicks(lo < 0 ? lo * 1.08 : lo, (hi || 1) * 1.08, 4);
-  const axisW = Math.max(...ticks.map((t) => randCompact(t).length)) * 7 + 8;
-  const padT = 22;
-  const bandW = (W - axisW) / Math.max(1, steps.length);
-  // Narrow screens: break two-word labels onto two lines rather than let them collide.
-  const wrap = steps.some((s) => s.label.length * 6.8 > bandW - 6);
+  const axisW = Math.max(...ticks.map((t) => textW(randCompact(t)))) + 10;
+  const padT = mode === 'none' ? 10 : 22;
+  const band = (W - axisW) / Math.max(1, steps.length);
+  // Narrow screens: step labels drop to 11px and two-word labels break onto two lines rather than collide.
+  const catPx = band < 72 ? 11 : 12;
+  const wrap = steps.some((s) => textW(s.label, catPx) > band - 6);
   const lines = (label: string) => {
     if (!wrap || !label.includes(' ')) return [label];
     const mid = label.length / 2;
@@ -58,17 +72,62 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, ca
   };
   const padB = wrap ? 42 : 28;
   const y = linear(ticks[0], ticks[ticks.length - 1], height - padB, padT);
-  const band = bandW;
-  const bw = Math.min(24, band * 0.5);
+  // Bars grow with the band so a short bridge still reads as one chart across the card.
+  const bw = Math.max(12, Math.min(64, band * 0.42));
   const cx = (i: number) => axisW + band * i + band / 2;
+  const zeroY = y(0);
 
   const deltas = steps.map((s, i) => ({ s, i })).filter(({ s }) => s.kind === 'delta' && s.value !== 0);
   const maxUp = deltas.reduce<number | null>((b, d) => (d.s.value > 0 && (b == null || d.s.value > steps[b].value) ? d.i : b), null);
   const maxDown = deltas.reduce<number | null>((b, d) => (d.s.value < 0 && (b == null || d.s.value < steps[b].value) ? d.i : b), null);
-  const isLabelled = (i: number) => labelAll || steps[i].kind === 'total' || i === maxUp || i === maxDown;
+  const wantsLabel = (i: number) => mode === 'all' || (mode === 'auto' && (steps[i].kind === 'total' || i === maxUp || i === maxDown));
 
   const colorOf = (s: WaterfallStep, g: { from: number; to: number }) =>
     s.kind === 'total' ? (g.to < 0 ? VIZ.warm : VIZ.accent) : s.value >= 0 ? VIZ.accent : VIZ.warm;
+
+  // ---- geometry per step
+  const bars = steps.map((s, i) => {
+    const g = geo[i];
+    const y0 = y(g.from);
+    const y1 = y(g.to);
+    return { i, x: cx(i), y0, y1, top: Math.min(y0, y1), bottom: Math.max(y0, y1), h: Math.abs(y1 - y0), empty: s.kind === 'delta' && s.value === 0 };
+  });
+
+  // ---- label collision pass
+  const obstacles: Box[] = [hLine(axisW, W, zeroY)];
+  // The "None" marks of empty steps are text too.
+  steps.forEach((s, i) => { if (s.kind === 'delta' && s.value === 0) obstacles.push(textBox('None', cx(i), y(geo[i].from) - 8)); });
+  bars.forEach((b, i) => {
+    if (i < steps.length - 1) obstacles.push(hLine(b.x + bw / 2, cx(i + 1) - bw / 2, b.y1));
+  });
+  const barBox = (b: typeof bars[number]): Box => ({ x0: b.x - bw / 2, x1: b.x + bw / 2, y0: b.top, y1: b.bottom });
+  const bounds: Box = { x0: 0, x1: W, y0: 0, y1: height - padB + 2 };
+  const placed: Record<number, { x: number; y: number; inside: boolean; text: string }> = {};
+  bars.forEach((b, i) => {
+    const s = steps[i];
+    if (!wantsLabel(i) || b.empty) return;
+    const text = `${s.kind === 'delta' && s.value > 0 ? '+' : ''}${randCompact(s.value)}`;
+    const tw = textW(text);
+    const lx = Math.max(tw / 2 + 1, Math.min(W - tw / 2 - 1, b.x));
+    const down = s.kind === 'delta' ? s.value < 0 : geo[i].to < 0;
+    // A label wider than its bar would sit on the connector at the bar's end: the second
+    // candidate on each side steps 4px further out to clear it.
+    const above = [{ x: lx, y: b.top - 7, inside: false }, { x: lx, y: b.top - 11, inside: false }];
+    const below = [{ x: lx, y: b.bottom + 15, inside: false }, { x: lx, y: b.bottom + 19, inside: false }];
+    const cands = (down ? [...below, ...above] : [...above, ...below]).map((c) => ({ ...c, box: textBox(text, c.x, c.y) }));
+    if (b.h >= 22 && bw >= tw + 6) {
+      const inY = down ? b.bottom - 7 : b.top + 16;
+      cands.push({ x: lx, y: inY, inside: true, box: textBox(text, lx, inY) });
+    }
+    const others = [
+      ...obstacles,
+      ...bars.filter((o) => o.i !== i && o.h >= 1).map(barBox),
+      ...Object.values(placed).map((p) => textBox(p.text, p.x, p.y)),
+    ];
+    // Outside candidates sit beyond the bar's own ends; the inside one sits on it by design.
+    const pick = placeLabel(cands, others, bounds, 4);
+    if (pick) placed[i] = { x: pick.x, y: pick.y, inside: pick.inside, text };
+  });
 
   const open = (i: number, el: Element) => {
     const s = steps[i];
@@ -90,58 +149,55 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, ca
 
   return (
     <div className="viz" ref={figRef}>
-      <div ref={ref} onPointerLeave={close} style={maxWidth ? { maxWidth } : undefined}>
+      <div ref={ref} onPointerLeave={close}>
         <svg width={W} height={height} role="img" aria-label={ariaLabel}>
+          {/* Hover: a column band behind the step; the other bars keep their full value. */}
+          {active != null && <rect className="viz-hover-band" x={axisW + band * active} y={0} width={band} height={height - padB + 4} rx={6} />}
           {ticks.map((t) => (
             <g key={t}>
-              <line x1={axisW} x2={W} y1={y(t)} y2={y(t)} className={t === 0 ? 'viz-zero' : 'viz-gridline'} />
+              {t !== 0 && <line x1={axisW} x2={W} y1={y(t)} y2={y(t)} className="viz-gridline" />}
               <text x={axisW - 8} y={y(t)} dy="0.32em" textAnchor="end">{randCompact(t)}</text>
             </g>
           ))}
-          {steps.map((s, i) => {
-            const g = geo[i];
-            const x = cx(i);
-            const y0 = y(g.from);
-            const y1 = y(g.to);
-            const topY = Math.min(y0, y1);
-            const h = Math.abs(y1 - y0);
-            const up = g.to >= g.from;
+          {bars.map((b, i) => {
+            const s = steps[i];
+            const { x, y0, y1, h } = b;
+            const up = geo[i].to >= geo[i].from;
             const r = Math.min(4, h / 2);
             // 4px rounded data end, square where the step starts.
             const d = h < 1 ? '' : up
               ? `M${x - bw / 2},${y0} V${y1 + r} Q${x - bw / 2},${y1} ${x - bw / 2 + r},${y1} H${x + bw / 2 - r} Q${x + bw / 2},${y1} ${x + bw / 2},${y1 + r} V${y0} Z`
               : `M${x - bw / 2},${y0} V${y1 - r} Q${x - bw / 2},${y1} ${x - bw / 2 + r},${y1} H${x + bw / 2 - r} Q${x + bw / 2},${y1} ${x + bw / 2},${y1 - r} V${y0} Z`;
             const next = i < steps.length - 1 ? cx(i + 1) : null;
-            const empty = s.kind === 'delta' && s.value === 0;
-            const dim = active != null && active !== i;
-            const labelY = s.value < 0 || g.to < 0 ? Math.max(y0, y1) + 16 : topY - 8;
+            const lab = placed[i];
+            const catLines = lines(s.label);
+            const catW = Math.max(...catLines.map((t) => textW(t, catPx)));
+            const catX = Math.max(catW / 2 + 1, Math.min(W - catW / 2 - 1, x));
             return (
               <g key={s.label + i}>
-                {next != null && <line x1={x + bw / 2} x2={next - bw / 2} y1={y1} y2={y1} stroke="var(--viz-axis)" strokeWidth={1} shapeRendering="crispEdges" />}
-                <g opacity={dim ? 0.45 : 1}>
-                  {empty ? (
-                    <line x1={x - bw / 2} x2={x + bw / 2} y1={y0} y2={y0} stroke="var(--viz-neutral-strong)" strokeWidth={2} />
-                  ) : h < 1 ? (
-                    <line x1={x - bw / 2} x2={x + bw / 2} y1={y0} y2={y0} stroke={colorOf(s, g)} strokeWidth={2} />
-                  ) : (
-                    <path d={d} fill={colorOf(s, g)} />
-                  )}
-                  {isLabelled(i) && !empty && (
-                    <text x={x} y={labelY} textAnchor="middle" className="viz-strong viz-halo">
-                      {s.kind === 'delta' && s.value > 0 ? '+' : ''}{randCompact(s.value)}
-                    </text>
-                  )}
-                  {empty && <text x={x} y={y0 - 8} textAnchor="middle" className="viz-muted">None</text>}
-                </g>
-                <text x={x} y={height - (lines(s.label).length > 1 ? 22 : 8)} textAnchor="middle" className={s.kind === 'total' ? 'viz-strong' : undefined}>
-                  {lines(s.label).map((t, k) => <tspan key={k} x={x} dy={k === 0 ? 0 : 14}>{t}</tspan>)}
+                {next != null && <line x1={x + bw / 2} x2={next - bw / 2} y1={y1} y2={y1} className="viz-connector" />}
+                {b.empty ? (
+                  <line x1={x - bw / 2} x2={x + bw / 2} y1={y0} y2={y0} stroke="var(--viz-neutral-strong)" strokeWidth={2} />
+                ) : h < 1 ? (
+                  <line x1={x - bw / 2} x2={x + bw / 2} y1={y0} y2={y0} stroke={colorOf(s, geo[i])} strokeWidth={2} />
+                ) : (
+                  <path d={d} fill={colorOf(s, geo[i])} />
+                )}
+                {lab && (
+                  <text x={lab.x} y={lab.y} textAnchor="middle" className={lab.inside ? 'viz-on-mark' : 'viz-strong viz-halo'}>{lab.text}</text>
+                )}
+                {b.empty && <text x={x} y={y0 - 8} textAnchor="middle" className="viz-muted">None</text>}
+                <text x={catX} y={height - (catLines.length > 1 ? 22 : 8)} textAnchor="middle" className={s.kind === 'total' ? 'viz-strong' : undefined} style={catPx !== 12 ? { fontSize: catPx } : undefined}>
+                  {catLines.map((t, k) => <tspan key={k} x={catX} dy={k === 0 ? 0 : 14}>{t}</tspan>)}
                 </text>
                 <rect className="viz-hit" x={x - band / 2} y={0} width={band} height={height} tabIndex={0}
-                  aria-label={`${s.label}: ${empty && s.emptyText ? s.emptyText : rand(s.value)}`}
+                  aria-label={`${s.label}: ${b.empty && s.emptyText ? s.emptyText : rand(s.value)}`}
                   onPointerEnter={(e) => open(i, e.currentTarget)} onFocus={(e) => open(i, e.currentTarget)} onBlur={close} />
               </g>
             );
           })}
+          {/* Zero line last so it sits over bar bases. */}
+          <line x1={axisW} x2={W} y1={zeroY} y2={zeroY} className="viz-zero" />
         </svg>
       </div>
       <Tip tip={tip} width={W} />

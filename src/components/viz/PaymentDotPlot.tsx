@@ -78,7 +78,8 @@ export function PaymentDotPlot({ rows, maxRows = 10 }: { rows: PayRow[]; maxRows
                 )}
                 {r.terms != null && (
                   <>
-                    <rect x={x(0)} y={cy - 7} width={Math.max(0, x(r.terms) - x(0))} height={14} rx={3} fill="var(--viz-track)" />
+                    {/* Context band (issue to terms); the terms tick carries the value at 3:1+. */}
+                    <rect className="viz-context-band" x={x(0)} y={cy - 7} width={Math.max(0, x(r.terms) - x(0))} height={14} rx={3} fill="var(--viz-track)" />
                     <line x1={x(r.terms)} x2={x(r.terms)} y1={cy - 9} y2={cy + 9} stroke="var(--text-secondary)" strokeWidth={2} />
                   </>
                 )}
@@ -88,9 +89,9 @@ export function PaymentDotPlot({ rows, maxRows = 10 }: { rows: PayRow[]; maxRows
                 ))}
                 {r.marks.map((m) => {
                   const mx = x(m.days);
-                  const dim = activeMark != null && activeMark !== m.id;
                   return (
-                    <g key={m.id} opacity={dim ? 0.5 : 1}>
+                    <g key={m.id}>
+                      {activeMark === m.id && <circle cx={mx} cy={cy} r={9} fill="none" stroke="var(--text-primary)" strokeWidth={1.5} />}
                       {m.open
                         ? <circle cx={mx} cy={cy} r={5} fill="var(--viz-surface)" stroke={VIZ.neutralStrong} strokeWidth={2} />
                         : <circle cx={mx} cy={cy} r={5} fill={VIZ.accent} stroke="var(--viz-surface)" strokeWidth={2} />}

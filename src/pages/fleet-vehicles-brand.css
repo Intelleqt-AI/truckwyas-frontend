@@ -198,8 +198,20 @@
   min-width: 60px;
   text-align: right;
 }
-.fleet-page .fleet-heatmap-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px; }
+/* Heatmap and Top routes stack full width: the 7x24 grid fills the card's
+   width with fixed-height cells (so the card is sized by its content, never
+   stretched around it), and the routes list flows into two columns. */
+.fleet-page .fleet-heatmap-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--card-gap, 16px); align-items: start; }
 .fleet-page .fleet-heatmap__row { display: grid; grid-template-columns: 40px repeat(24, minmax(0, 1fr)); gap: 3px; margin-bottom: 3px; }
+.fleet-page .fleet-heatmap__cell { height: 28px; border-radius: 3px; min-width: 0; }
+.fleet-page .fleet-routes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row; column-gap: 40px; }
+@media (max-width: 900px) {
+  .fleet-page .fleet-routes { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767px) {
+  .fleet-page .fleet-heatmap__row { grid-template-columns: 32px repeat(24, minmax(0, 1fr)); gap: 2px; margin-bottom: 2px; }
+  .fleet-page .fleet-heatmap__cell { height: 18px; border-radius: 2px; }
+}
 .fleet-page .fleet-heatmap__hour,
 .fleet-page .fleet-heatmap__day {
   font: 400 12px/16px var(--font-sans);
@@ -221,10 +233,6 @@
 .fleet-page .fleet-route__money { color: var(--text-primary); }
 .fleet-page .fleet-route__track { height: 4px; background: var(--border-subtle); border-radius: 2px; }
 .fleet-page .fleet-route__fill { height: 4px; background: var(--accent-primary); border-radius: 2px; }
-@media (max-width: 1100px) {
-  .fleet-page .fleet-heatmap-grid { grid-template-columns: minmax(0, 1fr); }
-}
-
 @media (max-width: 1100px) {
   .fleet-page .fleet-summary--4,
   .fleet-page .fleet-summary--5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -268,9 +276,9 @@
   background: var(--status-neutral-bg);
 }
 .fleet-page .fleet-chip--success { color: var(--status-success-text); background: rgba(34, 197, 94, 0.12); }
-.fleet-page .fleet-chip--warning { color: var(--status-warning-text, var(--status-warning)); background: var(--status-warning-bg); }
-.fleet-page .fleet-chip--danger { color: var(--status-danger-text, var(--status-danger)); background: var(--status-danger-bg); }
-.fleet-page .fleet-chip--info { color: var(--status-info-text, var(--accent-primary)); background: var(--accent-glow); }
+.fleet-page .fleet-chip--warning { color: var(--status-warning-text); background: var(--status-warning-bg); }
+.fleet-page .fleet-chip--danger { color: var(--status-danger-text); background: var(--status-danger-bg); }
+.fleet-page .fleet-chip--info { color: var(--status-info-text); background: var(--accent-glow); }
 
 /* Quiet row actions: 32px, neutral until hovered. */
 .fleet-page td button.fleet-row-action {
@@ -284,7 +292,7 @@
   cursor: pointer;
 }
 .fleet-page td button.fleet-row-action:hover:not(:disabled) { background: var(--bg-surface-hover); color: var(--text-primary); }
-.fleet-page td button.fleet-row-action--danger:hover:not(:disabled) { background: var(--status-danger-bg); color: var(--status-danger-text, var(--status-danger)); }
+.fleet-page td button.fleet-row-action--danger:hover:not(:disabled) { background: var(--status-danger-bg); color: var(--status-danger-text); }
 .fleet-page td button.fleet-row-action:disabled { opacity: 0.5; cursor: not-allowed; }
 .fleet-page td button.fleet-row-action:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 .fleet-page .fleet-header-secondary {

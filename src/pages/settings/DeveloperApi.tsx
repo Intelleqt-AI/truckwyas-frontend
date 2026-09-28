@@ -78,10 +78,10 @@ const SCHEMA_FIELDS = [
 ];
 
 const TIER_COLOR: Record<string, string> = {
-  A: 'var(--status-success-text, var(--status-success))',
+  A: 'var(--status-success-text)',
   B: 'var(--accent-primary)',
-  C: 'var(--status-warning-text, #f59e0b)',
-  D: 'var(--status-danger-text, var(--status-danger))',
+  C: 'var(--status-warning-text)',
+  D: 'var(--status-danger-text)',
 };
 
 function fmtDate(s?: string | null) {
@@ -250,7 +250,7 @@ export function DeveloperApi() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ maxWidth: 960 }}>
       <SettingsPageHeader
         title="Risk-scoring API"
         description="Score any invoice with the same 7-pillar underwriting engine your Capital product uses. Partners authenticate with an API key and are metered per call."
@@ -261,7 +261,7 @@ export function DeveloperApi() {
         <div style={sectionHeader}><h2 style={sectionTitle}>Endpoint</h2></div>
         <div style={{ padding: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <span style={{ ...mono, fontWeight: 700, color: 'var(--accent-primary)', padding: '2px 8px', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-chip)' }}>POST</span>
+            <span style={{ ...mono, fontWeight: 600, color: 'var(--accent-primary)', padding: '2px 8px', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-chip)' }}>POST</span>
             <span style={{ ...mono, color: 'var(--text-primary)' }}>/api/v1/risk/underwrite/</span>
           </div>
           <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 4 }}>
@@ -298,7 +298,7 @@ export function DeveloperApi() {
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{f.field}</td>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)' }}>{f.type}</td>
                   <td>
-                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, padding: '2px 8px', borderRadius: 'var(--radius-chip)', background: f.required ? 'rgba(239,68,68,0.12)' : 'var(--bg-deep)', color: f.required ? 'var(--status-danger-text, var(--status-danger))' : 'var(--text-tertiary)' }}>
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, padding: '2px 8px', borderRadius: 'var(--radius-chip)', background: f.required ? 'rgba(239,68,68,0.12)' : 'var(--bg-deep)', color: f.required ? 'var(--status-danger-text)' : 'var(--text-tertiary)' }}>
                       {f.required ? 'Yes' : 'No'}
                     </span>
                   </td>
@@ -330,7 +330,7 @@ export function DeveloperApi() {
               className="settings-control"
               aria-expanded={showAdvCreate}
               style={{
-                background: showAdvCreate ? 'rgba(var(--accent-primary-rgb,37,99,235),0.08)' : 'var(--bg-deep)',
+                background: showAdvCreate ? 'var(--accent-dim)' : 'var(--bg-deep)',
                 border: '1px solid var(--border-subtle)',
                 color: showAdvCreate ? 'var(--accent-primary)' : 'var(--text-secondary)',
                 fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500,
@@ -398,7 +398,7 @@ export function DeveloperApi() {
                           ...keyChipStyle,
                           background: copied === k.id ? 'rgba(34,197,94,0.12)' : 'var(--bg-deep)',
                           border: `1px solid ${copied === k.id ? 'var(--status-success)' : 'var(--border-subtle)'}`,
-                          color: copied === k.id ? 'var(--status-success-text, var(--status-success))' : 'var(--text-secondary)',
+                          color: copied === k.id ? 'var(--status-success-text)' : 'var(--text-secondary)',
                           transition: 'all 0.2s',
                         }}
                       >
@@ -469,8 +469,8 @@ export function DeveloperApi() {
                             <td>
                               {log.eligible === null ? <span style={{ color: 'var(--text-tertiary)' }}>—</span>
                                 : log.eligible
-                                  ? <span style={{ color: 'var(--status-success-text, var(--status-success))', fontSize: 13, fontWeight: 500 }}>Yes</span>
-                                  : <span style={{ color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, fontWeight: 500 }}>No</span>}
+                                  ? <span style={{ color: 'var(--status-success-text)', fontSize: 13, fontWeight: 500 }}>Yes</span>
+                                  : <span style={{ color: 'var(--status-danger-text)', fontSize: 13, fontWeight: 500 }}>No</span>}
                             </td>
                             <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{log.caller_ip || '—'}</td>
                           </tr>
@@ -516,11 +516,11 @@ export function DeveloperApi() {
           <div>
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>Response</div>
             {tryErr ? (
-              <div style={{ color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, lineHeight: '20px' }}>{tryErr}</div>
+              <div style={{ color: 'var(--status-danger-text)', fontSize: 13, lineHeight: '20px' }}>{tryErr}</div>
             ) : result ? (
               <div>
                 <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
-                  <Stat label="Tier" value={result.risk_tier || '—'} color={result.eligible ? (TIER_COLOR[result.risk_tier] || 'var(--accent-primary)') : 'var(--status-danger-text, var(--status-danger))'} />
+                  <Stat label="Tier" value={result.risk_tier || '—'} color={result.eligible ? (TIER_COLOR[result.risk_tier] || 'var(--accent-primary)') : 'var(--status-danger-text)'} />
                   <Stat label="Score" value={String(result.score ?? '—')} />
                   <Stat label="Fee" value={result.fee_percent != null ? `${result.fee_percent}%` : '—'} />
                   <Stat label="Advance" value={result.max_advance_percent != null ? `${result.max_advance_percent}%` : '—'} />
@@ -577,7 +577,7 @@ export function DeveloperApi() {
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>TruckWys will POST the full scoring result here after every call.</div>
             </div>
 
-            {editErr && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', padding: '8px 12px', background: 'var(--status-danger-bg)', borderRadius: 'var(--radius-nested)' }}>{editErr}</div>}
+            {editErr && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)', padding: '8px 12px', background: 'var(--status-danger-bg)', borderRadius: 'var(--radius-nested)' }}>{editErr}</div>}
 
             <div style={{ display: 'flex', gap: 12, marginTop: 'auto', paddingTop: 8 }}>
               <button

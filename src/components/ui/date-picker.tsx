@@ -111,8 +111,8 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
           display: 'flex',
           alignItems: 'center',
           width: '100%',
-          background: 'var(--bg-surface)',
-          border: dashboard ? '1px solid var(--date-picker-control-border)' : '1px solid var(--border-subtle)',
+          background: 'var(--input-bg)',
+          border: dashboard ? '1px solid var(--date-picker-control-border)' : '1px solid var(--border-control)',
           borderRadius: 'var(--radius-control)',
           minHeight: 40,
           ...style,
@@ -149,6 +149,7 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
               background: 'none',
               border: 'none',
               borderLeft: '1px solid var(--border-subtle)',
+              borderRadius: 0,
               padding: dashboard ? 8 : '8px 12px',
               cursor: 'pointer',
               display: 'flex',
@@ -166,10 +167,10 @@ export function DatePicker({ dashboard = false, value, onChange, placeholder = "
         className={dashboard ? "dashboard-date-popover" : "w-auto p-0"}
         align="start"
         style={{
-          background: 'var(--bg-surface)',
-          border: dashboard ? '1px solid var(--border-active)' : '1px solid var(--border-subtle)',
+          background: 'var(--bg-overlay)',
+          border: '1px solid var(--border-overlay)',
           borderRadius: 'var(--radius-card)',
-          boxShadow: 'none',
+          boxShadow: 'var(--shadow-pop)',
           color: 'var(--text-primary)',
         }}
       >

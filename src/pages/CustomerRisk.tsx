@@ -11,15 +11,16 @@ import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
 import LoadError, { loadFailed } from "@/components/data/LoadError";
+import { KpiRow, KpiTile } from "@/components/ui/KpiTile";
+import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
 
-const BAND_TONE: Record<string, string> = {
+const BAND_TONE: Record<string, StatusTone> = {
   LOW: "success",
   MEDIUM: "warning",
   HIGH: "danger",
   CRITICAL: "danger",
   NEW: "neutral",
 };
-const chip = (tone?: string) => `fin-chip${tone && tone !== "neutral" ? ` fin-chip--${tone}` : ""}`;
 const fmtStatus = (s?: string) =>
   s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : "—";
 const safeDate = (d?: string | null) => {
@@ -118,28 +119,33 @@ export default function CustomerRisk() {
   const lateCount: number = stats.late_count ?? beyond30;
   const name = data.customer_name;
 
-  const kpis = [
+  // Standard tiles; a tile with nothing to show is left out, never a dash.
+  const kpis: { label: string; value: string; sub: string; show: boolean }[] = [
     {
       label: "Late-payment risk",
       value: `${data.risk_pct}%`,
       sub: data.insufficient_history
         ? `Fewer than 3 invoices, so this is a starting estimate`
         : `${lateCount} of ${invoiceCount} invoices more than 30 days late`,
+      show: true,
     },
     {
       label: "Average time to pay",
       value: stats.avg_days_to_pay != null ? `${stats.avg_days_to_pay} days` : "—",
       sub: paidCount > 0 ? `Issue to payment, across ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}` : "No paid invoices yet",
+      show: stats.avg_days_to_pay != null,
     },
     {
       label: "Paid by the due date",
       value: stats.on_time_pct != null ? `${stats.on_time_pct}%` : "—",
       sub: paidCount > 0 ? `Of ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}` : "No paid invoices yet",
+      show: stats.on_time_pct != null,
     },
     {
       label: "Owed more than 30 days late",
       value: (stats.overdue_30_total || 0) > 0 ? formatCurrency(stats.overdue_30_total) : "Nothing",
       sub: stats.outstanding_total != null ? `Of ${formatCurrency(stats.outstanding_total)} unpaid, incl. VAT` : "Unpaid balance, incl. VAT",
+      show: (stats.overdue_30_total || 0) > 0,
     },
   ];
 
@@ -158,11 +164,11 @@ export default function CustomerRisk() {
           <div className="fin-detail-head__eyebrow">Payment risk profile</div>
           <div className="fin-detail-head__title-row">
             <h1>{name}</h1>
-            <span
-              className={chip(bandTone)}
-              title={data.insufficient_history ? "Fewer than 3 invoices: not enough history" : `Risk band: ${fmtStatus(data.band)}`}>
-              {bandLabel}
-            </span>
+            <StatusChip
+              tone={bandTone}
+              label={bandLabel}
+              title={data.insufficient_history ? "Fewer than 3 invoices: not enough history" : `Risk band: ${fmtStatus(data.band)}`}
+            />
           </div>
           <p className="fin-detail-head__sub" style={{ maxWidth: "72ch" }}>
             Scored only from how this customer pays: up to 30 days late is treated as normal; later payments and money still owed beyond 30 days raise the risk.
@@ -171,15 +177,11 @@ export default function CustomerRisk() {
         </div>
       </header>
 
-      <div className="fin-kpis">
-        {kpis.map((k) => (
-          <div key={k.label} className="card fin-kpi">
-            <span className="fin-kpi__label">{k.label}</span>
-            <span className="fin-kpi__value">{k.value}</span>
-            <span className="fin-kpi__sub">{k.sub}</span>
-          </div>
+      <KpiRow className="fin-kpi-row">
+        {kpis.filter((k) => k.show).map((k) => (
+          <KpiTile key={k.label} label={k.label} figure={k.value} note={<span title={k.sub}>{k.sub}</span>} />
         ))}
-      </div>
+      </KpiRow>
 
       {data.ai_summary && (
         <section className="card fin-section" aria-labelledby="summary-title">
@@ -298,9 +300,7 @@ export default function CustomerRisk() {
                       {r.days_late === null ? "—" : r.days_late > 0 ? `+${r.days_late}` : r.days_late}
                     </td>
                     <td>
-                      <span className={chip(r.status === "PAID" ? "success" : r.days_late !== null && r.days_late > 30 ? "danger" : "neutral")}>
-                        {fmtStatus(r.status)}
-                      </span>
+                      <StatusChip size="sm" tone={r.status === "PAID" ? "success" : r.days_late !== null && r.days_late > 30 ? "danger" : "neutral"} label={fmtStatus(r.status)} />
                     </td>
                     <td className="num">{formatCurrency(r.amount)}</td>
                   </tr>

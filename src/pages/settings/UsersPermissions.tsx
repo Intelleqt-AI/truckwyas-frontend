@@ -5,6 +5,15 @@ import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
+import { formatDateTime } from '@/lib/formatters';
+
+// Presentation only: the API sends a raw ISO timestamp; show it in the app's
+// date format, and anything unparseable verbatim.
+const displayLastActive = (v?: string) => {
+  if (!v) return '—';
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? v : formatDateTime(d);
+};
 
 const sectionStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -60,7 +69,7 @@ const ROLE_COLORS: Record<string, string> = {
   operator: 'var(--status-info-text, #3B82F6)',
   dispatcher: 'var(--status-info-text, #8B5CF6)',
   viewer: 'var(--text-tertiary)',
-  driver: 'var(--status-success)',
+  driver: 'var(--status-success-text, var(--status-success))',
   customer: 'var(--text-tertiary)',
 };
 
@@ -256,7 +265,7 @@ export function UsersPermissions() {
 
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <h3 style={sectionTitleStyle}>Team members</h3>
+          <h2 style={sectionTitleStyle}>Team members</h2>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <input
               className="settings-control"
@@ -344,14 +353,11 @@ export function UsersPermissions() {
           </div>
         ) : (
           <div className="settings-scroll-region" role="region" aria-label="Team members" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+          <table className="table-heading-roles settings-table">
             <thead>
               <tr>
                 {['User', 'Role', 'Status', 'Last active', ''].map(h => (
-                  <th key={h} style={{
-                    padding: '10px 20px', textAlign: 'left' as const,
-                    borderBottom: '1px solid var(--border-subtle)',
-                  }}>{h}</th>
+                  <th key={h || 'actions'} scope="col" style={{ textAlign: (h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
@@ -360,7 +366,7 @@ export function UsersPermissions() {
                 <tr><td colSpan={5} style={{ textAlign: 'center' as const, padding: 32, color: 'var(--text-tertiary)', fontSize: 13 }}>No users found</td></tr>
               ) : filtered.map(u => (
               <tr key={u.id} style={{ borderBottom: '1px solid var(--border-row)' }}>
-                <td style={{ padding: '12px 20px' }}>
+                <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {u.avatar ? (
                       <img
@@ -384,7 +390,7 @@ export function UsersPermissions() {
                     </div>
                   </div>
                 </td>
-                <td style={{ padding: '12px 20px' }}>
+                <td>
                   {isAdmin && u.id !== currentUser?.id ? (
                     <Select value={u.role?.toLowerCase()} onValueChange={val => handleRoleChange(u.id, val)} disabled={isDemo}>
                       <SelectTrigger
@@ -410,16 +416,16 @@ export function UsersPermissions() {
                     }}>{roleDisplay(u.role)}</span>
                   )}
                 </td>
-                <td style={{ padding: '12px 20px' }}>
+                <td>
                   <span style={{
                     fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
                     color: u.status?.toLowerCase() === 'active' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
                   }}>{statusDisplay(u.status)}</span>
                 </td>
-                <td style={{ padding: '12px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                  {u.last_active || '—'}
+                <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
+                  {displayLastActive(u.last_active)}
                 </td>
-                <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
+                <td style={{ textAlign: 'right' as const }}>
                   {isAdmin && (
                     <button
                       className="settings-control"
@@ -445,38 +451,35 @@ export function UsersPermissions() {
       {!loadingInvites && pendingInvites.length > 0 && (
         <div style={sectionStyle}>
           <div style={sectionHeaderStyle}>
-            <h3 style={sectionTitleStyle}>Pending invites</h3>
+            <h2 style={sectionTitleStyle}>Pending invites</h2>
           </div>
           <div className="settings-scroll-region" role="region" aria-label="Pending invites" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+          <table className="table-heading-roles settings-table">
             <thead>
               <tr>
                 {['Email', 'Role', 'Invited', 'Expires', ''].map(h => (
-                  <th key={h} style={{
-                    padding: '10px 20px', textAlign: 'left' as const,
-                    borderBottom: '1px solid var(--border-subtle)',
-                  }}>{h}</th>
+                  <th key={h || 'actions'} scope="col" style={{ textAlign: (h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {pendingInvites.map((inv, i) => (
                 <tr key={inv.id} style={{ borderBottom: i < pendingInvites.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{inv.email}</td>
-                  <td style={{ padding: '12px 20px' }}>
+                  <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{inv.email}</td>
+                  <td>
                     <span style={{
                       ...roleBadgeStyle,
                       border: `1px solid ${roleColor(inv.role)}`,
                       color: roleColor(inv.role),
                     }}>{roleDisplay(inv.role)}</span>
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+                  <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                     {new Date(inv.invited_at).toLocaleDateString()}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+                  <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                     {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '—'}
                   </td>
-                  <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
+                  <td style={{ textAlign: 'right' as const }}>
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                       <button
                         className="settings-control"
@@ -513,7 +516,7 @@ export function UsersPermissions() {
       {/* Roles Reference */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <h3 style={sectionTitleStyle}>Role permissions</h3>
+          <h2 style={sectionTitleStyle}>Role permissions</h2>
         </div>
         <div style={{ padding: '8px 0 4px' }}>
           {[

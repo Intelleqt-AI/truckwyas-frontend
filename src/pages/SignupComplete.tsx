@@ -1,3 +1,4 @@
+import "./auth-brand.css";
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -72,11 +73,11 @@ export const SignupComplete = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-sans)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-sans)' }}>
       <div style={{ width: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, textAlign: 'center' }}>
         <div style={{ marginBottom: 32 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>TRUCKWYS</div>
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>ROAD FREIGHT INTELLIGENCE</div>
+          <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 28, width: 'auto', display: 'inline-block' }} />
+          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4, fontFamily: 'var(--font-sans)' }}>Road freight intelligence</div>
         </div>
 
         {status === 'confirming' && (
@@ -88,16 +89,16 @@ export const SignupComplete = () => {
 
         {status === 'failed' && (
           <>
-            <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Payment not completed</div>
+            <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>Payment not completed</h1>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
               {error || 'Your card was not charged, so your account was not created.'} Your registration details are
               still saved — you can try again with the same or a different card.
             </div>
             <button onClick={handleRetry} className="btn-action" style={{ width: '100%' }} disabled={retrying}>
-              {retrying ? 'Redirecting...' : 'Try payment again'}
+              {retrying ? 'Redirecting…' : 'Try payment again'}
             </button>
             <div style={{ marginTop: 16 }}>
-              <button onClick={() => navigate('/signup')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>
+              <button onClick={() => navigate('/signup')} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 13, lineHeight: '20px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
                 ← Start over
               </button>
             </div>

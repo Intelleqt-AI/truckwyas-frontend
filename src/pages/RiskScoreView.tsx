@@ -1,4 +1,6 @@
 import './table-heading-roles.css';
+import './finance-brand.css';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
@@ -17,12 +19,16 @@ const TIER_COLOR: Record<string, string> = {
 const cap = (s?: string) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
 
-const TIER_BG: Record<string, string> = {
-  PRIME: 'var(--status-success-bg)',
-  STANDARD: 'var(--status-success-bg)',
-  ELEVATED: 'var(--status-warning-bg)',
-  HIGH: 'var(--status-danger-bg)',
-  INELIGIBLE: 'var(--bg-surface-hover)',
+const TIER_TONE: Record<string, string> = {
+  PRIME: 'success',
+  STANDARD: 'info',
+  ELEVATED: 'warning',
+  HIGH: 'danger',
+  INELIGIBLE: 'neutral',
+};
+const tierChip = (t?: string) => {
+  const tone = TIER_TONE[t || ''] || 'neutral';
+  return `fin-chip${tone === 'neutral' ? '' : ` fin-chip--${tone}`}`;
 };
 
 const ScoreRing = ({ score, tier }: { score: number; tier: string }) => {
@@ -36,7 +42,7 @@ const ScoreRing = ({ score, tier }: { score: number; tier: string }) => {
           strokeDasharray={`${pct} 283`} strokeLinecap="round" style={{ transition: 'stroke-dasharray 0.6s ease' }} />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontSize: 16, fontWeight: 700, color, fontFamily: 'var(--font-mono)' }}>{score}</span>
+        <span style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{score}</span>
       </div>
     </div>
   );
@@ -44,6 +50,10 @@ const ScoreRing = ({ score, tier }: { score: number; tier: string }) => {
 
 export default function RiskScoreView() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = 'Customer risk scores - TruckWys';
+  }, []);
 
   const { data: riskData, isLoading: loadingScores } = useQuery({
     queryKey: ['risk-scores'],
@@ -111,113 +121,120 @@ export default function RiskScoreView() {
   const FEE_MAP: Record<string, number> = { PRIME: 2.0, STANDARD: 2.5, ELEVATED: 3.5, HIGH: 4.5, INELIGIBLE: 0 };
 
   return (
-    <div>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>FAST PAY</div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Customer Risk Scores</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>AI-computed creditworthiness for fast pay eligibility</div>
-      </div>
+    <div className="fin-page">
+      <header style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 4 }}>Fast Pay</div>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>Customer risk scores</h1>
+        <p style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+          Creditworthiness scores used to check Fast Pay eligibility.
+        </p>
+      </header>
 
-      {/* Portfolio KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
+      {/* Tier counts */}
+      <div className="fin-kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
         {tiers.map(t => (
-          <div key={t} className="card" style={{ padding: 20, background: TIER_BG[t], border: `1px solid ${TIER_COLOR[t]}22` }}>
-            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: TIER_COLOR[t], marginBottom: 8, letterSpacing: '0.08em' }}>{t}</div>
-            <div style={{ fontSize: 24, fontWeight: 600, color: TIER_COLOR[t] }}>{tierCounts[t] || 0}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{FEE_MAP[t] > 0 ? `${FEE_MAP[t]}% fee` : 'Not eligible'}</div>
+          <div key={t} className="card fin-kpi">
+            <span className="fin-kpi__label"><span className={tierChip(t)}>{cap(t)}</span></span>
+            <span className="fin-kpi__value">{tierCounts[t] || 0}</span>
+            <span className="fin-kpi__sub">{FEE_MAP[t] > 0 ? `${FEE_MAP[t]}% fee` : 'Not eligible'}</span>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24, marginBottom: 24 }}>
+      <div className="fin-grid-2">
         {/* Portfolio score card */}
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>PORTFOLIO OVERVIEW</div>
-          <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+        <section className="card" aria-labelledby="portfolio-title">
+          <h2 id="portfolio-title" className="fin-h2" style={{ marginBottom: 16 }}>Portfolio overview</h2>
+          <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
             <ScoreRing score={avgScore} tier={avgScore >= 85 ? 'PRIME' : avgScore >= 70 ? 'STANDARD' : avgScore >= 55 ? 'ELEVATED' : avgScore >= 40 ? 'HIGH' : 'INELIGIBLE'} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Portfolio Score: {avgScore}/100</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>{customerScores.length} customers scored</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{customerScores.filter(c => c.tier !== 'INELIGIBLE').length} fast pay eligible</div>
+              <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>Portfolio score {avgScore}/100</div>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>{customerScores.length} customers scored</div>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{customerScores.filter(c => c.tier !== 'INELIGIBLE').length} eligible for Fast Pay</div>
             </div>
           </div>
-        </div>
+        </section>
 
         {/* Score factors legend */}
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>SCORE FACTORS</div>
-          {[
-            { label: 'Payment History', weight: 35 },
-            { label: 'Invoice Age', weight: 20 },
-            { label: 'POD Quality', weight: 15 },
-            { label: 'Credit Score', weight: 15 },
-            { label: 'Relationship', weight: 10 },
-            { label: 'Facility Use', weight: 5 },
-          ].map(f => (
-            <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border-row)' }}>
-              <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{f.label}</span>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{f.weight} pts</span>
-            </div>
-          ))}
-        </div>
+        <section className="card" aria-labelledby="factors-title">
+          <h2 id="factors-title" className="fin-h2" style={{ marginBottom: 8 }}>Score factors</h2>
+          <dl style={{ margin: 0 }}>
+            {[
+              { label: 'Payment history', weight: 35 },
+              { label: 'Invoice age', weight: 20 },
+              { label: 'POD quality', weight: 15 },
+              { label: 'Credit score', weight: 15 },
+              { label: 'Relationship', weight: 10 },
+              { label: 'Facility use', weight: 5 },
+            ].map(f => (
+              <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)', fontSize: 13, lineHeight: '20px' }}>
+                <dt style={{ color: 'var(--text-secondary)' }}>{f.label}</dt>
+                <dd style={{ margin: 0, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{f.weight} pts</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
       </div>
 
       {/* Customer table */}
-      <div className="card" style={{ overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em' }}>ALL CUSTOMERS — RISK SCORES</div>
-          <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{customerScores.length} scored</div>
+      <section className="card fin-table-card" aria-labelledby="scores-title">
+        <div className="fin-table-card__head">
+          <h2 id="scores-title" className="fin-h2">All customers</h2>
+          <span className="fin-support">{customerScores.length} scored</span>
         </div>
         {isLoading ? (
           <div style={{ padding: '40px 20px', display: 'flex', justifyContent: 'center' }}><Loader size={28} label="Loading scores…" /></div>
         ) : customerScores.length === 0 ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 12 }}>No risk scores calculated yet.</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>Run: python manage.py calculate_risk_scores</div>
+          <div className="fin-empty">
+            <p className="fin-empty__title">No risk scores yet</p>
+            <p className="fin-empty__body">Scores are calculated from each customer’s invoice and payment history.</p>
           </div>
         ) : (
-          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: 'var(--bg-surface-hover)' }}>
-                {['Customer', 'Score', 'Tier', 'Payment history', 'Invoice age', 'POD', 'Fast pay fee', 'Eligible'].map(h => (
-                  <th key={h} style={{ padding: '12px 16px', textAlign: 'left', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {customerScores.map((cs: any) => (
-                <tr key={cs.id} style={{ cursor: 'pointer', borderBottom: '1px solid var(--border-row)' }}
-                  onClick={() => navigate(`/customers/${cs.cid}`)}
-                >
-                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{cs.customer_name}</td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 60, height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
-                        <div style={{ height: 4, width: `${cs.total_score}%`, background: TIER_COLOR[cs.tier] || 'var(--accent-primary)', borderRadius: 2 }} />
-                      </div>
-                      <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: TIER_COLOR[cs.tier], fontWeight: 600 }}>{cs.total_score}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: TIER_COLOR[cs.tier], padding: '3px 8px', background: TIER_BG[cs.tier], borderRadius: 4, border: `1px solid ${TIER_COLOR[cs.tier]}44`, display: 'inline-block', whiteSpace: 'nowrap' }}>{cap(cs.tier)}</span>
-                  </td>
-                  <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{cs.factor_payment_history ?? '—'}/35</td>
-                  <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{cs.factor_invoice_age ?? '—'}/20</td>
-                  <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{cs.factor_pod_quality ?? '—'}/15</td>
-                  <td style={{ padding: '12px 16px', fontSize: 12, fontFamily: 'var(--font-mono)', color: cs.is_eligible ? 'var(--accent-primary)' : 'var(--text-tertiary)' }}>
-                    {cs.is_eligible ? `${parseFloat(cs.fee_percent || FEE_MAP[cs.tier] || 0).toFixed(1)}%` : 'N/A'}
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: cs.is_eligible ? 'var(--status-success)' : 'var(--status-danger)' }}>
-                      {cs.is_eligible ? '✓ Yes' : '✗ No'}
-                    </span>
-                  </td>
+          <div className="fin-table-scroll">
+            <table className="fin-table table-heading-roles">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Score</th>
+                  <th>Tier</th>
+                  <th className="num">Payment history</th>
+                  <th className="num">Invoice age</th>
+                  <th className="num">POD</th>
+                  <th className="num">Fast Pay fee</th>
+                  <th>Eligible</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {customerScores.map((cs: any) => (
+                  <tr key={cs.id} className="is-clickable" onClick={() => navigate(`/customers/${cs.cid}`)}>
+                    <td className="fin-strong">{cs.customer_name}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 60, height: 4, background: 'var(--border-subtle)', borderRadius: 2 }} aria-hidden="true">
+                          <div style={{ height: 4, width: `${cs.total_score}%`, background: TIER_COLOR[cs.tier] || 'var(--accent-primary)', borderRadius: 2 }} />
+                        </div>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{cs.total_score}</span>
+                      </div>
+                    </td>
+                    <td><span className={tierChip(cs.tier)}>{cap(cs.tier)}</span></td>
+                    <td className="num">{cs.factor_payment_history ?? '—'}/35</td>
+                    <td className="num">{cs.factor_invoice_age ?? '—'}/20</td>
+                    <td className="num">{cs.factor_pod_quality ?? '—'}/15</td>
+                    <td className="num">
+                      {cs.is_eligible ? `${parseFloat(cs.fee_percent || FEE_MAP[cs.tier] || 0).toFixed(1)}%` : '—'}
+                    </td>
+                    <td>
+                      <span className={`fin-chip ${cs.is_eligible ? 'fin-chip--success' : 'fin-chip--danger'}`}>
+                        {cs.is_eligible ? 'Yes' : 'No'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

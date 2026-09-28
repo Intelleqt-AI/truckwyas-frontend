@@ -159,10 +159,10 @@ export function AddVehicleDrawer({ open, onClose, onCreated }: Props) {
           }}>
             <span style={{ color: 'var(--status-danger, #dc2626)', fontWeight: 700, fontSize: 15, lineHeight: 1 }}>!</span>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-danger, #dc2626)', marginBottom: 2 }}>
+              <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 2 }}>
                 Failed to create vehicle
               </div>
-              <div style={{ fontSize: 12, color: 'var(--status-danger, #dc2626)', opacity: 0.85 }}>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
                 {submitError}
               </div>
             </div>

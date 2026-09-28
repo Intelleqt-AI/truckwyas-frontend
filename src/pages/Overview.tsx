@@ -1,4 +1,6 @@
 import "@/components/ui/dashboard-kpi.css";
+import StaleDataNotice from '@/components/data/StaleDataNotice';
+import '@/components/data/stale-data-notice.css';
 import './overview-typography.css';
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -6,7 +8,6 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { LiveBadge } from "@/components/LiveBadge";
 import { Loader } from "@/components/Loader";
 import { DashboardMetricIcon } from "@/components/ui/DashboardMetricIcon";
 
@@ -14,6 +15,13 @@ import { DashboardMetricIcon } from "@/components/ui/DashboardMetricIcon";
 // cached by TanStack Query (keyed below) and survives navigation — revisiting
 // the page no longer refires these 8 requests until the cache goes stale.
 async function loadOverview() {
+  // Each source may fail on its own; record which ones did so the page can
+  // say so instead of presenting an empty fallback as a real zero.
+  const failedSources: string[] = [];
+  const track = <T,>(label: string, fallback: T) => (err: unknown): T => {
+    failedSources.push(label);
+    return fallback;
+  };
   const [
     finance,
     insightsData,
@@ -25,22 +33,24 @@ async function loadOverview() {
     fleetData,
     eligibleData,
   ] = await Promise.all([
-    fetchData("api/v1/dashboard/finance/").catch(() => null),
+    fetchData("api/v1/dashboard/finance/").catch(track("revenue and margin", null)),
     fetchData("api/v1/dashboard/signals/").catch(() =>
-      fetchData("api/v1/dashboard/insights/").catch(() => []),
+      fetchData("api/v1/dashboard/insights/").catch(track("alerts", [])),
     ),
-    fetchData("api/v1/advances/").catch(() => []),
-    fetchData("api/v1/quotes/?limit=5").catch(() => []),
-    fetchData("api/v1/loads/").catch(() => []),
-    fetchData("api/v1/activity/").catch(() => []),
-    fetchData("api/v1/vehicles/").catch(() => []),
-    fetchData("api/v1/fleet/overview/").catch(() => null),
+    fetchData("api/v1/advances/").catch(track("advances", [])),
+    fetchData("api/v1/quotes/?limit=5").catch(track("recent quotes", [])),
+    fetchData("api/v1/loads/").catch(track("loads", [])),
+    fetchData("api/v1/activity/").catch(track("recent activity", [])),
+    fetchData("api/v1/vehicles/").catch(track("vehicles", [])),
+    fetchData("api/v1/fleet/overview/").catch(track("fleet utilisation", null)),
     // Invoices that qualify for a fast-pay advance but don't have one
-    // requested yet — this is the actionable "Capital" opportunity today,
-    // since the Capital page's "Apply" button routes to an external lender
-    // (Merchant Capital) and never creates an internal AdvanceRequest.
-    fetchData("api/v1/capital/eligible/").catch(() => null),
+    // requested yet: the actionable Capital opportunity on this page.
+    fetchData("api/v1/capital/eligible/").catch(track("capital eligibility", null)),
   ]);
+
+  if (failedSources.length >= 9) {
+    throw new Error("Overview data is unavailable");
+  }
 
   const insightsArr = Array.isArray(insightsData)
     ? insightsData
@@ -107,6 +117,7 @@ async function loadOverview() {
     : activityData?.results || [];
 
   return {
+    failedSources,
     financeData: finance,
     insights,
     advances,
@@ -139,9 +150,56 @@ const CARD_MENUS: Record<string, { label: string; route: string }[]> = {
   ],
 };
 
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 // Sentence-case a raw status token for display: "IN_TRANSIT" → "In transit".
 const titleCase = (s?: string) =>
   s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : "—";
+
+// Accessible KPI "more" menu: a named 40px button with real menu items.
+function KpiMenu({
+  id, label, openMenu, setOpenMenu, minWidth, onGo,
+}: {
+  id: string;
+  label: string;
+  openMenu: string | null;
+  setOpenMenu: (v: string | null) => void;
+  minWidth: number;
+  onGo: (route: string) => void;
+}) {
+  const open = openMenu === id;
+  return (
+    <div style={{ position: "relative" }} onMouseDown={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className="overview-kpi-menu-trigger"
+        aria-label={`More options for ${label.toLowerCase()}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpenMenu(open ? null : id)}
+        onKeyDown={(e) => { if (e.key === "Escape") setOpenMenu(null); }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+        </svg>
+      </button>
+      {open && (
+        <div role="menu" aria-label={`${label} options`} className="overview-kpi-menu" style={{ minWidth }}>
+          {CARD_MENUS[id].map((item) => (
+            <button
+              type="button"
+              role="menuitem"
+              key={item.route}
+              className="overview-kpi-menu-item"
+              onKeyDown={(e) => { if (e.key === "Escape") setOpenMenu(null); }}
+              onClick={() => { setOpenMenu(null); onGo(item.route); }}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Overview() {
   const navigate = useNavigate();
@@ -155,7 +213,7 @@ export default function Overview() {
     return () => document.removeEventListener("mousedown", close);
   }, [openMenu]);
 
-  const { data, isLoading: loading, refetch } = useQuery({
+  const { data, isLoading: loading, refetch, dataUpdatedAt, isRefetchError, isError } = useQuery({
     queryKey: ["overview-dashboard"],
     queryFn: loadOverview,
   });
@@ -166,10 +224,8 @@ export default function Overview() {
   const advances = data?.advances ?? [];
   // Advances actually in TruckWys's own request pipeline — REQUESTED
   // (submitted, not yet scored) or SCORING (risk engine actively evaluating
-  // it). In practice this is usually 0: the Capital page's "Apply" button
-  // routes to an external lender (Merchant Capital) rather than creating an
-  // AdvanceRequest, so it's added to the eligible-invoice count below rather
-  // than shown alone.
+  // it). In practice this is usually 0 while Fast Pay is being set up, so
+  // it's added to the eligible-invoice count below rather than shown alone.
   const pendingAdvancesCount = advances.filter(
     (a: any) => a.status === "REQUESTED" || a.status === "SCORING",
   ).length;
@@ -222,13 +278,16 @@ export default function Overview() {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString("en-ZA", {
+    // Built from parts so every browser shows "Mon, 28 Sep 2026" (no "Sept").
+    const parts = new Intl.DateTimeFormat("en-ZA", {
       timeZone: "Africa/Johannesburg",
       weekday: "short",
       year: "numeric",
-      month: "short",
+      month: "numeric",
       day: "numeric",
-    });
+    }).formatToParts(date);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value || "";
+    return `${get("weekday")}, ${Number(get("day"))} ${MONTHS_SHORT[Number(get("month")) - 1] || ""} ${get("year")}`;
   };
 
   const getHeatClass = (count: number) => {
@@ -326,11 +385,29 @@ export default function Overview() {
                   </span>
                 </div>
               </div>
-              <LiveBadge />
+              <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
+              {isError && !data && (
+                <div className="stale-data-notice" role="alert">
+                  <span>The overview couldn't be loaded.</span>
+                  <button type="button" className="stale-data-notice__retry" onClick={() => refetch()}>
+                    Try again
+                  </button>
+                </div>
+              )}
+              {!isRefetchError && (data?.failedSources?.length ?? 0) > 0 && (
+                <div className="stale-data-notice" role="status">
+                  <span>
+                    Some figures couldn't load: {data!.failedSources.join(", ")}.
+                  </span>
+                  <button type="button" className="stale-data-notice__retry" onClick={() => refetch()}>
+                    Try again
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Actionable pulse — clickable */}
-            <div style={{ display: "flex", gap: 26, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
               {(
                 [
                   {
@@ -353,10 +430,11 @@ export default function Overview() {
                   },
                 ] as const
               ).map((s) => (
-                <div
+                <button
+                  type="button"
                   key={s.label}
-                  onClick={() => navigate(s.route)}
-                  style={{ cursor: "pointer", textAlign: "right" }}>
+                  className="overview-pulse"
+                  onClick={() => navigate(s.route)}>
                   <div
                     style={{
                       fontSize: 13, lineHeight: "20px",
@@ -370,8 +448,9 @@ export default function Overview() {
                   </div>
                   <div
                     style={{
-                      fontSize: 17,
-                      fontWeight: 700,
+                      fontSize: 16,
+                      lineHeight: "24px",
+                      fontWeight: 600,
                       fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
                       color: s.warn
                         ? "var(--status-warning-text, var(--status-warning))"
@@ -379,7 +458,7 @@ export default function Overview() {
                     }}>
                     {s.value}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -453,30 +532,12 @@ export default function Overview() {
         <div className="card metric-card dashboard-kpi-card">
           <div className="card-header dashboard-kpi-label">
             <span className="card-title dashboard-kpi-label"><span className="dashboard-metric-label-content"><DashboardMetricIcon kind="money" /><span className="dashboard-metric-label-text">
-              {loading ? "Loading..." : "Total revenue"}
+              Total revenue
             </span></span></span>
-            <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                className="card-action"
-                onClick={() => setOpenMenu(openMenu === "revenue" ? null : "revenue")}>
-                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
-              </svg>
-              {openMenu === "revenue" && (
-                <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 200, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
-                  {CARD_MENUS.revenue.map(item => (
-                    <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
-                      style={{ padding: "9px 14px", fontSize: 13, lineHeight: "20px", fontFamily: "var(--font-sans)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
-                      onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
-                      {item.label}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <KpiMenu id="revenue" label="Total revenue" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={200} onGo={navigate} />
           </div>
           <div className="metric-value dashboard-kpi-value">
-            {loading ? "..." : formatCurrency(financeData?.total_revenue || 0)}
+            {loading ? "..." : financeData ? formatCurrency(financeData.total_revenue || 0) : "—"}
           </div>
           {typeof financeData?.revenue_change_pct === "number" ? (
             <div
@@ -511,34 +572,15 @@ export default function Overview() {
         <div className="card metric-card dashboard-kpi-card">
           <div className="card-header dashboard-kpi-label">
             <span className="card-title dashboard-kpi-label"><span className="dashboard-metric-label-content"><DashboardMetricIcon kind="percent" /><span className="dashboard-metric-label-text">
-              {loading ? "Loading..." : "Net margin"}
+              Net margin
             </span></span></span>
-            <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                className="card-action"
-                onClick={() => setOpenMenu(openMenu === "margin" ? null : "margin")}>
-                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
-              </svg>
-              {openMenu === "margin" && (
-                <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 200, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
-                  {CARD_MENUS.margin.map(item => (
-                    <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
-                      style={{ padding: "9px 14px", fontSize: 13, lineHeight: "20px", fontFamily: "var(--font-sans)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
-                      onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
-                      {item.label}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <KpiMenu id="margin" label="Net margin" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={200} onGo={navigate} />
           </div>
           <div
-            className="metric-value dashboard-kpi-value"
-            style={{ color: "var(--accent-primary)" }}>
+            className="metric-value dashboard-kpi-value">
             {loading
               ? "..."
-              : formatPercent(financeData?.net_margin_percent || 0)}
+              : financeData ? formatPercent(financeData.net_margin_percent || 0) : "—"}
           </div>
           {typeof financeData?.margin_change_pts === "number" ? (
             <div
@@ -573,38 +615,20 @@ export default function Overview() {
         <div className="card metric-card dashboard-kpi-card">
           <div className="card-header dashboard-kpi-label">
             <span className="card-title dashboard-kpi-label"><span className="dashboard-metric-label-content"><DashboardMetricIcon kind="overdue" /><span className="dashboard-metric-label-text">
-              {loading ? "Loading..." : "Outstanding"}
+              Outstanding
             </span></span></span>
-            <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                className="card-action"
-                onClick={() => setOpenMenu(openMenu === "outstanding" ? null : "outstanding")}>
-                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
-              </svg>
-              {openMenu === "outstanding" && (
-                <div style={{ position: "absolute", top: 22, right: 0, zIndex: 1000, background: "var(--bg-deep)", border: "1px solid var(--border-active)", borderRadius: 6, minWidth: 220, boxShadow: "0 8px 24px rgba(0,0,0,0.35)", overflow: "hidden" }}>
-                  {CARD_MENUS.outstanding.map(item => (
-                    <div key={item.route} onClick={() => { setOpenMenu(null); navigate(item.route); }}
-                      style={{ padding: "9px 14px", fontSize: 13, lineHeight: "20px", fontFamily: "var(--font-sans)", cursor: "pointer", color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
-                      onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--accent-glow)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent"; }}>
-                      {item.label}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <KpiMenu id="outstanding" label="Outstanding" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={220} onGo={navigate} />
           </div>
           <div
             className="metric-value dashboard-kpi-value"
             style={{ color: "var(--status-warning-text, var(--status-warning))" }}>
             {loading
               ? "..."
-              : formatCurrency(financeData?.outstanding_invoices_total || 0)}
+              : financeData ? formatCurrency(financeData.outstanding_invoices_total || 0) : "—"}
           </div>
           <div className="metric-delta delta-neutral dashboard-kpi-context">
             <span>
-              DSO: {loading ? "—" : Math.round(financeData?.dso || 0)} days
+              DSO: {loading || !financeData ? "—" : Math.round(financeData.dso || 0)} days
             </span>
           </div>
         </div>
@@ -613,7 +637,7 @@ export default function Overview() {
         <div className="card chart-card">
           <div className="card-header">
             <span className="card-title">
-              Revenue vs fuel cost (last 30 days)
+              Revenue vs costs by month
             </span>
             <div
               style={{
@@ -644,7 +668,7 @@ export default function Overview() {
                     borderRadius: 1,
                   }}
                 />
-                Fuel cost
+                Costs
               </span>
             </div>
           </div>
@@ -662,7 +686,7 @@ export default function Overview() {
                     `${(i / Math.max(arr.length - 1, 1)) * 100},${100 - (v / maxV) * 100}`,
                 )
                 .join(" ");
-            const labels = trend.map((m: any) => m.month?.slice(5) || "");
+            const labels = trend.map((m: any) => MONTHS_SHORT[Number(m.month?.slice(5, 7)) - 1] || m.month || "");
             return (
               <>
                 <svg
@@ -715,9 +739,9 @@ export default function Overview() {
                     marginTop: 4,
                     fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
                     fontSize: 13, lineHeight: "20px",
-                    color: "var(--text-tertiary)",
+                    color: "var(--text-secondary)",
                   }}>
-                  {labels.slice(-4).map((l: string, i: number) => (
+                  {labels.map((l: string, i: number) => (
                     <span key={i}>{l}</span>
                   ))}
                 </div>
@@ -728,30 +752,26 @@ export default function Overview() {
             style={{
               display: "flex",
               gap: 20,
+              flexWrap: "wrap",
               marginTop: 8,
+              color: "var(--text-secondary)",
               fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
               fontSize: 13, lineHeight: "20px",
             }}>
             <span>
               Net margin{" "}
-              <span style={{ color: "var(--accent-primary)" }}>
+              <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
                 {financeData?.net_margin_percent != null
                   ? `${(financeData.net_margin_percent || 0).toFixed(1)}%`
                   : "—"}
               </span>
             </span>
             <span>
-              Fuel/Rev ratio{" "}
-              <span style={{ color: "var(--status-warning-text, var(--status-warning))" }}>
+              Costs as % of revenue, latest month{" "}
+              <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
                 {financeData?.monthly_trend?.length > 0
                   ? `${Math.round(((financeData.monthly_trend.at(-1)?.expenses || 0) / Math.max(financeData.monthly_trend.at(-1)?.revenue || 1, 1)) * 100)}%`
                   : "—"}
-              </span>
-            </span>
-            <span>
-              Trend{" "}
-              <span style={{ color: "var(--status-success)" }}>
-                ↑ improving
               </span>
             </span>
           </div>
@@ -760,7 +780,7 @@ export default function Overview() {
         {/* Utilization card */}
         <div className="card utilization-card">
           <div className="card-header">
-            <span className="card-title">Fleet utilization (last 28 days)</span>
+            <span className="card-title">Fleet utilisation</span>
           </div>
           <div
             style={{
@@ -772,8 +792,10 @@ export default function Overview() {
             <div>
               <div
                 style={{
-                  fontSize: 24,
-                  fontWeight: 500,
+                  fontSize: 28,
+                  lineHeight: "36px",
+                  fontWeight: 600,
+                  fontVariantNumeric: "tabular-nums",
                   color: "var(--text-primary)",
                 }}>
                 {totalVehicles > 0
@@ -795,16 +817,20 @@ export default function Overview() {
               </div>
               <div
                 style={{
-                  fontSize: 18,
+                  fontSize: 16,
+                  lineHeight: "24px",
                   fontWeight: 600,
-                  color: "var(--accent-primary)",
+                  color: "var(--text-primary)",
                   fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
                 }}>
                 {activeLoadsCount}
               </div>
             </div>
           </div>
-          <div className="heatmap-grid">
+          <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>
+            Loads created per day, last 28 days
+          </div>
+          <div className="heatmap-grid" role="img" aria-label={`Loads created per day over the last 28 days: ${heatmapData.reduce((a: number, b: number) => a + b, 0)} in total`}>
             {(heatmapData.length > 0 ? heatmapData : new Array(28).fill(0)).map(
               (count, i) => (
                 <div
@@ -858,7 +884,7 @@ export default function Overview() {
                   <th>Quote #</th>
                   <th>Customer</th>
                   <th>Route</th>
-                  <th>Total</th>
+                  <th style={{ textAlign: "right" }}>Total</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -871,7 +897,7 @@ export default function Overview() {
                     <td className="mono">{quote.quote_number}</td>
                     <td>{quote.customer_name}</td>
                     <td
-                      style={{ color: "var(--text-secondary)", fontSize: 11 }}>
+                      style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: "20px" }}>
                       {quote.pickup_location?.split(" ").slice(0, 2).join(" ")}{" "}
                       →{" "}
                       {quote.delivery_location
@@ -881,7 +907,9 @@ export default function Overview() {
                     </td>
                     <td
                       style={{
-                        color: "var(--accent-primary)",
+                        color: "var(--text-primary)",
+                        textAlign: "right",
+                        whiteSpace: "nowrap",
                         fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums",
                       }}>
                       {formatCurrency(parseFloat(quote.total_amount || "0"))}
@@ -893,11 +921,11 @@ export default function Overview() {
                           fontSize: 13, lineHeight: "20px",
                           color:
                             quote.status === "ACCEPTED"
-                              ? "var(--status-success)"
+                              ? "var(--status-success-text, var(--status-success))"
                               : quote.status === "SENT"
                                 ? "var(--status-warning-text, var(--status-warning))"
-                                : "var(--text-tertiary)",
-                          padding: "2px 6px",
+                                : "var(--text-secondary)",
+                          padding: "2px 8px",
                           background: "var(--bg-surface-hover)",
                           borderRadius: 4,
                           display: "inline-block",
@@ -969,7 +997,7 @@ export default function Overview() {
                       {load.customer_name || load.customer?.company_name || "—"}
                     </td>
                     <td
-                      style={{ color: "var(--text-secondary)", fontSize: 11 }}>
+                      style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: "20px" }}>
                       {(load.pickup_location || load.origin || "")
                         .split(" ")
                         .slice(0, 2)
@@ -987,11 +1015,11 @@ export default function Overview() {
                           fontSize: 13, lineHeight: "20px",
                           color:
                             load.status === "DELIVERED"
-                              ? "var(--status-success)"
+                              ? "var(--status-success-text, var(--status-success))"
                               : load.status === "IN_TRANSIT"
                                 ? "var(--accent-primary)"
-                                : "var(--text-tertiary)",
-                          padding: "2px 6px",
+                                : "var(--text-secondary)",
+                          padding: "2px 8px",
                           background: "var(--bg-surface-hover)",
                           borderRadius: 4,
                           display: "inline-block",
@@ -1046,7 +1074,7 @@ export default function Overview() {
                     padding: "10px 0",
                     borderBottom: "1px solid var(--border-row)",
                   }}>
-                  <div style={{ fontSize: 13, color: "var(--text-primary)" }}>
+                  <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-primary)", minWidth: 0, overflowWrap: "anywhere" }}>
                     {e.title}
                   </div>
                   <div
@@ -1071,8 +1099,7 @@ export default function Overview() {
           grid card it's only as tall as its own content. */}
       <div className="card" style={{ padding: 0, background: "var(--bg-sidebar)" }}>
         <div className="agent-header">
-          <div className="live-dot" />
-          Agent activity stream
+          Alerts and signals
         </div>
         <div className="agent-feed">
           {loading ? (
@@ -1083,22 +1110,27 @@ export default function Overview() {
             insights.slice(0, 5).map((insight: any, idx: number) => (
               <div key={idx} className="feed-item">
                 <div className="feed-meta">
-                  <span
-                    style={{
-                      color:
-                        insight.priority === "high"
-                          ? "var(--accent-primary)"
-                          : "inherit",
-                    }}>
-                    {insight.category || "Insight"}
-                  </span>
-                  <span>{insight.time_ago || "Now"}</span>
+                  <span>{titleCase(insight.category || "Insight")}</span>
+                  {insight.severity && (
+                    <span
+                      style={{
+                        color: ["high", "critical"].includes(String(insight.severity).toLowerCase())
+                          ? "var(--status-danger-text, var(--status-danger))"
+                          : String(insight.severity).toLowerCase() === "medium"
+                            ? "var(--status-warning-text, var(--status-warning))"
+                            : "var(--text-secondary)",
+                      }}>
+                      {titleCase(String(insight.severity))} priority
+                    </span>
+                  )}
                 </div>
                 <div className="feed-content">
                   <span className="highlight-text">
                     {insight.title || insight.message}
                   </span>
-                  {insight.description && ` ${insight.description}`}
+                  {insight.body && insight.body !== insight.title && (
+                    <span style={{ display: "block", color: "var(--text-secondary)" }}>{insight.body}</span>
+                  )}
                 </div>
               </div>
             ))
@@ -1109,12 +1141,11 @@ export default function Overview() {
             // returned "no such record". Show nothing invented instead.
             <div className="feed-item">
               <div className="feed-meta">
-                <span>Agent</span>
-                <span>—</span>
+                <span>Alerts</span>
               </div>
               <div className="feed-content">
-                No agent activity yet. As your quotes, invoices and fleet data grow,
-                insights will appear here.{" "}
+                No alerts yet. As your quotes, invoices and fleet data grow,
+                signals will appear here.{" "}
                 <button
                   className="btn-action"
                   style={{ marginTop: 10 }}

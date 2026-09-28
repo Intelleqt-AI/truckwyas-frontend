@@ -1,22 +1,32 @@
 import './table-heading-roles.css';
+import './fleet-detail.css';
 import { useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
 import { formatCurrency } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
+import SectionHeader from "@/components/layout/SectionHeader";
 
 const DRIVER_STATUSES = ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] as const;
 
 const ScoreBar = ({ label, value, max = 100, color = 'var(--accent-primary)' }: any) => (
-  <div style={{ marginBottom: 14 }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{label}</span>
-      <span style={{ fontSize: 13, color, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{value ?? '—'}</span>
+  <div className="fd-score">
+    <div className="fd-score__row">
+      <span className="fd-row__label">{label}</span>
+      <span className="fd-row__value">{value ?? '—'}</span>
     </div>
-    <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
+    <div className="fd-score__track" aria-hidden="true">
       <div style={{ height: 4, width: `${Math.min(100, ((value ?? 0) / max) * 100)}%`, background: color, borderRadius: 2, transition: 'width 0.5s ease' }} />
     </div>
+  </div>
+);
+
+/** Label/value row used by every detail card. `mono` only for identifiers. */
+const DetailRow = ({ label, value, mono, alert }: { label: string; value: any; mono?: boolean; alert?: boolean }) => (
+  <div className="fd-row">
+    <span className="fd-row__label">{label}</span>
+    <span className={`fd-row__value${mono ? ' fd-id' : ''}`} style={alert ? { color: 'var(--status-danger-text, var(--status-danger))' } : undefined}>{value ?? '—'}</span>
   </div>
 );
 
@@ -24,9 +34,9 @@ const formatZAR = (v: number) =>
   'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: 'var(--status-success)',
-  INACTIVE: 'var(--text-tertiary)',
-  ON_LEAVE: 'var(--status-warning)',
+  ACTIVE: 'var(--status-success-text, var(--status-success))',
+  INACTIVE: 'var(--text-secondary)',
+  ON_LEAVE: 'var(--status-warning-text, var(--status-warning))',
 };
 
 // Sentence-case a status token for display: "ON_LEAVE" → "On leave".
@@ -55,9 +65,9 @@ export default function DriverProfile() {
 
   if (isLoading) return <Loader fullScreen />;
   if (!driver) return (
-    <div style={{ padding: 40 }}>
-      <div style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Driver not found.</div>
-      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/fleet/drivers')}>← Back</button>
+    <div className="fleet-detail">
+      <SectionHeader eyebrow="Fleet" title="Driver not found" description="This driver may have been removed, or the link is out of date." />
+      <button className="btn-action" onClick={() => navigate('/fleet/drivers')}>Back to drivers</button>
     </div>
   );
 
@@ -89,42 +99,37 @@ export default function DriverProfile() {
   const experienceScore = Math.min(100, ((driver.experience_years ?? 0) / 15) * 100);
   const complianceScore = driver.license_expiry && new Date(driver.license_expiry) > new Date() ? 100 : 0;
 
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    background: 'transparent', border: 'none',
-    borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
-    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-    fontFamily: 'var(--font-mono)', fontSize: 13, letterSpacing: '0.05em',
-    fontWeight: active ? 500 : 400,
-    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
-    transition: 'all 0.2s ease',
-  });
+  const loadStatusColor = (st: string) =>
+    st === 'DELIVERED' || st === 'INVOICED' ? 'var(--status-success-text, var(--status-success))'
+      : st === 'IN_TRANSIT' ? 'var(--status-warning-text, var(--status-warning))'
+      : 'var(--text-secondary)';
 
   return (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <button
-          onClick={() => navigate('/fleet/drivers')}
-          style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}
-        >← Back to drivers</button>
+    <div className="fleet-detail">
+      <button className="fd-back" onClick={() => navigate('/fleet/drivers')}>← Back to drivers</button>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>DRIVER</div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)' }}>{name}</div>
-            {phone && (
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-                {driver.license_number ? `${driver.license_number} · ${phone}` : phone}
-              </div>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
+      <SectionHeader
+        eyebrow="Driver"
+        title={name}
+        description={phone ? (
+          driver.license_number
+            ? <><span className="fd-id">{driver.license_number}</span> · {phone}</>
+            : phone
+        ) : undefined}
+        tabs={[
+          { label: 'Overview', to: `/fleet/drivers/${driverId}`, end: true },
+          { label: 'Financial profile', to: `/fleet/drivers/${driverId}/financial` },
+        ]}
+        actions={
+          <div className="fd-status-group" role="group" aria-label="Driver status">
             {DRIVER_STATUSES.map(s => {
               const isCurrentStatus = driver.status === s;
-              const btnColor = STATUS_COLOR[s] || 'var(--text-tertiary)';
+              const btnColor = STATUS_COLOR[s] || 'var(--text-secondary)';
               return (
                 <button
                   key={s}
+                  className="fd-button fd-status"
+                  aria-pressed={isCurrentStatus}
                   disabled={isCurrentStatus || updating}
                   onClick={async () => {
                     setUpdating(true);
@@ -134,232 +139,143 @@ export default function DriverProfile() {
                     } catch (e) { console.error(e); }
                     setUpdating(false);
                   }}
-                  style={{
-                    display: 'inline-block', whiteSpace: 'nowrap',
-                    fontFamily: 'var(--font-mono)', fontSize: 11,
-                    color: isCurrentStatus ? 'var(--bg-deep)' : btnColor,
-                    background: isCurrentStatus ? btnColor : 'transparent',
-                    padding: '6px 12px',
-                    border: `1px solid ${btnColor}`, borderRadius: 4,
-                    cursor: isCurrentStatus || updating ? 'default' : 'pointer',
-                    opacity: updating && !isCurrentStatus ? 0.5 : 1,
-                    letterSpacing: '0.08em',
-                    transition: 'all 0.15s ease',
-                  }}
+                  style={isCurrentStatus ? { color: btnColor, borderColor: btnColor } : { opacity: updating ? 0.5 : 1 }}
                 >
                   {formatStatus(s)}
                 </button>
               );
             })}
           </div>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Tabs */}
-      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 24, display: 'flex' }}>
-        <button style={tabStyle(!isFinancial)} onClick={() => navigate(`/fleet/drivers/${driverId}`)}>Overview</button>
-        <button style={tabStyle(isFinancial)} onClick={() => navigate(`/fleet/drivers/${driverId}/financial`)}>Financial Profile</button>
-      </div>
-
-      {/* ── OVERVIEW TAB ── */}
+      {/* ── Overview tab ── */}
       {!isFinancial && (
         <>
-      {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Total Revenue</span></div>
-          <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>
-            {formatZAR(totalRevenue)}
+          <div className="fd-metrics">
+            {[
+              { label: 'Total revenue', value: formatZAR(totalRevenue) },
+              { label: 'Total trips', value: totalTrips },
+              { label: 'Avg revenue per trip', value: formatZAR(avgRevPerTrip) },
+              { label: 'Completed trips', value: completedTrips },
+            ].map(m => (
+              <div key={m.label} className="card metric-card">
+                <div className="card-header"><span className="card-title">{m.label}</span></div>
+                <div className="metric-value">{m.value}</div>
+              </div>
+            ))}
           </div>
-        </div>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Total Trips</span></div>
-          <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-            {totalTrips}
-          </div>
-        </div>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Avg Revenue per Trip</span></div>
-          <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-            {formatZAR(avgRevPerTrip)}
-          </div>
-        </div>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Completed Trips</span></div>
-          <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-            {completedTrips}
-          </div>
-        </div>
-      </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        {/* Details */}
-        <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>DETAILS</div>
-          {[
-            { label: 'LICENSE NUMBER', value: driver.license_number },
-            { label: 'LICENSE STATE', value: driver.license_state },
-            { label: 'PHONE', value: phone },
-            { label: 'EMAIL', value: email },
-            { label: 'ADDRESS', value: ud.address },
-            { label: 'HIRE DATE', value: driver.hire_date?.slice(0, 10) },
-            { label: 'EMERGENCY CONTACT', value: driver.emergency_contact || driver.emergency_phone },
-            { label: 'VEHICLE', value: driver.assigned_vehicle },
-          ].map(r => (
-            <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
-              <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: r.label === 'LICENSE NUMBER' || r.label === 'ID NUMBER' || r.label === 'VEHICLE' ? 'var(--font-mono)' : 'var(--font-sans)', maxWidth: 260, textAlign: 'right' }}>
-                {r.value ?? '—'}
-              </span>
-            </div>
-          ))}
-        </div>
+          <div className="fd-grid">
+            <section className="card fd-card">
+              <h2 className="fd-card__title">Details</h2>
+              <DetailRow label="Licence number" value={driver.license_number} mono />
+              <DetailRow label="Licence province" value={driver.license_state} />
+              <DetailRow label="Phone" value={phone || undefined} />
+              <DetailRow label="Email" value={email || undefined} />
+              <DetailRow label="Address" value={ud.address} />
+              <DetailRow label="Hire date" value={driver.hire_date?.slice(0, 10)} />
+              <DetailRow label="Emergency contact" value={driver.emergency_contact || driver.emergency_phone} />
+              <DetailRow label="Vehicle" value={driver.assigned_vehicle} mono />
+            </section>
 
-        {/* Performance */}
-        <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>PERFORMANCE</div>
-          {[
-            { label: 'EFFICIENCY SCORE', value: driver.efficiency_score ?? '—' },
-            { label: 'ON-TIME RATE', value: driver.on_time_rate ? `${driver.on_time_rate}%` : '—' },
-            { label: 'AVG RATING', value: driver.avg_rating ? `★ ${driver.avg_rating}` : '—' },
-            { label: 'TRIPS THIS MONTH', value: driver.trips_this_month ?? 0 },
-            { label: 'TOTAL TRIPS', value: driver.total_trips ?? totalTrips },
-            { label: 'TOTAL DISTANCE', value: driver.total_distance ? `${parseFloat(driver.total_distance).toLocaleString('en-ZA')} km` : totalDistance > 0 ? `${Math.round(totalDistance).toLocaleString('en-ZA')} km` : '—' },
-            { label: 'LICENSE EXPIRY', value: driver.license_expiry?.slice(0, 10) || '—', alert: driver.license_expiry && new Date(driver.license_expiry) < new Date() },
-          ].map(r => (
-            <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
-              <span style={{ fontSize: 13, color: r.alert ? 'var(--status-danger)' : 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                {r.value}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+            <section className="card fd-card">
+              <h2 className="fd-card__title">Performance</h2>
+              <DetailRow label="Efficiency score" value={driver.efficiency_score ?? '—'} />
+              <DetailRow label="On-time rate" value={driver.on_time_rate ? `${driver.on_time_rate}%` : '—'} />
+              <DetailRow label="Average rating" value={driver.avg_rating ? `${driver.avg_rating}` : '—'} />
+              <DetailRow label="Trips this month" value={driver.trips_this_month ?? 0} />
+              <DetailRow label="Total trips" value={driver.total_trips ?? totalTrips} />
+              <DetailRow label="Total distance" value={driver.total_distance ? `${parseFloat(driver.total_distance).toLocaleString('en-ZA')} km` : totalDistance > 0 ? `${Math.round(totalDistance).toLocaleString('en-ZA')} km` : '—'} />
+              <DetailRow label="Licence expiry" value={driver.license_expiry?.slice(0, 10) || '—'} alert={!!(driver.license_expiry && new Date(driver.license_expiry) < new Date())} />
+            </section>
+          </div>
 
-      {/* Recent Loads */}
-      <div className="card" style={{ padding: 20, marginTop: 24 }}>
-        <div className="card-title" style={{ marginBottom: 16 }}>RECENT LOADS ({loads.length})</div>
-        {loads.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No loads recorded</div>
-        ) : (
-          <table className="data-table table-heading-roles">
-            <thead>
-              <tr>
-                {['Load #', 'Route', 'Distance', 'Revenue', 'Status', 'Date'].map(h => (
-                  <th key={h} style={{
-                    padding: '8px 16px', textAlign: 'left',
-                    borderBottom: '1px solid var(--border-subtle)',
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loads.slice(0, 10).map((load: any, idx: number) => (
-                <tr
-                  key={load.id}
-                  style={{ cursor: 'pointer', borderBottom: idx < Math.min(loads.length, 10) - 1 ? '1px solid var(--border-row)' : 'none' }}
-                  onClick={() => navigate(`/bookings/${load.id}`)}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                >
-                  <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                    {load.load_number}
-                  </td>
-                  <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-secondary)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${load.pickup_city || '—'} → ${load.delivery_city || '—'}`}>
-                    {load.pickup_city || '—'} → {load.delivery_city || '—'}
-                  </td>
-                  <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                    {load.distance ? `${parseFloat(load.distance).toFixed(0)} km` : '—'}
-                  </td>
-                  <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent-primary)', whiteSpace: 'nowrap' }}>
-                    {load.total_amount ? formatZAR(parseFloat(load.total_amount)) : '—'}
-                  </td>
-                  <td style={{ padding: '10px 16px' }}>
-                    <span style={{
-                      display: 'inline-block', whiteSpace: 'nowrap',
-                      fontFamily: 'var(--font-mono)', fontSize: 10,
-                      color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : load.status === 'IN_TRANSIT' ? 'var(--status-warning)' : 'var(--text-tertiary)',
-                    }}>{formatStatus(load.status)}</span>
-                  </td>
-                  <td style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
-                    {load.created_at?.slice(0, 10) || '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+          <section className="card fd-card fd-table-card" style={{ marginTop: 24 }}>
+            <h2 className="fd-card__title">Recent loads ({loads.length})</h2>
+            {loads.length === 0 ? (
+              <div className="fd-empty">No loads recorded</div>
+            ) : (
+              <div className="fd-table-scroll" role="region" aria-label="Recent loads" tabIndex={0}>
+                <table className="table-heading-roles fd-table">
+                  <thead>
+                    <tr>
+                      {['Load', 'Route', 'Distance', 'Revenue', 'Status', 'Date'].map(h => (
+                        <th key={h} className={h === 'Distance' || h === 'Revenue' ? 'is-numeric' : undefined}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loads.slice(0, 10).map((load: any) => (
+                      <tr
+                        key={load.id}
+                        onClick={() => navigate(`/bookings/${load.id}`)}
+                      >
+                        <td><span className="fd-id" style={{ color: 'var(--text-primary)' }}>{load.load_number}</span></td>
+                        <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${load.pickup_city || '—'} → ${load.delivery_city || '—'}`}>
+                          {load.pickup_city || '—'} → {load.delivery_city || '—'}
+                        </td>
+                        <td className="is-numeric">{load.distance ? `${parseFloat(load.distance).toFixed(0)} km` : '—'}</td>
+                        <td className="is-numeric" style={{ color: 'var(--text-primary)' }}>{load.total_amount ? formatZAR(parseFloat(load.total_amount)) : '—'}</td>
+                        <td style={{ color: loadStatusColor(load.status) }}>{formatStatus(load.status)}</td>
+                        <td>{load.created_at?.slice(0, 10) || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         </>
       )}
 
-      {/* ── FINANCIAL PROFILE TAB ── */}
+      {/* ── Financial profile tab ── */}
       {isFinancial && (
         <>
-          {/* KPI strip */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+          <div className="fd-metrics">
             <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Revenue Generated</span></div>
-              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>
-                {formatCurrency(driver.revenue_generated ?? totalRevenue)}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{driver.total_trips ?? totalTrips} completed trips</div>
+              <div className="card-header"><span className="card-title">Revenue generated</span></div>
+              <div className="metric-value">{formatCurrency(driver.revenue_generated ?? totalRevenue)}</div>
+              <div className="fd-metric-sub">{driver.total_trips ?? totalTrips} completed trips</div>
             </div>
             <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Avg Revenue / Trip</span></div>
-              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)' }}>
-                {formatCurrency(driver.avg_revenue_per_trip ?? avgRevPerTrip)}
-              </div>
+              <div className="card-header"><span className="card-title">Avg revenue per trip</span></div>
+              <div className="metric-value">{formatCurrency(driver.avg_revenue_per_trip ?? avgRevPerTrip)}</div>
             </div>
             <div className="card metric-card">
-              <div className="card-header"><span className="card-title">Revenue / km</span></div>
-              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)' }}>
-                R {(revPerKm || 0).toFixed(2)}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{(totalDistanceKm || 0).toFixed(0)} km total</div>
+              <div className="card-header"><span className="card-title">Revenue per km</span></div>
+              <div className="metric-value">R {(revPerKm || 0).toFixed(2)}</div>
+              <div className="fd-metric-sub">{(totalDistanceKm || 0).toFixed(0)} km total</div>
             </div>
             <div className="card metric-card">
               <div className="card-header"><span className="card-title">Experience</span></div>
-              <div className="metric-value" style={{ fontSize: 20, fontFamily: 'var(--font-mono)' }}>
-                {driver.experience_years ?? 0} years
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>Hire: {driver.hire_date?.slice(0, 10) || '—'}</div>
+              <div className="metric-value">{driver.experience_years ?? 0}<span className="fd-suffix"> years</span></div>
+              <div className="fd-metric-sub">Hired {driver.hire_date?.slice(0, 10) || '—'}</div>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-            {/* Performance Scores */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 20 }}>PERFORMANCE SCORES</div>
-              <ScoreBar label="ON-TIME RATE" value={onTimeRate} color="var(--accent-primary)" />
-              <ScoreBar label="SAFETY SCORE" value={safetyScore} color={safetyScore >= 80 ? 'var(--status-success)' : safetyScore >= 60 ? 'var(--status-warning)' : 'var(--status-danger)'} />
-              <ScoreBar label="EXPERIENCE SCORE" value={experienceScore} />
-              <ScoreBar label="COMPLIANCE" value={complianceScore} color={complianceScore === 100 ? 'var(--status-success)' : 'var(--status-danger)'} />
-            </div>
+          <div className="fd-grid">
+            <section className="card fd-card">
+              <h2 className="fd-card__title">Performance scores</h2>
+              <ScoreBar label="On-time rate" value={onTimeRate} color="var(--accent-primary)" />
+              <ScoreBar label="Safety score" value={safetyScore} color={safetyScore >= 80 ? 'var(--status-success)' : safetyScore >= 60 ? 'var(--status-warning)' : 'var(--status-danger)'} />
+              <ScoreBar label="Experience score" value={experienceScore} />
+              <ScoreBar label="Compliance" value={complianceScore} color={complianceScore === 100 ? 'var(--status-success)' : 'var(--status-danger)'} />
+            </section>
 
-            {/* Earnings Breakdown */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>EARNINGS BREAKDOWN</div>
-              {[
-                { label: 'TOTAL REVENUE', value: formatCurrency(driver.revenue_generated ?? totalRevenue) },
-                { label: 'TOTAL TRIPS', value: (driver.total_trips ?? totalTrips).toString() },
-                { label: 'AVG PER TRIP', value: formatCurrency(driver.avg_revenue_per_trip ?? avgRevPerTrip) },
-                { label: 'BEST TRIP', value: formatCurrency(bestTripAmount) },
-                { label: 'TOTAL DISTANCE', value: `${(totalDistanceKm || 0).toFixed(0)} km` },
-                { label: 'VIOLATIONS', value: (driver.violation_count ?? 0).toString() },
-                { label: 'ACCIDENTS', value: (driver.accident_history ?? 0).toString() },
-              ].map(r => (
-                <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{r.label}</span>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
-                </div>
-              ))}
-            </div>
+            <section className="card fd-card">
+              <h2 className="fd-card__title">Earnings breakdown</h2>
+              <DetailRow label="Total revenue" value={formatCurrency(driver.revenue_generated ?? totalRevenue)} />
+              <DetailRow label="Total trips" value={(driver.total_trips ?? totalTrips).toString()} />
+              <DetailRow label="Avg per trip" value={formatCurrency(driver.avg_revenue_per_trip ?? avgRevPerTrip)} />
+              <DetailRow label="Best trip" value={formatCurrency(bestTripAmount)} />
+              <DetailRow label="Total distance" value={`${(totalDistanceKm || 0).toFixed(0)} km`} />
+              <DetailRow label="Violations" value={(driver.violation_count ?? 0).toString()} />
+              <DetailRow label="Accidents" value={(driver.accident_history ?? 0).toString()} />
+            </section>
 
-            {/* Monthly Earnings */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>MONTHLY EARNINGS</div>
+            <section className="card fd-card">
+              <h2 className="fd-card__title">Monthly earnings</h2>
               {(() => {
                 const monthMap: Record<string, number> = {};
                 loads.forEach((l: any) => {
@@ -371,51 +287,51 @@ export default function DriverProfile() {
                 const months = Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0])).slice(-6);
                 const maxVal = Math.max(...months.map(([, v]) => v), 1);
                 if (months.length === 0) return (
-                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '20px 0', textAlign: 'center' }}>No data available</div>
+                  <div className="fd-empty">No data available</div>
                 );
                 return months.map(([key, val]) => {
                   const [yr, mo] = key.split('-');
-                  const label = new Date(parseInt(yr), parseInt(mo) - 1).toLocaleString('en-ZA', { month: 'short', year: '2-digit' });
+                  const label = new Date(parseInt(yr), parseInt(mo) - 1).toLocaleString('en-ZA', { month: 'short', year: 'numeric' });
                   const pct = (val / maxVal) * 100;
                   return (
-                    <div key={key} style={{ marginBottom: 14 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>{label}</span>
-                        <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>R {val.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                    <div key={key} className="fd-score">
+                      <div className="fd-score__row">
+                        <span className="fd-row__label">{label}</span>
+                        <span className="fd-row__value">R {val.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                       </div>
-                      <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
+                      <div className="fd-score__track" aria-hidden="true">
                         <div style={{ height: 4, width: `${pct}%`, background: 'var(--accent-primary)', borderRadius: 2, transition: 'width 0.5s ease' }} />
                       </div>
                     </div>
                   );
                 });
               })()}
-            </div>
+            </section>
 
-            {/* Recent Loads */}
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>RECENT LOADS ({loads.length})</div>
+            <section className="card fd-card">
+              <h2 className="fd-card__title">Recent loads ({loads.length})</h2>
               {loads.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '20px 0', textAlign: 'center' }}>No loads recorded</div>
+                <div className="fd-empty">No loads recorded</div>
               ) : loads.slice(0, 8).map((load: any) => (
                 <div
                   key={load.id}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-row)', cursor: 'pointer' }}
+                  className="fd-row fd-row--link"
+                  role="link"
+                  tabIndex={0}
                   onClick={() => navigate(`/bookings/${load.id}`)}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  onKeyDown={e => { if (e.key === 'Enter') navigate(`/bookings/${load.id}`); }}
                 >
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{load.load_number}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{load.pickup_city || '—'} → {load.delivery_city || '—'}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="fd-id" style={{ color: 'var(--text-primary)' }}>{load.load_number}</div>
+                    <div className="fd-row__label">{load.pickup_city || '—'} → {load.delivery_city || '—'}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>{formatCurrency(parseFloat(load.total_amount || '0'))}</div>
-                    <div style={{ fontSize: 10, color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success)' : 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{formatStatus(load.status)}</div>
+                    <div className="fd-row__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</div>
+                    <div className="fd-row__label" style={{ color: load.status === 'DELIVERED' || load.status === 'INVOICED' ? 'var(--status-success-text, var(--status-success))' : undefined }}>{formatStatus(load.status)}</div>
                   </div>
                 </div>
               ))}
-            </div>
+            </section>
           </div>
         </>
       )}

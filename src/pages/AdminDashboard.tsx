@@ -1,5 +1,6 @@
 import { useParams, NavLink, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import '@/pages/admin/admin-brand.css';
 
 import AdminHome from '@/pages/admin/AdminHome';
 import { CompaniesTable } from '@/pages/admin/CompaniesTable';
@@ -77,7 +78,7 @@ export default function AdminDashboard() {
         flexShrink: 0,
         borderRight: '1px solid var(--border-subtle)',
       }}>
-        <div style={{
+        <nav aria-label="Admin dashboard" style={{
           position: 'sticky',
           top: 0,
           maxHeight: '100vh',
@@ -110,6 +111,8 @@ export default function AdminDashboard() {
                   <NavLink
                     key={item.id}
                     to={`/admin/${item.id}`}
+                    className="admin-control"
+                    aria-current={active ? 'page' : undefined}
                     style={{
                       display: 'block',
                       padding: '8px 20px',
@@ -118,6 +121,7 @@ export default function AdminDashboard() {
                       lineHeight: '20px',
                       letterSpacing: 'normal',
                       textDecoration: 'none',
+                      fontWeight: active ? 500 : 400,
                       color: active ? 'var(--status-info-text, var(--accent-primary))' : 'var(--text-secondary)',
                       background: active ? 'rgba(var(--accent-primary-rgb, 37,99,235), 0.08)' : 'transparent',
                       borderLeft: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
@@ -130,14 +134,14 @@ export default function AdminDashboard() {
               })}
             </div>
           ))}
-        </div>
+        </nav>
       </div>
 
       {/* Content */}
       <div style={{ flex: 1, padding: '0 0 60px 32px', minWidth: 0 }}>
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)' }}>{current.label}</h1>
-          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 2 }}>
+          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>
             Cross-tenant visibility and controls, superuser only. Every write action is recorded in the audit log.
           </div>
         </div>

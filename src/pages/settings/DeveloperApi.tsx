@@ -99,10 +99,10 @@ const SCHEMA_FIELDS = [
 ];
 
 const TIER_COLOR: Record<string, string> = {
-  A: 'var(--status-success)',
+  A: 'var(--status-success-text, var(--status-success))',
   B: 'var(--accent-primary)',
-  C: '#f59e0b',
-  D: 'var(--status-danger)',
+  C: 'var(--status-warning-text, #f59e0b)',
+  D: 'var(--status-danger-text, var(--status-danger))',
 };
 
 function fmtDate(s?: string | null) {
@@ -282,7 +282,7 @@ export function DeveloperApi() {
 
       {/* ── Endpoint reference ── */}
       <div style={sectionStyle}>
-        <div style={sectionHeader}><h3 style={sectionTitle}>Endpoint</h3></div>
+        <div style={sectionHeader}><h2 style={sectionTitle}>Endpoint</h2></div>
         <div style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <span style={{ ...mono, fontWeight: 700, color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 4 }}>POST</span>
@@ -305,28 +305,28 @@ export function DeveloperApi() {
 
       {/* ── Request body schema ── */}
       <div style={sectionStyle}>
-        <div style={sectionHeader}><h3 style={sectionTitle}>Request body schema</h3></div>
+        <div style={sectionHeader}><h2 style={sectionTitle}>Request body schema</h2></div>
         <div style={{ overflowY: 'auto', maxHeight: 320 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, lineHeight: '20px' }}>
+          <table className="table-heading-roles settings-table" style={{ fontSize: 13, lineHeight: '20px' }}>
             <thead>
               <tr style={{ background: 'var(--bg-deep)' }}>
                 {['Object', 'Field', 'Type', 'Required', 'Description'].map(h => (
-                  <th key={h} style={{ position: 'sticky', top: 0, zIndex: 1, padding: '8px 14px', textAlign: 'left', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-subtle)', whiteSpace: 'nowrap', background: 'var(--bg-deep)' }}>{h}</th>
+                  <th key={h} scope="col" style={{ position: 'sticky', top: 0, zIndex: 1, textAlign: 'left', background: 'var(--bg-deep)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {SCHEMA_FIELDS.map((f, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid var(--border-row)' }}>
-                  <td style={{ padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--accent-primary)' }}>{f.obj}</td>
-                  <td style={{ padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{f.field}</td>
-                  <td style={{ padding: '7px 14px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)' }}>{f.type}</td>
-                  <td style={{ padding: '7px 14px' }}>
-                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', fontWeight: 500, padding: '2px 6px', borderRadius: 4, background: f.required ? 'rgba(239,68,68,0.12)' : 'var(--bg-deep)', color: f.required ? 'var(--status-danger-text, var(--status-danger))' : 'var(--text-tertiary)' }}>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--accent-primary)' }}>{f.obj}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{f.field}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-secondary)' }}>{f.type}</td>
+                  <td>
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, lineHeight: '16px', fontWeight: 500, padding: '2px 6px', borderRadius: 4, background: f.required ? 'rgba(239,68,68,0.12)' : 'var(--bg-deep)', color: f.required ? 'var(--status-danger-text, var(--status-danger))' : 'var(--text-tertiary)' }}>
                       {f.required ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td style={{ padding: '7px 14px', color: 'var(--text-secondary)' }}>{f.desc}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{f.desc}</td>
                 </tr>
               ))}
             </tbody>
@@ -336,7 +336,7 @@ export function DeveloperApi() {
 
       {/* ── API keys ── */}
       <div style={sectionStyle}>
-        <div style={sectionHeader}><h3 style={sectionTitle}>API keys</h3></div>
+        <div style={sectionHeader}><h2 style={sectionTitle}>API keys</h2></div>
 
         {/* Create row */}
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
@@ -422,7 +422,7 @@ export function DeveloperApi() {
                           ...keyChipStyle,
                           background: copied === k.id ? 'rgba(34,197,94,0.12)' : 'var(--bg-deep)',
                           border: `1px solid ${copied === k.id ? 'var(--status-success)' : 'var(--border-subtle)'}`,
-                          color: copied === k.id ? 'var(--status-success)' : 'var(--text-secondary)',
+                          color: copied === k.id ? 'var(--status-success-text, var(--status-success))' : 'var(--text-secondary)',
                           transition: 'all 0.2s',
                         }}
                       >
@@ -470,7 +470,7 @@ export function DeveloperApi() {
 
               {/* Call history panel */}
               {logsOpen && (
-                <div style={{ background: 'var(--bg-deep)', borderTop: '1px solid var(--border-subtle)', padding: '10px 20px 14px' }}>
+                <div style={{ background: 'var(--bg-deep)', borderTop: '1px solid var(--border-subtle)', padding: '12px 20px 16px' }}>
                   <h4 style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', margin: 0, marginBottom: 8 }}>Call history (last 100)</h4>
                   {logsLoading[k.id] ? (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0' }}><Loader size={16} /></div>
@@ -478,34 +478,34 @@ export function DeveloperApi() {
                     <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No calls recorded yet.</div>
                   ) : (
                     <div className="settings-scroll-region" role="region" aria-label={`Call history for ${k.name}`} tabIndex={0} style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, lineHeight: '20px' }}>
+                    <table className="table-heading-roles settings-table is-inset" style={{ fontSize: 13, lineHeight: '20px' }}>
                       <thead>
                         <tr>
                           {['Time', 'Invoice amount', 'Tier', 'Score', 'Eligible', 'IP'].map(h => (
-                            <th key={h} style={{ padding: '4px 10px', textAlign: 'left', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
+                            <th key={h} scope="col" style={{ textAlign: (h === 'Invoice amount' || h === 'Score') ? 'right' : 'left' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {logs[k.id].map(log => (
                           <tr key={log.id} style={{ borderBottom: '1px solid var(--border-row)' }}>
-                            <td style={{ padding: '5px 10px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmtDate(log.scored_at)}</td>
-                            <td style={{ padding: '5px 10px', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                            <td style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmtDate(log.scored_at)}</td>
+                            <td className="num" style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                               {log.invoice_amount ? `R${parseFloat(log.invoice_amount).toLocaleString('en-ZA', { maximumFractionDigits: 0 })}` : '—'}
                             </td>
-                            <td style={{ padding: '5px 10px' }}>
-                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: TIER_COLOR[log.risk_tier] || 'var(--text-secondary)' }}>
+                            <td>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: TIER_COLOR[log.risk_tier] || 'var(--text-secondary)' }}>
                                 {log.risk_tier || '—'}
                               </span>
                             </td>
-                            <td style={{ padding: '5px 10px', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{log.score ?? '—'}</td>
-                            <td style={{ padding: '5px 10px' }}>
+                            <td className="num" style={{ color: 'var(--text-primary)' }}>{log.score ?? '—'}</td>
+                            <td>
                               {log.eligible === null ? <span style={{ color: 'var(--text-tertiary)' }}>—</span>
                                 : log.eligible
-                                  ? <span style={{ color: 'var(--status-success)', fontSize: 13, fontWeight: 500 }}>Yes</span>
+                                  ? <span style={{ color: 'var(--status-success-text, var(--status-success))', fontSize: 13, fontWeight: 500 }}>Yes</span>
                                   : <span style={{ color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, fontWeight: 500 }}>No</span>}
                             </td>
-                            <td style={{ padding: '5px 10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{log.caller_ip || '—'}</td>
+                            <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{log.caller_ip || '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -522,7 +522,7 @@ export function DeveloperApi() {
       {/* ── Try it console ── */}
       <div style={sectionStyle}>
         <div style={sectionHeader}>
-          <h3 style={sectionTitle}>Try it</h3>
+          <h2 style={sectionTitle}>Try it</h2>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div>
               <label style={{ ...labelStyle, marginBottom: 0, marginRight: 6, display: 'inline' }}>Auth as</label>
@@ -553,7 +553,7 @@ export function DeveloperApi() {
             ) : result ? (
               <div>
                 <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
-                  <Stat label="Tier" value={result.risk_tier || '—'} color={result.eligible ? (TIER_COLOR[result.risk_tier] || 'var(--accent-primary)') : 'var(--status-danger)'} />
+                  <Stat label="Tier" value={result.risk_tier || '—'} color={result.eligible ? (TIER_COLOR[result.risk_tier] || 'var(--accent-primary)') : 'var(--status-danger-text, var(--status-danger))'} />
                   <Stat label="Score" value={String(result.score ?? '—')} />
                   <Stat label="Fee" value={result.fee_percent != null ? `${result.fee_percent}%` : '—'} />
                   <Stat label="Advance" value={result.max_advance_percent != null ? `${result.max_advance_percent}%` : '—'} />
@@ -566,7 +566,7 @@ export function DeveloperApi() {
                     <span>lifetime: <b style={{ color: 'var(--text-secondary)' }}>{result._meta.usage_count}</b></span>
                   </div>
                 )}
-                <pre style={{ ...mono, fontSize: 11, color: 'var(--text-secondary)', background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: 12, maxHeight: 220, overflow: 'auto', margin: 0 }}>
+                <pre style={{ ...mono, color: 'var(--text-secondary)', background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: 12, maxHeight: 220, overflow: 'auto', margin: 0 }}>
                   {JSON.stringify(result, null, 2)}
                 </pre>
               </div>

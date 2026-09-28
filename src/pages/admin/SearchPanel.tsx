@@ -18,9 +18,9 @@ const inputStyle: React.CSSProperties = {
   padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
   fontFamily: 'var(--font-sans)', minHeight: 40, width: '100%', maxWidth: 360,
 };
-const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)' };
+const thStyle: React.CSSProperties = { textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
-  padding: '12px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
@@ -42,7 +42,7 @@ function ResultTable({ title, rows, numberKey }: { title: string; rows: any[]; n
         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No matches.</div>
       ) : (
         <div className="admin-scroll-region" role="region" aria-label={title} tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Number</th>

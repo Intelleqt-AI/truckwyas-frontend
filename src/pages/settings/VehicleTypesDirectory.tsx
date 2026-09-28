@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
+import { settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsBadgeStyle } from "./settingsUi";
 
 interface VehicleType {
   id: number;
@@ -38,16 +39,8 @@ const sectionStyle: React.CSSProperties = {
   borderRadius: 8,
 };
 
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-  fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', marginBottom: 6,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-  color: 'var(--text-primary)', padding: '8px 12px', borderRadius: 6,
-  fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', minHeight: 40, boxSizing: 'border-box',
-};
+const labelStyle = settingsLabelStyle;
+const inputStyle = settingsInputStyle;
 
 const rowActionStyle: React.CSSProperties = {
   background: 'none', border: '1px solid var(--border-subtle)',
@@ -214,12 +207,12 @@ export function VehicleTypesDirectory() {
 
       <div style={sectionStyle}>
         <div style={{
-          padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)',
+          padding: '12px 20px', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)', gap: 12, flexWrap: 'wrap',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-            Vehicle types ({types.length})
-          </span>
+          <h2 style={settingsCardTitleStyle}>
+            Vehicle types <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>({types.length})</span>
+          </h2>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             {selected.size > 0 && (
               <button
@@ -266,17 +259,14 @@ export function VehicleTypesDirectory() {
           <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
         ) : (
           <div className="settings-scroll-region" role="region" aria-label="Vehicle types" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+          <table className="table-heading-roles settings-table">
             <thead>
               <tr>
-                <th style={{ padding: '10px 20px', borderBottom: '1px solid var(--border-subtle)', width: 36 }}>
+                <th style={{ width: 36 }}>
                   <input type="checkbox" aria-label="Select all vehicle types" checked={allSelected} onChange={toggleAll} style={{ cursor: 'pointer' }} />
                 </th>
                 {['Name', 'Description', 'Payload (t)', 'Base rate', 'Status', ''].map(h => (
-                  <th key={h} style={{
-                    padding: '10px 20px', textAlign: 'left' as const,
-                    borderBottom: '1px solid var(--border-subtle)',
-                  }}>{h}</th>
+                  <th key={h || 'actions'} scope="col" style={{ textAlign: (h === 'Payload (t)' || h === 'Base rate' || h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
@@ -300,7 +290,7 @@ export function VehicleTypesDirectory() {
                 const deleteDisabled = isDemo || isShared; // nothing to delete/reset until this company has diverged
                 return (
                 <tr key={t.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-row)' : 'none', background: selected.has(t.id) ? 'var(--bg-elevated)' : 'transparent' }}>
-                  <td style={{ padding: '12px 20px' }}>
+                  <td>
                     <input
                       type="checkbox"
                       checked={selected.has(t.id)}
@@ -310,32 +300,28 @@ export function VehicleTypesDirectory() {
                       style={{ cursor: isShared ? 'not-allowed' : 'pointer' }}
                     />
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                  <td style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>
                     {t.name}
                     {(isShared || isOverride) && (
-                      <span style={{
-                        marginLeft: 8, fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px',
-                        color: 'var(--text-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: 4,
-                        padding: '1px 6px',
-                      }} title={badgeTitle}>{isShared ? 'Platform default' : 'Customized'}</span>
+                      <span style={{ ...settingsBadgeStyle, marginLeft: 8, fontWeight: 400 }} title={badgeTitle}>{isShared ? 'Platform default' : 'Customized'}</span>
                     )}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', maxWidth: 220 }}>
+                  <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', minWidth: 200 }}>
                     {t.description || '—'}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                  <td className="num" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                     {t.capacity ? `${t.capacity}t` : '—'}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                  <td className="num" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                     {formatRate(t.base_rate)}<span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>/km</span>
                   </td>
-                  <td style={{ padding: '12px 20px' }}>
+                  <td>
                     <span style={{
                       fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
                       color: t.active ? 'var(--accent-primary)' : 'var(--text-tertiary)',
                     }}>{t.active ? 'Active' : 'Inactive'}</span>
                   </td>
-                  <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
+                  <td style={{ textAlign: 'right' as const }}>
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                       <button
                         className="settings-control"

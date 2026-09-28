@@ -3,76 +3,13 @@ import { toast } from "react-toastify";
 import { fetchData, patchData } from "@/lib/Api";
 import { enablePush, disablePush, pushSupported, PushStatus } from "@/lib/push";
 import { useAuth } from "@/lib/AuthContext";
+import { SettingsToggleRow, settingsBadgeStyle, settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle } from "./settingsUi";
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 'var(--card-radius)',
-  marginBottom: 16,
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: '16px 20px 12px',
-  borderBottom: '1px solid var(--border-subtle)',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  textTransform: 'none' as const,
-  letterSpacing: 'normal',
-  margin: 0,
-  color: 'var(--text-secondary)',
-  fontWeight: 600,
-};
-
-const sectionBodyStyle: React.CSSProperties = { padding: '4px 0 8px' };
-
-interface ToggleRowProps {
-  label: string;
-  description?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-  disabledTitle?: string;
-}
-
-function ToggleRow({ label, description, checked, onChange, disabled, disabledTitle }: ToggleRowProps) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '12px 20px',
-      borderBottom: '1px solid var(--border-row)',
-      opacity: disabled ? 0.5 : 1,
-    }}>
-      <div>
-        <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: description ? 2 : 0 }}>{label}</div>
-        {description && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{description}</div>}
-      </div>
-      <button
-        onClick={() => !disabled && onChange(!checked)}
-        disabled={disabled}
-        title={disabled ? disabledTitle : undefined}
-        style={{
-          width: 36, height: 20, borderRadius: 10, border: 'none',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          background: checked ? 'var(--accent-primary)' : 'var(--border-active)',
-          position: 'relative', flexShrink: 0, transition: 'background 0.2s',
-        }}
-      >
-        <span style={{
-          position: 'absolute', top: 2, left: checked ? 18 : 2,
-          width: 16, height: 16, borderRadius: '50%', background: 'var(--bg-surface)',
-          transition: 'left 0.2s',
-        }} />
-      </button>
-    </div>
-  );
-}
+const sectionStyle = settingsCardStyle;
+const sectionHeaderStyle = settingsCardHeaderStyle;
+const sectionTitleStyle = settingsCardTitleStyle;
+const sectionBodyStyle: React.CSSProperties = { padding: 0 };
+const ToggleRow = SettingsToggleRow;
 
 // Canonical schema — mirrors backend core/services/notification_prefs.py.
 const DEFAULTS = {
@@ -206,7 +143,7 @@ export function NotificationSettings() {
           <ToggleRow label="Maintenance due" checked={settings.push.maintenance_due} onChange={v => setChannel('push', 'maintenance_due', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           <ToggleRow label="Driver status updates" checked={settings.push.driver_updates} onChange={v => setChannel('push', 'driver_updates', v)} disabled={isDemo} disabledTitle="Fixed in demo mode" />
           {pushHint && (
-            <div style={{ padding: '10px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
+            <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-row)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{pushHint}</div>
           )}
         </div>
       </div>
@@ -215,11 +152,7 @@ export function NotificationSettings() {
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <h2 style={sectionTitleStyle}>SMS notifications</h2>
-          <span style={{
-            fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', fontWeight: 500,
-            color: 'var(--text-tertiary)',
-            border: '1px solid var(--border-subtle)', borderRadius: 4, padding: '2px 6px',
-          }}>Coming soon</span>
+          <span style={settingsBadgeStyle}>Coming soon</span>
         </div>
         <div style={sectionBodyStyle}>
           <ToggleRow label="Critical alerts only" description="System-wide urgent notifications" checked={settings.sms.critical_alerts} onChange={v => setChannel('sms', 'critical_alerts', v)} disabled />
@@ -229,11 +162,11 @@ export function NotificationSettings() {
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button
-          className="btn-action"
+          className="btn-action settings-control"
           onClick={handleSave}
           disabled={saving || isDemo}
           title={isDemo ? 'Fixed in demo mode' : undefined}
-          style={{ minHeight: 40, borderRadius: 6, opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+          style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
         >
           {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
         </button>

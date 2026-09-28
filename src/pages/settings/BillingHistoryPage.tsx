@@ -3,29 +3,17 @@ import '@/pages/settings/settings-brand.css';
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchData } from "@/lib/Api";
+import { formatCurrency, formatDate } from "@/lib/formatters";
+import { SettingsShell } from "./SettingsShell";
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle } from "./settingsUi";
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 8,
-  marginBottom: 20,
-};
+const sectionStyle = settingsCardStyle;
+const sectionHeaderStyle: React.CSSProperties = { ...settingsCardHeaderStyle, justifyContent: 'space-between' };
+const sectionTitleStyle = settingsCardTitleStyle;
 
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: '14px 20px',
-  borderBottom: '1px solid var(--border-subtle)',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  fontWeight: 600,
-  color: 'var(--text-primary)',
-  margin: 0,
+const STATUS_COLOR: Record<string, string> = {
+  complete: 'var(--status-success-text, var(--accent-primary))',
+  pending: 'var(--status-warning-text, var(--status-warning))',
 };
 
 // Presentation-only labels for known status payload values — unknown strings
@@ -46,8 +34,8 @@ interface BillingTransaction {
   status: string;
 }
 
-const formatRand = (amount?: string | number | null) =>
-  `R${Number(amount ?? 0).toLocaleString('en-ZA')}`;
+// Exact ZAR with cents (brand: two decimals for exact totals).
+const formatRand = (amount?: string | number | null) => formatCurrency(Number(amount ?? 0));
 
 const PERIODS = ['All time', 'Today', 'This week', 'This month', 'This year'] as const;
 type Period = typeof PERIODS[number];
@@ -76,7 +64,7 @@ function HistoryTable({ title, rows }: { title: string; rows: BillingTransaction
   return (
     <div style={sectionStyle}>
       <div style={sectionHeaderStyle}>
-        <h3 style={sectionTitleStyle}>{title}</h3>
+        <h2 style={sectionTitleStyle}>{title}</h2>
         <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
           {rows.length} charge{rows.length === 1 ? '' : 's'} · {formatRand(total)} total
         </span>
@@ -87,34 +75,31 @@ function HistoryTable({ title, rows }: { title: string; rows: BillingTransaction
         </div>
       ) : (
         <div className="settings-scroll-region" role="region" aria-label={title} tabIndex={0} style={{ overflowX: 'auto' }}>
-        <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+        <table className="table-heading-roles settings-table">
           <thead>
             <tr>
               {['Charge', 'Reference', 'Date', 'Amount', 'Status'].map(h => (
-                <th key={h} style={{
-                  padding: '10px 20px', textAlign: 'left' as const,
-                  borderBottom: '1px solid var(--border-subtle)',
-                }}>{h}</th>
+                <th key={h} scope="col" className={h === 'Amount' ? 'num' : undefined} style={{ textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {rows.map((tx, i) => (
               <tr key={tx.id} style={{ borderBottom: i < rows.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{tx.label}</td>
-                <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{tx.label}</td>
+                <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                   {tx.reference || '—'}
                 </td>
-                <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                  {new Date(tx.created_at).toLocaleDateString('en-ZA')}
+                <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                  {formatDate(tx.created_at)}
                 </td>
-                <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                <td className="num" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                   {formatRand(tx.amount)}
                 </td>
-                <td style={{ padding: '12px 20px' }}>
+                <td>
                   <span style={{
                     fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                    color: tx.status === 'complete' ? 'var(--accent-primary)' : tx.status === 'pending' ? 'var(--status-warning)' : 'var(--status-danger)',
+                    color: STATUS_COLOR[tx.status] ?? 'var(--status-danger-text, var(--status-danger))',
                   }}>{statusDisplay(tx.status)}</span>
                 </td>
               </tr>
@@ -149,19 +134,24 @@ export default function BillingHistoryPage() {
   const feeCharges = filtered.filter(tx => tx.kind === 'delivery_fee');
 
   return (
+    <SettingsShell activeId="billing">
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
-      <button className="settings-control" onClick={() => navigate('/settings/billing')} style={{
-        background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 13, lineHeight: '20px',
-        fontFamily: 'var(--font-sans)', fontWeight: 500, cursor: 'pointer', padding: '8px 0', minHeight: 44, marginBottom: 8,
-      }}>
-        ← Back to billing
-      </button>
-
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Billing history</h1>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-          Every charge to your card on file — the monthly plan and the per-delivery platform fee
+      {/* Title block sits at the same y as every other settings section; the
+          way back lives beside it instead of pushing the h1 down. */}
+      <div style={{ marginBottom: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 }}>Billing history</h1>
+          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+            Every charge to your card on file — the monthly plan and the per-delivery platform fee
+          </div>
         </div>
+        <button type="button" className="settings-control" onClick={() => navigate('/settings/billing')} style={{
+          background: 'transparent', border: '1px solid var(--border-subtle)', borderRadius: 6, color: 'var(--text-secondary)',
+          fontSize: 14, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontWeight: 500, cursor: 'pointer',
+          padding: '8px 12px', minHeight: 40, flexShrink: 0,
+        }}>
+          Back to billing
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -204,5 +194,6 @@ export default function BillingHistoryPage() {
         </>
       )}
     </div>
+    </SettingsShell>
   );
 }

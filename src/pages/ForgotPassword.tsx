@@ -1,3 +1,5 @@
+import "./auth-brand.css";
+import { Mail } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { postData } from "@/lib/Api";
@@ -51,10 +53,10 @@ export function ForgotPassword() {
         {submitted ? (
           <>
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>📧</div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+              <Mail aria-hidden="true" size={40} strokeWidth={1.5} style={{ color: 'var(--accent-primary)', marginBottom: 16 }} />
+              <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
                 Check your email
-              </div>
+              </h1>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 If an account exists for <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>,
                 you will receive a password reset link shortly.
@@ -69,28 +71,28 @@ export function ForgotPassword() {
         ) : (
           <>
             <div style={{ marginBottom: 32 }}>
-              <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+              <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
                 Reset password
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+              </h1>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                 Enter your email and we'll send you a reset link
               </div>
             </div>
 
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: 24 }}>
-                <label style={{
+                <label htmlFor="forgot-email-address" style={{
                   display: 'block',
-                  fontSize: 11,
-                  fontFamily: 'var(--font-mono)',
-                  textTransform: 'uppercase' as const,
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-tertiary)',
+                  fontSize: 13,
+                  lineHeight: '20px',
+                  fontWeight: 500,
+                  fontFamily: 'var(--font-sans)',
+                  color: 'var(--text-primary)',
                   marginBottom: 6,
                 }}>
                   Email Address
                 </label>
-                <input
+                <input className="tw-auth-control" id="forgot-email-address"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -98,13 +100,15 @@ export function ForgotPassword() {
                   autoFocus
                   style={{
                     width: '100%',
-                    padding: '10px 14px',
+                    padding: '8px 12px',
+                    minHeight: 40,
+                    boxSizing: 'border-box',
                     background: 'var(--input-bg)',
                     border: '1px solid var(--border-subtle)',
-                    borderRadius: 2,
+                    borderRadius: 6,
                     color: 'var(--text-primary)',
-                    fontSize: 13,
-                    outline: 'none',
+                    fontSize: 14,
+                    lineHeight: '20px',
                   }}
                 />
               </div>
@@ -115,11 +119,11 @@ export function ForgotPassword() {
                 className="btn-action"
                 style={{ width: '100%', marginBottom: 16 }}
               >
-                {submitting ? 'Sending...' : 'Send reset link'}
+                {submitting ? 'Sending…' : 'Send reset link'}
               </button>
             </form>
 
-            <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)' }}>
+            <div style={{ textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
               Remember your password?{' '}
               <Link to="/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>
                 Log in

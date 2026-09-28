@@ -2,16 +2,16 @@ import './fleet-vehicles-brand.css';
 import './table-heading-roles.css';
 import { UserRound as EmptyDriversIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { LiveBadge } from "@/components/LiveBadge";
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader } from '@/components/Loader';
+import SectionHeader, { FLEET_TABS } from '@/components/layout/SectionHeader';
 import { useAuth } from '@/lib/AuthContext';
 
 interface Driver {
@@ -60,6 +60,9 @@ const STATUS_COLOR: Record<string, string> = {
   ON_LEAVE: 'var(--status-warning-text, var(--status-warning))',
 };
 
+// Numeric columns are right aligned (header and cells) per the table standard.
+const NUMERIC_COLUMNS = new Set(['Trips MTD', 'Revenue generated']);
+
 const formatZAR = (v: number) =>
   'R ' + (v || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -76,7 +79,6 @@ const getDriverName = (d: Driver) => {
 
 export default function Drivers() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user: authUser } = useAuth();
   // Shared public demo account — creation/edit/delete controls are fixed off,
   // viewing/filtering/search stay fully live.
@@ -205,60 +207,40 @@ export default function Drivers() {
     return 'var(--text-secondary)';
   };
 
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    background: 'transparent', border: 'none',
-    borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
-    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal',
-    fontWeight: active ? 500 : 400,
-    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
-    transition: 'all 0.2s ease',
-    whiteSpace: 'nowrap',
-  });
-
-  if (loading) return <Loader fullScreen />;
-
   return (
     <div className="fleet-page">
-      {/* Page header */}
-      <div className="fleet-header-row" style={{ marginBottom: 24, alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal', textTransform: 'none', marginBottom: 4 }}>Fleet</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <h1 className="fleet-page-title">Fleet</h1>
-            <LiveBadge />
-          </div>
-        </div>
-        <button data-fleet-control
-          className="btn-action"
-          onClick={() => setShowAddForm(true)}
-          disabled={isDemo}
-          title={isDemo ? 'Fixed in demo mode' : undefined}
-          style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-        >+ Add driver</button>
-      </div>
+      <SectionHeader
+        eyebrow="Fleet"
+        title="Fleet"
+        tabs={FLEET_TABS}
+        actions={
+          <button data-fleet-control
+            className="btn-action"
+            onClick={() => setShowAddForm(true)}
+            disabled={isDemo}
+            title={isDemo ? 'Fixed in demo mode' : undefined}
+            style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+          >+ Add driver</button>
+        }
+      />
 
-      {/* Tabs */}
-      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 24, display: 'flex', overflowX: 'auto' }}>
-        <button style={tabStyle(false)} onClick={() => navigate('/fleet/vehicles')}>Vehicles</button>
-        <button style={tabStyle(true)}>Drivers</button>
-      </div>
-
-      {/* KPI strip */}
-      <div className="fleet-summary fleet-summary--3">
+      {/* KPI strip — same 4-card grid, toolbar and table card as Vehicles so
+          switching tabs never moves the page. */}
+      <div className="fleet-summary fleet-summary--4">
         {[
           { label: 'Total drivers', value: overview?.total_drivers ?? drivers.length, color: 'var(--text-primary)' },
           { label: 'Active', value: overview?.active_drivers ?? drivers.filter(d => d.status === 'ACTIVE').length, color: 'var(--accent-primary)' },
+          { label: 'On leave', value: drivers.filter(d => d.status === 'ON_LEAVE').length, color: 'var(--status-warning-text, var(--status-warning))' },
           { label: 'Avg revenue per driver', value: formatZAR(overview?.avg_revenue_per_driver ?? 0), color: 'var(--text-primary)' },
         ].map(k => (
           <div key={k.label} className="card metric-card">
             <div className="card-header"><span className="card-title">{k.label}</span></div>
-            <div className="metric-value" style={{ fontSize: 28, color: k.color }}>{k.value}</div>
+            <div className="metric-value" style={{ color: loading ? 'var(--text-tertiary)' : k.color }}>{loading ? '—' : k.value}</div>
           </div>
         ))}
       </div>
 
-      {/* Search + Status Filter Toolbar */}
+      {/* Search + status filter toolbar */}
       <div className="fleet-toolbar">
         <input data-fleet-control
           type="text"
@@ -266,19 +248,9 @@ export default function Drivers() {
           placeholder="Search name, license, username..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{
-            width: 280,
-            maxWidth: '100%',
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-subtle)',
-            color: 'var(--text-primary)',
-            padding: '8px 12px',
-            borderRadius: 6,
-            lineHeight: '20px',
-            fontFamily: 'var(--font-sans)',
-          }}
+          className="fleet-search"
         />
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="fleet-filters">
           {['All', 'ACTIVE', 'INACTIVE', 'ON_LEAVE'].map(status => {
             const isActive = statusFilter === status;
             return (
@@ -286,20 +258,7 @@ export default function Drivers() {
                 key={status}
                 aria-pressed={isActive}
                 onClick={() => setStatusFilter(status)}
-                style={{
-                  background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  color: isActive ? 'var(--btn-action-color)' : 'var(--text-secondary)',
-                  padding: '8px 12px',
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: 14,
-                  lineHeight: '20px',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  letterSpacing: 'normal',
-                  fontWeight: isActive ? 500 : 400,
-                  transition: 'all 0.2s ease'
-                }}
+                className="fleet-filter"
               >
                 {status === 'All' ? 'All' : formatStatus(status)}
               </button>
@@ -309,31 +268,31 @@ export default function Drivers() {
       </div>
 
       {/* Table */}
-      <div className="card fleet-table-region" role="region" aria-label="Drivers table" tabIndex={0} style={{ padding: 0, overflowX: 'auto', minWidth: 0, maxWidth: '100%' }}>
-        <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="card fleet-table-region" role="region" aria-label="Drivers table" tabIndex={0}>
+        <table className="table-heading-roles fleet-table">
           <thead>
             <tr>
               {['Name', 'License', 'Status', 'Trips MTD', 'Revenue generated', 'Performance', ''].map(h => (
-                <th key={h} style={{
-                  padding: '12px 16px', textAlign: 'left',
-                  borderBottom: '1px solid var(--border-subtle)',
-                }}>{h}</th>
+                <th key={h} className={NUMERIC_COLUMNS.has(h) ? 'is-numeric' : undefined}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={7} className="fleet-table__state-cell">
+                  <div className="fleet-table-state"><Loader size={32} label="Loading drivers" /></div>
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
               drivers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: 0 }}>
-                    <div style={{ padding: '48px var(--fleet-card-inset)', textAlign: 'center' }}>
-                      <div style={{ marginBottom: 16, opacity: 0.3 }}><EmptyDriversIcon size={40} aria-hidden="true" /></div>
-                      <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-                        No drivers yet
-                      </div>
-                      <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 20 }}>
-                        Get started by adding your first driver to your team
-                      </div>
+                  <td colSpan={7} className="fleet-table__state-cell">
+                    <div className="fleet-empty">
+                      <div className="fleet-empty__icon"><EmptyDriversIcon size={40} aria-hidden="true" /></div>
+                      <h2 className="fleet-empty__title">No drivers yet</h2>
+                      <p className="fleet-empty__text">Get started by adding your first driver to your team.</p>
+                      <div className="fleet-empty__actions">
                       <button data-fleet-control
                         onClick={() => setShowAddForm(true)}
                         className="btn-action"
@@ -343,11 +302,12 @@ export default function Drivers() {
                       >
                         Add driver
                       </button>
+                      </div>
                     </div>
                   </td>
                 </tr>
               ) : (
-                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40, fontSize: 13 }}>No drivers match your filters</td></tr>
+                <tr><td colSpan={7} className="fleet-table__no-match">No drivers match your filters</td></tr>
               )
             ) : filtered.map((d, idx) => {
               const statusDotColor = d.status === 'ACTIVE' ? 'var(--status-success)' : d.status === 'ON_LEAVE' ? 'var(--status-warning)' : 'var(--text-tertiary)';
@@ -361,7 +321,7 @@ export default function Drivers() {
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                  <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{
                         width: 6,
@@ -373,25 +333,24 @@ export default function Drivers() {
                       {getDriverName(d)}
                     </div>
                   </td>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                    {d.license_number || '—'}
+                  <td>
+                    <span className="fleet-table__id">{d.license_number || '—'}</span>
                   </td>
-                  <td style={{ padding: '12px 16px' }}>
+                  <td>
                     <span style={{
                       display: 'inline-block', whiteSpace: 'nowrap',
-                      fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px',
                       color: STATUS_COLOR[d.status] || 'var(--text-secondary)',
                     }}>
                       {formatStatus(d.status)}
                     </span>
                   </td>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                  <td className="is-numeric">
                     {d.total_trips ?? 0}
                   </td>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                  <td className="is-numeric">
                     {d.revenue_generated ? formatZAR(d.revenue_generated) : '—'}
                   </td>
-                  <td style={{ padding: '12px 16px' }}>
+                  <td>
                     {efficiencyScore > 0 ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ flex: 1, maxWidth: 120, height: 6, background: 'var(--bg-surface-hover)', borderRadius: 3, overflow: 'hidden' }}>
@@ -403,16 +362,16 @@ export default function Drivers() {
                             transition: 'width 0.3s ease'
                           }} />
                         </div>
-                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)', fontWeight: 600, minWidth: 32, textAlign: 'right' }}>
+                        <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)', fontWeight: 600, minWidth: 32, textAlign: 'right' }}>
                           {efficiencyScore}
                         </span>
                       </div>
                     ) : (
-                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>—</span>
+                      <span style={{ color: 'var(--text-tertiary)' }}>—</span>
                     )}
                   </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <td className="fleet-table__actions">
+                    <div>
                       <button data-fleet-control
                         onClick={(e) => {
                           e.stopPropagation();

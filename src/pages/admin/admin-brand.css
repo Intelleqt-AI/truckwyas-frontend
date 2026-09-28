@@ -12,3 +12,12 @@
   outline: 2px solid var(--accent-primary);
   outline-offset: -2px;
 }
+
+/* Admin tables — app-wide 12px 16px cell rhythm. The outer columns drop
+   their side padding so cell text lines up with the card title above the
+   table (cards already carry 24px padding). `!important` only overrides the
+   per-file inline cell padding for those two edge columns. */
+table.admin-table :is(th, td):first-child { padding-left: 0 !important; }
+table.admin-table :is(th, td):last-child { padding-right: 0 !important; }
+table.admin-table th { white-space: nowrap; }
+table.admin-table .num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }

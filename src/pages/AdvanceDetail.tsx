@@ -1,30 +1,45 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchData } from "@/lib/Api";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
+import "./finance-brand.css";
 import { Loader } from "@/components/Loader";
 
-const TIER_META: Record<string, { color: string; label: string; feeRange: string; desc: string }> = {
-  PRIME:    { color: 'var(--accent-primary)',   label: 'Prime',    feeRange: '1.5%–2.0%', desc: 'Low-risk customer with strong payment history.' },
-  STANDARD: { color: 'var(--status-success)',   label: 'Standard', feeRange: '2.0%–2.75%', desc: 'Normal risk — reliable customer, acceptable DSO.' },
-  ELEVATED: { color: 'var(--status-warning-text, var(--status-warning))',   label: 'Elevated', feeRange: '2.75%–3.5%', desc: 'Moderate risk — slower payer or older invoice.' },
-  HIGH:     { color: 'var(--status-danger-text, var(--status-danger))',    label: 'High',     feeRange: '3.5%–4.5%', desc: 'Higher risk — late payment history or high DSO.' },
+const TIER_META: Record<string, { tone: string; label: string; feeRange: string; desc: string }> = {
+  PRIME:    { tone: 'success', label: 'Prime',    feeRange: '1.5%–2.0%', desc: 'Low-risk customer with strong payment history.' },
+  STANDARD: { tone: 'info',    label: 'Standard', feeRange: '2.0%–2.75%', desc: 'Normal risk — reliable customer, acceptable DSO.' },
+  ELEVATED: { tone: 'warning', label: 'Elevated', feeRange: '2.75%–3.5%', desc: 'Moderate risk — slower payer or older invoice.' },
+  HIGH:     { tone: 'danger',  label: 'High',     feeRange: '3.5%–4.5%', desc: 'Higher risk — late payment history or high DSO.' },
 };
 
 // Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
 const formatStatus = (s?: string) =>
   s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
 
-const STATUS_COLOR: Record<string, string> = {
-  REQUESTED: 'var(--accent-primary)',
-  APPROVED: 'var(--status-success)',
-  DISBURSED: 'var(--status-success)',
-  FUNDED: 'var(--status-success)',
-  ACTIVE: 'var(--status-warning)',
-  SETTLED: 'var(--text-tertiary)',
-  REPAID: 'var(--text-tertiary)',
-  DENIED: 'var(--status-danger)',
+const STATUS_TONE: Record<string, string> = {
+  REQUESTED: 'info',
+  APPROVED: 'success',
+  DISBURSED: 'success',
+  FUNDED: 'success',
+  ACTIVE: 'warning',
+  SETTLED: 'neutral',
+  REPAID: 'neutral',
+  DENIED: 'danger',
 };
+
+const chip = (tone?: string) => `fin-chip${tone && tone !== 'neutral' ? ` fin-chip--${tone}` : ''}`;
+const safeDate = (d?: string | null) => {
+  if (!d) return '—';
+  const t = new Date(d);
+  return isNaN(t.getTime()) ? String(d) : formatDate(t);
+};
+const safeDateTime = (d?: string | null) => {
+  if (!d) return '—';
+  const t = new Date(d);
+  return isNaN(t.getTime()) ? String(d) : formatDateTime(t);
+};
+const labelStyle = { fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)' } as const;
+const rowStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16 } as const;
 
 export default function AdvanceDetail() {
   const navigate = useNavigate();
@@ -58,20 +73,11 @@ export default function AdvanceDetail() {
 
   if (error || !advance) {
     return (
-      <div>
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Advance Detail</div>
-        </div>
-        <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-          <div style={{ color: 'var(--status-danger-text, var(--status-danger))', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>{error || 'Advance not found'}</div>
-          <button
-            className="btn-action"
-            style={{ padding: '8px 16px', background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, marginTop: 12 }}
-            onClick={() => navigate('/capital')}
-          >
-            Back to Capital
-          </button>
+      <div className="fin-page">
+        <div className="card fin-empty">
+          <h1 className="fin-empty__title" style={{ fontSize: 22, lineHeight: '28px' }}>Advance not found</h1>
+          <p className="fin-empty__body">{error ? 'We couldn’t load this advance. Check your connection and try again.' : 'It may have been removed, or the link is wrong.'}</p>
+          <button className="btn-action" onClick={() => navigate('/capital')}>Back to Capital</button>
         </div>
       </div>
     );
@@ -101,236 +107,209 @@ export default function AdvanceDetail() {
   // Timeline steps
   const timelineSteps = [
     { label: 'Requested', date: createdAt, completed: true },
-    { label: 'Under Review', date: createdAt, completed: !!createdAt },
+    { label: 'Under review', date: createdAt, completed: !!createdAt },
     { label: 'Approved', date: approvedAt, completed: !!approvedAt },
     { label: 'Disbursed', date: disbursedAt, completed: !!disbursedAt },
     { label: 'Repaid', date: settledAt, completed: !!settledAt },
   ];
 
   return (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <button
-          style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 8, padding: 0 }}
-          onClick={() => navigate('/capital')}
-        >
-          ← Back to Capital
-        </button>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Capital / Advance</div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Advance #{advance.id}</div>
-          <span style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: STATUS_COLOR[status] || 'var(--text-tertiary)',
-            background: 'var(--bg-surface-hover)',
-            padding: '4px 10px',
-            borderRadius: 4,
-            display: 'inline-block',
-            whiteSpace: 'nowrap',
-            fontWeight: 500
-          }}>
-            {formatStatus(status)}
-          </span>
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-          Created {new Date(createdAt).toLocaleDateString()} at {new Date(createdAt).toLocaleTimeString()}
-        </div>
-      </div>
+    <div className="fin-page">
+      <button
+        type="button"
+        style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 8, padding: 0, minHeight: 40 }}
+        onClick={() => navigate('/capital')}
+      >
+        ← Back to Capital
+      </button>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
-        {/* Left column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Amount summary card */}
-          <div className="card" style={{ padding: 20 }}>
-            <div className="card-header" style={{ marginBottom: 16 }}>
-              <span className="card-title">Amount Summary</span>
-            </div>
-            <div style={{ display: 'grid', gap: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Invoice Amount</span>
-                <span style={{ fontSize: 16, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(grossAmount)}</span>
+      <header style={{ marginBottom: 24 }}>
+        <div style={{ ...labelStyle, marginBottom: 4 }}>Capital · Advance</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>Advance #{advance.id}</h1>
+          <span className={chip(STATUS_TONE[status])}>{formatStatus(status)}</span>
+        </div>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>
+          Requested {safeDateTime(createdAt)} · Invoice <span className="fin-id">{invoiceNumber}</span> · {customerName}
+        </div>
+      </header>
+
+      <div className="fin-grid-2" style={{ alignItems: 'start' }}>
+        {/* Main column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24, minWidth: 0 }}>
+          {/* Key amount */}
+          <section className="card" aria-labelledby="amount-title">
+            <h2 id="amount-title" className="fin-kpi__label" style={{ margin: 0 }}>Net payout</h2>
+            <div className="fin-kpi__value">{formatCurrency(netAmount)}</div>
+            <div className="fin-kpi__sub">{disbursedAt ? `Paid to your account on ${safeDate(disbursedAt)}` : 'Paid to your account once disbursed'}</div>
+            <dl style={{ display: 'grid', gap: 8, margin: '20px 0 0', paddingTop: 16, borderTop: '1px solid var(--border-subtle)', fontSize: 14, lineHeight: '20px' }}>
+              <div style={rowStyle}>
+                <dt style={{ color: 'var(--text-secondary)' }}>Invoice amount</dt>
+                <dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>{formatCurrency(grossAmount)}</dd>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Fee ({feePercent.toFixed(1)}%)</span>
-                <span style={{ fontSize: 16, fontFamily: 'var(--font-mono)', color: 'var(--status-danger-text, var(--status-danger))' }}>-{formatCurrency(feeAmount)}</span>
+              <div style={rowStyle}>
+                <dt style={{ color: 'var(--text-secondary)' }}>Fee ({feePercent.toFixed(1)}%)</dt>
+                <dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>−{formatCurrency(feeAmount)}</dd>
               </div>
-              <div style={{ height: 1, background: 'var(--border-subtle)' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Net Advanced</span>
-                <span style={{ fontSize: 24, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--status-success)' }}>{formatCurrency(netAmount)}</span>
+              <div style={{ ...rowStyle, paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
+                <dt style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Net advanced</dt>
+                <dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)', fontWeight: 600 }}>{formatCurrency(netAmount)}</dd>
               </div>
-            </div>
-          </div>
+            </dl>
+          </section>
 
           {/* Invoice details */}
-          <div className="card" style={{ padding: 20 }}>
-            <div className="card-header" style={{ marginBottom: 16 }}>
-              <span className="card-title">Invoice Details</span>
+          <section className="card" aria-labelledby="invoice-title">
+            <div className="fin-card-head">
+              <h2 id="invoice-title" className="fin-h2">Invoice</h2>
+              <button
+                type="button"
+                className="btn-action fin-btn-secondary"
+                onClick={() => navigate(`/finance/invoices/${advance.invoice || advance.invoice_id}`)}
+              >
+                View invoice
+              </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, margin: 0 }}>
               <div>
-                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Invoice Number</div>
-                <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 500 }}>{invoiceNumber}</div>
+                <dt style={labelStyle}>Invoice number</dt>
+                <dd style={{ margin: '4px 0 0' }}><span className="fin-id">{invoiceNumber}</span></dd>
               </div>
               <div>
-                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Customer</div>
-                <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>{customerName}</div>
+                <dt style={labelStyle}>Customer</dt>
+                <dd style={{ margin: '4px 0 0', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{customerName}</dd>
               </div>
               {repaymentDate && (
-                <>
-                  <div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Repayment Due</div>
-                    <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{new Date(repaymentDate).toLocaleDateString()}</div>
-                  </div>
-                </>
+                <div>
+                  <dt style={labelStyle}>Repayment due</dt>
+                  <dd style={{ margin: '4px 0 0', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{safeDate(repaymentDate)}</dd>
+                </div>
               )}
-              <div>
-                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Invoice Link</div>
-                <button
-                  style={{ fontSize: 12, color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'var(--font-mono)' }}
-                  onClick={() => navigate(`/finance/invoices/${advance.invoice || advance.invoice_id}`)}
-                >
-                  View Invoice →
-                </button>
-              </div>
-            </div>
-          </div>
+            </dl>
+          </section>
 
           {/* Timeline */}
-          <div className="card" style={{ padding: 20 }}>
-            <div className="card-header" style={{ marginBottom: 16 }}>
-              <span className="card-title">Status Timeline</span>
-            </div>
-            <div style={{ display: 'grid', gap: 20 }}>
+          <section className="card" aria-labelledby="timeline-title">
+            <h2 id="timeline-title" className="fin-h2" style={{ marginBottom: 16 }}>Status timeline</h2>
+            <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 20 }}>
               {timelineSteps.map((step, index) => (
-                <div key={index} style={{ display: 'flex', gap: 16 }}>
-                  <div style={{ position: 'relative' }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: '50%',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: step.completed ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                      color: step.completed ? 'white' : 'var(--text-tertiary)',
-                      fontWeight: 600, fontSize: 14
-                    }}>
+                <li key={index} style={{ display: 'flex', gap: 16 }}>
+                  <div style={{ position: 'relative', flex: 'none' }}>
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: step.completed ? 'var(--accent-primary)' : 'var(--bg-surface-hover)',
+                        border: step.completed ? 'none' : '1px solid var(--border-subtle)',
+                        color: step.completed ? 'var(--btn-action-color)' : 'var(--text-tertiary)',
+                        fontWeight: 600, fontSize: 14,
+                      }}>
                       {step.completed ? '✓' : index + 1}
                     </div>
                     {index < timelineSteps.length - 1 && (
                       <div style={{
                         position: 'absolute', left: '50%', top: 32, width: 2, height: 20,
                         background: step.completed ? 'var(--accent-primary)' : 'var(--border-subtle)',
-                        transform: 'translateX(-50%)'
+                        transform: 'translateX(-50%)',
                       }} />
                     )}
                   </div>
-                  <div style={{ flex: 1, paddingTop: 4 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: step.completed ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{step.label}</div>
+                  <div style={{ flex: 1, paddingTop: 6 }}>
+                    <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: step.completed ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
+                      {step.label}
+                      <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{step.completed ? ' (done)' : ' (not yet)'}</span>
+                    </div>
                     {step.date && (
-                      <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', marginTop: 2 }}>
-                        {new Date(step.date).toLocaleDateString()} {new Date(step.date).toLocaleTimeString()}
+                      <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                        {safeDateTime(step.date)}
                       </div>
                     )}
                   </div>
-                </div>
+                </li>
               ))}
-            </div>
-          </div>
+            </ol>
+          </section>
         </div>
 
-        {/* Right column - Key metrics */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div className="card" style={{ padding: 20, background: 'var(--bg-surface-hover)' }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>Net Payout</div>
-            <div style={{ fontSize: 28, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-primary)' }}>{formatCurrency(netAmount)}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>Advanced to your account</div>
-          </div>
+        {/* Side column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24, minWidth: 0 }}>
+          {/* Key dates */}
+          {(disbursedAt || repaymentDate || settledAt) && (
+            <section className="card" aria-labelledby="dates-title">
+              <h2 id="dates-title" className="fin-h2" style={{ marginBottom: 12 }}>Key dates</h2>
+              <dl style={{ display: 'grid', gap: 12, margin: 0 }}>
+                {disbursedAt && (
+                  <div>
+                    <dt style={labelStyle}>Disbursed</dt>
+                    <dd style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{safeDate(disbursedAt)} · Funds transferred</dd>
+                  </div>
+                )}
+                {repaymentDate && !settledAt && (
+                  <div>
+                    <dt style={labelStyle}>Repayment due</dt>
+                    <dd style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{safeDate(repaymentDate)} · Repaid when your customer pays</dd>
+                  </div>
+                )}
+                {settledAt && (
+                  <div>
+                    <dt style={labelStyle}>Settled</dt>
+                    <dd style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{safeDate(settledAt)} · Fully repaid</dd>
+                  </div>
+                )}
+              </dl>
+            </section>
+          )}
 
-          {/* Fee Breakdown */}
-          <div className="card" style={{ padding: 20 }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>Fee Breakdown</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 12 }}>
-              This is TruckWys's invoice factoring fee — the cost of receiving cash upfront before your customer pays.
-            </div>
-            <div style={{ display: 'grid', gap: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Factoring Fee</span>
-                <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{feePercent.toFixed(1)}%</span>
+          {/* Fee breakdown */}
+          <section className="card" aria-labelledby="fee-title">
+            <h2 id="fee-title" className="fin-h2" style={{ marginBottom: 4 }}>Fee breakdown</h2>
+            <p className="fin-support" style={{ marginBottom: 12 }}>
+              The fee for receiving cash before your customer pays the invoice.
+            </p>
+            <dl style={{ display: 'grid', gap: 8, margin: 0, fontSize: 14, lineHeight: '20px' }}>
+              <div style={rowStyle}>
+                <dt style={{ color: 'var(--text-secondary)' }}>Fee rate</dt>
+                <dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>{feePercent.toFixed(1)}%</dd>
               </div>
-              <div style={{ height: 1, background: 'var(--border-subtle)' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Total Fee</span>
-                <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--status-danger-text, var(--status-danger))' }}>{formatCurrency(feeAmount)}</span>
+              <div style={{ ...rowStyle, paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
+                <dt style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Total fee</dt>
+                <dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)', fontWeight: 600 }}>{formatCurrency(feeAmount)}</dd>
               </div>
-            </div>
-          </div>
+            </dl>
+          </section>
 
-          {/* Risk Assessment */}
+          {/* Risk assessment */}
           {tierMeta && (
-            <div className="card" style={{ padding: 20, borderLeft: `3px solid ${tierMeta.color}` }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 12, textTransform: 'uppercase' }}>Risk Assessment</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: tierMeta.color }}>{tierMeta.label}</span>
+            <section className="card" aria-labelledby="risk-title">
+              <h2 id="risk-title" className="fin-h2" style={{ marginBottom: 12 }}>Risk assessment</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                <span className={chip(tierMeta.tone)}>{tierMeta.label}</span>
                 {riskScore !== null && (
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', background: 'var(--bg-surface-hover)', padding: '2px 8px', borderRadius: 2 }}>
-                    Score: {Number(riskScore).toFixed(0)}
-                  </span>
+                  <span className="fin-chip" style={{ fontVariantNumeric: 'tabular-nums' }}>Score {Number(riskScore).toFixed(0)}</span>
                 )}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12 }}>{tierMeta.desc}</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Fee range for this tier</span>
-                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: tierMeta.color }}>{tierMeta.feeRange}</span>
+              <p style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', margin: '0 0 12px' }}>{tierMeta.desc}</p>
+              <div style={{ ...rowStyle, fontSize: 13, lineHeight: '20px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Fee range for this tier</span>
+                <span style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{tierMeta.feeRange}</span>
               </div>
               {Object.keys(factorsBreakdown).length > 0 && (
                 <>
-                  <div style={{ height: 1, background: 'var(--border-subtle)', marginBottom: 10 }} />
-                  <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>Score Factors</div>
-                  <div style={{ display: 'grid', gap: 6 }}>
+                  <h3 style={{ ...labelStyle, margin: '16px 0 8px', paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>Score factors</h3>
+                  <dl style={{ display: 'grid', gap: 6, margin: 0 }}>
                     {Object.entries(factorsBreakdown)
                       .filter(([, val]) => typeof val === 'number' && !isNaN(val))
                       .map(([key, val]) => (
-                        <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
-                            {key.replace(/_/g, ' ')}
-                          </span>
-                          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>{(val as number).toFixed(1)}</span>
+                        <div key={key} style={{ ...rowStyle, fontSize: 13, lineHeight: '20px' }}>
+                          <dt style={{ color: 'var(--text-secondary)' }}>{formatStatus(key)}</dt>
+                          <dd style={{ margin: 0, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{(val as number).toFixed(1)}</dd>
                         </div>
                       ))}
-                  </div>
+                  </dl>
                 </>
               )}
-            </div>
-          )}
-
-          {disbursedAt && (
-            <div className="card" style={{ padding: 20, background: 'var(--bg-surface-hover)', borderLeft: '4px solid var(--status-success)' }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>Disbursed</div>
-              <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                {new Date(disbursedAt).toLocaleDateString()}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>Funds transferred</div>
-            </div>
-          )}
-
-          {repaymentDate && !settledAt && (
-            <div className="card" style={{ padding: 20, background: 'var(--bg-surface-hover)', borderLeft: '4px solid var(--status-warning)' }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>Repayment Due</div>
-              <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                {new Date(repaymentDate).toLocaleDateString()}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>Auto-repaid when customer pays</div>
-            </div>
-          )}
-
-          {settledAt && (
-            <div className="card" style={{ padding: 20, background: 'var(--bg-surface-hover)', borderLeft: '4px solid var(--text-tertiary)' }}>
-              <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 8, textTransform: 'uppercase' }}>Settled</div>
-              <div style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                {new Date(settledAt).toLocaleDateString()}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>Fully repaid</div>
-            </div>
+            </section>
           )}
         </div>
       </div>

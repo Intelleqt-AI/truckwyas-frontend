@@ -2,9 +2,11 @@ import './table-heading-roles.css';
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
-import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { formatCurrency, formatPercent, formatDate } from "@/lib/formatters";
 import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import { Loader } from '@/components/Loader';
+import SectionHeader, { FINANCE_TABS } from '@/components/layout/SectionHeader';
+import './finance-brand.css';
 
 // Brand text roles (styling only): support 13/20, labels 13/20/500,
 // section headings 16/24/600, controls 14/20, metrics 28/36/600 tabular.
@@ -18,6 +20,56 @@ const reportControlText = { fontFamily: 'var(--font-sans)', fontSize: 14, lineHe
 const formatStatus = (s?: string) =>
   s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
 
+const fmtDate = (d?: string) => {
+  if (!d) return '—';
+  const t = new Date(d);
+  return isNaN(t.getTime()) ? d : formatDate(t);
+};
+
+// Headline figures stay neutral; only warning/danger text roles carry meaning.
+const kpiColor = (c?: string) =>
+  c && /(danger|warning)-text/.test(c) ? c : 'var(--text-primary)';
+
+// Map the legacy colour expression of a status to a chip tone.
+const chipTone = (c: string) =>
+  c.includes('danger') ? 'danger' : c.includes('warning') ? 'warning' : 'success';
+
+const toNum = (v: unknown) => {
+  const n = parseFloat(String(v ?? 0));
+  return isNaN(n) ? 0 : n;
+};
+
+const AGING_LABELS: Record<string, string> = {
+  current: 'Current', '1-30': '1-30 Days', '31-60': '31-60 Days', '61-90': '61-90 Days', '90+': '90+ Days',
+};
+
+function normaliseAging(a: any) {
+  if (!a) return a;
+  const buckets = Array.isArray(a.buckets)
+    ? a.buckets.map((b: any) => ({
+        ...b,
+        label: b.label ?? AGING_LABELS[b.bucket_name] ?? b.bucket_name,
+        amount: toNum(b.amount ?? b.total_amount),
+        count: b.count ?? b.invoice_count ?? 0,
+      }))
+    : a.buckets;
+  return { ...a, buckets };
+}
+
+function normaliseFacility(f: any) {
+  if (!f) return f;
+  return {
+    ...f,
+    facility_limit: f.facility_limit ?? (f.limit != null ? toNum(f.limit) : undefined),
+    outstanding_advances: f.outstanding_advances ?? (f.outstanding != null ? toNum(f.outstanding) : undefined),
+  };
+}
+
+const ADVANCE_TONE: Record<string, string> = {
+  REQUESTED: 'info', APPROVED: 'success', DISBURSED: 'success', FUNDED: 'warning', ACTIVE: 'warning',
+  SETTLED: '', REPAID: '', DENIED: 'danger',
+};
+
 const TABS = [
   { id: 'pl', label: 'P&L' },
   { id: 'cashflow', label: 'Cash flow' },
@@ -25,7 +77,7 @@ const TABS = [
   { id: 'aging', label: 'Aging' },
   { id: 'lanes', label: 'Lanes' },
   { id: 'capital', label: 'Capital' },
-  { id: 'fastpay', label: 'Fast-pay' },
+  { id: 'fastpay', label: 'Fast Pay' },
 ];
 
 export default function FinanceReports() {
@@ -34,7 +86,7 @@ export default function FinanceReports() {
   // All report data is fetched + derived inside the queryFn so the result is
   // cached by TanStack Query and survives navigation — revisiting the page no
   // longer refires these 8 requests until the cache goes stale.
-  const { data, isLoading: loading, isError } = useQuery({
+  const { data, isLoading: loading, isError, dataUpdatedAt } = useQuery({
     queryKey: ["finance-reports"],
     queryFn: async () => {
       const [finance, cashflow, cust, aging, fac, adv, lanes, fastpay] = await Promise.all([
@@ -66,9 +118,18 @@ export default function FinanceReports() {
   const financeData = data?.financeData ?? null;
   const cashflowData = data?.cashflowData ?? null;
   const customers = data?.customers ?? [];
-  const agingData = data?.agingData ?? null;
-  const facilities = data?.facilities ?? null;
-  const advances = data?.advances ?? [];
+  // Presentation-only field mapping: the aging, facility and advance endpoints
+  // return decimals as strings and use different field names from the ones
+  // this screen was written against. Values are read as-is, never recalculated.
+  const agingData = normaliseAging(data?.agingData ?? null);
+  const facilities = normaliseFacility(data?.facilities ?? null);
+  const advances = (data?.advances ?? []).map((a: any) => ({
+    ...a,
+    fee_amount: toNum(a.fee_amount),
+    advanced_amount: a.advanced_amount == null ? undefined : toNum(a.advanced_amount),
+  }));
+  const totalAdvanced = advances.reduce((sum: number, a: any) => sum + (a.advanced_amount || 0), 0);
+  const totalFees = advances.reduce((sum: number, a: any) => sum + (a.fee_amount || 0), 0);
   const laneData = data?.laneData ?? null;
   const fastpayData = data?.fastpayData ?? null;
 
@@ -172,7 +233,7 @@ export default function FinanceReports() {
   const ErrorState = () => (
     <div className="card" style={{ padding: 40, textAlign: 'center' }}>
       <div style={{ color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 16, fontSize: 14 }}>Failed to load data</div>
-      <button className="btn-action" onClick={() => window.location.reload()}>Retry</button>
+      <button className="btn-action" onClick={() => window.location.reload()}>Retry loading</button>
     </div>
   );
 
@@ -183,44 +244,36 @@ export default function FinanceReports() {
   );
 
   return (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ ...reportSupportText, color: 'var(--text-tertiary)', marginBottom: 4 }}>Finance</div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: 22, lineHeight: '28px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>Reports</h1>
-            <div style={{ ...reportSupportText, color: 'var(--text-secondary)', marginTop: 4 }}>
-              Comprehensive financial analytics • Last updated: {new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
-            </div>
-          </div>
-          <button className="btn-action" onClick={exportToCSV}>↓ Export CSV</button>
-        </div>
-      </div>
+    <div className="fin-page">
+      <SectionHeader
+        eyebrow="Finance"
+        title="Finance"
+        tabs={FINANCE_TABS}
+        actions={
+          <button className="btn-action" onClick={exportToCSV} disabled={loading || !!error}>
+            Export CSV
+          </button>
+        }
+      />
 
-      {/* Tab bar */}
-      <div style={{ display: 'flex', marginBottom: 20, borderBottom: '1px solid var(--border-subtle)' }}>
+      {/* Report switcher — second-level, in-page selection */}
+      <div className="fin-subnav" role="group" aria-label="Report">
         {TABS.map(t => (
           <button
             key={t.id}
+            type="button"
+            className="fin-chip-filter"
+            aria-pressed={tab === t.id}
             onClick={() => setTab(t.id)}
-            style={{
-              background: 'none',
-              border: 'none',
-              borderBottom: tab === t.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
-              ...reportControlText,
-              color: tab === t.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              fontWeight: tab === t.id ? 500 : 400,
-              padding: '12px 0',
-              marginRight: 24,
-              cursor: 'pointer',
-              marginBottom: -1,
-              whiteSpace: 'nowrap',
-            }}
           >
             {t.label}
           </button>
         ))}
+        {dataUpdatedAt > 0 && (
+          <span className="fin-subnav__meta">
+            Data loaded at {new Date(dataUpdatedAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
       </div>
 
       {/* Content */}
@@ -229,26 +282,26 @@ export default function FinanceReports() {
           {/* TAB 1: P&L */}
           {tab === 'pl' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+              <div className="fin-kpis" style={{ marginBottom: 0 }}>
                 {[
                   { label: 'Total revenue', value: formatCurrency(financeData?.total_revenue || 0), color: 'var(--accent-primary)' },
-                  { label: 'Total expenses', value: formatCurrency(financeData?.total_expenses || 0), color: 'var(--status-danger-text, var(--status-danger))' },
+                  { label: 'Total expenses', value: formatCurrency(financeData?.total_expenses || 0), color: 'var(--text-primary)' },
                   { label: 'Net margin %', value: formatPercent(financeData?.net_margin_percent || 0), color: 'var(--status-success)' },
                   { label: 'Net profit', value: formatCurrency((financeData?.total_revenue || 0) - (financeData?.total_expenses || 0)), color: 'var(--text-primary)' },
                 ].map(m => (
-                  <div key={m.label} className="card metric-card">
-                    <div className="card-header"><span className="card-title" style={reportLabelText}>{m.label}</span></div>
-                    <div className="metric-value" style={{ ...reportMetricText, color: m.color }}>{m.value}</div>
+                  <div key={m.label} className="card fin-kpi">
+                    <span className="fin-kpi__label">{m.label}</span>
+                    <span className="fin-kpi__value" style={{ color: kpiColor(m.color) }}>{m.value}</span>
                   </div>
                 ))}
               </div>
 
               {/* Monthly Trend Chart - recharts ComposedChart */}
               {financeData?.monthly_trend && financeData.monthly_trend.length > 0 ? (
-                <div className="card" style={{ padding: 20 }}>
+                <div className="card">
                   <div className="card-header">
                     <h2 className="card-title" style={reportHeadingText}>Revenue vs expenses trend (last 12 months)</h2>
-                    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-secondary)' }}>
+                    <div style={{ display: 'flex', gap: 12, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <span style={{ width: 20, height: 2, background: 'var(--accent-primary)', display: 'inline-block', borderRadius: 1 }}/>Revenue
                       </span>
@@ -260,7 +313,10 @@ export default function FinanceReports() {
                   {(() => {
                     const trend = financeData.monthly_trend.map((m: any) => ({
                       ...m,
-                      monthLabel: m.month?.slice(5) || ''
+                      // "2026-05" → "May 26" (avoids ambiguous bare month numbers)
+                      monthLabel: /^\d{4}-\d{2}/.test(m.month || '')
+                        ? `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m.month.slice(5, 7), 10) - 1]} ${m.month.slice(2, 4)}`
+                        : (m.month || '')
                     }));
 
                     return (
@@ -284,7 +340,7 @@ export default function FinanceReports() {
                               tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                             />
                             <Tooltip
-                              contentStyle={{ ...reportSupportText, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}
+                              contentStyle={{ ...reportSupportText, background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}
                               formatter={(value: any, name: string) => {
                                 if (name === 'revenue') return [formatCurrency(value), 'Revenue'];
                                 if (name === 'expenses') return [formatCurrency(value), 'Expenses'];
@@ -292,7 +348,7 @@ export default function FinanceReports() {
                               }}
                             />
                             <Area
-                              type="monotone"
+                              type="linear"
                               dataKey="revenue"
                               fill="url(#revenueGradientPL)"
                               stroke="var(--accent-primary)"
@@ -300,7 +356,7 @@ export default function FinanceReports() {
                               isAnimationActive={true}
                             />
                             <Line
-                              type="monotone"
+                              type="linear"
                               dataKey="expenses"
                               stroke="var(--status-danger)"
                               strokeWidth={2}
@@ -318,22 +374,22 @@ export default function FinanceReports() {
 
               {/* Expense breakdown */}
               {financeData?.expense_breakdown && Object.keys(financeData.expense_breakdown).length > 0 ? (
-                <div className="card" style={{ padding: 20 }}>
+                <div className="card">
                   <div className="card-header"><h2 className="card-title" style={reportHeadingText}>Expense breakdown by category</h2></div>
-                  <table className="data-table table-heading-roles" style={{ marginTop: 16 }}>
+                  <table className="fin-table table-heading-roles" style={{ marginTop: 16 }}>
                     <thead>
                       <tr>
                         <th>Category</th>
-                        <th className="text-right">Amount</th>
-                        <th className="text-right">% of total</th>
+                        <th className="num">Amount</th>
+                        <th className="num">% of total</th>
                       </tr>
                     </thead>
                     <tbody>
                       {Object.entries(financeData.expense_breakdown).map(([category, amount]: [string, any]) => (
                         <tr key={category}>
                           <td style={reportSupportText}>{formatStatus(category)}</td>
-                          <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(amount)}</td>
-                          <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums' }}>
+                          <td className="num" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(amount)}</td>
+                          <td className="num" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums' }}>
                             {((amount / financeData.total_expenses) * 100).toFixed(1)}%
                           </td>
                         </tr>
@@ -360,15 +416,15 @@ export default function FinanceReports() {
 
                 return (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                    <div className="fin-kpis fin-kpis--3" style={{ marginBottom: 0 }}>
                       {[
                         { label: 'Expected in (30d)', value: formatCurrency(totalIn), color: 'var(--status-success)' },
-                        { label: 'Expected out (30d)', value: formatCurrency(totalOut), color: 'var(--status-danger-text, var(--status-danger))' },
+                        { label: 'Expected out (30d)', value: formatCurrency(totalOut), color: 'var(--text-primary)' },
                         { label: 'Net cash position', value: formatCurrency(netPosition), color: netPosition >= 0 ? 'var(--accent-primary)' : 'var(--status-danger-text, var(--status-danger))' },
                       ].map(m => (
-                        <div key={m.label} className="card metric-card">
-                          <div className="card-header"><span className="card-title" style={reportLabelText}>{m.label}</span></div>
-                          <div className="metric-value" style={{ ...reportMetricText, color: m.color }}>{m.value}</div>
+                        <div key={m.label} className="card fin-kpi">
+                          <span className="fin-kpi__label">{m.label}</span>
+                          <span className="fin-kpi__value" style={{ color: kpiColor(m.color) }}>{m.value}</span>
                         </div>
                       ))}
                     </div>
@@ -381,15 +437,15 @@ export default function FinanceReports() {
                             Next {forecast.length} weeks
                           </span>
                         </div>
-                        <table className="data-table table-heading-roles">
+                        <table className="fin-table table-heading-roles">
                           <thead>
                             <tr>
                               <th>Period</th>
                               <th>Week starting</th>
-                              <th className="text-right">Expected in</th>
-                              <th className="text-right">Expected out</th>
-                              <th className="text-right">Net</th>
-                              <th className="text-right">Status</th>
+                              <th className="num">Expected in</th>
+                              <th className="num">Expected out</th>
+                              <th className="num">Net</th>
+                              <th>Status</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -397,33 +453,20 @@ export default function FinanceReports() {
                               const net = (f.expected_in || 0) - (f.expected_out || 0);
                               return (
                                 <tr key={idx}>
-                                  <td className="mono" style={reportSupportText}>{f.period}</td>
-                                  <td className="mono" style={reportSupportText}>{f.start_date}</td>
-                                  <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', color: 'var(--status-success)' }}>
+                                  <td className="fin-strong">{f.period}</td>
+                                  <td className="fin-date">{fmtDate(f.start_date)}</td>
+                                  <td className="num">
                                     {formatCurrency(f.expected_in || 0)}
                                   </td>
-                                  <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', color: 'var(--status-danger-text, var(--status-danger))' }}>
+                                  <td className="num">
                                     {formatCurrency(f.expected_out || 0)}
                                   </td>
-                                  <td className="mono text-right" style={{
-                                    ...reportSupportText,
-                                    fontVariantNumeric: 'tabular-nums',
-                                    color: net >= 0 ? 'var(--accent-primary)' : 'var(--status-danger-text, var(--status-danger))',
-                                    fontWeight: 600
-                                  }}>
+                                  <td className={`num ${net < 0 ? 'fin-text-danger' : ''}`} style={{ fontWeight: 600 }}>
                                     {formatCurrency(net)}
                                   </td>
-                                  <td className="text-right">
-                                    <span style={{
-                                      ...reportSupportText,
-                                      color: net >= 0 ? 'var(--status-success)' : 'var(--status-danger-text, var(--status-danger))',
-                                      padding: '2px 6px',
-                                      background: 'var(--bg-surface-hover)',
-                                      borderRadius: 4,
-                                      display: 'inline-block',
-                                      whiteSpace: 'nowrap'
-                                    }}>
-                                      {net >= 0 ? 'Positive' : 'Negative'}
+                                  <td>
+                                    <span className={net === 0 ? 'fin-chip' : `fin-chip fin-chip--${net > 0 ? 'success' : 'danger'}`}>
+                                      {net > 0 ? 'Positive' : net < 0 ? 'Negative' : 'No movement'}
                                     </span>
                                   </td>
                                 </tr>
@@ -461,22 +504,22 @@ export default function FinanceReports() {
 
                 return (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                    <div className="fin-kpis fin-kpis--3" style={{ marginBottom: 0 }}>
                       {[
                         { label: 'Total customers', value: customers.length, color: 'var(--text-primary)' },
                         { label: 'Top 10 revenue', value: formatCurrency(totalRevenue), color: 'var(--accent-primary)' },
                         { label: 'Invoices (top 10)', value: totalInvoices, color: 'var(--status-success)' },
                       ].map(m => (
-                        <div key={m.label} className="card metric-card">
-                          <div className="card-header"><span className="card-title" style={reportLabelText}>{m.label}</span></div>
-                          <div className="metric-value" style={{ ...reportMetricText, color: m.color }}>{m.value}</div>
+                        <div key={m.label} className="card fin-kpi">
+                          <span className="fin-kpi__label">{m.label}</span>
+                          <span className="fin-kpi__value" style={{ color: kpiColor(m.color) }}>{m.value}</span>
                         </div>
                       ))}
                     </div>
 
                     {/* Top 10 Customers BarChart */}
                     {topCustomers.length > 0 && (
-                      <div className="card" style={{ padding: 20 }}>
+                      <div className="card">
                         <div className="card-header" style={{ marginBottom: 16 }}>
                           <h2 className="card-title" style={reportHeadingText}>Top 10 customers by revenue</h2>
                         </div>
@@ -500,7 +543,7 @@ export default function FinanceReports() {
                               width={110}
                             />
                             <Tooltip
-                              contentStyle={{ ...reportSupportText, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}
+                              contentStyle={{ ...reportSupportText, background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}
                               formatter={(value: any) => [formatCurrency(value), 'Revenue']}
                             />
                             <Bar dataKey="revenue" fill="var(--accent-primary)" isAnimationActive={true} />
@@ -518,15 +561,15 @@ export default function FinanceReports() {
                         </span>
                       </div>
                       {topCustomers.length > 0 ? (
-                        <table className="data-table table-heading-roles">
+                        <table className="fin-table table-heading-roles">
                           <thead>
                             <tr>
-                              <th style={{ width: 40 }}>Rank</th>
+                              <th style={{ width: 56 }}>Rank</th>
                               <th>Customer name</th>
-                              <th className="text-right">Revenue</th>
-                              <th className="text-right">Invoice count</th>
-                              <th className="text-right">Avg payment days</th>
-                              <th className="text-right">Status</th>
+                              <th className="num">Revenue</th>
+                              <th className="num">Invoice count</th>
+                              <th className="num">Avg payment days</th>
+                              <th>Status</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -536,45 +579,30 @@ export default function FinanceReports() {
                               );
                               const avgPaymentDays = matchingCustomer?.avg_payment_days || 0;
                               const dso = avgPaymentDays;
+                              // Missing data is shown as unavailable, not as a perfect 0-day payer.
+                              const hasDso = matchingCustomer?.avg_payment_days != null;
 
                               return (
                                 <tr key={idx} style={{ cursor: 'pointer' }}>
-                                  <td className="mono text-right" style={{
-                                    ...reportSupportText,
-                                    color: idx < 3 ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                                    fontWeight: idx < 3 ? 600 : 400
-                                  }}>
-                                    #{idx + 1}
+                                  <td style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                                    {idx + 1}
                                   </td>
                                   <td style={{ fontWeight: idx < 3 ? 500 : 400, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={cust.customer_name}>{cust.customer_name}</td>
-                                  <td className="mono text-right" style={{
-                                    ...reportSupportText,
-                                    fontVariantNumeric: 'tabular-nums',
-                                    color: 'var(--accent-primary)',
-                                    fontWeight: 600
-                                  }}>
+                                  <td className="num" style={{ fontWeight: 500 }}>
                                     {formatCurrency(cust.revenue || 0)}
                                   </td>
-                                  <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums' }}>{cust.invoice_count || 0}</td>
-                                  <td className="mono text-right" style={{
-                                    ...reportSupportText,
-                                    fontVariantNumeric: 'tabular-nums',
-                                    color: dso > 60 ? 'var(--status-danger-text, var(--status-danger))' : dso > 30 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-success)'
-                                  }}>
-                                    {dso}d
+                                  <td className="num" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums' }}>{cust.invoice_count || 0}</td>
+                                  <td className={`num ${!hasDso ? 'fin-text-muted' : dso > 60 ? 'fin-text-danger' : dso > 30 ? 'fin-text-warning' : ''}`}>
+                                    {hasDso ? `${dso}d` : '—'}
                                   </td>
-                                  <td className="text-right">
-                                    <span style={{
-                                      ...reportSupportText,
-                                      color: dso <= 30 ? 'var(--status-success)' : dso <= 60 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))',
-                                      padding: '2px 6px',
-                                      background: 'var(--bg-surface-hover)',
-                                      borderRadius: 4,
-                                      display: 'inline-block',
-                                      whiteSpace: 'nowrap'
-                                    }}>
-                                      {dso <= 30 ? 'Excellent' : dso <= 60 ? 'Good' : 'Watch'}
-                                    </span>
+                                  <td>
+                                    {hasDso ? (
+                                      <span className={`fin-chip fin-chip--${chipTone(dso <= 30 ? 'var(--status-success)' : dso <= 60 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))')}`}>
+                                        {dso <= 30 ? 'Excellent' : dso <= 60 ? 'Good' : 'Watch'}
+                                      </span>
+                                    ) : (
+                                      <span className="fin-chip" title="No payment-day data for this customer yet">No data</span>
+                                    )}
                                   </td>
                                 </tr>
                               );
@@ -595,15 +623,18 @@ export default function FinanceReports() {
           {tab === 'aging' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* Header metrics */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+              <div className="fin-kpis fin-kpis--3" style={{ marginBottom: 0 }}>
                 {[
                   { label: 'Total outstanding', value: formatCurrency(agingData?.summary?.total_outstanding || 0), color: 'var(--accent-primary)' },
-                  { label: 'Overdue amount', value: formatCurrency(agingData?.summary?.total_overdue || 0), color: 'var(--status-danger-text, var(--status-danger))' },
+                  { label: 'Overdue amount', value: agingData?.summary?.total_overdue == null ? '—' : formatCurrency(agingData.summary.total_overdue), color: 'var(--status-danger-text, var(--status-danger))' },
                   { label: 'DSO (days)', value: Math.round(agingData?.summary?.dso || 0), color: 'var(--text-primary)' },
                 ].map(m => (
-                  <div key={m.label} className="card metric-card">
-                    <div className="card-header"><span className="card-title" style={reportLabelText}>{m.label}</span></div>
-                    <div className="metric-value" style={{ ...reportMetricText, color: m.color }}>{m.value}</div>
+                  <div key={m.label} className="card fin-kpi">
+                    <span className="fin-kpi__label">{m.label}</span>
+                    <span className="fin-kpi__value" style={{ color: kpiColor(m.color) }}>{m.value}</span>
+                    {m.label === 'Overdue amount' && agingData?.summary?.total_overdue == null && (
+                      <span className="fin-kpi__sub">Not reported — see the aging buckets below</span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -627,9 +658,9 @@ export default function FinanceReports() {
                 };
 
                 return (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: 20 }}>
+                  <div className="fin-grid-2">
                     {/* Bar Chart */}
-                    <div className="card" style={{ padding: 20 }}>
+                    <div className="card">
                       <div className="card-header" style={{ marginBottom: 16 }}>
                         <h2 className="card-title" style={reportHeadingText}>Aging analysis</h2>
                       </div>
@@ -650,7 +681,7 @@ export default function FinanceReports() {
                                 <span style={{ ...reportSupportText, color: 'var(--text-tertiary)' }}>
                                   {pct.toFixed(1)}%
                                 </span>
-                                <span style={{ ...reportSupportText, fontSize: 15, fontWeight: 600, color: barColor, fontVariantNumeric: 'tabular-nums' }}>
+                                <span style={{ ...reportSupportText, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                                   {formatCurrency(bucket.amount || 0)}
                                 </span>
                               </div>
@@ -670,10 +701,13 @@ export default function FinanceReports() {
                     </div>
 
                     {/* PieChart (Donut) */}
-                    <div className="card" style={{ padding: 20 }}>
+                    <div className="card">
                       <div className="card-header" style={{ marginBottom: 16 }}>
                         <h2 className="card-title" style={reportHeadingText}>Distribution</h2>
                       </div>
+                      {buckets.every((b: any) => !(b.amount > 0)) ? (
+                        <div style={{ ...reportSupportText, color: 'var(--text-tertiary)', textAlign: 'center', padding: '48px 0' }}>No outstanding invoices to show</div>
+                      ) : (
                       <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
                           <Pie
@@ -690,7 +724,7 @@ export default function FinanceReports() {
                             ))}
                           </Pie>
                           <Tooltip
-                            contentStyle={{ ...reportSupportText, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}
+                            contentStyle={{ ...reportSupportText, background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}
                             formatter={(value: any, name: string, props: any) => [
                               formatCurrency(value),
                               props.payload.label
@@ -698,6 +732,7 @@ export default function FinanceReports() {
                           />
                         </PieChart>
                       </ResponsiveContainer>
+                      )}
                     </div>
                   </div>
                 );
@@ -712,24 +747,24 @@ export default function FinanceReports() {
                       {agingData.overdue_invoices.length} overdue
                     </span>
                   </div>
-                  <table className="data-table table-heading-roles">
+                  <table className="fin-table table-heading-roles">
                     <thead>
                       <tr>
                         <th>Invoice #</th>
                         <th>Customer</th>
-                        <th className="text-right">Amount</th>
-                        <th className="text-right">Due date</th>
-                        <th className="text-right">Days overdue</th>
+                        <th className="num">Amount</th>
+                        <th>Due date</th>
+                        <th className="num">Days overdue</th>
                       </tr>
                     </thead>
                     <tbody>
                       {agingData.overdue_invoices.map((inv: any) => (
                         <tr key={inv.id}>
-                          <td className="mono" style={{ whiteSpace: 'nowrap' }}>{inv.invoice_number}</td>
+                          <td className="fin-id">{inv.invoice_number}</td>
                           <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={inv.customer_name}>{inv.customer_name}</td>
-                          <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{formatCurrency(inv.total_amount || 0)}</td>
-                          <td className="mono text-right" style={{ ...reportSupportText, whiteSpace: 'nowrap' }}>{inv.due_date}</td>
-                          <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', color: 'var(--status-danger-text, var(--status-danger))' }}>
+                          <td className="num" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{formatCurrency(inv.total_amount || 0)}</td>
+                          <td className="fin-date">{fmtDate(inv.due_date)}</td>
+                          <td className="num" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', color: 'var(--status-danger-text, var(--status-danger))' }}>
                             {inv.days_overdue || 0}
                           </td>
                         </tr>
@@ -746,54 +781,54 @@ export default function FinanceReports() {
           {/* TAB 5: Capital */}
           {tab === 'capital' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+              <div className="fin-kpis" style={{ marginBottom: 0 }}>
                 {[
                   { label: 'Facility limit', value: formatCurrency(facilities?.facility_limit || 0), color: 'var(--accent-primary)' },
                   { label: 'Available', value: formatCurrency((facilities?.facility_limit || 0) - (facilities?.outstanding_advances || 0)), color: 'var(--status-success)' },
-                  { label: 'In use', value: formatCurrency(facilities?.outstanding_advances || 0), color: 'var(--status-warning-text, var(--status-warning))' },
+                  { label: 'In use', value: formatCurrency(facilities?.outstanding_advances || 0), color: 'var(--text-primary)' },
                   { label: 'Advances this month', value: advances.filter((a: any) => {
                     const date = new Date(a.created_at || a.advanced_date);
                     const now = new Date();
                     return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
                   }).length, color: 'var(--text-primary)' },
                 ].map(m => (
-                  <div key={m.label} className="card metric-card">
-                    <div className="card-header"><span className="card-title" style={reportLabelText}>{m.label}</span></div>
-                    <div className="metric-value" style={{ ...reportMetricText, color: m.color }}>{m.value}</div>
+                  <div key={m.label} className="card fin-kpi">
+                    <span className="fin-kpi__label">{m.label}</span>
+                    <span className="fin-kpi__value" style={{ color: kpiColor(m.color) }}>{m.value}</span>
                   </div>
                 ))}
               </div>
 
               {/* Fee summary */}
-              <div className="card" style={{ padding: 20 }}>
+              <div className="card">
                 <div className="card-header"><h2 className="card-title" style={reportHeadingText}>Fee summary</h2></div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginTop: 16 }}>
                   <div>
-                    <div style={{ ...reportSupportText, color: 'var(--text-tertiary)', marginBottom: 4 }}>Total fees paid</div>
+                    <div style={{ ...reportSupportText, color: 'var(--text-tertiary)', marginBottom: 4 }}>Fees across all advances</div>
                     <div style={{ fontSize: 18, lineHeight: '28px', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>
-                      {formatCurrency(advances.reduce((sum: number, a: any) => sum + (a.fee_amount || 0), 0))}
+                      {formatCurrency(totalFees)}
                     </div>
                   </div>
                   <div>
                     <div style={{ ...reportSupportText, color: 'var(--text-tertiary)', marginBottom: 4 }}>Avg fee rate</div>
                     <div style={{ fontSize: 18, lineHeight: '28px', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>
-                      {advances.length > 0
-                        ? ((advances.reduce((sum: number, a: any) => sum + (a.fee_amount || 0), 0) /
-                            advances.reduce((sum: number, a: any) => sum + (a.advanced_amount || 0), 0)) * 100).toFixed(2)
-                        : 0}%
+                      {totalAdvanced > 0 ? `${((totalFees / totalAdvanced) * 100).toFixed(2)}%` : '—'}
                     </div>
                   </div>
                   <div>
                     <div style={{ ...reportSupportText, color: 'var(--text-tertiary)', marginBottom: 4 }}>Total advanced</div>
                     <div style={{ fontSize: 18, lineHeight: '28px', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>
-                      {formatCurrency(advances.reduce((sum: number, a: any) => sum + (a.advanced_amount || 0), 0))}
+                      {totalAdvanced > 0 ? formatCurrency(totalAdvanced) : '—'}
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Advances Over Time AreaChart */}
-              {advances.length > 0 && (() => {
+              {advances.length > 0 && totalAdvanced === 0 && (
+                <EmptyState message="No advanced amounts recorded yet" />
+              )}
+              {advances.length > 0 && totalAdvanced > 0 && (() => {
                 // Group advances by month
                 const advancesByMonth = advances.reduce((acc: any, adv: any) => {
                   const date = new Date(adv.advanced_date || adv.created_at);
@@ -808,7 +843,7 @@ export default function FinanceReports() {
                 const chartData = Object.values(advancesByMonth).sort((a: any, b: any) => a.month.localeCompare(b.month)).slice(-6);
 
                 return chartData.length > 0 ? (
-                  <div className="card" style={{ padding: 20 }}>
+                  <div className="card">
                     <div className="card-header" style={{ marginBottom: 16 }}>
                       <h2 className="card-title" style={reportHeadingText}>Advances over time (last 6 months)</h2>
                     </div>
@@ -824,7 +859,7 @@ export default function FinanceReports() {
                           dataKey="month"
                           stroke="var(--text-tertiary)"
                           style={{ ...reportSupportText }}
-                          tickFormatter={(value) => value.slice(5)}
+                          tickFormatter={(value) => /^\d{4}-\d{2}/.test(String(value)) ? `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(String(value).slice(5, 7), 10) - 1]} ${String(value).slice(2, 4)}` : String(value)}
                         />
                         <YAxis
                           stroke="var(--text-tertiary)"
@@ -832,11 +867,11 @@ export default function FinanceReports() {
                           tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                         />
                         <Tooltip
-                          contentStyle={{ ...reportSupportText, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}
+                          contentStyle={{ ...reportSupportText, background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}
                           formatter={(value: any, name: string) => [formatCurrency(value), 'Advances']}
                         />
                         <Area
-                          type="monotone"
+                          type="linear"
                           dataKey="amount"
                           fill="url(#advancesGradient)"
                           stroke="var(--accent-primary)"
@@ -858,37 +893,29 @@ export default function FinanceReports() {
                       {advances.length} total
                     </span>
                   </div>
-                  <table className="data-table table-heading-roles">
+                  <table className="fin-table table-heading-roles">
                     <thead>
                       <tr>
                         <th>Invoice #</th>
                         <th>Customer</th>
-                        <th className="text-right">Advanced</th>
-                        <th className="text-right">Fee</th>
-                        <th className="text-right">Date</th>
-                        <th className="text-right">Status</th>
+                        <th className="num">Advanced</th>
+                        <th className="num">Fee</th>
+                        <th>Date</th>
+                        <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {advances.slice(0, 10).map((adv: any) => (
                         <tr key={adv.id}>
-                          <td className="mono" style={{ whiteSpace: 'nowrap' }}>{adv.invoice_number}</td>
+                          <td className="fin-id">{adv.invoice_number}</td>
                           <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={adv.customer_name}>{adv.customer_name}</td>
-                          <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums', color: 'var(--accent-primary)' }}>
-                            {formatCurrency(adv.advanced_amount || 0)}
+                          <td className="num">
+                            {adv.advanced_amount == null ? '—' : formatCurrency(adv.advanced_amount)}
                           </td>
-                          <td className="mono text-right" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(adv.fee_amount || 0)}</td>
-                          <td className="mono text-right" style={reportSupportText}>{adv.advanced_date || adv.created_at?.slice(0, 10)}</td>
-                          <td className="text-right">
-                            <span style={{
-                              ...reportSupportText,
-                              color: adv.status === 'FUNDED' || adv.status === 'ACTIVE' ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-success)',
-                              padding: '2px 6px',
-                              background: 'var(--bg-surface-hover)',
-                              borderRadius: 4,
-                              display: 'inline-block',
-                              whiteSpace: 'nowrap'
-                            }}>
+                          <td className="num" style={{ ...reportSupportText, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(adv.fee_amount || 0)}</td>
+                          <td className="fin-date">{fmtDate(adv.advanced_date || adv.created_at?.slice(0, 10))}</td>
+                          <td>
+                            <span className={`fin-chip${ADVANCE_TONE[adv.status || 'ACTIVE'] ? ` fin-chip--${ADVANCE_TONE[adv.status || 'ACTIVE']}` : ''}`}>
                               {formatStatus(adv.status || 'ACTIVE')}
                             </span>
                           </td>
@@ -905,54 +932,54 @@ export default function FinanceReports() {
 
           {tab === 'lanes' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+              <div className="fin-kpis" style={{ marginBottom: 0 }}>
                 {[
                   { label: 'Lanes', value: laneData?.summary?.lane_count || 0, color: 'var(--accent-primary)' },
                   { label: 'Lane revenue', value: formatCurrency(laneData?.summary?.total_revenue || 0), color: 'var(--text-primary)' },
                   { label: 'Best margin', value: laneData?.summary?.best_lane ? formatPercent(laneData.summary.best_lane.margin_pct) : '—', color: 'var(--status-success)' },
                   { label: 'Worst margin', value: laneData?.summary?.worst_lane ? formatPercent(laneData.summary.worst_lane.margin_pct) : '—', color: 'var(--status-danger-text, var(--status-danger))' },
                 ].map(m => (
-                  <div key={m.label} className="card metric-card">
-                    <div className="card-header"><span className="card-title" style={reportLabelText}>{m.label}</span></div>
-                    <div className="metric-value" style={{ ...reportMetricText, color: m.color }}>{m.value}</div>
+                  <div key={m.label} className="card fin-kpi">
+                    <span className="fin-kpi__label">{m.label}</span>
+                    <span className="fin-kpi__value" style={{ color: kpiColor(m.color) }}>{m.value}</span>
                   </div>
                 ))}
               </div>
 
               {(laneData?.lanes || []).length > 0 ? (
-                <div className="card" style={{ padding: 20 }}>
+                <div className="card">
                   <div className="card-header" style={{ marginBottom: 8 }}>
                     <h2 className="card-title" style={reportHeadingText}>Margin by lane</h2>
                   </div>
                   <div style={{ ...reportSupportText, color: 'var(--text-tertiary)', marginBottom: 12 }}>
                     True cost (fuel · driver · tolls · wear, deadheaded) — same engine as the quoting tool. Margin shown where distance is known.
                   </div>
-                  <table className="data-table table-heading-roles">
+                  <table className="fin-table table-heading-roles">
                     <thead>
                       <tr>
-                        <th style={{ textAlign: 'left' }}>Lane</th>
-                        <th style={{ textAlign: 'right' }}>Loads</th>
-                        <th style={{ textAlign: 'right' }}>Revenue</th>
-                        <th style={{ textAlign: 'right' }}>Est. margin</th>
-                        <th style={{ textAlign: 'right' }}>Margin %</th>
-                        <th style={{ textAlign: 'right' }}>R / km</th>
+                        <th>Lane</th>
+                        <th className="num">Loads</th>
+                        <th className="num">Revenue</th>
+                        <th className="num">Est. margin</th>
+                        <th className="num">Margin %</th>
+                        <th className="num">R / km</th>
                       </tr>
                     </thead>
                     <tbody>
                       {laneData.lanes.map((l: any, idx: number) => {
                         const mpct = l.margin_pct;
                         const mColor = mpct == null ? 'var(--text-tertiary)'
-                          : mpct < 0 ? 'var(--status-danger)'
-                          : mpct < 15 ? 'var(--status-warning)'
-                          : 'var(--status-success)';
+                          : mpct < 0 ? 'var(--status-danger-text, var(--status-danger))'
+                          : mpct < 15 ? 'var(--status-warning-text, var(--status-warning))'
+                          : 'var(--status-success-text, var(--status-success))';
                         return (
                           <tr key={idx}>
                             <td style={{ color: 'var(--text-primary)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.lane}>{l.lane}</td>
-                            <td style={{ ...reportSupportText, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>{l.loads}</td>
-                            <td style={{ ...reportSupportText, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>{formatCurrency(l.revenue || 0)}</td>
-                            <td style={{ ...reportSupportText, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>{l.est_margin == null ? '—' : formatCurrency(l.est_margin)}</td>
-                            <td style={{ ...reportSupportText, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: mColor }}>{mpct == null ? '—' : formatPercent(mpct)}</td>
-                            <td style={{ ...reportSupportText, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-tertiary)' }}>{l.revenue_per_km == null ? '—' : formatCurrency(l.revenue_per_km)}</td>
+                            <td className="num" style={{ color: 'var(--text-secondary)' }}>{l.loads}</td>
+                            <td className="num" style={{ color: 'var(--text-primary)' }}>{formatCurrency(l.revenue || 0)}</td>
+                            <td className="num" style={{ color: 'var(--text-secondary)' }}>{l.est_margin == null ? '—' : formatCurrency(l.est_margin)}</td>
+                            <td className="num" style={{ fontWeight: 600, color: mColor }}>{mpct == null ? '—' : formatPercent(mpct)}</td>
+                            <td className="num" style={{ color: 'var(--text-tertiary)' }}>{l.revenue_per_km == null ? '—' : formatCurrency(l.revenue_per_km)}</td>
                           </tr>
                         );
                       })}
@@ -967,22 +994,22 @@ export default function FinanceReports() {
 
           {tab === 'fastpay' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+              <div className="fin-kpis" style={{ marginBottom: 0 }}>
                 {[
                   { label: 'Cash accelerated', value: formatCurrency(fastpayData?.cash_accelerated || 0), color: 'var(--accent-primary)' },
                   { label: 'Avg days early', value: `${fastpayData?.avg_days_early || 0}`, color: 'var(--status-success)' },
                   { label: 'Total fees', value: formatCurrency(fastpayData?.total_fees || 0), color: 'var(--status-warning-text, var(--status-warning))' },
                   { label: 'Effective APR', value: fastpayData?.effective_apr == null ? '—' : formatPercent(fastpayData.effective_apr), color: 'var(--text-primary)' },
                 ].map(m => (
-                  <div key={m.label} className="card metric-card">
-                    <div className="card-header"><span className="card-title" style={reportLabelText}>{m.label}</span></div>
-                    <div className="metric-value" style={{ ...reportMetricText, color: m.color }}>{m.value}</div>
+                  <div key={m.label} className="card fin-kpi">
+                    <span className="fin-kpi__label">{m.label}</span>
+                    <span className="fin-kpi__value" style={{ color: kpiColor(m.color) }}>{m.value}</span>
                   </div>
                 ))}
               </div>
 
               {(fastpayData?.count || 0) > 0 ? (
-                <div className="card" style={{ padding: 24 }}>
+                <div className="card">
                   <div className="card-header" style={{ marginBottom: 16 }}>
                     <h2 className="card-title" style={reportHeadingText}>What fast-pay delivered</h2>
                   </div>

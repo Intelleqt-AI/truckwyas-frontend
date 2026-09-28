@@ -31,9 +31,9 @@ const selectStyle: React.CSSProperties = {
   padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
   fontFamily: 'var(--font-sans)', minHeight: 40, cursor: 'pointer',
 };
-const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)' };
+const thStyle: React.CSSProperties = { textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
-  padding: '12px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
   padding: '8px 12px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
@@ -259,7 +259,7 @@ export default function UsersTable() {
         <Loader size={24} />
       ) : (
         <div className="admin-scroll-region" role="region" aria-label="Users" tabIndex={0} style={{ overflowX: 'auto', opacity: isFetching ? 0.7 : 1 }}>
-          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Name</th>

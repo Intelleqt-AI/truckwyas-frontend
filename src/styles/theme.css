@@ -239,9 +239,15 @@
    =========================== */
 
 :root {
-  --font-mono: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+  /* The only two families in the product. Identifiers use mono; everything else sans. */
+  --font-mono: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Tailwind radius scale (tailwind.config.ts) resolves from these: lg/xl = card 8,
+     md = control 6, sm = badge 4, 2xl/sheet = dialog 12. Previously undefined,
+     so every rounded-* utility collapsed to square corners. */
+  --radius: 8px;
+  --radius-sheet: 12px;
 }
 
 /* ===========================
@@ -260,9 +266,15 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
-  letter-spacing: -0.01em;
+  letter-spacing: normal;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Form controls don't inherit the page font by default (textarea falls back to
+   the UA monospace). Family only — sizes stay with each component. */
+button, input, select, textarea, optgroup {
+  font-family: inherit;
 }
 
 /* ===========================
@@ -526,23 +538,25 @@ body {
   margin-bottom: 16px;
 }
 
+/* Card / metric label: brand "Label" role — sans 13/20/500, sentence case. */
 .card-title {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-secondary);
   font-weight: 500;
 }
 
-/* The one true micro-label: 11px mono uppercase. The ONLY place uppercase is
-   allowed (page eyebrows, table column headers, stat-card labels). Nothing at
-   13px+ should ever be uppercase. */
+/* Muted eyebrow/label: sans 13/20, sentence case (uppercase mono eyebrows are
+   a retired legacy style). */
 .ui-label {
-  font-family: var(--font-mono);
-  font-size: var(--text-micro);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--text-tertiary);
   font-weight: var(--weight-medium);
 }
@@ -579,19 +593,22 @@ body {
 
 /* Metric Values */
 .metric-value {
-  /* Numbers render in the mono face everywhere — this class previously inherited
-     sans, so cards using it looked different from cards with inline mono. */
-  font-family: var(--font-mono);
+  /* Headline metrics: sans with tabular numerals (brand type role "Primary
+     metric"). Mono is reserved for identifiers. */
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
   font-size: 28px;
   font-weight: 600;
   color: var(--text-primary);
-  letter-spacing: -0.03em;
+  letter-spacing: normal;
   margin-bottom: 4px;
 }
 
 .metric-delta {
-  font-size: 12px;
-  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 20px;
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
   font-weight: 500;
   display: flex;
   align-items: center;
@@ -657,16 +674,20 @@ body {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
 }
 
 .data-table th {
   text-align: left;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: 500;
   padding: 0 16px 12px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -690,6 +711,11 @@ body {
 .data-table tr:hover td {
   color: var(--text-primary);
 }
+
+/* Numeric columns right-align (header and cells); identifiers use the 13px mono role. */
+.data-table th.text-right,
+.data-table td.text-right { text-align: right; }
+.data-table td.mono { font-size: 13px; }
 
 /* ===========================
    STATUS BADGES
@@ -1221,7 +1247,6 @@ body {
 /* Desktop dashboard token adoption. Legacy/public and chart aliases remain separate. */
 @media (min-width: 768px) {
   .os-app-shell {
-    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     --input-bg: var(--bg-surface);
     --btn-action-color: #060709;
     --border-row: #2A2E34;

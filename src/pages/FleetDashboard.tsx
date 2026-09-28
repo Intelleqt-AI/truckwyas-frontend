@@ -5,14 +5,14 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { LiveBadge } from "@/components/LiveBadge";
 import { Loader } from "@/components/Loader";
+import SectionHeader from "@/components/layout/SectionHeader";
 
 const STATUS_COLOR: Record<string, string> = {
   IN_TRANSIT: 'var(--accent-primary)',
-  LOADING: 'var(--status-warning)',
+  LOADING: 'var(--status-warning-text, var(--status-warning))',
   IDLE: 'var(--text-secondary)',
-  MAINTENANCE: 'var(--status-danger)',
+  MAINTENANCE: 'var(--status-danger-text, var(--status-danger))',
   ACTIVE: 'var(--accent-primary)',
   OFF: 'var(--text-tertiary)',
 };
@@ -74,17 +74,33 @@ export default function FleetDashboard() {
   const inMaintenance = vehicles.filter(v => v.status === 'MAINTENANCE').length;
   const activeDrivers = drivers.filter(d => d.status === 'ACTIVE').length;
 
+  // Same shared header in every state so loading/error never move the title.
+  const header = (
+    <SectionHeader
+      eyebrow="Fleet"
+      title="Fleet command"
+      actions={!loading && !error ? (
+        <button data-fleet-control className="btn-action" onClick={() => navigate(tab === 'vehicles' ? '/fleet/vehicles' : '/fleet/drivers')}>
+          + Add {tab === 'vehicles' ? 'vehicle' : 'driver'}
+        </button>
+      ) : undefined}
+    />
+  );
+
   if (loading) {
-    return <Loader fullScreen />;
+    return (
+      <div className="fleet-page">
+        {header}
+        <div className="fleet-table-state"><Loader size={32} label="Loading fleet" /></div>
+      </div>
+    );
   }
 
   if (error) {
     return (
       <div className="fleet-page">
-        <div style={{ marginBottom: 24 }}>
-          <h1 className="fleet-page-title">Fleet command</h1>
-        </div>
-        <div className="card" style={{ padding: 20, color: 'var(--status-danger-text, var(--status-danger))', fontSize: 13, lineHeight: '20px' }}>
+        {header}
+        <div className="card" role="alert" style={{ padding: 24, color: 'var(--status-danger-text, var(--status-danger))', fontSize: 14, lineHeight: '20px' }}>
           {error}
         </div>
       </div>
@@ -93,18 +109,7 @@ export default function FleetDashboard() {
 
   return (
     <div className="fleet-page">
-      {/* Header */}
-      <div className="fleet-header-row" style={{ marginBottom: 24, alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h1 className="fleet-page-title">Fleet command</h1>
-            <LiveBadge />
-          </div>
-        </div>
-        <button data-fleet-control className="btn-action" onClick={() => navigate(tab === 'vehicles' ? '/fleet/vehicles' : '/fleet/drivers')}>
-          + Add {tab === 'vehicles' ? 'vehicle' : 'driver'}
-        </button>
-      </div>
+      {header}
 
       {/* Stats — always visible */}
       <div className="fleet-summary fleet-summary--5">
@@ -113,7 +118,7 @@ export default function FleetDashboard() {
           { label: 'Active', value: activeVehicles, color: 'var(--accent-primary)' },
           { label: 'Idle', value: idleVehicles, color: 'var(--text-secondary)' },
           { label: 'Maintenance', value: inMaintenance, color: 'var(--status-danger-text, var(--status-danger))' },
-          { label: 'Drivers on duty', value: activeDrivers, color: 'var(--status-success)' },
+          { label: 'Drivers on duty', value: activeDrivers, color: 'var(--status-success-text, var(--status-success))' },
         ].map(m => (
           <div key={m.label} className="card metric-card">
             <div className="card-header"><span className="card-title">{m.label}</span></div>
@@ -134,7 +139,7 @@ export default function FleetDashboard() {
           <table className="data-table table-heading-roles">
             <thead>
               <tr>
-                <th>Registration</th><th>Vehicle</th><th>Driver</th><th>Status</th><th>Route</th><th className="text-right">Fuel %</th>
+                <th>Registration</th><th>Vehicle</th><th>Driver</th><th>Status</th><th>Route</th><th className="text-right">Fuel</th>
               </tr>
             </thead>
             <tbody>
@@ -144,13 +149,13 @@ export default function FleetDashboard() {
                   <td>{v.make || ''} {v.model || ''}</td>
                   <td>{v.driver || '—'}</td>
                   <td>
-                    <span style={{ display: 'inline-block', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[v.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 4 }}>
+                    <span style={{ display: 'inline-block', whiteSpace: 'nowrap', fontSize: 13, lineHeight: '20px', color: STATUS_COLOR[v.status] || 'var(--text-secondary)', padding: '2px 8px', background: 'var(--bg-surface-hover)', borderRadius: 4 }}>
                       {v.status ? formatStatus(v.status) : '—'}
                     </span>
                   </td>
                   <td style={{ color: 'var(--text-secondary)' }}>{v.route || '—'}</td>
                   <td className="text-right">
-                    <span style={{ fontFamily: 'var(--font-mono)', color: v.fuel < 50 ? 'var(--status-danger-text, var(--status-danger))' : v.fuel < 70 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--text-primary)' }}>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', color: v.fuel < 50 ? 'var(--status-danger-text, var(--status-danger))' : v.fuel < 70 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--text-primary)' }}>
                       {v.fuel !== undefined ? `${v.fuel}%` : '—'}
                     </span>
                   </td>
@@ -167,7 +172,7 @@ export default function FleetDashboard() {
           <table className="data-table table-heading-roles">
             <thead>
               <tr>
-                <th>Name</th><th>Code</th><th>Trips</th><th>On time %</th><th>Rating</th><th className="text-right">Status</th>
+                <th>Name</th><th>Licence</th><th className="text-right">Trips</th><th className="text-right">On time</th><th className="text-right">Rating</th><th className="text-right">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -175,15 +180,15 @@ export default function FleetDashboard() {
                 <tr key={d.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/fleet/drivers/${d.id}`)}>
                   <td>{(d.user_details ? `${d.user_details.first_name || ''} ${d.user_details.last_name || ''}`.trim() : '') || d.name || `Driver ${d.id}`}</td>
                   <td className="mono">{d.license_number || '—'}</td>
-                  <td className="mono">{d.total_trips ?? '—'}</td>
-                  <td style={{ color: d.onTime >= 90 ? 'var(--accent-primary)' : d.onTime >= 80 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))', fontFamily: 'var(--font-mono)' }}>
+                  <td className="text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>{d.total_trips ?? '—'}</td>
+                  <td className="text-right" style={{ color: d.onTime >= 90 ? 'var(--accent-primary)' : d.onTime >= 80 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))', fontVariantNumeric: 'tabular-nums' }}>
                     {d.onTime !== undefined ? `${d.onTime}%` : '—'}
                   </td>
-                  <td style={{ color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
-                    {d.rating !== undefined ? `★ ${d.rating}` : '—'}
+                  <td className="text-right" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                    {d.rating !== undefined ? `${d.rating}` : '—'}
                   </td>
                   <td className="text-right">
-                    <span style={{ display: 'inline-block', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: 10, color: STATUS_COLOR[d.status] || 'var(--text-secondary)', padding: '2px 6px', background: 'var(--bg-surface-hover)', borderRadius: 4 }}>
+                    <span style={{ display: 'inline-block', whiteSpace: 'nowrap', fontSize: 13, lineHeight: '20px', color: STATUS_COLOR[d.status] || 'var(--text-secondary)', padding: '2px 8px', background: 'var(--bg-surface-hover)', borderRadius: 4 }}>
                       {d.status ? formatStatus(d.status) : '—'}
                     </span>
                   </td>

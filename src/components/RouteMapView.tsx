@@ -88,7 +88,7 @@ function dotIcon(L: LeafletModule, color: string) {
 function numberedIcon(L: LeafletModule, n: number) {
   return L.divIcon({
     className: '',
-    html: `<div style="width:18px;height:18px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;font-family:monospace;">${n}</div>`,
+    html: `<div style="width:18px;height:18px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;font-family:var(--font-sans);font-variant-numeric:tabular-nums;">${n}</div>`,
     iconSize: [18, 18],
     iconAnchor: [9, 9],
   });

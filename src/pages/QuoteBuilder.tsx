@@ -1,4 +1,5 @@
 import "./quote-invoice-roles.css";
+import "./quote-builder-controls.css";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -123,7 +124,7 @@ function SortableStopRow({ stop, index, inputStyle, onLocationChange, onRemove }
       opacity: removing ? 0 : (isDragging ? 0.5 : 1),
       zIndex: isDragging ? 2 : "auto",
     }}>
-      <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--accent-primary)", color: "var(--btn-action-color)", fontSize: 10, fontFamily: "var(--font-mono)", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--accent-primary)", color: "var(--btn-action-color)", fontSize: 11, fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         {index + 1}
       </span>
       <span {...attributes} {...listeners} title="Drag to reorder"
@@ -1058,7 +1059,7 @@ export default function QuoteBuilder() {
   const renderMapPanel = (height: number, expandButton?: React.ReactNode, closeButton?: React.ReactNode) => (
     <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)" }}>
-        <span style={{ fontSize: 12, color: "var(--text-tertiary)", display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 6 }}>
           <Map size={13} />
           {(() => {
             // pickMode is "pickup", "delivery", or a stop's id — resolve
@@ -1080,10 +1081,10 @@ export default function QuoteBuilder() {
         </span>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <button onClick={() => setPickMode("pickup")}
-            style={{ height: 24, display: "inline-flex", alignItems: "center", fontSize: 12, fontFamily: "var(--font-sans)", padding: "0 8px", borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
+            style={{ height: 24, display: "inline-flex", alignItems: "center", fontSize: 13, fontFamily: "var(--font-sans)", padding: "0 8px", borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
               border: `1px solid ${pickMode === "pickup" || pickupCoords ? "#16a34a" : "var(--border-subtle)"}`,
               background: pickMode === "pickup" ? "color-mix(in srgb, #16a34a 12%, transparent)" : "transparent",
-              color: pickMode === "pickup" || pickupCoords ? "#16a34a" : "var(--text-tertiary)" }}>
+              color: pickMode === "pickup" || pickupCoords ? "var(--status-success-text, #16a34a)" : "var(--text-secondary)" }}>
             Collection
           </button>
           {stops.map((stop, i) => (
@@ -1098,10 +1099,10 @@ export default function QuoteBuilder() {
             </button>
           )}
           <button onClick={() => setPickMode("delivery")}
-            style={{ height: 24, display: "inline-flex", alignItems: "center", fontSize: 12, fontFamily: "var(--font-sans)", padding: "0 8px", borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
+            style={{ height: 24, display: "inline-flex", alignItems: "center", fontSize: 13, fontFamily: "var(--font-sans)", padding: "0 8px", borderRadius: 4, cursor: "pointer", whiteSpace: "nowrap",
               border: `1px solid ${pickMode === "delivery" || deliveryCoords ? "#dc2626" : "var(--border-subtle)"}`,
               background: pickMode === "delivery" ? "color-mix(in srgb, #dc2626 12%, transparent)" : "transparent",
-              color: pickMode === "delivery" || deliveryCoords ? "#dc2626" : "var(--text-tertiary)" }}>
+              color: pickMode === "delivery" || deliveryCoords ? "var(--status-danger-text, #dc2626)" : "var(--text-secondary)" }}>
             Delivery
           </button>
           {expandButton}
@@ -1124,7 +1125,7 @@ export default function QuoteBuilder() {
         <div style={{ padding: "10px", borderTop: "1px solid var(--border-subtle)" }}>
           {stops.length === 0 ? (
             <button type="button" onClick={addStop}
-              style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: 0, color: "var(--accent-primary)", cursor: "pointer", fontSize: 12, fontWeight: 500 }}>
+              style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: 0, color: "var(--accent-primary)", cursor: "pointer", fontSize: 13, lineHeight: "20px", fontWeight: 500 }}>
               <Plus size={12} /> Add stop
             </button>
           ) : (
@@ -1144,7 +1145,7 @@ export default function QuoteBuilder() {
 
                   <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                     <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid #16a34a", flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 400 }}>{pickup || "Collection"}</span>
+                    <span style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", fontWeight: 400 }}>{pickup || "Collection"}</span>
                   </div>
 
                   <DndContext sensors={stopSensors} onDragEnd={handleStopDragEnd}>
@@ -1154,7 +1155,7 @@ export default function QuoteBuilder() {
                           key={stop.id}
                           stop={stop}
                           index={i}
-                          inputStyle={{ ...inputS, fontFamily: "var(--font-sans)", padding: "7px 10px" }}
+                          inputStyle={{ ...inputS, fontFamily: "var(--font-sans)", padding: "7px 10px", minHeight: 0 }}
                           onLocationChange={(v, c) => updateStop(stop.id, { location: v, coords: c || null })}
                           onRemove={() => removeStop(stop.id)}
                         />
@@ -1162,13 +1163,13 @@ export default function QuoteBuilder() {
                     </SortableContext>
                   </DndContext>
 
-                  <button type="button" onClick={addStop} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: "0 0 10px 28px", color: "var(--accent-primary)", cursor: "pointer", fontSize: 12, fontWeight: 500 }}>
+                  <button type="button" onClick={addStop} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: "0 0 10px 28px", color: "var(--accent-primary)", cursor: "pointer", fontSize: 13, lineHeight: "20px", fontWeight: 500 }}>
                     <Plus size={12} /> Add stop
                   </button>
 
                   <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10 }}>
                     <span style={{ position: "relative", zIndex: 1, width: 18, height: 18, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid #dc2626", flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 400 }}>{delivery || "Delivery"}</span>
+                    <span style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", fontWeight: 400 }}>{delivery || "Delivery"}</span>
                   </div>
                 </div>
               )}
@@ -1189,7 +1190,7 @@ export default function QuoteBuilder() {
                   {r.label || r.summary || `Route ${i + 1}`} · {Math.round(r.distance_km)} km
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top" style={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", fontSize: 12, padding: "10px 12px", maxWidth: 220 }}>
+              <TooltipContent side="top" style={{ background: "var(--bg-deep)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", fontSize: 13, lineHeight: "20px", padding: "10px 12px", maxWidth: 220, borderRadius: 8 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "3px 12px" }}>
                   <span style={{ color: "var(--text-tertiary)" }}>Distance</span><span>{Math.round(r.distance_km)} km</span>
                   <span style={{ color: "var(--text-tertiary)" }}>Duration</span><span>{formatDuration(r.duration_minutes ?? r.duration_min)}</span>
@@ -1228,10 +1229,10 @@ export default function QuoteBuilder() {
   const cardS: React.CSSProperties = { background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, boxShadow: "var(--shadow-card)" };
   // Brand label role: 13/20/500 sans, sentence case (label strings are
   // authored in sentence case; no uppercase transform).
-  const labelS: React.CSSProperties = { fontSize: 13, lineHeight: "20px", fontWeight: 500, fontFamily: "var(--font-sans)", color: "var(--text-tertiary)", letterSpacing: "normal", textTransform: "none" };
+  const labelS: React.CSSProperties = { fontSize: 13, lineHeight: "20px", fontWeight: 500, fontFamily: "var(--font-sans)", color: "var(--text-secondary)", letterSpacing: "normal", textTransform: "none" };
   // Marks a field required for the cost calculation to run (see `ready`).
   const Req = () => <span style={{ display: "inline-block", width: 4, height: 4, borderRadius: "50%", background: "var(--status-danger)", marginLeft: 5, verticalAlign: "middle" }} />;
-  const inputS: React.CSSProperties = { background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: 6, padding: "9px 11px", color: "var(--text-primary)", fontSize: 14, lineHeight: "20px", width: "100%" };
+  const inputS: React.CSSProperties = { background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: 6, padding: "9px 11px", color: "var(--text-primary)", fontSize: 14, lineHeight: "20px", fontFamily: "var(--font-sans)", width: "100%", minHeight: 40, boxSizing: "border-box" };
   const dot = (c: string): React.CSSProperties => ({ width: 7, height: 7, borderRadius: 2, background: c, flexShrink: 0 });
 
   // All four AI fields (recommended price, margin, win probability, sweet-spot)
@@ -1245,11 +1246,11 @@ export default function QuoteBuilder() {
   );
 
   return (
-    <div className="qi-form" style={{ maxWidth: 1080, margin: "0 auto" }}>
+    <div className="qi-form qb-controls" style={{ maxWidth: 1080, margin: "0 auto" }}>
       {/* header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
         <div>
-          <div style={labelS}>Operations</div>
+          <div style={labelS}>Bookings</div>
           <h1 style={{ fontSize: 22, lineHeight: "28px", fontWeight: 600, color: "var(--text-primary)", margin: "4px 0 0" }}>{isEditing ? "Edit quote" : "New quote"}</h1>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -1272,7 +1273,7 @@ export default function QuoteBuilder() {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={applyResumable} style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "var(--accent-primary)", color: "var(--btn-action-color)", border: "none", borderRadius: 6, padding: "9px 12px", cursor: "pointer" }}>Resume</button>
-            <button onClick={discardResumable} style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "transparent", color: "var(--text-tertiary)", border: "1px solid var(--border-subtle)", borderRadius: 6, padding: "9px 12px", cursor: "pointer" }}>Discard</button>
+            <button onClick={discardResumable} style={{ fontSize: 14, lineHeight: "20px", fontWeight: 500, background: "transparent", color: "var(--text-secondary)", border: "1px solid var(--border-subtle)", borderRadius: 6, padding: "9px 12px", cursor: "pointer" }}>Discard</button>
           </div>
         </div>
       )}
@@ -1403,7 +1404,7 @@ export default function QuoteBuilder() {
                         <Info size={9} />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" style={{ width: 270, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                    <PopoverContent align="start" style={{ width: 270, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
                       <div style={{ ...labelS, marginBottom: 8 }}>{x.vt.name}</div>
                       {suggestionReasons(x).map((reason, ri) => (
                         <div key={ri} style={{ display: "flex", gap: 7, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 6 }}>
@@ -1522,7 +1523,7 @@ export default function QuoteBuilder() {
                             <Info size={11} />
                           </button>
                         </PopoverTrigger>
-                        <PopoverContent align="start" style={{ width: 280, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                        <PopoverContent align="start" style={{ width: 280, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
                           <div style={{ ...labelS, marginBottom: 8 }}>How this fuel figure is worked out</div>
                           {fuelRefCapacityTons > 0 ? (<>
                             <div style={{ color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 10 }}>
@@ -1585,7 +1586,7 @@ export default function QuoteBuilder() {
                             <Info size={11} />
                           </button>
                         </PopoverTrigger>
-                        <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                        <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
                           <div style={{ ...labelS, marginBottom: 8 }}>Toll plazas on this route</div>
                           {tollBreakdown.length === 0 ? (
                             <div style={{ color: "var(--text-tertiary)" }}>No SANRAL plazas matched on this route.</div>
@@ -1631,7 +1632,7 @@ export default function QuoteBuilder() {
                               <Info size={11} />
                             </button>
                           </PopoverTrigger>
-                          <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                          <PopoverContent align="start" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
                             <div style={{ ...labelS, marginBottom: 8 }}>
                               Cross-border charges{routeData?.countries?.length ? ` · crosses ${routeData.countries.join("→")}` : ""}
                             </div>
@@ -1663,8 +1664,8 @@ export default function QuoteBuilder() {
               </div>
               <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 8 }}>{Math.round(distance)} km {legs === 2 ? `one way · ${Math.round(chargeDistance)} km round trip` : "one way"} · live diesel · {hasVehicleType ? `your ${vehicleType} settings` : "your company defaults"}{crossBorderCost > 0 ? ` · crosses ${(routeData?.countries || []).join("→")}` : ""}</div>
               <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Tolls</div><input type="number" value={tollManuallyEdited ? editableTollCost : String(tollCost)} onChange={e => { setEditableTollCost(e.target.value); setTollManuallyEdited(true); }} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
-                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Driver</div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} style={{ ...inputS, fontSize: 13, padding: "6px 8px" }} /></div>
+                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Tolls</div><input type="number" value={tollManuallyEdited ? editableTollCost : String(tollCost)} onChange={e => { setEditableTollCost(e.target.value); setTollManuallyEdited(true); }} style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
+                <div style={{ flex: 1 }}><div style={{ ...labelS, marginBottom: 4 }}>Driver</div><input type="number" value={driverAllowanceInput} onChange={e => setDriverAllowanceInput(e.target.value)} style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }} /></div>
                 <div style={{ flex: 1 }}>
                   <div style={{ ...labelS, marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
                     <span>R/km</span>
@@ -1675,7 +1676,7 @@ export default function QuoteBuilder() {
                           <Info size={11} />
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent align="end" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 4, padding: 12, fontSize: 12, color: "var(--text-primary)" }}>
+                      <PopoverContent align="end" style={{ width: 260, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 8, padding: 12, fontSize: 13, lineHeight: "20px", color: "var(--text-primary)" }}>
                         <div style={{ ...labelS, marginBottom: 8 }}>Base rate per km</div>
                         <div style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
                           What this quote charges per kilometre, before fuel, tolls and allowances.
@@ -1714,7 +1715,7 @@ export default function QuoteBuilder() {
                     type="number"
                     value={baseRatePerKm}
                     onChange={e => setBaseRatePerKm(e.target.value)}
-                    style={{ ...inputS, fontSize: 13, padding: "6px 8px" }}
+                    style={{ ...inputS, fontSize: 13, padding: "6px 8px", minHeight: 0 }}
                   />
                   {baseRateSource && (
                     <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", marginTop: 4 }}>
@@ -1776,9 +1777,9 @@ export default function QuoteBuilder() {
                   <span
                     title={`Trained on ${aiPrediction.training_samples?.toLocaleString?.() ?? aiPrediction.training_samples} ${aiPrediction.model_scope === "user" ? "of your own" : "platform-wide"} closed quotes`}
                     style={{
-                      fontSize: 11, lineHeight: "16px", fontWeight: 600, padding: "1px 6px", borderRadius: 10, textTransform: "none", letterSpacing: 0,
+                      fontSize: 13, lineHeight: "20px", fontWeight: 500, padding: "0 6px", borderRadius: 4, textTransform: "none", letterSpacing: 0,
                       background: aiPrediction.model_scope === "user" ? "color-mix(in srgb, var(--accent-primary) 18%, transparent)" : "var(--bg-surface-hover)",
-                      color: aiPrediction.model_scope === "user" ? "var(--accent-primary)" : "var(--text-tertiary)",
+                      color: aiPrediction.model_scope === "user" ? "var(--accent-primary)" : "var(--text-secondary)",
                     }}
                   >
                     {aiPrediction.model_scope === "user" ? "Personal AI" : "Platform AI"}

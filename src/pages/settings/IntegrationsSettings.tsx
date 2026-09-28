@@ -4,13 +4,15 @@ import { fetchData, postData, deleteData, patchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
+import { settingsBadgeStyle } from "./settingsUi";
+import { formatDate } from "@/lib/formatters";
 
 const cardStyle: React.CSSProperties = {
   background: 'var(--bg-surface)',
   border: '1px solid var(--border-subtle)',
   borderRadius: 8,
   marginBottom: 16,
-  padding: 24,
+  padding: 20,
 };
 
 const secondaryBtnStyle: React.CSSProperties = {
@@ -34,10 +36,24 @@ const sectionTitleStyle: React.CSSProperties = {
   textTransform: 'none' as const,
   letterSpacing: 'normal',
   margin: 0,
-  color: 'var(--text-secondary)',
+  color: 'var(--text-primary)',
   fontWeight: 600,
   marginBottom: 16,
 };
+
+/** Connection state as text + dot, never colour alone. Not connected is a
+ *  neutral state, not an error. */
+function ConnectionPill({ connected }: { connected: boolean }) {
+  return (
+    <span style={{
+      ...settingsBadgeStyle, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
+      color: connected ? 'var(--status-success-text, var(--accent-primary))' : 'var(--text-secondary)',
+    }}>
+      <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
+      {connected ? 'Connected' : 'Not connected'}
+    </span>
+  );
+}
 
 interface XeroStatus {
   connected: boolean;
@@ -453,17 +469,14 @@ export function IntegrationsSettings() {
             <img src="/Xero_logo.jpg" alt="Xero" style={{ width: 48, height: 48, objectFit: 'contain' }} />
           </div>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
+            <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
               Xero
-            </h3>
+            </h2>
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
               Sync invoices and payments with Xero accounting
             </div>
           </div>
-          <div style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: xeroStatus?.connected ? 'var(--status-success)' : 'var(--status-danger)',
-          }} />
+          <ConnectionPill connected={!!xeroStatus?.connected} />
         </div>
 
         {loadingXero ? (
@@ -538,17 +551,14 @@ export function IntegrationsSettings() {
             <img src="/cartract-logo.png" alt="Cartrack" style={{ width: 48, height: 48, objectFit: 'contain' }} />
           </div>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
+            <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
               Cartrack
-            </h3>
+            </h2>
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
               Live vehicle location, speed and ignition status
             </div>
           </div>
-          <div style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: cartrackStatus?.connected ? 'var(--status-success)' : 'var(--status-danger)',
-          }} />
+          <ConnectionPill connected={!!cartrackStatus?.connected} />
         </div>
 
         {loadingCartrack ? (
@@ -634,17 +644,14 @@ export function IntegrationsSettings() {
             <img src="/cntrfleet-logo.png" alt="CtrlFleet" style={{ width: 48, height: 48, objectFit: 'contain' }} />
           </div>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
+            <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 2 }}>
               CtrlFleet
-            </h3>
+            </h2>
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
               Live vehicle location and points of interest
             </div>
           </div>
-          <div style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: ctrlfleetStatus?.connected ? 'var(--status-success)' : 'var(--status-danger)',
-          }} />
+          <ConnectionPill connected={!!ctrlfleetStatus?.connected} />
         </div>
 
         {loadingCtrlfleet ? (
@@ -754,7 +761,7 @@ export function IntegrationsSettings() {
                         {cf.matched_vehicle_id ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{
-                              fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-success)',
+                              fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-success-text, var(--status-success))',
                             }}>
                               Linked → {cf.matched_vehicle_plate}
                             </span>
@@ -857,7 +864,7 @@ export function IntegrationsSettings() {
       {/* Partner API Keys Card */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={sectionTitleStyle}>Partner API keys</h2>
+          <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Partner API keys</h2>
           <button
             onClick={() => setShowAddKey(!showAddKey)}
             disabled={isDemo}
@@ -909,19 +916,20 @@ export function IntegrationsSettings() {
             {apiKeys.map((key) => (
               <div key={key.id} style={{
                 padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-                borderRadius: 4, display: 'flex', alignItems: 'center', gap: 12,
+                borderRadius: 6, display: 'flex', alignItems: 'center', gap: 12,
               }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>
                     {key.name}
                   </div>
-                  <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-                    {key.prefix}... • Created {new Date(key.created_at).toLocaleDateString()}
-                    {key.last_used && ` • Last used ${new Date(key.last_used).toLocaleDateString()}`}
+                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
+                    {/* Only the key prefix is an identifier (mono); dates stay sans. */}
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{key.prefix}…</span> · Created {formatDate(key.created_at)}
+                    {key.last_used && ` · Last used ${formatDate(key.last_used)}`}
                   </div>
                 </div>
                 <button
-                  onClick={() => handleRevokeKey(key.id)}
+                  onClick={() => { if (window.confirm(`Revoke the API key "${key.name}"? Systems using it will stop working immediately.`)) handleRevokeKey(key.id); }}
                   disabled={isDemo}
                   title={isDemo ? 'Not available in the demo' : undefined}
                   className="settings-control"
@@ -940,7 +948,7 @@ export function IntegrationsSettings() {
       {/* Webhook Manager Card */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={sectionTitleStyle}>Webhooks</h2>
+          <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Webhooks</h2>
           <button
             onClick={() => setShowAddWebhook(!showAddWebhook)}
             disabled={isDemo}
@@ -1013,7 +1021,7 @@ export function IntegrationsSettings() {
             {webhooks.map((webhook) => (
               <div key={webhook.id} style={{
                 padding: 12, background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
-                borderRadius: 4, display: 'flex', alignItems: 'center', gap: 12,
+                borderRadius: 6, display: 'flex', alignItems: 'center', gap: 12,
               }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginBottom: 4 }}>
@@ -1022,7 +1030,7 @@ export function IntegrationsSettings() {
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {webhook.events.map((evt) => (
                       <span key={evt} style={{
-                        fontSize: 11, lineHeight: '16px', fontFamily: 'var(--font-mono)', padding: '2px 6px',
+                        fontSize: 12, lineHeight: '16px', fontFamily: 'var(--font-mono)', padding: '2px 6px',
                         background: 'var(--bg-surface)', color: 'var(--text-tertiary)', borderRadius: 4,
                       }}>
                         {evt}
@@ -1042,7 +1050,7 @@ export function IntegrationsSettings() {
                   Test
                 </button>
                 <button
-                  onClick={() => handleDeleteWebhook(webhook.id)}
+                  onClick={() => { if (window.confirm(`Delete the webhook to ${webhook.url}? It will stop receiving events.`)) handleDeleteWebhook(webhook.id); }}
                   disabled={isDemo}
                   title={isDemo ? 'Not available in the demo' : undefined}
                   className="settings-control"

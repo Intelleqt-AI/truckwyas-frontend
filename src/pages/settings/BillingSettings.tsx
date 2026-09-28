@@ -29,7 +29,7 @@ const sectionTitleStyle: React.CSSProperties = {
 };
 
 const planBadgeStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', fontWeight: 500,
+  fontFamily: 'var(--font-sans)', fontSize: 12, lineHeight: '16px', fontWeight: 500,
   padding: '2px 7px', borderRadius: 4,
 };
 
@@ -165,7 +165,7 @@ function NextPaymentCountdown({ nextBillingAt, mode = 'charge' }: { nextBillingA
 
   return (
     <div style={{
-      fontSize: 13, lineHeight: '20px', color: mode === 'cancel' ? 'var(--status-warning)' : 'var(--accent-primary)', marginTop: 2,
+      fontSize: 13, lineHeight: '20px', color: mode === 'cancel' ? 'var(--status-warning-text, var(--status-warning))' : 'var(--accent-primary)', marginTop: 2,
       fontVariantNumeric: 'tabular-nums' as const,
     }}>
       {label} · {new Date(nextBillingAt).toLocaleDateString('en-ZA')}
@@ -427,7 +427,7 @@ export function BillingSettings() {
 
       {!showLoading && (
         <div style={sectionStyle}>
-          <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Plan</h3></div>
+          <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Plan</h2></div>
           <div style={{ padding: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
@@ -631,7 +631,7 @@ export function BillingSettings() {
       {!showLoading && (
         <div style={sectionStyle}>
           <div style={{ ...sectionHeaderStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={sectionTitleStyle}>Billing history</h3>
+            <h2 style={sectionTitleStyle}>Billing history</h2>
             {billingHistory.length > 0 && (
               <button className="settings-control" onClick={() => navigate('/settings/billing/history')} style={{
                 ...secondaryBtnStyle, color: 'var(--accent-primary)', cursor: 'pointer',
@@ -647,36 +647,33 @@ export function BillingSettings() {
             </div>
           ) : (
             <div className="settings-scroll-region" role="region" aria-label="Billing history" tabIndex={0} style={{ overflowX: 'auto' }}>
-            <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+            <table className="table-heading-roles settings-table">
               <thead>
                 <tr>
                   {['Charge', 'Reference', 'Date', 'Amount', 'Status'].map(h => (
-                    <th key={h} style={{
-                      padding: '10px 20px', textAlign: 'left' as const,
-                      borderBottom: '1px solid var(--border-subtle)',
-                    }}>{h}</th>
+                    <th key={h || 'actions'} scope="col" style={{ textAlign: (h === 'Amount') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {billingHistory.slice(0, 5).map((tx, i, arr) => (
                   <tr key={tx.id} style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                    <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
+                    <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
                       {tx.label}
                     </td>
-                    <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                       {tx.reference || '—'}
                     </td>
-                    <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                    <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                       {new Date(tx.created_at).toLocaleDateString('en-ZA')}
                     </td>
-                    <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                    <td className="num" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                       {formatRand(tx.amount)}
                     </td>
-                    <td style={{ padding: '12px 20px' }}>
+                    <td>
                       <span style={{
                         fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
-                        color: tx.status === 'complete' ? 'var(--accent-primary)' : tx.status === 'pending' ? 'var(--status-warning)' : 'var(--status-danger)',
+                        color: tx.status === 'complete' ? 'var(--status-success-text, var(--accent-primary))' : tx.status === 'pending' ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))',
                       }}>{statusDisplay(tx.status)}</span>
                     </td>
                   </tr>

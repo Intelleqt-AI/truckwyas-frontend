@@ -2,65 +2,17 @@ import "./profile-form.css";
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData } from "@/lib/Api";
 import { useAuth } from "@/lib/AuthContext";
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsCardBodyStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle } from './settingsUi';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 'var(--card-radius)',
-  marginBottom: 16,
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: '16px 20px 12px',
-  borderBottom: '1px solid var(--border-subtle)',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  margin: 0,
-  textTransform: 'none',
-  letterSpacing: 'normal',
-  color: 'var(--text-secondary)',
-  fontWeight: 600,
-};
-
-const sectionBodyStyle: React.CSSProperties = {
-  padding: '20px',
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 13,
-  lineHeight: '20px',
-  fontWeight: 500,
-  textTransform: 'none',
-  letterSpacing: 'normal',
-  color: 'var(--text-primary)',
-  marginBottom: 6,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: 'var(--input-bg)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 6,
-  minHeight: 48,
-  minWidth: 0,
-  padding: '10px 12px',
-  color: 'var(--text-primary)',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  transition: 'border-color 0.15s',
-};
-
+const sectionStyle = settingsCardStyle;
+const sectionHeaderStyle = settingsCardHeaderStyle;
+const sectionTitleStyle = settingsCardTitleStyle;
+const sectionBodyStyle = settingsCardBodyStyle;
+const labelStyle = settingsLabelStyle;
+// 40px / 14px on desktop like every other settings section; the shell's
+// <=640px rule lifts it to 48px / 16px for touch and iOS focus-zoom.
+const inputStyle = settingsInputStyle;
 
 const gridStyle: React.CSSProperties = {
   display: 'grid',
@@ -141,7 +93,7 @@ export function ProfileSettings() {
         <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
           Profile settings
         </h1>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
           Manage your personal information and account preferences
         </div>
       </div>
@@ -179,9 +131,11 @@ export function ProfileSettings() {
               disabled={isDemo}
             />
             <button
+              type="button"
+              className="settings-control"
               style={{
                 background: 'none', border: '1px solid var(--border-subtle)',
-                color: 'var(--text-secondary)', padding: '6px 12px',
+                color: 'var(--text-secondary)', padding: '8px 12px',
                 fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, borderRadius: 6, minHeight: 40,
                 cursor: (uploadingAvatar || isDemo) ? 'not-allowed' : 'pointer',
                 letterSpacing: 'normal',
@@ -193,7 +147,7 @@ export function ProfileSettings() {
             >
               {uploadingAvatar ? 'Uploading…' : 'Change picture'}
             </button>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
+            <div style={settingsHelpStyle}>
               JPG, GIF or PNG. Max size 2MB.
             </div>
           </div>
@@ -268,7 +222,7 @@ export function ProfileSettings() {
               </Select>
             </div>
           </div>
-          <div className="tw-profile-fields" style={{ ...gridStyle, marginBottom: 20 }}>
+          <div className="tw-profile-fields" style={gridStyle}>
             <div>
               <label htmlFor="profile-date_format" style={labelStyle}>Date format</label>
               <Select value={form.date_format} onValueChange={val => set('date_format', val)}>
@@ -283,18 +237,20 @@ export function ProfileSettings() {
               </Select>
             </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              className="btn-action"
-              onClick={handleSave}
-              disabled={saving || isDemo}
-              title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
-            >
-              {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
-            </button>
-          </div>
         </div>
+      </div>
+      {/* Page-level save sits below the last card, as on Notifications and
+          Company details — it saves every card on this page. */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          className="btn-action settings-control"
+          onClick={handleSave}
+          disabled={saving || isDemo}
+          title={isDemo ? 'Fixed in demo mode' : undefined}
+          style={{ opacity: (saving || isDemo) ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+        >
+          {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
+        </button>
       </div>
     </div>
   );

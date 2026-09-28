@@ -15,15 +15,15 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 // Zimborders bridge toll). An edit here applies to every company's quotes
 // immediately, same reasoning as the Truck Types page.
 
-const cardStyle: React.CSSProperties = { padding: 20, marginBottom: 20 };
+const cardStyle: React.CSSProperties = { padding: 24, marginBottom: 24 };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 4 };
 const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 12px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  textAlign: 'left', padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
   fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)',
   borderBottom: '1px solid var(--border-subtle)',
 };
 const tdStyle: React.CSSProperties = {
-  padding: '12px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
   padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
@@ -241,40 +241,40 @@ export default function CrossBorderRatesPanel() {
     <div>
       <div className="card" style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
-          <div style={{ ...sectionTitleStyle, marginBottom: 0 }}>Border Crossing Fees {feesData ? `(${fees.length})` : ''}</div>
-          <button className="btn-action" style={{ fontSize: 11 }} onClick={() => { setShowAddFee(s => !s); setFeeErr(''); }}>
-            {showAddFee ? 'Cancel' : '+ Add Fee'}
+          <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Border crossing fees {feesData ? `(${fees.length})` : ''}</h2>
+          <button className="btn-action admin-control" onClick={() => { setShowAddFee(s => !s); setFeeErr(''); }}>
+            {showAddFee ? 'Cancel' : 'Add fee'}
           </button>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 14 }}>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
           One-way fee per country pair — feeds the "Border fees" line item on every quote.
         </div>
 
         {showAddFee && (
-          <div style={{ padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))', border: '1px solid var(--border-subtle)', borderRadius: 2, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-            {feeErr && <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, fontSize: 12 }}>{feeErr}</div>}
-            <div><label style={labelStyle}>From Country</label><input style={inputStyle} value={feeForm.from_country} onChange={e => setFeeForm(p => ({ ...p, from_country: e.target.value.toUpperCase() }))} placeholder="SA" /></div>
-            <div><label style={labelStyle}>To Country</label><input style={inputStyle} value={feeForm.to_country} onChange={e => setFeeForm(p => ({ ...p, to_country: e.target.value.toUpperCase() }))} placeholder="ZW" /></div>
+          <div style={{ padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))', border: '1px solid var(--border-subtle)', borderRadius: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+            {feeErr && <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 6, fontSize: 13, lineHeight: '20px' }}>{feeErr}</div>}
+            <div><label style={labelStyle}>From country</label><input style={inputStyle} value={feeForm.from_country} onChange={e => setFeeForm(p => ({ ...p, from_country: e.target.value.toUpperCase() }))} placeholder="SA" /></div>
+            <div><label style={labelStyle}>To country</label><input style={inputStyle} value={feeForm.to_country} onChange={e => setFeeForm(p => ({ ...p, to_country: e.target.value.toUpperCase() }))} placeholder="ZW" /></div>
             <div><label style={labelStyle}>Fee (R)</label><input type="number" style={inputStyle} value={feeForm.fee_zar} onChange={e => setFeeForm(p => ({ ...p, fee_zar: e.target.value }))} /></div>
             <div style={{ gridColumn: 'span 2' }}><label style={labelStyle}>Notes</label><input style={inputStyle} value={feeForm.notes} onChange={e => setFeeForm(p => ({ ...p, notes: e.target.value }))} /></div>
-            <div style={{ gridColumn: '1 / -1' }}><button className="btn-action" style={{ fontSize: 11 }} disabled={feeSaving} onClick={handleAddFee}>{feeSaving ? 'Saving…' : 'Save Fee'}</button></div>
+            <div style={{ gridColumn: '1 / -1' }}><button className="btn-action admin-control" disabled={feeSaving} onClick={handleAddFee}>{feeSaving ? 'Saving…' : 'Save fee'}</button></div>
           </div>
         )}
 
         {feesLoading ? <Loader size={24} /> : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={thStyle}>From</th><th style={thStyle}>To</th><th style={thStyle}>Fee</th><th style={thStyle}>Notes</th><th style={thStyle}>Status</th><th style={thStyle}>Actions</th></tr></thead>
+            <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr><th style={thStyle}>From</th><th style={thStyle}>To</th><th className="num" style={thStyle}>Fee</th><th style={thStyle}>Notes</th><th style={thStyle}>Status</th><th style={{ ...thStyle, textAlign: 'right' }}>Actions</th></tr></thead>
               <tbody>
                 {fees.map(f => (
                   <tr key={f.id} style={{ opacity: f.is_active ? 1 : 0.55 }}>
                     <td style={tdStyle}>{f.from_country}</td>
                     <td style={tdStyle}>{f.to_country}</td>
-                    <td style={tdStyle}>{fmtRand(f.fee_zar)}</td>
-                    <td style={{ ...tdStyle, fontSize: 11, color: 'var(--text-tertiary)', maxWidth: 320 }}>{f.notes || '—'}</td>
+                    <td className="num" style={tdStyle}>{fmtRand(f.fee_zar)}</td>
+                    <td style={{ ...tdStyle, fontSize: 13, color: 'var(--text-tertiary)', maxWidth: 320 }}>{f.notes || '—'}</td>
                     <td style={tdStyle}><span className={`status-badge ${f.is_active ? 'active' : 'delayed'}`}>{f.is_active ? 'Active' : 'Inactive'}</span></td>
                     <td style={tdStyle}>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                         <button style={secondaryBtnStyle} disabled={feePending === f.id} onClick={() => openEditFee(f)}>Edit</button>
                         <button style={secondaryBtnStyle} disabled={feePending === f.id} onClick={() => toggleFeeActive(f)}>{f.is_active ? 'Deactivate' : 'Activate'}</button>
                         <button style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }} disabled={feePending === f.id} onClick={() => setDeleteFee(f)}>Delete</button>
@@ -291,41 +291,41 @@ export default function CrossBorderRatesPanel() {
 
       <div className="card" style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
-          <div style={{ ...sectionTitleStyle, marginBottom: 0 }}>Country Transit Rates {ratesData ? `(${rates.length})` : ''}</div>
-          <button className="btn-action" style={{ fontSize: 11 }} onClick={() => { setShowAddRate(s => !s); setRateErr(''); }}>
-            {showAddRate ? 'Cancel' : '+ Add Country'}
+          <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Country transit rates {ratesData ? `(${rates.length})` : ''}</h2>
+          <button className="btn-action admin-control" onClick={() => { setShowAddRate(s => !s); setRateErr(''); }}>
+            {showAddRate ? 'Cancel' : 'Add country'}
           </button>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 14 }}>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
           Per-country weighbridge fee and in-country toll rate — feeds "Weighbridge" and "Non-SA tolls" line items.
         </div>
 
         {showAddRate && (
-          <div style={{ padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))', border: '1px solid var(--border-subtle)', borderRadius: 2, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-            {rateErr && <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, fontSize: 12 }}>{rateErr}</div>}
-            <div><label style={labelStyle}>Country Code</label><input style={inputStyle} value={rateForm.country_code} onChange={e => setRateForm(p => ({ ...p, country_code: e.target.value.toUpperCase() }))} placeholder="ZW" /></div>
-            <div><label style={labelStyle}>Country Name</label><input style={inputStyle} value={rateForm.country_name} onChange={e => setRateForm(p => ({ ...p, country_name: e.target.value }))} placeholder="Zimbabwe" /></div>
+          <div style={{ padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))', border: '1px solid var(--border-subtle)', borderRadius: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+            {rateErr && <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 6, fontSize: 13, lineHeight: '20px' }}>{rateErr}</div>}
+            <div><label style={labelStyle}>Country code</label><input style={inputStyle} value={rateForm.country_code} onChange={e => setRateForm(p => ({ ...p, country_code: e.target.value.toUpperCase() }))} placeholder="ZW" /></div>
+            <div><label style={labelStyle}>Country name</label><input style={inputStyle} value={rateForm.country_name} onChange={e => setRateForm(p => ({ ...p, country_name: e.target.value }))} placeholder="Zimbabwe" /></div>
             <div><label style={labelStyle}>Weighbridge (R)</label><input type="number" style={inputStyle} value={rateForm.weighbridge_fee_zar} onChange={e => setRateForm(p => ({ ...p, weighbridge_fee_zar: e.target.value }))} /></div>
-            <div><label style={labelStyle}>Toll Rate (R/km)</label><input type="number" style={inputStyle} value={rateForm.toll_rate_per_km} onChange={e => setRateForm(p => ({ ...p, toll_rate_per_km: e.target.value }))} /></div>
-            <div><label style={labelStyle}>Border Distance (km)</label><input type="number" style={inputStyle} value={rateForm.sa_border_distance_km} onChange={e => setRateForm(p => ({ ...p, sa_border_distance_km: e.target.value }))} /></div>
-            <div style={{ gridColumn: '1 / -1' }}><button className="btn-action" style={{ fontSize: 11 }} disabled={rateSaving} onClick={handleAddRate}>{rateSaving ? 'Saving…' : 'Save Country'}</button></div>
+            <div><label style={labelStyle}>Toll rate (R/km)</label><input type="number" style={inputStyle} value={rateForm.toll_rate_per_km} onChange={e => setRateForm(p => ({ ...p, toll_rate_per_km: e.target.value }))} /></div>
+            <div><label style={labelStyle}>Border distance (km)</label><input type="number" style={inputStyle} value={rateForm.sa_border_distance_km} onChange={e => setRateForm(p => ({ ...p, sa_border_distance_km: e.target.value }))} /></div>
+            <div style={{ gridColumn: '1 / -1' }}><button className="btn-action admin-control" disabled={rateSaving} onClick={handleAddRate}>{rateSaving ? 'Saving…' : 'Save country'}</button></div>
           </div>
         )}
 
         {ratesLoading ? <Loader size={24} /> : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={thStyle}>Country</th><th style={thStyle}>Weighbridge</th><th style={thStyle}>Toll/km</th><th style={thStyle}>Border Dist.</th><th style={thStyle}>Status</th><th style={thStyle}>Actions</th></tr></thead>
+            <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr><th style={thStyle}>Country</th><th className="num" style={thStyle}>Weighbridge</th><th className="num" style={thStyle}>Toll/km</th><th className="num" style={thStyle}>Border distance</th><th style={thStyle}>Status</th><th style={{ ...thStyle, textAlign: 'right' }}>Actions</th></tr></thead>
               <tbody>
                 {rates.map(r => (
                   <tr key={r.id} style={{ opacity: r.is_active ? 1 : 0.55 }}>
-                    <td style={tdStyle}>{r.country_name} <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>({r.country_code})</span></td>
-                    <td style={tdStyle}>{fmtRand(r.weighbridge_fee_zar)}</td>
-                    <td style={tdStyle}>{fmtRand(r.toll_rate_per_km)}/km</td>
-                    <td style={tdStyle}>{r.sa_border_distance_km}km</td>
+                    <td style={tdStyle}>{r.country_name} <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>({r.country_code})</span></td>
+                    <td className="num" style={tdStyle}>{fmtRand(r.weighbridge_fee_zar)}</td>
+                    <td className="num" style={tdStyle}>{fmtRand(r.toll_rate_per_km)}/km</td>
+                    <td className="num" style={tdStyle}>{r.sa_border_distance_km}km</td>
                     <td style={tdStyle}><span className={`status-badge ${r.is_active ? 'active' : 'delayed'}`}>{r.is_active ? 'Active' : 'Inactive'}</span></td>
                     <td style={tdStyle}>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                         <button style={secondaryBtnStyle} disabled={ratePending === r.id} onClick={() => openEditRate(r)}>Edit</button>
                         <button style={secondaryBtnStyle} disabled={ratePending === r.id} onClick={() => toggleRateActive(r)}>{r.is_active ? 'Deactivate' : 'Activate'}</button>
                         <button style={{ ...secondaryBtnStyle, color: 'var(--status-danger-text, var(--status-danger))', borderColor: 'var(--status-danger)' }} disabled={ratePending === r.id} onClick={() => setDeleteRate(r)}>Delete</button>
@@ -345,7 +345,7 @@ export default function CrossBorderRatesPanel() {
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditFee(null)} />
           <div style={{ position: 'relative', width: 420, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit {editFee.from_country} → {editFee.to_country} Fee</div>
+              <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit {editFee.from_country} → {editFee.to_country} fee</h2>
               <button onClick={() => setEditFee(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {feeErr && <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>{feeErr}</div>}
@@ -364,14 +364,14 @@ export default function CrossBorderRatesPanel() {
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditRate(null)} />
           <div style={{ position: 'relative', width: 420, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit {editRate.country_name}</div>
+              <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit {editRate.country_name}</h2>
               <button onClick={() => setEditRate(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {rateErr && <div style={{ padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, marginBottom: 16, fontSize: 12 }}>{rateErr}</div>}
-            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Country Name</label><input style={inputStyle} value={editRateForm.country_name} onChange={e => setEditRateForm(p => ({ ...p, country_name: e.target.value }))} /></div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Country name</label><input style={inputStyle} value={editRateForm.country_name} onChange={e => setEditRateForm(p => ({ ...p, country_name: e.target.value }))} /></div>
             <div style={{ marginBottom: 14 }}><label style={labelStyle}>Weighbridge (R)</label><input type="number" style={inputStyle} value={editRateForm.weighbridge_fee_zar} onChange={e => setEditRateForm(p => ({ ...p, weighbridge_fee_zar: e.target.value }))} /></div>
-            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Toll Rate (R/km)</label><input type="number" style={inputStyle} value={editRateForm.toll_rate_per_km} onChange={e => setEditRateForm(p => ({ ...p, toll_rate_per_km: e.target.value }))} /></div>
-            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Border Distance (km)</label><input type="number" style={inputStyle} value={editRateForm.sa_border_distance_km} onChange={e => setEditRateForm(p => ({ ...p, sa_border_distance_km: e.target.value }))} /></div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Toll rate (R/km)</label><input type="number" style={inputStyle} value={editRateForm.toll_rate_per_km} onChange={e => setEditRateForm(p => ({ ...p, toll_rate_per_km: e.target.value }))} /></div>
+            <div style={{ marginBottom: 14 }}><label style={labelStyle}>Border distance (km)</label><input type="number" style={inputStyle} value={editRateForm.sa_border_distance_km} onChange={e => setEditRateForm(p => ({ ...p, sa_border_distance_km: e.target.value }))} /></div>
             <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
               <button disabled={rateSaving} onClick={handleEditRateSave} style={{ flex: 1, padding: '8px 0', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'var(--accent-primary)', color: 'var(--btn-action-color, var(--bg-deep))', border: 'none', borderRadius: 6, cursor: rateSaving ? 'wait' : 'pointer', fontWeight: 500 }}>{rateSaving ? 'Saving…' : 'Save changes'}</button>
               <button onClick={() => setEditRate(null)} style={{ padding: '8px 20px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 6, cursor: 'pointer' }}>Cancel</button>

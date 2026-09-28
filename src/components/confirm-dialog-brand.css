@@ -29,3 +29,19 @@
   .os-app-shell .dashboard-confirm-button[data-danger] { box-shadow: inset 0 0 0 1px var(--confirm-danger-text); }
   .os-app-shell .dashboard-confirm-button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
 }
+
+/* Type roles and shape apply at every width (phones previously fell back to
+   the legacy 11px mono buttons). Desktop geometry above is unchanged. */
+.dashboard-confirm-dialog {
+  --confirm-radius: 12px;
+  --confirm-title-size: 16px;
+  --confirm-body-size: 14px; --confirm-body-line: 20px;
+  --confirm-actions-gap: 12px;
+  --confirm-button-padding: 8px 16px; --confirm-button-radius: 6px;
+  --confirm-button-size: 14px; --confirm-button-font: var(--font-sans);
+  --confirm-button-tracking: normal; --confirm-button-weight: 500;
+  font-family: var(--font-sans);
+}
+@media (max-width: 767px) {
+  .dashboard-confirm-dialog .dashboard-confirm-button { min-height: 48px; }
+}

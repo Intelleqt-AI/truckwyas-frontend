@@ -1,3 +1,4 @@
+import "./auth-brand.css";
 import { useState } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -61,16 +62,16 @@ export const LoginOtp = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-sans)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-sans)' }}>
       <div style={{ width: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
         {/* Logo */}
         <div style={{ marginBottom: 32, textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>TRUCKWYS</div>
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>ROAD FREIGHT INTELLIGENCE</div>
+          <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 28, width: 'auto', display: 'inline-block' }} />
+          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4, fontFamily: 'var(--font-sans)' }}>Road freight intelligence</div>
         </div>
 
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Enter your sign-in code</div>
+          <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>Enter your sign-in code</h1>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
             Two-factor authentication is on. We sent a 6-digit code to{' '}
             <strong style={{ color: 'var(--text-primary)' }}>{email || 'your email'}</strong>.
@@ -79,22 +80,22 @@ export const LoginOtp = () => {
         </div>
 
         {error && (
-          <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 4, fontSize: 12, color: 'var(--status-danger-text, var(--status-danger))' }}>
+          <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
             {error}
           </div>
         )}
         {resentMsg && (
-          <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-success-bg, rgba(34,197,94,0.1))', border: '1px solid var(--status-success)', borderRadius: 4, fontSize: 12, color: 'var(--status-success)' }}>
+          <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-success-bg, rgba(34,197,94,0.1))', border: '1px solid var(--status-success)', borderRadius: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-success)' }}>
             {resentMsg}
           </div>
         )}
 
         <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', display: 'block', marginBottom: 6, letterSpacing: '0.08em' }}>
+            <label style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
               SIGN-IN CODE
             </label>
-            <input
+            <input className="tw-auth-control tw-auth-code"
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -105,29 +106,28 @@ export const LoginOtp = () => {
               placeholder="000000"
               autoFocus
               style={{
-                width: '100%', padding: '14px 16px', background: 'var(--bg-base)',
-                border: '1px solid var(--border-subtle)', borderRadius: 4,
-                color: 'var(--text-primary)', fontSize: 26, outline: 'none',
-                boxSizing: 'border-box', letterSpacing: '0.3em', fontFamily: 'var(--font-mono)',
+                width: '100%', padding: '14px 16px', background: 'var(--bg-deep)',
+                border: '1px solid var(--border-subtle)', borderRadius: 6,
+                color: 'var(--text-primary)', fontSize: 26,                 boxSizing: 'border-box', letterSpacing: '0.3em', fontFamily: 'var(--font-mono)',
                 textAlign: 'center',
               }}
             />
           </div>
 
           <button type="submit" className="btn-action" style={{ width: '100%' }} disabled={loading || code.length !== 6}>
-            {loading ? 'Verifying...' : 'Verify & sign in'}
+            {loading ? 'Verifying…' : 'Verify & sign in'}
           </button>
         </form>
 
-        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 12, color: 'var(--text-secondary)' }}>
+        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
           Didn't receive the code?{' '}
-          <button onClick={handleResend} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: 12, padding: 0, fontFamily: 'var(--font-sans)' }}>
+          <button onClick={handleResend} style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: 13, lineHeight: '20px', padding: 0, fontFamily: 'var(--font-sans)' }}>
             Resend code
           </button>
         </div>
 
         <div style={{ marginTop: 16, textAlign: 'center' }}>
-          <button onClick={() => navigate('/login')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>
+          <button onClick={() => navigate('/login')} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 13, lineHeight: '20px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
             ← Back to login
           </button>
         </div>

@@ -1,13 +1,19 @@
 import './insights-page-brand.css';
-import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency as formatCurrencyBase } from '@/lib/formatters';
+
+// Missing or non-numeric amounts render as an em dash (unavailable), never as a
+// fabricated R0.00. Valid numbers use the shared formatter unchanged.
+const formatCurrency = (amount: number | null | undefined, options?: Intl.NumberFormatOptions) =>
+  amount == null || !Number.isFinite(Number(amount)) ? '—' : formatCurrencyBase(amount, options);
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 import { DatePicker } from '@/components/ui/date-picker';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 import { Loader } from '@/components/Loader';
+import ExecutiveBriefing, { RecommendationGroups, type BriefingResponse, type RecommendationDetail } from '@/components/insights/ExecutiveBriefing';
 
 // Brand text roles (presentation only — every value and calculation is untouched).
 const metricLabelTypography = { fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', textTransform: 'none' as const };
@@ -216,9 +222,17 @@ export default function Insights() {
   // grounded in the company's DB via RAG. Period-aware: re-fetches when the filter
   // changes so the narrative matches the selected window. getPeriodParams() is only
   // called inside queryFn (it's declared below), never synchronously in the key.
-  const { data: briefing = null } = useQuery<{ narrative?: string; ai_available?: boolean } | null>({
+  // Same endpoint and key as before; failures now surface as an explicit error
+  // state with retry instead of silently hiding the briefing.
+  const {
+    data: briefing = null,
+    isLoading: briefingLoading,
+    isError: briefingError,
+    refetch: refetchBriefing,
+  } = useQuery<BriefingResponse | null>({
     queryKey: ['insights-briefing', period, customFrom, customTo],
-    queryFn: () => fetchData(`api/v1/dashboard/briefing/?${getPeriodParams()}`).catch(() => null),
+    queryFn: () => fetchData(`api/v1/dashboard/briefing/?${getPeriodParams()}`),
+    retry: 1,
   });
 
   // Build period params
@@ -339,12 +353,6 @@ export default function Insights() {
     return 'var(--status-danger-text, var(--status-danger))';
   };
 
-  const getSeverityDot = (severity: string) => {
-    if (severity === 'HIGH' || severity === 'CRITICAL') return 'var(--status-danger)';
-    if (severity === 'MEDIUM') return 'var(--status-warning)';
-    return 'var(--status-success)';
-  };
-
   const SectionHeader = ({ children }: { children: string }) => (
     <h2 style={{
       margin: '0 0 16px',
@@ -461,24 +469,15 @@ export default function Insights() {
           {/* TAB 1: BRIEFING */}
           {tab === 'briefing' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {/* AI EXECUTIVE BRIEFING */}
-              {briefing?.narrative && (
-                <div className="card">
-                  <div style={{
-                    fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', letterSpacing: 'normal',
-                    color: 'var(--text-secondary)', marginBottom: 12,
-                    display: 'flex', minWidth: 0, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
-                  }}>
-                    <h2 style={{ margin: 0, fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>AI executive briefing</h2>
-                    <span style={{ color: briefing.ai_available ? 'var(--accent-primary)' : 'var(--text-tertiary)' }}>
-                      {briefing.ai_available ? 'Claude' : 'Summary'}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
-                    {briefing.narrative}
-                  </div>
-                </div>
-              )}
+              {/* EXECUTIVE BRIEFING — structured, decision-first */}
+              <ExecutiveBriefing
+                data={briefing}
+                isLoading={briefingLoading}
+                isError={briefingError}
+                onRetry={() => { refetchBriefing(); }}
+                details={(insightsData?.recommendations || []) as RecommendationDetail[]}
+                onShowLongerPeriod={period === 'THIS_MONTH' || period === 'LAST_MONTH' ? () => setPeriod('LAST_3M') : undefined}
+              />
 
               {/* SECTION 1: BUSINESS PULSE */}
               <div>
@@ -496,7 +495,7 @@ export default function Insights() {
                         color: kpiData.revenue_change_pct >= 0 ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))',
                         marginBottom: 8,
                       }}>
-                        {kpiData.revenue_change_pct >= 0 ? '+' : ''}{kpiData.revenue_change_pct.toFixed(1)}%
+                        {kpiData.revenue_change_pct >= 0 ? '+' : ''}{kpiData.revenue_change_pct.toFixed(1)}% vs last month
                       </div>
                     )}
                     <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
@@ -556,7 +555,7 @@ export default function Insights() {
                   <div className="card">
                     <div style={{
                       ...metricValueTypography,
-                      color: 'var(--status-success)',
+                      color: 'var(--text-primary)',
                       marginBottom: 12,
                     }}>
                       {formatCurrency(kpiData?.total_advance_amount || 0)}
@@ -568,110 +567,33 @@ export default function Insights() {
                 </div>
               </div>
 
-              {/* SECTION 2: ACTION REQUIRED */}
+              {/* SECTION 2: ALL RECOMMENDATIONS — same data/order, grouped by type */}
               <div>
-                <SectionHeader>Action required</SectionHeader>
-                <div className="card">
-                  {insightsData?.recommendations && insightsData.recommendations.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {[...insightsData.recommendations]
-                        .sort((a, b) => {
-                          const impactA = a.amount || 0;
-                          const impactB = b.amount || 0;
-                          return impactB - impactA;
-                        })
-                        .map((rec, idx) => (
-                          <div key={idx} style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 12,
-                            padding: 12,
-                            background: 'var(--bg-surface)',
-                            borderRadius: 8,
-                          }}>
-                            <div style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: '50%',
-                              background: getSeverityDot(rec.severity),
-                              flexShrink: 0,
-                            }} />
-                            <div style={{
-                              fontSize: 13,
-                              lineHeight: '20px',
-                              fontFamily: 'var(--font-sans)',
-                              padding: '4px 8px',
-                              borderRadius: 4,
-                              background: 'var(--bg-surface-hover)',
-                              color: 'var(--text-secondary)',
-                              display: 'inline-block',
-                              whiteSpace: 'nowrap',
-                            }}>
-                              {titleCase(rec.type)}
-                            </div>
-                            <div style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>
-                              {rec.message}
-                            </div>
-                            {rec.amount && (
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                fontWeight: 600,
-                                color: 'var(--text-primary)',
-                              }}>
-                                {formatCurrency(rec.amount)}
-                              </div>
-                            )}
-                            {rec.days_overdue && (
-                              <div style={{
-                                fontSize: 13,
-                                fontFamily: 'var(--font-sans)',
-                                color: 'var(--text-secondary)',
-                              }}>
-                                {rec.days_overdue}d
-                              </div>
-                            )}
-                            {rec.link && (
-                              <button
-                                type="button"
-                                className="insights-recommendation-action"
-                                aria-label="Open recommendation"
-                                onClick={() => navigate(rec.link || '')}
-                                style={{
-                                  color: 'var(--accent-primary)',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <ArrowRight size={20} aria-hidden="true" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                    </div>
-                  ) : (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      padding: 12,
-                    }}>
-                      <div style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        background: 'var(--status-success)',
-                      }} />
-                      <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
-                        All systems normal — no alerts
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <SectionHeader>All recommendations</SectionHeader>
+                {insightsData?.recommendations && insightsData.recommendations.length > 0 ? (
+                  (() => {
+                    const sorted = [...insightsData.recommendations].sort((a, b) => (b.amount || 0) - (a.amount || 0));
+                    return (
+                      <RecommendationGroups
+                        recommendations={sorted}
+                        details={sorted as RecommendationDetail[]}
+                        initialRows={5}
+                        headingLevel={3}
+                      />
+                    );
+                  })()
+                ) : (
+                  <div className="card">
+                    <p style={{ margin: 0, fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                      No recommendations right now.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* SECTION 3: LIVE OPERATIONS */}
               <div>
-                <SectionHeader>Live operations</SectionHeader>
+                <SectionHeader>Operations snapshot</SectionHeader>
                 <div className="insights-brand-grid insights-brand-grid--3">
                   {(() => {
                     const inTransit = loads.filter(l => ['IN_TRANSIT', 'ASSIGNED'].includes(l.status.toUpperCase().replace(' ', '_')));
@@ -747,7 +669,7 @@ export default function Insights() {
                             fontFamily: 'var(--font-sans)',
                             color: 'var(--text-tertiary)',
                           }}>
-                            {topRoute ? `${topRoute[1]} trips this period` : ''}
+                            {topRoute ? `${plural(topRoute[1], 'trip', 'trips')} this period` : ''}
                           </div>
                         </div>
                       </>
@@ -781,7 +703,7 @@ export default function Insights() {
                   <div className="card">
                     <div style={{
                       ...metricValueTypography,
-                      color: 'var(--status-danger-text, var(--status-danger))',
+                      color: 'var(--text-primary)',
                       marginBottom: 12,
                     }}>
                       {formatCurrency(financeData?.expenses_period || 0)}
@@ -794,13 +716,13 @@ export default function Insights() {
                   <div className="card">
                     <div style={{
                       ...metricValueTypography,
-                      color: (financeData?.net_margin_period || 0) >= 0 ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))',
+                      color: (financeData?.net_margin_period || 0) > 0 ? 'var(--status-success-text, var(--status-success))' : (financeData?.net_margin_period || 0) < 0 ? 'var(--status-danger-text, var(--status-danger))' : 'var(--text-primary)',
                       marginBottom: 12,
                     }}>
                       {formatCurrency(financeData?.net_margin_period || 0)}
                     </div>
                     <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Net margin R
+                      Net margin (R)
                     </div>
                   </div>
 
@@ -813,7 +735,7 @@ export default function Insights() {
                       {(financeData?.net_margin_percent_period || 0).toFixed(1)}%
                     </div>
                     <div style={{ ...metricLabelTypography, color: 'var(--text-tertiary)' }}>
-                      Net margin %
+                      Net margin (%)
                     </div>
                   </div>
                 </div>
@@ -901,7 +823,7 @@ export default function Insights() {
                                 color: 'var(--text-secondary)',
                                 minWidth: 60,
                               }}>
-                                {r.trips} trips
+                                {plural(r.trips, 'trip', 'trips')}
                               </div>
                               <div style={{
                                 fontSize: 13,
@@ -969,6 +891,11 @@ export default function Insights() {
 
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 520 }}>
+                          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 2, background: 'var(--accent-primary)' }} />Revenue</span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 2, background: 'var(--status-danger)', opacity: 0.7 }} />Costs</span>
+                            <span style={{ marginLeft: 'auto' }}>Net margin</span>
+                          </div>
                           {trend.map((m, idx) => {
                             const revWidth = maxValue > 0 ? (m.revenue / maxValue) * 100 : 0;
                             const expWidth = maxValue > 0 ? (m.expenses / maxValue) * 100 : 0;
@@ -982,7 +909,7 @@ export default function Insights() {
                                   fontFamily: 'var(--font-sans)',
                                   color: 'var(--text-tertiary)',
                                 }}>
-                                  {new Date(m.month + '-01').toLocaleString('en-ZA', { month: 'short' })}
+                                  {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(m.month.slice(5, 7)) - 1] || m.month}
                                 </div>
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
                                   <div style={{
@@ -1017,7 +944,7 @@ export default function Insights() {
                             fontSize: 13,
                             color: isImproving ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))',
                           }}>
-                            {isImproving ? '↑ Margin improving' : '↓ Margin declining'}
+                            {isImproving ? 'Margin improving vs previous month' : 'Margin declining vs previous month'}
                           </div>
                         </div>
                       );
@@ -1036,7 +963,9 @@ export default function Insights() {
                     return (
                       <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-surface-hover)', borderRadius: 4, borderLeft: '3px solid var(--accent-primary)' }}>
                         <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                          <strong style={{ color: 'var(--text-primary)' }}>{largest.category.replace('_', ' ').charAt(0).toUpperCase() + largest.category.replace('_', ' ').slice(1)}</strong> is your largest cost at <strong style={{ color: 'var(--accent-primary)' }}>{largestPct.toFixed(1)}%</strong> of revenue ({formatCurrency(largest.amount)}).
+                          <strong style={{ color: 'var(--text-primary)' }}>{titleCase(largest.category)}</strong> is your largest cost ({formatCurrency(largest.amount)}){revenue > 0
+                            ? <> at <strong style={{ color: 'var(--text-primary)' }}>{largestPct.toFixed(1)}%</strong> of revenue.</>
+                            : '. No revenue was recorded in this period, so no share of revenue is shown.'}
                         </div>
                       </div>
                     );
@@ -1150,7 +1079,7 @@ export default function Insights() {
                   <div className="card">
                     <div style={{
                       ...metricValueTypography,
-                      color: (financeData?.cash_flow_forecast?.next_30_days || 0) >= 0 ? 'var(--status-success-text, var(--status-success))' : 'var(--status-danger-text, var(--status-danger))',
+                      color: (financeData?.cash_flow_forecast?.next_30_days || 0) > 0 ? 'var(--status-success-text, var(--status-success))' : (financeData?.cash_flow_forecast?.next_30_days || 0) < 0 ? 'var(--status-danger-text, var(--status-danger))' : 'var(--text-primary)',
                       marginBottom: 8,
                     }}>
                       {formatCurrency(financeData?.cash_flow_forecast?.next_30_days || 0)}
@@ -1281,7 +1210,7 @@ export default function Insights() {
                                 color: 'var(--text-secondary)',
                                 minWidth: 80,
                               }}>
-                                {c.invoice_count} invoices
+                                {plural(c.invoice_count, 'invoice', 'invoices')}
                               </div>
                               <div style={{
                                 fontSize: 13,
@@ -1307,11 +1236,15 @@ export default function Insights() {
                           fontSize: 13,
                           color: 'var(--text-secondary)',
                         }}>
-                          Collecting these 3 accounts would unlock <span style={{
-                            fontFamily: 'var(--font-sans)',
-                            fontWeight: 600,
-                            color: 'var(--accent-primary)',
-                          }}>{formatCurrency(top3sum)}</span> in cash
+                          {Number.isFinite(Number(top3sum)) ? (
+                            <>Collecting the top 3 accounts would unlock <span style={{
+                              fontFamily: 'var(--font-sans)',
+                              fontWeight: 600,
+                              color: 'var(--text-primary)',
+                            }}>{formatCurrency(top3sum)}</span> in cash</>
+                          ) : (
+                            <>The combined balance of the top 3 accounts is unavailable because one balance couldn't be read.</>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -1340,12 +1273,14 @@ export default function Insights() {
                         <ResponsiveContainer width="100%" height={240}>
                           <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
-                            <XAxis dataKey="week" tick={{ fontFamily: 'var(--font-sans)', fontSize: 13, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fontFamily: 'var(--font-sans)', fontSize: 13, fill: 'var(--text-tertiary)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R${Math.abs(v/1000).toFixed(0)}k`} />
+                            <XAxis dataKey="week" tick={{ fontFamily: 'var(--font-sans)', fontSize: 13, fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontFamily: 'var(--font-sans)', fontSize: 13, fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R${Math.abs(v/1000).toFixed(0)}k`} />
                             <Tooltip
                               contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}
-                              formatter={(value: number) => [formatCurrency(value), '']}
+                              formatter={(value: number) => [formatCurrency(value), 'Net position']}
                               labelStyle={{ color: 'var(--text-secondary)', marginBottom: 4 }}
+                              itemStyle={{ color: 'var(--text-primary)', padding: 0 }}
+                              cursor={{ fill: 'var(--bg-surface-hover)' }}
                             />
                             <ReferenceLine y={0} stroke="var(--border-subtle)" strokeWidth={1} />
                             <Bar dataKey="net" radius={[2, 2, 0, 0]}>
@@ -1613,7 +1548,7 @@ export default function Insights() {
                               color: 'var(--text-secondary)',
                               minWidth: 60,
                             }}>
-                              {d.total_trips} trips
+                              {plural(d.total_trips, 'trip', 'trips')}
                             </div>
                             <div style={{
                               fontSize: 13,
@@ -1775,7 +1710,7 @@ export default function Insights() {
                           </table>
                         </div>
                         <div className="insights-lanes-legend">
-                          Green = most efficient corridors · Red = least efficient
+                          Blue edge: two most efficient corridors · Red edge: two least efficient
                         </div>
                       </>
                     );

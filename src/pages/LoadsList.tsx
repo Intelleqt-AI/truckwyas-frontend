@@ -1,15 +1,16 @@
 import './bookings-typography.css';
 import './table-heading-roles.css';
+import './bookings-section.css';
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package } from 'lucide-react';
+import { Package, Plus } from 'lucide-react';
+import SectionHeader, { type SectionTab } from '@/components/layout/SectionHeader';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData, postData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { QuotesList } from './QuotesList';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
-import { LiveBadge } from '@/components/LiveBadge';
 import { Loader } from '@/components/Loader';
 
 interface Load {
@@ -26,17 +27,15 @@ interface Load {
   quote_number?: string;
 }
 
-/* Status text uses the tested -text roles: the raw amber swatch measures
-   2.2:1 on the light surface. (CANCELLED previously pointed at the
-   non-existent --status-error token and silently inherited.) */
-const STATUS_COLOR: Record<string, string> = {
-  PENDING: 'var(--text-secondary)',
-  ASSIGNED: 'var(--status-warning-text, var(--status-warning))',
-  IN_TRANSIT: 'var(--accent-primary)',
-  LOADING: 'var(--status-warning-text, var(--status-warning))',
-  DELIVERED: 'var(--status-success)',
-  INVOICED: 'var(--accent-primary)',
-  CANCELLED: 'var(--status-danger-text, var(--status-danger))',
+// Status chip tone; each tone uses the tested -text role on a tinted surface.
+const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
+  PENDING: 'neutral',
+  ASSIGNED: 'warning',
+  IN_TRANSIT: 'info',
+  LOADING: 'warning',
+  DELIVERED: 'success',
+  INVOICED: 'info',
+  CANCELLED: 'danger',
 };
 
 // Sentence-case a status token for display: "IN_TRANSIT" → "In transit".
@@ -48,10 +47,23 @@ type BookingTab = 'quotes' | 'orders' | 'history';
 const ACTIVE_STATUSES = ['PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'];
 const HISTORY_STATUSES = ['DELIVERED', 'INVOICED', 'CANCELLED'];
 
-const TAB_SUBTITLES: Record<BookingTab, string> = {
-  quotes: 'Sales pipeline',
+/** Shared sub-navigation for every Bookings list view. */
+export const BOOKINGS_TABS: SectionTab[] = [
+  { label: 'Quotes', to: '/bookings/quotes' },
+  { label: 'Orders', to: '/bookings/orders' },
+  { label: 'History', to: '/bookings/history' },
+];
+
+const TAB_TITLES: Record<BookingTab, string> = {
+  quotes: 'Quotes',
   orders: 'Active orders',
-  history: 'Completed & archived',
+  history: 'Order history',
+};
+
+const TAB_DESCRIPTIONS: Record<BookingTab, string> = {
+  quotes: 'Draft, send and track quotes.',
+  orders: 'Booked loads that are not yet delivered.',
+  history: 'Delivered, invoiced and cancelled loads.',
 };
 
 export default function LoadsList() {
@@ -125,212 +137,132 @@ export default function LoadsList() {
   });
 
   const renderTable = (data: Load[], showInvoiceAction: boolean) => (
-    <div className="card" style={{ padding: 0, overflowX: 'auto', overflowY: 'hidden' }}>
-      <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
+    <div className="bk-table-wrap">
+      <table className="table-heading-roles bk-table">
         <thead>
-          <tr style={{ background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)' }}>
-            {['Load #', 'Customer', 'Route', 'Driver', 'Vehicle', 'Status', 'Amount', 'Action'].map(h => (
-              <th key={h} style={{
-                padding: '12px 16px',
-                textAlign: h === 'Amount' ? 'right' : h === 'Action' ? 'center' : 'left',
-                whiteSpace: 'nowrap'
-              }}>{h}</th>
-            ))}
+          <tr>
+            <th scope="col">Load #</th>
+            <th scope="col">Customer</th>
+            <th scope="col">Route</th>
+            <th scope="col">Driver</th>
+            <th scope="col">Vehicle</th>
+            <th scope="col">Status</th>
+            <th scope="col" className="is-num">Amount</th>
+            {showInvoiceAction && <th scope="col" className="is-center">Action</th>}
           </tr>
         </thead>
         <tbody>
-          {data.map((load, idx) => (
+          {data.map((load) => (
             <tr
               key={load.id}
+              className="is-clickable"
               onClick={() => navigate(`/bookings/${load.id}`)}
-              style={{
-                borderBottom: idx < data.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                cursor: 'pointer',
-                transition: 'background 0.15s ease',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-surface)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
-              <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', fontWeight: 500, whiteSpace: 'nowrap' }}>{load.load_number}</td>
-              <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{load.customer_name || '—'}</td>
-              <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${load.pickup_location} → ${load.delivery_location}`}>
+              <td className="is-id">{load.load_number}</td>
+              <td className="is-primary is-truncate" style={{ maxWidth: 200 }} title={load.customer_name || ''}>{load.customer_name || '—'}</td>
+              <td className="is-truncate" style={{ maxWidth: 220 }} title={`${load.pickup_location} → ${load.delivery_location}`}>
                 {load.pickup_location} → {load.delivery_location}
               </td>
-              <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{load.driver_name || '—'}</td>
-              <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={load.vehicle_info || ''}>{load.vehicle_info || '—'}</td>
-              <td style={{ padding: '12px 16px' }}>
-                <span style={{
-                  display: 'inline-block', whiteSpace: 'nowrap',
-                  fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)',
-                  color: STATUS_COLOR[load.status] || 'var(--text-secondary)',
-                  padding: '3px 9px',
-                  border: `1px solid ${STATUS_COLOR[load.status] || 'var(--border-subtle)'}`,
-                  borderRadius: 4,
-                }}>
+              <td>{load.driver_name || '—'}</td>
+              <td className="is-truncate" style={{ maxWidth: 160 }} title={load.vehicle_info || ''}>{load.vehicle_info || '—'}</td>
+              <td>
+                <span className={`bk-status bk-status--${STATUS_TONE[load.status] || 'neutral'}`}>
                   {formatStatus(load.status)}
                 </span>
               </td>
-              <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              <td className="is-money">
                 {formatCurrency(parseFloat(load.total_amount || '0'))}
               </td>
-              <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                {showInvoiceAction && load.status === 'DELIVERED' && (
+              {showInvoiceAction && <td className="is-center" onClick={(e) => e.stopPropagation()}>
+                {load.status === 'DELIVERED' && (
                   <button
+                    type="button"
+                    className="bk-btn bk-btn--outline"
                     onClick={(e) => handleConvertToInvoice(load, e)}
                     disabled={convertingIds.has(load.id)}
-                    style={{
-                      background: 'transparent',
-                      border: '1px solid var(--accent-primary)',
-                      color: 'var(--accent-primary)',
-                      padding: '5px 12px', minHeight: 40, fontSize: 14, lineHeight: '20px', whiteSpace: 'nowrap',
-                      borderRadius: 6,
-                      cursor: convertingIds.has(load.id) ? 'not-allowed' : 'pointer',
-                      opacity: convertingIds.has(load.id) ? 0.5 : 1,
-                      transition: 'all 0.15s ease',
-                    }}
+                    style={{ padding: '8px 12px' }}
                   >
-                    {convertingIds.has(load.id) ? 'Creating…' : '→ Invoice'}
+                    {convertingIds.has(load.id) ? 'Creating…' : 'Create invoice'}
                   </button>
                 )}
-              </td>
+              </td>}
             </tr>
           ))}
         </tbody>
       </table>
       {data.length === 0 && (
         loads.length === 0 ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-            <div style={{ marginBottom: 16, opacity: 0.3 }}><Package size={40} aria-hidden="true" /></div>
-            <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-              No loads yet
-            </div>
-            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 20 }}>
-              Get started by creating your first quote or booking
-            </div>
-            <button onClick={() => navigate('/bookings/quotes/new')} className="btn-action">
-              Create quote
+          <div className="bk-empty">
+            <div className="bk-empty__icon"><Package size={32} aria-hidden="true" /></div>
+            <h2 className="bk-empty__title">No loads yet</h2>
+            <p className="bk-empty__text">Create a quote, then convert it to a booking once the customer accepts.</p>
+            <button type="button" onClick={() => navigate('/bookings/quotes/new')} className="bk-btn bk-btn--primary">
+              New quote
             </button>
           </div>
         ) : (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>
-            No loads match your filters
+          <div className="bk-empty">
+            <p className="bk-empty__text">No loads match your filters.</p>
           </div>
         )
       )}
     </div>
   );
 
-  if (loading) {
-    return <Loader fullScreen />;
-  }
+  const metricCards = (items: { label: string; value: React.ReactNode; color: string }[]) => (
+    <div className="bk-metrics bk-metrics--money">
+      {items.map(m => (
+        <div key={m.label} className="card metric-card">
+          <div className="card-header"><span className="card-title">{m.label}</span></div>
+          <div className="metric-value" style={{ color: m.color }}>{m.value}</div>
+        </div>
+      ))}
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div style={{ padding: 40 }}>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 4 }}>
-          Unable to reach the server.
-        </div>
-        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
+  // Body below the shared header. Loading and error states render here so
+  // the title and sub-navigation stay put while data arrives.
+  let body: React.ReactNode;
+  if (activeTab === 'quotes') {
+    body = null; // Quotes manage their own loading per column.
+  } else if (loading) {
+    body = <Loader fullScreen />;
+  } else if (error) {
+    body = (
+      <div className="card" role="alert" style={{ padding: 24 }}>
+        <h2 className="bk-empty__title" style={{ textAlign: 'left' }}>Unable to load bookings</h2>
+        <p className="bk-empty__text" style={{ marginBottom: 16 }}>
           The server may be starting up — this usually resolves in 20–30 seconds.
+        </p>
+        <div>
+          <button
+            type="button"
+            className="bk-btn bk-btn--primary"
+            disabled={isFetching}
+            onClick={() => refetch()}
+          >
+            {isFetching ? 'Retrying…' : 'Retry loading'}
+          </button>
         </div>
-        <button
-          className="btn-action"
-          disabled={isFetching}
-          onClick={() => refetch()}
-          style={{ opacity: isFetching ? 0.6 : 1 }}
-        >
-          {isFetching ? 'Connecting…' : 'Retry'}
-        </button>
       </div>
     );
   }
 
   return (
     <div className="bookings-typography" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexShrink: 0 }}>
-        <div>
-          <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Bookings</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)' }}>{TAB_SUBTITLES[activeTab]}</h1>
-            <LiveBadge />
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => navigate('/bookings/quotes/new')}
-            style={{
-              background: 'var(--accent-primary)', border: 'none', color: 'var(--btn-action-color, #fff)',
-              padding: '8px 16px', minHeight: 40, fontSize: 14, lineHeight: '20px',
-              fontWeight: 500, borderRadius: 4, cursor: 'pointer',
-            }}
-          >+ New quote</button>
-        </div>
-      </div>
-
-      {/* Tab Navigation — search + Board/List toggle sit inline on the right, only for Quotes */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', marginBottom: 20, flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: 24 }}>
-          {([
-            { id: 'quotes' as BookingTab, label: 'Quotes' },
-            { id: 'orders' as BookingTab, label: 'Orders' },
-            { id: 'history' as BookingTab, label: 'History' },
-          ]).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => navigate(`/bookings/${tab.id}`)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
-                color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-                padding: '12px 0',
-                fontSize: 14,
-                fontWeight: activeTab === tab.id ? 500 : 400,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--text-primary)';
-              }}
-              onMouseLeave={(e) => {
-                if (activeTab !== tab.id) e.currentTarget.style.color = 'var(--text-secondary)';
-              }}
-            >
-              {tab.label}
+      <div style={{ flexShrink: 0 }}>
+        <SectionHeader
+          eyebrow="Bookings"
+          title={TAB_TITLES[activeTab]}
+          description={TAB_DESCRIPTIONS[activeTab]}
+          actions={
+            <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate('/bookings/quotes/new')}>
+              <Plus size={16} aria-hidden="true" />
+              New quote
             </button>
-          ))}
-        </div>
-
-        {activeTab === 'quotes' && (
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', paddingBottom: 12 }}>
-            <input
-              type="text"
-              placeholder="Search loads, customers, routes..."
-              value={quoteSearch}
-              onChange={e => setQuoteSearch(e.target.value)}
-              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '6px 10px', minHeight: 40, color: 'var(--text-primary)', borderRadius: 6, fontSize: 14, lineHeight: '20px', outline: 'none', width: 280, fontFamily: 'var(--font-sans)' }}
-            />
-            <div style={{ display: 'flex', gap: 4 }}>
-              {(['board', 'list'] as const).map(v => (
-                <button key={v} onClick={() => setQuoteView(v)} style={{
-                  background: quoteView === v ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  color: quoteView === v ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                  padding: '6px 12px',
-                  minHeight: 40,
-                  borderRadius: 6,
-                  fontSize: 14,
-                  lineHeight: '20px',
-                  fontFamily: 'var(--font-sans)',
-                  cursor: 'pointer',
-                  fontWeight: quoteView === v ? 500 : 400,
-                  transition: 'all 0.2s ease',
-                }}>{v === 'board' ? 'Board' : 'List'}</button>
-              ))}
-            </div>
-          </div>
-        )}
+          }
+          tabs={BOOKINGS_TABS}
+        />
       </div>
 
       {/* QUOTES TAB — fills remaining viewport height; QuotesList scrolls its own areas internally */}
@@ -340,46 +272,33 @@ export default function LoadsList() {
         </div>
       )}
 
-      {/* ORDERS TAB */}
-      {activeTab === 'orders' && (
-        <div>
-          {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 24 }}>
-            {[
-              { label: 'Active orders', value: activeLoads.length, color: 'var(--text-primary)' },
-              { label: 'In transit', value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length, color: 'var(--accent-primary)' },
-              { label: 'Loading', value: activeLoads.filter(l => l.status === 'LOADING').length, color: 'var(--status-warning-text, var(--status-warning))' },
-              { label: 'Revenue (active)', value: formatCurrency(activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--accent-primary)' },
-            ].map(m => (
-              <div key={m.label} className="card metric-card">
-                <div className="card-header"><span className="card-title">{m.label}</span></div>
-                <div className="metric-value" style={{ color: m.color }}>{m.value}</div>
-              </div>
-            ))}
-          </div>
+      {activeTab !== 'quotes' && body}
 
-          {/* Order Status Filter */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-            {['All', 'PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].map(status => {
-              const isActive = orderFilter === status;
-              return (
+      {/* ORDERS TAB */}
+      {activeTab === 'orders' && !body && (
+        <div>
+          {metricCards([
+            { label: 'Active orders', value: activeLoads.length, color: 'var(--text-primary)' },
+            { label: 'In transit', value: activeLoads.filter(l => l.status === 'IN_TRANSIT').length, color: 'var(--text-primary)' },
+            { label: 'Loading', value: activeLoads.filter(l => l.status === 'LOADING').length, color: 'var(--text-primary)' },
+            { label: 'Revenue (active)', value: formatCurrency(activeLoads.reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--text-primary)' },
+          ])}
+
+          <div className="bk-toolbar">
+            <div className="bk-filters" role="group" aria-label="Filter orders by status">
+              {['All', 'PENDING', 'ASSIGNED', 'LOADING', 'IN_TRANSIT'].map(status => (
                 <button
                   key={status}
+                  type="button"
+                  aria-pressed={orderFilter === status}
+                  className={`bk-chip${orderFilter === status ? ' is-active' : ''}`}
                   onClick={() => setOrderFilter(status)}
-                  style={{
-                    background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                    border: `1px solid ${isActive ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
-                    color: isActive ? 'var(--btn-action-color, #fff)' : 'var(--text-secondary)',
-                    padding: '6px 12px', minHeight: 40, fontSize: 14, lineHeight: '20px', whiteSpace: 'nowrap',
-                    borderRadius: 4, cursor: 'pointer',
-                    fontWeight: isActive ? 500 : 400,
-                    transition: 'all 0.2s ease'
-                  }}
                 >
                   {status === 'All' ? 'All' : formatStatus(status)}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+            <span className="bk-toolbar__end">{filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}</span>
           </div>
 
           {renderTable(filteredOrders, false)}
@@ -387,59 +306,38 @@ export default function LoadsList() {
       )}
 
       {/* HISTORY TAB */}
-      {activeTab === 'history' && (
+      {activeTab === 'history' && !body && (
         <div>
-          {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 24 }}>
-            {[
-              { label: 'Completed', value: historyLoads.filter(l => l.status === 'DELIVERED' || l.status === 'INVOICED').length, color: 'var(--status-success)' },
-              { label: 'Invoiced', value: historyLoads.filter(l => l.status === 'INVOICED').length, color: 'var(--accent-primary)' },
-              { label: 'Cancelled', value: historyLoads.filter(l => l.status === 'CANCELLED').length, color: 'var(--status-error)' },
-              { label: 'Total revenue', value: formatCurrency(historyLoads.filter(l => l.status !== 'CANCELLED').reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--accent-primary)' },
-            ].map(m => (
-              <div key={m.label} className="card metric-card">
-                <div className="card-header"><span className="card-title">{m.label}</span></div>
-                <div className="metric-value" style={{ color: m.color }}>{m.value}</div>
-              </div>
-            ))}
-          </div>
+          {metricCards([
+            { label: 'Completed', value: historyLoads.filter(l => l.status === 'DELIVERED' || l.status === 'INVOICED').length, color: 'var(--text-primary)' },
+            { label: 'Invoiced', value: historyLoads.filter(l => l.status === 'INVOICED').length, color: 'var(--text-primary)' },
+            { label: 'Cancelled', value: historyLoads.filter(l => l.status === 'CANCELLED').length, color: 'var(--text-primary)' },
+            { label: 'Total revenue', value: formatCurrency(historyLoads.filter(l => l.status !== 'CANCELLED').reduce((sum, l) => sum + parseFloat(l.total_amount || '0'), 0)), color: 'var(--text-primary)' },
+          ])}
 
-          {/* History Filters */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center' }}>
+          <div className="bk-toolbar">
             <input
-              type="text" placeholder="Search history..."
-              value={historySearch} onChange={e => setHistorySearch(e.target.value)}
-              style={{
-                background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                padding: '6px 10px', minHeight: 40, color: 'var(--text-primary)', borderRadius: 6,
-                fontSize: 14, lineHeight: '20px', outline: 'none', width: 220, fontFamily: 'var(--font-sans)',
-              }}
+              type="search"
+              className="bk-search"
+              aria-label="Search history"
+              placeholder="Search customer, load or route"
+              value={historySearch}
+              onChange={e => setHistorySearch(e.target.value)}
             />
-            <div style={{ display: 'flex', gap: 8 }}>
-              {['All', 'DELIVERED', 'INVOICED', 'CANCELLED'].map(status => {
-                const isActive = historyFilter === status;
-                return (
-                  <button
-                    key={status}
-                    onClick={() => setHistoryFilter(status)}
-                    style={{
-                      background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                      border: '1px solid var(--border-subtle)',
-                      color: isActive ? 'var(--bg-deep)' : 'var(--text-secondary)',
-                      padding: '6px 12px', minHeight: 40, fontFamily: 'var(--font-sans)', fontSize: 14,
-                      lineHeight: '20px', borderRadius: 6, cursor: 'pointer',
-                      fontWeight: isActive ? 600 : 400,
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    {status === 'All' ? 'All' : formatStatus(status)}
-                  </button>
-                );
-              })}
+            <div className="bk-filters" role="group" aria-label="Filter history by status">
+              {['All', 'DELIVERED', 'INVOICED', 'CANCELLED'].map(status => (
+                <button
+                  key={status}
+                  type="button"
+                  aria-pressed={historyFilter === status}
+                  className={`bk-chip${historyFilter === status ? ' is-active' : ''}`}
+                  onClick={() => setHistoryFilter(status)}
+                >
+                  {status === 'All' ? 'All' : formatStatus(status)}
+                </button>
+              ))}
             </div>
-            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-              {filteredHistory.length} records
-            </span>
+            <span className="bk-toolbar__end">{filteredHistory.length} {filteredHistory.length === 1 ? 'record' : 'records'}</span>
           </div>
 
           {renderTable(filteredHistory, true)}

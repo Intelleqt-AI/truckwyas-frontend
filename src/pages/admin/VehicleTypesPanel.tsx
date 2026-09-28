@@ -16,15 +16,15 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 // VehicleTypeViewSet._forbid_shared_type_write), this is the only place they
 // can actually be changed.
 
-const cardStyle: React.CSSProperties = { padding: 20 };
+const cardStyle: React.CSSProperties = { padding: 24 };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 16 };
 const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 12px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  textAlign: 'left', padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
   fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)',
   borderBottom: '1px solid var(--border-subtle)',
 };
 const tdStyle: React.CSSProperties = {
-  padding: '12px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
   padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
@@ -175,10 +175,10 @@ export default function VehicleTypesPanel() {
         { key: 'name', label: 'Name', type: 'text' },
         { key: 'description', label: 'Description', type: 'text' },
         { key: 'capacity', label: 'Payload (tonnes)', type: 'number' },
-        { key: 'max_distance', label: 'Max Distance (km)', type: 'number' },
-        { key: 'base_rate', label: 'Base Rate (R/km)', type: 'number' },
-        { key: 'fuel_consumption_l_per_100km', label: 'Fuel Consumption (L/100km)', type: 'number' },
-        { key: 'fuel_consumption_sensitivity_pct', label: 'Fuel Sensitivity (%/tonne over payload)', type: 'number' },
+        { key: 'max_distance', label: 'Max distance (km)', type: 'number' },
+        { key: 'base_rate', label: 'Base rate (R/km)', type: 'number' },
+        { key: 'fuel_consumption_l_per_100km', label: 'Fuel consumption (L/100km)', type: 'number' },
+        { key: 'fuel_consumption_sensitivity_pct', label: 'Fuel sensitivity (%/tonne over payload)', type: 'number' },
       ] as const).map(fld => (
         <div key={fld.key} style={{ marginBottom: 14 }}>
           <label style={labelStyle}>{fld.label}</label>
@@ -196,30 +196,30 @@ export default function VehicleTypesPanel() {
   return (
     <div className="card" style={cardStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
-        <div style={{ ...sectionTitleStyle, marginBottom: 0 }}>Truck Types {data ? `(${types.length})` : ''}</div>
-        <button className="btn-action" style={{ fontSize: 11 }} onClick={() => { setShowAdd(s => !s); setFormErr(''); }}>
-          {showAdd ? 'Cancel' : '+ Add Type'}
+        <h2 style={{ ...sectionTitleStyle, marginBottom: 0 }}>Truck types {data ? `(${types.length})` : ''}</h2>
+        <button className="btn-action admin-control" onClick={() => { setShowAdd(s => !s); setFormErr(''); }}>
+          {showAdd ? 'Cancel' : 'Add type'}
         </button>
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 14 }}>
+      <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
         Shared across every company — capacity is always payload, never GVM. Changes here apply platform-wide immediately.
       </div>
 
       {showAdd && (
         <div style={{
           padding: 16, marginBottom: 16, background: 'var(--bg-surface-hover, var(--bg-surface))',
-          border: '1px solid var(--border-subtle)', borderRadius: 2,
+          border: '1px solid var(--border-subtle)', borderRadius: 8,
           display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12,
         }}>
           {formErr && (
-            <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 2, fontSize: 12 }}>
+            <div style={{ gridColumn: '1 / -1', padding: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', borderRadius: 6, fontSize: 13, lineHeight: '20px' }}>
               {formErr}
             </div>
           )}
           {renderFields(form, setForm)}
           <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 10 }}>
-            <button className="btn-action" style={{ fontSize: 11 }} disabled={saving} onClick={handleAdd}>
-              {saving ? 'Saving…' : 'Save Type'}
+            <button className="btn-action admin-control" disabled={saving} onClick={handleAdd}>
+              {saving ? 'Saving…' : 'Save type'}
             </button>
           </div>
         </div>
@@ -229,15 +229,15 @@ export default function VehicleTypesPanel() {
         <Loader size={24} />
       ) : (
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Name</th>
-                <th style={thStyle}>Payload</th>
-                <th style={thStyle}>Base Rate</th>
-                <th style={thStyle}>Fuel</th>
+                <th className="num" style={thStyle}>Payload</th>
+                <th className="num" style={thStyle}>Base rate</th>
+                <th className="num" style={thStyle}>Fuel</th>
                 <th style={thStyle}>Status</th>
-                <th style={thStyle}>Actions</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -245,16 +245,16 @@ export default function VehicleTypesPanel() {
                 <tr key={t.id} style={{ opacity: t.active ? 1 : 0.55 }}>
                   <td style={tdStyle}>
                     <div>{t.name}</div>
-                    {t.description && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{t.description}</div>}
+                    {t.description && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{t.description}</div>}
                   </td>
-                  <td style={tdStyle}>{t.capacity}t</td>
-                  <td style={tdStyle}>{fmtRate(t.base_rate)}<span style={{ color: 'var(--text-tertiary)', fontSize: 10 }}>/km</span></td>
-                  <td style={tdStyle}>{t.fuel_consumption_l_per_100km}L/100km</td>
+                  <td className="num" style={tdStyle}>{t.capacity}t</td>
+                  <td className="num" style={tdStyle}>{fmtRate(t.base_rate)}<span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>/km</span></td>
+                  <td className="num" style={tdStyle}>{t.fuel_consumption_l_per_100km}L/100km</td>
                   <td style={tdStyle}>
                     <span className={`status-badge ${t.active ? 'active' : 'delayed'}`}>{t.active ? 'Active' : 'Inactive'}</span>
                   </td>
                   <td style={tdStyle}>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                       <button style={secondaryBtnStyle} disabled={pending === t.id} onClick={() => openEdit(t)}>Edit</button>
                       <button style={secondaryBtnStyle} disabled={pending === t.id} onClick={() => toggleActive(t)}>
                         {t.active ? 'Deactivate' : 'Activate'}
@@ -283,7 +283,7 @@ export default function VehicleTypesPanel() {
           <div style={{ position: 'absolute', inset: 0, background: 'var(--modal-backdrop)' }} onClick={() => setEditTarget(null)} />
           <div style={{ position: 'relative', width: 420, background: 'var(--bg-deep)', borderLeft: '1px solid var(--border-subtle)', padding: 28, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>Edit Truck Type</div>
+              <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Edit truck type</h2>
               <button onClick={() => setEditTarget(null)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
             {formErr && (

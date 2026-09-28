@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader } from '@/components/Loader';
 import { toast } from '@/lib/toast';
 import { useAuth } from '@/lib/AuthContext';
+import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsHelpStyle } from './settingsUi';
 
 const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 const resolveLogoUrl = (url?: string) => {
@@ -14,56 +15,15 @@ const resolveLogoUrl = (url?: string) => {
   return `${apiBase}/${url.replace(/^\//, '')}`;
 };
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 8,
-  marginBottom: 16,
-};
+const sectionStyle = settingsCardStyle;
+const sectionHeaderStyle = settingsCardHeaderStyle;
+const sectionTitleStyle = settingsCardTitleStyle;
+const labelStyle = settingsLabelStyle;
+const inputStyle = settingsInputStyle;
+const helpTextStyle = settingsHelpStyle;
 
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: '16px 20px 12px',
-  borderBottom: '1px solid var(--border-subtle)',
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  fontWeight: 600,
-  color: 'var(--text-primary)',
-  margin: 0,
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 13,
-  lineHeight: '20px',
-  fontWeight: 500,
-  color: 'var(--text-primary)',
-  marginBottom: 6,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: 'var(--input-bg)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 6,
-  padding: '8px 12px',
-  minHeight: 40,
-  color: 'var(--text-primary)',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 14,
-  lineHeight: '20px',
-};
-
-const helpTextStyle: React.CSSProperties = {
-  fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 6,
-};
-
-const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 };
-const grid3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 };
+const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 };
+const grid3: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 };
 
 export function CompanySettings() {
   const { user: authUser } = useAuth();
@@ -291,7 +251,7 @@ export function CompanySettings() {
 
       {/* Company Logo */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Company logo</h3></div>
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Company logo</h2></div>
         <div style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 20 }}>
           <div style={{
             width: 96, height: 96, flexShrink: 0,
@@ -325,7 +285,7 @@ export function CompanySettings() {
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingLogo || isDemo}
               title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ minHeight: 40, borderRadius: 6, opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+              style={{ opacity: isDemo ? 0.5 : uploadingLogo ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
             >
               {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace logo' : 'Upload logo'}
             </button>
@@ -335,17 +295,17 @@ export function CompanySettings() {
 
       {/* Business Info */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Business information</h3></div>
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Business information</h2></div>
         <div style={{ padding: 20 }}>
           <div style={{ ...grid2, marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>Company name</label>
-              <input className="settings-control" style={inputStyle} value={form.company_name} onChange={e => set('company_name', e.target.value)} />
+              <label htmlFor="company-company-name" style={labelStyle}>Company name</label>
+              <input id="company-company-name" className="settings-control" style={inputStyle} value={form.company_name} onChange={e => set('company_name', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Industry</label>
+              <label htmlFor="company-industry" style={labelStyle}>Industry</label>
               <Select value={form.industry} onValueChange={val => set('industry', val)}>
-                <SelectTrigger>
+                <SelectTrigger style={inputStyle} id="company-industry">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -361,21 +321,21 @@ export function CompanySettings() {
           </div>
           <div style={{ ...grid2, marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>Registration number</label>
-              <input className="settings-control" style={inputStyle} value={form.registration_number} onChange={e => set('registration_number', e.target.value)} placeholder="YYYY/XXXXXX/XX" />
+              <label htmlFor="company-registration-number" style={labelStyle}>Registration number</label>
+              <input id="company-registration-number" className="settings-control" style={inputStyle} value={form.registration_number} onChange={e => set('registration_number', e.target.value)} placeholder="YYYY/XXXXXX/XX" />
             </div>
             <div>
-              <label style={labelStyle}>VAT number</label>
-              <input className="settings-control" style={inputStyle} value={form.vat_number} onChange={e => set('vat_number', e.target.value)} placeholder="4XXXXXXXXX" />
+              <label htmlFor="company-vat-number" style={labelStyle}>VAT number</label>
+              <input id="company-vat-number" className="settings-control" style={inputStyle} value={form.vat_number} onChange={e => set('vat_number', e.target.value)} placeholder="4XXXXXXXXX" />
             </div>
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Website</label>
-            <input className="settings-control" style={inputStyle} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://" />
+            <label htmlFor="company-website" style={labelStyle}>Website</label>
+            <input id="company-website" className="settings-control" style={inputStyle} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://" />
           </div>
           <div>
-            <label style={labelStyle}>Description</label>
-            <textarea
+            <label htmlFor="company-description" style={labelStyle}>Description</label>
+            <textarea id="company-description"
               className="settings-control"
               style={{ ...inputStyle, minHeight: 72, resize: 'vertical' as const }}
               value={form.description}
@@ -387,21 +347,21 @@ export function CompanySettings() {
 
       {/* Address */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Business address</h3></div>
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Business address</h2></div>
         <div style={{ padding: 20 }}>
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Street address</label>
-            <input className="settings-control" style={inputStyle} value={form.street} onChange={e => set('street', e.target.value)} />
+            <label htmlFor="company-street-address" style={labelStyle}>Street address</label>
+            <input id="company-street-address" className="settings-control" style={inputStyle} value={form.street} onChange={e => set('street', e.target.value)} />
           </div>
           <div style={{ ...grid3, marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>City</label>
-              <input className="settings-control" style={inputStyle} value={form.city} onChange={e => set('city', e.target.value)} />
+              <label htmlFor="company-city" style={labelStyle}>City</label>
+              <input id="company-city" className="settings-control" style={inputStyle} value={form.city} onChange={e => set('city', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Province</label>
+              <label htmlFor="company-province" style={labelStyle}>Province</label>
               <Select value={form.province} onValueChange={val => set('province', val)}>
-                <SelectTrigger>
+                <SelectTrigger style={inputStyle} id="company-province">
                   <SelectValue placeholder="Select province" />
                 </SelectTrigger>
                 <SelectContent>
@@ -418,8 +378,8 @@ export function CompanySettings() {
               </Select>
             </div>
             <div>
-              <label style={labelStyle}>Postal code</label>
-              <input className="settings-control" style={inputStyle} value={form.postal_code} onChange={e => set('postal_code', e.target.value)} />
+              <label htmlFor="company-postal-code" style={labelStyle}>Postal code</label>
+              <input id="company-postal-code" className="settings-control" style={inputStyle} value={form.postal_code} onChange={e => set('postal_code', e.target.value)} />
             </div>
           </div>
         </div>
@@ -427,20 +387,20 @@ export function CompanySettings() {
 
       {/* Contact */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Contact details</h3></div>
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Contact details</h2></div>
         <div style={{ padding: 20 }}>
           <div style={{ ...grid3 }}>
             <div>
-              <label style={labelStyle}>Phone</label>
-              <input className="settings-control" style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
+              <label htmlFor="company-phone" style={labelStyle}>Phone</label>
+              <input id="company-phone" className="settings-control" style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Business email</label>
-              <input className="settings-control" style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+              <label htmlFor="company-business-email" style={labelStyle}>Business email</label>
+              <input id="company-business-email" className="settings-control" style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
             </div>
             <div>
-              <label style={labelStyle}>Support email</label>
-              <input className="settings-control" style={inputStyle} type="email" value={form.support_email} onChange={e => set('support_email', e.target.value)} />
+              <label htmlFor="company-support-email" style={labelStyle}>Support email</label>
+              <input id="company-support-email" className="settings-control" style={inputStyle} type="email" value={form.support_email} onChange={e => set('support_email', e.target.value)} />
             </div>
           </div>
         </div>
@@ -448,12 +408,12 @@ export function CompanySettings() {
 
       {/* Quote Defaults */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Quote defaults</h3></div>
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Quote defaults</h2></div>
         <div style={{ padding: 20 }}>
           <div style={grid2}>
             <div>
-              <label style={labelStyle}>Default quote validity (days)</label>
-              <input
+              <label htmlFor="company-default-quote-validity-days" style={labelStyle}>Default quote validity (days)</label>
+              <input id="company-default-quote-validity-days"
                 className="settings-control"
                 style={inputStyle}
                 type="number"
@@ -467,9 +427,9 @@ export function CompanySettings() {
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Cross-border routes</label>
+              <label htmlFor="company-cross-border-routes" style={labelStyle}>Cross-border routes</label>
               <Select value={form.allow_cross_border} onValueChange={val => set('allow_cross_border', val)}>
-                <SelectTrigger>
+                <SelectTrigger style={inputStyle} id="company-cross-border-routes">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -487,8 +447,8 @@ export function CompanySettings() {
 
           <div style={{ ...grid2, marginTop: 16 }}>
             <div>
-              <label style={labelStyle}>Default base rate (R/km)</label>
-              <input
+              <label htmlFor="company-default-base-rate-r-km" style={labelStyle}>Default base rate (R/km)</label>
+              <input id="company-default-base-rate-r-km"
                 className="settings-control"
                 style={inputStyle}
                 type="number"
@@ -504,8 +464,8 @@ export function CompanySettings() {
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Default toll rate (R/km)</label>
-              <input
+              <label htmlFor="company-default-toll-rate-r-km" style={labelStyle}>Default toll rate (R/km)</label>
+              <input id="company-default-toll-rate-r-km"
                 className="settings-control"
                 style={inputStyle}
                 type="number"
@@ -524,8 +484,8 @@ export function CompanySettings() {
 
           <div style={{ ...grid2, marginTop: 16 }}>
             <div>
-              <label style={labelStyle}>Default SLA (hours)</label>
-              <input
+              <label htmlFor="company-default-sla-hours" style={labelStyle}>Default SLA (hours)</label>
+              <input id="company-default-sla-hours"
                 className="settings-control"
                 style={inputStyle}
                 type="number"
@@ -540,8 +500,8 @@ export function CompanySettings() {
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Border crossings per year</label>
-              <input
+              <label htmlFor="company-border-crossings-per-year" style={labelStyle}>Border crossings per year</label>
+              <input id="company-border-crossings-per-year"
                 className="settings-control"
                 style={inputStyle}
                 type="number"
@@ -563,7 +523,7 @@ export function CompanySettings() {
 
       {/* Fuel Price Defaults */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}><h3 style={sectionTitleStyle}>Fuel price defaults</h3></div>
+        <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Fuel price defaults</h2></div>
         <div style={{ padding: 20 }}>
           <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginBottom: 16 }}>
             Used as the default price when a vehicle type of that fuel type doesn't have
@@ -573,13 +533,13 @@ export function CompanySettings() {
           </div>
           <div style={{ marginBottom: 16 }}>
             <div>
-              <label style={labelStyle}>Fuel pricing zone</label>
+              <label htmlFor="company-fuel-pricing-zone" style={labelStyle}>Fuel pricing zone</label>
               <Select
                 value={form.fuel_zone}
                 onValueChange={val => { set('fuel_zone', val); loadLivePrice(true, val, true); }}
                 disabled={fetchingLivePrice}
               >
-                <SelectTrigger>
+                <SelectTrigger style={inputStyle} id="company-fuel-pricing-zone">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -597,9 +557,9 @@ export function CompanySettings() {
           </div>
           <div style={grid2}>
             <div>
-              <label style={labelStyle}>Diesel (R/L)</label>
+              <label htmlFor="company-diesel-r-l" style={labelStyle}>Diesel (R/L)</label>
               <div style={{ display: 'flex', gap: 8 }}>
-                <input
+                <input id="company-diesel-r-l"
                   style={inputStyle}
                   type="number"
                   min={0}
@@ -627,7 +587,7 @@ export function CompanySettings() {
                 </button>
               </div>
               {livePrice?.success !== false && (livePrice?.inland_price != null || livePrice?.stale_warning) && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: livePrice.is_stale ? 'var(--status-warning)' : 'var(--text-tertiary)', marginTop: 6 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: livePrice.is_stale ? 'var(--status-warning-text, var(--status-warning))' : 'var(--text-tertiary)', marginTop: 6 }}>
                   {livePrice.inland_price != null ? (
                     <>
                       Live national price: R{Number(livePrice.inland_price).toFixed(2)}/L
@@ -645,9 +605,9 @@ export function CompanySettings() {
               )}
             </div>
             <div>
-              <label style={labelStyle}>Petrol (R/L)</label>
+              <label htmlFor="company-petrol-r-l" style={labelStyle}>Petrol (R/L)</label>
               <div style={{ display: 'flex', gap: 8 }}>
-                <input
+                <input id="company-petrol-r-l"
                   style={inputStyle}
                   type="number"
                   min={0}
@@ -675,7 +635,7 @@ export function CompanySettings() {
                 </button>
               </div>
               {livePrice?.success !== false && (livePrice?.petrol_95 != null || livePrice?.stale_warning) && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: livePrice.is_stale ? 'var(--status-warning)' : 'var(--text-tertiary)', marginTop: 6 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: livePrice.is_stale ? 'var(--status-warning-text, var(--status-warning))' : 'var(--text-tertiary)', marginTop: 6 }}>
                   {livePrice.petrol_95 != null ? (
                     <>
                       Live national price (95 unleaded): R{Number(livePrice.petrol_95).toFixed(2)}/L
@@ -694,8 +654,8 @@ export function CompanySettings() {
           </div>
           <div style={{ ...grid2, marginTop: 16 }}>
             <div>
-              <label style={labelStyle}>Electric (R/kWh)</label>
-              <input
+              <label htmlFor="company-electric-r-kwh" style={labelStyle}>Electric (R/kWh)</label>
+              <input id="company-electric-r-kwh"
                 className="settings-control"
                 style={inputStyle}
                 type="number"
@@ -707,8 +667,8 @@ export function CompanySettings() {
               />
             </div>
             <div>
-              <label style={labelStyle}>Hybrid (R/L)</label>
-              <input
+              <label htmlFor="company-hybrid-r-l" style={labelStyle}>Hybrid (R/L)</label>
+              <input id="company-hybrid-r-l"
                 className="settings-control"
                 style={inputStyle}
                 type="number"
@@ -729,7 +689,7 @@ export function CompanySettings() {
           onClick={handleSave}
           disabled={saving || isDemo}
           title={isDemo ? 'Fixed in demo mode' : undefined}
-          style={{ minHeight: 40, borderRadius: 6, opacity: isDemo ? 0.5 : saving ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
+          style={{ opacity: isDemo ? 0.5 : saving ? 0.6 : 1, cursor: isDemo ? 'not-allowed' : undefined }}
         >
           {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
         </button>

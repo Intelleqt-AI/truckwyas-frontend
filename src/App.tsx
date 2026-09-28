@@ -4,7 +4,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as ToastProvider } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OSLayout } from './components/os/OSLayout';
@@ -144,6 +144,13 @@ function LoadsRedirect() {
   return <Navigate to={`/bookings/${id}`} replace />;
 }
 
+// Section aliases land on the canonical tabbed route (so the section tab and
+// sidebar item are active) while keeping any query string / hash intact.
+function SectionRedirect({ to }: { to: string }) {
+  const { search, hash } = useLocation();
+  return <Navigate to={`${to}${search}${hash}`} replace />;
+}
+
 const App = () => (
   <AuthProvider>
     <BrowserRouter>
@@ -267,7 +274,7 @@ const App = () => (
                 <Route path="/bookings/:id" element={<Bookings />} />
 
                 {/* Fleet */}
-                <Route path="/fleet" element={<Vehicles />} />
+                <Route path="/fleet" element={<SectionRedirect to="/fleet/vehicles" />} />
                 <Route path="/fleet/overview" element={<FleetDashboard />} />
                 <Route path="/fleet/vehicles" element={<Vehicles />} />
                 <Route path="/fleet/vehicles/:id" element={<VehicleFinancialProfile />} />
@@ -275,11 +282,12 @@ const App = () => (
                 <Route path="/fleet/drivers/:driverId" element={<DriverProfile />} />
                 <Route path="/fleet/drivers/:driverId/financial" element={<DriverProfile />} />
                 <Route path="/fleet/heatmap" element={<FleetHeatmap />} />
-                <Route path="/vehicles" element={<Vehicles />} />
-                <Route path="/drivers" element={<Drivers />} />
+                <Route path="/vehicles" element={<SectionRedirect to="/fleet/vehicles" />} />
+                <Route path="/drivers" element={<SectionRedirect to="/fleet/drivers" />} />
 
                 {/* Finance */}
-                <Route path="/invoices" element={<Invoices />} />
+                <Route path="/invoices" element={<SectionRedirect to="/finance/invoices" />} />
+                <Route path="/finance" element={<SectionRedirect to="/finance/invoices" />} />
                 <Route path="/finance/invoices" element={<Invoices />} />
                 <Route path="/finance/invoices/new" element={<CreateInvoice />} />
                 <Route path="/finance/invoices/:id" element={<InvoiceDetail />} />

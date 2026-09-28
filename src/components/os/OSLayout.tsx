@@ -218,7 +218,20 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   const visibleNavItems = navItems.filter(item => allowedPaths.includes(item.path));
   const canAccessSettings = !['VIEWER', 'DRIVER'].includes(userRole);
 
-  const isActive = (path: string) => (path === '/' ? location.pathname === '/' : location.pathname.startsWith(path));
+  // `path` stays the permission key (NAV_ACCESS). A section links to its first
+  // sub-route and stays highlighted on every sub-route and legacy alias.
+  const NAV_TARGET: Record<string, { to: string; match: string[] }> = {
+    '/fleet': { to: '/fleet/vehicles', match: ['/fleet', '/vehicles', '/drivers'] },
+    '/invoices': { to: '/finance/invoices', match: ['/finance', '/invoices', '/expenses', '/finance-reports'] },
+    '/bookings': { to: '/bookings', match: ['/bookings', '/quotes'] },
+  };
+  const underPrefix = (prefix: string) =>
+    location.pathname === prefix || location.pathname.startsWith(prefix + '/');
+  const isActive = (path: string) =>
+    path === '/'
+      ? location.pathname === '/'
+      : (NAV_TARGET[path]?.match ?? [path]).some(underPrefix);
+  const navTo = (path: string) => NAV_TARGET[path]?.to ?? path;
 
   return (
     <div className="os-container os-app-shell" style={{ gridTemplateColumns: '60px 1fr', gridTemplateRows: 'minmax(60px, auto) minmax(0, 1fr)' }}>
@@ -433,25 +446,20 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
           <Link
             key={item.path}
             className={`nav-item${isActive(item.path) ? ' active' : ''}`}
-            // onClick={() => navigate()}
-            to={item.path}
-            role="button"
-            aria-label={`Navigate to ${item.label}`}
-            // tabIndex={0}
-            // onKeyDown={e => e.key === 'Enter' && navigate(item.path)}
+            to={navTo(item.path)}
+            aria-label={item.label}
+            aria-current={isActive(item.path) ? 'page' : undefined}
           >
             {item.icon}
             <div className="nav-tooltip">{item.label}</div>
           </Link>
         ))}
         {canAccessSettings && (
-          <div
-            className={`nav-item${location.pathname.startsWith('/settings') ? ' active' : ''}`}
-            onClick={() => navigate('/settings')}
-            role="button"
-            aria-label="Navigate to Settings"
-            tabIndex={0}
-            onKeyDown={e => e.key === 'Enter' && navigate('/settings')}
+          <Link
+            className={`nav-item${underPrefix('/settings') ? ' active' : ''}`}
+            to="/settings"
+            aria-label="Settings"
+            aria-current={underPrefix('/settings') ? 'page' : undefined}
             style={{ marginTop: 'auto', marginBottom: 16 }}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -459,7 +467,7 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
             <div className="nav-tooltip">Settings</div>
-          </div>
+          </Link>
         )}
       </nav>
 

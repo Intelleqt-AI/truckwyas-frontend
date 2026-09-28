@@ -1,0 +1,12 @@
+/* Quote builder only: native date/select chrome follows the active theme so
+   the calendar and chevron icons stay visible on dark surfaces. Presentation
+   only; values and handlers untouched. */
+[data-theme="dark"] .qb-controls input[type="date"],
+[data-theme="dark"] .qb-controls select {
+  color-scheme: dark;
+}
+[data-theme="light"] .qb-controls input[type="date"],
+[data-theme="light"] .qb-controls select {
+  color-scheme: light;
+}
+.qb-controls input[type="date"] { height: 40px; }

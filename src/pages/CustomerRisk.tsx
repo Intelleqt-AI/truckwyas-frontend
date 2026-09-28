@@ -1,4 +1,5 @@
 import './table-heading-roles.css';
+import './finance-brand.css';
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -7,16 +8,27 @@ import {
   ResponsiveContainer, Cell, ReferenceLine,
 } from "recharts";
 import { fetchData } from "@/lib/Api";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
 
-const BAND_COLOR: Record<string, string> = {
-  LOW: "var(--status-success)",
-  MEDIUM: "var(--status-warning)",
-  HIGH: "var(--status-danger)",
-  CRITICAL: "var(--status-danger)",
-  NEW: "var(--text-tertiary)",
+const BAND_TONE: Record<string, string> = {
+  LOW: "success",
+  MEDIUM: "warning",
+  HIGH: "danger",
+  CRITICAL: "danger",
+  NEW: "neutral",
 };
+const chip = (tone?: string) => `fin-chip${tone && tone !== "neutral" ? ` fin-chip--${tone}` : ""}`;
+const fmtStatus = (s?: string) =>
+  s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : "—";
+const safeDate = (d?: string | null) => {
+  if (!d) return "—";
+  const t = new Date(d);
+  return isNaN(t.getTime()) ? d : formatDate(t);
+};
+// Text colour for lateness values (AA text roles, not chart swatches).
+const lateTextClass = (daysLate: number | null) =>
+  daysLate === null ? "fin-text-muted" : daysLate > 30 ? "fin-text-danger" : "";
 
 // Status encoding for lateness relative to the 30-day "normal" threshold.
 // Color never stands alone: the 30d reference line, the legend, and the
@@ -51,7 +63,7 @@ export default function CustomerRisk() {
   });
 
   useEffect(() => {
-    document.title = "AI Risk Profile - TruckWys";
+    document.title = "AI risk profile - TruckWys";
   }, []);
 
   if (isLoading) {
@@ -60,16 +72,18 @@ export default function CustomerRisk() {
 
   if (error || !data) {
     return (
-      <div style={{ padding: 40 }}>
-        <div style={{ fontSize: 13, color: "var(--status-danger-text, var(--status-danger))", marginBottom: 12 }}>
-          Customer risk profile not found
+      <div className="fin-page">
+        <div className="card fin-empty">
+          <h1 className="fin-empty__title" style={{ fontSize: 22, lineHeight: "28px" }}>Risk profile not found</h1>
+          <p className="fin-empty__body">We couldn’t load this customer’s risk profile.</p>
+          <button className="btn-action" onClick={() => navigate("/capital")}>Back to Capital</button>
         </div>
-        <button className="btn-action" onClick={() => navigate("/capital")}>Back to Capital</button>
       </div>
     );
   }
 
-  const bandColor = BAND_COLOR[data.band] || "var(--text-tertiary)";
+  const bandTone = BAND_TONE[data.band] || "neutral";
+  const bandLabel = data.band === "NEW" ? "New customer" : `${fmtStatus(data.band)} risk`;
   const rows: RiskRow[] = data.rows || [];
   const stats = data.stats || {};
 
@@ -79,7 +93,7 @@ export default function CustomerRisk() {
     .reverse()
     .map((r) => ({
       ...r,
-      label: (r.issue_date || r.due_date || "").slice(5), // MM-DD
+      label: safeDate(r.issue_date || r.due_date).replace(/ \d{4}$/, ""), // e.g. "16 Jun"
     }));
 
   const onTime = rows.filter((r) => r.paid_date && (r.days_late ?? 0) <= 0).length;
@@ -88,93 +102,87 @@ export default function CustomerRisk() {
   const compTotal = Math.max(1, onTime + normalLate + beyond30);
 
   const kpis = [
-    { label: "AI RISK", value: `${data.risk_pct}%`, color: bandColor },
-    { label: "AVG DAYS TO PAY", value: stats.avg_days_to_pay ?? "—" },
-    { label: "ON-TIME RATE", value: stats.on_time_pct !== null && stats.on_time_pct !== undefined ? `${stats.on_time_pct}%` : "—" },
-    { label: "OVERDUE >30D", value: formatCurrency(stats.overdue_30_total || 0) },
+    { label: "AI risk", value: `${data.risk_pct}%`, sub: bandLabel },
+    { label: "Average days to pay", value: stats.avg_days_to_pay ?? "—", sub: "Settled invoices" },
+    { label: "On-time rate", value: stats.on_time_pct !== null && stats.on_time_pct !== undefined ? `${stats.on_time_pct}%` : "—", sub: "Paid by due date" },
+    { label: "Overdue more than 30 days", value: formatCurrency(stats.overdue_30_total || 0), sub: "Outstanding" },
   ];
 
   const legend = [
     { label: "Early / on time", color: "var(--status-success)" },
-    { label: "Late ≤30d (normal)", color: "var(--accent-primary)" },
-    { label: "Late >30d", color: "var(--status-danger-text, var(--status-danger))" },
+    { label: "Late ≤30 days (normal)", color: "var(--accent-primary)" },
+    { label: "Late >30 days", color: "var(--status-danger)" },
   ];
 
   return (
-    <div style={{ padding: "24px 28px" }}>
-      {/* Header */}
+    <div className="fin-page">
       <button
+        type="button"
         onClick={() => navigate(-1)}
-        style={{ background: "none", border: "none", color: "var(--text-tertiary)", fontSize: 11, fontFamily: "var(--font-mono)", cursor: "pointer", padding: 0, marginBottom: 14, letterSpacing: "0.06em" }}>
-        ← BACK
+        style={{ background: "none", border: "none", color: "var(--text-secondary)", fontSize: 14, lineHeight: "20px", fontWeight: 500, cursor: "pointer", padding: 0, marginBottom: 8, minHeight: 40 }}>
+        ← Back
       </button>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <div>
-          <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.1em", marginBottom: 4 }}>
-            AI RISK PROFILE
+      <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, lineHeight: "20px", fontWeight: 500, color: "var(--text-secondary)", marginBottom: 4 }}>AI risk profile</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <h1 style={{ fontSize: 22, lineHeight: "28px", fontWeight: 600, margin: 0, color: "var(--text-primary)" }}>{data.customer_name}</h1>
+            <span
+              className={chip(bandTone)}
+              title={data.insufficient_history ? "Fewer than 3 invoices — insufficient history" : `Risk band: ${fmtStatus(data.band)}`}>
+              {bandLabel} · {data.risk_pct}%
+            </span>
           </div>
-          <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)" }}>{data.customer_name}</div>
+          {data.insufficient_history && (
+            <p className="fin-support" style={{ marginTop: 4 }}>Fewer than 3 invoices — limited history, treat this score with caution.</p>
+          )}
         </div>
-        <div
-          title={data.insufficient_history ? "Fewer than 3 invoices — insufficient history" : `Risk band: ${data.band}`}
-          style={{
-            fontFamily: "var(--font-mono)", fontSize: 24, fontWeight: 700, color: bandColor,
-            border: `2px solid ${bandColor}`, borderRadius: 8, padding: "10px 22px",
-          }}>
-          {data.risk_pct}%
-          <span style={{ fontSize: 10, display: "block", textAlign: "center", letterSpacing: "0.08em" }}>{data.band}</span>
-        </div>
-      </div>
+      </header>
 
       {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 16 }}>
-        {kpis.map((k) => (
-          <div key={k.label} className="card metric-card">
-            <div className="card-header"><span className="card-title">{k.label}</span></div>
-            <div className="metric-value" style={{ color: (k as any).color }}>{k.value}</div>
+      <div className="fin-kpis">
+        {kpis.map((k, i) => (
+          <div key={k.label} className="card fin-kpi">
+            <span className="fin-kpi__label">{k.label}</span>
+            <span className={`fin-kpi__value ${i === 0 && (bandTone === "danger" || bandTone === "warning") ? `fin-text-${bandTone}` : ""}`}>{k.value}</span>
+            <span className="fin-kpi__sub">{k.sub}</span>
           </div>
         ))}
       </div>
 
       {/* AI summary */}
-      <div className="card" style={{ padding: 20, marginBottom: 16 }}>
-        <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", letterSpacing: "0.1em", marginBottom: 8 }}>
-          REAL-TIME AI SUMMARY
-        </div>
-        <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.65, textAlign: "justify" }}>
+      <section className="card fin-section" aria-labelledby="ai-summary-title">
+        <h2 id="ai-summary-title" className="fin-h2" style={{ marginBottom: 8 }}>AI summary</h2>
+        <p style={{ fontSize: 14, lineHeight: "20px", color: "var(--text-secondary)", margin: 0, maxWidth: "80ch" }}>
           {data.ai_summary}
-        </div>
-      </div>
+        </p>
+      </section>
 
       {/* Lateness chart */}
-      <div className="card" style={{ padding: 20, marginBottom: 16 }}>
-        <div className="card-header" style={{ marginBottom: 4 }}>
-          <span className="card-title">Payment lateness by invoice</span>
-          <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-            DAYS PAST DUE · 30D = NORMAL LIMIT
-          </span>
+      <section className="card fin-section" aria-labelledby="lateness-title">
+        <div className="fin-card-head" style={{ marginBottom: 8 }}>
+          <h2 id="lateness-title" className="fin-h2">Payment lateness by invoice</h2>
+          <span className="fin-support">Days past due · 30 days is the normal limit</span>
         </div>
         {/* Legend — identity never by color alone (threshold line + table below) */}
-        <div style={{ display: "flex", gap: 16, margin: "6px 0 10px" }}>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", margin: "0 0 12px" }}>
           {legend.map((l) => (
-            <span key={l.label} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-secondary)" }}>
+            <span key={l.label} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)" }}>
               <span style={{ width: 8, height: 8, borderRadius: 2, background: l.color, display: "inline-block" }} />
               {l.label}
             </span>
           ))}
         </div>
         {chartData.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "30px 0", color: "var(--text-tertiary)", fontSize: 13 }}>
-            No payment history yet.
-          </div>
+          <div className="fin-empty fin-empty--compact">No payment history yet.</div>
         ) : (
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }} barCategoryGap="25%">
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontFamily: "var(--font-mono)", fontSize: 10, fill: "var(--text-tertiary)" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontFamily: "var(--font-mono)", fontSize: 10, fill: "var(--text-tertiary)" }} axisLine={false} tickLine={false} width={34} />
+              <XAxis dataKey="label" tick={{ fontFamily: "var(--font-sans)", fontSize: 12, fill: "var(--text-tertiary)" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontFamily: "var(--font-sans)", fontSize: 12, fill: "var(--text-tertiary)" }} axisLine={false} tickLine={false} width={34} />
               <Tooltip
-                contentStyle={{ background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: 2, fontFamily: "var(--font-mono)", fontSize: 11 }}
+                contentStyle={{ background: "var(--bg-surface)", color: "var(--text-primary)", border: "1px solid var(--border-subtle)", borderRadius: 6, fontFamily: "var(--font-sans)", fontSize: 13 }}
                 labelStyle={{ color: "var(--text-secondary)", marginBottom: 4 }}
                 formatter={(value: number, _name, entry: any) => {
                   const r = entry?.payload as RiskRow;
@@ -187,7 +195,7 @@ export default function CustomerRisk() {
                 y={30}
                 stroke="var(--status-warning)"
                 strokeDasharray="4 4"
-                label={{ value: "30d normal limit", position: "insideTopRight", fontSize: 10, fill: "var(--status-warning)", fontFamily: "var(--font-mono)" }}
+                label={{ value: "30-day limit", position: "insideTopRight", fontSize: 12, fill: "var(--text-secondary)", fontFamily: "var(--font-sans)" }}
               />
               <Bar dataKey="days_late" radius={[2, 2, 0, 0]} maxBarSize={26}>
                 {chartData.map((entry, index) => (
@@ -199,70 +207,68 @@ export default function CustomerRisk() {
         )}
         {/* Composition bar: settled behavior split */}
         {rows.length > 0 && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", gap: 2 }}>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: "flex", height: 10, borderRadius: 4, overflow: "hidden", gap: 2 }} aria-hidden="true">
               {onTime > 0 && <div style={{ flex: onTime / compTotal, background: "var(--status-success)" }} />}
               {normalLate > 0 && <div style={{ flex: normalLate / compTotal, background: "var(--accent-primary)" }} />}
               {beyond30 > 0 && <div style={{ flex: beyond30 / compTotal, background: "var(--status-danger)" }} />}
             </div>
-            <div style={{ display: "flex", gap: 16, marginTop: 6, fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 8, fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
               <span>{onTime} on time</span>
-              <span>{normalLate} late ≤30d</span>
-              <span>{beyond30} late &gt;30d</span>
+              <span>{normalLate} late ≤30 days</span>
+              <span>{beyond30} late &gt;30 days</span>
             </div>
           </div>
         )}
-      </div>
+      </section>
 
       {/* Payment behavior table */}
-      <div className="card table-card">
-        <div className="card-header" style={{ marginBottom: 16 }}>
-          <span className="card-title">Payment Behavior</span>
-          <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-            {rows.length} INVOICES
-          </span>
+      <section className="card fin-table-card" aria-labelledby="behaviour-title">
+        <div className="fin-table-card__head">
+          <h2 id="behaviour-title" className="fin-h2">Payment behaviour</h2>
+          <span className="fin-support">{rows.length} {rows.length === 1 ? "invoice" : "invoices"}</span>
         </div>
         {rows.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "30px 0", color: "var(--text-tertiary)", fontSize: 13 }}>
-            No invoices for this customer yet.
-          </div>
+          <div className="fin-empty fin-empty--compact">No invoices for this customer yet.</div>
         ) : (
-          <table className="data-table table-heading-roles">
-            <thead>
-              <tr>
-                <th>Invoice #</th>
-                <th>Invoice date</th>
-                <th>Due date</th>
-                <th>Payment date</th>
-                <th>Days to pay</th>
-                <th>Days late</th>
-                <th>Amount</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.invoice_number}>
-                  <td className="mono">{r.invoice_number}</td>
-                  <td className="mono">{r.issue_date || "—"}</td>
-                  <td className="mono">{r.due_date}</td>
-                  <td className="mono">{r.paid_date || "—"}</td>
-                  <td className="mono">{r.days_to_pay ?? "—"}</td>
-                  <td className="mono" style={{ color: lateColor(r.days_late) }}>
-                    {r.days_late === null ? "—" : r.days_late > 0 ? `+${r.days_late}` : r.days_late}
-                  </td>
-                  <td className="mono">{formatCurrency(r.amount)}</td>
-                  <td>
-                    <span style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: r.status === "PAID" ? "var(--status-success)" : r.days_late !== null && r.days_late > 30 ? "var(--status-danger)" : "var(--text-secondary)" }}>
-                      {r.status}
-                    </span>
-                  </td>
+          <div className="fin-table-scroll">
+            <table className="fin-table table-heading-roles">
+              <thead>
+                <tr>
+                  <th>Invoice #</th>
+                  <th>Invoice date</th>
+                  <th>Due date</th>
+                  <th>Payment date</th>
+                  <th className="num">Days to pay</th>
+                  <th className="num">Days late</th>
+                  <th className="num">Amount</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.invoice_number}>
+                    <td><span className="fin-id">{r.invoice_number}</span></td>
+                    <td className="fin-date">{safeDate(r.issue_date)}</td>
+                    <td className="fin-date">{safeDate(r.due_date)}</td>
+                    <td className="fin-date">{safeDate(r.paid_date)}</td>
+                    <td className="num">{r.days_to_pay ?? "—"}</td>
+                    <td className={`num ${lateTextClass(r.days_late)}`}>
+                      {r.days_late === null ? "—" : r.days_late > 0 ? `+${r.days_late}` : r.days_late}
+                    </td>
+                    <td className="num">{formatCurrency(r.amount)}</td>
+                    <td>
+                      <span className={chip(r.status === "PAID" ? "success" : r.days_late !== null && r.days_late > 30 ? "danger" : "neutral")}>
+                        {fmtStatus(r.status)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

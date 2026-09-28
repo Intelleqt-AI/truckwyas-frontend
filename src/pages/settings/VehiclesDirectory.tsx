@@ -9,6 +9,7 @@ import { EditVehicleDrawer } from "@/components/EditVehicleDrawer";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
+import { settingsCardTitleStyle } from "./settingsUi";
 
 interface Vehicle {
   id: number;
@@ -114,12 +115,12 @@ export function VehiclesDirectory() {
 
       <div style={sectionStyle}>
         <div style={{
-          padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)',
+          padding: '12px 20px', minHeight: 64, boxSizing: 'border-box', borderBottom: '1px solid var(--border-subtle)', gap: 12, flexWrap: 'wrap',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-            Vehicles ({vehicles.length})
-          </span>
+          <h2 style={settingsCardTitleStyle}>
+            Vehicles <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>({vehicles.length})</span>
+          </h2>
           <div style={{ display: 'flex', gap: 12 }}>
             <input
               className="settings-control"
@@ -167,10 +168,10 @@ export function VehiclesDirectory() {
           <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
         ) : (
           <div className="settings-scroll-region" role="region" aria-label="Vehicles" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' as const }}>
+          <table className="table-heading-roles settings-table">
             <thead>
               <tr>
-                <th style={{ padding: '10px 0 10px 16px', width: 32, borderBottom: '1px solid var(--border-subtle)' }}>
+                <th style={{ width: 32, }}>
                   {filtered.length > 0 && (
                     <RowCheckbox
                       title="Select everything shown"
@@ -180,10 +181,7 @@ export function VehiclesDirectory() {
                   )}
                 </th>
                 {['Plate', 'Make and model', 'Type', 'Status', 'Driver', 'Last service', ''].map(h => (
-                  <th key={h} style={{
-                    padding: '10px 20px', textAlign: 'left' as const,
-                    borderBottom: '1px solid var(--border-subtle)',
-                  }}>{h}</th>
+                  <th key={h || 'actions'} scope="col" style={{ textAlign: (h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
@@ -192,16 +190,16 @@ export function VehiclesDirectory() {
                 <tr><td colSpan={8} style={{ textAlign: 'center' as const, padding: 40, color: 'var(--text-tertiary)', fontSize: 13 }}>No vehicles found</td></tr>
               ) : filtered.map((v, i) => (
                 <tr key={v.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
-                  <td style={{ padding: '12px 0 12px 16px', width: 32 }}>
+                  <td style={{ width: 32 }}>
                     <RowCheckbox checked={selected.includes(v.id)} onChange={on => toggleOne(v.id, on)} />
                   </td>
-                  <td style={{ padding: '12px 20px', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', fontWeight: 400, color: 'var(--text-primary)' }}>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', fontWeight: 400, color: 'var(--text-primary)' }}>
                     {v.plate || '—'}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                  <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {[v.make, v.model].filter(Boolean).join(' ') || '—'}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                  <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {v.vehicle_type_name || v.vehicle_type || '—'}
                     {v.vehicle_type_capacity != null && (
                       <span style={{ marginLeft: 6, color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums' }}>
@@ -209,16 +207,16 @@ export function VehiclesDirectory() {
                       </span>
                     )}
                   </td>
-                  <td style={{ padding: '12px 20px' }}>
+                  <td>
                     <span style={{
                       fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500,
                       color: statusColor(v.status),
                     }}>{statusLabel(v.status)}</span>
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                  <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     {v.driver_name || '—'}
                   </td>
-                  <td style={{ padding: '12px 20px', fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+                  <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
                     {(() => {
                       if (v.service_interval_km && v.last_service_mileage && v.mileage) {
                         const nextAt = parseFloat(String(v.last_service_mileage)) + Number(v.service_interval_km);
@@ -233,7 +231,7 @@ export function VehiclesDirectory() {
                       return v.last_maintenance_date || '—';
                     })()}
                   </td>
-                  <td style={{ padding: '12px 20px', textAlign: 'right' as const }}>
+                  <td style={{ textAlign: 'right' as const }}>
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                       <button
                         className="settings-control"

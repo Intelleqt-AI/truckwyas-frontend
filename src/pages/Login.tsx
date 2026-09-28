@@ -1,3 +1,4 @@
+import "./auth-brand.css";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Check } from "lucide-react";
@@ -108,25 +109,27 @@ const Login = () => {
   };
 
   const inputStyle: React.CSSProperties = {
-    background: 'var(--bg-surface)',
+    background: 'var(--input-bg, var(--bg-surface))',
     border: '1px solid var(--border-subtle)',
-    padding: '10px 12px',
+    padding: '8px 12px',
+    minHeight: 40,
     color: 'var(--text-primary)',
-    borderRadius: 2,
-    fontSize: 13,
-    outline: 'none',
+    borderRadius: 6,
+    fontSize: 14,
+    lineHeight: '20px',
     width: '100%',
+    boxSizing: 'border-box',
     fontFamily: 'var(--font-sans)',
   };
 
   const labelStyle: React.CSSProperties = {
     display: 'block',
-    fontSize: 10,
-    fontFamily: 'var(--font-mono)',
-    color: 'var(--text-tertiary)',
-    marginBottom: 8,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
+    fontSize: 13,
+    lineHeight: '20px',
+    fontWeight: 500,
+    fontFamily: 'var(--font-sans)',
+    color: 'var(--text-primary)',
+    marginBottom: 6,
   };
 
   const formCard = (
@@ -135,15 +138,15 @@ const Login = () => {
       maxWidth: 400,
       background: 'var(--bg-surface)',
       border: '1px solid var(--border-subtle)',
-      borderRadius: 2,
-      padding: 40,
+      borderRadius: 8,
+      padding: 32,
       boxSizing: 'border-box',
     }}>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
           Sign in to your account
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+        </h1>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
           Enter your credentials to access the dashboard
         </div>
       </div>
@@ -153,6 +156,7 @@ const Login = () => {
           <label htmlFor="username" style={labelStyle}>Email</label>
           <input
             id="username"
+            className="tw-auth-control"
             name="username"
             type="text"
             placeholder="name@example.com"
@@ -165,20 +169,23 @@ const Login = () => {
             }}
           />
           {validationErrors.username && (
-            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger-text, var(--status-danger))' }}>
+            <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
               {validationErrors.username}
             </div>
           )}
         </div>
 
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <label htmlFor="password" style={{ ...labelStyle, marginBottom: 0 }}>Password</label>
             <Link
               to="/password-reset"
+              className="tw-auth-control"
               style={{
-                fontSize: 11,
-                color: 'var(--accent-primary)',
+                fontSize: 13,
+                lineHeight: '20px',
+                fontWeight: 500,
+                color: 'var(--status-info-text, var(--accent-primary))',
                 textDecoration: 'none',
               }}
             >
@@ -188,6 +195,7 @@ const Login = () => {
           <div style={{ position: 'relative' }}>
             <input
               id="password"
+              className="tw-auth-control"
               name="password"
               type={showPassword ? "text" : "password"}
               required
@@ -202,6 +210,7 @@ const Login = () => {
             <button
               type="button"
               onClick={() => setShowPassword(v => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
               style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}
               tabIndex={-1}
             >
@@ -209,7 +218,7 @@ const Login = () => {
             </button>
           </div>
           {validationErrors.password && (
-            <div style={{ marginTop: 4, fontSize: 11, color: 'var(--status-danger-text, var(--status-danger))' }}>
+            <div style={{ marginTop: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
               {validationErrors.password}
             </div>
           )}
@@ -220,10 +229,11 @@ const Login = () => {
             padding: '12px 16px',
             background: 'var(--status-danger-bg)',
             border: '1px solid var(--status-danger)',
-            borderRadius: 2,
+            borderRadius: 6,
             color: 'var(--status-danger-text, var(--status-danger))',
-            fontSize: 12,
-          }}>
+            fontSize: 13,
+            lineHeight: '20px',
+          }} role="alert">
             {error}
           </div>
         )}
@@ -234,17 +244,19 @@ const Login = () => {
           style={{
             width: '100%',
             padding: '12px 16px',
-            fontSize: 11,
-            letterSpacing: '0.08em',
+            fontSize: 14,
+            lineHeight: '20px',
+            letterSpacing: 'normal',
+            minHeight: 40,
             cursor: isPending ? 'wait' : 'pointer',
             opacity: isPending ? 0.6 : 1,
           }}
           disabled={isPending}
         >
-          {isPending ? "Signing in..." : "Sign in"}
+          {isPending ? "Signing in…" : "Sign in"}
         </button>
 
-        <div style={{ marginTop: 4, textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>
+        <div style={{ marginTop: 4, textAlign: 'center', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
           Just exploring?{" "}
           <button
             type="button"
@@ -262,7 +274,7 @@ const Login = () => {
               opacity: isPending ? 0.6 : 1,
             }}
           >
-            View Demo
+            View demo
           </button>
         </div>
       </form>
@@ -271,6 +283,7 @@ const Login = () => {
         marginTop: 24,
         textAlign: 'center',
         fontSize: 13,
+        lineHeight: '20px',
         color: 'var(--text-secondary)'
       }}>
         Don't have an account?{" "}
@@ -287,26 +300,26 @@ const Login = () => {
   // blocks completing the form above it.
   const extraContent = (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px 16px' }}>
         {PLAN_FEATURES.map(f => (
-          <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-            <Check size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+          <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+            <Check size={16} aria-hidden="true" style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: 2 }} />
             {f}
           </div>
         ))}
       </div>
 
       <div style={{
-        marginTop: 18, padding: '10px 13px', border: '1px solid var(--border-subtle)',
+        marginTop: 20, padding: '12px 16px', border: '1px solid var(--border-subtle)',
         borderRadius: 'var(--card-radius)', background: 'var(--bg-surface-hover)',
-        fontSize: 12, color: 'var(--text-secondary)',
+        fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
       }}>
         Reminder: every completed load also carries a <strong style={{ color: 'var(--text-primary)' }}>0.25% platform fee</strong>,
         charged automatically to the card on file on top of the monthly plan.
       </div>
 
-      <div style={{ marginTop: 16, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
-        BUILT FOR SOUTH AFRICAN ROAD FREIGHT
+      <div style={{ marginTop: 16, fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)' }}>
+        Built for South African road freight
       </div>
     </>
   );
@@ -355,15 +368,15 @@ const Login = () => {
         borderRight: '1px solid var(--border-subtle)',
       }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
-          <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
+          <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
 
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent-primary)', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-info-text, var(--accent-primary))', marginBottom: 10 }}>
             Welcome back
           </div>
-          <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3, marginBottom: 16, letterSpacing: '-0.01em' }}>
+          <p style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', margin: '0 0 16px', letterSpacing: 'normal' }}>
             Your fleet, right where <span style={{ color: 'var(--accent-primary)' }}>you left it</span>.
-          </div>
-          <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 32 }}>
+          </p>
+          <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: '22px', marginBottom: 32 }}>
             Loads, quotes, invoices, and fleet intelligence — all in one dashboard, updated in real time.
           </div>
 

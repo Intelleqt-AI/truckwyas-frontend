@@ -45,12 +45,12 @@ const tabBtn = (active: boolean): React.CSSProperties => ({
 });
 const bodyStyle: React.CSSProperties = { flex: 1, overflowY: 'auto', padding: 20 };
 const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '6px 10px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  textAlign: 'left', padding: '12px 16px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
   fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)',
   borderBottom: '1px solid var(--border-subtle)',
 };
 const tdStyle: React.CSSProperties = {
-  padding: '8px 10px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
   padding: '8px 12px', minHeight: 40, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--status-danger-text, var(--status-danger))',
@@ -152,7 +152,7 @@ export default function UserActivityDrawer({
             activityQuery.isLoading ? <Loader size={20} /> : (
               <>
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
                         <th style={thStyle}>Time</th>
@@ -167,7 +167,7 @@ export default function UserActivityDrawer({
                         <tr key={r.id}>
                           <td style={tdStyle}>{fmt(r.created_at)}</td>
                           <td style={tdStyle}>{r.method}</td>
-                          <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 11 }}>{r.path}</td>
+                          <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontSize: 13 }}>{r.path}</td>
                           <td style={tdStyle}>
                             <span style={{ color: r.status_code >= 400 ? 'var(--status-danger)' : 'var(--text-secondary)' }}>
                               {r.status_code}
@@ -208,7 +208,7 @@ export default function UserActivityDrawer({
                   >
                     <div>
                       <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{s.device}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                      <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
                         {s.ip_address || 'Unknown IP'} · last active {fmt(s.last_activity)}
                       </div>
                     </div>
@@ -232,7 +232,7 @@ export default function UserActivityDrawer({
             authQuery.isLoading ? <Loader size={20} /> : (
               <>
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
                         <th style={thStyle}>Time</th>

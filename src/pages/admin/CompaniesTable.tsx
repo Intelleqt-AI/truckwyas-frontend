@@ -138,9 +138,9 @@ const selectStyle: React.CSSProperties = {
   padding: '8px 12px', borderRadius: 6, fontSize: 14, lineHeight: '20px', fontWeight: 400,
   fontFamily: 'var(--font-sans)', minHeight: 40, cursor: 'pointer',
 };
-const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)' };
+const thStyle: React.CSSProperties = { textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' };
 const tdStyle: React.CSSProperties = {
-  padding: '12px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
+  padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 const secondaryBtnStyle: React.CSSProperties = {
   padding: '8px 12px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
@@ -227,15 +227,15 @@ export function CompaniesTable() {
 
       {isLoading ? <Loader size={24} /> : (
         <div className="admin-scroll-region" role="region" aria-label="Companies" tabIndex={0} style={{ overflowX: 'auto' }}>
-          <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Company</th>
                 <th style={thStyle}>Status</th>
                 <th style={thStyle}>Next billing</th>
-                <th style={thStyle}>Users</th>
-                <th style={thStyle}>Quotes</th>
-                <th style={thStyle}>Orders</th>
+                <th className="num" style={thStyle}>Users</th>
+                <th className="num" style={thStyle}>Quotes</th>
+                <th className="num" style={thStyle}>Orders</th>
                 <th style={thStyle}>Created</th>
                 <th style={thStyle}>Actions</th>
               </tr>
@@ -270,9 +270,9 @@ export function CompaniesTable() {
                         <span className={`status-badge ${STATUS_BADGE_CLASS[c.subscription_status] || ''}`}>{subscriptionStatusLabel(c.subscription_status)}</span>
                       </td>
                       <td style={tdStyle}>{fmtDate(c.next_billing_date)}</td>
-                      <td style={tdStyle}>{c.user_count}</td>
-                      <td style={tdStyle}>{c.quote_count}</td>
-                      <td style={tdStyle}>{c.load_count}</td>
+                      <td className="num" style={tdStyle}>{c.user_count}</td>
+                      <td className="num" style={tdStyle}>{c.quote_count}</td>
+                      <td className="num" style={tdStyle}>{c.load_count}</td>
                       <td style={tdStyle}>{fmtDateTime(c.created_at)}</td>
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -521,13 +521,13 @@ function CompanyBillingPanel({ company }: { company: Company }) {
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>No charges recorded.</div>
             ) : (
               <div className="admin-scroll-region" role="region" aria-label={`Billing history for ${company.company_name}`} tabIndex={0} style={{ overflowX: 'auto' }}>
-                <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
                       <th style={thStyle}>Date</th>
                       <th style={thStyle}>Kind</th>
                       <th style={thStyle}>Label</th>
-                      <th style={thStyle}>Amount</th>
+                      <th className="num" style={thStyle}>Amount</th>
                       <th style={thStyle}>Status</th>
                       <th style={thStyle}>Reference</th>
                       <th style={thStyle}>Actions</th>
@@ -539,7 +539,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                         <td style={tdStyle}>{fmtDateTime(ch.created_at)}</td>
                         <td style={tdStyle}>{chargeKindLabel(ch.kind)}</td>
                         <td style={tdStyle}>{ch.label}</td>
-                        <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(ch.amount)}</td>
+                        <td className="num" style={tdStyle}>{formatCurrency(ch.amount)}</td>
                         <td style={tdStyle}>
                           <span className={`status-badge ${chargeStatusClass(ch.status)}`}>{chargeStatusLabel(ch.status)}</span>
                         </td>

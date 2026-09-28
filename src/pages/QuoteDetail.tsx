@@ -1,10 +1,11 @@
 import './quote-detail-responsive.css';
 import './quote-invoice-roles.css';
+import './bookings-section.css';
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData, deleteData, postData, downloadBlob } from '@/lib/Api';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency, formatDate } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ConvertToBookingModal } from '@/components/ConvertToBookingModal';
@@ -13,15 +14,15 @@ import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
 import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
 import { Loader } from '@/components/Loader';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Download } from 'lucide-react';
 
-const STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'var(--text-tertiary)',
-  SENT: 'var(--status-warning)',
-  ACCEPTED: 'var(--status-success)',
-  DECLINED: 'var(--status-danger)',
-  IT: 'var(--accent-primary)',
-  COMPLETED: 'var(--status-success)',
+const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
+  DRAFT: 'neutral',
+  SENT: 'warning',
+  ACCEPTED: 'success',
+  DECLINED: 'danger',
+  IT: 'info',
+  COMPLETED: 'success',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -225,9 +226,17 @@ export default function QuoteDetail() {
 
   if (error || !quote) {
     return (
-      <div style={{ padding: 40 }}>
-        <div style={{ fontSize: 13, color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 12 }}>Quote not found</div>
-        <button className="btn-action" onClick={() => navigate('/bookings/quotes')}>Back to quotes</button>
+      <div className="bk-detail">
+        <button type="button" className="bk-back" onClick={() => navigate('/bookings/quotes')}>
+          <ArrowLeft size={16} aria-hidden="true" /> Back to quotes
+        </button>
+        <div className="bk-card">
+          <div className="bk-empty" style={{ padding: 16 }}>
+            <h1 className="bk-empty__title">Quote not found</h1>
+            <p className="bk-empty__text">It may have been deleted, or the link is out of date.</p>
+            <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate('/bookings/quotes')}>View quotes</button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -282,60 +291,35 @@ export default function QuoteDetail() {
   );
 
   return (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <button
-          className="qi-action"
-          onClick={() => navigate('/bookings/quotes')}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-tertiary)',
-            cursor: 'pointer',
-            fontFamily: 'var(--font-sans)',
-            fontSize: 14,
-            lineHeight: '20px',
-            marginBottom: 8,
-            padding: 0,
-          }}
-        >
-          ← Back to quotes
-        </button>
-        <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>
-          Quote detail
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 22, lineHeight: '28px', fontWeight: 600, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>{quote.quote_number}</h1>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{quote.customer_name}</div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span
-              style={{
-                display: 'inline-block',
-                whiteSpace: 'nowrap',
-                fontFamily: 'var(--font-sans)',
-                fontSize: 13,
-                lineHeight: '20px',
-                color: STATUS_COLOR[quote.status] || 'var(--text-secondary)',
-                padding: '4px 10px',
-                border: `1px solid ${STATUS_COLOR[quote.status] || 'var(--border-subtle)'}`,
-                borderRadius: 4,
-                background: 'var(--bg-surface)',
-              }}
-            >
-              {STATUS_LABEL[quote.status] || quote.status}
+    <div className="bk-detail">
+      {/* Header — identity on the left, the quoted amount on the right */}
+      <button type="button" className="bk-back" onClick={() => navigate('/bookings/quotes')}>
+        <ArrowLeft size={16} aria-hidden="true" /> Back to quotes
+      </button>
+      <div className="bk-detail-header">
+        <div className="bk-detail-header__titles">
+          <div className="bk-eyebrow">Bookings · Quote</div>
+          <div className="bk-title-row">
+            <h1 className="bk-title">{quote.quote_number}</h1>
+            <span className={`bk-status bk-status--${STATUS_TONE[quote.status] || 'neutral'}`}>
+              {STATUS_LABEL[quote.status] || sentenceCase(quote.status)}
             </span>
+            {quote.outcome === 'accepted' && <span className="bk-status bk-status--success">Won</span>}
+            {quote.outcome === 'rejected' && <span className="bk-status bk-status--danger">Lost</span>}
           </div>
+          <p className="bk-subtitle">{quote.customer_name}</p>
+        </div>
+        <div className="bk-amount">
+          <span className="bk-amount__label">{quote.trip_type === 'ROUND_TRIP' ? 'Total (both legs)' : 'Total amount'}</span>
+          <span className="bk-amount__value">{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
         </div>
       </div>
 
       {/* UPGRADE 2: Fuel Delta Alert */}
       {fuelAlert && fuelAlert.has_alert && (
-        <div style={{ padding: '14px 20px', background: 'rgba(251, 191, 36, 0.1)', border: '1px solid var(--status-warning)', borderRadius: 2, marginBottom: 16 }}>
+        <div role="status" style={{ padding: '16px 20px', background: 'var(--status-warning-bg)', border: '1px solid var(--status-warning)', borderRadius: 8, marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
-            <AlertTriangle size={18} color="var(--status-warning)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
+            <AlertTriangle size={20} color="var(--status-warning-text, var(--status-warning))" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--status-warning-text, var(--status-warning))', marginBottom: 4 }}>
                 Fuel price alert
@@ -344,7 +328,7 @@ export default function QuoteDetail() {
                 {fuelAlert.message || `Diesel up R${fuelAlert.fuel_delta_zar?.toFixed(2)}/L since this quote was created. This job now costs ~R${Math.round(fuelAlert.estimated_cost_impact).toLocaleString()} more.`}
               </div>
               {fuelAlert.action && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)' }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>
                   {fuelAlert.action}
                 </div>
               )}
@@ -359,33 +343,33 @@ export default function QuoteDetail() {
           {/* Customer */}
           <div className="card" style={{ padding: 24, borderRadius: 8 }}>
             <h2 style={{ ...sectionHeadingStyle, marginBottom: 14 }}>Customer</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px 24px' }}>
               <div>
                 <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Name</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{quote.customer_name || '—'}</div>
+                <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>{quote.customer_name || '—'}</div>
               </div>
               {quote.customer_company && (
                 <div>
                   <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Company</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_company}</div>
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.customer_company}</div>
                 </div>
               )}
               {quote.customer_email && (
                 <div>
                   <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Email</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_email}</div>
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.customer_email}</div>
                 </div>
               )}
               {quote.customer_phone && (
                 <div>
                   <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Phone</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_phone}</div>
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.customer_phone}</div>
                 </div>
               )}
               {quote.customer_city && (
                 <div>
                   <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>City</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.customer_city}</div>
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.customer_city}</div>
                 </div>
               )}
             </div>
@@ -398,7 +382,7 @@ export default function QuoteDetail() {
                 {quote.trip_type === 'ROUND_TRIP' ? 'Leg 1 — Outbound route' : 'Route'}
               </h2>
               {quote.trip_type === 'ROUND_TRIP' && (
-                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--accent-primary)', padding: '3px 8px', border: '1px solid var(--accent-primary)', borderRadius: 4, fontWeight: 500, whiteSpace: 'nowrap', display: 'inline-block' }}>
+                <span className="bk-status bk-status--info">
                   Round trip
                 </span>
               )}
@@ -406,7 +390,7 @@ export default function QuoteDetail() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 {label('Pickup location')}
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.pickup_location || '—'}</div>
+                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.pickup_location || '—'}</div>
               </div>
 
               {Array.isArray(quote.stops) && quote.stops.map((s: { location: string }, i: number) => (
@@ -414,13 +398,13 @@ export default function QuoteDetail() {
                   <div style={{ ...fieldLabelStyle, marginBottom: 2 }}>
                     Stop {i + 1}
                   </div>
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{s.location}</div>
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{s.location}</div>
                 </div>
               ))}
 
               <div>
                 {label('Delivery location')}
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
+                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
               </div>
             </div>
 
@@ -434,7 +418,7 @@ export default function QuoteDetail() {
                   stops={Array.isArray(quote.stops) ? quote.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
                   geometry={Array.isArray(quote.route_geometry) && quote.route_geometry.length > 1 ? quote.route_geometry.map((p: { lat: number; lon: number }) => [Number(p.lat), Number(p.lon)] as [number, number]) : undefined}
                   height={220}
-                  dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 4, boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
+                  dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 12, boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
                 />
               </div>
             )}
@@ -442,22 +426,22 @@ export default function QuoteDetail() {
 
           {/* Return Leg — visible only for ROUND_TRIP quotes */}
           {quote.trip_type === 'ROUND_TRIP' && (
-            <div className="card" style={{ padding: 24, borderRadius: 8, border: '1px solid var(--accent-primary)', borderLeft: '3px solid var(--accent-primary)' }}>
-              <h2 style={{ ...sectionHeadingStyle, marginBottom: 16, color: 'var(--accent-primary)' }}>
+            <div className="card" style={{ padding: 24, borderRadius: 8, borderLeft: '3px solid var(--accent-primary)' }}>
+              <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>
                 Leg 2 — Return route
               </h2>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px 24px' }}>
                 <div>
                   {label('Returns from')}
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
                 </div>
                 <div>
                   {label('Return destination')}
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.return_location || '—'}</div>
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.return_location || '—'}</div>
                 </div>
                 <div>
                   {label('Return cargo')}
-                  <div style={{ fontSize: 13, color: quote.return_cargo ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: quote.return_cargo ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
                     {quote.return_cargo || 'Empty return'}
                   </div>
                 </div>
@@ -465,14 +449,14 @@ export default function QuoteDetail() {
                   <div>
                     {label('Return date')}
                     <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)' }}>
-                      {new Date(quote.return_date).toLocaleDateString('en-ZA')}
+                      {formatDate(quote.return_date)}
                     </div>
                   </div>
                 )}
                 {quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
                   <div>
                     {label('Return rate')}
-                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--accent-primary)', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+                    <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>
                       {formatCurrency(parseFloat(quote.return_base_rate))}
                     </div>
                   </div>
@@ -480,7 +464,7 @@ export default function QuoteDetail() {
                 {quote.return_notes && (
                   <div style={{ gridColumn: '1 / -1' }}>
                     {label('Return notes')}
-                    <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{quote.return_notes}</div>
+                    <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>{quote.return_notes}</div>
                   </div>
                 )}
               </div>
@@ -490,33 +474,33 @@ export default function QuoteDetail() {
           {/* Cargo Details */}
           <div className="card" style={{ padding: 24, borderRadius: 8 }}>
             <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Cargo details</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px 24px' }}>
               <div>
                 {label('Description')}
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.cargo_description || '—'}</div>
+                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.cargo_description || '—'}</div>
               </div>
               <div>
                 {label('Vehicle type')}
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.vehicle_type || '—'}</div>
+                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.vehicle_type || '—'}</div>
               </div>
               <div>
                 {label('Weight (kg)')}
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.weight ? parseFloat(quote.weight).toLocaleString() : '—'}</div>
+                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.weight ? parseFloat(quote.weight).toLocaleString() : '—'}</div>
               </div>
               <div>
                 {label('Distance (km)')}
-                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.distance ? Math.round(parseFloat(quote.distance)).toLocaleString() : '—'}</div>
+                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.distance ? Math.round(parseFloat(quote.distance)).toLocaleString() : '—'}</div>
               </div>
               {quote.vehicle_display && (
                 <div>
                   {label('Assigned vehicle')}
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.vehicle_display}</div>
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.vehicle_display}</div>
                 </div>
               )}
               {quote.driver_display && (
                 <div>
                   {label('Assigned driver')}
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{quote.driver_display}</div>
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.driver_display}</div>
                 </div>
               )}
             </div>
@@ -525,7 +509,7 @@ export default function QuoteDetail() {
           {/* Cost Breakdown */}
           <div className="card" style={{ padding: 24, borderRadius: 8 }}>
             <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Cost breakdown</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
               {(() => {
                 const fuel = parseFloat(quote.fuel_surcharge || '0');
                 const toll = parseFloat(quote.toll_charges || '0');
@@ -550,7 +534,7 @@ export default function QuoteDetail() {
                 return rows.map((item) => (
                   <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
                     <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{item.label}</span>
-                    <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)' }}>
+                    <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', textAlign: 'right' }}>
                       {formatCurrency(item.value)}
                     </span>
                   </div>
@@ -558,19 +542,19 @@ export default function QuoteDetail() {
               })()}
               {quote.trip_type === 'ROUND_TRIP' && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed var(--accent-primary)' }}>
-                  <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--accent-primary)' }}>
+                  <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                     Return leg ({quote.return_cargo ? 'with cargo' : 'empty return'})
                   </span>
-                  <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 13, lineHeight: '20px', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                  <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', textAlign: 'right' }}>
                     {formatCurrency(parseFloat(quote.return_base_rate))}
                   </span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, paddingTop: 12, marginTop: 4 }}>
-                <span style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                <span style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>
                   {quote.trip_type === 'ROUND_TRIP' ? 'Total (both legs)' : 'Total amount'}
                 </span>
-                <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--accent-primary)', minWidth: 0, overflowWrap: 'anywhere', textAlign: 'right' }}>
+                <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', minWidth: 0, overflowWrap: 'anywhere', textAlign: 'right' }}>
                   {formatCurrency(parseFloat(quote.total_amount || '0'))}
                 </span>
               </div>
@@ -581,7 +565,7 @@ export default function QuoteDetail() {
           {quote.notes && (
             <div className="card" style={{ padding: 24, borderRadius: 8 }}>
               <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Notes</h2>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{quote.notes}</div>
+              <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{quote.notes}</div>
             </div>
           )}
         </div>
@@ -619,30 +603,32 @@ export default function QuoteDetail() {
                 {billingBlocked && (
                   <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))', marginTop: 4 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
                     Status changes are blocked —{' '}
-                    <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/settings/billing')}>
+                    <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>
                       go to billing
-                    </span>
+                    </button>
                   </div>
                 )}
               </div>
               <div>
                 {label('Confidence')}
-                <div style={{ fontSize: 13, lineHeight: '20px', color: quote.confidence === 'HIGH' ? 'var(--status-success)' : quote.confidence === 'LOW' ? 'var(--status-danger)' : 'var(--status-warning)' }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, color: quote.confidence === 'HIGH' ? 'var(--status-success-text, var(--status-success))' : quote.confidence === 'LOW' ? 'var(--status-danger-text, var(--status-danger))' : 'var(--status-warning-text, var(--status-warning))' }}>
                   {sentenceCase(quote.confidence)}
                 </div>
               </div>
               <div>
                 {label('Margin')}
-                <div style={{ fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>{quote.margin_percentage || 0}%</div>
+                <div style={{ fontSize: 14, lineHeight: '20px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>{quote.margin_percentage || 0}%</div>
               </div>
               {quote.valid_until && (
                 <div>
                   {label('Valid until')}
-                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                    {new Date(quote.valid_until).toLocaleDateString('en-ZA')}
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
+                    {formatDate(quote.valid_until)}
                     {new Date(quote.valid_until).getTime() - Date.now() < 48 * 60 * 60 * 1000 && (
                       <span style={{ color: 'var(--status-danger-text, var(--status-danger))', marginLeft: 8 }}>
-                        ({Math.ceil((new Date(quote.valid_until).getTime() - Date.now()) / (1000 * 60 * 60))}h left)
+                        {new Date(quote.valid_until).getTime() <= Date.now()
+                          ? '(expired)'
+                          : `(${Math.ceil((new Date(quote.valid_until).getTime() - Date.now()) / (1000 * 60 * 60))}h left)`}
                       </span>
                     )}
                   </div>
@@ -651,8 +637,8 @@ export default function QuoteDetail() {
               {quote.created_at && (
                 <div>
                   {label('Created')}
-                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                    {new Date(quote.created_at).toLocaleDateString('en-ZA')}
+                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
+                    {formatDate(quote.created_at)}
                   </div>
                 </div>
               )}
@@ -671,7 +657,7 @@ export default function QuoteDetail() {
                     // multiply by 100 again here.
                     width: `${Math.min(Number(quote.win_probability), 100)}%`,
                     height: '100%',
-                    background: quote.win_probability >= 70 ? 'var(--status-success)' : quote.win_probability >= 40 ? 'var(--status-warning)' : 'var(--status-danger)',
+                    background: quote.win_probability >= 70 ? 'var(--status-success-text, var(--status-success))' : quote.win_probability >= 40 ? 'var(--status-warning)' : 'var(--status-danger)',
                   }} />
                 </div>
                 <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -688,58 +674,57 @@ export default function QuoteDetail() {
           {(quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome && (
             <div className="card" style={{ padding: 24, borderRadius: 8 }}>
               <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Mark outcome</h2>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button
+                  type="button"
                   onClick={() => {
                     setOutcomeType('accepted');
                     setFinalPrice(String(quote.total_amount || ''));
                     setShowOutcomeModal(true);
                   }}
-                  className="btn-action"
-                  style={{ flex: 1, padding: '10px 16px', minHeight: 40, background: 'var(--status-success)', border: 'none', color: '#000' }}
+                  className="bk-btn bk-btn--success-outline"
+                  style={{ flex: 1 }}
                 >
-                  ✓ Mark as accepted
+                  Mark accepted
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setOutcomeType('rejected');
                     setShowOutcomeModal(true);
                   }}
-                  className="btn-action"
-                  style={{ flex: 1, padding: '10px 16px', minHeight: 40, background: 'var(--status-danger)', border: 'none', color: '#fff' }}
+                  className="bk-btn bk-btn--danger-outline"
+                  style={{ flex: 1 }}
                 >
-                  ✗ Mark as rejected
+                  Mark rejected
                 </button>
               </div>
             </div>
           )}
 
-          {/* Actions */}
+          {/* Actions — primary next step first, secondary tools, destructive last */}
           <div className="card" style={{ padding: 24, borderRadius: 8 }}>
-            <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Actions</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button
-                className="btn-action"
-                onClick={() => navigate(`/bookings/quotes/${id}/edit`)}
-                style={{ width: '100%', padding: '10px 16px', minHeight: 40 }}
-              >
-                Edit quote
-              </button>
+            <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Actions</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {quote.status === 'ACCEPTED' && (
+                <button
+                  type="button"
+                  className="bk-btn bk-btn--primary bk-btn--block"
+                  onClick={handleConvertToLoad}
+                  disabled={convertToLoadMutation.isPending}
+                >
+                  {convertToLoadMutation.isPending ? 'Converting…' : 'Convert to booking'}
+                </button>
+              )}
 
               {/* Send to Customer — status SENT now sends automatically no
                   matter how it got there (this button, a status-dropdown
                   change, or a Kanban drag), so once a quote is already SENT
                   this becomes an explicit resend rather than the first send. */}
               <button
-                className="btn-action"
+                type="button"
+                className={`bk-btn bk-btn--block ${quote.status === 'ACCEPTED' ? 'bk-btn--secondary' : 'bk-btn--primary'}`}
                 onClick={() => sendToCustomerMutation.mutate()}
-                style={{
-                  width: '100%',
-                  padding: '10px 16px',
-                  minHeight: 40,
-                  background: 'var(--accent-primary)',
-                  border: 'none',
-                }}
                 disabled={sendToCustomerMutation.isPending}
               >
                 {sendToCustomerMutation.isPending
@@ -749,19 +734,19 @@ export default function QuoteDetail() {
 
               {effectiveShareUrl && (
                 <div style={{
-                  padding: '12px 14px',
-                  borderRadius: 6,
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--accent-primary)',
+                  padding: 16,
+                  borderRadius: 8,
+                  background: 'var(--bg-deep)',
+                  border: '1px solid var(--border-subtle)',
                   fontSize: 13,
                   lineHeight: '20px',
                   color: 'var(--text-primary)',
                   fontFamily: 'var(--font-sans)',
                 }}>
-                  <div style={{ color: 'var(--text-tertiary)', marginBottom: 6, fontWeight: 500 }}>Share link</div>
+                  <div style={{ color: 'var(--text-secondary)', marginBottom: 4, fontWeight: 500 }}>Share link</div>
                   <div style={{
                     wordBreak: 'break-all',
-                    color: 'var(--accent-primary)',
+                    color: 'var(--text-primary)',
                     marginBottom: 8,
                     fontSize: 13,
                     lineHeight: '20px',
@@ -771,116 +756,60 @@ export default function QuoteDetail() {
                   </div>
                   {effectiveEmailStatus && (
                     <div style={{
-                      color: effectiveEmailStatus.sent ? 'var(--status-success)' : 'var(--status-warning)',
-                      marginBottom: 8,
+                      color: effectiveEmailStatus.sent ? 'var(--status-success-text, var(--status-success))' : 'var(--status-warning-text, var(--status-warning))',
+                      marginBottom: 12,
                       fontSize: 13,
                       lineHeight: '20px',
                     }}>
                       {effectiveEmailStatus.sent
-                        ? `✓ Quote emailed to ${effectiveEmailStatus.address}`
+                        ? `Quote emailed to ${effectiveEmailStatus.address}`
                         : isDemoEmailSkip
                           ? 'Demo mode — link generated, no real email is sent.'
                           : 'Could not email the customer — no email on file. Share the link below instead.'}
                     </div>
                   )}
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(effectiveShareUrl);
-                      toast.success('Link copied to clipboard');
-                    }}
-                    className="qi-action"
-                    style={{
-                      padding: '9px 12px',
-                      minHeight: 40,
-                      background: 'var(--accent-primary)',
-                      border: 'none',
-                      color: 'var(--btn-action-color, #fff)',
-                      borderRadius: 6,
-                      fontSize: 14,
-                      lineHeight: '20px',
-                      fontWeight: 500,
-                      fontFamily: 'var(--font-sans)',
-                      cursor: 'pointer',
-                      width: '100%',
-                    }}
-                  >
-                    Copy link
-                  </button>
-                  <a
-                    href={buildWhatsAppShareUrl(
-                      quote.customer_phone,
-                      `Hi${quote.customer_name ? ` ${quote.customer_name}` : ''}, here's your freight quote${quote.quote_number ? ` (${quote.quote_number})` : ''} from TruckWys: ${effectiveShareUrl}`
-                    )}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      padding: '9px 12px',
-                      minHeight: 40,
-                      marginTop: 8,
-                      background: '#08933C',
-                      border: 'none',
-                      color: 'white',
-                      borderRadius: 6,
-                      fontSize: 14,
-                      lineHeight: '20px',
-                      fontWeight: 500,
-                      fontFamily: 'var(--font-sans)',
-                      textDecoration: 'none',
-                      cursor: 'pointer',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="white" aria-hidden="true">
-                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-                      <path d="M12.001 2C6.478 2 2 6.477 2 12c0 1.892.526 3.708 1.523 5.29L2 22l4.828-1.494A9.953 9.953 0 0012.001 22C17.523 22 22 17.523 22 12S17.523 2 12.001 2zm0 18.062a8.03 8.03 0 01-4.284-1.236l-.307-.183-3.194.988.99-3.13-.2-.32A8.02 8.02 0 013.938 12c0-4.452 3.612-8.062 8.063-8.062 4.45 0 8.061 3.61 8.061 8.062 0 4.452-3.61 8.062-8.061 8.062z" />
-                    </svg>
-                    Share via WhatsApp
-                  </a>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(effectiveShareUrl);
+                        toast.success('Link copied to clipboard');
+                      }}
+                      className="bk-btn bk-btn--secondary bk-btn--block"
+                    >
+                      Copy link
+                    </button>
+                    <a
+                      href={buildWhatsAppShareUrl(
+                        quote.customer_phone,
+                        `Hi${quote.customer_name ? ` ${quote.customer_name}` : ''}, here's your freight quote${quote.quote_number ? ` (${quote.quote_number})` : ''} from TruckWys: ${effectiveShareUrl}`
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bk-btn bk-btn--whatsapp bk-btn--block"
+                      style={{ boxSizing: 'border-box' }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                        <path d="M12.001 2C6.478 2 2 6.477 2 12c0 1.892.526 3.708 1.523 5.29L2 22l4.828-1.494A9.953 9.953 0 0012.001 22C17.523 22 22 17.523 22 12S17.523 2 12.001 2zm0 18.062a8.03 8.03 0 01-4.284-1.236l-.307-.183-3.194.988.99-3.13-.2-.32A8.02 8.02 0 013.938 12c0-4.452 3.612-8.062 8.063-8.062 4.45 0 8.061 3.61 8.061 8.062 0 4.452-3.61 8.062-8.061 8.062z" />
+                      </svg>
+                      Share via WhatsApp
+                    </a>
+                  </div>
                 </div>
               )}
 
-              {quote.status === 'ACCEPTED' && (
-                <>
-                  <button
-                    className="btn-action"
-                    onClick={handleConvertToLoad}
-                    style={{ width: '100%', padding: '10px 16px', minHeight: 40, background: 'var(--status-success)', border: 'none' }}
-                    disabled={convertToLoadMutation.isPending}
-                  >
-                    {convertToLoadMutation.isPending ? 'Converting…' : '✓ Convert to booking'}
-                  </button>
-                </>
-              )}
-
               <button
-                className="qi-action"
-                onClick={handleDelete}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid var(--status-danger)',
-                  color: 'var(--status-danger-text, var(--status-danger))',
-                  padding: '9px 16px',
-                  minHeight: 40,
-                  borderRadius: 6,
-                  fontSize: 14,
-                  lineHeight: '20px',
-                  fontWeight: 500,
-                  fontFamily: 'var(--font-sans)',
-                  cursor: 'pointer',
-                  width: '100%',
-                }}
-                disabled={deleteMutation.isPending}
+                type="button"
+                className="bk-btn bk-btn--secondary bk-btn--block"
+                onClick={() => navigate(`/bookings/quotes/${id}/edit`)}
               >
-                {deleteMutation.isPending ? 'Deleting…' : 'Delete quote'}
+                Edit quote
               </button>
 
               {/* PDF Download */}
               <button
+                type="button"
                 onClick={() => {
                   downloadBlob(`api/v1/quotes/${id}/generate_pdf/`)
                     .then(blob => {
@@ -892,24 +821,20 @@ export default function QuoteDetail() {
                     })
                     .catch((e: any) => toast.error(e?.message || 'PDF download failed'));
                 }}
-                className="qi-action"
-                style={{
-                  padding: '9px 16px',
-                  minHeight: 40,
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--accent-primary)',
-                  color: 'var(--accent-primary)',
-                  borderRadius: 6,
-                  fontSize: 14,
-                  lineHeight: '20px',
-                  fontWeight: 500,
-                  fontFamily: 'var(--font-sans)',
-                  cursor: 'pointer',
-                  width: '100%',
-                  marginTop: 8,
-                }}
+                className="bk-btn bk-btn--secondary bk-btn--block"
               >
-                ↓ Download PDF
+                <Download size={16} aria-hidden="true" /> Download PDF
+              </button>
+
+              <hr className="bk-divider" />
+
+              <button
+                type="button"
+                className="bk-btn bk-btn--danger-outline bk-btn--block"
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Deleting…' : 'Delete quote'}
               </button>
             </div>
           </div>
@@ -924,7 +849,7 @@ export default function QuoteDetail() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.8)',
+          background: 'rgba(0,0,0,0.65)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -933,8 +858,11 @@ export default function QuoteDetail() {
         onClick={() => setShowOutcomeModal(false)}
         >
           <div
-            className="card"
-            style={{ padding: 24, borderRadius: 12, maxWidth: 440, margin: 20, width: '100%' }}
+            className="bk-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={outcomeType === 'accepted' ? 'Mark quote as accepted' : 'Mark quote as rejected'}
+            style={{ margin: 20 }}
             onClick={(e) => e.stopPropagation()}
           >
             <h2 style={{ margin: '0 0 16px', fontSize: 16, lineHeight: '24px', fontWeight: 600, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>
@@ -942,7 +870,7 @@ export default function QuoteDetail() {
             </h2>
 
             {outcomeType === 'accepted' && (
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 0 }}>
                 {label('Final price agreed (optional)')}
                 <input
                   className="qi-input"
@@ -952,14 +880,14 @@ export default function QuoteDetail() {
                   placeholder={String(quote?.total_amount || '')}
                   style={inputStyle}
                 />
-                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 6 }}>
                   Leave blank to use quote total: {formatCurrency(parseFloat(quote?.total_amount || '0'))}
                 </div>
               </div>
             )}
 
             {outcomeType === 'rejected' && (
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 0 }}>
                 {label('Rejection reason')}
                 <Select value={rejectionReason} onValueChange={setRejectionReason}>
                   <SelectTrigger>
@@ -979,13 +907,13 @@ export default function QuoteDetail() {
                     placeholder="Please specify reason"
                     value={customRejectionReason}
                     onChange={e => setCustomRejectionReason(e.target.value)}
-                    style={{ ...inputStyle, marginTop: 10 }}
+                    style={{ ...inputStyle, marginTop: 12 }}
                   />
                 )}
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
               <button
                 onClick={() => {
                   setShowOutcomeModal(false);
@@ -994,8 +922,9 @@ export default function QuoteDetail() {
                   setCustomRejectionReason('');
                   setFinalPrice('');
                 }}
-                className="btn-action"
-                style={{ flex: 1, background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}
+                type="button"
+                className="bk-btn bk-btn--secondary"
+                style={{ flex: 1 }}
               >
                 Cancel
               </button>
@@ -1011,13 +940,9 @@ export default function QuoteDetail() {
                   outcomeMutation.mutate(data);
                 }}
                 disabled={outcomeType === 'rejected' && (!rejectionReason || (rejectionReason === 'Other' && !customRejectionReason))}
-                className="btn-action"
-                style={{
-                  flex: 1,
-                  background: outcomeType === 'accepted' ? 'var(--status-success)' : 'var(--status-danger)',
-                  border: 'none',
-                  color: outcomeType === 'accepted' ? '#000' : '#fff'
-                }}
+                type="button"
+                className={`bk-btn ${outcomeType === 'accepted' ? 'bk-btn--primary' : 'bk-btn--danger'}`}
+                style={{ flex: 1 }}
               >
                 {outcomeMutation.isPending ? 'Saving…' : outcomeType === 'accepted' ? 'Mark accepted' : 'Mark rejected'}
               </button>

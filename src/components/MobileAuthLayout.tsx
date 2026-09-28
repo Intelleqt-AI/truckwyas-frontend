@@ -42,11 +42,13 @@ export function MobileAuthLayout({ eyebrow, title, subtitle, children, footer }:
           padding: 24px 20px 32px;
         }
         .mobile-auth-layout__eyebrow {
-          font-family: var(--font-mono);
-          font-size: 10px;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: var(--accent-primary);
+          font-family: var(--font-sans);
+          font-size: 13px;
+          line-height: 20px;
+          font-weight: 500;
+          letter-spacing: normal;
+          text-transform: none;
+          color: var(--text-secondary);
           margin-bottom: 4px;
         }
         .mobile-auth-layout__title {

@@ -1,0 +1,200 @@
+import '@/pages/settings/settings-brand.css';
+
+// Shared presentation roles for every settings section (see
+// docs/brand/BRAND-GUIDELINES.md). Each section used to carry its own copy of
+// these objects and they had drifted (h2 vs h3 card titles, 48px vs 40px
+// inputs, 11px help text, three different toggle drawings). Pure styling — no
+// data, no behaviour beyond the switch's own click/keyboard contract.
+
+export const settingsCardStyle: React.CSSProperties = {
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--card-radius, 8px)',
+  marginBottom: 16,
+  minWidth: 0,
+};
+
+export const settingsCardHeaderStyle: React.CSSProperties = {
+  padding: '16px 20px 12px',
+  borderBottom: '1px solid var(--border-subtle)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  flexWrap: 'wrap',
+};
+
+/** Card titles are the h2 under each section's single h1. */
+export const settingsCardTitleStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-sans)',
+  fontSize: 16,
+  lineHeight: '24px',
+  fontWeight: 600,
+  letterSpacing: 'normal',
+  textTransform: 'none',
+  color: 'var(--text-primary)',
+  margin: 0,
+};
+
+export const settingsCardBodyStyle: React.CSSProperties = { padding: 20 };
+
+export const settingsLabelStyle: React.CSSProperties = {
+  display: 'block',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 13,
+  lineHeight: '20px',
+  fontWeight: 500,
+  letterSpacing: 'normal',
+  textTransform: 'none',
+  color: 'var(--text-primary)',
+  marginBottom: 6,
+};
+
+/** Desktop controls are 40px / 14px text. Below 640px the `.tw-settings-shell`
+ *  rule in settings-brand.css lifts every settings field to 48px / 16px so
+ *  iOS Safari does not zoom on focus — one rule for every section instead of
+ *  the profile page alone using 48px on desktop too. */
+export const settingsInputStyle: React.CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  background: 'var(--input-bg)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 6,
+  minHeight: 40,
+  minWidth: 0,
+  padding: '8px 12px',
+  color: 'var(--text-primary)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 14,
+  lineHeight: '20px',
+  transition: 'border-color 0.15s',
+};
+
+export const settingsHelpStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-sans)',
+  fontSize: 13,
+  lineHeight: '20px',
+  color: 'var(--text-tertiary)',
+  marginTop: 6,
+};
+
+export const settingsErrorStyle: React.CSSProperties = {
+  ...settingsHelpStyle,
+  color: 'var(--status-danger-text, var(--status-danger))',
+};
+
+/** Right-aligned action row that closes a card (Save changes etc.). */
+export const settingsCardActionsStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: 12,
+  flexWrap: 'wrap',
+  marginTop: 20,
+};
+
+interface SettingsSwitchProps {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  disabled?: boolean;
+  title?: string;
+}
+
+/** Accessible on/off switch. Off = outlined track with a muted knob on the
+ *  left; on = filled accent track with a contrasting knob on the right, so
+ *  state reads by position and fill (not hue alone) in both themes. */
+export function SettingsSwitch({ checked, onChange, label, disabled, title }: SettingsSwitchProps) {
+  return (
+    <button
+      type="button"
+      className="settings-control settings-switch"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      data-state={checked ? 'on' : 'off'}
+      onClick={() => !disabled && onChange(!checked)}
+      disabled={disabled}
+      title={title}
+    >
+      <span className="settings-switch-knob" aria-hidden="true" />
+    </button>
+  );
+}
+
+interface SettingsToggleRowProps extends Omit<SettingsSwitchProps, 'title'> {
+  description?: string;
+  disabledTitle?: string;
+  badge?: React.ReactNode;
+}
+
+export function SettingsToggleRow({ label, description, checked, onChange, disabled, disabledTitle, badge }: SettingsToggleRowProps) {
+  return (
+    <div className="settings-toggle-row" style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+      padding: '12px 20px',
+      opacity: disabled ? 0.6 : 1,
+    }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{label}</span>
+          {badge}
+        </div>
+        {description && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{description}</div>}
+      </div>
+      <SettingsSwitch checked={checked} onChange={onChange} label={label} disabled={disabled} title={disabled ? disabledTitle : undefined} />
+    </div>
+  );
+}
+
+/** Small neutral badge (4px radius, 12/16 sans). */
+export const settingsBadgeStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-sans)',
+  fontSize: 12,
+  lineHeight: '16px',
+  fontWeight: 500,
+  color: 'var(--text-secondary)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 4,
+  padding: '2px 6px',
+  whiteSpace: 'nowrap',
+};
+
+/** Outlined secondary action (40px, 6px radius). Pair with className="settings-control". */
+export const settingsSecondaryButtonStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  background: 'transparent',
+  border: '1px solid var(--border-subtle)',
+  color: 'var(--text-secondary)',
+  padding: '8px 12px',
+  minHeight: 40,
+  borderRadius: 6,
+  fontFamily: 'var(--font-sans)',
+  fontSize: 14,
+  lineHeight: '20px',
+  fontWeight: 500,
+  letterSpacing: 'normal',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+};
+
+/** Explicitly named destructive action — outlined in the danger role. */
+export const settingsDangerButtonStyle: React.CSSProperties = {
+  ...settingsSecondaryButtonStyle,
+  border: '1px solid var(--status-danger)',
+  color: 'var(--status-danger-text, var(--status-danger))',
+};
+
+/** Standard settings section title block (one h1 + supporting line). */
+export function SettingsPageHeader({ title, description, actions }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ minWidth: 0 }}>
+        <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: description ? 4 : 0 }}>{title}</h1>
+        {description && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{description}</div>}
+      </div>
+      {actions && <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', flexShrink: 0 }}>{actions}</div>}
+    </div>
+  );
+}

@@ -25,9 +25,12 @@ export default {
 			},
 			/* Typography - Mercury-inspired system */
 			fontFamily: {
-				'display': ['Inter', 'sans-serif'],        // Headings
-				'body': ['Inter', 'sans-serif'],           // Body text
-				'mono': ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Consolas', 'monospace']
+				// One sans + one mono for the whole product; both resolve to the
+				// single definitions in src/styles/theme.css (no downloaded fonts).
+				'sans': ['var(--font-sans)'],
+				'display': ['var(--font-sans)'],
+				'body': ['var(--font-sans)'],
+				'mono': ['var(--font-mono)']
 			},
 			fontWeight: {
 				'display-bold': '700',    // H1

@@ -1,13 +1,16 @@
 import './customers-typography.css';
+import './table-heading-roles.css';
+import './bookings-section.css';
+import './quote-invoice-roles.css';
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Building2 } from "lucide-react";
+import { Building2, Plus, X } from "lucide-react";
+import SectionHeader from "@/components/layout/SectionHeader";
 import { useQuery } from "@tanstack/react-query";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
 import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
 import { fetchData, postData, patchData, deleteData } from "../lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { LiveBadge } from "@/components/LiveBadge";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -49,7 +52,6 @@ const fieldStyle: React.CSSProperties = {
   fontSize: 14,
   lineHeight: "20px",
   fontFamily: "var(--font-sans)",
-  outline: "none",
   boxSizing: "border-box",
 };
 
@@ -59,11 +61,16 @@ const labelStyle: React.CSSProperties = {
   lineHeight: "20px",
   fontWeight: 500,
   fontFamily: "var(--font-sans)",
-  color: "var(--text-tertiary)",
+  color: "var(--text-secondary)",
   letterSpacing: "normal",
   marginBottom: 6,
   textTransform: "none",
 };
+
+const PAYMENT_TERMS_LABEL: Record<string, string> = Object.fromEntries(PAYMENT_TERMS.map(t => [t.value, t.label]));
+// "NET45" → "Net 45 days" for terms outside the fixed list.
+const paymentTermsLabel = (v?: string) =>
+  !v ? "Net 30 days" : PAYMENT_TERMS_LABEL[v] || (/^NET(\d+)$/.test(v) ? `Net ${v.slice(3)} days` : v);
 
 const EMPTY_FORM = {
   name: "", company_name: "", email: "", phone: "",
@@ -163,44 +170,48 @@ export default function Customers() {
     });
   }
 
-  if (loading) return <Loader fullScreen />;
-
-  return (
-    <div className="customers-typography">
-      {/* Header */}
-      <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 22, lineHeight: "28px", fontWeight: 600, color: "var(--text-primary)" }}>Customers</h1>
-          <LiveBadge />
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
+  const header = (
+    <SectionHeader
+      title="Customers"
+      description="Everyone you quote and invoice, with their payment terms and credit limits."
+      actions={
+        <>
           <button
+            type="button"
+            className="bk-btn bk-btn--secondary"
             onClick={() => setShowImport(true)}
             disabled={isDemo}
             title={isDemo ? 'Fixed in demo mode' : 'Paste a list from Excel'}
-            style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', textTransform: 'none', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
           >Import from Excel</button>
           <button
-            className="btn-action"
+            type="button"
+            className="bk-btn bk-btn--primary"
             onClick={() => setShowAddForm(true)}
             disabled={isDemo}
             title={isDemo ? 'Fixed in demo mode' : undefined}
-            style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-          >+ Add customer</button>
-        </div>
-      </div>
+          ><Plus size={16} aria-hidden="true" /> Add customer</button>
+        </>
+      }
+    />
+  );
+
+  if (loading) return <div className="customers-typography">{header}<Loader fullScreen /></div>;
+
+  return (
+    <div className="customers-typography bookings-typography">
+      {header}
 
       {/* KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+      <div className="bk-metrics">
         {[
           { label: "Total customers", value: customers.length, color: "var(--text-primary)" },
-          { label: "With credit limit", value: customers.filter(c => c.credit_limit != null && Number(c.credit_limit) > 0).length, color: "var(--accent-primary)" },
+          { label: "With credit limit", value: customers.filter(c => c.credit_limit != null && Number(c.credit_limit) > 0).length, color: "var(--text-primary)" },
           { label: "Cities covered", value: new Set(customers.map(c => c.city).filter(Boolean)).size, color: "var(--text-primary)" },
           { label: "Net 30 clients", value: customers.filter(c => (c.payment_terms_default || "NET30") === "NET30").length, color: "var(--text-primary)" },
         ].map(k => (
           <div key={k.label} className="card metric-card">
             <div className="card-header"><span className="card-title">{k.label}</span></div>
-            <div className="metric-value" style={{ fontSize: 28, color: k.color }}>{k.value}</div>
+            <div className="metric-value" style={{ color: k.color }}>{k.value}</div>
           </div>
         ))}
       </div>
@@ -208,7 +219,7 @@ export default function Customers() {
       {/* Table */}
       <div className="card" style={{ padding: 0, overflowX: "auto" }}>
         {/* Sits above the toolbar so it never covers the rows being chosen. */}
-        <div style={{ padding: selected.length ? "12px 20px 0 32px" : 0 }}>
+        <div style={{ padding: selected.length ? "12px 16px 0" : 0 }}>
           <BulkDeleteBar
             entity="customers"
             selected={selected}
@@ -218,18 +229,19 @@ export default function Customers() {
         </div>
 
         {/* Table toolbar */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px 12px 32px", borderBottom: "1px solid var(--border-subtle)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, padding: "12px 16px", borderBottom: "1px solid var(--border-subtle)" }}>
           <input
-            type="text"
-            placeholder="Search name, company, email, city..."
+            type="search"
+            className="bk-search"
+            aria-label="Search customers"
+            placeholder="Search name, company, email, city"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ ...fieldStyle, width: 280 }}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 13, lineHeight: "20px", fontWeight: 500, fontFamily: "var(--font-sans)", color: "var(--text-tertiary)", letterSpacing: 0 }}>Sort</span>
+            <span id="customers-sort-label" style={{ fontSize: 13, lineHeight: "20px", fontWeight: 500, fontFamily: "var(--font-sans)", color: "var(--text-secondary)", letterSpacing: 0 }}>Sort</span>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger>
+              <SelectTrigger aria-labelledby="customers-sort-label" style={{ minWidth: 160, minHeight: 40 }}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -242,14 +254,10 @@ export default function Customers() {
             </Select>
           </div>
         </div>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <table className="table-heading-roles bk-table">
           <thead>
             <tr>
-              <th style={{
-                padding: "12px 0 12px 20px", width: 32,
-                fontSize: 13, lineHeight: "20px", fontWeight: 500,
-                borderBottom: "1px solid var(--border-subtle)",
-              }}>
+              <th scope="col" style={{ padding: "12px 0 12px 16px", width: 32 }}>
                 {filtered.length > 0 && (
                   <RowCheckbox
                     title="Select everything shown"
@@ -258,40 +266,37 @@ export default function Customers() {
                   />
                 )}
               </th>
-              {["Name", "Company", "Email", "Phone", "City", "Payment terms", ""].map(h => (
-                <th key={h} style={{
-                  padding: "12px 20px 12px 12px", textAlign: "left",
-                  fontFamily: "var(--font-sans)", fontSize: 13, lineHeight: "20px",
-                  letterSpacing: 0, textTransform: "none", color: "var(--text-secondary)",
-                  borderBottom: "1px solid var(--border-subtle)", fontWeight: 500, whiteSpace: "nowrap",
-                }}>{h}</th>
+              {["Name", "Company", "Email", "Phone", "City", "Payment terms", "Status"].map(h => (
+                <th key={h} scope="col">{h}</th>
               ))}
+              <th scope="col" className="is-num"><span className="sr-only" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Actions</span></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               customers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: 0 }}>
-                    <div style={{ padding: "60px 20px", textAlign: "center" }}>
-                      <div style={{ marginBottom: 16, opacity: 0.3, color: "var(--text-secondary)" }}><Building2 size={48} strokeWidth={1.5} aria-hidden="true" /></div>
-                      <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", marginBottom: 8 }}>No customers yet</div>
-                      <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20 }}>
+                  <td colSpan={9} style={{ padding: 0, whiteSpace: "normal" }}>
+                    <div className="bk-empty" style={{ padding: "48px 24px" }}>
+                      <div className="bk-empty__icon"><Building2 size={32} strokeWidth={1.5} aria-hidden="true" /></div>
+                      <h2 className="bk-empty__title">No customers yet</h2>
+                      <div className="bk-empty__text">
                         Already have them in a spreadsheet? Paste the list straight in.
                       </div>
                       <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
                         <button
+                          type="button"
                           onClick={() => setShowImport(true)}
-                          className="btn-action"
+                          className="bk-btn bk-btn--primary"
                           disabled={isDemo}
                           title={isDemo ? 'Fixed in demo mode' : undefined}
-                          style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                         >Paste from Excel</button>
                         <button
+                          type="button"
+                          className="bk-btn bk-btn--secondary"
                           onClick={() => setShowAddForm(true)}
                           disabled={isDemo}
                           title={isDemo ? 'Fixed in demo mode' : undefined}
-                          style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, letterSpacing: 'normal', textTransform: 'none', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
                         >Add one at a time</button>
                       </div>
                     </div>
@@ -299,56 +304,56 @@ export default function Customers() {
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: "center", color: "var(--text-tertiary)", padding: 40, fontSize: 13 }}>
-                    No customers match your filters
+                  <td colSpan={9} style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40, fontSize: 13 }}>
+                    No customers match your search.
                   </td>
                 </tr>
               )
             ) : filtered.map((c, idx) => {
               const status = customerStatus(c);
-              const dotColor = status === "ACTIVE" ? "var(--status-success)" : "var(--text-tertiary)";
               return (
                 <tr
                   key={c.id}
-                  style={{ cursor: "pointer", borderBottom: idx < filtered.length - 1 ? "1px solid var(--border-row)" : "none" }}
+                  className="is-clickable"
                   onClick={() => navigate(`/customers/${c.id}`)}
-                  onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-surface-hover)")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
-                  <td style={{ padding: "12px 0 12px 20px", width: 32 }}>
+                  <td style={{ padding: "12px 0 12px 16px", width: 32 }}>
                     <RowCheckbox
                       checked={selected.includes(c.id)}
                       onChange={on => toggleOne(c.id, on)}
                     />
                   </td>
-                  <td style={{ padding: "12px 20px 12px 12px", fontSize: 13, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
-                      {c.name}
-                    </div>
+                  <td className="is-primary is-truncate" style={{ fontWeight: 500, maxWidth: 220 }} title={c.name}>
+                    {c.name}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, color: "var(--text-secondary)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.company_name || ""}>
+                  <td className="is-truncate" style={{ maxWidth: 200 }} title={c.company_name || ""}>
                     {c.company_name || "—"}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-sans)", fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.email}>
+                  <td className="is-truncate" style={{ maxWidth: 220 }} title={c.email}>
                     {c.email}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-sans)", fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                  <td>
                     {c.phone || "—"}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontSize: 13, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                  <td>
                     {c.city || "—"}
                   </td>
-                  <td style={{ padding: "12px 20px 12px 32px", fontFamily: "var(--font-sans)", fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                    {c.payment_terms_default || "NET30"}
+                  <td>
+                    {paymentTermsLabel(c.payment_terms_default)}
                   </td>
-                  <td style={{ padding: "12px 20px", textAlign: "right" }}>
-                    <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                  <td>
+                    <span className={`bk-status bk-status--${status === "ACTIVE" ? "success" : "neutral"}`}>{status === "ACTIVE" ? "Active" : "Inactive"}</span>
+                  </td>
+                  <td className="is-num" style={{ padding: "8px 16px" }}>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                       <button
+                        type="button"
+                        className="bk-btn bk-btn--secondary"
+                        style={{ padding: "8px 12px" }}
+                        aria-label={`Edit ${c.name}`}
                         onClick={e => { e.stopPropagation(); openEdit(c); }}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", padding: "4px 10px", minHeight: 40, borderRadius: 6, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", fontWeight: 500, letterSpacing: "normal", opacity: isDemo ? 0.5 : 1 }}
                       >Edit</button>
                       <button
                         onClick={e => {
@@ -369,9 +374,12 @@ export default function Customers() {
                             },
                           });
                         }}
+                        type="button"
+                        className="bk-btn bk-btn--danger-outline"
+                        style={{ padding: "8px 12px" }}
+                        aria-label={`Delete ${c.name}`}
                         disabled={isDemo}
                         title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={{ background: "none", border: "1px solid var(--status-danger)", color: "var(--status-danger-text, var(--status-danger))", padding: "4px 10px", minHeight: 40, borderRadius: 6, cursor: isDemo ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", fontWeight: 500, letterSpacing: "normal", opacity: isDemo ? 0.5 : 1 }}
                       >Delete</button>
                     </div>
                   </td>
@@ -392,11 +400,11 @@ export default function Customers() {
       {/* Add customer slide-out */}
       {showAddForm && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ position: "absolute", inset: 0, background: "var(--modal-backdrop)" }} onClick={() => { setShowAddForm(false); if (location.pathname === "/customers/new") navigate("/customers", { replace: true }); }} />
-          <div style={{ position: "relative", width: 440, background: "var(--bg-deep)", borderLeft: "1px solid var(--border-subtle)", padding: 28, overflowY: "auto" }}>
+          <div style={{ position: "absolute", inset: 0, background: "var(--modal-backdrop, rgba(0,0,0,0.65))" }} onClick={() => { setShowAddForm(false); if (location.pathname === "/customers/new") navigate("/customers", { replace: true }); }} />
+          <div role="dialog" aria-modal="true" style={{ position: "relative", width: 440, maxWidth: "100%", background: "var(--bg-surface)", borderLeft: "1px solid var(--border-subtle)", padding: 24, overflowY: "auto", fontFamily: "var(--font-sans)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>Add customer</div>
-              <button onClick={() => setShowAddForm(false)} style={{ background: "none", border: "none", color: "var(--text-tertiary)", cursor: "pointer", fontSize: 18 }}>✕</button>
+              <h2 className="bk-dialog__title" style={{ margin: 0 }}>Add customer</h2>
+              <button type="button" className="bk-icon-btn" aria-label="Close" onClick={() => setShowAddForm(false)}><X size={20} aria-hidden="true" /></button>
             </div>
 
             {[
@@ -405,14 +413,16 @@ export default function Customers() {
               { key: "email", label: "Email", placeholder: "e.g. john@company.com", type: "email", required: true },
               { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000", required: true },
               { key: "city", label: "City", placeholder: "e.g. Johannesburg", required: true },
-              { key: "state", label: "Province / state", placeholder: "e.g. Gauteng" },
-              { key: "zip_code", label: "Zip code", placeholder: "e.g. 2000" },
+              { key: "state", label: "Province", placeholder: "e.g. Gauteng" },
+              { key: "zip_code", label: "Postal code", placeholder: "e.g. 2000" },
               { key: "address", label: "Address", placeholder: "Street address" },
               { key: "billing_address", label: "Billing address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text, var(--status-danger))", marginLeft: 2 }}>*</span>}</label>
                 <input
+                  className="qi-input"
+                  aria-label={f.label}
                   type={f.type || "text"}
                   placeholder={f.placeholder}
                   value={(addForm as any)[f.key]}
@@ -429,7 +439,9 @@ export default function Customers() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_TERMS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  {[...PAYMENT_TERMS, ...(addForm.payment_terms_default && !PAYMENT_TERMS.some(t => t.value === addForm.payment_terms_default)
+                    ? [{ value: addForm.payment_terms_default, label: paymentTermsLabel(addForm.payment_terms_default) }] : [])]
+                    .map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -468,13 +480,16 @@ export default function Customers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: "10px 0", minHeight: 40, fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", letterSpacing: "normal", background: "var(--accent-primary)", color: "var(--btn-action-color, var(--bg-deep))", border: "none", borderRadius: 6, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
+                type="button"
+                className="bk-btn bk-btn--primary"
+                style={{ flex: 1 }}
               >
                 {saving ? "Saving…" : "Create customer"}
               </button>
               <button
                 onClick={() => setShowAddForm(false)}
-                style={{ padding: "10px 20px", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 6, cursor: "pointer" }}
+                type="button"
+                className="bk-btn bk-btn--secondary"
               >
                 Cancel
               </button>
@@ -486,11 +501,11 @@ export default function Customers() {
       {/* Edit customer slide-out */}
       {editCustomer && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ position: "absolute", inset: 0, background: "var(--modal-backdrop)" }} onClick={() => setEditCustomer(null)} />
-          <div style={{ position: "relative", width: 440, background: "var(--bg-deep)", borderLeft: "1px solid var(--border-subtle)", padding: 28, overflowY: "auto" }}>
+          <div style={{ position: "absolute", inset: 0, background: "var(--modal-backdrop, rgba(0,0,0,0.65))" }} onClick={() => setEditCustomer(null)} />
+          <div role="dialog" aria-modal="true" style={{ position: "relative", width: 440, maxWidth: "100%", background: "var(--bg-surface)", borderLeft: "1px solid var(--border-subtle)", padding: 24, overflowY: "auto", fontFamily: "var(--font-sans)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>Edit customer</div>
-              <button onClick={() => setEditCustomer(null)} style={{ background: "none", border: "none", color: "var(--text-tertiary)", cursor: "pointer", fontSize: 18 }}>✕</button>
+              <h2 className="bk-dialog__title" style={{ margin: 0 }}>Edit customer</h2>
+              <button type="button" className="bk-icon-btn" aria-label="Close" onClick={() => setEditCustomer(null)}><X size={20} aria-hidden="true" /></button>
             </div>
 
             {[
@@ -499,14 +514,16 @@ export default function Customers() {
               { key: "email", label: "Email", placeholder: "e.g. john@company.com", type: "email", required: true },
               { key: "phone", label: "Phone", placeholder: "e.g. +27 11 000 0000", required: true },
               { key: "city", label: "City", placeholder: "e.g. Johannesburg", required: true },
-              { key: "state", label: "Province / state", placeholder: "e.g. Gauteng" },
-              { key: "zip_code", label: "Zip code", placeholder: "e.g. 2000" },
+              { key: "state", label: "Province", placeholder: "e.g. Gauteng" },
+              { key: "zip_code", label: "Postal code", placeholder: "e.g. 2000" },
               { key: "address", label: "Address", placeholder: "Street address" },
               { key: "billing_address", label: "Billing address", placeholder: "Leave blank if same as address" },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>{f.label}{(f as any).required && <span style={{ color: "var(--status-danger-text, var(--status-danger))", marginLeft: 2 }}>*</span>}</label>
                 <input
+                  className="qi-input"
+                  aria-label={f.label}
                   type={f.type || "text"}
                   placeholder={f.placeholder}
                   value={editForm[f.key] ?? ""}
@@ -523,7 +540,9 @@ export default function Customers() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_TERMS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  {[...PAYMENT_TERMS, ...(editForm.payment_terms_default && !PAYMENT_TERMS.some(t => t.value === editForm.payment_terms_default)
+                    ? [{ value: editForm.payment_terms_default, label: paymentTermsLabel(editForm.payment_terms_default) }] : [])]
+                    .map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -571,13 +590,16 @@ export default function Customers() {
                   }
                   setSaving(false);
                 }}
-                style={{ flex: 1, padding: "10px 0", minHeight: 40, fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", letterSpacing: "normal", background: "var(--accent-primary)", color: "var(--btn-action-color, var(--bg-deep))", border: "none", borderRadius: 6, cursor: saving ? "wait" : "pointer", fontWeight: 600 }}
+                type="button"
+                className="bk-btn bk-btn--primary"
+                style={{ flex: 1 }}
               >
-                {saving ? "Saving…" : "Update customer"}
+                {saving ? "Saving…" : "Save changes"}
               </button>
               <button
                 onClick={() => setEditCustomer(null)}
-                style={{ padding: "10px 20px", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", background: "none", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", borderRadius: 6, cursor: "pointer" }}
+                type="button"
+                className="bk-btn bk-btn--secondary"
               >
                 Cancel
               </button>

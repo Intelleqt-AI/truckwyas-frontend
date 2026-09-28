@@ -320,12 +320,12 @@ export default function Copilot() {
     }
     return (
       <div style={{
-        flexShrink: 0, width: 26, height: 26, borderRadius: "var(--cp-radius, 2px)", display: 'grid', placeItems: 'center',
+        flexShrink: 0, minWidth: 28, height: 28, padding: '0 6px', boxSizing: 'border-box', borderRadius: "var(--cp-radius, 2px)", display: 'grid', placeItems: 'center',
         background: role === 'user' ? 'var(--bg-surface)' : 'var(--accent-primary)',
         border: role === 'user' ? '1px solid var(--border-subtle)' : 'none',
         color: role === 'user' ? 'var(--text-secondary)' : 'var(--cp-on-accent, var(--bg-deep))',
-        fontFamily: 'var(--cp-font, var(--font-mono))', fontSize: "var(--cp-support-size, 9px)", lineHeight: "var(--cp-support-line, inherit)", fontWeight: 700, letterSpacing: "var(--cp-tracking, 0.05em)",
-      }}>{role === 'user' ? 'YOU' : 'AI'}</div>
+        fontFamily: 'var(--cp-font, var(--font-mono))', fontSize: "var(--cp-support-size, 9px)", lineHeight: "var(--cp-support-line, inherit)", fontWeight: 600, letterSpacing: "var(--cp-tracking, 0.05em)",
+      }} aria-hidden="true">{role === 'user' ? 'You' : 'AI'}</div>
     );
   };
 
@@ -354,17 +354,17 @@ export default function Copilot() {
           display: 'inline-flex', alignItems: 'center', gap: "var(--cp-space-6, 6px)", fontFamily: 'var(--cp-font, var(--font-mono))', fontSize: "var(--cp-support-size, 10px)", lineHeight: "var(--cp-support-line, inherit)",
           padding: "var(--cp-inset-0, 4px 9px)", borderRadius: "var(--cp-radius, 2px)", letterSpacing: "var(--cp-tracking, 0.07em)",
           background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-          color: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+          color: aiAvailable ? 'var(--accent-primary)' : 'var(--text-secondary)',
         }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: aiAvailable ? 'var(--accent-primary)' : 'var(--text-tertiary)' }} />
-          {aiAvailable === null ? 'Ready' : aiAvailable ? 'AI · Live' : 'Rules engine'}
+          {aiAvailable === null ? 'Ready' : aiAvailable ? 'AI available' : 'Rules engine'}
         </span>
       </div>
 
       {/* Two-pane: conversation history sidebar (left) + active chat (right) */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 12 }}>
+      <div className="cp-layout" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 12 }}>
         {/* Sidebar */}
-        <div className="cp-panel" style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: "var(--cp-radius, 2px)", overflow: 'hidden' }}>
+        <div className="cp-panel cp-sidebar" style={{ width: 250, flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: "var(--cp-radius, 2px)", overflow: 'hidden' }}>
           <div style={{ padding: "var(--cp-space-10, 10px)", borderBottom: '1px solid var(--border-subtle)' }}>
             <button onClick={newChat} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: "var(--cp-space-6, 6px)", background: 'var(--accent-primary)', color: 'var(--cp-on-accent, var(--bg-deep))', border: 'none', borderRadius: "var(--cp-radius, 2px)", padding: "var(--cp-inset-1, 9px 12px)", cursor: 'pointer', fontFamily: 'var(--cp-font, var(--font-mono))', fontSize: "var(--cp-control-size, 11px)", lineHeight: "var(--cp-support-line, inherit)", fontWeight: "var(--cp-control-weight, 600)" as React.CSSProperties['fontWeight'], letterSpacing: "var(--cp-tracking, 0.05em)" }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -384,16 +384,16 @@ export default function Copilot() {
               >
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: "var(--cp-body-size, 12.5px)", lineHeight: "var(--cp-body-line, inherit)", color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'New conversation'}</div>
-                  <div style={{ fontSize: "var(--cp-support-size, 10px)", lineHeight: "var(--cp-support-line, inherit)", color: 'var(--text-tertiary)', fontFamily: 'var(--cp-font, var(--font-mono))', marginTop: "var(--cp-space-2, 2px)" }}>{c.message_count} msgs · {relTime(c.updated_at)}</div>
+                  <div style={{ fontSize: "var(--cp-support-size, 10px)", lineHeight: "var(--cp-support-line, inherit)", color: 'var(--text-tertiary)', fontFamily: 'var(--cp-font, var(--font-mono))', marginTop: "var(--cp-space-2, 2px)" }}>{c.message_count} {c.message_count === 1 ? 'message' : 'messages'} · {relTime(c.updated_at)}</div>
                 </div>
-                <button onClick={(e) => deleteConversation(c.id, e)} className="cp-del" title="Delete" style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: "var(--cp-control-size, 13px)", lineHeight: "var(--cp-body-line, inherit)", padding: "var(--cp-space-2, 2px)", opacity: "var(--cp-delete-opacity, 0.6)" as React.CSSProperties['opacity'] }}><X size={13} aria-hidden="true" /></button>
+                <button onClick={(e) => deleteConversation(c.id, e)} className="cp-del" title="Delete conversation" aria-label={`Delete conversation ${c.title || 'New conversation'}`} style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: "var(--cp-control-size, 13px)", lineHeight: "var(--cp-body-line, inherit)", padding: "var(--cp-space-2, 2px)", opacity: "var(--cp-delete-opacity, 0.6)" as React.CSSProperties['opacity'] }}><X size={13} aria-hidden="true" /></button>
               </div>
             ))}
           </div>
         </div>
 
       {/* Conversation card fills remaining height; input docked inside at the bottom */}
-      <div className="card" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+      <div className="card cp-chat" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 20 }}>
           {isEmpty ? (
             <div>

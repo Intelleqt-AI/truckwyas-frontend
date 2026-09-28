@@ -2,11 +2,10 @@ import './fleet-vehicles-brand.css';
 import './table-heading-roles.css';
 import { Truck as EmptyFleetIcon } from 'lucide-react';
 import { useState, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from '@tanstack/react-query';
 import { fetchData, patchData, deleteData } from '../lib/Api';
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { LiveBadge } from "@/components/LiveBadge";
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -16,6 +15,7 @@ import { PasteImportDrawer } from '@/components/import/PasteImportDrawer';
 import { BulkDeleteBar, RowCheckbox } from '@/components/BulkDeleteBar';
 import { EditVehicleDrawer } from '@/components/EditVehicleDrawer';
 import { Loader } from '@/components/Loader';
+import SectionHeader, { FLEET_TABS } from '@/components/layout/SectionHeader';
 import { secondaryButtonStyle } from '@/components/BulkDeleteBar';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -98,13 +98,16 @@ interface FleetIntelligence {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  ACTIVE: 'var(--status-success)',
-  AVAILABLE: 'var(--status-success)',
-  IN_USE: 'var(--status-success)',
+  ACTIVE: 'var(--status-success-text, var(--status-success))',
+  AVAILABLE: 'var(--status-success-text, var(--status-success))',
+  IN_USE: 'var(--status-success-text, var(--status-success))',
   MAINTENANCE: 'var(--status-warning-text, var(--status-warning))',
   INACTIVE: 'var(--text-tertiary)',
   OUT_OF_SERVICE: 'var(--text-tertiary)',
 };
+
+// Numeric columns are right aligned (header and cells) per the table standard.
+const NUMERIC_COLUMNS = new Set(['Revenue MTD', 'Trips MTD']);
 
 const formatZAR = (v: number) =>
   'R ' + v.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -151,7 +154,6 @@ async function loadFleet(q: string) {
 
 export default function Vehicles() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user: authUser } = useAuth();
   // Shared public demo account — creation/edit/delete controls are fixed off,
   // viewing/filtering/search stay fully live.
@@ -222,7 +224,7 @@ export default function Vehicles() {
       <span style={{
         display: 'inline-flex', alignItems: 'center', gap: 4,
         fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px',
-        color: isStale ? 'var(--text-tertiary)' : 'var(--status-success)',
+        color: isStale ? 'var(--text-tertiary)' : 'var(--status-success-text, var(--status-success))',
         marginTop: 4,
       }}>
         <span style={{
@@ -254,309 +256,250 @@ export default function Vehicles() {
     );
   };
 
-  if (loading) {
-    return <Loader fullScreen />;
-  }
-
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    background: 'transparent', border: 'none',
-    borderBottom: active ? '2px solid var(--accent-primary)' : '2px solid transparent',
-    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-    fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal',
-    fontWeight: active ? 500 : 400,
-    padding: '12px 0', marginRight: 24, cursor: 'pointer', marginBottom: -1,
-    transition: 'all 0.2s ease',
-    whiteSpace: 'nowrap',
-  });
+  const secondaryHeaderButton: React.CSSProperties = {
+    background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
+    padding: '8px 16px', borderRadius: 6, cursor: 'pointer',
+  };
 
   return (
     <div className="fleet-page">
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', letterSpacing: 'normal', textTransform: 'none', marginBottom: 4 }}>Fleet</div>
-        <div className="fleet-header-row">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <h1 className="fleet-page-title">Fleet</h1>
-            <LiveBadge />
-          </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <button data-fleet-control onClick={() => navigate('/fleet/heatmap')} style={{ fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', letterSpacing: 'normal' }}>Heatmap</button>
-            <button data-fleet-control
-              onClick={() => setShowImport(true)}
-              disabled={isDemo}
-              title={isDemo ? 'Fixed in demo mode' : 'Paste a fleet list from Excel'}
-              style={{
-                fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', background: 'none',
-                border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)',
-                padding: '8px 16px', borderRadius: 6, letterSpacing: 'normal',
-                cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1,
-              }}
-            >Import from Excel</button>
-            <button data-fleet-control
-              className="btn-action"
-              onClick={() => setShowAddForm(true)}
-              disabled={isDemo}
-              title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-            >+ Add vehicle</button>
-          </div>
-        </div>
-      </div>
+      <SectionHeader
+        eyebrow="Fleet"
+        title="Fleet"
+        tabs={FLEET_TABS}
+        actions={<>
+          <button data-fleet-control onClick={() => navigate('/fleet/heatmap')} style={secondaryHeaderButton}>Heatmap</button>
+          <button data-fleet-control
+            onClick={() => setShowImport(true)}
+            disabled={isDemo}
+            title={isDemo ? 'Fixed in demo mode' : 'Paste a fleet list from Excel'}
+            style={{ ...secondaryHeaderButton, cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+          >Import from Excel</button>
+          <button data-fleet-control
+            className="btn-action"
+            onClick={() => setShowAddForm(true)}
+            disabled={isDemo}
+            title={isDemo ? 'Fixed in demo mode' : undefined}
+            style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+          >+ Add vehicle</button>
+        </>}
+      />
 
-      {/* Fleet sub-tabs */}
-      <div style={{ borderBottom: '1px solid var(--border-subtle)', marginBottom: 24, display: 'flex', overflowX: 'auto' }}>
-        <button style={tabStyle(!location.pathname.includes('/drivers'))} onClick={() => navigate('/fleet/vehicles')}>Vehicles</button>
-        <button style={tabStyle(location.pathname.includes('/drivers'))} onClick={() => navigate('/fleet/drivers')}>Drivers</button>
-      </div>
-
-      {/* Fleet Summary — always computed from real vehicle data */}
+      {/* Fleet summary — always computed from real vehicle data. Same 4-card
+          grid, toolbar and table card as Drivers so switching tabs never moves the page. */}
       <div className="fleet-summary fleet-summary--4">
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Total vehicles</span></div>
-          <div className="metric-value" style={{ fontSize: 28 }}>{vehicles.length}</div>
-        </div>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Available</span></div>
-          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-success)' }}>
-            {vehicles.filter(v => v.status === 'AVAILABLE' || v.status === 'ACTIVE' || v.status === 'IN_USE').length}
-          </div>
-        </div>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">In maintenance</span></div>
-          <div className="metric-value" style={{ fontSize: 28, color: 'var(--status-warning-text, var(--status-warning))' }}>
-            {vehicles.filter(v => v.status === 'MAINTENANCE').length}
-          </div>
-        </div>
-        <div className="card metric-card">
-          <div className="card-header"><span className="card-title">Fleet health score</span></div>
-          <div className="metric-value" style={{ fontSize: 28, color: 'var(--accent-primary)' }}>
-            {(() => {
+        {[
+          { label: 'Total vehicles', value: vehicles.length, color: 'var(--text-primary)' },
+          { label: 'Available', value: vehicles.filter(v => v.status === 'AVAILABLE' || v.status === 'ACTIVE' || v.status === 'IN_USE').length, color: 'var(--status-success-text, var(--status-success))' },
+          { label: 'In maintenance', value: vehicles.filter(v => v.status === 'MAINTENANCE').length, color: 'var(--status-warning-text, var(--status-warning))' },
+          {
+            label: 'Fleet health score',
+            value: (() => {
               const scores = vehicles.filter(v => v.ai_health_score).map(v => v.ai_health_score || 0);
               return scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : '—';
-            })()}
+            })(),
+            color: 'var(--accent-primary)',
+          },
+        ].map(k => (
+          <div key={k.label} className="card metric-card">
+            <div className="card-header"><span className="card-title">{k.label}</span></div>
+            <div className="metric-value" style={{ color: loading ? 'var(--text-tertiary)' : k.color }}>{loading ? '—' : k.value}</div>
           </div>
+        ))}
+      </div>
+
+      {/* Search + status filter toolbar */}
+      <div className="fleet-toolbar">
+        <input data-fleet-control
+          type="text"
+          aria-label="Search vehicles"
+          placeholder="Search VIN, plate, make, model..."
+          value={search}
+          onChange={e => handleSearchChange(e.target.value)}
+          className="fleet-search"
+        />
+        <div className="fleet-filters">
+          {['All', 'AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE'].map(status => {
+            const isActive = statusFilter === status;
+            return (
+              <button data-fleet-control
+                key={status}
+                aria-pressed={isActive}
+                onClick={() => setStatusFilter(status)}
+                className="fleet-filter"
+              >
+                {status === 'All' ? 'All' : formatStatus(status)}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', minWidth: 0, gap: 20 }}>
-        {/* Vehicle Table */}
-        <div style={{ minWidth: 0 }}>
-          {/* Search + Status Filter Toolbar */}
-          <div className="fleet-toolbar">
-            <input data-fleet-control
-              type="text"
-              aria-label="Search vehicles"
-              placeholder="Search VIN, plate, make, model..."
-              value={search}
-              onChange={e => handleSearchChange(e.target.value)}
-              style={{
-                width: 280,
-                maxWidth: '100%',
-                background: 'var(--bg-surface)',
-                border: '1px solid var(--border-subtle)',
-                color: 'var(--text-primary)',
-                padding: '8px 12px',
-                borderRadius: 6,
-                lineHeight: '20px',
-                fontFamily: 'var(--font-sans)',
-              }}
-            />
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {['All', 'AVAILABLE', 'IN_USE', 'MAINTENANCE', 'INACTIVE'].map(status => {
-                const isActive = statusFilter === status;
-                return (
-                  <button data-fleet-control
-                    key={status}
-                    aria-pressed={isActive}
-                    onClick={() => setStatusFilter(status)}
-                    style={{
-                      background: isActive ? 'var(--accent-primary)' : 'var(--bg-surface)',
-                      border: '1px solid var(--border-subtle)',
-                      color: isActive ? 'var(--btn-action-color)' : 'var(--text-secondary)',
-                      padding: '8px 12px',
-                      fontFamily: 'var(--font-sans)',
-                      fontSize: 14,
-                      lineHeight: '20px',
-                      borderRadius: 6,
-                      cursor: 'pointer',
-                      letterSpacing: 'normal',
-                      fontWeight: isActive ? 500 : 400,
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    {status === 'All' ? 'All' : formatStatus(status)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+      {/* Above the table so it never covers the rows being chosen. */}
+      <BulkDeleteBar
+        entity="vehicles"
+        selected={selected}
+        onClear={() => setSelected([])}
+        onDeleted={() => { setSelected([]); refetch(); }}
+      />
 
-          {/* Above the table so it never covers the rows being chosen. */}
-          <BulkDeleteBar
-            entity="vehicles"
-            selected={selected}
-            onClear={() => setSelected([])}
-            onDeleted={() => { setSelected([]); refetch(); }}
-          />
-
-          {/* Table */}
-          <div className="card fleet-table-region" role="region" aria-label="Vehicles table" tabIndex={0} style={{ padding: 0, overflowX: 'auto', minWidth: 0, maxWidth: '100%' }}>
-            <table className="table-heading-roles" style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
+      {/* Table */}
+      <div className="card fleet-table-region" role="region" aria-label="Vehicles table" tabIndex={0}>
+        <table className="table-heading-roles fleet-table">
+          <thead>
+            <tr>
+              <th className="fleet-table__select">
+                {sorted.length > 0 && (
+                  <RowCheckbox
+                    title="Select everything shown"
+                    checked={selected.length > 0 && sorted.every((v: any) => selected.includes(v.id))}
+                    onChange={on => setSelected(on ? sorted.map((v: any) => v.id) : [])}
+                  />
+                )}
+              </th>
+              {['Registration', 'Make / model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency', ''].map(h => (
+                <th key={h} className={NUMERIC_COLUMNS.has(h) ? 'is-numeric' : undefined}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={10} className="fleet-table__state-cell">
+                  <div className="fleet-table-state"><Loader size={32} label="Loading vehicles" /></div>
+                </td>
+              </tr>
+            ) : sorted.length === 0 ? (
+              vehicles.length === 0 ? (
                 <tr>
-                  <th style={{ padding: '12px 0 12px 20px', width: 32, borderBottom: '1px solid var(--border-subtle)' }}>
-                    {sorted.length > 0 && (
-                      <RowCheckbox
-                        title="Select everything shown"
-                        checked={selected.length > 0 && sorted.every((v: any) => selected.includes(v.id))}
-                        onChange={on => setSelected(on ? sorted.map((v: any) => v.id) : [])}
-                      />
-                    )}
-                  </th>
-                  {['Registration', 'Make / model', 'Type', 'Status', 'Utilization', 'Revenue MTD', 'Trips MTD', 'Efficiency', ''].map(h => (
-                    <th key={h} style={{
-                      padding: '12px 16px 12px 12px', textAlign: 'left',
-                      borderBottom: '1px solid var(--border-subtle)',
-                    }}>{h}</th>
-                  ))}
+                  <td colSpan={10} className="fleet-table__state-cell">
+                    <div className="fleet-empty">
+                      <div className="fleet-empty__icon"><EmptyFleetIcon size={40} aria-hidden="true" /></div>
+                      <h2 className="fleet-empty__title">No vehicles yet</h2>
+                      <p className="fleet-empty__text">Already have your fleet in a spreadsheet? Paste the list straight in.</p>
+                      <div className="fleet-empty__actions">
+                      <button data-fleet-control
+                        onClick={() => setShowImport(true)}
+                        className="btn-action"
+                        disabled={isDemo}
+                        title={isDemo ? 'Fixed in demo mode' : undefined}
+                        style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                      >
+                        Paste from Excel
+                      </button>
+                      <button data-fleet-control
+                        onClick={() => setShowAddForm(true)}
+                        disabled={isDemo}
+                        title={isDemo ? 'Fixed in demo mode' : undefined}
+                        style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', borderRadius: 6, padding: '8px 16px', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
+                      >
+                        Add one at a time
+                      </button>
+                      </div>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {sorted.length === 0 ? (
-                  vehicles.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} style={{ padding: 0 }}>
-                        <div style={{ padding: '48px var(--fleet-card-inset)', textAlign: 'center' }}>
-                          <div style={{ marginBottom: 16, opacity: 0.3 }}><EmptyFleetIcon size={40} aria-hidden="true" /></div>
-                          <div style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-                            No vehicles yet
-                          </div>
-                          <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 20 }}>
-                            Already have your fleet in a spreadsheet? Paste the list straight in.
-                          </div>
-                          <button data-fleet-control
-                            onClick={() => setShowImport(true)}
-                            className="btn-action"
-                            disabled={isDemo}
-                            title={isDemo ? 'Fixed in demo mode' : undefined}
-                            style={{ ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}), marginRight: 8 }}
-                          >
-                            Paste from Excel
-                          </button>
-                          <button data-fleet-control
-                            onClick={() => setShowAddForm(true)}
-                            disabled={isDemo}
-                            title={isDemo ? 'Fixed in demo mode' : undefined}
-                            style={{ ...secondaryButtonStyle, fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', borderRadius: 6, padding: '8px 16px', cursor: isDemo ? 'not-allowed' : 'pointer', opacity: isDemo ? 0.5 : 1 }}
-                          >
-                            Add one at a time
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 40, fontSize: 13, lineHeight: '20px' }}>No vehicles match your filters</td></tr>
-                  )
-                ) : sorted.map((v, idx) => {
-                  const utilizationPercent = ((v.total_trips || 0) / 20) * 100;
-                  const utilizationColor = utilizationPercent > 70 ? 'var(--status-success)' : utilizationPercent >= 40 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))';
+              ) : (
+                <tr><td colSpan={10} className="fleet-table__no-match">No vehicles match your filters</td></tr>
+              )
+            ) : sorted.map((v, idx) => {
+              const utilizationPercent = ((v.total_trips || 0) / 20) * 100;
+              const utilizationColor = utilizationPercent > 70 ? 'var(--status-success-text, var(--status-success))' : utilizationPercent >= 40 ? 'var(--status-warning-text, var(--status-warning))' : 'var(--status-danger-text, var(--status-danger))';
 
-                  return (
-                    <tr
-                      key={v.id}
-                      style={{ cursor: 'pointer', borderBottom: idx < sorted.length - 1 ? '1px solid var(--border-row)' : 'none' }}
-                      onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <td style={{ padding: '12px 0 12px 20px', width: 32 }}>
-                        <RowCheckbox
-                          checked={selected.includes(v.id)}
-                          onChange={on => toggleOne(v.id, on)}
-                        />
-                      </td>
-                      <td style={{ padding: '12px 16px 12px 12px', fontFamily: 'var(--font-mono)', fontWeight: 400, fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                        <div>{v.plate || v.registration || '—'}</div>
-                        {formatLastSeen(v)}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={[v.make, v.model].filter(Boolean).join(' ')}>
-                        {[v.make, v.model].filter(Boolean).join(' ') || '—'}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                        {v.vehicle_type_name || '—'}
-                        {v.vehicle_type_capacity != null && (
-                          <span style={{ marginLeft: 6, color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>
-                            · {v.vehicle_type_capacity}t
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>{getStatusBadge(v.status)}</td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{
-                          fontFamily: 'var(--font-sans)',
-                          fontSize: 13,
-                          lineHeight: '20px',
-                          color: utilizationColor,
-                          padding: '4px 8px',
-                          background: 'var(--bg-surface-hover)',
-                          borderRadius: 4,
-                          fontWeight: 600
-                        }}>
-                          {Math.min(utilizationPercent, 100).toFixed(0)}%
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                        {v.revenue_generated ? formatZAR(v.revenue_generated) : '—'}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                        {v.total_trips ?? 0}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                        {v.fuel_efficiency_score ? `${parseFloat(v.fuel_efficiency_score as any).toFixed(0)}/100` : '—'}
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                          <button data-fleet-control
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditVehicle(v);
-                            }}
-                            disabled={isDemo}
-                            title={isDemo ? 'Fixed in demo mode' : undefined}
-                            style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
-                          >Edit</button>
-                          <button data-fleet-control
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setConfirmOpts({
-                                title: 'Delete vehicle',
-                                message: `Remove ${v.plate || v.registration} from your fleet? This cannot be undone.`,
-                                confirmLabel: 'Delete',
-                                danger: true,
-                                onConfirm: async () => {
-                                  try {
-                                    await deleteData({ url: `api/v1/vehicles/${v.id}/` });
-                                    toast.success('Vehicle deleted');
-                                    refetch();
-                                  } catch (err: any) {
-                                    toast.error(err?.message || 'Failed to delete vehicle');
-                                  }
-                                },
-                              });
-                            }}
-                            disabled={isDemo}
-                            title={isDemo ? 'Fixed in demo mode' : undefined}
-                            style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
-                          >Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
+              return (
+                <tr
+                  key={v.id}
+                  style={{ cursor: 'pointer', borderBottom: idx < sorted.length - 1 ? '1px solid var(--border-row)' : 'none' }}
+                  onClick={() => navigate(`/fleet/vehicles/${v.id}`)}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <td className="fleet-table__select">
+                    <RowCheckbox
+                      checked={selected.includes(v.id)}
+                      onChange={on => toggleOne(v.id, on)}
+                    />
+                  </td>
+                  <td>
+                    <div className="fleet-table__id">{v.plate || v.registration || '—'}</div>
+                    {formatLastSeen(v)}
+                  </td>
+                  <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={[v.make, v.model].filter(Boolean).join(' ')}>
+                    {[v.make, v.model].filter(Boolean).join(' ') || '—'}
+                  </td>
+                  <td>
+                    {v.vehicle_type_name || '—'}
+                    {v.vehicle_type_capacity != null && (
+                      <span style={{ marginLeft: 4, color: 'var(--text-tertiary)' }}>
+                        · {v.vehicle_type_capacity}t
+                      </span>
+                    )}
+                  </td>
+                  <td>{getStatusBadge(v.status)}</td>
+                  <td>
+                    <span style={{
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: 13,
+                      lineHeight: '20px',
+                      color: utilizationColor,
+                      padding: '4px 8px',
+                      background: 'var(--bg-surface-hover)',
+                      borderRadius: 4,
+                      fontWeight: 600
+                    }}>
+                      {Math.min(utilizationPercent, 100).toFixed(0)}%
+                    </span>
+                  </td>
+                  <td className="is-numeric">
+                    {v.revenue_generated ? formatZAR(v.revenue_generated) : '—'}
+                  </td>
+                  <td className="is-numeric">
+                    {v.total_trips ?? 0}
+                  </td>
+                  <td>
+                    {v.fuel_efficiency_score ? `${parseFloat(v.fuel_efficiency_score as any).toFixed(0)}/100` : '—'}
+                  </td>
+                  <td className="fleet-table__actions">
+                    <div>
+                      <button data-fleet-control
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditVehicle(v);
+                        }}
+                        disabled={isDemo}
+                        title={isDemo ? 'Fixed in demo mode' : undefined}
+                        style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
+                      >Edit</button>
+                      <button data-fleet-control
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmOpts({
+                            title: 'Delete vehicle',
+                            message: `Remove ${v.plate || v.registration} from your fleet? This cannot be undone.`,
+                            confirmLabel: 'Delete',
+                            danger: true,
+                            onConfirm: async () => {
+                              try {
+                                await deleteData({ url: `api/v1/vehicles/${v.id}/` });
+                                toast.success('Vehicle deleted');
+                                refetch();
+                              } catch (err: any) {
+                                toast.error(err?.message || 'Failed to delete vehicle');
+                              }
+                            },
+                          });
+                        }}
+                        disabled={isDemo}
+                        title={isDemo ? 'Fixed in demo mode' : undefined}
+                        style={{ background: 'none', border: '1px solid var(--status-danger)', color: 'var(--status-danger-text, var(--status-danger))', padding: '4px 12px', borderRadius: 6, cursor: isDemo ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', letterSpacing: 'normal', opacity: isDemo ? 0.5 : 1 }}
+                      >Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       <PasteImportDrawer

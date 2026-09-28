@@ -6,50 +6,13 @@ import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
 import { formatRelativeTime } from "@/lib/formatters";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/AuthContext";
+import { SettingsToggleRow, settingsBadgeStyle, settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle } from "./settingsUi";
 
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 8,
-  marginBottom: 16,
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-  padding: '16px 20px 12px',
-  borderBottom: '1px solid var(--border-subtle)',
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-sans)',
-  fontSize: 16,
-  lineHeight: '24px',
-  fontWeight: 600,
-  color: 'var(--text-primary)',
-  margin: 0,
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 13,
-  lineHeight: '20px',
-  fontWeight: 500,
-  color: 'var(--text-primary)',
-  marginBottom: 6,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: 'var(--input-bg)',
-  border: '1px solid var(--border-subtle)',
-  borderRadius: 6,
-  padding: '8px 12px',
-  minHeight: 40,
-  color: 'var(--text-primary)',
-  fontFamily: 'var(--font-sans)',
-  fontSize: 14,
-  lineHeight: '20px',
-};
+const sectionStyle = settingsCardStyle;
+const sectionHeaderStyle = settingsCardHeaderStyle;
+const sectionTitleStyle = settingsCardTitleStyle;
+const labelStyle = settingsLabelStyle;
+const inputStyle = settingsInputStyle;
 
 const dangerBtnStyle: React.CSSProperties = {
   background: 'none', border: '1px solid var(--status-danger)',
@@ -67,58 +30,15 @@ const ACTIVITY_META: Record<string, { label: string; color: string }> = {
   revoked_all: { label: 'All sessions revoked', color: 'var(--status-danger-text, var(--status-danger))' },
 };
 
-interface ToggleRowProps {
-  label: string;
-  description?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  badge?: string;
-  badgeColor?: string;
-  disabled?: boolean;
-}
-
-function ToggleRow({ label, description, checked, onChange, badge, badgeColor, disabled }: ToggleRowProps) {
+function ToggleRow({ badge, ...props }: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void; badge?: string; disabled?: boolean }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '14px 20px', borderBottom: '1px solid var(--border-row)',
-      opacity: disabled ? 0.5 : 1,
-    }}>
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: description ? 2 : 0 }}>
-          <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{label}</span>
-          {badge && (
-            <span style={{
-              fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', fontWeight: 500,
-              padding: '2px 6px', borderRadius: 4, background: badgeColor || 'var(--status-success-bg)',
-              color: badgeColor ? 'var(--bg-deep)' : 'var(--accent-primary)',
-            }}>{badge}</span>
-          )}
-        </div>
-        {description && <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{description}</div>}
-      </div>
-      <button
-        className="settings-control"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        onClick={() => !disabled && onChange(!checked)}
-        disabled={disabled}
-        title={disabled ? 'Fixed in demo mode' : undefined}
-        style={{
-          width: 36, height: 20, borderRadius: 10, border: 'none',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          background: checked ? 'var(--accent-primary)' : 'var(--border-active)',
-          position: 'relative', flexShrink: 0, transition: 'background 0.2s',
-        }}
-      >
-        <span style={{
-          position: 'absolute', top: 2, left: checked ? 18 : 2,
-          width: 16, height: 16, borderRadius: '50%', background: 'var(--bg-surface)',
-          transition: 'left 0.2s',
-        }} />
-      </button>
-    </div>
+    <SettingsToggleRow
+      {...props}
+      disabledTitle="Fixed in demo mode"
+      badge={badge ? (
+        <span style={{ ...settingsBadgeStyle, color: 'var(--status-info-text, var(--accent-primary))', borderColor: 'currentColor' }}>{badge}</span>
+      ) : undefined}
+    />
   );
 }
 
@@ -317,10 +237,10 @@ export function SecuritySettings() {
       {/* Change Password */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <h3 style={sectionTitleStyle}>Change password</h3>
+          <h2 style={sectionTitleStyle}>Change password</h2>
         </div>
         <div style={{ padding: 20 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 16 }}>
             <div>
               <label htmlFor="pw-current" style={labelStyle}>Current password</label>
               <input id="pw-current" className="settings-control" style={inputStyle} type="password" value={pwForm.current} onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))} disabled={isDemo} />
@@ -340,7 +260,7 @@ export function SecuritySettings() {
               onClick={handleChangePassword}
               disabled={saving || isDemo}
               title={isDemo ? 'Fixed in demo mode' : undefined}
-              style={{ minHeight: 40, borderRadius: 6, ...(isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+              style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
             >
               {saving ? 'Updating…' : 'Update password'}
             </button>
@@ -351,9 +271,9 @@ export function SecuritySettings() {
       {/* Security Options */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <h3 style={sectionTitleStyle}>Security options</h3>
+          <h2 style={sectionTitleStyle}>Security options</h2>
         </div>
-        <div style={{ paddingBottom: 4 }}>
+        <div>
           <ToggleRow label="Two-factor authentication" description="Require OTP on login in addition to password" checked={twoFactor} onChange={(v) => updateSecuritySetting('two_factor', v, setTwoFactor)} badge="Recommended" disabled={isDemo} />
           <ToggleRow label="Session timeout" description="Auto sign out after 30 minutes of inactivity" checked={sessionTimeout} onChange={(v) => updateSecuritySetting('session_timeout', v, setSessionTimeout)} disabled={isDemo} />
           <ToggleRow label="Login alerts" description="Email me when a new device signs in" checked={loginAlerts} onChange={(v) => updateSecuritySetting('login_alerts', v, setLoginAlerts)} disabled={isDemo} />
@@ -363,7 +283,7 @@ export function SecuritySettings() {
       {/* Active Sessions */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <h3 style={sectionTitleStyle}>Active sessions</h3>
+          <h2 style={sectionTitleStyle}>Active sessions</h2>
         </div>
         {loadingSessions ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading sessions…</div>
@@ -374,17 +294,13 @@ export function SecuritySettings() {
           {sessions.map((s, i) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '14px 20px', borderBottom: i < sessions.length - 1 ? '1px solid var(--border-row)' : 'none',
+              padding: '12px 20px', gap: 16, borderBottom: i < sessions.length - 1 ? '1px solid var(--border-row)' : 'none',
             }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                   <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{s.device}</span>
                   {s.current && (
-                    <span style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 11, lineHeight: '16px', fontWeight: 500,
-                      padding: '2px 6px', borderRadius: 4, background: 'var(--status-success-bg)',
-                      color: 'var(--accent-primary)',
-                    }}>Current</span>
+                    <span style={{ ...settingsBadgeStyle, color: 'var(--status-info-text, var(--accent-primary))', borderColor: 'currentColor' }}>Current</span>
                   )}
                 </div>
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{s.location} · {formatRelativeTime(s.time)}</div>
@@ -427,7 +343,7 @@ export function SecuritySettings() {
       {/* Login Activity */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <h3 style={sectionTitleStyle}>Login activity</h3>
+          <h2 style={sectionTitleStyle}>Login activity</h2>
         </div>
         {loadingActivity ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: '20px' }}>Loading activity…</div>
@@ -463,11 +379,11 @@ export function SecuritySettings() {
       {/* Danger Zone */}
       <div style={{ ...sectionStyle, borderColor: 'var(--status-danger)' }}>
         <div style={sectionHeaderStyle}>
-          <h3 style={{ ...sectionTitleStyle, color: 'var(--status-danger-text, var(--status-danger))' }}>Danger zone</h3>
+          <h2 style={{ ...sectionTitleStyle, color: 'var(--status-danger-text, var(--status-danger))' }}>Danger zone</h2>
         </div>
         <div style={{
-          padding: '16px 20px', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', gap: 16,
+          padding: 20, display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
         }}>
           <div>
             <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', marginBottom: 2 }}>Delete my account</div>
@@ -517,7 +433,7 @@ export function SecuritySettings() {
             }}
             onClick={e => e.stopPropagation()}
           >
-            <h2 id="delete-account-title" style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 10 }}>
+            <h2 id="delete-account-title" style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: 8 }}>
               Delete your account?
             </h2>
             <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 20 }}>

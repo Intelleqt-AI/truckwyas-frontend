@@ -90,7 +90,7 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend }: AICh
 
           <div ref={listRef} style={{ flex: 1, minHeight: 160, maxHeight: 360, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
             {messages.length === 0 && (
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", marginTop: 20 }}>
+              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", textAlign: "center", marginTop: 20 }}>
                 Describe the load in plain language, or use the mic — I'll fill in the form as we talk.
               </div>
             )}
@@ -106,7 +106,7 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend }: AICh
                   {m.link && (
                     <Link
                       to={m.link.href}
-                      style={{ display: "inline-block", marginTop: 6, fontSize: 12, color: "var(--accent-primary)", textDecoration: "underline" }}
+                      style={{ display: "inline-block", marginTop: 6, fontSize: 13, color: "var(--accent-primary)", textDecoration: "underline" }}
                     >
                       {m.link.label} →
                     </Link>
@@ -116,7 +116,7 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend }: AICh
             ))}
             {busy && (
               <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)", padding: "8px 12px", borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
+                <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", padding: "8px 12px", borderRadius: 10, border: "1px solid var(--border-subtle)" }}>
                   Thinking…
                 </div>
               </div>
@@ -137,7 +137,7 @@ export function AIChatPanel({ messages, busy, open, onOpenChange, onSend }: AICh
                 </button>
               </div>
             ) : voice.transcribing ? (
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)", padding: "6px 4px" }}>Transcribing…</div>
+              <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-secondary)", padding: "6px 4px" }}>Transcribing…</div>
             ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <input

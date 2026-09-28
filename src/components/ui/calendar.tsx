@@ -19,13 +19,13 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-10 w-10 p-0 opacity-50 hover:opacity-100"
+          "h-10 w-10 p-0 text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
         table: "w-full border-collapse",
         head_row: "flex",
-        head_cell: "rounded-md w-9 font-normal text-[0.75rem] opacity-50",
+        head_cell: "rounded-md w-10 font-normal text-[13px] leading-5 text-[color:var(--text-secondary)]",
         row: "flex w-full mt-1",
         cell: "h-10 w-10 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
         day: "rdp-day-btn h-10 w-10 p-0 text-sm font-normal rounded-md",

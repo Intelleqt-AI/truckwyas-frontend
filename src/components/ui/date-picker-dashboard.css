@@ -20,7 +20,7 @@
 }
 .dashboard-date-picker .dashboard-date-input {
   box-sizing: border-box;
-  min-height: var(--date-picker-input-height);
+  min-height: calc(var(--date-picker-input-height) - 2px);
   line-height: 20px;
   font-weight: 400;
   letter-spacing: normal;
@@ -28,8 +28,11 @@
 .dashboard-date-picker .dashboard-date-trigger {
   justify-content: center;
   width: 44px;
-  min-height: 44px;
-  border-radius: 6px;
+  /* Fill the 40px field exactly (inside its 1px border) so date fields line up
+     with every other 40px input in the same form. */
+  min-height: calc(var(--date-picker-input-height) - 2px);
+  align-self: stretch;
+  border-radius: 0 6px 6px 0;
 }
 .dashboard-date-picker:focus-within {
   --date-picker-control-border: var(--accent-primary);

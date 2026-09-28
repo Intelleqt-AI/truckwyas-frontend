@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { formatCurrency } from '@/lib/formatters';
 import { Loader } from '@/components/Loader';
+import SectionHeader from '@/components/layout/SectionHeader';
+import './fleet-vehicles-brand.css';
 
 // 7-day heatmap — Mon → Sun
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -42,16 +44,16 @@ function generateHeatmap(loads: any[], vehicleCount: number) {
 const RouteBar = ({ route, count, revenue }: any) => {
   const maxCount = 10;
   return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>{route}</span>
-        <div style={{ display: 'flex', gap: 16 }}>
-          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{count} trips</span>
-          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)' }}>{formatCurrency(revenue)}</span>
+    <div className="fleet-route">
+      <div className="fleet-route__row">
+        <span className="fleet-route__name">{route}</span>
+        <div className="fleet-route__figures">
+          <span>{count} trips</span>
+          <span className="fleet-route__money">{formatCurrency(revenue)}</span>
         </div>
       </div>
-      <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 2 }}>
-        <div style={{ height: 4, width: `${Math.min(100, (count / maxCount) * 100)}%`, background: 'var(--accent-primary)', borderRadius: 2 }} />
+      <div className="fleet-route__track" aria-hidden="true">
+        <div className="fleet-route__fill" style={{ width: `${Math.min(100, (count / maxCount) * 100)}%` }} />
       </div>
     </div>
   );
@@ -93,90 +95,95 @@ export default function FleetHeatmap() {
     statusMap[v.status] = (statusMap[v.status] || 0) + 1;
   }
 
+  // Dots are decorative swatches; the adjacent text label carries the meaning.
   const STATUS_COLOR: Record<string, string> = {
     AVAILABLE: 'var(--status-success)',
     IN_USE: 'var(--accent-primary)',
     MAINTENANCE: 'var(--status-warning)',
     OUT_OF_SERVICE: 'var(--status-danger)',
   };
+  const formatStatus = (st: string) =>
+    st ? st.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '—';
 
   const utilRate = vehicles.length > 0
     ? Math.round((statusMap['IN_USE'] || 0) / vehicles.length * 100)
     : 0;
 
   return (
-    <div>
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 4 }}>FLEET INTELLIGENCE</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Utilisation Heatmap</div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Live fleet activity and route performance</div>
-        </div>
-        <button onClick={() => navigate('/fleet')} style={{ background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: 11, padding: '6px 12px', borderRadius: 2, cursor: 'pointer' }}>← FLEET</button>
-      </div>
+    <div className="fleet-page">
+      <SectionHeader
+        eyebrow="Fleet"
+        title="Utilisation heatmap"
+        description="Load activity by day and hour, and your busiest routes."
+        actions={
+          <button data-fleet-control className="fleet-secondary-button" onClick={() => navigate('/fleet/vehicles')}>
+            Back to fleet
+          </button>
+        }
+      />
 
-      {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      {/* KPI strip — same summary grid as the Fleet list pages */}
+      <div className="fleet-summary fleet-summary--4">
         {[
-          { label: 'FLEET SIZE', value: vehicles.length, sub: 'Total vehicles', color: 'var(--text-primary)' },
-          { label: 'IN USE NOW', value: statusMap['IN_USE'] || 0, sub: `${utilRate}% utilisation`, color: 'var(--accent-primary)' },
-          { label: 'AVAILABLE', value: statusMap['AVAILABLE'] || 0, sub: 'Ready to deploy', color: 'var(--status-success)' },
-          { label: 'MAINTENANCE', value: statusMap['MAINTENANCE'] || 0, sub: 'Off the road', color: 'var(--status-warning-text, var(--status-warning))' },
+          { label: 'Fleet size', value: vehicles.length, sub: 'Total vehicles', color: 'var(--text-primary)' },
+          { label: 'In use now', value: statusMap['IN_USE'] || 0, sub: `${utilRate}% utilisation`, color: 'var(--accent-primary)' },
+          { label: 'Available', value: statusMap['AVAILABLE'] || 0, sub: 'Ready to deploy', color: 'var(--status-success-text, var(--status-success))' },
+          { label: 'In maintenance', value: statusMap['MAINTENANCE'] || 0, sub: 'Off the road', color: 'var(--status-warning-text, var(--status-warning))' },
         ].map(k => (
-          <div key={k.label} className="card metric-card" style={{ padding: 20 }}>
-            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.08em', marginBottom: 8 }}>{k.label}</div>
-            <div style={{ fontSize: 26, fontWeight: 500, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{k.sub}</div>
+          <div key={k.label} className="card metric-card">
+            <div className="card-header"><span className="card-title">{k.label}</span></div>
+            <div className="metric-value" style={{ color: k.color }}>{k.value}</div>
+            <div className="fleet-metric-sub">{k.sub}</div>
           </div>
         ))}
       </div>
 
       {/* Utilisation gauge */}
-      <div className="card" style={{ padding: 20, marginBottom: 20 }}>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>FLEET UTILISATION RATE</div>
+      <section className="card fleet-panel" style={{ marginBottom: 24 }}>
+        <h2 className="fleet-panel__title">Fleet utilisation rate</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ flex: 1, height: 12, background: 'var(--border-subtle)', borderRadius: 6 }}>
+          <div style={{ flex: 1, height: 12, background: 'var(--border-subtle)', borderRadius: 6 }} aria-hidden="true">
             <div style={{ height: 12, width: `${utilRate}%`, background: utilRate >= 70 ? 'var(--status-success)' : utilRate >= 40 ? 'var(--accent-primary)' : 'var(--status-warning)', borderRadius: 6, transition: 'width 0.6s ease' }} />
           </div>
-          <span style={{ fontSize: 20, fontWeight: 600, fontFamily: 'var(--font-mono)', color: utilRate >= 70 ? 'var(--status-success)' : 'var(--accent-primary)', minWidth: 60 }}>{utilRate}%</span>
+          <span className="fleet-panel__figure" style={{ color: utilRate >= 70 ? 'var(--status-success-text, var(--status-success))' : 'var(--accent-primary)' }}>{utilRate}%</span>
         </div>
-        <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
-          {Object.entries(statusMap).map(([s, count]) => (
-            <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLOR[s] || 'var(--text-tertiary)' }} />
-              <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{s.replace('_', ' ')} ({count})</span>
+        <div style={{ display: 'flex', gap: 20, marginTop: 12, flexWrap: 'wrap' }}>
+          {Object.entries(statusMap).map(([st, count]) => (
+            <div key={st} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLOR[st] || 'var(--text-tertiary)' }} aria-hidden="true" />
+              <span className="fleet-muted">{formatStatus(st)} ({count})</span>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+      <div className="fleet-heatmap-grid">
         {/* Heatmap */}
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em' }}>LOAD ACTIVITY — WEEKLY PATTERN</div>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 10, color: 'var(--text-tertiary)' }}>
+        <section className="card fleet-panel">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
+            <h2 className="fleet-panel__title" style={{ margin: 0 }}>Load activity by day and hour</h2>
+            <div className="fleet-muted" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               <span>Low</span>
-              {[0, 25, 50, 75, 100].map(v => <div key={v} style={{ width: 12, height: 12, background: getUtilColor(v), borderRadius: 2, border: '1px solid var(--border-subtle)' }} />)}
+              {[0, 25, 50, 75, 100].map(v => <div key={v} style={{ width: 12, height: 12, background: getUtilColor(v), borderRadius: 2, border: '1px solid var(--border-subtle)' }} aria-hidden="true" />)}
               <span>High</span>
             </div>
           </div>
 
           {isLoading ? (
-            <div style={{ padding: '40px 0', display: 'flex', justifyContent: 'center' }}><Loader size={28} /></div>
+            <div style={{ padding: '40px 0', display: 'flex', justifyContent: 'center' }}><Loader size={28} label="Loading activity" /></div>
           ) : (
-            <div>
+            <div className="fleet-heatmap">
               {/* Hour labels */}
-              <div style={{ display: 'grid', gridTemplateColumns: '40px repeat(24, 1fr)', gap: 3, marginBottom: 4 }}>
+              <div className="fleet-heatmap__row">
                 <div />
                 {HOURS.map(h => (
-                  <div key={h} style={{ fontSize: 9, color: h % 3 === 0 ? 'var(--text-tertiary)' : 'transparent', fontFamily: 'var(--font-mono)', textAlign: 'center' }}>{h}h</div>
+                  <div key={h} className="fleet-heatmap__hour" style={{ visibility: h % 3 === 0 ? 'visible' : 'hidden' }}>{h}h</div>
                 ))}
               </div>
               {/* Heatmap grid */}
               {DAYS.map((day, di) => (
-                <div key={day} style={{ display: 'grid', gridTemplateColumns: '40px repeat(24, 1fr)', gap: 3, marginBottom: 3 }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center' }}>{day}</div>
+                <div key={day} className="fleet-heatmap__row">
+                  <div className="fleet-heatmap__day">{day}</div>
                   {heatmap[di].map((val, hi) => (
                     <div key={hi} title={`${day} ${hi}:00 — ${val}%`} style={{ aspectRatio: '1', background: getUtilColor(val), borderRadius: 2, cursor: 'default', transition: 'transform 0.1s', minHeight: 0 }}
                       onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.2)')}
@@ -187,17 +194,17 @@ export default function FleetHeatmap() {
               ))}
             </div>
           )}
-        </div>
+        </section>
 
         {/* Top routes */}
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', marginBottom: 16 }}>TOP ROUTES BY VOLUME</div>
+        <section className="card fleet-panel">
+          <h2 className="fleet-panel__title">Top routes by volume</h2>
           {topRoutes.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', textAlign: 'center', padding: '20px 0' }}>No route data yet</div>
+            <div className="fleet-muted" style={{ textAlign: 'center', padding: '20px 0' }}>No route data yet</div>
           ) : topRoutes.map(([route, data]) => (
             <RouteBar key={route} route={route} count={data.count} revenue={data.revenue} />
           ))}
-        </div>
+        </section>
       </div>
     </div>
   );

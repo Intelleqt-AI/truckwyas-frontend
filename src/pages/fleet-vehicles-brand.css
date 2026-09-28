@@ -71,11 +71,149 @@
   outline-offset: 3px;
 }
 
+/* Toolbar: search left, filter chips right — identical on Vehicles and Drivers. */
+.fleet-page .fleet-search {
+  width: 280px;
+  max-width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 8px 12px;
+}
+.fleet-page .fleet-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+.fleet-page .fleet-filter {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.fleet-page .fleet-filter:hover { color: var(--text-primary); }
+.fleet-page .fleet-filter[aria-pressed="true"] {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--btn-action-color);
+  font-weight: 500;
+}
+
 /* Table card: intentional zero outer padding + local scroll region. */
-.fleet-page .fleet-table-region { border-radius: 8px; }
+.fleet-page .fleet-table-region {
+  border-radius: 8px;
+  padding: 0;
+  overflow-x: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.fleet-page .fleet-table { width: 100%; border-collapse: collapse; }
+.fleet-page .fleet-table th {
+  height: 44px;
+  padding: 12px 16px;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.fleet-page .fleet-table td {
+  padding: 12px 16px;
+  font: 400 14px/20px var(--font-sans);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+/* First column aligns with the card inset used everywhere else. */
+.fleet-page .fleet-table th:first-child,
+.fleet-page .fleet-table td:first-child { padding-left: var(--fleet-card-inset); }
+.fleet-page .fleet-table th:last-child,
+.fleet-page .fleet-table td:last-child { padding-right: var(--fleet-card-inset); }
+.fleet-page .fleet-table .fleet-table__select { width: 56px; padding-right: 0; }
+.fleet-page .fleet-table .is-numeric { text-align: right; }
+.fleet-page .fleet-table__id {
+  font: 400 13px/20px var(--font-mono);
+  color: var(--text-primary);
+}
+.fleet-page .fleet-table__actions { text-align: right; }
+.fleet-page .fleet-table__actions > div { display: flex; gap: 8px; justify-content: flex-end; }
+.fleet-page .fleet-table td.fleet-table__state-cell { padding: 0; }
+.fleet-page .fleet-table td.fleet-table__no-match {
+  padding: 40px var(--fleet-card-inset);
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+.fleet-page .fleet-table-state {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 240px;
+}
+.fleet-page .fleet-empty { padding: 48px var(--fleet-card-inset); text-align: center; white-space: normal; }
+.fleet-page .fleet-empty__icon { margin-bottom: 16px; color: var(--text-tertiary); display: flex; justify-content: center; }
+.fleet-page .fleet-empty__title {
+  margin: 0 0 8px;
+  font: 600 16px/24px var(--font-sans);
+  color: var(--text-primary);
+}
+.fleet-page .fleet-empty__text {
+  margin: 0 0 20px;
+  font: 400 13px/20px var(--font-sans);
+  color: var(--text-secondary);
+}
+.fleet-page .fleet-empty__actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .fleet-page td { font-variant-numeric: tabular-nums; }
 /* Row actions must not inherit the primary-control width. */
 .fleet-page td button[data-fleet-control] { min-width: 0; width: auto; }
+
+/* Shared fleet panels (heatmap, overview). */
+.fleet-page .fleet-secondary-button {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.fleet-page .fleet-secondary-button:hover { color: var(--text-primary); }
+.fleet-page .fleet-metric-sub { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); margin-top: 4px; }
+.fleet-page .fleet-muted { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-page .fleet-panel { padding: var(--fleet-card-inset); border-radius: 8px; min-width: 0; }
+.fleet-page .fleet-panel__title {
+  margin: 0 0 16px;
+  font: 600 16px/24px var(--font-sans);
+  color: var(--text-primary);
+  letter-spacing: normal;
+  text-transform: none;
+}
+.fleet-page .fleet-panel__figure {
+  font: 600 22px/28px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  min-width: 60px;
+  text-align: right;
+}
+.fleet-page .fleet-heatmap-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px; }
+.fleet-page .fleet-heatmap__row { display: grid; grid-template-columns: 40px repeat(24, minmax(0, 1fr)); gap: 3px; margin-bottom: 3px; }
+.fleet-page .fleet-heatmap__hour,
+.fleet-page .fleet-heatmap__day {
+  font: 400 12px/16px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.fleet-page .fleet-heatmap__hour { text-align: center; }
+.fleet-page .fleet-heatmap__day { display: flex; align-items: center; }
+.fleet-page .fleet-route { margin-bottom: 12px; }
+.fleet-page .fleet-route__row { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.fleet-page .fleet-route__name { font: 400 14px/20px var(--font-sans); color: var(--text-primary); min-width: 0; overflow-wrap: anywhere; }
+.fleet-page .fleet-route__figures {
+  display: flex; gap: 16px; flex-shrink: 0;
+  font: 400 13px/20px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+.fleet-page .fleet-route__money { color: var(--text-primary); }
+.fleet-page .fleet-route__track { height: 4px; background: var(--border-subtle); border-radius: 2px; }
+.fleet-page .fleet-route__fill { height: 4px; background: var(--accent-primary); border-radius: 2px; }
+@media (max-width: 1100px) {
+  .fleet-page .fleet-heatmap-grid { grid-template-columns: minmax(0, 1fr); }
+}
 
 @media (max-width: 1100px) {
   .fleet-page .fleet-summary--4,

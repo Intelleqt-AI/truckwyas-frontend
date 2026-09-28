@@ -10,6 +10,9 @@ import { Loader } from '@/components/Loader';
 const formatCurrency = (n: number) =>
   new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 0 }).format(n);
 
+// Brand primary-metric role: 28/36 semibold, tabular numerals.
+const metricStyle: React.CSSProperties = { fontFamily: 'var(--font-sans)', fontSize: 28, lineHeight: '36px', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' };
+
 export default function AdminHome() {
   const navigate = useNavigate();
   const { data: overview, isLoading } = useQuery({
@@ -21,32 +24,32 @@ export default function AdminHome() {
   if (!overview) return null;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-      <div className="card metric-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/admin/companies')}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+      <div className="card metric-card admin-control" role="link" tabIndex={0} style={{ cursor: 'pointer' }} onClick={() => navigate('/admin/companies')} onKeyDown={e => { if (e.key === 'Enter') navigate('/admin/companies'); }}>
         <div className="card-header"><span className="card-title">Companies</span></div>
-        <div className="metric-value" style={{ fontSize: 20 }}>{overview.total_companies}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
+        <div className="metric-value" style={metricStyle}>{overview.total_companies}</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
           {overview.companies_by_status.active} active · {overview.companies_by_status.suspended} suspended · {overview.companies_by_status.cancelled} cancelled
         </div>
       </div>
-      <div className="card metric-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/admin/users')}>
+      <div className="card metric-card admin-control" role="link" tabIndex={0} style={{ cursor: 'pointer' }} onClick={() => navigate('/admin/users')} onKeyDown={e => { if (e.key === 'Enter') navigate('/admin/users'); }}>
         <div className="card-header"><span className="card-title">Users</span></div>
-        <div className="metric-value" style={{ fontSize: 20 }}>{overview.total_users}</div>
+        <div className="metric-value" style={metricStyle}>{overview.total_users}</div>
       </div>
       <div className="card metric-card">
         <div className="card-header"><span className="card-title">Quotes</span></div>
-        <div className="metric-value" style={{ fontSize: 20 }}>{overview.total_quotes}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{overview.quotes_this_month} this month</div>
+        <div className="metric-value" style={metricStyle}>{overview.total_quotes}</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>{overview.quotes_this_month} this month</div>
       </div>
       <div className="card metric-card">
         <div className="card-header"><span className="card-title">Orders</span></div>
-        <div className="metric-value" style={{ fontSize: 20 }}>{overview.total_loads}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{overview.loads_this_month} this month</div>
+        <div className="metric-value" style={metricStyle}>{overview.total_loads}</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>{overview.loads_this_month} this month</div>
       </div>
-      <div className="card metric-card" style={{ gridColumn: 'span 4' }}>
+      <div className="card metric-card" style={{ gridColumn: '1 / -1' }}>
         <div className="card-header"><span className="card-title">Estimated MRR</span></div>
-        <div className="metric-value" style={{ fontSize: 20, color: 'var(--accent-primary)' }}>{formatCurrency(overview.mrr_estimate)}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
+        <div className="metric-value" style={metricStyle}>{formatCurrency(overview.mrr_estimate)}</div>
+        <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
           Active + grace-period companies × flat monthly fee — an estimate, not reconciled against actual Paystack charges.
         </div>
       </div>

@@ -1,18 +1,23 @@
 import "./table-heading-roles.css";
 import "./expense-row-actions.css";
+import "./finance-brand.css";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ellipsis } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
+import { fetchData, postData } from "@/lib/Api";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { Loader } from "@/components/Loader";
+import SectionHeader, { FINANCE_TABS } from "@/components/layout/SectionHeader";
 
-const MC_URL =
-  "https://getstarted.merchantcapital.co.za?actiontype=C_C&channel=Part_Trad&who=IA_SP";
-const MC_STORAGE_KEY = "mc_applied_invoice_ids";
+// External Fast Pay application link. The applied-state key is unchanged so
+// invoices already marked "Applied" stay marked.
+const FAST_PAY_STORAGE_KEY = "mc_applied_invoice_ids";
 
 function loadAppliedIds(): Set<string> {
   try {
-    return new Set(JSON.parse(localStorage.getItem(MC_STORAGE_KEY) || "[]"));
+    return new Set(JSON.parse(localStorage.getItem(FAST_PAY_STORAGE_KEY) || "[]"));
   } catch {
     return new Set();
   }
@@ -20,56 +25,49 @@ function loadAppliedIds(): Set<string> {
 
 function saveAppliedId(id: string, current: Set<string>): Set<string> {
   const next = new Set(current).add(id);
-  localStorage.setItem(MC_STORAGE_KEY, JSON.stringify([...next]));
+  localStorage.setItem(FAST_PAY_STORAGE_KEY, JSON.stringify([...next]));
   return next;
 }
-import { fetchData, postData, putData, deleteData } from "@/lib/Api";
-import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { LiveBadge } from "@/components/LiveBadge";
-import { Loader } from "@/components/Loader";
-import { DatePicker } from "@/components/ui/date-picker";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
-// Brand text roles (styling only): labels 13/20/500, support 13/20,
-// controls 14/20 sans with 48px minimum, financial metrics 28/36/600 tabular.
-const invoiceLabelText = { fontFamily: "var(--font-sans)", fontSize: 13, lineHeight: "20px", fontWeight: 500, letterSpacing: "normal", textTransform: "none" as const };
-const invoiceSupportText = { fontFamily: "var(--font-sans)", fontSize: 13, lineHeight: "20px", letterSpacing: "normal", textTransform: "none" as const };
-const invoiceControlText = { minHeight: 48, fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: "20px", letterSpacing: "normal", textTransform: "none" as const };
-const invoiceMetricText = { fontFamily: "var(--font-sans)", fontSize: 28, lineHeight: "36px", fontWeight: 600, letterSpacing: "normal", fontVariantNumeric: "tabular-nums" as const, whiteSpace: "normal" as const, overflowWrap: "anywhere" as const };
+type Tone = "success" | "warning" | "danger" | "info" | "neutral";
 
-const TIER_COLOR: Record<string, string> = {
-  prime: "var(--status-success)",
-  standard: "var(--accent-primary)",
-  elevated: "var(--status-warning-text, var(--status-warning))",
-  high: "var(--status-danger-text, var(--status-danger))",
+const STATUS_TONE: Record<string, Tone> = {
+  PAID: "success",
+  SENT: "warning",
+  PARTIALLY_PAID: "warning",
+  OVERDUE: "danger",
+  DRAFT: "neutral",
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  PAID: "var(--status-success)",
-  SENT: "var(--status-warning-text, var(--status-warning))",
-  OVERDUE: "var(--status-danger-text, var(--status-danger))",
-  DRAFT: "var(--text-tertiary)",
+const TIER_TONE: Record<string, Tone> = {
+  prime: "success",
+  standard: "info",
+  elevated: "warning",
+  high: "danger",
 };
 
-const EXPENSE_STATUS_COLOR: Record<string, string> = {
-  PENDING: "var(--status-warning-text, var(--status-warning))",
-  APPROVED: "var(--status-success)",
-  REJECTED: "var(--status-danger-text, var(--status-danger))",
-};
+const chipClass = (tone: Tone, outline = false) =>
+  `fin-chip${tone === "neutral" ? "" : ` fin-chip--${tone}`}${outline ? " fin-chip--outline" : ""}`;
 
 // Sentence-case a status/token for display: "PARTIALLY_PAID" → "Partially paid".
 const formatStatus = (s?: string) =>
   s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : "—";
 
-const PAGE_SIZE = 10;
+const safeDate = (d?: string) => {
+  if (!d) return "—";
+  const t = new Date(d);
+  return isNaN(t.getTime()) ? d : formatDate(t);
+};
 
-type FinanceTab = "invoices" | "expenses";
+const PAGE_SIZE = 10;
+const STATUSES = ["All", "SENT", "OVERDUE", "PAID", "DRAFT"];
+
+/** Finance tabs; on the legacy /invoices path the Invoices tab points at it so it stays active. */
+function financeTabsFor(pathname: string) {
+  return pathname === "/invoices"
+    ? FINANCE_TABS.map((t) => (t.to === "/finance/invoices" ? { ...t, to: "/invoices" } : t))
+    : FINANCE_TABS;
+}
 
 // Fetches invoices + stats. Lives in the queryFn so the result is cached by
 // TanStack Query (keyed below) and survives navigation — revisiting the page
@@ -86,44 +84,28 @@ async function loadInvoicesPage() {
   };
 }
 
-// Fetches expenses + vehicles together (mirrors the original Promise.all
-// grouping). Cached under its own key so the expenses tab survives navigation.
-async function loadFinanceExpenses() {
-  const [expensesData, vehiclesData] = await Promise.all([
-    fetchData("/api/v1/expenses/"),
-    fetchData("/api/v1/vehicles/").catch(() => []),
-  ]);
-  return {
-    expenses: Array.isArray(expensesData)
-      ? expensesData
-      : expensesData?.results || [],
-    vehicles: Array.isArray(vehiclesData)
-      ? vehiclesData
-      : vehiclesData?.results || [],
-  };
-}
-
 export default function Invoices() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<FinanceTab>("invoices");
+  const initialStatus = (searchParams.get("status") || "").toUpperCase();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState(
+    STATUSES.includes(initialStatus) ? initialStatus : "All",
+  );
   const [page, setPage] = useState(1);
   const [sendingId, setSendingId] = useState<string | null>(null);
-  const [sendingReminderId, setSendingReminderId] = useState<string | null>(
-    null,
-  );
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
-  const [openExpenseMenuId, setOpenExpenseMenuId] = useState<string | null>(null);
   const [appliedIds, setAppliedIds] = useState<Set<string>>(loadAppliedIds);
-  const statuses = ["All", "SENT", "OVERDUE", "PAID", "DRAFT"];
 
   // Invoices + stats, cached across navigations.
   const {
     data: invoicesData,
     isLoading: loading,
+    isError,
     refetch: refetchInvoices,
   } = useQuery({
     queryKey: ["invoices-page"],
@@ -138,217 +120,24 @@ export default function Invoices() {
     queryFn: () => fetchData("api/v1/capital/eligible/").catch(() => null),
   });
   const eligibleInvoices: any[] = capitalData?.invoices || [];
-  const eligibleById = new Map(
-    eligibleInvoices.map((e: any) => [String(e.id), e]),
-  );
+  const eligibleById = new Map(eligibleInvoices.map((e: any) => [String(e.id), e]));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ineligibleInvoices: any[] = capitalData?.ineligible_invoices || [];
-  const ineligibleById = new Map(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ineligibleInvoices.map((e: any) => [String(e.id), e]),
-  );
-
-  // Expenses + vehicles, cached across navigations. Only fetched once the
-  // expenses tab is opened, mirroring the original lazy load.
-  const {
-    data: expensesData,
-    isLoading: expensesQueryLoading,
-    refetch: refetchExpenses,
-  } = useQuery({
-    queryKey: ["finance-expenses"],
-    queryFn: loadFinanceExpenses,
-    enabled: activeTab === "expenses",
-  });
-  const expenses: any[] = expensesData?.expenses ?? [];
-  const vehicles: any[] = expensesData?.vehicles ?? [];
-  // Show the skeleton only before the first expenses fetch resolves.
-  const expensesLoading = activeTab === "expenses" && expensesQueryLoading;
-
-  // Expenses state
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const [expenseStatusFilter, setExpenseStatusFilter] = useState("All");
-  const [expenseSearch, setExpenseSearch] = useState("");
-  const [expensePage, setExpensePage] = useState(1);
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [editingExpense, setEditingExpense] = useState<any>(null);
-  const [expenseForm, setExpenseForm] = useState({
-    category: "FUEL",
-    description: "",
-    amount: "",
-    expense_date: new Date().toISOString().split("T")[0],
-    vehicle: "",
-    vendor: "",
-    receipt_number: "",
-    notes: "",
-    litres: "",
-    price_per_litre: "",
-  });
-
-  const expenseCategories = [
-    "All",
-    "FUEL",
-    "TOLLS",
-    "MAINTENANCE",
-    "DRIVER_COST",
-    "INSURANCE",
-    "OVERHEAD",
-    "OTHER",
-  ];
-  const expenseStatuses = ["All", "PENDING", "APPROVED", "REJECTED"];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ineligibleById = new Map(ineligibleInvoices.map((e: any) => [String(e.id), e]));
 
   useEffect(() => {
     document.title = "Invoices - TruckWys";
   }, []);
 
-  // Live-refresh both datasets on the auto-refresh tick / focus / live events.
-  // The expenses query is a no-op until its tab has been opened (enabled flag).
+  // Live-refresh on the auto-refresh tick / focus / live events.
   useAutoRefresh(() => {
     refetchInvoices();
-    if (activeTab === "expenses") refetchExpenses();
   });
 
-  // Expense handlers
-  const handleExpenseFormChange = (field: string, value: any) => {
-    setExpenseForm((prev) => {
-      const updated = { ...prev, [field]: value };
-      // Auto-calculate amount for fuel
-      if (field === "litres" || field === "price_per_litre") {
-        const litres =
-          parseFloat(field === "litres" ? value : updated.litres) || 0;
-        const pricePerLitre =
-          parseFloat(
-            field === "price_per_litre" ? value : updated.price_per_litre,
-          ) || 0;
-        if (litres > 0 && pricePerLitre > 0) {
-          updated.amount = (litres * pricePerLitre).toFixed(2);
-        }
-      }
-      return updated;
-    });
-  };
-
-  const handleAddExpense = async () => {
-    try {
-      const payload: any = {
-        category: expenseForm.category,
-        description: expenseForm.description,
-        amount: parseFloat(expenseForm.amount),
-        expense_date: expenseForm.expense_date,
-        vehicle: expenseForm.vehicle || null,
-        vendor: expenseForm.vendor || null,
-        receipt_number: expenseForm.receipt_number || null,
-        notes: expenseForm.notes || "",
-      };
-
-      // Add fuel details to notes if category is FUEL
-      if (
-        expenseForm.category === "FUEL" &&
-        expenseForm.litres &&
-        expenseForm.price_per_litre
-      ) {
-        payload.notes = `Fuel: ${expenseForm.litres}L @ ${formatCurrency(parseFloat(expenseForm.price_per_litre))}/L${payload.notes ? "\n" + payload.notes : ""}`;
-      }
-
-      if (editingExpense) {
-        await putData({
-          url: `/api/v1/expenses/${editingExpense.id}/`,
-          data: payload,
-        });
-        setToast("Expense updated!");
-        refetchExpenses();
-      } else {
-        await postData({ url: "/api/v1/expenses/", data: payload });
-        setToast("Expense added!");
-        refetchExpenses();
-      }
-
-      setTimeout(() => setToast(null), 3000);
-      setShowExpenseForm(false);
-      setEditingExpense(null);
-      setExpenseForm({
-        category: "FUEL",
-        description: "",
-        amount: "",
-        expense_date: new Date().toISOString().split("T")[0],
-        vehicle: "",
-        vendor: "",
-        receipt_number: "",
-        notes: "",
-        litres: "",
-        price_per_litre: "",
-      });
-    } catch (error) {
-      console.error("Failed to save expense:", error);
-      setToast("Failed to save expense");
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  const handleApproveExpense = async (expenseId: string) => {
-    try {
-      await postData({ url: `/api/v1/expenses/${expenseId}/approve/` });
-      setToast("Expense approved!");
-      setTimeout(() => setToast(null), 3000);
-      refetchExpenses();
-    } catch (error) {
-      console.error("Failed to approve expense:", error);
-      setToast("Failed to approve expense");
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  const handleRejectExpense = async (expenseId: string) => {
-    try {
-      await postData({ url: `/api/v1/expenses/${expenseId}/reject/` });
-      setToast("Expense rejected!");
-      setTimeout(() => setToast(null), 3000);
-      refetchExpenses();
-    } catch (error) {
-      console.error("Failed to reject expense:", error);
-      setToast("Failed to reject expense");
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  const handleEditExpense = (expense: any) => {
-    setEditingExpense(expense);
-    // Parse fuel details from notes if present
-    let litres = "";
-    let pricePerLitre = "";
-    if (expense.category === "FUEL" && expense.notes) {
-      const fuelMatch = expense.notes.match(/Fuel: ([\d.]+)L @ R([\d.]+)\/L/);
-      if (fuelMatch) {
-        litres = fuelMatch[1];
-        pricePerLitre = fuelMatch[2];
-      }
-    }
-    setExpenseForm({
-      category: expense.category,
-      description: expense.description,
-      amount: expense.amount.toString(),
-      expense_date: expense.expense_date,
-      vehicle: expense.vehicle || "",
-      vendor: expense.vendor || "",
-      receipt_number: expense.receipt_number || "",
-      notes: expense.notes?.replace(/^Fuel: [\d.]+L @ R[\d.]+\/L\n?/, "") || "",
-      litres,
-      price_per_litre: pricePerLitre,
-    });
-    setShowExpenseForm(true);
-  };
-
-  const handleDeleteExpense = async (expenseId: string) => {
-    if (!confirm("Are you sure you want to delete this expense?")) return;
-    try {
-      await deleteData({ url: `/api/v1/expenses/${expenseId}/` });
-      setToast("Expense deleted!");
-      setTimeout(() => setToast(null), 3000);
-      refetchExpenses();
-    } catch (error) {
-      console.error("Failed to delete expense:", error);
-      setToast("Failed to delete expense");
-      setTimeout(() => setToast(null), 3000);
-    }
+  const flash = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
   };
 
   const handleSendInvoice = async (e: React.MouseEvent, invoiceId: string) => {
@@ -356,14 +145,12 @@ export default function Invoices() {
     setSendingId(invoiceId);
     try {
       await postData({ url: `/api/v1/invoices/${invoiceId}/send_invoice/` });
-      setToast("Invoice sent!");
-      setTimeout(() => setToast(null), 3000);
+      flash("Invoice sent");
       refetchInvoices();
-      queryClient.invalidateQueries({ queryKey: ['capital-eligible'] });
+      queryClient.invalidateQueries({ queryKey: ["capital-eligible"] });
     } catch (error) {
       console.error("Failed to send invoice:", error);
-      setToast("Failed to send invoice");
-      setTimeout(() => setToast(null), 3000);
+      flash("Could not send the invoice. Try again.");
     } finally {
       setSendingId(null);
     }
@@ -378,11 +165,10 @@ export default function Invoices() {
         data: {},
       });
       if (result?.pdf_url) window.open(result.pdf_url, "_blank");
-      setToast("PDF ready");
+      flash("PDF ready");
     } catch {
-      setToast("Could not generate PDF");
+      flash("Could not generate the PDF. Try again.");
     }
-    setTimeout(() => setToast(null), 3000);
   };
 
   const handleSendReminder = async (e: React.MouseEvent, invoiceId: string) => {
@@ -393,20 +179,17 @@ export default function Invoices() {
         url: `/api/v1/invoices/${invoiceId}/send_reminder/`,
         data: {},
       });
-      setToast("Reminder sent successfully!");
-      setTimeout(() => setToast(null), 3000);
+      flash("Reminder sent");
     } catch (error: any) {
       if (error?.response?.status === 404) {
-        setToast("Reminder recorded — customer will be contacted");
+        flash("Reminder recorded — customer will be contacted");
       } else {
-        setToast("Failed to send reminder");
+        flash("Could not send the reminder. Try again.");
       }
-      setTimeout(() => setToast(null), 3000);
     } finally {
       setSendingReminderId(null);
     }
   };
-
 
   // Never fall back to mock data — show empty state if API returns nothing
   const allInvoices = invoices;
@@ -426,19 +209,6 @@ export default function Invoices() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const filteredExpenses = expenses.filter((e) => {
-    const matchCategory =
-      categoryFilter === "All" || e.category === categoryFilter;
-    const matchStatus =
-      expenseStatusFilter === "All" || e.status === expenseStatusFilter;
-    const matchSearch =
-      !expenseSearch ||
-      e.description?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
-      e.vendor?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
-      e.expense_number?.toLowerCase().includes(expenseSearch.toLowerCase());
-    return matchCategory && matchStatus && matchSearch;
-  });
-
   const outstanding = allInvoices
     .filter((i) => i.status === "SENT")
     .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
@@ -449,1476 +219,266 @@ export default function Invoices() {
     .filter((i) => i.status === "PAID")
     .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
 
+  const kpis = [
+    {
+      label: "Total invoiced this month",
+      value: formatCurrency(stats?.total_invoiced_mtd ?? outstanding),
+      sub: "Month to date",
+    },
+    {
+      label: "Collected",
+      value: formatCurrency(stats?.total_collected_mtd ?? paid),
+      sub: "Month to date",
+    },
+    {
+      label: "Overdue",
+      value: formatCurrency(stats?.overdue_amount ?? overdue),
+      sub: `${stats?.overdue_count ?? 0} ${(stats?.overdue_count ?? 0) === 1 ? "invoice" : "invoices"}`,
+      tone: "fin-text-danger",
+    },
+    {
+      label: "Collection rate",
+      value: `${Math.round((stats?.collection_rate ?? 0) * 100)}%`,
+      sub: "Collected ÷ invoiced",
+    },
+  ];
+
   return (
-    <div>
+    <div className="fin-page">
       {toast && (
-        <div
-          style={{
-            ...invoiceSupportText,
-            position: "fixed",
-            top: 80,
-            right: 24,
-            zIndex: 1000,
-            background: "var(--accent-primary)",
-            color: "black",
-            padding: "12px 20px",
-            borderRadius: 6,
-            fontWeight: 500,
-          }}>
+        <div className="fin-toast" role="status" aria-live="polite">
           {toast}
         </div>
       )}
-      <div style={{ marginBottom: 24 }}>
-        <div
-          style={{
-            ...invoiceLabelText,
-            color: "var(--text-tertiary)",
-            marginBottom: 4,
-          }}>
-          Finance
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <h1
-              style={{
-                fontSize: 22,
-                fontWeight: 600,
-                fontFamily: "var(--font-sans)",
-                lineHeight: "28px",
-                margin: 0,
-                color: "var(--text-primary)",
-              }}>
-              {activeTab === "invoices" ? "Invoices" : "Expenses"}
-            </h1>
-            <LiveBadge />
-          </div>
-          {activeTab === "invoices" && (
-            <button
-              className="btn-action"
-              onClick={() => navigate("/finance/invoices/new")}>
-              + New invoice
-            </button>
-          )}
-          {activeTab === "expenses" && (
-            <button
-              className="btn-action"
-              onClick={() => {
-                setShowExpenseForm(true);
-                setEditingExpense(null);
-              }}>
-              + Add expense
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* Tab Navigation */}
-      <div
-        style={{
-          borderBottom: "1px solid var(--border-subtle)",
-          marginBottom: 20,
-          display: "flex",
-          gap: 24,
-        }}>
-        {(
-          [
-            { id: "invoices", label: "Invoices" },
-            { id: "expenses", label: "Expenses" },
-          ] as { id: FinanceTab; label: string }[]
-        ).map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              ...invoiceControlText,
-              background: "transparent",
-              border: "none",
-              borderBottom:
-                activeTab === tab.id
-                  ? "2px solid var(--accent-primary)"
-                  : "2px solid transparent",
-              color:
-                activeTab === tab.id
-                  ? "var(--text-primary)"
-                  : "var(--text-secondary)",
-              padding: "12px 0",
-              marginBottom: -1,
-              fontWeight: activeTab === tab.id ? 500 : 400,
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              if (activeTab !== tab.id) {
-                e.currentTarget.style.color = "var(--text-primary)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== tab.id) {
-                e.currentTarget.style.color = "var(--text-secondary)";
-              }
-            }}>
-            {tab.label}
+      <SectionHeader
+        eyebrow="Finance"
+        title="Finance"
+        tabs={financeTabsFor(location.pathname)}
+        actions={
+          <button className="btn-action" onClick={() => navigate("/finance/invoices/new")}>
+            New invoice
           </button>
-        ))}
-        <button
-          onClick={() => navigate("/finance/reports")}
-          style={{
-            ...invoiceControlText,
-            background: "transparent",
-            border: "none",
-            borderBottom: "2px solid transparent",
-            color: "var(--text-secondary)",
-            padding: "12px 0",
-            marginBottom: -1,
-            fontWeight: 400,
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; }}>
-          Reports
-        </button>
-      </div>
+        }
+      />
 
-      {/* Tab Content */}
-      {activeTab === "expenses" && (
-        <>
-          {/* Expense Form Modal */}
-          {showExpenseForm && (
-            <div
-              style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: "rgba(0, 0, 0, 0.7)",
-                zIndex: 1000,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 24,
-              }}>
-              <div
-                className="card"
-                style={{
-                  width: "100%",
-                  maxWidth: 600,
-                  maxHeight: "90vh",
-                  overflow: "auto",
-                  padding: 20,
-                }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 24,
-                  }}>
-                  <h2
-                    style={{
-                      fontSize: 16,
-                      lineHeight: "24px",
-                      fontFamily: "var(--font-sans)",
-                      margin: 0,
-                      fontWeight: 600,
-                      color: "var(--text-primary)",
-                    }}>
-                    {editingExpense ? "Edit expense" : "Add expense"}
-                  </h2>
-                  <button
-                    onClick={() => {
-                      setShowExpenseForm(false);
-                      setEditingExpense(null);
-                    }}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-tertiary)",
-                      fontSize: 24,
-                      cursor: "pointer",
-                      padding: 0,
-                      lineHeight: 1,
-                    }}>
-                    ×
-                  </button>
-                </div>
-
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div>
-                    <label
-                      style={{
-                        ...invoiceLabelText,
-                        display: "block",
-                        color: "var(--text-secondary)",
-                        marginBottom: 6,
-                      }}>
-                      Category *
-                    </label>
-                    <Select
-                      value={expenseForm.category}
-                      onValueChange={(val) =>
-                        handleExpenseFormChange("category", val)
-                      }>
-                      <SelectTrigger style={invoiceControlText}>
-                        <SelectValue placeholder="Select category..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="FUEL">Fuel</SelectItem>
-                        <SelectItem value="TOLLS">Tolls</SelectItem>
-                        <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                        <SelectItem value="DRIVER_COST">Driver cost</SelectItem>
-                        <SelectItem value="INSURANCE">Insurance</SelectItem>
-                        <SelectItem value="OVERHEAD">Overhead</SelectItem>
-                        <SelectItem value="OTHER">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label
-                      style={{
-                        ...invoiceLabelText,
-                        display: "block",
-                        color: "var(--text-secondary)",
-                        marginBottom: 6,
-                      }}>
-                      Description *
-                    </label>
-                    <input
-                      type="text"
-                      value={expenseForm.description}
-                      onChange={(e) =>
-                        handleExpenseFormChange("description", e.target.value)
-                      }
-                      placeholder="e.g. Fuel refill at Shell"
-                      style={{
-                        ...invoiceControlText,
-                        width: "100%",
-                        background: "var(--bg-surface)",
-                        border: "1px solid var(--border-subtle)",
-                        padding: "10px 12px",
-                        color: "var(--text-primary)",
-                        borderRadius: 6,
-                      }}
-                    />
-                  </div>
-
-                  {expenseForm.category === "FUEL" && (
-                    <>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 1fr",
-                          gap: 12,
-                        }}>
-                        <div>
-                          <label
-                            style={{
-                              ...invoiceLabelText,
-                              display: "block",
-                              color: "var(--text-secondary)",
-                              marginBottom: 6,
-                            }}>
-                            Litres
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={expenseForm.litres}
-                            onChange={(e) =>
-                              handleExpenseFormChange("litres", e.target.value)
-                            }
-                            placeholder="0.00"
-                            style={{
-                              ...invoiceControlText,
-                              width: "100%",
-                              background: "var(--bg-surface)",
-                              border: "1px solid var(--border-subtle)",
-                              padding: "10px 12px",
-                              color: "var(--text-primary)",
-                              borderRadius: 6,
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label
-                            style={{
-                              ...invoiceLabelText,
-                              display: "block",
-                              color: "var(--text-secondary)",
-                              marginBottom: 6,
-                            }}>
-                            Price/litre
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={expenseForm.price_per_litre}
-                            onChange={(e) =>
-                              handleExpenseFormChange(
-                                "price_per_litre",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="0.00"
-                            style={{
-                              ...invoiceControlText,
-                              width: "100%",
-                              background: "var(--bg-surface)",
-                              border: "1px solid var(--border-subtle)",
-                              padding: "10px 12px",
-                              color: "var(--text-primary)",
-                              borderRadius: 6,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div>
-                    <label
-                      style={{
-                        ...invoiceLabelText,
-                        display: "block",
-                        color: "var(--text-secondary)",
-                        marginBottom: 6,
-                      }}>
-                      Amount (ZAR) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={expenseForm.amount}
-                      onChange={(e) =>
-                        handleExpenseFormChange("amount", e.target.value)
-                      }
-                      placeholder="0.00"
-                      readOnly={Boolean(
-                        expenseForm.category === "FUEL" &&
-                        expenseForm.litres &&
-                        expenseForm.price_per_litre,
-                      )}
-                      style={{
-                        ...invoiceControlText,
-                        width: "100%",
-                        background: "var(--bg-surface)",
-                        border: "1px solid var(--border-subtle)",
-                        padding: "10px 12px",
-                        color: "var(--text-primary)",
-                        borderRadius: 6,
-                      }}
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 12,
-                    }}>
-                    <div>
-                      <label
-                        style={{
-                          ...invoiceLabelText,
-                          display: "block",
-                          color: "var(--text-secondary)",
-                          marginBottom: 6,
-                        }}>
-                        Date *
-                      </label>
-                      <DatePicker
-                        value={expenseForm.expense_date}
-                        onChange={(val) =>
-                          handleExpenseFormChange("expense_date", val)
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          ...invoiceLabelText,
-                          display: "block",
-                          color: "var(--text-secondary)",
-                          marginBottom: 6,
-                        }}>
-                        Vehicle
-                      </label>
-                      <Select
-                        value={expenseForm.vehicle}
-                        onValueChange={(val) =>
-                          handleExpenseFormChange("vehicle", val)
-                        }>
-                        <SelectTrigger style={invoiceControlText}>
-                          <SelectValue placeholder="Select vehicle..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {vehicles.map((v) => (
-                            <SelectItem key={v.id} value={String(v.id)}>
-                              {v.plate || v.registration || v.vehicle_number}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 12,
-                    }}>
-                    <div>
-                      <label
-                        style={{
-                          ...invoiceLabelText,
-                          display: "block",
-                          color: "var(--text-secondary)",
-                          marginBottom: 6,
-                        }}>
-                        Vendor
-                      </label>
-                      <input
-                        type="text"
-                        value={expenseForm.vendor}
-                        onChange={(e) =>
-                          handleExpenseFormChange("vendor", e.target.value)
-                        }
-                        placeholder="e.g. Shell, BP"
-                        style={{
-                          ...invoiceControlText,
-                          width: "100%",
-                          background: "var(--bg-surface)",
-                          border: "1px solid var(--border-subtle)",
-                          padding: "10px 12px",
-                          color: "var(--text-primary)",
-                          borderRadius: 6,
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        style={{
-                          ...invoiceLabelText,
-                          display: "block",
-                          color: "var(--text-secondary)",
-                          marginBottom: 6,
-                        }}>
-                        Receipt #
-                      </label>
-                      <input
-                        type="text"
-                        value={expenseForm.receipt_number}
-                        onChange={(e) =>
-                          handleExpenseFormChange(
-                            "receipt_number",
-                            e.target.value,
-                          )
-                        }
-                        placeholder="Receipt number"
-                        style={{
-                          ...invoiceControlText,
-                          width: "100%",
-                          background: "var(--bg-surface)",
-                          border: "1px solid var(--border-subtle)",
-                          padding: "10px 12px",
-                          color: "var(--text-primary)",
-                          borderRadius: 6,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      style={{
-                        ...invoiceLabelText,
-                        display: "block",
-                        color: "var(--text-secondary)",
-                        marginBottom: 6,
-                      }}>
-                      Notes
-                    </label>
-                    <textarea
-                      value={expenseForm.notes}
-                      onChange={(e) =>
-                        handleExpenseFormChange("notes", e.target.value)
-                      }
-                      placeholder="Additional notes..."
-                      rows={3}
-                      style={{
-                        ...invoiceControlText,
-                        width: "100%",
-                        background: "var(--bg-surface)",
-                        border: "1px solid var(--border-subtle)",
-                        padding: "10px 12px",
-                        color: "var(--text-primary)",
-                        borderRadius: 6,
-                        resize: "vertical",
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                    <button
-                      className="btn-action"
-                      onClick={handleAddExpense}
-                      disabled={
-                        !expenseForm.category ||
-                        !expenseForm.description ||
-                        !expenseForm.amount ||
-                        !expenseForm.expense_date
-                      }
-                      style={{
-                        ...invoiceControlText,
-                        flex: 1,
-                      }}>
-                      {editingExpense ? "Update expense" : "Add expense"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowExpenseForm(false);
-                        setEditingExpense(null);
-                      }}
-                      style={{
-                        ...invoiceControlText,
-                        flex: 1,
-                        background: "transparent",
-                        border: "1px solid var(--border-subtle)",
-                        color: "var(--text-secondary)",
-                        padding: "10px 16px",
-                        borderRadius: 6,
-                        cursor: "pointer",
-                        fontWeight: 500,
-                      }}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
+      {/* KPIs */}
+      {loading ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: "20px 0", marginBottom: 24 }}>
+          <Loader size={28} />
+        </div>
+      ) : (
+        <div className="fin-kpis">
+          {kpis.map((m) => (
+            <div key={m.label} className="card fin-kpi">
+              <span className="fin-kpi__label">{m.label}</span>
+              <span className={`fin-kpi__value ${m.tone ?? ""}`}>{m.value}</span>
+              <span className="fin-kpi__sub">{m.sub}</span>
             </div>
-          )}
-
-          {/* Expenses KPIs */}
-          {expensesLoading ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0", marginBottom: 24 }}>
-              <Loader size={28} />
-            </div>
-          ) : (
-            <>
-              {(() => {
-                const now = new Date();
-                const currentMonth = now.getMonth();
-                const currentYear = now.getFullYear();
-
-                const thisMonthExpenses = expenses.filter((e) => {
-                  const expDate = new Date(e.expense_date);
-                  return (
-                    expDate.getMonth() === currentMonth &&
-                    expDate.getFullYear() === currentYear
-                  );
-                });
-
-                const totalMtd = thisMonthExpenses
-                  .filter((e) => e.status === "APPROVED")
-                  .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
-
-                const pendingExpenses = expenses.filter(
-                  (e) => e.status === "PENDING",
-                );
-                const pendingAmount = pendingExpenses.reduce(
-                  (sum, e) => sum + parseFloat(e.amount || 0),
-                  0,
-                );
-
-                const fuelCosts = thisMonthExpenses
-                  .filter((e) => e.category === "FUEL")
-                  .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
-
-                // Top category
-                const categoryTotals: Record<string, number> = {};
-                thisMonthExpenses.forEach((e) => {
-                  categoryTotals[e.category] =
-                    (categoryTotals[e.category] || 0) +
-                    parseFloat(e.amount || 0);
-                });
-                const topCategoryEntry = Object.entries(categoryTotals).sort(
-                  (a, b) => b[1] - a[1],
-                )[0];
-                const topCategory = topCategoryEntry
-                  ? topCategoryEntry[0].replace("_", " ")
-                  : "N/A";
-                const topCategoryAmount = topCategoryEntry
-                  ? topCategoryEntry[1]
-                  : 0;
-
-                return (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(4, 1fr)",
-                      gap: 16,
-                      marginBottom: 24,
-                    }}>
-                    {[
-                      {
-                        label: "Total expenses MTD",
-                        value: formatCurrency(totalMtd),
-                        color: "var(--text-primary)",
-                      },
-                      {
-                        label: "Pending approval",
-                        value: `${pendingExpenses.length} / ${formatCurrency(pendingAmount)}`,
-                        color: "var(--status-warning-text, var(--status-warning))",
-                      },
-                      {
-                        label: "Fuel costs MTD",
-                        value: formatCurrency(fuelCosts),
-                        color: "var(--accent-primary)",
-                      },
-                      {
-                        label: "Top category",
-                        value: `${topCategory === "N/A" ? topCategory : formatStatus(topCategory)}\n${formatCurrency(topCategoryAmount)}`,
-                        color: "var(--text-primary)",
-                      },
-                    ].map((m) => (
-                      <div key={m.label} className="card metric-card">
-                        <div className="card-header">
-                          <span className="card-title" style={invoiceLabelText}>{m.label}</span>
-                        </div>
-                        <div
-                          className="metric-value"
-                          style={{
-                            ...invoiceMetricText,
-                            color: m.color,
-                            whiteSpace: "pre-line",
-                          }}>
-                          {m.value}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </>
-          )}
-
-          {/* Filters */}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              flexDirection: "row",
-              gap: 8,
-              marginBottom: 20,
-              alignItems: "center",
-            }}>
-            <input
-              type="text"
-              placeholder="Search expenses..."
-              value={expenseSearch}
-              onChange={(e) => {
-                setExpenseSearch(e.target.value);
-                setExpensePage(1);
-              }}
-              style={{
-                ...invoiceControlText,
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border-subtle)",
-                padding: "6px 10px",
-                color: "var(--text-primary)",
-                borderRadius: 6,
-                outline: "none",
-                width: 220,
-              }}
-            />
-            <select
-              value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
-                setExpensePage(1);
-              }}
-              style={{
-                ...invoiceControlText,
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border-subtle)",
-                padding: "6px 10px",
-                color: "var(--text-primary)",
-                borderRadius: 6,
-                width: 160,
-                cursor: "pointer",
-              }}>
-              {expenseCategories.map((c) => (
-                <option key={c} value={c}>
-                  {c === "All" ? "All categories" : formatStatus(c)}
-                </option>
-              ))}
-            </select>
-            {expenseStatuses.map((s) => (
-              <button
-                key={s}
-                onClick={() => {
-                  setExpenseStatusFilter(s);
-                  setExpensePage(1);
-                }}
-                style={{
-                  ...invoiceControlText,
-                  background:
-                    expenseStatusFilter === s
-                      ? "var(--accent-primary)"
-                      : "var(--bg-surface)",
-                  border: "1px solid var(--border-subtle)",
-                  color:
-                    expenseStatusFilter === s
-                      ? "var(--bg-deep)"
-                      : "var(--text-secondary)",
-                  padding: "6px 12px",
-                  minHeight: 40,
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontWeight: expenseStatusFilter === s ? 500 : 400,
-                  whiteSpace: "nowrap",
-                }}>
-                {s === "All" ? "All" : formatStatus(s)}
-              </button>
-            ))}
-            <span
-              style={{
-                ...invoiceSupportText,
-                marginLeft: "auto",
-                color: "var(--text-tertiary)",
-              }}>
-              {filteredExpenses.length} expenses
-            </span>
-          </div>
-
-          {/* Expenses Table */}
-          {(() => {
-            const totalPages = Math.max(
-              1,
-              Math.ceil(filteredExpenses.length / PAGE_SIZE),
-            );
-            const expenseRows = filteredExpenses.slice(
-              (expensePage - 1) * PAGE_SIZE,
-              expensePage * PAGE_SIZE,
-            );
-
-            return (
-              <>
-                <div className="card table-card">
-                  <table className="data-table table-heading-roles">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Category</th>
-                        <th>Description</th>
-                        <th>Vehicle</th>
-                        <th>Amount</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {expenseRows.length === 0 ? (
-                        expenses.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} style={{ padding: 0 }}>
-                              <div
-                                style={{
-                                  padding: "60px 20px",
-                                  textAlign: "center",
-                                }}>
-                                <div
-                                  style={{
-                                    fontSize: 48,
-                                    marginBottom: 16,
-                                    opacity: 0.3,
-                                  }}>
-                                  💰
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: 16,
-                                    fontWeight: 500,
-                                    color: "var(--text-primary)",
-                                    marginBottom: 8,
-                                  }}>
-                                  No expenses yet
-                                </div>
-                                <div
-                                  style={{
-                                    ...invoiceSupportText,
-                                    color: "var(--text-secondary)",
-                                    marginBottom: 20,
-                                  }}>
-                                  Add your first expense to track costs and
-                                  manage budgets
-                                </div>
-                                <button
-                                  onClick={() => setShowExpenseForm(true)}
-                                  className="btn-action">
-                                  Add expense
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : (
-                          <tr>
-                            <td
-                              colSpan={7}
-                              style={{
-                                ...invoiceSupportText,
-                                textAlign: "center",
-                                padding: "32px 0",
-                                color: "var(--text-tertiary)",
-                              }}>
-                              No expenses match your filters
-                            </td>
-                          </tr>
-                        )
-                      ) : (
-                        expenseRows.map((exp) => {
-                          const veh = vehicles.find(
-                            (v) => v.id === exp.vehicle,
-                          );
-                          const vehicleName =
-                            veh?.plate ||
-                            veh?.registration ||
-                            veh?.vehicle_number ||
-                            "N/A";
-
-                          return (
-                            <tr key={exp.id}>
-                              <td className="mono" style={{ ...invoiceSupportText, whiteSpace: "nowrap" }}>
-                                {formatDate(exp.expense_date)}
-                              </td>
-                              <td style={{ ...invoiceSupportText, whiteSpace: "nowrap" }}>
-                                <span
-                                  style={{ fontFamily: "var(--font-sans)" }}>
-                                  {formatStatus(exp.category)}
-                                </span>
-                              </td>
-                              <td style={{ ...invoiceSupportText, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={exp.description}>
-                                {exp.description}
-                              </td>
-                              <td
-                                className="mono"
-                                style={{
-                                  fontSize: 12,
-                                  color: "var(--text-secondary)",
-                                }}>
-                                {vehicleName}
-                              </td>
-                              <td
-                                className="mono"
-                                style={{ ...invoiceSupportText, fontVariantNumeric: "tabular-nums", fontWeight: 500, whiteSpace: "nowrap" }}>
-                                {formatCurrency(exp.amount)}
-                              </td>
-                              <td>
-                                <span
-                                  style={{
-                                    ...invoiceSupportText,
-                                    color:
-                                      EXPENSE_STATUS_COLOR[exp.status] ||
-                                      "var(--text-secondary)",
-                                    padding: "2px 6px",
-                                    background: "var(--bg-surface-hover)",
-                                    borderRadius: 4,
-                                    display: "inline-block",
-                                    whiteSpace: "nowrap",
-                                  }}>
-                                  {formatStatus(exp.status)}
-                                </span>
-                              </td>
-                              <td
-                                onKeyDown={(e) => {
-                                  if (e.key === "Escape") setOpenExpenseMenuId(null);
-                                }}>
-                                <div className="expense-row-actions">
-                                  <button
-                                    type="button"
-                                    className="expense-menu-trigger"
-                                    aria-label={`Expense actions for ${exp.description || exp.id}`}
-                                    aria-haspopup="menu"
-                                    aria-expanded={openExpenseMenuId === exp.id}
-                                    onClick={() =>
-                                      setOpenExpenseMenuId(
-                                        openExpenseMenuId === exp.id ? null : exp.id,
-                                      )
-                                    }>
-                                    <Ellipsis size={16} aria-hidden="true" />
-                                  </button>
-                                  {openExpenseMenuId === exp.id && (
-                                    <>
-                                      {/* click-away overlay */}
-                                      <div
-                                        style={{ position: "fixed", inset: 0, zIndex: 99 }}
-                                        onClick={() => setOpenExpenseMenuId(null)}
-                                      />
-                                      <div className="expense-menu" role="menu">
-                                        {exp.status === "PENDING" && (
-                                          <>
-                                            <button
-                                              type="button"
-                                              role="menuitem"
-                                              className="expense-menu-item"
-                                              style={{ color: "var(--status-success)" }}
-                                              onClick={() => {
-                                                setOpenExpenseMenuId(null);
-                                                handleApproveExpense(exp.id);
-                                              }}>
-                                              Approve
-                                            </button>
-                                            <button
-                                              type="button"
-                                              role="menuitem"
-                                              className="expense-menu-item"
-                                              style={{ color: "var(--status-danger-text, var(--status-danger))" }}
-                                              onClick={() => {
-                                                setOpenExpenseMenuId(null);
-                                                handleRejectExpense(exp.id);
-                                              }}>
-                                              Reject
-                                            </button>
-                                          </>
-                                        )}
-                                        <button
-                                          type="button"
-                                          role="menuitem"
-                                          className="expense-menu-item"
-                                          onClick={() => {
-                                            setOpenExpenseMenuId(null);
-                                            handleEditExpense(exp);
-                                          }}>
-                                          Edit
-                                        </button>
-                                        <button
-                                          type="button"
-                                          role="menuitem"
-                                          className="expense-menu-item"
-                                          style={{ color: "var(--status-danger-text, var(--status-danger))" }}
-                                          onClick={() => {
-                                            setOpenExpenseMenuId(null);
-                                            handleDeleteExpense(exp.id);
-                                          }}>
-                                          Delete
-                                        </button>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "12px 20px",
-                        borderTop: "1px solid var(--border-subtle)",
-                      }}>
-                      <span
-                        style={{
-                          ...invoiceSupportText,
-                          color: "var(--text-tertiary)",
-                        }}>
-                        Page {expensePage} of {totalPages} · showing{" "}
-                        {expenseRows.length} of {filteredExpenses.length}
-                      </span>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          className="btn-action"
-                          onClick={() =>
-                            setExpensePage((p) => Math.max(1, p - 1))
-                          }
-                          disabled={expensePage === 1}>
-                          ← Prev
-                        </button>
-                        <button
-                          className="btn-action"
-                          onClick={() =>
-                            setExpensePage((p) => Math.min(totalPages, p + 1))
-                          }
-                          disabled={expensePage === totalPages}>
-                          Next →
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            );
-          })()}
-        </>
+          ))}
+        </div>
       )}
 
-      {activeTab === "invoices" && (
-        <>
-          {/* KPIs */}
-          {loading ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: "20px 0", marginBottom: 24 }}>
-              <Loader size={28} />
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: 16,
-                marginBottom: 24,
-              }}>
-              {[
-                {
-                  label: "Total invoiced MTD",
-                  value: formatCurrency(
-                    stats?.total_invoiced_mtd ?? outstanding,
-                  ),
-                  color: "var(--text-primary)",
-                },
-                {
-                  label: "Collected",
-                  value: formatCurrency(stats?.total_collected_mtd ?? paid),
-                  color: "var(--status-success)",
-                },
-                {
-                  label: "Overdue",
-                  value: `${stats?.overdue_count ?? 0} / ${formatCurrency(stats?.overdue_amount ?? overdue)}`,
-                  color: "var(--status-danger-text, var(--status-danger))",
-                },
-                {
-                  label: "Collection rate",
-                  value: `${Math.round((stats?.collection_rate ?? 0) * 100)}%`,
-                  color: "var(--accent-primary)",
-                },
-              ].map((m) => (
-                <div key={m.label} className="card metric-card">
-                  <div className="card-header">
-                    <span className="card-title" style={invoiceLabelText}>{m.label}</span>
-                  </div>
-                  <div
-                    className="metric-value"
-                    style={{ ...invoiceMetricText, color: m.color }}>
-                    {m.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Filters */}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              marginBottom: 20,
-              alignItems: "center",
-            }}>
-            <input
-              type="text"
-              placeholder="Search invoices..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
+      {/* Filters */}
+      <div className="fin-toolbar">
+        <input
+          type="search"
+          className="fin-control fin-control--search"
+          placeholder="Search invoices"
+          aria-label="Search invoices by number or customer"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+        />
+        <div className="fin-toolbar__group" role="group" aria-label="Filter by status">
+          {STATUSES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className="fin-chip-filter"
+              aria-pressed={statusFilter === s}
+              onClick={() => {
+                setStatusFilter(s);
                 setPage(1);
-              }}
-              style={{
-                ...invoiceControlText,
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border-subtle)",
-                padding: "6px 10px",
-                color: "var(--text-primary)",
-                borderRadius: 6,
-                outline: "none",
-                width: 220,
-              }}
-            />
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {statuses.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => {
-                    setStatusFilter(s);
-                    setPage(1);
-                  }}
-                  style={{
-                    ...invoiceControlText,
-                    background:
-                      statusFilter === s
-                        ? "var(--accent-primary)"
-                        : "var(--bg-surface)",
-                    border: "1px solid var(--border-subtle)",
-                    color:
-                      statusFilter === s
-                        ? "var(--bg-deep)"
-                        : "var(--text-secondary)",
-                    padding: "6px 12px",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    fontWeight: statusFilter === s ? 500 : 400,
-                    transition: "all 0.2s ease",
-                  }}>
-                  {s === "All" ? "All" : formatStatus(s)}
-                </button>
-              ))}
-            </div>
-            <span
-              style={{
-                ...invoiceSupportText,
-                marginLeft: "auto",
-                color: "var(--text-tertiary)",
               }}>
-              {filtered.length} invoices
-            </span>
-          </div>
+              {s === "All" ? "All" : formatStatus(s)}
+            </button>
+          ))}
+        </div>
+        <span className="fin-toolbar__count">
+          {filtered.length} {filtered.length === 1 ? "invoice" : "invoices"}
+        </span>
+      </div>
 
-          {/* Table — 10 per page, clickable */}
-          <div className="card table-card">
-            <table className="data-table table-heading-roles">
-              <colgroup>
-                <col style={{ width: "160px" }} />
-                <col />
-                <col style={{ width: "130px" }} />
-                <col style={{ width: "160px" }} />
-                <col style={{ width: "180px" }} />
-                <col style={{ width: "80px" }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Invoice #</th>
-                  <th>Customer</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Due date</th>
-                  <th style={{ textAlign: "right" }}>Actions</th>
+      {/* Table — 10 per page, clickable */}
+      <div className="card fin-table-card">
+        <div className="fin-table-scroll">
+          <table className="fin-table table-heading-roles">
+            <thead>
+              <tr>
+                <th>Invoice #</th>
+                <th>Customer</th>
+                <th className="num">Amount</th>
+                <th>Status</th>
+                <th>Due date</th>
+                <th className="actions">
+                  <span className="sr-only" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
+                    Actions
+                  </span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr className="is-empty">
+                  <td colSpan={6} style={{ padding: 0 }}>
+                    {loading ? (
+                      <div className="fin-empty fin-empty--compact">Loading invoices…</div>
+                    ) : isError ? (
+                      <div className="fin-empty">
+                        <p className="fin-empty__title">Couldn’t load invoices</p>
+                        <p className="fin-empty__body">Check your connection and try again.</p>
+                        <button className="btn-action" onClick={() => refetchInvoices()}>
+                          Retry loading
+                        </button>
+                      </div>
+                    ) : allInvoices.length === 0 ? (
+                      <div className="fin-empty">
+                        <p className="fin-empty__title">No invoices yet</p>
+                        <p className="fin-empty__body">Invoices are generated from completed bookings.</p>
+                        <button onClick={() => navigate("/bookings")} className="btn-action">
+                          Go to bookings
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="fin-empty fin-empty--compact">No invoices match your filters</div>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  allInvoices.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} style={{ padding: 0 }}>
-                        <div
-                          style={{ padding: "60px 20px", textAlign: "center" }}>
-                          <div
-                            style={{
-                              fontSize: 48,
-                              marginBottom: 16,
-                              opacity: 0.3,
-                            }}>
-                            📄
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 16,
-                              fontWeight: 500,
-                              color: "var(--text-primary)",
-                              marginBottom: 8,
-                            }}>
-                            No invoices yet
-                          </div>
-                          <div
-                            style={{
-                              ...invoiceSupportText,
-                              color: "var(--text-secondary)",
-                              marginBottom: 20,
-                            }}>
-                            Invoices will be generated from completed bookings
-                          </div>
-                          <button
-                            onClick={() => navigate("/bookings")}
-                            className="btn-action">
-                            Go to bookings
-                          </button>
+              ) : (
+                rows.map((inv) => {
+                  const invStatus = inv.status?.toUpperCase();
+                  const amount = parseFloat(inv.total_amount || inv.amount) || 0;
+                  const invNumber = inv.invoice_number || inv.invoiceNumber;
+                  const custName = inv.customer_name || inv.customerName;
+                  const dueDate = inv.due_date || inv.dueDate;
+                  // Aging indicator
+                  const ageDays = dueDate
+                    ? Math.floor((Date.now() - new Date(dueDate).getTime()) / 86400000)
+                    : 0;
+                  const agingTone: Tone =
+                    ageDays <= 0 ? "success" : ageDays <= 30 ? "warning" : ageDays <= 60 ? "info" : "danger";
+                  const agingLabel = ageDays <= 0 ? `Due in ${Math.abs(ageDays)}d` : `${ageDays}d overdue`;
+
+                  const capitalEntry = eligibleById.get(String(inv.id));
+                  const ineligibleEntry = !capitalEntry ? ineligibleById.get(String(inv.id)) : null;
+                  const tier = capitalEntry
+                    ? String(capitalEntry.risk_tier || capitalEntry.tier || "standard").toLowerCase()
+                    : null;
+                  const applied = appliedIds.has(String(inv.id));
+
+                  return (
+                    <tr
+                      key={inv.id}
+                      className="is-clickable"
+                      onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
+                      <td>
+                        <span className="fin-id">{invNumber}</span>
+                      </td>
+                      <td className="fin-strong">
+                        <div className="fin-truncate" title={custName}>
+                          {custName}
                         </div>
                       </td>
-                    </tr>
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        style={{
-                          ...invoiceSupportText,
-                          textAlign: "center",
-                          padding: "32px 0",
-                          color: "var(--text-tertiary)",
-                        }}>
-                        No invoices match your filters
+                      <td className="num">{formatCurrency(amount)}</td>
+                      <td>
+                        <span className="fin-inline-list">
+                          <span className={chipClass(STATUS_TONE[invStatus] ?? "neutral")}>
+                            {formatStatus(invStatus)}
+                          </span>
+                          {capitalEntry && tier && (
+                            <span
+                              className={chipClass(TIER_TONE[tier] ?? "neutral", true)}
+                              title="Fast Pay risk tier">
+                              {formatStatus(tier)}
+                            </span>
+                          )}
+                        </span>
                       </td>
-                    </tr>
-                  )
-                ) : (
-                  rows.map((inv) => {
-                    const invStatus = inv.status?.toUpperCase();
-                    const amount =
-                      parseFloat(inv.total_amount || inv.amount) || 0;
-                    const invNumber = inv.invoice_number || inv.invoiceNumber;
-                    const custName = inv.customer_name || inv.customerName;
-                    const dueDate = inv.due_date || inv.dueDate;
-                    // Aging indicator
-                    const ageDays = dueDate
-                      ? Math.floor(
-                          (Date.now() - new Date(dueDate).getTime()) / 86400000,
-                        )
-                      : 0;
-                    const agingColor =
-                      ageDays <= 0
-                        ? "var(--status-success)"
-                        : ageDays <= 30
-                          ? "var(--status-warning-text, var(--status-warning))"
-                          : ageDays <= 60
-                            ? "var(--accent-primary)"
-                            : "var(--status-danger-text, var(--status-danger))";
-                    const agingLabel =
-                      ageDays <= 0
-                        ? `Due in ${Math.abs(ageDays)}d`
-                        : `${ageDays}d overdue`;
-
-                    const capitalEntry = eligibleById.get(String(inv.id));
-                    const ineligibleEntry = !capitalEntry ? ineligibleById.get(String(inv.id)) : null;
-                    const tier = capitalEntry
-                      ? String(
-                          capitalEntry.risk_tier ||
-                            capitalEntry.tier ||
-                            "standard",
-                        ).toLowerCase()
-                      : null;
-
-                    return (
-                      <tr
-                        key={inv.id}
-                        style={{ cursor: "pointer" }}
-                        onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
-                        <td className="mono" style={{ whiteSpace: "nowrap" }}>{invNumber}</td>
-                        <td style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={custName}>{custName}</td>
-                        <td className="mono" style={{ ...invoiceSupportText, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{formatCurrency(amount)}</td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}>
-                            <span
-                              style={{
-                                ...invoiceSupportText,
-                                color:
-                                  STATUS_COLOR[invStatus] ||
-                                  "var(--text-secondary)",
-                                padding: "2px 6px",
-                                background: "var(--bg-surface-hover)",
-                                borderRadius: 4,
-                                display: "inline-block",
-                                whiteSpace: "nowrap",
-                              }}>
-                              {formatStatus(invStatus)}
-                            </span>
-                            {capitalEntry && tier && (
-                              <span
-                                style={{
-                                  ...invoiceSupportText,
-                                  color:
-                                    TIER_COLOR[tier] || "var(--text-tertiary)",
-                                  padding: "1px 5px",
-                                  border: `1px solid ${TIER_COLOR[tier] || "var(--border-subtle)"}`,
-                                  borderRadius: 4,
-                                  display: "inline-block",
-                                  whiteSpace: "nowrap",
-                                }}>
-                                {formatStatus(tier)}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}>
-                            <span
-                              style={{
-                                ...invoiceSupportText,
-                                color:
-                                  invStatus === "OVERDUE"
-                                    ? "var(--status-danger)"
-                                    : "var(--text-secondary)",
-                              }}>
-                              {dueDate}
-                            </span>
-                            {invStatus !== "PAID" && dueDate && (
-                              <span
-                                style={{
-                                  ...invoiceSupportText,
-                                  color: agingColor,
-                                  padding: "1px 5px",
-                                  border: `1px solid ${agingColor}`,
-                                  borderRadius: 4, /* badge radius */
-                                  whiteSpace: "nowrap",
-                                }}>
-                                {agingLabel}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ position: "relative", textAlign: "right" }}>
-                          {/* 3-dot menu button */}
+                      <td>
+                        <span className="fin-inline-list">
+                          <span className={`fin-date ${invStatus === "OVERDUE" ? "fin-text-danger" : ""}`}>
+                            {safeDate(dueDate)}
+                          </span>
+                          {invStatus !== "PAID" && dueDate && (
+                            <span className={chipClass(agingTone, true)}>{agingLabel}</span>
+                          )}
+                        </span>
+                      </td>
+                      <td
+                        className="actions"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") setOpenDropdownId(null);
+                        }}>
+                        <div className="expense-row-actions">
                           <button
+                            type="button"
+                            className="expense-menu-trigger"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setOpenDropdownId(
-                                openDropdownId === inv.id ? null : inv.id,
-                              );
+                              setOpenDropdownId(openDropdownId === inv.id ? null : inv.id);
                             }}
                             aria-label={`Invoice actions for ${invNumber}`}
                             aria-haspopup="menu"
-                            aria-expanded={openDropdownId === inv.id}
-                            style={{
-                              ...invoiceControlText,
-                              minWidth: 44,
-                              background: "transparent",
-                              border: "1px solid var(--border-subtle)",
-                              color: "var(--text-secondary)",
-                              borderRadius: 6,
-                              cursor: "pointer",
-                              padding: "3px 8px",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}>
-                            <Ellipsis size={14} aria-hidden="true" />
+                            aria-expanded={openDropdownId === inv.id}>
+                            <Ellipsis size={16} aria-hidden="true" />
                           </button>
 
-                          {/* Dropdown */}
                           {openDropdownId === inv.id && (
                             <>
                               {/* click-away overlay */}
                               <div
-                                style={{
-                                  position: "fixed",
-                                  inset: 0,
-                                  zIndex: 99,
-                                }}
+                                style={{ position: "fixed", inset: 0, zIndex: 99 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setOpenDropdownId(null);
                                 }}
                               />
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  right: 0,
-                                  top: "calc(100% + 4px)",
-                                  zIndex: 100,
-                                  background: "var(--bg-surface)",
-                                  border: "1px solid var(--border-subtle)",
-                                  borderRadius: 4,
-                                  minWidth: 200,
-                                  boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
-                                  overflow: "hidden",
-                                }}>
+                              <div className="expense-menu" role="menu">
                                 {invStatus === "DRAFT" && (
                                   <button
-                                    style={{
-                                      display: "block",
-                                      width: "100%",
-                                      textAlign: "left",
-                                      background: "transparent",
-                                      border: "none",
-                                      borderBottom:
-                                        "1px solid var(--border-subtle)",
-                                      color: "var(--accent-primary)",
-                                      fontFamily: "var(--font-sans)",
-                                      fontSize: 14,
-                                      lineHeight: "20px",
-                                      letterSpacing: "normal",
-                                      padding: "10px 14px",
-                                      cursor: "pointer",
-                                      transition: "background 0.15s",
-                                    }}
+                                    type="button"
+                                    role="menuitem"
+                                    className="expense-menu-item"
                                     disabled={sendingId === inv.id}
-                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                                     onClick={(e) => {
                                       setOpenDropdownId(null);
                                       handleSendInvoice(e, inv.id);
                                     }}>
-                                    {sendingId === inv.id
-                                      ? "Sending..."
-                                      : "Send to customer"}
+                                    {sendingId === inv.id ? "Sending…" : "Send to customer"}
                                   </button>
                                 )}
                                 {invStatus === "OVERDUE" && (
                                   <button
-                                    style={{
-                                      display: "block",
-                                      width: "100%",
-                                      textAlign: "left",
-                                      background: "transparent",
-                                      border: "none",
-                                      borderBottom:
-                                        "1px solid var(--border-subtle)",
-                                      color: "var(--status-warning-text, var(--status-warning))",
-                                      fontFamily: "var(--font-sans)",
-                                      fontSize: 14,
-                                      lineHeight: "20px",
-                                      letterSpacing: "normal",
-                                      padding: "10px 14px",
-                                      cursor: "pointer",
-                                      transition: "background 0.15s",
-                                    }}
+                                    type="button"
+                                    role="menuitem"
+                                    className="expense-menu-item"
                                     disabled={sendingReminderId === inv.id}
-                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                                     onClick={(e) => {
                                       setOpenDropdownId(null);
                                       handleSendReminder(e, inv.id);
                                     }}>
-                                    {sendingReminderId === inv.id
-                                      ? "Sending..."
-                                      : "Send reminder"}
+                                    {sendingReminderId === inv.id ? "Sending…" : "Send reminder"}
                                   </button>
                                 )}
                                 {invStatus !== "DRAFT" && (
                                   <button
-                                    style={{
-                                      display: "block",
-                                      width: "100%",
-                                      textAlign: "left",
-                                      background: "transparent",
-                                      border: "none",
-                                      borderBottom:
-                                        "1px solid var(--border-subtle)",
-                                      color: "var(--text-secondary)",
-                                      fontFamily: "var(--font-sans)",
-                                      fontSize: 14,
-                                      lineHeight: "20px",
-                                      letterSpacing: "normal",
-                                      padding: "10px 14px",
-                                      cursor: "pointer",
-                                      transition: "background 0.15s",
-                                    }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                                    type="button"
+                                    role="menuitem"
+                                    className="expense-menu-item"
                                     onClick={(e) => {
                                       setOpenDropdownId(null);
                                       handleDownloadPDF(e, inv.id);
@@ -1927,105 +487,53 @@ export default function Invoices() {
                                   </button>
                                 )}
                                 {capitalEntry && (
-                                  <a
-                                    href={MC_URL}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={() => {
-                                      setOpenDropdownId(null);
-                                      setAppliedIds((prev) => saveAppliedId(String(inv.id), prev));
-                                    }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                                    style={{
-                                      display: "block",
-                                      width: "100%",
-                                      textAlign: "left",
-                                      background: "transparent",
-                                      borderBottom: "1px solid var(--border-subtle)",
-                                      color: appliedIds.has(String(inv.id))
-                                        ? "var(--status-success)"
-                                        : TIER_COLOR[tier || ""] || "var(--accent-primary)",
-                                      fontFamily: "var(--font-sans)",
-                                      fontSize: 14,
-                                      lineHeight: "20px",
-                                      letterSpacing: "normal",
-                                      padding: "10px 14px",
-                                      cursor: "pointer",
-                                      textDecoration: "none",
-                                      boxSizing: "border-box",
-                                      transition: "background 0.15s",
-                                    }}>
-                                    {appliedIds.has(String(inv.id)) ? "Applied ✓" : "Request capital →"}
-                                  </a>
+                                  <div className="fin-menu-note">
+                                    <strong>{applied ? "Applied for Fast Pay" : "Eligible for Fast Pay"}</strong>
+                                    {applied ? "Your earlier application is on record." : "Coming soon: Fast Pay is being set up."}
+                                  </div>
                                 )}
                                 {ineligibleEntry && (
-                                  <div
-                                    style={{
-                                      ...invoiceSupportText,
-                                      padding: "10px 14px",
-                                      color: "var(--text-tertiary)",
-                                    }}>
-                                    <div
-                                      style={{
-                                        ...invoiceSupportText,
-                                        color: "var(--status-danger-text, var(--status-danger))",
-                                        fontWeight: 500,
-                                        marginBottom: 2,
-                                      }}>
-                                      Not eligible for capital
-                                    </div>
+                                  <div className="fin-menu-note">
+                                    <strong>Not eligible for Fast Pay</strong>
                                     {ineligibleEntry.reason}
                                   </div>
                                 )}
                               </div>
                             </>
                           )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "12px 20px",
-                  borderTop: "1px solid var(--border-subtle)",
-                }}>
-                <span
-                  style={{
-                    ...invoiceSupportText,
-                    color: "var(--text-tertiary)",
-                  }}>
-                  Page {page} of {totalPages} · showing {rows.length} of{" "}
-                  {filtered.length}
-                </span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    className="btn-action"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}>
-                    ← Prev
-                  </button>
-                  <button
-                    className="btn-action"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}>
-                    Next →
-                  </button>
-                </div>
-              </div>
-            )}
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="fin-table-foot">
+            <span>
+              Page {page} of {totalPages} · showing {rows.length} of {filtered.length}
+            </span>
+            <div className="fin-table-foot__nav">
+              <button
+                className="btn-action fin-btn-secondary"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}>
+                Previous
+              </button>
+              <button
+                className="btn-action fin-btn-secondary"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}>
+                Next
+              </button>
+            </div>
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }

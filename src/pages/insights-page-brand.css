@@ -19,6 +19,9 @@
   --insights-success-surface: #10271B;
   --insights-warning-surface: #302410;
   --insights-danger-surface: #321919;
+  /* Dark tertiary text (#6E757D) measures ~3.9:1 on the card surface; lift it
+     to an AA-passing grey for this page's small supporting text. */
+  --text-tertiary: #8E959D;
 }
 [data-theme="light"] .insights-page-brand {
   --status-success-text: #166534;
@@ -27,6 +30,7 @@
   --insights-success-surface: #F0FDF4;
   --insights-warning-surface: #FFFBEB;
   --insights-danger-surface: #FEF2F2;
+  --text-tertiary: #6B7280;
 }
 
 /* Cards: 24px desktop / 16px phone, 8px radius. */

@@ -348,64 +348,69 @@ export function MapLocationPicker({
   }, [pickupCoords, deliveryCoords, returnCoords, mapReady, routeOptions, selectedRouteIndex]);
 
   const FIELD_CONFIG: { key: MapField; label: string; color: string; visible: boolean }[] = [
-    { key: 'pickup', label: '● PICKUP', color: '#0057FF', visible: true },
-    { key: 'delivery', label: '● DELIVERY', color: '#e85d04', visible: true },
-    { key: 'return', label: '● RETURN', color: '#16a34a', visible: showReturn },
+    { key: 'pickup', label: 'Pickup', color: '#0057FF', visible: true },
+    { key: 'delivery', label: 'Delivery', color: '#c2410c', visible: true },
+    { key: 'return', label: 'Return', color: '#15803d', visible: showReturn },
   ];
 
   const btnBase: React.CSSProperties = {
     flex: 1,
-    padding: '6px 10px',
-    borderRadius: 2,
-    fontSize: 10,
-    fontFamily: 'var(--font-mono)',
-    letterSpacing: '0.08em',
+    padding: '8px 12px',
+    minHeight: 40,
+    borderRadius: 6,
+    fontSize: 14,
+    lineHeight: '20px',
+    fontFamily: 'var(--font-sans)',
+    letterSpacing: 'normal',
     cursor: 'pointer',
-    fontWeight: 600,
+    fontWeight: 500,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
     transition: 'all 0.15s',
   };
 
   return (
     <div style={{ marginBottom: 4 }}>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         {FIELD_CONFIG.filter((f) => f.visible).map(({ key, label, color }) => (
           <button
             key={key}
             type="button"
             onClick={() => onActiveFieldChange(key)}
+            aria-pressed={activeField === key}
             style={{
               ...btnBase,
               background: activeField === key ? color : 'var(--bg-surface)',
               border: `1px solid ${activeField === key ? color : 'var(--border-subtle)'}`,
-              color: activeField === key ? '#fff' : 'var(--text-tertiary)',
+              color: activeField === key ? '#fff' : 'var(--text-secondary)',
             }}
           >
+            <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: activeField === key ? '#fff' : color, flexShrink: 0 }} />
             {label}
           </button>
         ))}
       </div>
 
-      <div style={{ position: 'relative', border: '1px solid var(--border-subtle)', borderRadius: 3, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', border: '1px solid var(--border-subtle)', borderRadius: 8, overflow: 'hidden' }}>
         <div ref={mapRef} style={{ height: mapHeight, width: '100%' }} />
 
         <div style={{
           position: 'absolute', bottom: 8, left: 8, zIndex: 500,
           background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-          borderRadius: 3, padding: '3px 8px',
-          fontSize: 9, color: '#fff', fontFamily: 'var(--font-mono)',
-          letterSpacing: '0.07em', pointerEvents: 'none',
+          borderRadius: 4, padding: '2px 8px',
+          fontSize: 12, lineHeight: '16px', color: '#fff', fontFamily: 'var(--font-sans)',
+          letterSpacing: 'normal', pointerEvents: 'none',
         }}>
-          DOUBLE-TAP MAP TO SET {activeField.toUpperCase()}
+          Double-tap the map to set {activeField}
         </div>
 
         {geocoding && (
           <div style={{
             position: 'absolute', top: 8, right: 8, zIndex: 500,
             background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-            borderRadius: 2, padding: '4px 8px',
-            fontSize: 9, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)',
+            borderRadius: 4, padding: '2px 8px',
+            fontSize: 12, lineHeight: '16px', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)',
           }}>
-            LOCATING…
+            Locating…
           </div>
         )}
 
@@ -414,10 +419,11 @@ export function MapLocationPicker({
             type="button"
             onClick={onExpand}
             title="Expand map"
+            aria-label="Expand map"
             style={{
               position: 'absolute', top: 8, right: 8, zIndex: 500,
               background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-              border: 'none', borderRadius: 3, width: 28, height: 28,
+              border: 'none', borderRadius: 6, width: 44, height: 44,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', color: '#fff', fontSize: 14,
             }}
@@ -431,10 +437,11 @@ export function MapLocationPicker({
             type="button"
             onClick={onClose}
             title="Close fullscreen"
+            aria-label="Close fullscreen"
             style={{
               position: 'absolute', top: 8, right: 8, zIndex: 500,
               background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-              border: 'none', borderRadius: 3, width: 32, height: 32,
+              border: 'none', borderRadius: 6, width: 44, height: 44,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', color: '#fff', fontSize: 18, lineHeight: 1,
             }}
@@ -455,24 +462,25 @@ export function MapLocationPicker({
               style={{
                 background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
                 border: `1px solid ${showTraffic ? '#2EAB30' : 'transparent'}`,
-                borderRadius: 3, padding: '4px 8px', cursor: 'pointer',
-                fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.07em',
-                color: showTraffic ? '#7CF07E' : '#cbd5e1', fontWeight: 600,
+                borderRadius: 6, padding: '4px 8px', minHeight: 32, cursor: 'pointer',
+                fontSize: 12, lineHeight: '16px', fontFamily: 'var(--font-sans)', letterSpacing: 'normal',
+                color: showTraffic ? '#7CF07E' : '#E5E7EB', fontWeight: 500,
               }}
+              aria-pressed={showTraffic}
             >
-              {showTraffic ? '● TRAFFIC ON' : '○ TRAFFIC OFF'}
+              {showTraffic ? '● Traffic on' : '○ Traffic off'}
             </button>
             {showTraffic && (
               <div style={{
                 background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-                borderRadius: 3, padding: '3px 8px',
-                fontSize: 8, fontFamily: 'var(--font-mono)', color: '#fff',
-                display: 'flex', gap: 8, alignItems: 'center', letterSpacing: '0.05em',
+                borderRadius: 4, padding: '2px 8px',
+                fontSize: 12, lineHeight: '16px', fontFamily: 'var(--font-sans)', color: '#fff',
+                display: 'flex', gap: 8, alignItems: 'center', letterSpacing: 'normal',
               }}>
-                <span style={{ color: '#2EAB30' }}>● clear</span>
-                <span style={{ color: '#F1BF40' }}>● light</span>
-                <span style={{ color: '#F18237' }}>● mod</span>
-                <span style={{ color: '#E70704' }}>● heavy</span>
+                <span><span style={{ color: '#2EAB30' }}>●</span> Clear</span>
+                <span><span style={{ color: '#F1BF40' }}>●</span> Light</span>
+                <span><span style={{ color: '#F18237' }}>●</span> Moderate</span>
+                <span><span style={{ color: '#E70704' }}>●</span> Heavy</span>
               </div>
             )}
           </div>

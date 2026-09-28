@@ -1,6 +1,7 @@
+import "./auth-brand.css";
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff, Check } from 'lucide-react';
+import { Eye, EyeOff, Check, CheckCircle2 } from 'lucide-react';
 import { postData } from '@/lib/Api';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { MobileAuthLayout } from '@/components/MobileAuthLayout';
@@ -108,13 +109,26 @@ export default function PasswordReset() {
   };
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 12px', background: 'var(--bg-base)',
-    border: '1px solid var(--border-subtle)', borderRadius: 4,
-    color: 'var(--text-primary)', fontSize: 13, outline: 'none', boxSizing: 'border-box',
+    background: 'var(--input-bg, var(--bg-surface))',
+    border: '1px solid var(--border-subtle)',
+    padding: '8px 12px',
+    minHeight: 40,
+    color: 'var(--text-primary)',
+    borderRadius: 6,
+    fontSize: 14,
+    lineHeight: '20px',
+    width: '100%',
+    boxSizing: 'border-box',
+    fontFamily: 'var(--font-sans)',
   };
   const labelStyle: React.CSSProperties = {
-    fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-    display: 'block', marginBottom: 6, letterSpacing: '0.08em',
+    display: 'block',
+    fontSize: 13,
+    lineHeight: '20px',
+    fontWeight: 500,
+    fontFamily: 'var(--font-sans)',
+    color: 'var(--text-primary)',
+    marginBottom: 6,
   };
 
   // Shared between the desktop card (which shows its own text logo, since
@@ -125,29 +139,29 @@ export default function PasswordReset() {
     <>
         {step === 'done' ? (
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 40, marginBottom: 16 }}>✓</div>
-            <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Password updated</div>
+            <CheckCircle2 aria-hidden="true" size={40} strokeWidth={1.5} style={{ color: 'var(--status-success-text, var(--accent-primary))', marginBottom: 16 }} />
+            <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>Password updated</h1>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24 }}>Your password has been reset. You can now log in.</div>
             <button className="btn-action" style={{ width: '100%' }} onClick={() => navigate('/login')}>Back to login</button>
           </div>
         ) : (
           <>
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 6 }}>
+              <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
                 {step === 'request' ? 'Reset password' : 'Enter reset code'}
-              </div>
+              </h1>
               {step === 'confirm' && (
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                   Reset code sent to <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>
                 </div>
               )}
               {step === 'request' && (
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Enter your email address to receive a reset code.</div>
+                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Enter your email address to receive a reset code.</div>
               )}
             </div>
 
             {error && (
-              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 4, fontSize: 12, color: 'var(--status-danger-text, var(--status-danger))' }}>
+              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)', borderRadius: 6, fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text, var(--status-danger))' }}>
                 {error}
               </div>
             )}
@@ -155,31 +169,31 @@ export default function PasswordReset() {
             {step === 'request' ? (
               <form onSubmit={requestReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
-                  <label style={labelStyle}>EMAIL ADDRESS</label>
-                  <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                  <label style={labelStyle}>Email address</label>
+                  <input className="tw-auth-control" type="email" required value={email} onChange={e => setEmail(e.target.value)}
                     style={inputStyle} placeholder="your@email.com" />
                 </div>
                 <button type="submit" className="btn-action" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
-                  {loading ? 'Sending...' : 'Send reset code'}
+                  {loading ? 'Sending…' : 'Send reset code'}
                 </button>
               </form>
             ) : (
               <form onSubmit={confirmReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {/* Resend row */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                  <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>
                     {countdown > 0 ? `Resend in ${formatCountdown(countdown)}` : 'Didn\'t receive the code?'}
                   </span>
                   <button type="button" onClick={handleResend} disabled={countdown > 0}
-                    style={{ fontSize: 11, fontFamily: 'var(--font-mono)', background: 'none', border: 'none', cursor: countdown > 0 ? 'default' : 'pointer', color: countdown > 0 ? 'var(--text-tertiary)' : 'var(--accent-primary)', padding: 0, letterSpacing: '0.06em' }}>
+                    style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', background: 'none', border: 'none', cursor: countdown > 0 ? 'default' : 'pointer', color: countdown > 0 ? 'var(--text-tertiary)' : 'var(--accent-primary)', padding: 0 }}>
                     Resend
                   </button>
                 </div>
 
                 {/* Reset code */}
                 <div>
-                  <label style={labelStyle}>RESET CODE</label>
-                  <input type="text" required value={code} onChange={e => setCode(e.target.value)}
+                  <label style={labelStyle}>Reset code</label>
+                  <input className="tw-auth-control" type="text" required value={code} onChange={e => setCode(e.target.value)}
                     placeholder="6-digit code from email" maxLength={6}
                     style={{ ...inputStyle, letterSpacing: '0.2em', fontSize: 16, fontFamily: 'var(--font-mono)' }} />
                 </div>
@@ -188,9 +202,9 @@ export default function PasswordReset() {
                 <div>
                   <label style={labelStyle}>NEW PASSWORD</label>
                   <div style={{ position: 'relative' }}>
-                    <input type={showNew ? 'text' : 'password'} required value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                    <input className="tw-auth-control" type={showNew ? 'text' : 'password'} required value={newPassword} onChange={e => setNewPassword(e.target.value)}
                       placeholder="Min 8 characters" style={{ ...inputStyle, paddingRight: 40 }} />
-                    <button type="button" tabIndex={-1} onClick={() => setShowNew(v => !v)}
+                    <button type="button" tabIndex={-1} aria-label="Show or hide password" onClick={() => setShowNew(v => !v)}
                       style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}>
                       {showNew ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
@@ -199,11 +213,11 @@ export default function PasswordReset() {
 
                 {/* Confirm password */}
                 <div>
-                  <label style={labelStyle}>CONFIRM PASSWORD</label>
+                  <label style={labelStyle}>Confirm password</label>
                   <div style={{ position: 'relative' }}>
-                    <input type={showConfirm ? 'text' : 'password'} required value={confirm} onChange={e => setConfirm(e.target.value)}
+                    <input className="tw-auth-control" type={showConfirm ? 'text' : 'password'} required value={confirm} onChange={e => setConfirm(e.target.value)}
                       placeholder="Repeat new password" style={{ ...inputStyle, paddingRight: 40 }} />
-                    <button type="button" tabIndex={-1} onClick={() => setShowConfirm(v => !v)}
+                    <button type="button" tabIndex={-1} aria-label="Show or hide password" onClick={() => setShowConfirm(v => !v)}
                       style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, display: 'flex' }}>
                       {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
@@ -211,13 +225,13 @@ export default function PasswordReset() {
                 </div>
 
                 <button type="submit" className="btn-action" style={{ width: '100%', marginTop: 8 }} disabled={loading}>
-                  {loading ? 'Resetting...' : 'Set new password'}
+                  {loading ? 'Resetting…' : 'Set new password'}
                 </button>
               </form>
             )}
 
             <div style={{ marginTop: 20, textAlign: 'center' }}>
-              <button onClick={() => navigate('/login')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
+              <button onClick={() => navigate('/login')} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 13, lineHeight: '20px', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
                 ← Back to login
               </button>
             </div>
@@ -228,10 +242,7 @@ export default function PasswordReset() {
 
   const desktopFormCard = (
     <div style={{ width: '100%', maxWidth: 420, padding: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8, boxSizing: 'border-box' }}>
-      <div style={{ marginBottom: 32, textAlign: 'center' }}>
-        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>TRUCKWYS</div>
-        <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>ROAD FREIGHT INTELLIGENCE</div>
-      </div>
+      {/* The split layout already shows the logo in its content panel. */}
       {formBody}
     </div>
   );
@@ -241,10 +252,10 @@ export default function PasswordReset() {
   // mobile) — demoted to a footer below the form there.
   const extraContent = (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px 16px' }}>
         {PLAN_FEATURES.map(f => (
-          <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-            <Check size={13} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+          <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+            <Check size={16} aria-hidden="true" style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: 2 }} />
             {f}
           </div>
         ))}
@@ -253,14 +264,14 @@ export default function PasswordReset() {
       <div style={{
         marginTop: 18, padding: '10px 13px', border: '1px solid var(--border-subtle)',
         borderRadius: 'var(--card-radius)', background: 'var(--bg-surface-hover)',
-        fontSize: 12, color: 'var(--text-secondary)',
+        fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
       }}>
         Reminder: every completed load also carries a <strong style={{ color: 'var(--text-primary)' }}>0.25% platform fee</strong>,
         charged automatically to the card on file on top of the monthly plan.
       </div>
 
-      <div style={{ marginTop: 16, fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
-        BUILT FOR SOUTH AFRICAN ROAD FREIGHT
+      <div style={{ marginTop: 16, fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)' }}>
+        Built for South African road freight
       </div>
     </>
   );
@@ -311,12 +322,12 @@ export default function PasswordReset() {
         borderRight: '1px solid var(--border-subtle)',
       }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
-          <img src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
+          <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
 
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent-primary)', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-info-text, var(--accent-primary))', marginBottom: 10 }}>
             Account recovery
           </div>
-          <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3, marginBottom: 16, letterSpacing: '-0.01em' }}>
+          <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', marginBottom: 16 }}>
             Let's get you <span style={{ color: 'var(--accent-primary)' }}>back in</span>.
           </div>
           <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 32 }}>

@@ -1,8 +1,11 @@
+import "./bookings-typography.css";
+import "./bookings-section.css";
 import { useState, useRef } from "react";
+import { ArrowLeft, Upload, X } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData, patchData } from "@/lib/Api";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,14 +14,14 @@ import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscript
 import { ExpandableRouteMap } from "@/components/ExpandableRouteMap";
 import { Loader } from '@/components/Loader';
 
-const STATUS_COLOR: Record<string, string> = {
-  PENDING: 'var(--text-tertiary)',
-  LOADING: 'var(--status-warning)',
-  ASSIGNED: 'var(--status-warning)',
-  IN_TRANSIT: 'var(--accent-primary)',
-  DELIVERED: 'var(--status-success)',
-  INVOICED: 'var(--accent-primary)',
-  CANCELLED: 'var(--status-danger)',
+const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
+  PENDING: 'neutral',
+  LOADING: 'warning',
+  ASSIGNED: 'warning',
+  IN_TRANSIT: 'info',
+  DELIVERED: 'success',
+  INVOICED: 'info',
+  CANCELLED: 'danger',
 };
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -32,7 +35,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 };
 
 const fmt = (dateStr?: string) =>
-  dateStr ? new Date(dateStr).toLocaleDateString('en-ZA') : '—';
+  dateStr ? formatDate(dateStr) : '—';
 
 // Sentence-case a raw status token for display: "IN_TRANSIT" → "In transit".
 const titleCase = (s?: string) =>
@@ -151,9 +154,9 @@ export default function Bookings() {
 
     if (newStatus === 'CANCELLED' && !['PENDING', 'LOADING'].includes(currentStatus)) {
       setConfirmOpts({
-        title: 'Cancel Load',
+        title: 'Cancel load',
         message: `Cancel this load? The load is currently ${currentStatus.replace('_', ' ')}. This action is difficult to reverse.`,
-        confirmLabel: 'Cancel Load',
+        confirmLabel: 'Cancel load',
         danger: true,
         onConfirm: async () => {
           try {
@@ -276,9 +279,17 @@ export default function Bookings() {
   if (isLoading) return <Loader fullScreen />;
 
   if (!load) return (
-    <div style={{ padding: 40 }}>
-      <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Load not found.</div>
-      <button className="btn-action" style={{ marginTop: 16 }} onClick={() => navigate('/bookings')}>← Back</button>
+    <div className="bk-detail">
+      <button type="button" className="bk-back" onClick={() => navigate('/bookings/orders')}>
+        <ArrowLeft size={16} aria-hidden="true" /> Back to orders
+      </button>
+      <div className="bk-card">
+        <div className="bk-empty" style={{ padding: 16 }}>
+          <h1 className="bk-empty__title">Load not found</h1>
+          <p className="bk-empty__text">It may have been removed, or the link is out of date.</p>
+          <button type="button" className="bk-btn bk-btn--primary" onClick={() => navigate('/bookings/orders')}>View orders</button>
+        </div>
+      </div>
     </div>
   );
 
@@ -293,32 +304,38 @@ export default function Bookings() {
 
   return (
     <>
-    <div>
+    <div className="bk-detail bookings-typography">
       {/* Header */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <button onClick={() => navigate('/bookings')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, marginBottom: 8, padding: 0 }}>← Back to loads</button>
-          <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Load Detail</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{load.load_number}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{load.customer_name}</div>
+      <button type="button" className="bk-back" onClick={() => navigate('/bookings')}>
+        <ArrowLeft size={16} aria-hidden="true" /> Back to orders
+      </button>
+      <div className="bk-detail-header">
+        <div className="bk-detail-header__titles">
+          <div className="bk-eyebrow">Bookings · Order</div>
+          <div className="bk-title-row">
+            <h1 className="bk-title">{load.load_number}</h1>
+            <span className={`bk-status bk-status--${STATUS_TONE[load.status] || 'neutral'}`}>{titleCase(load.status)}</span>
+          </div>
+          <p className="bk-subtitle">{load.customer_name}</p>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
-          <Select value={load.status} onValueChange={updateStatus} disabled={billingBlocked}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={load.status}>{titleCase(load.status)}</SelectItem>
-              {allowedNextStatuses.map(s => <SelectItem key={s} value={s}>{titleCase(s)}</SelectItem>)}
-            </SelectContent>
-          </Select>
+        <div className="bk-detail-header__actions" style={{ flexDirection: 'column', alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="bk-field__label" id="load-status-label">Status</span>
+            <Select value={load.status} onValueChange={updateStatus} disabled={billingBlocked}>
+              <SelectTrigger aria-labelledby="load-status-label" style={{ minWidth: 160, minHeight: 40 }}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={load.status}>{titleCase(load.status)}</SelectItem>
+                {allowedNextStatuses.map(s => <SelectItem key={s} value={s}>{titleCase(s)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           {billingBlocked && (
-            <div style={{ fontSize: 11, color: 'var(--status-danger-text, var(--status-danger))', textAlign: 'right', maxWidth: 220 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+            <p className="bk-help bk-help--danger" style={{ textAlign: 'right', maxWidth: 260 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
               Status changes are blocked —{' '}
-              <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/settings/billing')}>
-                go to billing
-              </span>
-            </div>
+              <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>go to billing</button>
+            </p>
           )}
         </div>
       </div>
@@ -328,8 +345,8 @@ export default function Bookings() {
         const STEPS = ['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED'];
         const currentIdx = STEPS.indexOf(load.status);
         return (
-          <div className="card" style={{ padding: '12px 20px', marginBottom: 20 }}>
-            <div style={{ display: 'flex', gap: 0 }}>
+          <div className="bk-card bk-stepper" style={{ padding: '16px 24px', marginBottom: 24 }}>
+            <ol aria-label="Order progress" style={{ display: 'flex', gap: 0, listStyle: 'none', margin: 0, padding: 0 }}>
               {STEPS.map((step, stepIdx) => {
                 const isActive = stepIdx === currentIdx;
                 const isPast   = stepIdx <= currentIdx;
@@ -338,87 +355,99 @@ export default function Bookings() {
                 // blocks skipping ahead, since VALID_TRANSITIONS only ever
                 // lists the immediate next step(s).
                 const isClickable = !billingBlocked && allowedNextStatuses.includes(step);
+                const label = titleCase(step);
+                const dot = (
+                  <span style={{
+                    width: isActive ? 12 : 10,
+                    height: isActive ? 12 : 10,
+                    borderRadius: '50%',
+                    background: isPast ? 'var(--accent-primary)' : 'var(--border-active)',
+                    boxShadow: isActive ? '0 0 0 4px var(--accent-glow)' : (isClickable ? '0 0 0 3px var(--accent-glow)' : 'none'),
+                    transition: 'all 0.3s',
+                  }} />
+                );
+                const text = (
+                  <span style={{
+                    fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)',
+                    color: isActive ? 'var(--text-primary)' : isPast ? 'var(--text-secondary)' : (isClickable ? 'var(--accent-primary)' : 'var(--text-secondary)'),
+                    fontWeight: isActive ? 600 : 400,
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {label}
+                  </span>
+                );
                 return (
-                  <div key={step} style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                    <div style={{ flex: 1, height: 3, background: isPast ? 'var(--accent-primary)' : 'var(--border-subtle)', transition: 'background 0.3s' }} />
-                    <div
-                      onClick={isClickable ? () => updateStatus(step) : undefined}
-                      title={isClickable ? `Mark as ${titleCase(step)}` : undefined}
-                      style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '0 8px',
-                        cursor: isClickable ? 'pointer' : 'default',
-                      }}
-                    >
-                      <div style={{
-                        width: isActive ? 12 : 10,
-                        height: isActive ? 12 : 10,
-                        borderRadius: '50%',
-                        background: isPast ? 'var(--accent-primary)' : 'var(--border-subtle)',
-                        boxShadow: isActive ? '0 0 0 3px rgba(77,158,255,0.25)' : (isClickable ? '0 0 0 3px rgba(77,158,255,0.12)' : 'none'),
-                        transition: 'all 0.3s',
-                      }} />
-                      <div style={{
-                        fontSize: 9, fontFamily: 'var(--font-mono)',
-                        color: isPast ? 'var(--accent-primary)' : (isClickable ? 'var(--text-secondary)' : 'var(--text-tertiary)'),
-                        fontWeight: isActive ? 600 : 400,
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {step.replace('_', ' ')}
-                      </div>
-                    </div>
-                  </div>
+                  <li key={step} aria-current={isActive ? 'step' : undefined} style={{ flex: 1, display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                    <span aria-hidden="true" style={{ flex: 1, height: 2, background: isPast ? 'var(--accent-primary)' : 'var(--border-subtle)', transition: 'background 0.3s' }} />
+                    {isClickable ? (
+                      <button
+                        type="button"
+                        onClick={() => updateStatus(step)}
+                        title={`Mark as ${label}`}
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '4px 8px', minHeight: 40, background: 'none', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                      >
+                        {dot}{text}
+                      </button>
+                    ) : (
+                      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '4px 8px' }}>
+                        {dot}{text}
+                      </span>
+                    )}
+                  </li>
                 );
               })}
-            </div>
+            </ol>
           </div>
         );
       })()}
 
       {/* Key metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="bk-metrics bk-metrics--money">
         {[
-          { label: 'Total Amount', value: formatCurrency(parseFloat(load.total_amount || '0')), color: 'var(--accent-primary)' },
-          { label: 'Distance', value: `${parseFloat(load.distance || '0').toFixed(0)} km`, color: 'var(--text-primary)' },
-          { label: 'Weight', value: `${parseFloat(load.weight || '0').toFixed(0)} kg`, color: 'var(--text-primary)' },
-          { label: 'Rate/km', value: `R ${(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)).toFixed(2)}`, color: 'var(--text-primary)' },
+          { label: 'Total amount', value: formatCurrency(parseFloat(load.total_amount || '0')) },
+          { label: 'Distance', value: `${parseFloat(load.distance || '0').toFixed(0)} km` },
+          { label: 'Weight', value: `${parseFloat(load.weight || '0').toFixed(0)} kg` },
+          { label: 'Rate per km', value: `R ${(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)).toFixed(2)}` },
         ].map(m => (
           <div key={m.label} className="card metric-card">
             <div className="card-header"><span className="card-title">{m.label}</span></div>
-            <div className="metric-value" style={{ fontSize: 20, color: m.color }}>{m.value}</div>
+            <div className="metric-value" style={{ color: 'var(--text-primary)' }}>{m.value}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div className="bk-detail-grid">
         {/* Route */}
-        <div className="card" style={{ padding: 20 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>Route</div>
+        <section className="bk-card" aria-labelledby="bk-route-title">
+          <div className="bk-card__head"><h2 className="bk-card__title" id="bk-route-title">Route</h2></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
-              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>PICKUP</div>
-              <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{load.pickup_location}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{load.pickup_city}, {load.pickup_state}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>{fmt(load.pickup_date)}</div>
+              <div className="bk-field__label">Pickup</div>
+              <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontWeight: 500 }}>{load.pickup_location}</div>
+              <div className="bk-help">{load.pickup_city}, {load.pickup_state}</div>
+              <div className="bk-help">{fmt(load.pickup_date)}</div>
             </div>
             {Array.isArray(load.stops) && load.stops.length > 0 && (
-              <div style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>STOPS ({load.stops.length})</div>
+              <div style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div className="bk-field__label">Stops ({load.stops.length})</div>
                 {load.stops.map((s: { location: string }, i: number) => (
-                  <div key={i} style={{ fontSize: 13, color: 'var(--text-primary)', display: 'flex', gap: 8 }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>{i + 1}</span>
+                  <div key={i} style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', display: 'flex', gap: 8 }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
                     {s.location}
                   </div>
                 ))}
               </div>
             )}
-            <div style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{load.cargo_description}</div>
-            </div>
+            {load.cargo_description && (
+              <div style={{ borderLeft: '2px dashed var(--border-subtle)', marginLeft: 8, paddingLeft: 16 }}>
+                <p className="bk-help">{load.cargo_description}</p>
+              </div>
+            )}
             <div>
-              <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: 4 }}>DELIVERY</div>
-              <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{load.delivery_location}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{load.delivery_city}, {load.delivery_state}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>{fmt(load.delivery_date)}</div>
+              <div className="bk-field__label">Delivery</div>
+              <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontWeight: 500 }}>{load.delivery_location}</div>
+              <div className="bk-help">{load.delivery_city}, {load.delivery_state}</div>
+              <div className="bk-help">{fmt(load.delivery_date)}</div>
             </div>
           </div>
 
@@ -431,7 +460,7 @@ export default function Bookings() {
               deliveryCoords={load.delivery_lat ? { lat: Number(load.delivery_lat), lon: Number(load.delivery_lng) } : undefined}
               stops={Array.isArray(load.stops) ? load.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
               geometry={Array.isArray(load.route_geometry) && load.route_geometry.length > 1 ? load.route_geometry.map((p: { lat: number; lon: number }) => [Number(p.lat), Number(p.lon)] as [number, number]) : undefined}
-              dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 4, boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
+              dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 12, boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
               currentLocation={
                 vehicleDetail?.latitude && vehicleDetail?.longitude
                   ? { lat: parseFloat(vehicleDetail.latitude), lon: parseFloat(vehicleDetail.longitude) }
@@ -444,8 +473,8 @@ export default function Bookings() {
               }
               height={220}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+              <p className="bk-help">
                 {!load.vehicle
                   ? 'No vehicle assigned yet'
                   : !vehicleDetail?.ctrlfleet_vehicle_code
@@ -453,56 +482,57 @@ export default function Bookings() {
                     : vehicleDetail?.last_location_at
                       ? `Last synced ${new Date(vehicleDetail.last_location_at).toLocaleString()}`
                       : 'Linked to CtrlFleet — no position synced yet'}
-              </div>
+              </p>
               {load.vehicle && vehicleDetail?.ctrlfleet_vehicle_code && (
                 <button
+                  type="button"
                   onClick={handleSyncLocation}
                   disabled={syncingLocation}
-                  className="btn-action"
-                  style={{ fontSize: 10 }}
+                  className="bk-btn bk-btn--secondary"
                 >
-                  {syncingLocation ? 'SYNCING...' : 'SYNC LOCATION'}
+                  {syncingLocation ? 'Syncing…' : 'Sync location'}
                 </button>
               )}
             </div>
           </div>
-        </div>
+        </section>
 
         {/* Right column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="bk-stack">
           {/* Financials */}
-          <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 12 }}>Financials</div>
+          <section className="bk-card" aria-labelledby="bk-fin-title">
+            <div className="bk-card__head"><h2 className="bk-card__title" id="bk-fin-title">Financials</h2></div>
             {[
-              { label: 'Base Rate', value: formatCurrency(parseFloat(load.rate || '0')) },
-              { label: 'Fuel Surcharge', value: formatCurrency(parseFloat(load.fuel_surcharge || '0')) },
-              { label: 'Additional', value: formatCurrency(parseFloat(load.additional_charges || '0')) },
-              { label: 'Total', value: formatCurrency(parseFloat(load.total_amount || '0')), highlight: true },
+              { label: 'Base rate', value: formatCurrency(parseFloat(load.rate || '0')) },
+              { label: 'Fuel surcharge', value: formatCurrency(parseFloat(load.fuel_surcharge || '0')) },
+              { label: 'Additional charges', value: formatCurrency(parseFloat(load.additional_charges || '0')) },
             ].map(r => (
-              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.label}</span>
-                <span style={{ fontSize: 12, color: r.highlight ? 'var(--accent-primary)' : 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontWeight: r.highlight ? 600 : 400 }}>{r.value}</span>
+              <div key={r.label} className="bk-kv">
+                <span className="bk-kv__label">{r.label}</span>
+                <span className="bk-kv__value">{r.value}</span>
               </div>
             ))}
-          </div>
+            <div className="bk-kv bk-kv--total">
+              <span className="bk-kv__label">Total</span>
+              <span className="bk-kv__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</span>
+            </div>
+          </section>
 
           {/* Actions — nothing to do here before the load has a vehicle, so
               hide the whole card until it's at least Assigned. Invoicing
               itself is automatic on delivery (see convert_to_invoice from
               the delivery signal) — no manual "create invoice" trigger. */}
           {load.status !== 'PENDING' && (
-            <div className="card" style={{ padding: 20 }}>
-              <div className="card-title" style={{ marginBottom: 16 }}>Actions</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <section className="bk-card" aria-labelledby="bk-actions-title">
+              <div className="bk-card__head"><h2 className="bk-card__title" id="bk-actions-title">Actions</h2></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {hasInvoice && (
                   <button
-                    className="btn-action"
-                    style={{ width: '100%', background: 'var(--status-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                    type="button"
+                    className="bk-btn bk-btn--success bk-btn--block"
                     onClick={() => navigate(`/finance/invoices/${invoiceId}`)}
                   >
-                    <span>✓ Invoice created</span>
-                    <span style={{ opacity: 0.7, fontSize: 10 }}>—</span>
-                    <span>See invoice →</span>
+                    Invoice created — view invoice
                   </button>
                 )}
 
@@ -514,48 +544,32 @@ export default function Bookings() {
                   onChange={e => { if (e.target.files?.[0]) uploadPOD(e.target.files[0]); }}
                 />
                 <button
+                  type="button"
+                  className={`bk-btn bk-btn--block ${hasPOD ? 'bk-btn--success-outline' : 'bk-btn--secondary'}`}
                   onClick={() => (hasPOD ? setPodPreviewOpen(true) : fileRef.current?.click())}
                   disabled={podButtonUploading}
-                  style={{
-                    width: '100%',
-                    padding: '10px 16px',
-                    background: hasPOD ? 'var(--status-success-dim)' : 'var(--bg-surface)',
-                    border: `1px solid ${hasPOD ? 'var(--status-success)' : 'var(--border-subtle)'}`,
-                    color: hasPOD ? 'var(--status-success)' : 'var(--text-secondary)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
-                    letterSpacing: '0.08em',
-                    cursor: podButtonUploading ? 'not-allowed' : 'pointer',
-                    opacity: podButtonUploading ? 0.6 : 1,
-                    borderRadius: 2,
-                  }}
                 >
-                  {podButtonUploading ? 'UPLOADING…' : hasPOD ? `✓ POD: ${load.pod_received_by || 'Uploaded'}` : '↑ Upload POD'}
+                  {podButtonUploading ? 'Uploading…' : hasPOD ? `View POD — ${load.pod_received_by || 'uploaded'}` : <><Upload size={16} aria-hidden="true" /> Upload POD</>}
                 </button>
               </div>
-            </div>
+            </section>
           )}
 
           {/* Assignment */}
-          <div className="card" style={{ padding: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div className="card-title">Assignment</div>
+          <section className="bk-card" aria-labelledby="bk-assign-title">
+            <div className="bk-card__head">
+              <h2 className="bk-card__title" id="bk-assign-title">Assignment</h2>
               {!editingAssignment && !billingBlocked && !assignmentLocked && (
-                <button
-                  onClick={startEditAssignment}
-                  style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', cursor: 'pointer', padding: 0 }}
-                >
-                  EDIT
+                <button type="button" className="bk-btn bk-btn--secondary" onClick={startEditAssignment} style={{ margin: '-8px 0' }}>
+                  Edit
                 </button>
               )}
             </div>
             {billingBlocked && (
-              <div style={{ fontSize: 11, color: 'var(--status-danger-text, var(--status-danger))', marginBottom: 8 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+              <p className="bk-help bk-help--danger" style={{ marginBottom: 8 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
                 Assignment is locked —{' '}
-                <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/settings/billing')}>
-                  go to billing
-                </span>
-              </div>
+                <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>go to billing</button>
+              </p>
             )}
 
             {!editingAssignment || assignmentLocked ? (
@@ -563,17 +577,17 @@ export default function Bookings() {
                 { label: 'Vehicle', value: load.vehicle_info || '—' },
                 { label: 'Driver', value: load.driver_name || '—' },
               ].map(r => (
-                <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.label}</span>
-                  <span style={{ fontSize: 12, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{r.value}</span>
+                <div key={r.label} className="bk-kv">
+                  <span className="bk-kv__label">{r.label}</span>
+                  <span className="bk-kv__value">{r.value}</span>
                 </div>
               ))
             ) : (
               <>
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Vehicle</div>
+                <div className="bk-field">
+                  <span className="bk-field__label" id="bk-assign-vehicle">Vehicle</span>
                   <Select value={assignVehicleId} onValueChange={setAssignVehicleId}>
-                    <SelectTrigger><SelectValue placeholder="— No vehicle —" /></SelectTrigger>
+                    <SelectTrigger aria-labelledby="bk-assign-vehicle"><SelectValue placeholder="No vehicle" /></SelectTrigger>
                     <SelectContent>
                       {assignableVehicles.map(v => (
                         <SelectItem key={v.id} value={String(v.id)}>
@@ -583,10 +597,10 @@ export default function Bookings() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Driver (optional)</div>
+                <div className="bk-field">
+                  <span className="bk-field__label" id="bk-assign-driver">Driver (optional)</span>
                   <Select value={assignDriverId} onValueChange={setAssignDriverId}>
-                    <SelectTrigger><SelectValue placeholder="— No driver —" /></SelectTrigger>
+                    <SelectTrigger aria-labelledby="bk-assign-driver"><SelectValue placeholder="No driver" /></SelectTrigger>
                     <SelectContent>
                       {assignableDrivers.map(d => (
                         <SelectItem key={d.id} value={String(d.id)}>
@@ -597,29 +611,31 @@ export default function Bookings() {
                   </Select>
                 </div>
                 {(!!assignDriverId && !assignVehicleId) && (
-                  <div style={{ fontSize: 11, color: 'var(--status-warning-text, var(--status-warning))', marginBottom: 8 }}>
+                  <p className="bk-help bk-help--warning" style={{ marginBottom: 8 }}>
                     A driver needs a vehicle — select a vehicle too, or clear the driver.
-                  </div>
+                  </p>
                 )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button
-                    className="btn-action"
-                    style={{ flex: 1, opacity: assignSaving || (!!assignDriverId && !assignVehicleId) ? 0.6 : 1 }}
+                    type="button"
+                    className="bk-btn bk-btn--primary"
+                    style={{ flex: 1 }}
                     disabled={assignSaving || (!!assignDriverId && !assignVehicleId)}
                     onClick={saveAssignment}
                   >
-                    {assignSaving ? 'Saving…' : 'Save'}
+                    {assignSaving ? 'Saving…' : 'Save assignment'}
                   </button>
                   <button
+                    type="button"
+                    className="bk-btn bk-btn--secondary"
                     onClick={() => setEditingAssignment(false)}
-                    style={{ padding: '10px 16px', background: 'none', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer' }}
                   >
                     Cancel
                   </button>
                 </div>
               </>
             )}
-          </div>
+          </section>
         </div>
       </div>
     </div>
@@ -636,23 +652,17 @@ export default function Bookings() {
     )}
 
     {assignModalOpen && (
-      <div
-        style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
-        onClick={() => setAssignModalOpen(false)}
-      >
-        <div
-          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 4, padding: 28, maxWidth: 420, width: '100%', boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
-          onClick={e => e.stopPropagation()}
-        >
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>Assign Driver & Vehicle</div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
+      <div className="bk-dialog-backdrop" onClick={() => setAssignModalOpen(false)}>
+        <div className="bk-dialog" role="dialog" aria-modal="true" aria-labelledby="bk-assign-dialog-title" onClick={e => e.stopPropagation()}>
+          <h2 className="bk-dialog__title" id="bk-assign-dialog-title">Assign driver and vehicle</h2>
+          <p className="bk-dialog__body">
             This order needs a vehicle before it can be marked <b>Assigned</b>. A driver is optional.
-          </div>
+          </p>
 
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Vehicle</div>
+          <div className="bk-field">
+            <span className="bk-field__label" id="bk-modal-vehicle">Vehicle</span>
             <Select value={assignVehicleId} onValueChange={setAssignVehicleId}>
-              <SelectTrigger><SelectValue placeholder="Select vehicle…" /></SelectTrigger>
+              <SelectTrigger aria-labelledby="bk-modal-vehicle"><SelectValue placeholder="Select vehicle…" /></SelectTrigger>
               <SelectContent>
                 {assignableVehicles.map(v => (
                   <SelectItem key={v.id} value={String(v.id)}>
@@ -662,14 +672,14 @@ export default function Bookings() {
               </SelectContent>
             </Select>
             {assignableVehicles.length === 0 && (
-              <div style={{ fontSize: 11, color: 'var(--status-warning-text, var(--status-warning))', marginTop: 5 }}>No available vehicles — check the Fleet page.</div>
+              <p className="bk-help bk-help--warning">No available vehicles — check the Fleet page.</p>
             )}
           </div>
 
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 5 }}>Driver (optional)</div>
+          <div className="bk-field" style={{ marginBottom: 0 }}>
+            <span className="bk-field__label" id="bk-modal-driver">Driver (optional)</span>
             <Select value={assignDriverId} onValueChange={setAssignDriverId}>
-              <SelectTrigger><SelectValue placeholder="Select driver…" /></SelectTrigger>
+              <SelectTrigger aria-labelledby="bk-modal-driver"><SelectValue placeholder="Select driver…" /></SelectTrigger>
               <SelectContent>
                 {assignableDrivers.map(d => (
                   <SelectItem key={d.id} value={String(d.id)}>
@@ -679,28 +689,21 @@ export default function Bookings() {
               </SelectContent>
             </Select>
             {assignableDrivers.length === 0 && (
-              <div style={{ fontSize: 11, color: 'var(--status-warning-text, var(--status-warning))', marginTop: 5 }}>No available drivers — check the Fleet page.</div>
+              <p className="bk-help bk-help--warning">No available drivers — check the Fleet page.</p>
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-            <button
-              onClick={() => setAssignModalOpen(false)}
-              style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', cursor: 'pointer' }}
-            >
-              CANCEL
+          <div className="bk-dialog__footer">
+            <button type="button" className="bk-btn bk-btn--secondary" onClick={() => setAssignModalOpen(false)}>
+              Cancel
             </button>
             <button
+              type="button"
+              className="bk-btn bk-btn--primary"
               onClick={submitAssignAndActivate}
               disabled={assignSaving || !assignVehicleId}
-              style={{
-                padding: '8px 18px', background: 'var(--accent-primary)', border: 'none', color: '#fff',
-                borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.06em',
-                cursor: (assignSaving || !assignVehicleId) ? 'not-allowed' : 'pointer',
-                opacity: (assignSaving || !assignVehicleId) ? 0.5 : 1,
-              }}
             >
-              {assignSaving ? 'ASSIGNING…' : 'ASSIGN & SET ASSIGNED'}
+              {assignSaving ? 'Assigning…' : 'Assign and mark assigned'}
             </button>
           </div>
         </div>
@@ -708,18 +711,12 @@ export default function Bookings() {
     )}
 
     {podModalOpen && (
-      <div
-        style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
-        onClick={() => (!podUploading && !podSkipping) && setPodModalOpen(false)}
-      >
-        <div
-          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 4, padding: 28, maxWidth: 420, width: '100%', boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
-          onClick={e => e.stopPropagation()}
-        >
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 10 }}>Proof of Delivery</div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
+      <div className="bk-dialog-backdrop" onClick={() => (!podUploading && !podSkipping) && setPodModalOpen(false)}>
+        <div className="bk-dialog" role="dialog" aria-modal="true" aria-labelledby="bk-pod-dialog-title" onClick={e => e.stopPropagation()}>
+          <h2 className="bk-dialog__title" id="bk-pod-dialog-title">Proof of delivery</h2>
+          <p className="bk-dialog__body">
             Attach a POD before marking this order <b>Delivered</b>, or skip and mark it delivered anyway.
-          </div>
+          </p>
 
           <input
             ref={podModalFileRef}
@@ -729,37 +726,30 @@ export default function Bookings() {
             onChange={e => { if (e.target.files?.[0]) uploadPODFromModal(e.target.files[0]); }}
           />
           <button
+            type="button"
+            className="bk-btn bk-btn--secondary bk-btn--block"
             onClick={() => podModalFileRef.current?.click()}
             disabled={podUploading || podSkipping}
-            style={{
-              width: '100%', padding: '12px 16px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-              color: 'var(--text-primary)', borderRadius: 2, fontSize: 12, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
-              cursor: (podUploading || podSkipping) ? 'not-allowed' : 'pointer', opacity: (podUploading || podSkipping) ? 0.6 : 1,
-              marginBottom: 20,
-            }}
           >
-            {podUploading ? 'UPLOADING…' : '↑ UPLOAD POD & SET DELIVERED'}
+            {podUploading ? 'Uploading…' : <><Upload size={16} aria-hidden="true" /> Upload POD and mark delivered</>}
           </button>
 
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <div className="bk-dialog__footer">
             <button
+              type="button"
+              className="bk-btn bk-btn--secondary"
               onClick={() => setPodModalOpen(false)}
               disabled={podUploading || podSkipping}
-              style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', cursor: (podUploading || podSkipping) ? 'not-allowed' : 'pointer' }}
             >
-              CANCEL
+              Cancel
             </button>
             <button
+              type="button"
+              className="bk-btn bk-btn--primary"
               onClick={skipPodMarkDelivered}
               disabled={podUploading || podSkipping}
-              style={{
-                padding: '8px 18px', background: 'var(--accent-primary)', border: 'none', color: '#fff',
-                borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.06em',
-                cursor: (podUploading || podSkipping) ? 'not-allowed' : 'pointer',
-                opacity: (podUploading || podSkipping) ? 0.5 : 1,
-              }}
             >
-              {podSkipping ? 'UPDATING…' : 'SKIP & SET DELIVERED'}
+              {podSkipping ? 'Updating…' : 'Skip and mark delivered'}
             </button>
           </div>
         </div>
@@ -767,30 +757,24 @@ export default function Bookings() {
     )}
 
     {podPreviewOpen && (
-      <div
-        style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
-        onClick={() => setPodPreviewOpen(false)}
-      >
+      <div className="bk-dialog-backdrop" onClick={() => setPodPreviewOpen(false)}>
         <div
-          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 4, padding: 24, maxWidth: 640, width: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
+          className="bk-dialog"
+          role="dialog" aria-modal="true" aria-labelledby="bk-pod-preview-title"
+          style={{ maxWidth: 640, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
           onClick={e => e.stopPropagation()}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Proof of Delivery</div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                {load.pod_received_by || 'Received'}
-              </div>
+              <h2 className="bk-dialog__title" id="bk-pod-preview-title" style={{ marginBottom: 0 }}>Proof of delivery</h2>
+              <p className="bk-help">{load.pod_received_by || 'Received'}</p>
             </div>
-            <button
-              onClick={() => setPodPreviewOpen(false)}
-              style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}
-            >
-              ×
+            <button type="button" className="bk-icon-btn" aria-label="Close" onClick={() => setPodPreviewOpen(false)} style={{ margin: '-8px -8px 0 0' }}>
+              <X size={20} aria-hidden="true" />
             </button>
           </div>
 
-          <div style={{ flex: 1, overflow: 'auto', background: 'var(--bg-canvas, #f4f4f5)', borderRadius: 2, border: '1px solid var(--border-subtle)' }}>
+          <div style={{ flex: 1, overflow: 'auto', background: 'var(--bg-deep)', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
             {load.pod_document ? (
               /\.pdf($|\?)/i.test(load.pod_document) ? (
                 <iframe src={load.pod_document} title="POD document" style={{ width: '100%', height: '60vh', border: 'none' }} />
@@ -798,26 +782,22 @@ export default function Bookings() {
                 <img src={load.pod_document} alt="Proof of delivery" style={{ width: '100%', height: 'auto', display: 'block' }} />
               )
             ) : (
-              <div style={{ padding: 24, fontSize: 12, color: 'var(--text-tertiary)' }}>No document file was attached — only a receipt name is on record.</div>
+              <p className="bk-help" style={{ padding: 24 }}>No document file was attached — only a receipt name is on record.</p>
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+          <div className="bk-dialog__footer" style={{ marginTop: 16 }}>
             {load.pod_document && (
-              <a
-                href={load.pod_document}
-                target="_blank"
-                rel="noreferrer"
-                style={{ padding: '8px 18px', background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textDecoration: 'none' }}
-              >
-                OPEN IN NEW TAB
+              <a className="bk-btn bk-btn--secondary" href={load.pod_document} target="_blank" rel="noreferrer">
+                Open in new tab
               </a>
             )}
             <button
+              type="button"
+              className="bk-btn bk-btn--primary"
               onClick={() => { setPodPreviewOpen(false); fileRef.current?.click(); }}
-              style={{ padding: '8px 18px', background: 'var(--accent-primary)', border: 'none', color: '#fff', borderRadius: 2, fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: '0.06em', cursor: 'pointer' }}
             >
-              REPLACE
+              Replace POD
             </button>
           </div>
         </div>

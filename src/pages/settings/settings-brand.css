@@ -12,3 +12,82 @@
   outline: 2px solid var(--accent-primary);
   outline-offset: -2px;
 }
+
+/* ---- Switch (role=switch) ------------------------------------------------
+   40x24 track. Off: outlined track, muted knob left. On: accent track,
+   contrasting knob right. Both states clear 3:1 against the card surface. */
+.settings-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 24px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  box-sizing: border-box;
+}
+.settings-switch[data-state="on"] {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+.settings-switch:disabled { cursor: not-allowed; }
+.settings-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  transition: left 0.15s, background 0.15s;
+}
+.settings-switch[data-state="on"] .settings-switch-knob {
+  left: 19px;
+  background: var(--btn-action-color, #fff);
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-switch, .settings-switch-knob { transition: none; }
+}
+
+/* ---- Tables --------------------------------------------------------------
+   App-wide cell rhythm is 12px 16px; the outer columns take 20px so cell
+   text lines up with the 20px card header above the table. */
+table.settings-table { width: 100%; border-collapse: collapse; }
+table.settings-table th,
+table.settings-table td { padding: 12px 16px; vertical-align: middle; }
+table.settings-table th:first-child,
+table.settings-table td:first-child { padding-left: 20px; }
+table.settings-table th:last-child,
+table.settings-table td:last-child { padding-right: 20px; }
+table.settings-table th { border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
+table.settings-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---- Mobile fields -------------------------------------------------------
+   One rule for every settings section: 40px/14px controls on desktop,
+   48px/16px under 640px so iOS does not zoom into focused fields. */
+@media (max-width: 640px) {
+  .tw-settings-shell :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea, [role="combobox"]) {
+    font-size: 16px !important;
+    line-height: 24px !important;
+    min-height: 48px !important;
+  }
+}
+
+/* Row-selection checkboxes share one size and the accent across tables. */
+table.settings-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  vertical-align: middle;
+  accent-color: var(--accent-primary);
+}
+
+/* Tables nested inside an already-padded panel drop the outer 20px. */
+table.settings-table.is-inset :is(th, td):first-child { padding-left: 0; }
+table.settings-table.is-inset :is(th, td):last-child { padding-right: 0; }
+
+/* Toggle rows divide each other; the card border closes the last one. */
+.settings-toggle-row + .settings-toggle-row { border-top: 1px solid var(--border-row); }

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { fetchData, postData } from '@/lib/Api';
+import { History } from 'lucide-react';
 
 interface Suggestion {
   label: string;
@@ -151,11 +152,12 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
     border: 'none',
     padding: 0,
     marginTop: 4,
-    fontFamily: 'var(--font-mono)',
-    fontSize: 10,
+    fontFamily: 'var(--font-sans)',
+    fontSize: 13,
+    lineHeight: '20px',
     color: 'var(--accent-primary)',
     cursor: 'pointer',
-    letterSpacing: '0.04em',
+    letterSpacing: 'normal',
     display: 'block',
     textAlign: 'right' as const,
   };
@@ -216,8 +218,8 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
         <div style={{
           position: 'absolute', right: 10, top: '50%',
           transform: 'translateY(-50%)',
-          fontSize: 10, color: 'var(--text-tertiary)',
-          fontFamily: 'var(--font-mono)', pointerEvents: 'none',
+          fontSize: 13, color: 'var(--text-secondary)',
+          fontFamily: 'var(--font-sans)', pointerEvents: 'none',
         }}>
           ...
         </div>
@@ -228,7 +230,7 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
           background: 'var(--bg-surface)',
           border: '1px solid var(--border-subtle)',
           borderTop: 'none',
-          borderRadius: '0 0 4px 4px',
+          borderRadius: '0 0 6px 6px',
           zIndex: 1100, maxHeight: 220, overflowY: 'auto',
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         }}>
@@ -238,30 +240,30 @@ export function LocationInput({ value, onChange, placeholder, style, onFocus, re
               onMouseDown={() => handleSelect(s)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                padding: '9px 12px', fontSize: 12, cursor: 'pointer',
-                color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
+                padding: '8px 12px', fontSize: 14, cursor: 'pointer',
+                color: 'var(--text-primary)', fontFamily: 'var(--font-sans)',
                 borderBottom: i < suggestions.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                lineHeight: 1.4,
+                lineHeight: '20px',
               }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-elevated)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-                {s.is_recent && <span title="Used before" style={{ flexShrink: 0, opacity: 0.6 }}>🕘</span>}
+                {s.is_recent && <span title="Used before" aria-label="Used before" style={{ flexShrink: 0, display: 'inline-flex', color: 'var(--text-secondary)' }}><History size={14} aria-hidden="true" /></span>}
                 {s.label}
               </span>
               {s.cross_border && (
                 <span
                   title={`Cross-border — ${s.country || 'outside South Africa'}`}
                   style={{
-                    flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
-                    padding: '2px 6px', borderRadius: 3,
+                    flexShrink: 0, fontSize: 12, lineHeight: '16px', fontWeight: 500, letterSpacing: 'normal',
+                    padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap',
                     color: 'var(--status-warning-text, var(--status-warning))',
                     background: 'color-mix(in srgb, var(--status-warning) 15%, transparent)',
                     border: '1px solid var(--status-warning)',
                   }}
                 >
-                  {(s.country_code || 'INTL').replace('ZAF', '')} · CROSS-BORDER
+                  {(s.country_code || 'INTL').replace('ZAF', '')} · Cross-border
                 </span>
               )}
             </div>
@@ -293,9 +295,9 @@ function ResolvedInfo({ text }: { text: string }) {
       {show && (
         <div style={{
           position: 'absolute', bottom: '100%', right: 0, zIndex: 20, marginBottom: 6,
-          background: '#fff', border: '1px solid var(--border-subtle)',
-          borderRadius: 4, padding: '8px 12px',
-          fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)',
+          background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
+          borderRadius: 6, padding: '8px 12px',
+          fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)',
           whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
           pointerEvents: 'none',
         }}>

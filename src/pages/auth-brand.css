@@ -1,0 +1,29 @@
+/* Auth pages (login, signup, OTP, password reset, email verification,
+   invite, onboarding) — scoped brand roles, see docs/brand/BRAND-GUIDELINES.md.
+   Opt-in by class; nothing here restyles the rest of the app. */
+
+/* The wordmark asset is dark ink on transparent. On the dark theme it needs
+   the same treatment the app header gives it (OSLayout.tsx) or it disappears
+   into the panel. Logged-out pages have no data-theme attribute and use the
+   dark :root tokens, hence the :not() form. */
+:root:not([data-theme="light"]) .tw-auth-logo { filter: invert(1) brightness(2); }
+
+/* Visible 2px keyboard focus ring at 3px offset — the auth inputs used to
+   ship `outline: none` with no replacement. */
+.tw-auth-control:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+
+/* Phones: 16px field text (no iOS focus zoom) and 48px touch targets for
+   every auth field, whichever layout the page renders (the large one-time
+   code field keeps its own 26px size). */
+@media (max-width: 640px) {
+  input.tw-auth-control:not([type="checkbox"]):not([type="radio"]):not(.tw-auth-code),
+  textarea.tw-auth-control,
+  select.tw-auth-control {
+    font-size: 16px !important;
+    line-height: 24px !important;
+    min-height: 48px !important;
+  }
+}

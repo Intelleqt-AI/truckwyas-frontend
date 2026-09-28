@@ -29,3 +29,11 @@
   .os-app-shell .dashboard-notification-trigger:focus-visible,
   .os-app-shell .dashboard-notification-mark-read:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 3px; }
 }
+
+/* Type roles apply at every width (phones previously fell back to the legacy
+   mono/uppercase defaults). Desktop geometry above is unchanged. */
+.os-app-shell .dashboard-notifications {
+  --note-font: var(--font-sans); --note-line: 20px; --note-tracking: normal; --note-case: none;
+  --note-title-size: 16px; --note-body-size: 14px; --note-support-size: 13px;
+  --note-label-weight: 500; --note-unread-weight: 500; --note-read-weight: 400;
+}

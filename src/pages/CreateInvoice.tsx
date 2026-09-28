@@ -1,4 +1,6 @@
 import './quote-invoice-roles.css';
+import './finance-brand.css';
+import { formatCurrency } from '@/lib/formatters';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -82,15 +84,15 @@ export default function CreateInvoice() {
   };
 
   return (
-    <div>
+    <div className="fin-page">
       <div style={{ marginBottom: 24 }}>
-        <button className="qi-action" onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', marginBottom: 8, padding: 0 }}>← Back</button>
-        <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Finance</div>
+        <button className="qi-action" onClick={() => navigate('/finance/invoices')} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px', fontWeight: 500, minHeight: 40, marginBottom: 8, padding: 0 }}>← Back to invoices</button>
+        <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', marginBottom: 4 }}>Finance</div>
         <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>New invoice</h1>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20 }}>
+        <div className="fin-create-grid">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="card" style={{ padding: 24, borderRadius: 8 }}>
               <h2 style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', margin: '0 0 16px' }}>Invoice details</h2>
@@ -116,7 +118,7 @@ export default function CreateInvoice() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label htmlFor="create-invoice-amount" style={labelStyle}>Amount (R)</label>
+                    <label htmlFor="create-invoice-amount" style={labelStyle}>Amount (ZAR)</label>
                     <input id="create-invoice-amount" className="qi-input" type="number" placeholder="0.00" value={form.amount} onChange={set('amount')} style={inputStyle} />
                   </div>
                   <div>
@@ -149,8 +151,8 @@ export default function CreateInvoice() {
             <div className="card" style={{ padding: 24, borderRadius: 8, minWidth: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Total</span>
-                <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--accent-primary)', minWidth: 0, overflowWrap: 'anywhere' }}>
-                  R {parseFloat(form.amount || '0').toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--text-primary)', minWidth: 0, overflowWrap: 'anywhere' }}>
+                  {formatCurrency(parseFloat(form.amount || '0') || 0)}
                 </span>
               </div>
             </div>

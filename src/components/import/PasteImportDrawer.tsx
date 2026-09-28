@@ -158,23 +158,23 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
   };
 
   const labelS: React.CSSProperties = {
-    fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-    letterSpacing: '0.08em', textTransform: 'uppercase',
+    fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)',
+    color: 'var(--text-secondary)', letterSpacing: 'normal', textTransform: 'none',
   };
 
   return (
     <div>
         {showHeading && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 20 }}>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>{sample.title}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+              <h2 style={{ margin: 0, fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>{sample.title}</h2>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 4 }}>
                 Paste the rows straight out of Excel or Google Sheets, or drop the file in.
               </div>
             </div>
             {onClose && (
-              <button onClick={close}
-                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>
+              <button onClick={close} aria-label="Close"
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 20, lineHeight: 1, width: 44, height: 44, margin: '-10px -10px 0 0', borderRadius: 6, flexShrink: 0 }}>
                 &times;
               </button>
             )}
@@ -191,16 +191,16 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
               onDrop={e => { e.preventDefault(); takeFile(e.dataTransfer.files?.[0]); }}
               onClick={() => fileRef.current?.click()}
               style={{
-                border: '1px dashed var(--border-subtle)', borderRadius: 4,
-                padding: '14px 16px', marginBottom: 14, cursor: 'pointer',
+                border: '1px dashed var(--border-subtle)', borderRadius: 6,
+                padding: '12px 16px', marginBottom: 16, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
               }}>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                 {fileName
                   ? <>Loaded <b>{fileName}</b> — check it below, or drop another file.</>
                   : <>Drop an Excel, CSV or PDF file here, or <span style={{ color: 'var(--accent-primary)' }}>browse</span></>}
               </div>
-              <span style={{ ...labelS, flexShrink: 0 }}>xlsx · csv · ods · pdf</span>
+              <span style={{ ...labelS, fontWeight: 400, flexShrink: 0 }}>XLSX · CSV · ODS · PDF</span>
             </div>
             <input
               ref={fileRef}
@@ -213,8 +213,8 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
             {fromPdf && (
               <div style={{
                 border: '1px solid var(--status-warning)', background: 'var(--status-warning-bg)',
-                borderRadius: 4, padding: '10px 14px', marginBottom: 12,
-                fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6,
+                borderRadius: 6, padding: '12px 16px', marginBottom: 12,
+                fontSize: 13, color: 'var(--text-primary)', lineHeight: '20px',
               }}>
                 A PDF stores text and its position, not a table, so the columns below were
                 worked out from the layout. Check them — and fix any that ran together —
@@ -229,19 +229,19 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
               placeholder={sample.example}
               style={{
                 width: '100%', minHeight: 240, background: 'var(--input-bg)',
-                border: '1px solid var(--border-subtle)', borderRadius: 4, padding: 12,
-                color: 'var(--text-primary)', fontSize: 12, fontFamily: 'var(--font-mono)',
+                border: '1px solid var(--border-subtle)', borderRadius: 6, padding: 12,
+                color: 'var(--text-primary)', fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-mono)',
                 outline: 'none', whiteSpace: 'pre', overflowX: 'auto',
               }}
             />
-            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8, lineHeight: '20px' }}>
               Include the heading row if you have one — we work out which column is which.
               <br />
               Columns we recognise: {sample.columns}
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
               <button className="btn-action" onClick={check} disabled={busy} style={{ flex: 1 }}>
-                {busy ? <Loader size={12} color="currentColor" /> : 'CHECK LIST'}
+                {busy ? <Loader size={16} color="currentColor" /> : 'Check list'}
               </button>
               {onClose && (
                 <button onClick={close}
@@ -257,14 +257,14 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
           <>
 
 
-            <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
-              <div style={{ maxHeight: 380, overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, overflow: 'hidden' }}>
+              <div style={{ maxHeight: 380, overflow: 'auto' }} role="region" aria-label="Import preview" tabIndex={0}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, lineHeight: '20px', fontVariantNumeric: 'tabular-nums' }}>
                   <thead>
                     <tr>
                       <th style={thS}>#</th>
                       {PREVIEW_FIELDS[entity].map(f => (
-                        <th key={f} style={thS}>{f.replace(/_/g, ' ')}</th>
+                        <th key={f} style={thS}>{sentenceCase(f)}</th>
                       ))}
                       <th style={thS}>Status</th>
                     </tr>
@@ -276,7 +276,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
                         {PREVIEW_FIELDS[entity].map(f => (
                           <td key={f} style={tdS}>{String(r.data?.[f] ?? '') || '—'}</td>
                         ))}
-                        <td style={{ ...tdS, color: r.ready ? 'var(--text-tertiary)' : 'var(--status-warning)' }}>
+                        <td style={{ ...tdS, color: r.ready ? 'var(--text-secondary)' : 'var(--status-warning-text, var(--status-warning))' }}>
                           {r.problems.length ? r.problems.join('; ') : (r.notes?.join('; ') || 'Ready')}
                         </td>
                       </tr>
@@ -289,12 +289,12 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
             {/* Under the table, not above it: by the time it is worth counting
                 them you have already read the rows. */}
             <div style={{
-              fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)',
-              marginTop: 10, display: 'flex', gap: 10, flexWrap: 'wrap',
+              fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums',
+              color: 'var(--text-secondary)', marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap',
             }}>
               <span>{preview.total} found</span>
               <span>·</span>
-              <span style={{ color: preview.ready ? 'var(--status-success)' : undefined }}>
+              <span style={{ color: preview.ready ? 'var(--status-success-text, var(--status-success))' : undefined }}>
                 {preview.ready} ready
               </span>
               {preview.needs_attention > 0 && (
@@ -308,7 +308,7 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
             </div>
 
             {preview.needs_attention > 0 && (
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6, lineHeight: 1.6 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8, lineHeight: '20px' }}>
                 Rows needing attention are skipped &mdash; the other {preview.ready} still
                 import. Fix them in your spreadsheet and paste again.
                 {preview.unmapped_columns?.length > 0 && (
@@ -318,9 +318,9 @@ export function PasteImportPanel({ entity, onImported, showHeading = true, onClo
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
               <button className="btn-action" onClick={commit} disabled={busy || preview.ready === 0} style={{ flex: 1 }}>
-                {busy ? <Loader size={12} color="currentColor" /> : `IMPORT ${preview.ready}`}
+                {busy ? <Loader size={16} color="currentColor" /> : `Import ${preview.ready}`}
               </button>
               <button onClick={() => setPreview(null)} disabled={busy}
                 style={secondaryButtonStyle}>
@@ -345,8 +345,12 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: {
   return (
     <div
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Import"
+      onKeyDown={e => { if (e.key === 'Escape') onClose(); }}
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200,
+        position: 'fixed', inset: 0, background: 'var(--modal-backdrop, rgba(0,0,0,0.4))', zIndex: 200,
         display: 'flex', justifyContent: 'flex-end',
       }}>
       <div
@@ -361,15 +365,22 @@ export function PasteImportDrawer({ entity, open, onClose, onImported }: {
   );
 }
 
+// "plate_number" → "Plate number" for column headings (field keys are unchanged).
+const sentenceCase = (k: string) => {
+  const t = k.replace(/_/g, ' ');
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+
 const thS: React.CSSProperties = {
-  textAlign: 'left', padding: '8px 10px', fontSize: 10, fontFamily: 'var(--font-mono)',
-  textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)',
+  textAlign: 'left', padding: '8px 12px', fontSize: 13, lineHeight: '20px', fontWeight: 500,
+  fontFamily: 'var(--font-sans)', textTransform: 'none', letterSpacing: 'normal',
+  color: 'var(--text-secondary)', whiteSpace: 'nowrap',
   borderBottom: '1px solid var(--border-subtle)', position: 'sticky', top: 0,
   background: 'var(--bg-surface)',
 };
 
 const tdS: React.CSSProperties = {
-  padding: '7px 10px', borderBottom: '1px solid var(--border-row)',
+  padding: '8px 12px', borderBottom: '1px solid var(--border-row)',
   color: 'var(--text-secondary)', verticalAlign: 'top',
 };
 

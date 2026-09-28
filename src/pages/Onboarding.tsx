@@ -1,3 +1,5 @@
+import "./auth-brand.css";
+import { Truck } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchData, patchData, postData } from "@/lib/Api";
@@ -100,23 +102,24 @@ export function Onboarding() {
 
   const lblSt: React.CSSProperties = {
     display: 'block',
-    fontSize: 11,
-    fontFamily: 'var(--font-mono)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-    color: 'var(--text-tertiary)',
+    fontSize: 13,
+    lineHeight: '20px',
+    fontWeight: 500,
+    fontFamily: 'var(--font-sans)',
+    color: 'var(--text-primary)',
     marginBottom: 6,
   };
 
   const inSt: React.CSSProperties = {
     width: '100%',
-    padding: '10px 14px',
+    padding: '8px 12px',
+    minHeight: 40,
     background: 'var(--input-bg)',
     border: '1px solid var(--border-subtle)',
-    borderRadius: 2,
+    borderRadius: 6,
     color: 'var(--text-primary)',
-    fontSize: 13,
-    outline: 'none',
+    fontSize: 14,
+    lineHeight: '20px',
     boxSizing: 'border-box',
   };
 
@@ -157,15 +160,15 @@ export function Onboarding() {
                   reads as a fault. */}
               {step > 1 && step < 4 && (
                 <button onClick={() => setStep(step - 1)} style={{
-                  background: 'none', border: 'none', color: 'var(--text-tertiary)',
-                  fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', padding: 0,
+                  background: 'none', border: 'none', color: 'var(--text-secondary)',
+                  fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer', padding: 0, minHeight: 40,
                 }}>
                   ← Back
                 </button>
               )}
             </div>
-            <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
-              STEP {step} OF 4
+            <span style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+              Step {step} of 4
             </span>
             {/* Nothing left to skip on the final screen — setup is already
                 done and "Go to dashboard" is the way out. */}
@@ -175,8 +178,8 @@ export function Onboarding() {
                 title={step === 2 || step === 3 ? 'Move on without importing' : 'Finish setup later'}
                 style={{
                   justifySelf: 'end',
-                  background: 'none', border: 'none', color: 'var(--text-tertiary)',
-                  fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', padding: 0,
+                  background: 'none', border: 'none', color: 'var(--text-secondary)',
+                  fontSize: 13, lineHeight: '20px', fontWeight: 500, fontFamily: 'var(--font-sans)', cursor: 'pointer', padding: 0, minHeight: 40,
                 }}>
                 {step === 2 || step === 3 ? 'Skip this →' : 'Skip →'}
               </button>
@@ -187,7 +190,7 @@ export function Onboarding() {
               height: '100%',
               width: `${(step / 4) * 100}%`,
               background: 'var(--accent-primary)',
-              borderRadius: 2,
+              borderRadius: 6,
               transition: 'width 0.3s ease',
             }} />
           </div>
@@ -197,10 +200,10 @@ export function Onboarding() {
         {step === 1 && (
           <div>
             <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-                Welcome to Truckwys
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+              <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
+                Welcome to TruckWys
+              </h1>
+              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                 Let's get your company set up
               </div>
             </div>
@@ -212,18 +215,18 @@ export function Onboarding() {
             ) : (
               <>
                 <div style={{ marginBottom: 16 }}>
-                  <label style={{
+                  <label htmlFor="onboarding-company-name" style={{
                     display: 'block',
-                    fontSize: 11,
-                    fontFamily: 'var(--font-mono)',
-                    textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em',
-                    color: 'var(--text-tertiary)',
-                    marginBottom: 8,
+                    fontSize: 13,
+                    lineHeight: '20px',
+                    fontWeight: 500,
+                    fontFamily: 'var(--font-sans)',
+                    color: 'var(--text-primary)',
+                    marginBottom: 6,
                   }}>
-                    Company Name *
+                    Company name *
                   </label>
-                  <input
+                  <input className="tw-auth-control" id="onboarding-company-name"
                     type="text"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
@@ -231,38 +234,40 @@ export function Onboarding() {
                     autoFocus
                     style={{
                       width: '100%',
-                      padding: '10px 12px',
+                      padding: '8px 12px',
+                    minHeight: 40,
+                    boxSizing: 'border-box',
                       background: 'var(--input-bg)',
                       border: '1px solid var(--border-subtle)',
-                      borderRadius: 2,
+                      borderRadius: 6,
                       color: 'var(--text-primary)',
-                      fontSize: 13,
-                      outline: 'none',
-                    }}
+                      fontSize: 14,
+                    lineHeight: '20px',
+                  }}
                   />
                 </div>
 
                 <div style={{ marginBottom: 16 }}>
-                  <label style={{
+                  <label htmlFor="onboarding-industry" style={{
                     display: 'block',
-                    fontSize: 11,
-                    fontFamily: 'var(--font-mono)',
-                    textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em',
-                    color: 'var(--text-tertiary)',
-                    marginBottom: 8,
+                    fontSize: 13,
+                    lineHeight: '20px',
+                    fontWeight: 500,
+                    fontFamily: 'var(--font-sans)',
+                    color: 'var(--text-primary)',
+                    marginBottom: 6,
                   }}>
                     Industry
                   </label>
                   <Select value={industry} onValueChange={setIndustry}>
-                    <SelectTrigger>
+                    <SelectTrigger id="onboarding-industry">
                       <SelectValue placeholder="Select industry" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="general_freight">General Freight</SelectItem>
-                      <SelectItem value="refrigerated">Refrigerated Transport</SelectItem>
-                      <SelectItem value="hazmat">Hazmat / Dangerous Goods</SelectItem>
-                      <SelectItem value="construction">Construction Materials</SelectItem>
+                      <SelectItem value="general_freight">General freight</SelectItem>
+                      <SelectItem value="refrigerated">Refrigerated transport</SelectItem>
+                      <SelectItem value="hazmat">Hazmat / dangerous goods</SelectItem>
+                      <SelectItem value="construction">Construction materials</SelectItem>
                       <SelectItem value="agriculture">Agriculture</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
@@ -270,32 +275,34 @@ export function Onboarding() {
                 </div>
 
                 <div style={{ marginBottom: 24 }}>
-                  <label style={{
+                  <label htmlFor="onboarding-phone" style={{
                     display: 'block',
-                    fontSize: 11,
-                    fontFamily: 'var(--font-mono)',
-                    textTransform: 'uppercase' as const,
-                    letterSpacing: '0.08em',
-                    color: 'var(--text-tertiary)',
-                    marginBottom: 8,
+                    fontSize: 13,
+                    lineHeight: '20px',
+                    fontWeight: 500,
+                    fontFamily: 'var(--font-sans)',
+                    color: 'var(--text-primary)',
+                    marginBottom: 6,
                   }}>
                     Phone
                   </label>
-                  <input
+                  <input className="tw-auth-control" id="onboarding-phone"
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+27 11 123 4567"
                     style={{
                       width: '100%',
-                      padding: '10px 12px',
+                      padding: '8px 12px',
+                    minHeight: 40,
+                    boxSizing: 'border-box',
                       background: 'var(--input-bg)',
                       border: '1px solid var(--border-subtle)',
-                      borderRadius: 2,
+                      borderRadius: 6,
                       color: 'var(--text-primary)',
-                      fontSize: 13,
-                      outline: 'none',
-                    }}
+                      fontSize: 14,
+                    lineHeight: '20px',
+                  }}
                   />
                 </div>
 
@@ -305,7 +312,7 @@ export function Onboarding() {
                   className="btn-action"
                   style={{ width: '100%' }}
                 >
-                  {submitting ? 'Saving...' : 'Continue'}
+                  {submitting ? 'Saving…' : 'Continue'}
                 </button>
               </>
             )}
@@ -339,10 +346,10 @@ export function Onboarding() {
         {/* Step 4: You're all set */}
         {step === 4 && (
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 64, marginBottom: 16 }}>🚛</div>
-            <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+            <Truck aria-hidden="true" size={48} strokeWidth={1.5} style={{ color: 'var(--accent-primary)', marginBottom: 16 }} />
+            <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
               You're all set!
-            </div>
+            </h1>
             <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 32, lineHeight: 1.6 }}>
               {customersImported > 0 || vehiclesImported > 0 ? (
                 <>
@@ -373,11 +380,12 @@ export function Onboarding() {
               padding: '10px',
               background: 'var(--bg-deep)',
               border: '1px solid var(--border-subtle)',
-              borderRadius: 2,
+              borderRadius: 6,
               color: 'var(--text-secondary)',
               textDecoration: 'none',
               display: 'block',
-              fontSize: 12,
+              fontSize: 13,
+              lineHeight: '20px',
             }}>
               + Create a quote
             </a>
@@ -413,9 +421,9 @@ function ImportStep({
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+        <h1 style={{ fontSize: 22, lineHeight: '28px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>
           {title}
-        </div>
+        </h1>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
           {blurb}
         </div>

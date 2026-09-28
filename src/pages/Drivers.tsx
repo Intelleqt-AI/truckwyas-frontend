@@ -579,7 +579,9 @@ export default function Drivers() {
                       first_name: addForm.first_name,
                       last_name: addForm.last_name,
                       phone: addForm.phone,
-                      password: 'TruckWys2026!',
+                      // No password: the account is created without a usable one and the
+                      // driver sets their own via password reset. A shared default would
+                      // let anyone who knows it sign in as any new driver.
                       role: 'DRIVER',
                     }});
                     await postData({ url: 'api/v1/drivers/', data: {

@@ -1,8 +1,10 @@
 import '@/pages/table-heading-roles.css';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import '@/pages/admin/admin-brand.css';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { Loader } from '@/components/Loader';
+import { formatDate } from '@/lib/formatters';
 
 // Platform-wide view of which companies have connected each third-party
 // integration — a quick "who's on Xero / CtrlFleet" for support, not a
@@ -17,8 +19,7 @@ const tdStyle: React.CSSProperties = {
   padding: '12px 16px', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-row)',
 };
 
-const fmt = (dateStr?: string | null) =>
-  dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+const fmt = (dateStr?: string | null) => (dateStr ? formatDate(dateStr) : 'Not recorded');
 
 interface ConnectedCompany {
   id: string | number;
@@ -77,7 +78,7 @@ export default function IntegrationsPanel() {
     <div className="card" style={cardStyle}>
       <h2 style={sectionTitleStyle}>Integrations</h2>
       {isLoading ? (
-        <Loader size={24} />
+        <TableSkeleton rows={3} cols={2} label="Loading integrations" />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 24 }}>
           <IntegrationTable

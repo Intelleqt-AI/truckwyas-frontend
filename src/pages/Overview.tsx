@@ -6,12 +6,13 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchData } from "@/lib/Api";
-import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { formatMoney, formatMoneyWhole, formatPercent } from "@/lib/formatters";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { CircleAlert, ArrowUpRight, TrendingUp, TrendingDown } from "lucide-react";
+import { CircleAlert, ArrowUpRight, TrendingUp, TrendingDown, Truck, FileText } from "lucide-react";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { MicroBars, RevenueCostBars, PipelineBars, usePipeline } from "@/components/overview/today";
+import { presentSignal } from "@/components/overview/signals";
 
 // Fetches + derives all dashboard data. Lives in the queryFn so the result is
 // cached by TanStack Query (keyed below) and survives navigation — revisiting
@@ -66,6 +67,7 @@ async function loadOverview() {
       .replace(/\s*Estimated revenue loss:[^.]*\.?/gi, "")
       .trim(),
     action: s.action || "VIEW",
+    actionUrl: typeof s.action_url === "string" && s.action_url.startsWith("/") ? s.action_url : null,
     severity: s.severity || "low",
     type: s.type || "INFO",
   }));
@@ -97,7 +99,10 @@ async function loadOverview() {
   const loadsTotal: number | undefined = loadsData?.count;
 
   const vehicles = vehiclesData?.results || vehiclesData || [];
-  const totalVehicles = vehicles.length;
+  // The list is paginated: use the server count, and only derive "available"
+  // from the rows when the page holds the whole fleet.
+  const totalVehicles: number = typeof vehiclesData?.count === "number" ? vehiclesData.count : vehicles.length;
+  const vehiclesComplete = vehicles.length >= totalVehicles;
   const activeVehicles =
     fleetData?.active_vehicles ??
     vehicles.filter(
@@ -136,6 +141,7 @@ async function loadOverview() {
     totalVehicles,
     activeVehicles,
     availableVehicles,
+    vehiclesComplete,
     activity,
     heatmapData,
     // Full lists already fetched above, kept for the charts (no new requests).
@@ -147,87 +153,23 @@ async function loadOverview() {
   };
 }
 
-const CARD_MENUS: Record<string, { label: string; route: string }[]> = {
-  revenue: [
-    { label: "View revenue report", route: "/finance/reports" },
-    { label: "View all invoices",   route: "/finance/invoices" },
-    { label: "New invoice",         route: "/finance/invoices/new" },
-  ],
-  margin: [
-    { label: "View finance reports", route: "/finance/reports" },
-    { label: "View expenses",        route: "/finance/expenses" },
-  ],
-  outstanding: [
-    { label: "View outstanding invoices", route: "/finance/invoices?status=OVERDUE" },
-    { label: "View all invoices",         route: "/finance/invoices" },
-    { label: CAPITAL_LAUNCHED ? "Request capital advance" : "See Fast Pay (not live yet)", route: "/capital" },
-  ],
-};
-
 const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 // Sentence-case a raw status token for display: "IN_TRANSIT" → "In transit".
 const titleCase = (s?: string) =>
   s ? s.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()) : "—";
 
-// Accessible KPI "more" menu: a named 40px button with real menu items.
-function KpiMenu({
-  id, label, openMenu, setOpenMenu, minWidth, onGo,
-}: {
-  id: string;
-  label: string;
-  openMenu: string | null;
-  setOpenMenu: (v: string | null) => void;
-  minWidth: number;
-  onGo: (route: string) => void;
-}) {
-  const open = openMenu === id;
-  return (
-    <div style={{ position: "relative" }} onMouseDown={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        className="overview-kpi-menu-trigger"
-        aria-label={`More options for ${label.toLowerCase()}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpenMenu(open ? null : id)}
-        onKeyDown={(e) => { if (e.key === "Escape") setOpenMenu(null); }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
-        </svg>
-      </button>
-      {open && (
-        <div role="menu" aria-label={`${label} options`} className="overview-kpi-menu" style={{ minWidth }}>
-          {CARD_MENUS[id].map((item) => (
-            <button
-              type="button"
-              role="menuitem"
-              key={item.route}
-              className="overview-kpi-menu-item"
-              onKeyDown={(e) => { if (e.key === "Escape") setOpenMenu(null); }}
-              onClick={() => { setOpenMenu(null); onGo(item.route); }}>
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // Presentation-only helpers.
 const shortPlace = (s?: string) =>
   (s || "").split(" ").slice(0, 2).join(" ").replace(/[,\s]+$/, "") || "—";
-// Backend signal titles use " — " as a separator; show a colon instead.
-const cleanSignalText = (s?: string) => (s || "").replace(/\s+—\s+/g, ": ");
 const isFastPaySignal = (i: any) => /fast\s*pay|advance/i.test(`${i.title} ${i.body}`);
-const wholeRand = (v: number) => formatCurrency(v, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const wholeRand = (v: number) => formatMoneyWhole(v);
 
 function Delta({ value, unit, period }: { value: number; unit: "%" | "pts"; period: string }) {
   const up = value > 0;
   const flat = value === 0;
   const sign = up ? "+" : value < 0 ? "−" : "";
-  const shown = `${sign}${Math.abs(value)}${unit === "%" ? "%" : " pts"}`;
+  const shown = unit === "%" ? `${sign}${formatPercent(Math.abs(value))}` : `${sign}${formatPercent(Math.abs(value)).replace("%", "")}\u00A0pts`;
   const Glyph = up ? TrendingUp : TrendingDown;
   return (
     <span className={`tw-delta ${flat ? "" : up ? "is-up" : "is-down"}`}>
@@ -241,15 +183,7 @@ function Delta({ value, unit, period }: { value: number; unit: "%" | "pts"; peri
 
 export default function Overview() {
   const navigate = useNavigate();
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [recentTab, setRecentTab] = useState<"quotes" | "loads">("quotes");
-
-  useEffect(() => {
-    if (!openMenu) return;
-    const close = () => setOpenMenu(null);
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [openMenu]);
 
   const { data, isLoading: loading, refetch, dataUpdatedAt, isRefetchError, isError } = useQuery({
     queryKey: ["overview-dashboard"],
@@ -271,6 +205,7 @@ export default function Overview() {
   const availableVehicles = data?.availableVehicles ?? 0;
   const heatmapData: number[] = data?.heatmapData ?? [];
   const pipeline = usePipeline(allQuotes);
+  const allLoads: any[] = data?.loads ?? [];
 
   useEffect(() => {
     document.title = "Home - TruckWys";
@@ -301,7 +236,6 @@ export default function Overview() {
   const trend: any[] = lastActive >= 1 ? trendAll.slice(0, lastActive + 1) : trendAll;
   const trimmedMonths: any[] = trendAll.slice(trend.length);
   const monthLabel = (m: any) => MONTHS_SHORT[Number(String(m.month).slice(5, 7)) - 1] || m.month || "";
-  const marginSeries = trend.map((m) => (m.revenue > 0 ? ((m.revenue - m.expenses) / m.revenue) * 100 : null));
   const marginBasis = financeData
     ? financeData.revenue_mtd > 0 ? "this month" : financeData.total_revenue > 0 ? "all time" : null
     : null;
@@ -362,13 +296,12 @@ export default function Overview() {
                   : " Time to pay needs recent invoices.")}
               </InfoTip>
             </h2>
-            <KpiMenu id="outstanding" label="Owed to you" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={220} onGo={navigate} />
           </div>
           <div className="td-kpi__body">
-            <div className="td-kpi__value" title={financeData ? formatCurrency(outstanding) : undefined}>
+            <div className="td-kpi__value" title={financeData ? formatMoney(outstanding) : undefined}>
               {loading ? skeleton : financeData ? wholeRand(outstanding) : "—"}
             </div>
-            {financeData && outstanding > 0 && (
+            {financeData && pastShare > 0 && pastShare < 1 && (
               <div className="td-kpi__strip" role="img" aria-label={`${Math.round(pastShare * 100)}% of what you are owed is past due`}>
                 <span style={{ width: `${pastShare * 100}%` }} />
               </div>
@@ -386,19 +319,18 @@ export default function Overview() {
           <div className="td-kpi__head">
             <h2 className="td-kpi__label">
               Revenue received
-              <InfoTip>Invoices paid, all time. Change compares the last 30 days with the 30 before. Revenue per month is in the chart below.</InfoTip>
+              <InfoTip>Invoices paid in full, all time, incl. VAT. Change compares the last 30 days with the 30 before. Revenue per month is in the chart below.</InfoTip>
             </h2>
-            <KpiMenu id="revenue" label="Revenue" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={200} onGo={navigate} />
           </div>
           <div className="td-kpi__body">
-            <div className="td-kpi__value" title={financeData ? formatCurrency(financeData.total_revenue || 0) : undefined}>
+            <div className="td-kpi__value" title={financeData ? formatMoney(financeData.total_revenue || 0) : undefined}>
               {loading ? skeleton : financeData ? wholeRand(financeData.total_revenue || 0) : "—"}
             </div>
           </div>
           <div className="td-kpi__meta">
             {typeof financeData?.revenue_change_pct === "number" ? (
               <Delta value={financeData.revenue_change_pct} unit="%" period="vs prior 30 days" />
-            ) : financeData ? <span>No prior 30 days</span> : unavailable ? <span>Unavailable</span> : null}
+            ) : financeData ? <span>All time, incl. VAT</span> : unavailable ? <span>Unavailable</span> : null}
           </div>
         </section>
 
@@ -408,18 +340,16 @@ export default function Overview() {
               Net margin{marginBasis ? `, ${marginBasis}` : ""}
               <InfoTip>Revenue received minus approved expenses, as a share of revenue. Change is in percentage points, last 30 days vs the 30 before.</InfoTip>
             </h2>
-            <KpiMenu id="margin" label="Net margin" openMenu={openMenu} setOpenMenu={setOpenMenu} minWidth={200} onGo={navigate} />
           </div>
           <div className="td-kpi__body">
             <div className="td-kpi__value">
               {loading ? skeleton : financeData && marginBasis ? formatPercent(financeData.net_margin_percent || 0) : "—"}
             </div>
-            <MicroBars values={marginSeries} ariaLabel="Net margin per month" />
           </div>
           <div className="td-kpi__meta">
             {typeof financeData?.margin_change_pts === "number" ? (
               <Delta value={financeData.margin_change_pts} unit="pts" period="vs prior 30 days" />
-            ) : financeData ? <span>{marginBasis ? "Too little revenue" : "No revenue yet"}</span> : unavailable ? <span>Unavailable</span> : null}
+            ) : financeData ? <span>{marginBasis ? "No prior period" : "No revenue yet"}</span> : unavailable ? <span>Unavailable</span> : null}
           </div>
         </section>
 
@@ -429,7 +359,7 @@ export default function Overview() {
               Active loads
               <InfoTip align="end">
                 Loads not yet delivered, invoiced or cancelled. Bars show loads booked per day, last 28 days.
-                {!loading && !vehiclesFailed && totalVehicles > 0 && ` ${availableVehicles} of ${totalVehicles} trucks are available now.`}
+                {!loading && !vehiclesFailed && totalVehicles > 0 && data?.vehiclesComplete && ` ${availableVehicles} of ${totalVehicles} trucks are available now.`}
               </InfoTip>
             </h2>
             <Link to="/bookings" className="td-kpi__go" aria-label="Open loads"><ArrowUpRight size={16} strokeWidth={1.75} /></Link>
@@ -570,17 +500,18 @@ export default function Overview() {
           ) : insights.length > 0 ? (
             <ul className="td-needs__list">
               {insights.slice(0, 5).map((insight: any, idx: number) => {
-                const sev = String(insight.severity || "").toLowerCase();
-                const tone = ["high", "critical"].includes(sev) ? "bad" : sev === "medium" ? "warn" : "info";
+                const row = presentSignal(insight, allLoads);
+                const Icon = row.kind === "invoice" ? FileText : row.kind === "fleet" ? Truck : CircleAlert;
                 return (
                   <li key={idx} className="td-needs__row">
-                    <span className={`td-needs__icon is-${tone}`} aria-hidden="true"><CircleAlert size={16} strokeWidth={1.75} /></span>
+                    <Icon className="td-needs__icon" size={16} strokeWidth={1.75} aria-hidden="true" />
                     <div className="td-needs__text">
-                      <div className="td-needs__title">{cleanSignalText(insight.title || insight.message)}</div>
-                      {insight.body && insight.body !== insight.title && (
-                        <div className="td-needs__body" title={cleanSignalText(insight.body)}>{cleanSignalText(insight.body)}</div>
-                      )}
+                      <div className="td-needs__title">{row.title}</div>
+                      {row.detail && <div className="td-needs__body" title={row.detail}>{row.detail}</div>}
                     </div>
+                    {row.actionLabel && insight.actionUrl && (
+                      <Link to={insight.actionUrl} className="tw-btn tw-btn--sm td-needs__action" aria-label={`${row.actionLabel}: ${row.title}`}>{row.actionLabel}</Link>
+                    )}
                     <span className="ov-sr-only">{titleCase(String(insight.severity || "low"))} priority</span>
                   </li>
                 );
@@ -622,7 +553,7 @@ export default function Overview() {
                 <dl className="td-stats">
                   <div><dt>Awaiting reply</dt><dd>{pipeline.awaiting}</dd></div>
                   <div><dt>Drafts</dt><dd>{pipeline.drafts}</dd></div>
-                  <div><dt>Win rate</dt><dd>{pipeline.winRate != null ? `${pipeline.winRate}%` : "—"}</dd></div>
+                  <div><dt>Win rate</dt><dd>{pipeline.winRate != null ? formatPercent(pipeline.winRate, 0) : "—"}</dd></div>
                 </dl>
               </>
             )}

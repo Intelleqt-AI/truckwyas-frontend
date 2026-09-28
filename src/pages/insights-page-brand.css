@@ -15,7 +15,10 @@
 
 /* Page head: the standard .tw-page-head (28px title, one-line subtitle). The
    Margin period control sits on the title row, right-aligned. */
-.insights-header { margin: 0 0 16px; }
+/* Vertical rhythm comes from the shared spacing tokens (theme.css), so the head,
+   tabs and first card sit where they sit on every other page. The top margin is
+   the standard .tw-page-head one; only the head-to-tabs gap is set here. */
+.insights-header { margin-bottom: var(--head-to-tabs, 16px); }
 .insights-head-actions { justify-content: flex-end; min-width: 0; max-width: 100%; }
 /* Six periods do not fit a phone: the one track scrolls locally, never the page. */
 .insights-seg-scroll { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
@@ -23,11 +26,11 @@
 .insights-custom { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .insights-custom__to { color: var(--text-secondary); font-size: 13px; line-height: 20px; }
 
-.insights-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.insights-stack { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
 
 /* Section tabs: 40px, 2px underline in primary text (not accent). Scroll locally on phones. */
 .insights-tabs {
-  display: flex; gap: 24px; margin-bottom: 24px;
+  display: flex; gap: 24px; margin-bottom: var(--tabs-to-content, 24px);
   border-bottom: 1px solid var(--border-subtle);
   overflow-x: auto; scrollbar-width: none;
 }
@@ -72,6 +75,7 @@
 .insights-state__action:active { background: var(--btn-primary-pressed, var(--btn-primary-bg)); }
 .insights-state__action:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 3px; }
 .insights-skel { min-height: 240px; border-radius: var(--radius-card, 12px); background: var(--surface-tint-hover); }
+.insights-skel--card { min-height: 360px; }
 
 @media (max-width: 767px) {
   .insights-head-actions { justify-content: flex-start; width: 100%; }

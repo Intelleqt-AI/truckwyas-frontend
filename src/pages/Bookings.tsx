@@ -1,5 +1,6 @@
 import "./bookings-typography.css";
 import "./bookings-section.css";
+import SectionHeader from '@/components/layout/SectionHeader';
 import { StatusChip } from "@/components/ui/StatusChip";
 import { useStickyRail } from "@/components/fleet-detail/useStickyRail";
 import { InfoTip } from "@/components/ui/InfoTip";
@@ -8,14 +9,15 @@ import { ArrowLeft, Upload, X } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData, patchData } from "@/lib/Api";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatDistance, formatMoney, formatNumber } from "@/lib/formatters";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
 import { ExpandableRouteMap } from "@/components/ExpandableRouteMap";
-import { Loader } from '@/components/Loader';
+import { StatusMenu } from '@/components/fleet-detail/StatusMenu';
+import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 
@@ -40,7 +42,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 };
 
 const fmt = (dateStr?: string) =>
-  dateStr ? formatDate(dateStr) : '—';
+  dateStr ? formatDate(dateStr) : 'Not set';
 
 // Sentence-case a raw status token for display: "IN_TRANSIT" → "In transit".
 const titleCase = (s?: string) =>
@@ -299,7 +301,18 @@ export default function Bookings() {
     </div>
   );
 
-  if (isLoading && !loadFailedNow) return <Loader fullScreen />;
+  // Loading: keep the back link and page frame; only the content waits.
+  if (isLoading && !loadFailedNow) return (
+    <div className="bk-detail bookings-typography">
+      <SectionHeader
+        title="Loading order"
+        back={{ to: '/bookings/orders', label: 'Orders' }}
+      />
+      <BlockSkeleton height={96} label="Loading order" />
+      <div style={{ height: 24 }} />
+      <BlockSkeleton height={360} label="Loading order" />
+    </div>
+  );
 
   if (!load) return (
     <div className="bk-detail">
@@ -329,30 +342,44 @@ export default function Bookings() {
     <>
     <div className="bk-detail bookings-typography">
       {/* Header */}
-      <button type="button" className="bk-back" onClick={() => navigate('/bookings')}>
-        <ArrowLeft size={16} aria-hidden="true" /> Back to orders
-      </button>
-      <div className="bk-detail-header">
-        <div className="bk-detail-header__titles">
-          <div className="bk-eyebrow">Order</div>
-          <div className="bk-title-row">
-            <h1 className="bk-title">{load.load_number}</h1>
-            <StatusChip status={load.status} />
-          </div>
-          <p className="bk-subtitle">{load.customer_name}</p>
-        </div>
-        <div className="bk-amount">
-          <span className="bk-amount__label">Order total</span>
-          <span className="bk-amount__value">{formatCurrency(parseFloat(load.total_amount || '0'))}</span>
-        </div>
-      </div>
+      <SectionHeader
+        title={load.load_number}
+        back={{ to: '/bookings/orders', label: 'Orders' }}
+        titleAdornment={<><StatusChip status={load.status} /></>}
+        description={<>{load.customer_name}</>}
+        actions={<>
+          <StatusMenu
+            subject={load.load_number}
+            current={load.status}
+            options={[
+              { value: load.status, label: titleCase(load.status) },
+              ...allowedNextStatuses.map(s => ({
+                value: s,
+                label: titleCase(s),
+                hint: s === 'DELIVERED' ? 'Asks for the proof of delivery'
+                  : s === 'ASSIGNED' && !load.vehicle ? 'Asks for a vehicle first'
+                  : s === 'CANCELLED' ? 'Hard to reverse' : undefined,
+              })),
+            ]}
+            disabledReason={billingBlocked ? 'Status changes are blocked until billing is sorted.' : allowedNextStatuses.length === 0 ? 'No further status for this order.' : undefined}
+            // These steps open their own dialog (vehicle, proof of delivery,
+            // cancel warning), so they skip the generic confirmation.
+            intercept={(v) => {
+              const own = v === 'DELIVERED' || (v === 'ASSIGNED' && !load.vehicle) || (v === 'CANCELLED' && !['PENDING', 'LOADING'].includes(load.status));
+              if (own) updateStatus(v);
+              return own;
+            }}
+            onChange={updateStatus}
+          />
+        </>}
+      />
 
       {/* Status bar */}
       {(() => {
         const STEPS = ['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'INVOICED'];
         const currentIdx = STEPS.indexOf(load.status);
         return (
-          <section className="bk-card" style={{ padding: '16px 24px', marginBottom: 24 }} aria-label="Order progress">
+          <section className="bk-card" style={{ padding: '16px 24px', marginBottom: 'var(--section-gap, 24px)' }} aria-label="Order progress">
           <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
           <div className="bk-stepper" style={{ flex: 1, minWidth: 0 }}>
             <ol aria-label="Order progress" style={{ display: 'flex', gap: 0, listStyle: 'none', margin: 0, padding: 0 }}>
@@ -363,7 +390,8 @@ export default function Bookings() {
                 // status from where the load is now — this also naturally
                 // blocks skipping ahead, since VALID_TRANSITIONS only ever
                 // lists the immediate next step(s).
-                const isClickable = !billingBlocked && allowedNextStatuses.includes(step);
+                // Progress only: status changes go through "Change status".
+                const isClickable = false;
                 const label = titleCase(step);
                 // Done steps are filled, the current step is larger, a step you
                 // can move to next is an outlined ring. No glows.
@@ -409,26 +437,12 @@ export default function Bookings() {
               })}
             </ol>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="bk-field__label" id="load-status-label">Status</span>
-              <Select value={load.status} onValueChange={updateStatus} disabled={billingBlocked}>
-                <SelectTrigger aria-labelledby="load-status-label" style={{ minWidth: 160, minHeight: 40 }}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={load.status}>{titleCase(load.status)}</SelectItem>
-                  {allowedNextStatuses.map(s => <SelectItem key={s} value={s}>{titleCase(s)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            {billingBlocked && (
-              <p className="bk-help bk-help--danger" style={{ textAlign: 'right', maxWidth: 260 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
-                Status changes are blocked.{' '}
-                <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>Go to billing</button>
-              </p>
-            )}
-          </div>
+          {billingBlocked && (
+            <p className="bk-help bk-help--danger" style={{ textAlign: 'right', maxWidth: 260 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+              Status changes are blocked.{' '}
+              <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>Go to billing</button>
+            </p>
+          )}
           </div>
           </section>
         );
@@ -446,7 +460,7 @@ export default function Bookings() {
               <div>
                 <div className="bk-route__label">Pickup</div>
                 <div className="bk-route__place">{load.pickup_location}</div>
-                <div className="bk-route__meta">{[load.pickup_city, load.pickup_state].filter(Boolean).join(', ')}{load.pickup_date ? `. ${fmt(load.pickup_date)}` : ''}</div>
+                <div className="bk-route__meta">{[load.pickup_city, load.pickup_state].filter(Boolean).join(', ')}{load.pickup_date ? ` · ${fmt(load.pickup_date)}` : ''}</div>
               </div>
             </li>
             {Array.isArray(load.stops) && load.stops.map((s: { location: string }, i: number) => (
@@ -463,7 +477,7 @@ export default function Bookings() {
               <div>
                 <div className="bk-route__label">Delivery</div>
                 <div className="bk-route__place">{load.delivery_location}</div>
-                <div className="bk-route__meta">{[load.delivery_city, load.delivery_state].filter(Boolean).join(', ')}{load.delivery_date ? `. ${fmt(load.delivery_date)}` : ''}</div>
+                <div className="bk-route__meta">{[load.delivery_city, load.delivery_state].filter(Boolean).join(', ')}{load.delivery_date ? ` · ${fmt(load.delivery_date)}` : ''}</div>
               </div>
             </li>
           </ol>
@@ -477,18 +491,18 @@ export default function Bookings() {
               <dl className="bk-facts bk-facts--3" aria-label="Job figures">
                 <div>
                   <dt className="bk-fact__label">Distance</dt>
-                  <dd className="bk-fact__value">{distance > 0 ? `${Math.round(distance).toLocaleString('en-ZA')} km` : 'Not recorded'}</dd>
+                  <dd className="bk-fact__value">{distance > 0 ? formatDistance(distance) : 'Not recorded'}</dd>
                 </div>
                 <div>
                   <dt className="bk-fact__label" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     Base rate per km
                     <InfoTip>Base rate divided by distance, before surcharges.</InfoTip>
                   </dt>
-                  <dd className="bk-fact__value">{distance > 0 ? `R ${(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)).toFixed(2)}` : '—'}</dd>
+                  <dd className="bk-fact__value">{distance > 0 ? formatMoney(parseFloat(load.rate || '0') / Math.max(parseFloat(load.distance || '1'), 1)) : 'Not recorded'}</dd>
                 </div>
                 <div>
                   <dt className="bk-fact__label">Cargo</dt>
-                  <dd className="bk-fact__value">{[weight > 0 ? `${Math.round(weight).toLocaleString('en-ZA')} kg` : '', load.cargo_description || ''].filter(Boolean).join(', ') || 'Not recorded'}</dd>
+                  <dd className="bk-fact__value">{[weight > 0 ? `${formatNumber(weight)} kg` : '', load.cargo_description || ''].filter(Boolean).join(', ') || 'Not recorded'}</dd>
                 </div>
               </dl>
             );
@@ -511,7 +525,7 @@ export default function Bookings() {
               }
               currentLocationLabel={
                 vehicleDetail?.last_location_at
-                  ? `${vehicleDetail.plate}, last seen ${new Date(vehicleDetail.last_location_at).toLocaleString('en-ZA')}`
+                  ? `${vehicleDetail.plate}, last seen ${formatDateTime(vehicleDetail.last_location_at)}`
                   : undefined
               }
               height={220}
@@ -523,7 +537,7 @@ export default function Bookings() {
                   : !vehicleDetail?.ctrlfleet_vehicle_code
                     ? 'The assigned vehicle is not linked to CtrlFleet, so there is no live tracking.'
                     : vehicleDetail?.last_location_at
-                      ? `Last synced ${new Date(vehicleDetail.last_location_at).toLocaleString('en-ZA')}`
+                      ? `Last synced ${formatDateTime(vehicleDetail.last_location_at)}`
                       : 'Linked to CtrlFleet. No position synced yet.'}
               </p>
               {load.vehicle && vehicleDetail?.ctrlfleet_vehicle_code && (
@@ -617,8 +631,8 @@ export default function Bookings() {
 
             {!editingAssignment || assignmentLocked ? (
               [
-                { label: 'Vehicle', value: load.vehicle_info || '—' },
-                { label: 'Driver', value: load.driver_name || '—' },
+                { label: 'Vehicle', value: load.vehicle_info || 'Not assigned' },
+                { label: 'Driver', value: load.driver_name || 'Not assigned' },
               ].map(r => (
                 <div key={r.label} className="bk-kv">
                   <span className="bk-kv__label">{r.label}</span>

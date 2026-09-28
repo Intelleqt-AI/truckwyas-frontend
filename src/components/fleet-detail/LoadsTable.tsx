@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatDistance } from '@/lib/formatters';
 import { useNavigate } from 'react-router-dom';
 import { dateText, loadDate, num, randWhole } from './parts';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -47,7 +48,7 @@ export function LoadsTable({ loads, showCustomer = true, initial = 10 }: { loads
                   </td>
                   <td className="fd-col-route fd-ellipsis" title={route}>{route}</td>
                   {showCustomer && <td className="fd-col-opt fd-col-customer fd-ellipsis" title={l.customer_name || undefined}>{l.customer_name || '—'}</td>}
-                  <td className="is-num fd-col-opt fd-col-dist">{num(l.distance) ? `${Math.round(num(l.distance)).toLocaleString('en-ZA')} km` : '—'}</td>
+                  <td className="is-num fd-col-opt fd-col-dist">{num(l.distance) ? formatDistance(num(l.distance)) : '—'}</td>
                   <td className="is-num fd-strong">{amount ? randWhole(amount) : '—'}</td>
                   <td className="fd-col-status">
                     <StatusChip status={l.status} size="sm" />

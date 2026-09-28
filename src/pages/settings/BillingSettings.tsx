@@ -1,4 +1,5 @@
 import '@/pages/table-heading-roles.css';
+import { formatDate, formatMoney, formatMoneyWhole } from '@/lib/formatters';
 import '@/pages/settings/settings-brand.css';
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -95,18 +96,19 @@ interface BillingTransaction {
 // Pricing is server-driven (billing/status/ returns flat_plan) — only the
 // feature list lives here.
 const PLAN_FEATURES = [
-  'Unlimited loads & invoices',
-  'AI-powered quote optimisation',
-  'Fast Pay capital access (not live yet)',
-  'Advanced analytics & reporting',
-  'Fleet intelligence dashboard',
+  'Unlimited loads and invoices',
+  'Quotes priced from your own costs',
+  'Reports and insights',
+  'Fleet and driver records',
   'Multi-user access',
-  'API & integrations',
+  'API and integrations',
   'Priority support',
 ];
 
-const formatRand = (amount?: string | number | null) =>
-  `R${Number(amount ?? 0).toLocaleString('en-ZA')}`;
+const formatRand = (amount?: string | number | null) => {
+  const n = Number(amount ?? 0);
+  return Number.isInteger(n) ? formatMoneyWhole(n) : formatMoney(n);
+};
 
 // Live-ticking countdown to next_billing_at. Under 48h out it ticks every
 // second (HH:MM:SS, or MM:SS once under an hour) so a fast test cycle is
@@ -148,7 +150,7 @@ function NextPaymentCountdown({ nextBillingAt, mode = 'charge' }: { nextBillingA
       fontSize: 13, lineHeight: '20px', color: mode === 'cancel' ? 'var(--status-warning-text)' : 'var(--accent-primary)', marginTop: 2,
       fontVariantNumeric: 'tabular-nums' as const,
     }}>
-      {label} · {new Date(nextBillingAt).toLocaleDateString('en-ZA')}
+      {label} · {formatDate(nextBillingAt)}
       {mode === 'cancel' && '. You won\'t be charged again.'}
     </div>
   );
@@ -544,7 +546,7 @@ export function BillingSettings() {
                     <div>
                       <div style={{ color: 'var(--text-primary)' }}>{item.label}</div>
                       <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 1 }}>
-                        Failed {new Date(item.failed_at).toLocaleDateString('en-ZA')}
+                        Failed {formatDate(item.failed_at)}
                       </div>
                     </div>
                     <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--status-warning-text)' }}>{formatRand(item.amount)}</span>
@@ -584,9 +586,9 @@ export function BillingSettings() {
                 background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)',
                 borderRadius: 'var(--radius-nested)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
               }}>
-                <strong style={{ color: 'var(--accent-primary)' }}>Unlock the full platform</strong>
+                <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Subscribe to TruckWys</strong>
                 <br />
-                Subscribe to TruckWys for AI-powered insights, Fast Pay capital access, and unlimited loads:
+                Unlimited loads, invoices and reports:
                 one flat fee of {formatRand(flatPlan?.amount)}/month, whatever your fleet size,{' '}
                 <strong>plus {flatPlan?.take_rate_pct}% of every delivered load's value</strong>, charged
                 automatically to the same card the moment each load is delivered.
@@ -633,7 +635,7 @@ export function BillingSettings() {
                       {tx.reference || '—'}
                     </td>
                     <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                      {new Date(tx.created_at).toLocaleDateString('en-ZA')}
+                      {formatDate(tx.created_at)}
                     </td>
                     <td className="num" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                       {formatRand(tx.amount)}

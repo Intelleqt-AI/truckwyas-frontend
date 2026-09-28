@@ -2,7 +2,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
-import { formatCurrency } from '@/lib/formatters';
+import { formatDays, formatMoney, formatMoneyWhole } from '@/lib/formatters';
 import { CAPITAL_COMING_SOON } from '@/lib/features';
 import SectionHeader from '@/components/layout/SectionHeader';
 import './capital-prelaunch.css';
@@ -169,7 +169,7 @@ function WaitingCash() {
       body = (
         <div className="fp-outcome">
           <div className="fp-outcome__figure">
-            <div className="fp-hero">{formatCurrency(total)}</div>
+            <div className="fp-hero">{formatMoneyWhole(total)}</div>
             <p className="fp-hero__sub">
               owed on {plural(count, 'invoice')} by {plural(customers, 'customer')}
             </p>
@@ -181,7 +181,7 @@ function WaitingCash() {
                   <dd>All of it<span className="fp-muted">{' · '}every invoice is past due</span></dd>
                 ) : (
                   <dd>
-                    {formatCurrency(pastDue)}
+                    {formatMoneyWhole(pastDue)}
                     <span className="fp-muted">{' · '}{plural(pastDueCount, 'invoice')}, {pct(pastDue, total)}% of the total</span>
                   </dd>
                 )}
@@ -190,7 +190,7 @@ function WaitingCash() {
                 <dt>Average time to get paid</dt>
                 {dso > 0 ? (
                   <dd>
-                    {Math.round(dso)} days
+                    {formatDays(dso)}
                     <span className="fp-note">Days sales outstanding, based on invoices issued in the last 90 days.</span>
                   </dd>
                 ) : (
@@ -207,7 +207,7 @@ function WaitingCash() {
             <AgeingStrip
               buckets={buckets}
               hideEmptyLabels
-              ariaLabel={`Unpaid balance by how late it is: ${buckets.filter((b) => b.amount > 0).map((b) => `${b.label} ${formatCurrency(b.amount)}`).join(', ')}`}
+              ariaLabel={`Unpaid balance by how late it is: ${buckets.filter((b) => b.amount > 0).map((b) => `${b.label} ${formatMoneyWhole(b.amount)}`).join(', ')}`}
             />
           </div>
           {customerRows.length > 0 && (
@@ -218,15 +218,15 @@ function WaitingCash() {
                   <li key={c.id} className="fp-rank__row">
                     <span className="fp-rank__label">{c.name}</span>
                     <span className="fp-rank__aged">
-                      <AgeingStrip buckets={c.buckets} scaleTo={maxCustomer} ariaLabel={`${c.name}: ${formatCurrency(c.total)}, by how late it is`} />
+                      <AgeingStrip buckets={c.buckets} scaleTo={maxCustomer} ariaLabel={`${c.name}: ${formatMoneyWhole(c.total)}, by how late it is`} />
                     </span>
-                    <span className="fp-rank__value">{formatCurrency(c.total)}</span>
+                    <span className="fp-rank__value">{formatMoneyWhole(c.total)}</span>
                     <span className="fp-rank__meta">{plural(c.count, 'invoice')} · {pct(c.total, total)}%</span>
                   </li>
                 ))}
               </ul>
               {customerRows.length > 6 && (
-                <button type="button" className="fp-btn fp-btn--quiet" onClick={() => setAllCustomers((v) => !v)}>
+                <button type="button" className="fp-btn fp-btn--quiet fp-btn--flush" onClick={() => setAllCustomers((v) => !v)}>
                   {allCustomers ? 'Show the largest 6' : `Show all ${customerRows.length} customers`}
                 </button>
               )}
@@ -241,8 +241,8 @@ function WaitingCash() {
     <section className="fp-card" aria-labelledby={headId}>
       <CardHead
         id={headId}
-        title="How much cash is waiting on your customers"
-        description="Unpaid balances on sent invoices, as of today"
+        title="Waiting on customers"
+        description="Unpaid balances on sent invoices"
         info="Unpaid balances on invoices you have sent, as of today. Lateness is counted from each invoice's due date."
       />
       {body}
@@ -324,7 +324,7 @@ function HoldingBack() {
                   <span className="fp-rank__bar" aria-hidden="true">
                     <span style={{ width: `${(r.value / barScale) * 100}%` }} />
                   </span>
-                  <span className="fp-rank__value">{formatCurrency(r.value)}</span>
+                  <span className="fp-rank__value">{formatMoneyWhole(r.value)}</span>
                   <span className="fp-rank__meta">{r.count} of {checkedCount} · {pct(r.value, checkedValue)}%</span>
                 </li>
               ))}
@@ -348,7 +348,7 @@ function HoldingBack() {
                     <tr key={inv.id}>
                       <td><Link className="fp-id" to={`/finance/invoices/${inv.id}`}>{inv.invoice_number}</Link></td>
                       <td>{inv.customer}</td>
-                      <td className="num">{formatCurrency(amountOf(inv))}</td>
+                      <td className="num">{formatMoney(amountOf(inv))}</td>
                       <td className="fp-muted">
                         {INVOICE_CHECKS.filter((c) => keys.includes(c.key)).map((c) => c.label).join(', ')}
                       </td>
@@ -367,8 +367,8 @@ function HoldingBack() {
     <section className="fp-card" aria-labelledby={headId}>
       <CardHead
         id={headId}
-        title="What would stop your invoices qualifying"
-        description="Checks on your latest unpaid invoices, by value"
+        title="Invoice checks"
+        description="What would hold unpaid invoices back, by value"
         aside={aside}
         info="The invoice checks Fast Pay runs, applied to your most recent sent invoices that are not yet paid. Part-paid invoices are not checked, and one invoice can fail more than one check. Each bar is the value that fails the check, as a share of all checked invoice value."
       />
@@ -429,7 +429,7 @@ export default function CapitalPrelaunch() {
       <SectionHeader
         title="Fast Pay"
         titleAdornment={<StatusChip tone="neutral" label="Not live yet" />}
-        description="Get paid for delivered loads without waiting for your customers to settle their invoices."
+        description="Get paid for delivered loads before customers pay."
       />
       <div className="fp-stack">
         <WaitingCash />

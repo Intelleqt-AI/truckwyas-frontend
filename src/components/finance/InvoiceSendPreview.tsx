@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
 import { useAuth } from '@/lib/AuthContext';
-import { formatCurrency, formatDate } from '@/lib/formatters';
+import { formatDate, formatDays, formatMoney } from '@/lib/formatters';
 import { invoiceBalance } from '@/lib/invoiceStatus';
 import SendPreviewDialog, { type SendPreviewRow } from '@/components/SendPreviewDialog';
 
@@ -15,7 +15,9 @@ const toNum = (v: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-/** Python's f"R {amount:,.2f}", as the server writes amounts into email subjects. */
+/** Python's f"R {amount:,.2f}", exactly as the server writes amounts into
+ *  email subjects. The preview shows what the customer will receive, so it
+ *  stays literal until the backend subject uses the house format. */
 const serverRand = (n: number) =>
   `R ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -83,8 +85,8 @@ export default function InvoiceSendPreview({ kind, invoice, sending, onConfirm, 
     subject = `${heading}: invoice ${number} — ${serverRand(subjectAmount)}`;
     rows = [
       { label: 'Invoice', value: number },
-      { label: 'Outstanding', value: formatCurrency(balance) },
-      { label: 'Due', value: days > 0 ? `${dueLabel} · ${days} ${days === 1 ? 'day' : 'days'} late` : dueLabel },
+      { label: 'Outstanding', value: formatMoney(balance) },
+      { label: 'Due', value: days > 0 ? `${dueLabel} · ${formatDays(days)} late` : dueLabel },
       { label: 'Tone', value: tone },
       {
         label: 'Reminders',
@@ -98,7 +100,7 @@ export default function InvoiceSendPreview({ kind, invoice, sending, onConfirm, 
     subject = company ? `Invoice ${number} from ${company}` : undefined;
     rows = [
       { label: 'Invoice', value: number },
-      { label: 'Amount', value: `${formatCurrency(total)} incl. VAT` },
+      { label: 'Amount', value: `${formatMoney(total)} incl. VAT` },
       { label: 'Due', value: dueLabel },
     ];
     note = 'The invoice PDF is attached and the email links to the online copy.';

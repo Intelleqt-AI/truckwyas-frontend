@@ -1,8 +1,11 @@
 import './fleet-vehicles-brand.css';
+import { fetchAllPages } from '@/components/insights/findings';
+import { formatDate, formatMoneyWhole } from '@/lib/formatters';
+import { SkeletonRows } from '@/components/fleet-detail/ContentSkeleton';
 import { localDateISO } from '@/lib/dates';
 import StaleDataNotice from '@/components/data/StaleDataNotice';
 import './table-heading-roles.css';
-import { UserRound as EmptyDriversIcon } from 'lucide-react';
+import { Plus, UserRound as EmptyDriversIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from '@tanstack/react-query';
@@ -68,15 +71,17 @@ interface LeaderboardEntry {
 // total_trips is the all-time count of delivered or invoiced loads
 // (DriverSerializer.get_total_trips), so it is not labelled "MTD".
 const NUMERIC_COLUMNS = new Set(['Completed loads', 'Revenue']);
+// Column priority: Name and Status always show; the rest drop as the card narrows.
+const DRIVER_COL_CLASS: Record<string, string> = { Licence: 'fleet-col-opt', 'Licence expires': 'fleet-col-phone', 'Completed loads': 'fleet-col-phone', Efficiency: 'fleet-col-opt2' };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const formatDay = (iso?: string) =>
-  iso ? new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  iso ? formatDate(iso) : '—';
 
 // The API sends amounts as decimal strings; coerce before formatting.
 const formatZAR = (v: number | string | null | undefined) => {
   const n = Number(v);
-  return Number.isFinite(n) ? 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—';
+  return Number.isFinite(n) ? formatMoneyWhole(n) : '—';
 };
 
 // Sentence-case a status token for display: "ON_LEAVE" → "On leave".
@@ -139,10 +144,10 @@ export default function Drivers() {
         ? `api/v1/drivers/?search=${encodeURIComponent(q)}`
         : 'api/v1/drivers/';
       const [driversData, overviewData, leaderboardData, vehicleData] = await Promise.all([
-        fetchData(driversUrl),
+        fetchAllPages<any>(driversUrl).then(r => r.rows),
         fetchData('api/v1/drivers/overview/').catch(() => null),
         fetchData('api/v1/drivers/leaderboard/').catch(() => null),
-        fetchData('api/v1/vehicles/').catch(() => null),
+        fetchAllPages<any>('api/v1/vehicles/').then(r => r.rows).catch(() => null),
       ]);
 
       const vehicleList = Array.isArray(vehicleData) ? vehicleData : (vehicleData?.results || []);
@@ -153,7 +158,7 @@ export default function Drivers() {
         model: v.model,
         driver_id: v.driver ?? null,
       }));
-      const driverList = Array.isArray(driversData) ? driversData : (driversData?.results || []);
+      const driverList: any[] = driversData;
 
       // Parse leaderboard data
       const lbData = Array.isArray(leaderboardData) ? leaderboardData : (leaderboardData?.data || []);
@@ -191,7 +196,7 @@ export default function Drivers() {
           return parseFloat(c?.value) || 0;
         };
         overview = {
-          total_drivers: findVal('total') || driversData?.count || driverList.length,
+          total_drivers: findVal('total') || driverList.length,
           active_drivers: findVal('active') || driverList.filter((d: any) => d.status === 'ACTIVE').length,
           avg_revenue_per_driver: findVal('revenue') || findVal('avg') || 0,
         };
@@ -255,7 +260,7 @@ export default function Drivers() {
             disabled={isDemo}
             title={isDemo ? 'Fixed in demo mode' : undefined}
             style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-          >+ Add driver</button>
+          ><Plus size={16} aria-hidden="true" /> Add driver</button>
         }
       />
       <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
@@ -267,14 +272,14 @@ export default function Drivers() {
           <KpiTile
             aria-label="Active drivers"
             label="Active drivers"
-            figure={loading ? '—' : <>{activeCount}<span className="tw-kpi__of"> of {overview?.total_drivers ?? drivers.length}</span></>}
+            figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : <>{activeCount}<span className="tw-kpi__of"> of {overview?.total_drivers ?? drivers.length}</span></>}
             note={loading ? 'Loading' : availabilityNote ? availabilityNote.replace(/^./, c => c.toUpperCase()) : 'Everyone is active'}
           />
           <KpiTile
             aria-label="Completed loads"
             label="Completed loads"
             aside={<InfoTip>Loads delivered or invoiced, all time.</InfoTip>}
-            figure={loading ? '—' : completedLoads}
+            figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : completedLoads}
             note={loading ? 'Loading' : 'All time'}
           />
           {(() => {
@@ -283,11 +288,25 @@ export default function Drivers() {
               : hasExpired ? `${expired.slice(0, 2).map(x => getDriverName(x.d)).join(', ')}${expired.length > 2 ? ` and ${expired.length - 2} more` : ''}`
               : nextRenewal ? `Next: ${getDriverName(nextRenewal.d)}, in ${Math.ceil((nextRenewal.t - now) / DAY_MS)} days`
               : 'No expiry dates recorded';
+            // Never a big zero: with nothing due in 90 days the tile names the
+            // next renewal instead, and with no dates at all it is left out.
+            if (!loading && !hasExpired && renewSoon === 0) {
+              if (!nextRenewal) return null;
+              const days = Math.ceil((nextRenewal.t - now) / DAY_MS);
+              return (
+                <KpiTile
+                  aria-label="Next licence renewal"
+                  label="Next licence renewal"
+                  figure={<>{days}<span className="tw-kpi__of"> days</span></>}
+                  note={`${getDriverName(nextRenewal.d)}, ${formatDate(new Date(nextRenewal.t))}`}
+                />
+              );
+            }
             return (
               <KpiTile
                 aria-label={hasExpired ? 'Expired licences' : 'Licence renewals'}
                 label={hasExpired ? 'Expired licences' : 'Renewals in 90 days'}
-                figure={loading ? '—' : hasExpired ? expired.length : renewSoon}
+                figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : hasExpired ? expired.length : renewSoon}
                 note={note}
                 tone={hasExpired ? 'danger' : 'neutral'}
               />
@@ -331,7 +350,7 @@ export default function Drivers() {
           <thead>
             <tr>
               {['Name', 'Licence', 'Licence expires', 'Status', 'Completed loads', ...(hasRevenue ? ['Revenue'] : []), ...(hasEfficiency ? ['Efficiency'] : []), ''].map(h => (
-                <th key={h || 'actions'} className={NUMERIC_COLUMNS.has(h) || h === 'Efficiency' ? 'is-numeric' : undefined}>
+                <th key={h || 'actions'} className={[NUMERIC_COLUMNS.has(h) || h === 'Efficiency' ? 'is-numeric' : '', DRIVER_COL_CLASS[h] ?? ''].filter(Boolean).join(' ') || undefined}>
                   {h || <span className="sr-only">Actions</span>}
                 </th>
               ))}
@@ -339,11 +358,7 @@ export default function Drivers() {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={colCount} className="fleet-table__state-cell">
-                  <div className="fleet-table-state"><Loader size={32} label="Loading drivers" /></div>
-                </td>
-              </tr>
+              <SkeletonRows rows={10} cols={colCount} />
             ) : filtered.length === 0 ? (
               drivers.length === 0 ? (
                 <tr>
@@ -388,16 +403,16 @@ export default function Drivers() {
                   <td className="is-primary" style={{ fontWeight: 500 }}>
                     {getDriverName(d)}
                   </td>
-                  <td>
+                  <td className="fleet-col-opt">
                     <span className="fleet-table__id">{d.license_number || '—'}</span>
                   </td>
-                  <td style={{ color: isExpired ? 'var(--status-danger-text)' : undefined }}>
+                  <td className="fleet-col-phone" style={{ color: isExpired ? 'var(--status-danger-text)' : undefined }}>
                     {formatDay(d.license_expiry)}{isExpired ? ', expired' : ''}
                   </td>
                   <td>
                     <StatusChip status={d.status} size="sm" />
                   </td>
-                  <td className="is-numeric">
+                  <td className="is-numeric fleet-col-phone">
                     {d.total_trips ?? 0}
                   </td>
                   {hasRevenue && (
@@ -406,7 +421,7 @@ export default function Drivers() {
                     </td>
                   )}
                   {hasEfficiency && (
-                    <td className="is-numeric">{efficiencyScore > 0 ? efficiencyScore : '—'}</td>
+                    <td className="is-numeric fleet-col-opt2">{efficiencyScore > 0 ? efficiencyScore : '—'}</td>
                   )}
                   <td className="fleet-table__actions">
                     <RowActions

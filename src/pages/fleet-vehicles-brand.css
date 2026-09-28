@@ -21,12 +21,12 @@
   flex-wrap: wrap;
   gap: 16px;
 }
-.fleet-page .fleet-toolbar { margin-bottom: 16px; }
+.fleet-page .fleet-toolbar { margin-bottom: var(--card-gap, 16px); }
 
 .fleet-page .fleet-summary {
   display: grid;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--card-gap, 16px);
+  margin-bottom: var(--section-gap, 24px);
 }
 .fleet-page .fleet-summary--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .fleet-page .fleet-summary--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -133,7 +133,8 @@
 .fleet-page .fleet-table .fleet-table__select { width: 56px; padding-right: 0; }
 .fleet-page .fleet-table .is-numeric { text-align: right; font-variant-numeric: tabular-nums; }
 .fleet-page .fleet-table__id {
-  font: 400 13px/20px var(--font-mono);
+  font: 400 14px/20px var(--font-sans);
+  font-variant-numeric: tabular-nums;
   color: var(--text-primary);
 }
 .fleet-page .fleet-table__actions { text-align: right; width: 1%; }
@@ -301,3 +302,58 @@
 }
 .fleet-page .fleet-header-secondary:hover:not(:disabled) { background: var(--bg-surface-hover); }
 .fleet-page .fleet-header-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Fleet status (FleetDashboard.tsx): trucks grouped by what they are doing,
+   renewals and drivers in a side column. */
+.fleet-page .fs-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: var(--card-gap, 16px); align-items: start; }
+.fleet-page .fs-side { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
+.fleet-page .fs-group + .fs-group { margin-top: 20px; }
+.fleet-page .fs-group__title { margin: 0 0 4px; font: 500 13px/20px var(--font-sans); color: var(--text-secondary); letter-spacing: normal; text-transform: none; }
+.fleet-page .fs-group__count { margin-left: 4px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.fleet-page .fs-list { list-style: none; margin: 0; padding: 0; }
+.fleet-page .fs-list li + li { border-top: 1px solid var(--border-row); }
+.fleet-page .fs-row { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; align-items: baseline; padding: 10px 8px; margin: 0 -8px; border-radius: var(--radius-nested, 8px); color: inherit; text-decoration: none; }
+.fleet-page .fs-row:hover { background: var(--bg-surface-hover); }
+.fleet-page .fs-row:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 0; }
+.fleet-page .fs-row--stack { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.fleet-page .fs-row__id { font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fleet-page .fs-row__note { font: 400 14px/20px var(--font-sans); color: var(--text-secondary); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleet-page .fs-row--stack .fs-row__note { white-space: normal; font-size: 13px; }
+.fleet-page .fs-row__note.is-danger { color: var(--status-danger-text); }
+@media (max-width: 1100px) { .fleet-page .fs-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 520px) { .fleet-page .fs-row { grid-template-columns: minmax(0, 1fr); gap: 2px; } .fleet-page .fs-row__note { white-space: normal; } }
+
+/* Heatmap page when pickup times are not captured: weekday bars beside routes. */
+.fleet-page .fleet-heatmap-grid--2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.fleet-page .fleet-routes--1 { grid-template-columns: minmax(0, 1fr); }
+.fleet-page .fleet-days { display: flex; flex-direction: column; gap: 10px; }
+.fleet-page .fleet-days__row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 32px; align-items: center; gap: 12px; }
+.fleet-page .fleet-days__day { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
+.fleet-page .fleet-days__track { display: block; height: 8px; border-radius: 4px; }
+.fleet-page .fleet-days__track .fleet-route__fill { height: 8px; border-radius: 4px; }
+.fleet-page .fleet-days__count { font: 500 13px/20px var(--font-sans); color: var(--text-primary); text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 1000px) { .fleet-page .fleet-heatmap-grid--2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* Column priority on the fleet tables: Status and money never leave the card;
+   free text truncates, then Health, then Driver drop out. */
+.fleet-page .fleet-table-region { container-type: inline-size; }
+.fleet-page .fleet-table .fleet-col-truck { max-width: 32ch; overflow: hidden; text-overflow: ellipsis; }
+@container (max-width: 1080px) { .fleet-page .fleet-table .fleet-col-opt2 { display: none; } }
+@container (max-width: 900px) { .fleet-page .fleet-table .fleet-col-opt { display: none; } .fleet-page .fleet-table .fleet-col-truck { max-width: 22ch; } }
+/* Plus icon inside the primary action. */
+.fleet-page button[data-fleet-control].btn-action { display: inline-flex; align-items: center; gap: 6px; }
+@container (max-width: 600px) {
+  .fleet-page .fleet-table .fleet-col-phone { display: none; }
+  .fleet-page .fleet-table th, .fleet-page .fleet-table td { padding-left: 8px; padding-right: 8px; }
+  .fleet-page .fleet-table th:first-child, .fleet-page .fleet-table td:first-child { padding-left: 16px; }
+  .fleet-page .fleet-table th:last-child, .fleet-page .fleet-table td:last-child { padding-right: 16px; }
+  .fleet-page .fleet-table .fleet-table__select { display: none; }
+  .fleet-page .fleet-table td { font-size: 13px; }
+  .fleet-page .fleet-table .fleet-table__select + * { padding-left: 16px; }
+}
+/* Phone: Fleet's head matches Bookings' (one 40px primary action). The
+   desktop-only tools (Excel import, heatmap link) step aside. */
+@media (max-width: 720px) {
+  .fleet-page .section-header__actions .fleet-header-secondary { display: none; }
+  .fleet-page .section-header__actions button[data-fleet-control] { min-height: 40px; }
+}

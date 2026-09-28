@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Children, type CSSProperties, type ReactNode } from 'react';
 
 /**
  * v3 standard KPI tile (DESIGN-PRINCIPLES §11.6). Label, figure, one line.
@@ -54,9 +54,16 @@ export function KpiTile({ label, figure, note, tone = 'neutral', emphasis, aside
   return <div className={cls} aria-label={rest['aria-label']}>{body}</div>;
 }
 
-/** A row of 2 to 4 equal tiles. Three tiles never orphan on a phone. */
+/**
+ * A row of 1 to 4 tiles. Columns follow the tile count (2 tiles are 2
+ * columns, never half of a 4-column grid) and tiles stop growing at
+ * --kpi-max, so the row keeps to its content on wide screens. On phones:
+ * 2 columns, and an odd last tile spans the row as a compact line.
+ */
 export function KpiRow({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={['tw-kpi-row', className ?? ''].filter(Boolean).join(' ')}>{children}</div>;
+  const count = Children.toArray(children).length;
+  const style = count > 0 ? ({ '--kpi-cols': Math.min(count, 4) } as CSSProperties) : undefined;
+  return <div className={['tw-kpi-row', className ?? ''].filter(Boolean).join(' ')} style={style}>{children}</div>;
 }
 
 export default KpiTile;

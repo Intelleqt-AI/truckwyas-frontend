@@ -1,9 +1,9 @@
 import { useSearchParams } from 'react-router-dom';
 import {
-  catLabel, inPeriod, isApproved, methodLabel, monthLabel, monthsIn, money, moneyWhole, num, periodText, plural, ymOf,
-  type Ledger,
+  catLabel, inPeriod, isApproved, methodLabel, monthLabel, monthsIn, money, moneyWhole, num, periodText, plural, shownMonths,
+  trimNote, ymOf, type Ledger,
 } from './data';
-import { Check, Info, PeriodControl, ReportFrame, Seg, StatementTable, Tiles, statementCsv, usePeriod, type SRow, type Statement } from './ui';
+import { Check, Choice, Info, PeriodControl, ReportFrame, StatementTable, Tiles, statementCsv, usePeriod, type SRow, type Statement } from './ui';
 
 type View = 'summary' | 'book';
 
@@ -13,7 +13,7 @@ export default function CashMovement({ d, companyName }: { d: Ledger; companyNam
   const view: View = params.get('view') === 'book' ? 'book' : 'summary';
   const setView = (v: View) => setParams(p => { const n = new URLSearchParams(p); if (v === 'summary') n.delete('view'); else n.set('view', v); return n; }, { replace: true });
 
-  const months = monthsIn(period.from, period.to);
+  const allMonths = monthsIn(period.from, period.to);
   const receipts = d.payments.filter(p => inPeriod(p.payment_date, period));
   const outs = d.expenses.filter(e => isApproved(e) && inPeriod(e.expense_date, period));
   const totalIn = receipts.reduce((s, p) => s + num(p.amount), 0);
@@ -26,6 +26,9 @@ export default function CashMovement({ d, companyName }: { d: Ledger; companyNam
   const sumBy = <T,>(list: T[], date: (x: T) => string, amt: (x: T) => number, m: string) => list.filter(x => ymOf(date(x)) === m).reduce((s, x) => s + amt(x), 0);
   const inM = (m: string) => sumBy(receipts, p => p.payment_date, p => num(p.amount), m);
   const outM = (m: string) => sumBy(outs, e => e.expense_date, e => num(e.amount), m);
+  // Columns end at the last month with money in or out; totals cover the whole period.
+  const months = shownMonths(allMonths, m => receipts.some(p => ymOf(p.payment_date) === m) || outs.some(e => ymOf(e.expense_date) === m));
+  const trimmed = view === 'summary' ? trimNote(allMonths, months) : null;
   let run = 0;
   const cumulative = months.map(m => (run += inM(m) - outM(m)));
   const summary: Statement = {
@@ -90,14 +93,14 @@ export default function CashMovement({ d, companyName }: { d: Ledger; companyNam
       ]} />}
       controls={<>
         <PeriodControl period={period} onChange={setPeriod} />
-        <Seg label="View" value={view} onChange={setView} options={[{ id: 'summary', label: 'By month' }, { id: 'book', label: 'Cash book' }]} />
+        <Choice label="View" value={view} onChange={setView} options={[{ id: 'summary', label: 'By month' }, { id: 'book', label: 'Cash book' }]} />
       </>}
       tiles={<Tiles table={table} tiles={[
         { label: 'Money in', value: moneyWhole(totalIn), title: money(totalIn), note: plural(receipts.length, 'receipt'), amount: totalIn },
         { label: 'Money out', value: moneyWhole(totalOut), title: money(totalOut), note: plural(outs.length, 'approved expense'), amount: totalOut },
         { label: 'Net movement', value: moneyWhole(totalIn - totalOut), title: money(totalIn - totalOut), note: periodText(period), amount: totalIn - totalOut },
       ]} />}
-      gaps={['Bank balance is not recorded in TruckWys, so there is no opening or closing balance.']}
+      gaps={[...(trimmed ? [trimmed] : []), 'Bank balance is not recorded in TruckWys, so there is no opening or closing balance.']}
       csv={() => statementCsv(`Cash movement, ${periodText(period)}`, view === 'book' ? 'Cash book' : 'By month', table)}
       csvName={`cash-movement-${view}-${period.from}-to-${period.to}`}
     >

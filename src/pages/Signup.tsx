@@ -21,13 +21,12 @@ const SIGNUP_STEPS = [
 // Same list BillingSettings.tsx shows for an active subscription — kept
 // identical so nothing you're promised here differs from what you see later.
 const PLAN_FEATURES = [
-  "Unlimited loads & invoices",
-  "AI-powered quote optimisation",
-  "Fast Pay capital access (not live yet)",
-  "Advanced analytics & reporting",
-  "Fleet intelligence dashboard",
+  "Unlimited loads and invoices",
+  "Quotes priced from your own costs",
+  "Reports and insights",
+  "Fleet and driver records",
   "Multi-user access",
-  "API & integrations",
+  "API and integrations",
   "Priority support",
 ];
 
@@ -340,13 +339,13 @@ const Signup = () => {
       {/* Content side — what you're signing up for, before the form asks for anything */}
       <div className="signup-split__content" style={{
         position: 'relative', overflow: 'hidden',
-        background: 'var(--bg-surface)',
+        background: 'var(--bg-deep)',
         borderRight: '1px solid var(--border-subtle)',
       }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
           <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
 
-          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-info-text)', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)', marginBottom: 10 }}>
             One flat price, no hidden tiers
           </div>
           <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', marginBottom: 28 }}>

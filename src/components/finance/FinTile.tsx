@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { InfoTip } from '@/components/ui/InfoTip';
-import { formatCurrency } from '@/lib/formatters';
+import { formatMoneyWhole } from '@/lib/formatters';
 
 /**
  * One figure per card, the Today-page tile pattern (DESIGN-PRINCIPLES §5, §9):
@@ -43,4 +43,4 @@ export function FinTiles({ children, label }: { children: ReactNode; label?: str
 }
 
 /** Whole rands for tiles; the exact figure goes in the title attribute. */
-export const wholeRand = (v: number) => formatCurrency(v, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+export const wholeRand = (v: number) => formatMoneyWhole(v);

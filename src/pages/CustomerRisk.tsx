@@ -8,8 +8,7 @@ import {
   ResponsiveContainer, Cell, ReferenceLine,
 } from "recharts";
 import { fetchData } from "@/lib/Api";
-import { formatCurrency, formatDate } from "@/lib/formatters";
-import { Loader } from "@/components/Loader";
+import { formatCurrency, formatDate, formatDays, formatPercent } from "@/lib/formatters";
 import LoadError, { loadFailed } from "@/components/data/LoadError";
 import { KpiRow, KpiTile } from "@/components/ui/KpiTile";
 import { StatusChip, type StatusTone } from "@/components/ui/StatusChip";
@@ -79,15 +78,29 @@ export default function CustomerRisk() {
     );
   }
 
+  // Loading: back link and head placeholder at once; only the content waits.
   if (isLoading && !riskFailed) {
-    return <Loader fullScreen />;
+    return (
+      <div className="fin-page" aria-busy="true" aria-label="Loading risk profile">
+        <button type="button" onClick={() => navigate(-1)} className="fin-back">
+          <span aria-hidden="true">←</span> Back
+        </button>
+        <header className="fin-detail-head">
+          <div style={{ minWidth: 0 }}>
+            <div className="fin-detail-head__eyebrow">Payment risk profile</div>
+            <span className="fin-skel fin-skel--line" aria-hidden="true" />
+          </div>
+        </header>
+        <div className="fin-skel fin-skel--card" aria-hidden="true" />
+      </div>
+    );
   }
 
   if (error || !data) {
     return (
       <div className="fin-page">
         <div className="card fin-empty">
-          <h1 className="fin-empty__title" style={{ fontSize: 22, lineHeight: "28px" }}>Risk profile not found</h1>
+          <h1 className="fin-empty__title">Risk profile not found</h1>
           <p className="fin-empty__body">We couldn’t load this customer’s risk profile.</p>
           <button className="btn-action" onClick={() => navigate("/capital")}>Back to Capital</button>
         </div>
@@ -123,7 +136,7 @@ export default function CustomerRisk() {
   const kpis: { label: string; value: string; sub: string; show: boolean }[] = [
     {
       label: "Late-payment risk",
-      value: `${data.risk_pct}%`,
+      value: formatPercent(data.risk_pct, Number.isInteger(Number(data.risk_pct)) ? 0 : 1),
       sub: data.insufficient_history
         ? `Fewer than 3 invoices, so this is a starting estimate`
         : `${lateCount} of ${invoiceCount} invoices more than 30 days late`,
@@ -131,13 +144,13 @@ export default function CustomerRisk() {
     },
     {
       label: "Average time to pay",
-      value: stats.avg_days_to_pay != null ? `${stats.avg_days_to_pay} days` : "—",
+      value: stats.avg_days_to_pay != null ? formatDays(stats.avg_days_to_pay) : "—",
       sub: paidCount > 0 ? `Issue to payment, across ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}` : "No paid invoices yet",
       show: stats.avg_days_to_pay != null,
     },
     {
       label: "Paid by the due date",
-      value: stats.on_time_pct != null ? `${stats.on_time_pct}%` : "—",
+      value: stats.on_time_pct != null ? formatPercent(stats.on_time_pct, Number.isInteger(Number(stats.on_time_pct)) ? 0 : 1) : "—",
       sub: paidCount > 0 ? `Of ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}` : "No paid invoices yet",
       show: stats.on_time_pct != null,
     },

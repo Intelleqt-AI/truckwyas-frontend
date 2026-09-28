@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { prefetchProps } from './routePrefetch';
 import { PanelLeftClose, PanelLeftOpen, Settings, ChevronsUpDown, Building2, CreditCard, Users, LogOut } from 'lucide-react';
 import { NAV_GROUPS, isItemActive, underPrefix, type NavItem } from './nav';
 
@@ -26,6 +27,7 @@ function NavLinkItem({ item, active, collapsed }: { item: NavItem; active: boole
       className={`tw-nav__item${active ? ' is-active' : ''}${item.muted ? ' is-muted' : ''}`}
       aria-current={active ? 'page' : undefined}
       aria-label={collapsed ? item.label : undefined}
+      {...prefetchProps(item.to)}
     >
       <Icon className="tw-nav__icon" aria-hidden="true" strokeWidth={1.75} />
       <span className="tw-nav__label">{item.label}</span>

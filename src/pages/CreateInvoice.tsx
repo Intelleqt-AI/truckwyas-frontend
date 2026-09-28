@@ -1,6 +1,7 @@
 import './quote-invoice-roles.css';
 import './finance-brand.css';
 import { formatCurrency } from '@/lib/formatters';
+import SectionHeader from '@/components/layout/SectionHeader';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -69,16 +70,11 @@ export default function CreateInvoice() {
 
   return (
     <div className="fin-page">
-      <button type="button" className="fin-back" onClick={() => navigate('/finance/invoices')}>
-        <span aria-hidden="true">←</span> Back to invoices
-      </button>
-      <header className="fin-detail-head">
-        <div style={{ minWidth: 0 }}>
-          <div className="fin-detail-head__eyebrow">Finance</div>
-          <div className="fin-detail-head__title-row"><h1>New invoice</h1></div>
-          <p className="fin-detail-head__sub">For one-off charges. Loads invoice themselves.</p>
-        </div>
-      </header>
+      <SectionHeader
+        title="New invoice"
+        back={{ to: '/finance/invoices', label: 'Invoices' }}
+        description="For one-off charges. Loads invoice themselves."
+      />
 
       <form onSubmit={handleSubmit}>
         <div className="fin-create-grid">
@@ -106,13 +102,13 @@ export default function CreateInvoice() {
                   <label htmlFor="create-invoice-invoice_number" className="fin-label">
                     Invoice number <span className="fin-label__hint">Suggested, you can change it</span>
                   </label>
-                  <input id="create-invoice-invoice_number" className="fin-control qi-input" type="text" value={form.invoice_number} onChange={set('invoice_number')} style={{ fontFamily: 'var(--font-mono)' }} />
+                  <input id="create-invoice-invoice_number" className="fin-control qi-input" type="text" value={form.invoice_number} onChange={set('invoice_number')} />
                 </div>
               </div>
               <div className="fin-form__row">
                 <div>
                   <label htmlFor="create-invoice-amount" className="fin-label">Amount excl. VAT (ZAR)</label>
-                  <input id="create-invoice-amount" className="fin-control qi-input" type="number" inputMode="decimal" step="0.01" placeholder="0.00" value={form.amount} onChange={set('amount')} style={{ fontVariantNumeric: 'tabular-nums' }} />
+                  <input id="create-invoice-amount" className="fin-control qi-input" type="number" inputMode="decimal" step="0.01" placeholder="0,00" value={form.amount} onChange={set('amount')} style={{ fontVariantNumeric: 'tabular-nums' }} />
                 </div>
                 <div>
                   <div className="fin-label">Due date</div>

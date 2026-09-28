@@ -11,13 +11,12 @@ import { MobileAuthLayout } from "@/components/MobileAuthLayout";
 // every page that mentions the plan, so returning users see the same promise
 // new signups do.
 const PLAN_FEATURES = [
-  "Unlimited loads & invoices",
-  "AI-powered quote optimisation",
-  "Fast Pay capital access (not live yet)",
-  "Advanced analytics & reporting",
-  "Fleet intelligence dashboard",
+  "Unlimited loads and invoices",
+  "Quotes priced from your own costs",
+  "Reports and insights",
+  "Fleet and driver records",
   "Multi-user access",
-  "API & integrations",
+  "API and integrations",
   "Priority support",
 ];
 
@@ -185,7 +184,7 @@ const Login = () => {
                 fontSize: 13,
                 lineHeight: '20px',
                 fontWeight: 500,
-                color: 'var(--status-info-text)',
+                color: 'var(--text-primary)',
                 textDecoration: 'none',
               }}
             >
@@ -310,14 +309,6 @@ const Login = () => {
         ))}
       </div>
 
-      <div style={{
-        marginTop: 20, padding: '12px 16px', border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-nested)', background: 'var(--bg-surface-hover)',
-        fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
-      }}>
-        Reminder: every completed load also carries a <strong style={{ color: 'var(--text-primary)' }}>0.25% platform fee</strong>,
-        charged automatically to the card on file on top of the monthly plan.
-      </div>
 
       <div style={{ marginTop: 16, fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)' }}>
         Built for South African road freight
@@ -330,7 +321,7 @@ const Login = () => {
       <MobileAuthLayout
         eyebrow="Welcome back"
         title={<>Your fleet, right where <span style={{ color: 'var(--text-tertiary)' }}>you left it</span>.</>}
-        subtitle="Loads, quotes, invoices, and fleet intelligence, all in one dashboard, updated in real time."
+        subtitle="Loads, quotes, invoices and your fleet, in one place."
         footer={extraContent}
       >
         {formCard}
@@ -365,20 +356,20 @@ const Login = () => {
       {/* Content side — a reminder of what's waiting, not a sales pitch */}
       <div className="login-split__content" style={{
         position: 'relative', overflow: 'hidden',
-        background: 'var(--bg-surface)',
+        background: 'var(--bg-deep)',
         borderRight: '1px solid var(--border-subtle)',
       }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
           <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
 
-          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-info-text)', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)', marginBottom: 10 }}>
             Welcome back
           </div>
           <p style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', margin: '0 0 16px', letterSpacing: 'normal' }}>
             Your fleet, right where <span style={{ color: 'var(--text-tertiary)' }}>you left it</span>.
           </p>
           <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: '22px', marginBottom: 32 }}>
-            Loads, quotes, invoices, and fleet intelligence, all in one dashboard, updated in real time.
+            Loads, quotes, invoices and your fleet, in one place.
           </div>
 
           {extraContent}

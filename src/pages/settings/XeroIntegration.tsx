@@ -1,4 +1,6 @@
 import { StatusChip } from '@/components/ui/StatusChip';
+import { formatDateTime } from '@/lib/formatters';
+import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { useEffect, useState } from "react";
 import useFetch from "@/hooks/useFetch";
 import { usePost } from "@/hooks/usePost";
@@ -173,13 +175,7 @@ export default function XeroIntegration() {
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Never";
-    return new Date(dateString).toLocaleString("en-ZA", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTime(dateString);
   };
 
   const primaryBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 };
@@ -190,7 +186,14 @@ export default function XeroIntegration() {
   if (isLoading) {
     return (
       <SettingsShell activeId="integrations">
-        <Loader fullScreen />
+        {/* Head first; only the content waits. */}
+        <div style={{ maxWidth: 720 }}>
+          <SettingsPageHeader
+            title="Xero integration"
+            description="Connect your Xero account to automatically sync invoices and payments"
+          />
+          <BlockSkeleton height={200} label="Loading Xero connection" />
+        </div>
       </SettingsShell>
     );
   }

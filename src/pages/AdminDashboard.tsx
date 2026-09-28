@@ -19,9 +19,9 @@ type Section = { group: string; items: SectionItem[] };
 
 const SECTIONS: Section[] = [
   {
-    group: 'Overview',
+    group: 'Summary',
     items: [
-      { id: 'home', label: 'Home', component: AdminHome },
+      { id: 'home', label: 'Overview', component: AdminHome },
     ],
   },
   {
@@ -61,8 +61,9 @@ export default function AdminDashboard() {
   const { user: authUser } = useAuth();
   // On phones the section list is one horizontal row; keep the current one in view.
   const navRef = useRef<HTMLElement>(null);
+  const phoneNavRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    const nav = navRef.current;
+    const nav = phoneNavRef.current;
     if (!nav || nav.scrollWidth <= nav.clientWidth) return;
     const cur = nav.querySelector<HTMLElement>('[aria-current="page"]');
     if (!cur) return;
@@ -164,6 +165,15 @@ export default function AdminDashboard() {
             <div className="section-header__actions" />
           </div>
         </header>
+        {/* Phones: the section list sits under the head, so the H1 is where
+            it is on every other page. */}
+        <nav ref={phoneNavRef} aria-label="Admin sections" className="tw-admin-phone-nav">
+          {ALL_ITEMS.map(item => (
+            <NavLink key={item.id} to={`/admin/${item.id}`} className="admin-control admin-nav-link" aria-current={section === item.id ? 'page' : undefined}>
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
         <CurrentComponent />
       </div>
     </div>

@@ -1,4 +1,6 @@
 import '@/pages/table-heading-roles.css';
+import { formatDistance } from '@/lib/formatters';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import '@/pages/settings/settings-brand.css';
 import { useState, useEffect } from "react";
 import { fetchData, deleteData } from "@/lib/Api";
@@ -149,7 +151,7 @@ export function VehiclesDirectory() {
         />
 
         {loading ? (
-          <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
+          <TableSkeleton rows={6} cols={4} label="Loading vehicles" />
         ) : (
           <div className="settings-scroll-region" role="region" aria-label="Vehicles" tabIndex={0} style={{ overflowX: 'auto' }}>
           <table className="table-heading-roles settings-table settings-table--pin-actions">
@@ -177,7 +179,7 @@ export function VehiclesDirectory() {
                   <td style={{ width: 32 }}>
                     <RowCheckbox checked={selected.includes(v.id)} onChange={on => toggleOne(v.id, on)} />
                   </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', fontWeight: 400, color: 'var(--text-primary)' }}>
+                  <td style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 14, lineHeight: '20px', fontWeight: 400, color: 'var(--text-primary)' }}>
                     {v.plate || '—'}
                   </td>
                   <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
@@ -203,11 +205,11 @@ export function VehiclesDirectory() {
                         const nextAt = parseFloat(String(v.last_service_mileage)) + Number(v.service_interval_km);
                         const remaining = nextAt - parseFloat(String(v.mileage));
                         return remaining > 0
-                          ? `${Math.round(remaining).toLocaleString('en-ZA')} km left`
+                          ? `${formatDistance(remaining)} left`
                           : 'Overdue';
                       }
                       if (v.last_service_mileage) {
-                        return `At ${parseFloat(String(v.last_service_mileage)).toLocaleString('en-ZA')} km`;
+                        return `At ${formatDistance(parseFloat(String(v.last_service_mileage)))}`;
                       }
                       return v.last_maintenance_date || '—';
                     })()}

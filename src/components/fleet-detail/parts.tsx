@@ -1,4 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { StatusMenu } from './StatusMenu';
+import SectionHeader from '@/components/layout/SectionHeader';
+import { formatDate, formatDistance, formatMoney, formatMoneyWhole, formatMonth, formatNumber } from '@/lib/formatters';
 import { Link } from 'react-router-dom';
 import { StatusChip as SharedStatusChip } from '@/components/ui/StatusChip';
 import { Segmented } from '@/components/ui/Segmented';
@@ -17,14 +20,12 @@ export const formatStatus = (s?: string | null) =>
   s ? s.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase()) : '—';
 
 /** Whole rands for headline figures: "R 25 573". */
-export const randWhole = (v: number) =>
-  new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(v);
+export const randWhole = (v: number) => formatMoneyWhole(v);
 
 /** Rands and cents per unit: "R 15,50". */
-export const randCents = (v: number) =>
-  new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(v);
+export const randCents = (v: number) => formatMoney(v);
 
-export const kmText = (n: number) => `${Math.round(n).toLocaleString('en-ZA')} km`;
+export const kmText = (n: number) => formatDistance(n);
 
 export const num = (v: unknown) => {
   const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
@@ -35,7 +36,7 @@ export const num = (v: unknown) => {
 export const dateText = (v?: string | null) => {
   if (!v) return null;
   const d = new Date(v.length === 10 ? `${v}T00:00:00` : v);
-  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+  return Number.isNaN(d.getTime()) ? null : formatDate(d);
 };
 
 /** Whole days from today until a date (negative when past). */
@@ -48,7 +49,7 @@ export const daysUntil = (v?: string | null) => {
   return Math.round((d.getTime() - today.getTime()) / DAY_MS);
 };
 
-export const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en-ZA')} ${n === 1 ? one : many}`;
+export const plural = (n: number, one: string, many = `${one}s`) => `${formatNumber(n)} ${n === 1 ? one : many}`;
 
 // ---------------------------------------------------------------- monthly
 
@@ -66,8 +67,8 @@ export function monthlySeries(loads: any[], n = 12, now = new Date()): MonthPoin
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const p: MonthPoint = {
       key,
-      label: d.toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' }),
-      short: d.toLocaleDateString('en-ZA', { month: 'short' }),
+      label: formatMonth(d),
+      short: formatMonth(d).slice(0, 3),
       revenue: 0,
       loads: 0,
     };
@@ -164,38 +165,32 @@ export const StatusChip = ({ status, label }: { status?: string | null; label?: 
 export function RecordHeader({ crumb, crumbTo, title, chip, meta, actions }: {
   crumb: string; crumbTo: string; title: string; chip: ReactNode; meta?: ReactNode; actions?: ReactNode;
 }) {
+  // The one page head (SectionHeader): H1 at the same place as every other
+  // page, the back link on the subtitle line, actions on the title row.
   return (
-    <header className="fd-head">
-      <nav className="fd-crumb" aria-label="Breadcrumb">
-        <Link to={crumbTo}>{crumb}</Link>
-        <span aria-hidden="true">/</span>
-        <span aria-current="page">{title}</span>
-      </nav>
-      <div className="fd-head__row">
-        <div className="fd-head__id">
-          <div className="fd-head__title-row">
-            <h1 className="fd-head__title">{title}</h1>
-            {chip}
-          </div>
-          {meta && <p className="fd-head__meta">{meta}</p>}
-        </div>
-        {actions && <div className="fd-head__actions">{actions}</div>}
-      </div>
-    </header>
+    <SectionHeader
+      title={title}
+      titleAdornment={chip}
+      back={{ to: crumbTo, label: crumb }}
+      description={meta}
+      actions={actions}
+    />
   );
 }
 
-/** Segmented status control (the shared .tw-seg). Keeps the PATCH-per-click behaviour. */
-export function StatusControl({ label, options, current, busy, onPick }: {
-  label: string; options: readonly string[]; current?: string; busy: boolean; onPick: (s: string) => void;
+/** Status setter on a vehicle or driver page: the status is shown once as the
+ *  header chip; this "Change status" menu is the action, and it confirms the
+ *  choice before `onPick` runs the page's PATCH. */
+export function StatusControl({ label, options, current, busy, onPick, subject }: {
+  label: string; options: readonly string[]; current?: string; busy: boolean; onPick: (s: string) => void; subject?: string;
 }) {
   return (
-    <Segmented
-      className="fd-status-seg"
-      label={label}
-      value={current ?? ''}
+    <StatusMenu
+      subject={subject || label.replace(/^Set /, '').replace(/ status$/, '')}
+      current={current ?? ''}
+      busy={busy}
+      options={options.map((s) => ({ value: s, label: formatStatus(s) }))}
       onChange={(s) => { if (!busy) onPick(s); }}
-      options={options.map((s) => ({ value: s, label: formatStatus(s), disabled: busy && current !== s }))}
     />
   );
 }
@@ -361,12 +356,18 @@ export function expiryAlert(key: string, what: string, date: string | null | und
 
 // ------------------------------------------------------------------ states
 
-export function DetailSkeleton() {
+export function DetailSkeleton({ crumb, crumbTo }: { crumb?: string; crumbTo?: string } = {}) {
+  // The head renders straight away; only the content below waits.
   return (
     <div className="fleet-detail" aria-busy="true" aria-label="Loading">
-      <div className="fd-skel" style={{ width: 120, height: 16, marginBottom: 16 }} />
-      <div className="fd-skel" style={{ width: 260, height: 28, marginBottom: 8 }} />
-      <div className="fd-skel" style={{ width: 200, height: 16, marginBottom: 32 }} />
+      {crumb && crumbTo ? (
+        <SectionHeader title={crumb.replace(/s$/, '')} back={{ to: crumbTo, label: crumb }} />
+      ) : (
+        <>
+          <div className="fd-skel" style={{ width: 260, height: 28, marginBottom: 8 }} />
+          <div className="fd-skel" style={{ width: 200, height: 16, marginBottom: 32 }} />
+        </>
+      )}
       <div className="fd-strip">
         <KpiRow>
           {[0, 1, 2].map((i) => (

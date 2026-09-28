@@ -128,9 +128,21 @@ table.settings-table.is-inset :is(th, td):last-child { padding-right: 0; }
 
 /* ---- Phone and small tablet: the settings list becomes one scrollable row
    of links above the page, so content gets the full width. ---- */
+.tw-settings-phone-nav { display: none; }
 @media (max-width: 768px) {
   .tw-settings-shell { flex-direction: column; }
-  .tw-settings-shell > .tw-settings-shell__side {
+  /* The side list hides; the same links sit under the page head instead. */
+  .tw-settings-shell > .tw-settings-shell__side { display: none !important; }
+  .tw-settings-phone-nav {
+    display: flex; align-items: center; gap: 4px;
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+    margin: calc(-1 * var(--head-to-content, 16px) + 4px) 0 var(--head-to-content, 16px);
+    padding: 0 0 8px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .tw-settings-phone-nav::-webkit-scrollbar { display: none; }
+  .tw-settings-phone-nav .settings-nav-link { white-space: nowrap; flex-shrink: 0; margin: 0; }
+  .tw-settings-shell > .tw-settings-shell__side-legacy {
     width: auto !important;
     border-right: none !important;
     border-bottom: 1px solid var(--border-subtle);
@@ -153,4 +165,13 @@ table.settings-table.is-inset :is(th, td):last-child { padding-right: 0; }
   .tw-settings-shell .tw-settings-shell__group-label { display: none; }
   .tw-settings-shell .settings-nav-link { white-space: nowrap; flex-shrink: 0; margin: 0; }
   .tw-settings-shell > .tw-settings-shell__content { padding: 0 !important; }
+}
+
+/* Users table on phones: who and status stay; role and last active drop
+   (role still shows in the row menu's "Change role"). */
+@media (max-width: 600px) {
+  table.settings-table .st-col-phone { display: none; }
+  table.settings-table th:first-child, table.settings-table td:first-child { padding-left: 16px; }
+  table.settings-table th, table.settings-table td { padding-left: 8px; padding-right: 8px; }
+  table.settings-table .st-email { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }

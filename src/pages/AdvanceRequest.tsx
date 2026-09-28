@@ -6,8 +6,7 @@ import { CheckCircle2 } from 'lucide-react';
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchData, postData } from "@/lib/Api";
-import { formatCurrency, formatDate } from "@/lib/formatters";
-import { Loader } from "@/components/Loader";
+import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import SectionHeader from "@/components/layout/SectionHeader";
 
 const TIER_TONE: Record<string, string> = {
@@ -91,8 +90,22 @@ export default function AdvanceRequest() {
     }
   };
 
+  // The head renders at once; only the content waits, as a skeleton.
   if (loading) {
-    return <Loader fullScreen />;
+    return (
+      <div className="capital-typography fin-page">
+        <SectionHeader
+          eyebrow="Fast Pay"
+          title="Request advance"
+          titleAdornment={CAPITAL_LAUNCHED ? undefined : <span className="fin-chip" style={{ borderRadius: 'var(--radius-chip)' }}>Not live yet</span>}
+          description={CAPITAL_LAUNCHED ? 'Get paid early on an eligible invoice in three steps.' : CAPITAL_COMING_SOON}
+        />
+        <div aria-busy="true" aria-label="Loading" style={{ display: 'grid', gap: 'var(--card-gap, 16px)' }}>
+          <div style={{ height: 160, borderRadius: 'var(--radius-card)', background: 'var(--bg-surface-hover)' }} />
+          <div style={{ height: 240, borderRadius: 'var(--radius-card)', background: 'var(--bg-surface-hover)' }} />
+        </div>
+      </div>
+    );
   }
 
   // Step 4 - Success screen
@@ -187,7 +200,7 @@ export default function AdvanceRequest() {
                           style={{ cursor: 'pointer', width: 16, height: 16 }}
                         />
                       </td>
-                      <td><span className="fin-id">{inv.invoice_number || inv.invoiceNumber}</span></td>
+                      <td><span style={{ fontVariantNumeric: 'tabular-nums' }}>{inv.invoice_number || inv.invoiceNumber}</span></td>
                       <td className="fin-strong">{inv.customer_name || inv.customerName}</td>
                       <td className="num capital-amount">{formatCurrency(inv.total_amount || inv.amount)}</td>
                       <td>
@@ -237,7 +250,7 @@ export default function AdvanceRequest() {
           </div>
           <div style={{ marginBottom: 24, padding: 16, background: 'var(--bg-surface-hover)', borderRadius: 'var(--radius-nested)' }}>
             <div style={{ fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)', marginBottom: 4 }}>Selected invoice</div>
-            <div className="fin-id" style={{ fontSize: 16, lineHeight: '24px', fontWeight: 500 }}>{selectedInvoice.invoice_number}</div>
+            <div style={{ fontVariantNumeric: 'tabular-nums', fontSize: 16, lineHeight: '24px', fontWeight: 500 }}>{selectedInvoice.invoice_number}</div>
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginTop: 2 }}>{selectedInvoice.customer_name}</div>
           </div>
 
@@ -256,7 +269,7 @@ export default function AdvanceRequest() {
             {CAPITAL_LAUNCHED ? (
               <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Fee ({(feeRate * 100).toFixed(1)}%)</span>
+              <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>Fee ({formatPercent(feeRate * 100)})</span>
               <span style={{ fontSize: 16, lineHeight: '24px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>−{formatCurrency(feeAmount)}</span>
             </div>
             <div style={{ height: 1, background: 'var(--border-subtle)' }} />
@@ -312,7 +325,7 @@ export default function AdvanceRequest() {
           <div style={{ padding: 20, background: 'var(--bg-surface-hover)', borderRadius: 'var(--radius-control)', marginBottom: 24 }}>
             <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 12 }}>{CAPITAL_LAUNCHED ? 'You are requesting an advance of' : 'You would be requesting an advance'}</div>
             {CAPITAL_LAUNCHED && <div style={{ fontSize: 28, lineHeight: '36px', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>{formatCurrency(netReceived)}</div>}
-            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>on invoice <span className="fin-id">{selectedInvoice.invoice_number}</span></div>
+            <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>on invoice <span style={{ fontVariantNumeric: 'tabular-nums' }}>{selectedInvoice.invoice_number}</span></div>
           </div>
 
           <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: '20px', marginBottom: 24, padding: 0 }}>

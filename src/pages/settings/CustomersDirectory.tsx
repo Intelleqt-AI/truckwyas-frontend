@@ -1,4 +1,5 @@
 import './customers-directory-controls.css';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import { useState, useEffect } from "react";
 import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
@@ -224,7 +225,7 @@ export function CustomersDirectory() {
 
         {/* Table */}
         {loading ? (
-          <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
+          <TableSkeleton rows={6} cols={4} label="Loading customers" />
         ) : (
           <div role="region" aria-label="Customer directory table" tabIndex={0} style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'auto' }}>
           <table className="table-heading-roles settings-table settings-table--pin-actions" style={{ minWidth: 830, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px' }}>

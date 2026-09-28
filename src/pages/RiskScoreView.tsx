@@ -4,9 +4,8 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchData } from '@/lib/Api';
-import { formatDate } from '@/lib/formatters';
+import { formatDate, formatPercent } from '@/lib/formatters';
 import { CAPITAL_LAUNCHED, CAPITAL_COMING_SOON } from '@/lib/features';
-import { Loader } from '@/components/Loader';
 import { StatusChip, type StatusTone } from '@/components/ui/StatusChip';
 
 
@@ -182,7 +181,7 @@ export default function RiskScoreView() {
           </div>
         </div>
         {isLoading ? (
-          <div style={{ padding: '40px 20px', display: 'flex', justifyContent: 'center' }}><Loader size={28} label="Loading scores…" /></div>
+          <div style={{ padding: 20 }} aria-busy="true" aria-label="Loading scores"><span className="fin-skel" style={{ height: 240, borderRadius: 8 }} aria-hidden="true" /></div>
         ) : customerScores.length === 0 ? (
           <div className="fin-empty">
             <p className="fin-empty__title">No risk scores yet</p>
@@ -222,7 +221,7 @@ export default function RiskScoreView() {
                       </td>
                       <td>{cs.is_eligible ? 'Yes' : <span className="fin-text-muted">No</span>}</td>
                       {CAPITAL_LAUNCHED && (
-                        <td className="num">{cs.is_eligible && cs.fee_percent != null ? `${parseFloat(cs.fee_percent).toFixed(1)}%` : '—'}</td>
+                        <td className="num">{cs.is_eligible && cs.fee_percent != null ? formatPercent(parseFloat(cs.fee_percent), 1) : '—'}</td>
                       )}
                     </tr>
                   );

@@ -3,7 +3,7 @@ import { Tip, TipRow, localPoint, niceTicks, rand, randCompact, useTip, useWidth
 import '@/components/viz/viz.css';
 
 /**
- * Today (Overview) presentation pieces. Every value comes from what the page
+ * Home (Overview) presentation pieces. Every value comes from what the page
  * already fetched; nothing here requests or invents data.
  */
 

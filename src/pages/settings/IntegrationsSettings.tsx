@@ -1,11 +1,12 @@
 import '@/pages/settings/settings-brand.css';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState, useEffect } from "react";
 import { fetchData, postData, deleteData, patchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { Loader } from "@/components/Loader";
 import { useAuth } from "@/lib/AuthContext";
 import { settingsBadgeStyle, settingsCardStyle, settingsInputStyle, settingsSecondaryButtonStyle, SettingsPageHeader } from "./settingsUi";
-import { formatDate } from "@/lib/formatters";
+import { formatDate, formatDateTime } from '@/lib/formatters';
 import RowActions from '@/components/ui/RowActions';
 import { StatusChip } from '@/components/ui/StatusChip';
 
@@ -466,7 +467,7 @@ export function IntegrationsSettings() {
               <strong style={{ color: 'var(--text-primary)' }}>Connected:</strong> {xeroStatus.tenant_name || 'Xero account'}
               {xeroStatus.last_sync && (
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
-                  Last sync: {new Date(xeroStatus.last_sync).toLocaleString()}
+                  Last sync: {formatDateTime(xeroStatus.last_sync)}
                 </div>
               )}
             </div>
@@ -546,7 +547,7 @@ export function IntegrationsSettings() {
             <strong style={{ color: 'var(--text-primary)' }}>Connected:</strong> {cartrackStatus.base_url}
             {cartrackStatus.last_status_sync && (
               <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 4 }}>
-                Last vehicle status sync: {new Date(cartrackStatus.last_status_sync).toLocaleString()}
+                Last vehicle status sync: {formatDateTime(cartrackStatus.last_status_sync)}
               </div>
             )}
           </div>
@@ -642,7 +643,7 @@ export function IntegrationsSettings() {
               )}
               {ctrlfleetStatus.last_vehicle_sync && (
                 <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                  Last vehicle sync: {new Date(ctrlfleetStatus.last_vehicle_sync).toLocaleString()}
+                  Last vehicle sync: {formatDateTime(ctrlfleetStatus.last_vehicle_sync)}
                 </div>
               )}
             </div>
@@ -752,23 +753,18 @@ export function IntegrationsSettings() {
                           </div>
                         ) : (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <select
-                              value={linkSelections[cf.vehicle_code] || ''}
-                              onChange={(e) => setLinkSelections({ ...linkSelections, [cf.vehicle_code]: e.target.value })}
-                              className="settings-control"
-                              aria-label="Link to vehicle"
-                              style={{
-                                padding: '8px 12px', minHeight: 40, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)',
-                                borderRadius: 'var(--radius-control)', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: '20px',
-                              }}
-                            >
-                              <option value="">Link to vehicle…</option>
-                              {unlinkedOptions.map((v) => (
-                                <option key={v.id} value={v.id}>
-                                  {v.plate}{v.make ? `, ${v.make} ${v.model}` : ''}
-                                </option>
-                              ))}
-                            </select>
+                            <Select value={linkSelections[cf.vehicle_code] || undefined} onValueChange={(v) => setLinkSelections({ ...linkSelections, [cf.vehicle_code]: v })}>
+                              <SelectTrigger aria-label="Link to vehicle" style={{ minWidth: 200, minHeight: 40 }}>
+                                <SelectValue placeholder="Link to vehicle…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {unlinkedOptions.map((v) => (
+                                  <SelectItem key={v.id} value={String(v.id)}>
+                                    {v.plate}{v.make ? `, ${v.make} ${v.model}` : ''}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <button
                               onClick={() => handleLinkVehicle(cf.vehicle_code)}
                               disabled={linkingCode === cf.vehicle_code || isDemo}

@@ -25,39 +25,68 @@
 .fr-page .tw-info__pop { max-width: 320px; }
 
 /* -------------------------------------------------------------- library */
-.fr-library { display: flex; flex-direction: column; gap: 20px; }
-.fr-group { display: flex; flex-direction: column; gap: 12px; }
-.fr-group__title { margin: 0; font: 600 13px/20px var(--font-sans); color: var(--text-secondary); }
-.fr-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--fr-gap); }
-.fr-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.fr-card__group { font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); padding-top: 2px; }
-.fr-card {
-  display: flex; flex-direction: column; min-width: 0;
-  background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card);
-  padding: var(--card-pad, 20px);
+/* One compact list directly under the Finance tabs (the tab is the heading):
+   report, what it answers, the 12-month headline, the newest entry. */
+.fr-lib { overflow: hidden; }
+.fr-lib__head, .fr-lib__row {
+  display: grid; align-items: center; column-gap: 24px;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(180px, 220px) 120px 16px;
+  padding: 0 20px;
 }
-.fr-card__icon {
-  display: inline-grid; place-items: center; width: 36px; height: 36px; flex: none;
-  border-radius: var(--radius-chip); background: var(--bg-raised); color: var(--text-primary);
+.fr-lib__head {
+  height: 40px; border-bottom: 1px solid var(--border-subtle);
+  font: 500 12px/16px var(--font-sans); color: var(--text-tertiary);
 }
-.fr-card__title { margin: 0; font: 600 var(--text-subhead, 15px)/22px var(--font-sans); letter-spacing: var(--tracking-title, -0.01em); color: var(--text-primary); }
-.fr-card__purpose { margin: 2px 0 0; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); }
-.fr-card__meta {
-  margin: 12px 0 16px; display: flex; flex-direction: column; gap: 2px;
-  font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); font-variant-numeric: tabular-nums;
+.fr-lib__col-fig { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.fr-lib__col-latest { text-align: right; }
+.fr-lib__head > :last-child::after { content: ''; }
+.fr-lib__list { list-style: none; margin: 0; padding: 0; }
+.fr-lib__list li + li { border-top: 1px solid var(--border-row); }
+.fr-lib__row { min-height: 56px; padding-top: 8px; padding-bottom: 8px; color: var(--text-primary); text-decoration: none; }
+.fr-lib__row:hover { background: var(--bg-surface-hover); }
+.fr-lib__row:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
+.fr-lib__name { font: 500 14px/20px var(--font-sans); }
+.fr-lib__purpose { font: 400 13px/20px var(--font-sans); color: var(--text-secondary); min-width: 0; }
+.fr-lib__fig { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; text-align: right; }
+.fr-lib__value { font: 500 14px/20px var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fr-lib__caption { font: 400 12px/16px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.fr-lib__latest { font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fr-lib__chev { color: var(--text-tertiary); }
+.fr-lib__skel { display: block; width: 96px; height: 14px; border-radius: 4px; background: var(--bg-raised); animation: fr-pulse 1.4s ease-in-out infinite; }
+@media (max-width: 1100px) {
+  .fr-lib__head, .fr-lib__row { grid-template-columns: minmax(0, 1fr) minmax(140px, auto) 16px; column-gap: 16px; }
+  .fr-lib__col-purpose, .fr-lib__col-latest, .fr-lib__latest { display: none; }
+  .fr-lib__row { grid-template-areas: "name fig chev" "purpose fig chev"; }
+  .fr-lib__name { grid-area: name; }
+  .fr-lib__purpose { grid-area: purpose; }
+  .fr-lib__fig { grid-area: fig; }
+  .fr-lib__chev { grid-area: chev; }
 }
-.fr-card__btn { width: 100%; margin-top: auto; height: 40px; }
+@media (max-width: 640px) {
+  .fr-lib__head, .fr-lib__row { padding: 0 16px; grid-template-columns: minmax(0, 1fr) auto 16px; column-gap: 12px; }
+  .fr-lib__row { padding-top: 10px; padding-bottom: 10px; }
+  .fr-lib__head .fr-lib__col-fig { font-size: 12px; }
+  .fr-lib__caption { max-width: 132px; }
+}
+
+/* Compact menu for a report's second setting (basis, view, as-at date). */
+.fr-choice.tw-select-trigger { flex: none; max-width: 100%; }
+.fr-choice--wide.tw-select-trigger { max-width: 280px; }
+.fr-choice .fr-choice__pre { color: var(--text-tertiary); margin-right: 6px; }
+.fr-choice .fr-choice__val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-choice > span:first-child { display: inline-flex; min-width: 0; overflow: hidden; }
 
 /* --------------------------------------------------------------- report */
 .fr-report { display: flex; flex-direction: column; gap: var(--fr-gap); min-width: 0; }
 .fr-head { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
+.fr-head > .fr-head__sub { flex: 1 0 auto; max-width: 100%; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+@media (max-width: 640px) { .fr-head > .fr-head__sub { white-space: normal; flex-wrap: wrap; } }
 .fr-head__actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; min-width: 0; margin-left: auto; }
 .fr-head__actions .tw-btn { height: 32px; padding: 0 12px; font-size: 13px; }
 .fr-period { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .fr-period__custom { display: inline-flex; align-items: center; gap: 8px; }
 .fr-seg { max-width: 100%; }
 .fr-muted { color: var(--text-tertiary); font: 400 13px/20px var(--font-sans); }
-.fr-select { display: inline-flex; align-items: center; gap: 8px; }
 .fr-input {
   height: 32px; padding: 0 10px; min-width: 0; max-width: 100%;
   border: 1px solid var(--border-control, var(--border-subtle)); border-radius: var(--radius-control);
@@ -67,9 +96,9 @@
 .fr-input:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
 
 /* ---------------------------------------------------------------- tiles */
-/* Standard KPI tiles (components/ui/KpiTile). Always a 4-column grid, so one
-   or two tiles keep the standard tile width instead of stretching. */
-.fr-tiles.tw-kpi-row { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--fr-gap); margin: 0; }
+/* Standard KPI tiles (components/ui/KpiTile): the shared row sizes to its
+   count, so two tiles fill the row instead of leaving half of it empty. */
+.fr-tiles.tw-kpi-row { gap: var(--fr-gap); margin: 0; }
 .fr-gaps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .fr-gaps li { font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); display: flex; gap: 8px; align-items: baseline; }
 .fr-gaps li::before { content: ''; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--text-tertiary); opacity: 0.6; transform: translateY(-1px); }
@@ -137,29 +166,19 @@
 .fr-print-head { display: none; }
 
 /* --------------------------------------------------------------- phones */
-@media (max-width: 1024px) {
-  .fr-tiles.tw-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .fr-tiles--3.tw-kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (max-width: 767px) {
-  /* The shared tile rules take over: 2 per row, 3 compact columns for 3. */
-  .fr-tiles.tw-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .fr-tiles--3.tw-kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .fr-tiles--1.tw-kpi-row { grid-template-columns: minmax(0, 1fr); }
-}
 @media (max-width: 640px) {
-  .fr-card { padding: 16px; }
-  .fr-card__btn { height: 48px; }
   .fr-head__actions { width: 100%; justify-content: flex-start; margin-left: 0; }
-  .fr-head__actions .fr-period, .fr-head__actions .fr-seg, .fr-head__actions .fr-select { width: 100%; }
+  .fr-head__actions .fr-period, .fr-head__actions .fr-seg { width: 100%; }
+  .fr-head__actions .fr-choice.tw-select-trigger { height: 44px !important; min-height: 44px !important; flex: 1 1 auto; }
   .fr-head__actions .fr-head__btn { flex: 1; height: 44px; }
   .fr-parties { grid-template-columns: minmax(0, 1fr); }
-  .fr-select { width: 100%; }
-  .fr-select .fr-input { flex: 1; height: 44px; }
   /* Phone: the sticky label column is capped so figures stay in view; the
      full label is in the cell's title. */
-  .fr-table--sticky tr > :first-child { min-width: 140px; max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
-  .fr-table th, .fr-table td { padding-left: 12px; padding-right: 12px; }
+  /* Narrow enough that the latest month and the total both show beside it. */
+  .fr-table--sticky tr > :first-child { min-width: 116px; max-width: 128px; overflow: hidden; text-overflow: ellipsis; }
+  .fr-table th, .fr-table td { padding-left: 10px; padding-right: 10px; }
+  .fr-table tr > :first-child, .fr-table tr > .is-indent:first-child { padding-left: 12px; }
+  .fr-table .is-indent { padding-left: 12px; }
 }
 
 /* ---------------------------------------------------------------- print */
@@ -174,7 +193,7 @@
   body:has(.fr-report) { background: #fff !important; }
   .fr-report { --bg-surface: #fff; --bg-surface-hover: #fff; --text-primary: #000; --text-secondary: #333; --text-tertiary: #555; --border-subtle: #bbb; --border-row: #ddd; color: #000; gap: 10px; }
   .fr-print-head { display: flex; justify-content: space-between; gap: 16px; font: 500 11px/16px var(--font-sans); color: #333; border-bottom: 1px solid #999; padding-bottom: 6px; }
-  .tw-kpi, .fr-state, .fr-card, .fr-parties, .tw-card { border-color: #bbb !important; background: #fff !important; }
+  .tw-kpi, .fr-state, .fr-parties, .tw-card { border-color: #bbb !important; background: #fff !important; }
   .fr-tiles .tw-kpi { height: auto; padding: 10px 12px; }
   .fr-tiles .tw-kpi__figure { font-size: 18px; line-height: 24px; }
   .fr-crumb, .fr-crumb__sep { display: none; }

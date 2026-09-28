@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { loadFailed } from '@/components/data/LoadError';
 import { fetchData } from '@/lib/Api';
 import { fetchAllPages, type Source } from '@/components/insights/findings';
+import { formatDate, formatMoney, formatMoneyWhole, formatNumber, formatPercent } from '@/lib/formatters';
 
 // ------------------------------------------------------------------- types
 
@@ -101,22 +102,17 @@ export function useCompany() {
 export const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 export const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
-const f2 = new Intl.NumberFormat('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const f0 = new Intl.NumberFormat('en-ZA', { maximumFractionDigits: 0 });
-
 /** "R 1 234,56"; negatives in brackets, as on a statement: "(R 1 234,56)". */
 export const money = (v: number) => {
   const r = round2(v);
-  if (r === 0) return `R ${f2.format(0)}`;
-  return r < 0 ? `(R ${f2.format(-r)})` : `R ${f2.format(r)}`;
+  if (r === 0) return formatMoney(0);
+  return r < 0 ? `(${formatMoney(-r)})` : formatMoney(r);
 };
 /** Whole rand for tiles: "R 182 053", negatives "−R 4 200". */
-export const moneyWhole = (v: number) => {
-  const r = Math.round(v);
-  return r < 0 ? `−R ${f0.format(-r)}` : `R ${f0.format(r)}`;
-};
-export const int = (v: number) => f0.format(Math.round(v));
-export const pct = (v: number | null, dp = 1) => (v == null || !Number.isFinite(v) ? '' : `${v < 0 && Number(v.toFixed(dp)) !== 0 ? '\u2212' : ''}${Math.abs(v).toFixed(dp).replace('.', ',')}%`);
+export const moneyWhole = (v: number) => formatMoneyWhole(Math.round(v));
+export const int = (v: number) => formatNumber(Math.round(v));
+/** "14,1%"; '' when there is no value. */
+export const pct = (v: number | null, dp = 1) => (v == null || !Number.isFinite(v) ? '' : formatPercent(v, dp));
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 // ------------------------------------------------------------------- dates
@@ -138,17 +134,29 @@ export const monthsIn = (from: string, to: string) => {
   for (let m = from; m <= to && out.length < 60; m = addMonths(m, 1)) out.push(m);
   return out;
 };
+/** Months to show as columns or rows: the period up to its last month with
+ *  any entry. Empty months inside that range stay (a real zero); only the
+ *  empty tail after the last entry is dropped. With no entries at all the
+ *  whole period is kept. Display only: totals are over the full period. */
+export const shownMonths = (months: string[], hasEntry: (ym: string) => boolean) => {
+  let last = -1;
+  months.forEach((m, i) => { if (hasEntry(m)) last = i; });
+  return last < 0 ? months : months.slice(0, last + 1);
+};
+/** "No entries after Jun 2026, so Jul to Sep 2026 are not shown." or null. */
+export const trimNote = (all: string[], shown: string[]) => {
+  if (shown.length >= all.length) return null;
+  const from = all[shown.length]; const to = all[all.length - 1];
+  const gap = from === to ? monthLabel(from) : `${monthLabel(from)} to ${monthLabel(to)}`;
+  return `No entries after ${monthLabel(shown[shown.length - 1])}, so ${gap} ${from === to ? 'is' : 'are'} not shown.`;
+};
 export const monthLabel = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
 export const monthEnd = (ym: string) => {
   const d = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0);
   return `${ym}-${String(d.getDate()).padStart(2, '0')}`;
 };
 /** "15 Jun 2026" */
-export const day = (iso?: string | null) => {
-  if (!iso) return '';
-  const s = iso.slice(0, 10);
-  return `${Number(s.slice(8, 10))} ${MONTHS[Number(s.slice(5, 7)) - 1]} ${s.slice(0, 4)}`;
-};
+export const day = (iso?: string | null) => (iso ? formatDate(iso.slice(0, 10)) : '');
 export const daysBetween = (a: string, b: string) =>
   Math.round((new Date(`${b.slice(0, 10)}T00:00:00`).getTime() - new Date(`${a.slice(0, 10)}T00:00:00`).getTime()) / 86_400_000);
 
@@ -206,6 +214,8 @@ export const isIssued = (i: Invoice) => !NOT_ISSUED.has(st(i.status));
 export const isDraft = (i: Invoice) => st(i.status) === 'DRAFT';
 /** Owed today: issued, not fully paid, balance above zero. */
 export const isOpen = (i: Invoice) => isIssued(i) && st(i.status) !== 'PAID' && num(i.balance) > 0.005;
+/** Load statuses that count as delivered work. */
+export const DELIVERED = new Set(['DELIVERED', 'INVOICED', 'COMPLETED', 'PAID']);
 export const isApproved = (e: Expense) => st(e.status) === 'APPROVED';
 export const isPending = (e: Expense) => st(e.status) === 'PENDING';
 

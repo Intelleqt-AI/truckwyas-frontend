@@ -1,11 +1,12 @@
 import './bookings-typography.css';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import './table-heading-roles.css';
 import './bookings-section.css';
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { fetchData, patchData, postData } from "@/lib/Api";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateShort, formatMoneyWhole } from "@/lib/formatters";
 import { Loader } from "@/components/Loader";
 import { toast } from "@/lib/toast";
 import { Fuel } from "lucide-react";
@@ -96,15 +97,20 @@ function QuoteCardBody({ quote }: { quote: any }) {
           {quote.fuel_alert && (
             <span title={`Fuel price +${quote.fuel_delta_pct}% since quote created`} aria-label={`Fuel price up ${quote.fuel_delta_pct}% since quote created`} style={{ display: 'inline-flex', color: 'var(--status-warning-text)' }}><Fuel size={16} aria-hidden="true" /></span>
           )}
-          {quote.outcome === 'accepted' && <StatusChip status="WON" size="sm" />}
-          {quote.outcome === 'rejected' && <StatusChip status="LOST" size="sm" />}
+          {/* The recorded answer, when the column does not already say it.
+              Neutral text: the column is the status. */}
+          {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && <span className="bk-qcard__meta">Marked won</span>}
+          {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <span className="bk-qcard__meta">Marked lost</span>}
         </span>
       </div>
       <div className="bk-qcard__customer" title={quote.customer_name || ''}>{quote.customer_name || '—'}</div>
       <div className="bk-qcard__route" title={routeOf(quote)}>{routeOf(quote)}</div>
       <div className="bk-qcard__foot">
         <span className="bk-qcard__amount">{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
-        {quote.confidence && <span className="bk-qcard__meta">{sentenceCase(quote.confidence)} confidence</span>}
+        {/* Only a low price confidence is worth a word on the card; otherwise the date it was made. */}
+        {String(quote.confidence).toUpperCase() === 'LOW'
+          ? <span className="bk-qcard__meta">Low confidence</span>
+          : quote.created_at ? <span className="bk-qcard__meta">{formatDateShort(quote.created_at)}</span> : null}
       </div>
     </>
   );
@@ -537,7 +543,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                       {COLUMN_LABELS[col]}
                       {!colFailed && <span className="bk-col__count">{colCount}</span>}
                     </span>
-                    {colTotal > 0 && <span className="bk-col__total">{formatCurrency(colTotal)}</span>}
+                    {colTotal > 0 && <span className="bk-col__total" title={formatCurrency(colTotal)}>{formatMoneyWhole(colTotal)}</span>}
                   </div>
                   <div className="kanban-col-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
                     {colFailed ? (
@@ -549,7 +555,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
                         onRetry={() => columnQueries[col].refetch()}
                       />
                     ) : isLoading ? (
-                      <div style={{ padding: '28px 0', display: 'flex', justifyContent: 'center' }}><Loader size={22} /></div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[0, 1, 2].map(i => <div key={i} className="ops-skel" style={{ height: 84, borderRadius: 8 }} />)}</div>
                     ) : (
                       <DroppableColumn columnId={col} items={colItems} isOver={overColumnId === col}>
                         {colItems.map((q: any) => (
@@ -692,7 +698,7 @@ export function QuotesList({ embedded = false, search: searchProp, onSearchChang
               </tbody>
             </table>
             {listIsLoading && !loadFailed(activeListQuery) && (
-              <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={24} /></div>
+              <TableSkeleton rows={6} cols={5} label="Loading quotes" />
             )}
             {!listIsLoading && listItems.length === 0 && (
               <div className="bk-empty"><p className="bk-empty__text">{search ? 'No quotes match your search.' : 'No quotes yet.'}</p></div>

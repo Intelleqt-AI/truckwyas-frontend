@@ -6,12 +6,14 @@ import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
 import { Loader } from '@/components/Loader';
+import { formatDate, formatDistance, formatMoney, formatNumber } from '@/lib/formatters';
 
+// House formats: "R 20 505,65", "5 Apr 2026", "30 000 kg", "1 234 km".
 function formatCurrencyLocal(n: number) {
-  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 2 }).format(n);
+  return formatMoney(n);
 }
 
-const fmtDay = (d: string) => new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
+const fmtDay = (d: string) => formatDate(d);
 
 // Page shell: escapes the app's `overflow: hidden` root and carries the
 // client-facing document theme (see public-document.css).
@@ -198,8 +200,8 @@ export default function ClientQuoteView() {
           <div className="pd-grid">
             <Field label="Description">{quote.cargo_description || '—'}</Field>
             <Field label="Vehicle type">{quote.vehicle_type || '—'}</Field>
-            <Field label="Weight"><span className="pd-num">{quote.weight ? `${parseFloat(quote.weight).toLocaleString('en-ZA')} kg` : '—'}</span></Field>
-            <Field label="Distance"><span className="pd-num">{quote.distance ? `${Math.round(parseFloat(quote.distance)).toLocaleString('en-ZA')} km` : '—'}</span></Field>
+            <Field label="Weight"><span className="pd-num">{quote.weight ? `${formatNumber(parseFloat(quote.weight))} kg` : 'Not set'}</span></Field>
+            <Field label="Distance"><span className="pd-num">{quote.distance ? formatDistance(parseFloat(quote.distance)) : 'Not set'}</span></Field>
             <Field label="Collection date">{quote.pickup_date ? fmtDay(quote.pickup_date) : 'To be confirmed'}</Field>
             <Field label="Delivery date">{quote.delivery_date ? fmtDay(quote.delivery_date) : 'To be confirmed'}</Field>
           </div>

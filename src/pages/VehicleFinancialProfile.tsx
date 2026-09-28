@@ -10,6 +10,7 @@ import {
   randCents, randWhole, type AlertItem, type Tone,
 } from '@/components/fleet-detail/parts';
 import { MonthlyBars } from '@/components/fleet-detail/MonthlyBars';
+import { formatNumber, formatPercent, formatWeight, sentenceCaseLabel } from '@/lib/formatters';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
@@ -93,7 +94,7 @@ export default function VehicleFinancialProfile() {
       <LoadError what="this vehicle" error={loadError} busy={vehicleQuery.isFetching} onRetry={() => refetch()} />
     </div>
   );
-  if (isLoading && !isError) return <DetailSkeleton />;
+  if (isLoading && !isError) return <DetailSkeleton crumb="Vehicles" crumbTo="/fleet/vehicles" />;
   if (!vehicle) return (
     <DetailMessage
       title="Vehicle not found"
@@ -175,7 +176,7 @@ export default function VehicleFinancialProfile() {
   };
 
   const makeModel = [vehicle.make, vehicle.model].filter(Boolean).join(' ');
-  const meta = [makeModel, vehicle.vehicle_type_name, vehicle.year].filter(Boolean).join(' · ');
+  const meta = [makeModel, sentenceCaseLabel(vehicle.vehicle_type_name), vehicle.year].filter(Boolean).join(' · ');
   const title = vehicle.plate || vehicle.registration || `Vehicle ${id}`;
   const score = (v: any) => (Number(v) ? `${v}` : null);
   const regDays = daysUntil(vehicle.registration_expiry);
@@ -191,7 +192,7 @@ export default function VehicleFinancialProfile() {
         chip={<StatusChip status={vehicle.status} />}
         meta={meta || undefined}
         actions={<>
-          <StatusControl label="Set vehicle status" options={VEHICLE_STATUSES} current={vehicle.status} busy={updating} onPick={setStatus} />
+          <StatusControl label="Set vehicle status" subject={title} options={VEHICLE_STATUSES} current={vehicle.status} busy={updating} onPick={setStatus} />
           <button type="button" className="fd-button" onClick={openEdit}>Edit vehicle</button>
         </>}
       />
@@ -211,7 +212,7 @@ export default function VehicleFinancialProfile() {
           tag={costPerKmReal ? <Tag>Modelled</Tag> : undefined}
           sub={revPerKm > 0 ? <>Earns {randCents(revPerKm)} per km</> : undefined}
           info={costPerKmReal
-            ? <>Modelled: fuel at {lPerKm.toFixed(2)} L/km times the diesel price in settings, plus maintenance logged on this truck, over delivered km.</>
+            ? <>Modelled: fuel at {formatNumber(lPerKm, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L/km times the diesel price in settings, plus maintenance logged on this truck, over delivered km.</>
             : <>Needs this truck's own fuel use{totalDistance > 0 ? '' : ' and delivered km'}. The stored {storedCostPerKm ? randCents(storedCostPerKm) : 'figure'} uses the {DEFAULT_L_PER_KM} L/km default, so it is not shown.{revPerKm > 0 ? ` Earnings per km are from ${kmText(totalDistance)} of delivered loads.` : ''}</>}
         />
         <Kpi
@@ -220,11 +221,11 @@ export default function VehicleFinancialProfile() {
           empty={delivered.length > 0 ? 'Not calculated' : 'No delivered loads'}
           tag={marginPerTrip && delivered.length > 0 ? <Tag>Modelled</Tag> : undefined}
           sub={marginPerTrip && delivered.length > 0 ? 'Per load' : undefined}
-          info={<>Average revenue per completed load less modelled fuel (distance × {lPerKm ? lPerKm.toFixed(2) : DEFAULT_L_PER_KM} L/km{defaultFuel ? ', the default' : ''} × settings diesel). Tolls, driver and fixed costs are not deducted.</>}
+          info={<>Average revenue per completed load less modelled fuel (distance × {formatNumber(lPerKm || DEFAULT_L_PER_KM, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L/km{defaultFuel ? ', the default' : ''} × settings diesel). Tolls, driver and fixed costs are not deducted.</>}
         />
         <Kpi
           label="Loads delivered"
-          value={delivered.length.toLocaleString('en-ZA')}
+          value={formatNumber(delivered.length)}
           sub={<>of {plural(loads.length, 'load')}{partial ? ` (latest of ${loadsTotal})` : ''}</>}
         />
       </KpiStrip>
@@ -255,7 +256,7 @@ export default function VehicleFinancialProfile() {
               { label: 'Revenue per load', value: delivered.length > 0 ? randWhole(avgRevPerTrip) : null },
               { label: 'Revenue per km', value: revPerKm > 0 ? randCents(revPerKm) : null },
               { label: 'Delivered distance', value: totalDistance > 0 ? kmText(totalDistance) : null },
-              { label: 'Fuel use', value: lPerKm ? `${lPerKm.toFixed(2)} L/km` : null, note: defaultFuel ? <Tag>Default</Tag> : undefined },
+              { label: 'Fuel use', value: lPerKm ? `${formatNumber(lPerKm, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L/km` : null, note: defaultFuel ? <Tag>Default</Tag> : undefined },
             ]} />
           </Panel>
           )}
@@ -276,9 +277,9 @@ export default function VehicleFinancialProfile() {
               { label: 'Registration', value: vehicle.plate, mono: true },
               { label: 'VIN', value: vehicle.vin, mono: true },
               { label: 'Make and model', value: makeModel || null },
-              { label: 'Type', value: vehicle.vehicle_type_name },
+              { label: 'Type', value: sentenceCaseLabel(vehicle.vehicle_type_name) || null },
               { label: 'Year', value: vehicle.year },
-              { label: 'Capacity', value: vehicle.capacity ? `${(parseFloat(vehicle.capacity) / 1000).toFixed(1)} t` : null },
+              { label: 'Capacity', value: vehicle.capacity ? formatWeight(parseFloat(vehicle.capacity) / 1000) : null },
               { label: 'Fuel type', value: vehicle.fuel_type ? formatStatus(vehicle.fuel_type) : null },
               { label: 'Driver', value: vehicle.driver_name },
             ]} />
@@ -315,7 +316,7 @@ export default function VehicleFinancialProfile() {
                 { label: 'Uptime score', value: score(vehicle.uptime_score) },
                 { label: 'Fuel efficiency', value: score(vehicle.fuel_efficiency_score) },
                 { label: 'Maintenance score', value: score(vehicle.maintenance_score) },
-                { label: 'Uptime', value: Number(vehicle.uptime_percentage) ? `${parseFloat(vehicle.uptime_percentage).toFixed(1)}%` : null },
+                { label: 'Uptime', value: Number(vehicle.uptime_percentage) ? formatPercent(parseFloat(vehicle.uptime_percentage), 1) : null },
               ]}
             />
           </Panel>

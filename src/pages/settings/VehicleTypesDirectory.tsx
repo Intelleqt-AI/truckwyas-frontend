@@ -1,4 +1,6 @@
 import '@/pages/table-heading-roles.css';
+import { formatMoney } from '@/lib/formatters';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import '@/pages/settings/settings-brand.css';
 import { useState, useEffect } from "react";
 import { fetchData, deleteData, postData, patchData } from "@/lib/Api";
@@ -184,7 +186,7 @@ export function VehicleTypesDirectory() {
     }
   };
 
-  const formatRate = (v: any) => v ? `R ${parseFloat(v).toLocaleString('en-ZA', { minimumFractionDigits: 0 })}` : '—';
+  const formatRate = (v: any) => v ? formatMoney(parseFloat(v)) : '—';
 
   return (
     <div style={{ maxWidth: 960 }}>
@@ -237,7 +239,7 @@ export function VehicleTypesDirectory() {
         </div>
 
         {loading ? (
-          <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><Loader size={32} /></div>
+          <TableSkeleton rows={6} cols={4} label="Loading truck types" />
         ) : (
           <div className="settings-scroll-region" role="region" aria-label="Vehicle types" tabIndex={0} style={{ overflowX: 'auto' }}>
           <table className="table-heading-roles settings-table settings-table--pin-actions">

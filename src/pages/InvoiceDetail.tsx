@@ -4,12 +4,12 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, postData } from "@/lib/Api";
 
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import "./finance-brand.css";
 import "./table-heading-roles.css";
-import { Loader } from "@/components/Loader";
 import RowActions from "@/components/ui/RowActions";
 import { InfoTip } from "@/components/ui/InfoTip";
+import SectionHeader from "@/components/layout/SectionHeader";
 import { StatusChip } from "@/components/ui/StatusChip";
 import LoadError, { loadFailed } from "@/components/data/LoadError";
 import InvoiceSendPreview, { type InvoiceMessageKind } from "@/components/finance/InvoiceSendPreview";
@@ -232,19 +232,26 @@ export default function InvoiceDetail() {
   if (invoiceFailed && invoiceError?.status !== 404) {
     return (
       <div className="fin-page">
-        <button type="button" onClick={() => navigate('/finance/invoices')} className="fin-back">
-          <span aria-hidden="true">←</span> Back to invoices
-        </button>
+        <SectionHeader title="Invoice" back={{ to: '/finance/invoices', label: 'Invoices' }} />
         <LoadError what="this invoice" error={invoiceError} busy={invoiceQuery.isFetching} onRetry={() => refetch()} />
       </div>
     );
   }
-  if (isLoading && !invoiceFailed) return <Loader fullScreen />;
+  // Loading: the back link and a head placeholder render at once; only the
+  // content waits, so a click never blanks the page.
+  if (isLoading && !invoiceFailed) {
+    return (
+      <div className="fin-page" aria-busy="true" aria-label="Loading invoice">
+        <SectionHeader title="Invoice" back={{ to: '/finance/invoices', label: 'Invoices' }} />
+        <div className="fin-skel fin-skel--card" aria-hidden="true" />
+      </div>
+    );
+  }
   if (isError || !invoice) {
     return (
       <div className="fin-page">
         <div className="card fin-empty">
-          <h1 className="fin-empty__title" style={{ fontSize: 22, lineHeight: '28px' }}>Invoice not found</h1>
+          <h1 className="fin-empty__title">Invoice not found</h1>
           <p className="fin-empty__body">It may have been removed, or the link is wrong.</p>
           <button className="btn-action" onClick={() => navigate('/finance/invoices')}>Back to invoices</button>
         </div>
@@ -275,7 +282,7 @@ export default function InvoiceDetail() {
   const paidInDoc = partPaid ? (paidToDate ?? total - balance) : null;
   const terms = invoice.payment_terms ? String(invoice.payment_terms).replace(/^(?:NET)?\s*(\d+)$/i, '$1 days') : null;
   // The API may store the rate as a fraction (0.15) or a percentage (15).
-  const vatRateText = taxRate != null ? `${Number((taxRate > 0 && taxRate <= 1 ? taxRate * 100 : taxRate).toFixed(2))}%` : null;
+  const vatRateText = taxRate != null ? (() => { const r = taxRate > 0 && taxRate <= 1 ? taxRate * 100 : taxRate; return formatPercent(r, Number.isInteger(Math.round(r * 100) / 100) ? 0 : 1); })() : null;
 
 
   const activity = [
@@ -331,28 +338,15 @@ export default function InvoiceDetail() {
         />
       )}
 
-      <button type="button" onClick={() => navigate('/finance/invoices')} className="fin-back">
-        <span aria-hidden="true">←</span> Back to invoices
-      </button>
-
-      <header className="fin-detail-head">
-        <div style={{ minWidth: 0 }}>
-          <div className="fin-detail-head__eyebrow">Invoice</div>
-          <div className="fin-detail-head__title-row">
-            <h1>{invoice.invoice_number}</h1>
-            <StatusChip status={status} />
-          </div>
-          <p className="fin-detail-head__sub">
-            {invoice.customer_name}
-            {invoice.load_number && (
-              <>
-                {' · Load '}
-                <span className="fin-id">{invoice.load_number}</span>
-              </>
-            )}
-          </p>
-        </div>
-        <div className="fin-detail-head__actions">
+      <SectionHeader
+        title={invoice.invoice_number}
+        titleAdornment={<StatusChip status={status} />}
+        back={{ to: '/finance/invoices', label: 'Invoices' }}
+        description={<>
+          {invoice.customer_name}
+          {invoice.load_number && <>{' · Load '}<span className="fin-id">{invoice.load_number}</span></>}
+        </>}
+        actions={<>
           {/* One primary action; everything else sits behind one menu. */}
           {primary === 'remind' ? (
             <button className="btn-action" onClick={() => setPreview('reminder')} disabled={sendingReminder}>
@@ -377,8 +371,8 @@ export default function InvoiceDetail() {
             </button>
           )}
           {moreActions.length > 0 && <RowActions label={`Invoice ${invoice.invoice_number}`} items={moreActions} />}
-        </div>
-      </header>
+        </>}
+      />
 
       {/* One invoice document (party, dates, lines, totals) and a sticky side
           rail, so the two columns read as document + rail, not as a gap.
@@ -505,7 +499,11 @@ export default function InvoiceDetail() {
               </dl>
             </div>
           )}
-          {invoice.notes && <p className="fin-note fin-doc__note">Note: {invoice.notes}</p>}
+          {/* The system note "Auto-generated from Load …" only restates the load
+              already named in the head, so it is not shown; real notes are. */}
+          {invoice.notes && !/^auto-generated from load\b/i.test(String(invoice.notes).trim()) && (
+            <p className="fin-note fin-doc__note">Note: {invoice.notes}</p>
+          )}
         </section>
 
         {/* Side rail: sticky, same top as the document. */}

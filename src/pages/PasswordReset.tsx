@@ -9,13 +9,12 @@ import { MobileAuthLayout } from '@/components/MobileAuthLayout';
 // Same list Signup.tsx / Login.tsx / BillingSettings.tsx show — kept
 // identical everywhere the plan is mentioned.
 const PLAN_FEATURES = [
-  "Unlimited loads & invoices",
-  "AI-powered quote optimisation",
-  "Fast Pay capital access (not live yet)",
-  "Advanced analytics & reporting",
-  "Fleet intelligence dashboard",
+  "Unlimited loads and invoices",
+  "Quotes priced from your own costs",
+  "Reports and insights",
+  "Fleet and driver records",
   "Multi-user access",
-  "API & integrations",
+  "API and integrations",
   "Priority support",
 ];
 
@@ -260,14 +259,6 @@ export default function PasswordReset() {
         ))}
       </div>
 
-      <div style={{
-        marginTop: 20, padding: '12px 16px', border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-nested)', background: 'var(--bg-surface-hover)',
-        fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)',
-      }}>
-        Reminder: every completed load also carries a <strong style={{ color: 'var(--text-primary)' }}>0.25% platform fee</strong>,
-        charged automatically to the card on file on top of the monthly plan.
-      </div>
 
       <div style={{ marginTop: 16, fontSize: 13, lineHeight: '20px', fontFamily: 'var(--font-sans)', color: 'var(--text-tertiary)' }}>
         Built for South African road freight
@@ -317,13 +308,13 @@ export default function PasswordReset() {
       {/* Content side — same "welcome back" framing as Login, not a sales pitch */}
       <div className="pwreset-split__content" style={{
         position: 'relative', overflow: 'hidden',
-        background: 'var(--bg-surface)',
+        background: 'var(--bg-deep)',
         borderRight: '1px solid var(--border-subtle)',
       }}>
         <div style={{ position: 'relative', width: '100%', maxWidth: 440, margin: '0 auto' }}>
           <img className="tw-auth-logo" src="/brand/truckwys-logo-transparent.png" alt="TruckWys" style={{ maxHeight: 32, width: 'auto', marginBottom: 40 }} />
 
-          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-info-text)', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)', marginBottom: 10 }}>
             Account recovery
           </div>
           <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--text-primary)', lineHeight: '34px', marginBottom: 16 }}>

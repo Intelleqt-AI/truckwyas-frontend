@@ -1,4 +1,6 @@
 import '@/pages/table-heading-roles.css';
+import { formatDateTime, formatMoneyWhole, formatNumber } from '@/lib/formatters';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import '@/pages/settings/settings-brand.css';
 import { useState, useEffect } from 'react';
 import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
@@ -86,7 +88,7 @@ const TIER_COLOR: Record<string, string> = {
 
 function fmtDate(s?: string | null) {
   if (!s) return '—';
-  return new Date(s).toLocaleString('en-ZA', { dateStyle: 'short', timeStyle: 'short' });
+  return formatDateTime(s);
 }
 
 export function DeveloperApi() {
@@ -406,7 +408,7 @@ export function DeveloperApi() {
                       </button>
                     </div>
                     <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{(k.usage_count || 0).toLocaleString()} total calls</span>
+                      <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{formatNumber(k.usage_count || 0)} total calls</span>
                       <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>Last used: {fmtDate(k.last_used_at)}</span>
                       {k.monthly_quota ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -458,7 +460,7 @@ export function DeveloperApi() {
                           <tr key={log.id} style={{ borderBottom: '1px solid var(--border-row)' }}>
                             <td style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmtDate(log.scored_at)}</td>
                             <td className="num" style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                              {log.invoice_amount ? `R${parseFloat(log.invoice_amount).toLocaleString('en-ZA', { maximumFractionDigits: 0 })}` : '—'}
+                              {log.invoice_amount ? formatMoneyWhole(parseFloat(log.invoice_amount)) : '—'}
                             </td>
                             <td>
                               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: TIER_COLOR[log.risk_tier] || 'var(--text-secondary)' }}>
@@ -493,15 +495,15 @@ export function DeveloperApi() {
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
               <label style={{ ...labelStyle, marginBottom: 0, marginRight: 6, display: 'inline' }}>Auth as</label>
-              <select
-                className="settings-control"
-                value={tryKeyId}
-                onChange={e => setTryKeyId(e.target.value === '' ? '' : Number(e.target.value))}
-                style={{ ...inputStyle, width: 'auto' }}
-              >
-                <option value="">Bearer (in-app / internal)</option>
-                {keys.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
-              </select>
+              <Select value={tryKeyId === '' ? 'bearer' : String(tryKeyId)} onValueChange={v => setTryKeyId(v === 'bearer' ? '' : Number(v))}>
+                <SelectTrigger aria-label="Auth as" style={{ width: 'auto', minWidth: 220, minHeight: 40, display: 'inline-flex' }}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bearer">Bearer (in-app, internal)</SelectItem>
+                  {keys.map(k => <SelectItem key={k.id} value={String(k.id)}>{k.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <button className="btn-action settings-control" style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }} onClick={runTry} disabled={running}>{running ? 'Scoring…' : 'Run'}</button>
           </div>
@@ -524,7 +526,7 @@ export function DeveloperApi() {
                   <Stat label="Score" value={String(result.score ?? '—')} />
                   <Stat label="Fee" value={result.fee_percent != null ? `${result.fee_percent}%` : '—'} />
                   <Stat label="Advance" value={result.max_advance_percent != null ? `${result.max_advance_percent}%` : '—'} />
-                  <Stat label="Net" value={result.net_advance != null ? `R${Math.round(result.net_advance).toLocaleString()}` : '—'} color="var(--status-success)" />
+                  <Stat label="Net" value={result.net_advance != null ? formatMoneyWhole(result.net_advance) : '—'} color="var(--status-success)" />
                 </div>
                 {result._meta && (
                   <div style={{ ...mono, color: 'var(--text-tertiary)', marginBottom: 12, padding: '8px 12px', background: 'var(--bg-deep)', borderRadius: 'var(--radius-nested)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>

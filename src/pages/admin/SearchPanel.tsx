@@ -54,7 +54,7 @@ function ResultTable({ title, rows, numberKey }: { title: string; rows: any[]; n
             <tbody>
               {rows.map(r => (
                 <tr key={r.id}>
-                  <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)' }}>{r[numberKey]}</td>
+                  <td style={{ ...tdStyle, fontSize: 14, fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>{r[numberKey]}</td>
                   <td style={tdStyle}>
                     <StatusChip status={String(r.status)} size="sm" />
                   </td>

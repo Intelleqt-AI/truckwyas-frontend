@@ -9,6 +9,7 @@ import {
   randCents, randWhole, type AlertItem, type Tone,
 } from '@/components/fleet-detail/parts';
 import { MonthlyBars } from '@/components/fleet-detail/MonthlyBars';
+import { formatNumber, formatPercent } from '@/lib/formatters';
 import { LoadsTable } from '@/components/fleet-detail/LoadsTable';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
@@ -61,7 +62,7 @@ export default function DriverProfile() {
       <LoadError what="this driver" error={loadError} busy={driverQuery.isFetching} onRetry={() => refetch()} />
     </div>
   );
-  if (isLoading && !isError) return <DetailSkeleton />;
+  if (isLoading && !isError) return <DetailSkeleton crumb="Drivers" crumbTo="/fleet/drivers" />;
   if (!driver) return (
     <DetailMessage
       title="Driver not found"
@@ -137,7 +138,7 @@ export default function DriverProfile() {
           {driver.license_number && phone && ' · '}
           {phone}
         </> : undefined}
-        actions={<StatusControl label="Set driver status" options={DRIVER_STATUSES} current={driver.status} busy={updating} onPick={setStatus} />}
+        actions={<StatusControl label="Set driver status" subject={name} options={DRIVER_STATUSES} current={driver.status} busy={updating} onPick={setStatus} />}
       />
 
       {hasCompleted ? (
@@ -153,13 +154,13 @@ export default function DriverProfile() {
         />
         <Kpi
           label="Loads completed"
-          value={completedTrips.toLocaleString('en-ZA')}
+          value={formatNumber(completedTrips)}
           sub={<>of {plural(totalTrips, 'load')}{partial ? ` (latest of ${loadsTotal})` : ''}</>}
           info="Delivered or invoiced."
         />
         <Kpi
           label="On time"
-          value={onTime ? `${onTime.toFixed(0)}%` : null}
+          value={onTime ? formatPercent(onTime, 0) : null}
           empty="Not tracked yet"
           sub={onTime ? 'Of completed loads' : undefined}
           info="Completed loads with an actual delivery time on or before the planned date. Needs actual delivery times to be recorded."
@@ -167,7 +168,7 @@ export default function DriverProfile() {
       </KpiStrip>
       ) : (
         <section className="fd-panel fd-empty-line" aria-label="Driver summary">
-          <p className="fd-empty-line__text">No completed loads yet. {loads.length > 0 ? `${plural(loads.length, 'load')} in progress.` : `Assign ${firstName || name} to a load to track their work.`}</p>
+          <p className="fd-empty-line__text">No completed loads yet. {loads.length > 0 ? `${plural(loads.length, 'load')} in progress${driver.status && driver.status !== 'ACTIVE' ? `, although ${firstName || name} is marked ${formatStatus(driver.status).toLowerCase()}` : ''}.` : `Assign ${firstName || name} to a load to track their work.`}</p>
           <button type="button" className="fd-button" onClick={() => navigate('/bookings/orders')}>Open orders</button>
         </section>
       )}
@@ -189,8 +190,8 @@ export default function DriverProfile() {
               ? <MonthlyBars data={months} caption="Completed-load revenue by month" />
               : <p className="fd-empty">No completed loads yet.</p>}
             <MiniStats items={[
-              { label: 'Trips this month', value: (driver.trips_this_month ?? 0).toLocaleString('en-ZA') },
-              { label: 'Total trips', value: (driver.total_trips ?? totalTrips).toLocaleString('en-ZA') },
+              { label: 'Trips this month', value: formatNumber(driver.trips_this_month ?? 0) },
+              { label: 'Total trips', value: formatNumber(driver.total_trips ?? totalTrips) },
               { label: 'Total distance', value: Number(driver.total_distance) ? kmText(parseFloat(driver.total_distance)) : totalDistance > 0 ? kmText(totalDistance) : totalDistanceKm > 0 ? kmText(totalDistanceKm) : null },
               { label: 'Revenue per km', value: revPerKm > 0 ? randCents(revPerKm) : null },
               { label: 'Highest load', value: bestTripAmount > 0 ? randWhole(bestTripAmount) : null },

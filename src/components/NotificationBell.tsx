@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchData, postData } from '@/lib/Api';
+import { formatRelativeTime, normaliseFigures, sentenceCaseLabel } from '@/lib/formatters';
 import './notification-brand.css';
 
 interface Note {
@@ -11,23 +12,6 @@ interface Note {
   unread?: boolean;
   link?: string;
   created_at: string;
-}
-
-const TYPE_COLOR: Record<string, string> = {
-  success: 'var(--status-success)',
-  warning: 'var(--status-warning)',
-  alert: 'var(--status-danger)',
-  info: 'var(--accent-primary)',
-};
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
 }
 
 export function NotificationBell() {
@@ -104,16 +88,17 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="dashboard-notification-panel" style={{
-          position: 'absolute', top: 'var(--note-panel-top, calc(100% + 10px))', right: 0, width: 340, maxHeight: 460,
-          background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--note-panel-radius, var(--radius-card))',
+        <div className="dashboard-notification-panel" role="dialog" aria-label="Notifications" style={{
+          position: 'absolute', top: 'var(--note-panel-top, calc(100% + 10px))', right: 0, width: 360, maxWidth: 'calc(100vw - 24px)', maxHeight: 460,
+          background: 'var(--bg-overlay)', border: '1px solid var(--border-overlay, var(--border-subtle))', borderRadius: 'var(--radius-menu, 12px)',
+          boxShadow: 'var(--shadow-pop)',
           zIndex: 2000, overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
         }}>
-          <div className="dashboard-notification-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--note-header-padding, 12px 14px)', borderBottom: '1px solid var(--border-subtle)' }}>
+          <div className="dashboard-notification-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--note-header-padding, 12px 14px)', borderBottom: '1px solid var(--border-overlay, var(--border-subtle))' }}>
             <h2 className="dashboard-notification-title" style={{ fontSize: 'var(--note-title-size, 16px)', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Notifications</h2>
             {unread > 0 && (
-              <button className="dashboard-notification-mark-read" onClick={markAllRead} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', fontFamily: 'var(--note-font, var(--font-sans))', fontSize: 'var(--note-body-size, 14px)', letterSpacing: 'var(--note-tracking, normal)', textTransform: 'var(--note-case, none)' as React.CSSProperties['textTransform'] }}>
+              <button className="dashboard-notification-mark-read" onClick={markAllRead} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontFamily: 'var(--note-font, var(--font-sans))', fontSize: 'var(--note-body-size, 14px)', letterSpacing: 'var(--note-tracking, normal)', textTransform: 'var(--note-case, none)' as React.CSSProperties['textTransform'] }}>
                 Mark all read
               </button>
             )}
@@ -124,19 +109,23 @@ export function NotificationBell() {
             ) : notes.map(n => (
               <div
                 key={n.id}
-                className="dashboard-notification-row"
+                className={`dashboard-notification-row${n.unread ? ' is-unread' : ''}`}
                 onClick={() => onClickNote(n)}
+                role={n.link ? 'button' : undefined}
+                tabIndex={n.link ? 0 : undefined}
+                onKeyDown={n.link ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClickNote(n); } } : undefined}
                 style={{
                   display: 'flex', gap: 'var(--note-row-gap, 10px)', padding: 'var(--note-row-padding, 11px 14px)', cursor: n.link ? 'pointer' : 'default',
                   borderBottom: '1px solid var(--border-row)',
-                  background: n.unread ? 'var(--note-unread-surface, color-mix(in srgb, var(--accent-primary) 7%, transparent))' : undefined,
                 }}
               >
-                <span style={{ marginTop: 'var(--note-dot-offset, 5px)', flexShrink: 0, width: 'var(--note-dot-size, 7px)', height: 'var(--note-dot-size, 7px)', borderRadius: '50%', background: n.unread ? (TYPE_COLOR[n.type || 'info'] || 'var(--accent-primary)') : 'var(--border-active)' }} />
+                {/* Unread: a neutral 6px dot and 500 weight. No tinted wash, no type colours. */}
+                <span aria-hidden="true" style={{ marginTop: 7, flexShrink: 0, width: 6, height: 6, borderRadius: '50%', background: n.unread ? 'var(--text-primary)' : 'transparent' }} />
+                {n.unread && <span className="sr-only">Unread: </span>}
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 'var(--note-body-size, 12.5px)', fontWeight: n.unread ? 'var(--note-unread-weight, 600)' : 'var(--note-read-weight, 500)', color: 'var(--text-primary)', marginBottom: 'var(--note-copy-gap, 2px)' }}>{n.title}</div>
-                  {n.description && <div style={{ fontSize: 'var(--note-body-size, 11.5px)', color: 'var(--text-secondary)', marginBottom: 'var(--note-copy-gap, 3px)', lineHeight: 'var(--note-line, 1.4)' }}>{n.description}</div>}
-                  <div style={{ fontSize: 'var(--note-support-size, 10px)', color: 'var(--text-tertiary)', fontFamily: 'var(--note-font, var(--font-sans))' }}>{timeAgo(n.created_at)}</div>
+                  <div style={{ fontSize: 'var(--note-body-size, 12.5px)', fontWeight: n.unread ? 'var(--note-unread-weight, 600)' : 'var(--note-read-weight, 500)', color: 'var(--text-primary)', marginBottom: 'var(--note-copy-gap, 2px)' }}>{sentenceCaseLabel(normaliseFigures(n.title))}</div>
+                  {n.description && <div style={{ fontSize: 'var(--note-body-size, 11.5px)', color: 'var(--text-secondary)', marginBottom: 'var(--note-copy-gap, 3px)', lineHeight: 'var(--note-line, 1.4)' }}>{normaliseFigures(n.description)}</div>}
+                  <div style={{ fontSize: 'var(--note-support-size, 10px)', color: 'var(--text-tertiary)', fontFamily: 'var(--note-font, var(--font-sans))' }}>{formatRelativeTime(n.created_at)}</div>
                 </div>
               </div>
             ))}

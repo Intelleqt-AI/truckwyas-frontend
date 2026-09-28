@@ -95,11 +95,9 @@ export function PaymentDotPlot({ rows, maxRows = 10 }: { rows: PayRow[]; maxRows
                       {m.open
                         ? <circle cx={mx} cy={cy} r={5} fill="var(--viz-surface)" stroke={VIZ.neutralStrong} strokeWidth={2} />
                         : <circle cx={mx} cy={cy} r={5} fill={VIZ.accent} stroke="var(--viz-surface)" strokeWidth={2} />}
-                      <circle className="viz-hit" cx={mx} cy={cy} r={12} tabIndex={0}
-                        aria-label={`${r.label}, ${m.ref}: ${m.open ? `unpaid for ${plural(m.days, 'day')}` : `paid after ${plural(m.days, 'day')}`}${r.terms != null ? `, terms ${r.terms} days` : ''}`}
-                        onPointerEnter={() => open(r, m, mx, cy + (figRef.current && ref.current ? ref.current.getBoundingClientRect().top - figRef.current.getBoundingClientRect().top : 0))}
-                        onFocus={() => open(r, m, mx, cy + (figRef.current && ref.current ? ref.current.getBoundingClientRect().top - figRef.current.getBoundingClientRect().top : 0))}
-                        onBlur={close} />
+                      {/* Pointer only: the SVG is one labelled image; the table twin is the keyboard route to every invoice. */}
+                      <circle className="viz-hit" cx={mx} cy={cy} r={12} aria-hidden="true"
+                        onPointerEnter={() => open(r, m, mx, cy + (figRef.current && ref.current ? ref.current.getBoundingClientRect().top - figRef.current.getBoundingClientRect().top : 0))} />
                     </g>
                   );
                 })}

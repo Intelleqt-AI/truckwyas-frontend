@@ -1,4 +1,5 @@
 import '@/pages/admin/admin-brand.css';
+import { formatMoney } from '@/lib/formatters';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
@@ -53,7 +54,7 @@ interface TransitRate {
 const feeForm0 = { from_country: '', to_country: '', fee_zar: '', notes: '', is_active: true };
 const rateForm0 = { country_code: '', country_name: '', weighbridge_fee_zar: '', toll_rate_per_km: '', sa_border_distance_km: '', is_active: true };
 
-const fmtRand = (v: any) => (v || v === 0) ? `R${parseFloat(v).toFixed(2)}` : '—';
+const fmtRand = (v: any) => (v || v === 0) ? formatMoney(parseFloat(v)) : 'Not set';
 
 export default function CrossBorderRatesPanel() {
   const qc = useQueryClient();
@@ -324,7 +325,7 @@ export default function CrossBorderRatesPanel() {
               <tbody>
                 {rates.map(r => (
                   <tr key={r.id} style={{ opacity: r.is_active ? 1 : 0.55 }}>
-                    <td style={tdStyle}>{r.country_name} <span style={{ color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>({r.country_code})</span></td>
+                    <td style={tdStyle}>{r.country_name} <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>({r.country_code})</span></td>
                     <td className="num" style={tdStyle}>{fmtRand(r.weighbridge_fee_zar)}</td>
                     <td className="num" style={tdStyle}>{fmtRand(r.toll_rate_per_km)}/km</td>
                     <td className="num" style={tdStyle}>{r.sa_border_distance_km}km</td>

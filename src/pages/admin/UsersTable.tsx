@@ -1,5 +1,9 @@
 import '@/pages/table-heading-roles.css';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { formatDateTime } from '@/lib/formatters';
 import '@/pages/admin/admin-brand.css';
+import '@/pages/bookings-section.css';
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData } from '@/lib/Api';
@@ -57,7 +61,7 @@ const roleLabel = (role: string) =>
   Object.prototype.hasOwnProperty.call(ROLE_LABELS, role) ? ROLE_LABELS[role as Role] : role;
 
 const fmt = (dateStr?: string | null) =>
-  dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  dateStr ? formatDateTime(dateStr) : 'Never';
 
 interface AdminUserRow {
   id: number | string;
@@ -86,6 +90,8 @@ export default function UsersTable() {
   // rather than freezing the whole table on any single click.
   const [pending, setPending] = useState<{ id: AdminUserRow['id']; kind: PendingAction } | null>(null);
   const [lockTarget, setLockTarget] = useState<AdminUserRow | null>(null);
+  // Role is plain text in the table; the row menu's "Change role" opens this.
+  const [roleTarget, setRoleTarget] = useState<{ user: AdminUserRow; role: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
   const [activityTarget, setActivityTarget] = useState<AdminUserRow | null>(null);
 
@@ -210,17 +216,16 @@ export default function UsersTable() {
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          <select
-            className="admin-control"
-            style={selectStyle}
-            aria-label="Filter by status"
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value as '' | 'active' | 'inactive')}
-          >
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
+          <Select value={statusFilter || 'all'} onValueChange={v => setStatusFilter((v === 'all' ? '' : v) as '' | 'active' | 'inactive')}>
+            <SelectTrigger aria-label="Filter by status" style={{ width: 'auto', minWidth: 150, minHeight: 40 }}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
           <button className="btn-action admin-control" style={{ minHeight: 40, borderRadius: 'var(--radius-control)' }} onClick={() => setShowCreate(s => !s)}>
             {showCreate ? 'Cancel' : 'New user'}
           </button>
@@ -257,7 +262,7 @@ export default function UsersTable() {
       )}
 
       {isLoading ? (
-        <Loader size={24} />
+        <TableSkeleton rows={8} cols={6} label="Loading users" />
       ) : (
         <div className="admin-scroll-region" role="region" aria-label="Users" tabIndex={0} style={{ overflowX: 'auto', opacity: isFetching ? 0.7 : 1 }}>
           <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -268,7 +273,7 @@ export default function UsersTable() {
                 <th style={thStyle}>Company</th>
                 <th style={thStyle}>Role</th>
                 <th style={thStyle}>Status</th>
-                <th style={thStyle}>Last login</th>
+                <th className="adm-col-low" style={thStyle}>Last login</th>
                 <th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
@@ -279,34 +284,21 @@ export default function UsersTable() {
                   <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.55 }}>
                     <td style={tdStyle}>
                       {u.name || '—'}
-                      {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-warning-text)' }}>Superuser</span>}
+                      {u.is_superuser && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)' }}>Superuser</span>}
                     </td>
-                    <td style={tdStyle}>{u.email}</td>
+                    <td style={{ ...tdStyle, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.email}>{u.email}</td>
                     <td style={tdStyle}>{u.company_name || '—'}</td>
-                    <td style={controlTdStyle}>
-                      <select
-                        className="admin-control"
-                        style={{ ...selectStyle, padding: '8px 12px' }}
-                        aria-label={`Role for ${u.name || u.email}`}
-                        value={u.role}
-                        disabled={rowPending === 'role'}
-                        onChange={e => handleRoleChange(u, e.target.value)}
-                      >
-                        {ROLES.map(r => (
-                          <option key={r} value={r}>{roleLabel(r)}</option>
-                        ))}
-                        {!ROLES.includes(u.role as Role) && <option value={u.role}>{u.role}</option>}
-                      </select>
-                    </td>
+                    <td style={tdStyle}>{roleLabel(u.role)}</td>
                     <td style={tdStyle}>
                       <StatusChip status={u.is_active ? 'ACTIVE' : 'INACTIVE'} size="sm" />
                     </td>
-                    <td style={tdStyle}>{fmt(u.last_login)}</td>
+                    <td className="adm-col-low" style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmt(u.last_login)}</td>
                     <td style={actionTdStyle}>
                       <RowActions
                         label={u.name || u.email}
                         items={[
                           { label: 'Activity', onSelect: () => setActivityTarget(u) },
+                          { label: rowPending === 'role' ? 'Saving role…' : 'Change role', onSelect: () => setRoleTarget({ user: u, role: u.role }), disabled: !!rowPending },
                           { label: rowPending === 'reset_password' ? 'Sending…' : 'Reset password', onSelect: () => runAction(u, 'reset_password'), disabled: !!rowPending },
                           u.is_active
                             ? { label: rowPending === 'lock' ? 'Locking…' : 'Lock', danger: true, onSelect: () => setLockTarget(u), disabled: !!rowPending }
@@ -334,6 +326,34 @@ export default function UsersTable() {
           onPrev={() => setPage(p => Math.max(1, p - 1))}
           onNext={() => setPage(p => p + 1)}
         />
+      )}
+
+      {roleTarget && (
+        <div className="bk-dialog-backdrop" onClick={() => setRoleTarget(null)}>
+          <div className="bk-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-role-title" onClick={e => e.stopPropagation()}
+            onKeyDown={e => { if (e.key === 'Escape') setRoleTarget(null); }}>
+            <h2 className="bk-dialog__title" id="admin-role-title">Change role</h2>
+            <p className="bk-dialog__body">{roleTarget.user.name || roleTarget.user.email} is now {roleLabel(roleTarget.user.role).toLowerCase()}.</p>
+            <Select value={roleTarget.role} onValueChange={v => setRoleTarget({ ...roleTarget, role: v })}>
+              <SelectTrigger aria-label="New role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLES.map(r => <SelectItem key={r} value={r}>{roleLabel(r)}</SelectItem>)}
+                {!ROLES.includes(roleTarget.user.role as Role) && <SelectItem value={roleTarget.user.role}>{roleTarget.user.role}</SelectItem>}
+              </SelectContent>
+            </Select>
+            <div className="bk-dialog__footer">
+              <button type="button" className="bk-btn bk-btn--secondary" onClick={() => setRoleTarget(null)}>Cancel</button>
+              <button
+                type="button"
+                className="bk-btn bk-btn--primary"
+                disabled={roleTarget.role === roleTarget.user.role}
+                onClick={() => { const { user, role } = roleTarget; setRoleTarget(null); handleRoleChange(user, role); }}
+              >Save role</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {lockTarget && (

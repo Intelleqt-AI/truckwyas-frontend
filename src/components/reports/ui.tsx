@@ -1,10 +1,12 @@
 import { Fragment, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Check as CheckIcon, ChevronRight, Download, Printer } from 'lucide-react';
+import { Check as CheckIcon, Download, Printer } from 'lucide-react';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { Segmented } from '@/components/ui/Segmented';
 import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import LoadError from '@/components/data/LoadError';
+import { formatDistance } from '@/lib/formatters';
 import {
   PERIODS, day, downloadCsv, int, money, pct, resolvePeriod, slug,
   type CsvCell, type Period, type PeriodId,
@@ -69,6 +71,30 @@ export function Seg<T extends string>({ label, value, options, onChange }: {
   );
 }
 
+/** A compact menu for a report's second setting (basis, view, as-at date,
+ *  customer). One segmented control per head: the period (or the view when
+ *  there is no period) is the seg; everything else is one of these. An empty
+ *  id is allowed and means "the default". */
+const NONE = '__default';
+export function Choice<T extends string>({ label, prefix, value, options, onChange, wide }: {
+  label: string; prefix?: string; value: T; options: { id: T; label: string }[]; onChange: (id: T) => void; wide?: boolean;
+}) {
+  const current = options.find(o => o.id === value) ?? options[0];
+  return (
+    <Select value={(value as string) || NONE} onValueChange={v => onChange((v === NONE ? '' : v) as T)}>
+      <SelectTrigger aria-label={label} className={`fr-choice${wide ? ' fr-choice--wide' : ''}`} style={{ width: 'auto', minHeight: 32, height: 32, padding: '0 10px 0 12px', fontSize: 13 }}>
+        <SelectValue>
+          {prefix && <span className="fr-choice__pre">{prefix}</span>}
+          <span className="fr-choice__val">{current?.label}</span>
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent align="end">
+        {options.map(o => <SelectItem key={o.id || NONE} value={(o.id as string) || NONE}>{o.label}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}
+
 // ------------------------------------------------------------------- frame
 
 export interface ReportFrameProps {
@@ -88,28 +114,22 @@ export interface ReportFrameProps {
 }
 
 export function ReportFrame({ title, sub, info, controls, tiles, gaps, csv, csvName, children, companyName, printTitle }: ReportFrameProps) {
-  const [params] = useSearchParams();
-  const back = new URLSearchParams(params); back.delete('report'); back.delete('customer'); back.delete('view'); back.delete('basis'); back.delete('asat');
-  const qs = back.toString();
-  // One heading level under the Finance header: "Reports › Title", with the
-  // basis on the same line and the controls, Export and Print on the right.
+  // The page head (SectionHeader) carries the report title as the one H1 and
+  // a back link to the library. This row holds the basis line with its info
+  // tip on the left, and the controls, Export and Print on the right; data
+  // starts directly below.
   return (
-    <article className="fr-report" aria-labelledby="fr-report-title">
+    <article className="fr-report" aria-label={title}>
       <div className="fr-print-head">
         <span>{companyName || 'TruckWys'}</span>
         <span>{printTitle || title} · {sub}</span>
         <span>Printed {day(new Date().toISOString())}</span>
       </div>
-      <header className="fr-head">
-        <div className="fr-head__titles">
-          <h2 id="fr-report-title" className="fr-head__title">
-            <Link className="fr-crumb fr-noprint" to={`/finance/reports${qs ? `?${qs}` : ''}`}>Reports</Link>
-            <ChevronRight className="fr-crumb__sep fr-noprint" size={16} strokeWidth={1.75} aria-hidden="true" />
-            <span className="fr-head__name">{title}</span>
-            <InfoTip label={`How the ${title.toLowerCase()} is built`}>{info}</InfoTip>
-          </h2>
-          <p className="fr-head__sub">{sub}</p>
-        </div>
+      <div className="fr-head">
+        <p className="fr-head__sub">
+          <span>{sub}</span>
+          <InfoTip label={`How the ${title.toLowerCase()} is built`}>{info}</InfoTip>
+        </p>
         <div className="fr-head__actions fr-noprint">
           {controls}
           {csv && (
@@ -123,7 +143,7 @@ export function ReportFrame({ title, sub, info, controls, tiles, gaps, csv, csvN
             Print
           </button>
         </div>
-      </header>
+      </div>
       {tiles}
       {children}
       {/* What TruckWys does not capture: a note under the figures, beside the
@@ -135,6 +155,16 @@ export function ReportFrame({ title, sub, info, controls, tiles, gaps, csv, csvN
       )}
     </article>
   );
+}
+
+/** Library link that keeps the period (and other shared settings) but drops
+ *  the report-specific ones. */
+export function useLibraryHref() {
+  const [params] = useSearchParams();
+  const back = new URLSearchParams(params);
+  ['report', 'customer', 'view', 'basis', 'asat', 'since'].forEach(k => back.delete(k));
+  const qs = back.toString();
+  return `/finance/reports${qs ? `?${qs}` : ''}`;
 }
 
 // ------------------------------------------------------------------- tiles
@@ -217,10 +247,10 @@ function cell(v: CsvCell, type: ColType = 'text') {
   // Only ISO dates are formatted; a label such as "Total" in a date column stays as written.
   if (typeof v === 'string') return type === 'date' && /^\d{4}-\d{2}-\d{2}/.test(v) ? day(v) : v;
   switch (type) {
-    case 'money': return Math.abs(v) < 0.005 ? '0,00' : money(v);
+    case 'money': return money(Math.abs(v) < 0.005 ? 0 : v);
     case 'int': return int(v);
     case 'pct': return pct(v);
-    case 'km': return `${int(v)} km`;
+    case 'km': return formatDistance(v);
     default: return String(v);
   }
 }

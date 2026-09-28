@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { prefetchProps } from './routePrefetch';
 import { Ellipsis, Settings, MessageSquareText, Sun, Moon, LogOut, X } from 'lucide-react';
 import { NAV_GROUPS, PHONE_PRIMARY, isItemActive, underPrefix, type NavItem } from './nav';
 
@@ -49,7 +50,7 @@ export function PhoneBar({ allowed, canAccessSettings, canAsk, open, setOpen, th
           const Icon = i.icon;
           const active = !open && isItemActive(i, pathname);
           return (
-            <Link key={i.id} to={i.to} className={`tw-tab${active ? ' is-active' : ''}`} aria-current={active ? 'page' : undefined}>
+            <Link key={i.id} to={i.to} {...prefetchProps(i.to)} className={`tw-tab${active ? ' is-active' : ''}`} aria-current={active ? 'page' : undefined}>
               <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
               <span>{i.short || i.label}</span>
             </Link>
@@ -96,7 +97,7 @@ export function PhoneBar({ allowed, canAccessSettings, canAsk, open, setOpen, th
                     const Icon = i.icon;
                     const active = isItemActive(i, pathname);
                     return (
-                      <Link key={i.id} to={i.to} className={`tw-nav__item${active ? ' is-active' : ''}${i.muted ? ' is-muted' : ''}`} aria-current={active ? 'page' : undefined}>
+                      <Link key={i.id} to={i.to} {...prefetchProps(i.to)} className={`tw-nav__item${active ? ' is-active' : ''}${i.muted ? ' is-muted' : ''}`} aria-current={active ? 'page' : undefined}>
                         <Icon className="tw-nav__icon" aria-hidden="true" strokeWidth={1.75} />
                         <span className="tw-nav__label">{i.label}</span>
                         {i.muted && <span className="tw-nav__soon">Soon</span>}

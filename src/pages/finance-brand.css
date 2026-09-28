@@ -217,7 +217,9 @@ table.fin-table td.num { color: var(--text-primary); }
 table.fin-table th.actions,
 table.fin-table td.actions { text-align: right; width: 1%; white-space: nowrap; }
 .fin-id {
-  font-family: var(--font-mono);
+  /* IDs in the tabular sans, like every other figure (v3 decision). */
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
   font-size: 13px;
   line-height: 20px;
   font-weight: 400;
@@ -670,7 +672,7 @@ table.fin-table tfoot tr.fin-total-row td { color: var(--text-primary); font-wei
 }
 .fin-detail-head__eyebrow { font-size: 13px; line-height: 20px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
 .fin-detail-head__title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.fin-detail-head h1 { font-size: 22px; line-height: 28px; font-weight: 600; margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
+.fin-detail-head h1 { font-size: var(--text-display, 28px); line-height: 34px; font-weight: 600; letter-spacing: var(--tracking-display, -0.025em); margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
 .fin-detail-head__sub { font-size: 14px; line-height: 20px; color: var(--text-secondary); margin: 4px 0 0; }
 .fin-detail-head__actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .fin-hero-amount { font-size: 28px; line-height: 36px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); overflow-wrap: anywhere; margin: 0; }
@@ -843,17 +845,14 @@ table.fin-table td.fin-nowrap { white-space: nowrap; }
 .fin-tile__unit { margin-left: 6px; font-size: 0.56em; font-weight: 600; letter-spacing: -0.01em; color: var(--text-tertiary); }
 
 /* ==== v3 final: standard tiles, segmented filters, 32px toolbar ==== */
-.fin-page .fin-kpi-row { margin-bottom: 24px; }
+.fin-page .fin-kpi-row { margin-bottom: var(--section-gap, 24px); }
 .fin-page .fin-kpi-row .tw-kpi__head .tw-info { flex: none; }
 @media (min-width: 768px) {
-  /* Four equal columns at most; one to three tiles keep the standard width. */
-  .fin-page .fin-kpi-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* The row sizes to its count (shared .tw-kpi-row): two or three tiles
+     fill the row instead of leaving it half empty. */
   .fin-toolbar { gap: 8px 12px; }
   .fin-page .fin-toolbar .fin-control { min-height: 32px; height: 32px; font-size: 13px; }
   .fin-page .fin-toolbar .fin-control--search { width: 240px; }
-}
-@media (min-width: 768px) and (max-width: 1100px) {
-  .fin-page .fin-kpi-row { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 }
 .fin-toolbar .fin-seg { flex: none; }
 /* The segmented control sizes itself (28px, 40px on touch). */
@@ -941,3 +940,68 @@ table.fin-table tfoot tr.fin-doc__grand td { font-size: 16px; line-height: 24px;
 .fin-kpi-row .tw-kpi__head .tw-info { height: 16px; }
 /* 96px tile: label 16 + figure 34 + note 16 fill the 68px inner height
    exactly, so no extra flex gap (it squeezed the figure and note). */
+
+/* Loading: tile-shaped placeholders, so the head and filters render at once
+   and nothing jumps when the figures arrive. */
+.fin-skel-tile { background: var(--bg-raised); border-color: transparent; animation: fin-pulse 1.4s ease-in-out infinite; }
+@keyframes fin-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .fin-skel-tile { animation: none; } }
+@media (max-width: 767px) { .fin-detail-head h1 { font-size: 24px; line-height: 30px; } }
+.fin-skel { display: block; background: var(--bg-raised); border-radius: var(--radius-card); animation: fin-pulse 1.4s ease-in-out infinite; }
+.fin-skel--line { height: 34px; width: 220px; border-radius: 6px; }
+.fin-skel--card { height: 320px; margin-top: var(--section-gap, 24px); }
+@media (prefers-reduced-motion: reduce) { .fin-skel { animation: none; } }
+
+/* ==== Expenses overview (round 2): tiles, where the money goes and when,
+   in one row above the register; no half-empty tile row. ==== */
+.exp-overview {
+  display: grid; gap: var(--card-gap, 16px); margin-bottom: var(--section-gap, 24px);
+  grid-template-columns: minmax(220px, 1fr) minmax(0, 1.5fr) minmax(0, 1.3fr);
+  align-items: stretch;
+}
+.exp-overview > .fin-kpi-row.exp-tiles { margin: 0; max-width: none; grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(var(--kpi-height, 96px), 1fr); gap: var(--card-gap, 16px); }
+.exp-overview > .exp-tiles .tw-kpi { height: auto; min-height: var(--kpi-height, 96px); }
+.exp-overview > .card { margin: 0; min-width: 0; display: flex; flex-direction: column; }
+.exp-overview > .card.fin-skel-tile { min-height: 208px; }
+.exp-overview .fin-panel-head { margin-bottom: 12px; }
+.exp-overview .fin-rank { gap: 6px; }
+.exp-overview .fin-months { flex: 1; min-height: 132px; }
+@media (max-width: 1279px) {
+  .exp-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .exp-overview > .fin-kpi-row.exp-tiles { grid-column: 1 / -1; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); grid-auto-rows: auto; }
+  .exp-overview > .exp-tiles .tw-kpi { height: var(--kpi-height, 96px); }
+}
+/* Phone: tiles, filters and the register first; the analytics follow. */
+@media (max-width: 767px) {
+  .exp-page { display: flex; flex-direction: column; }
+  .exp-page > * { min-width: 0; }
+  .exp-overview { display: contents; }
+  .exp-overview > .fin-kpi-row.exp-tiles { margin-bottom: var(--section-gap, 24px); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .exp-overview > .fin-kpi-row.exp-tiles:has(> :only-child) { grid-template-columns: minmax(0, 1fr); }
+  .exp-overview > .card.exp-cat { order: 20; margin-bottom: var(--card-gap, 16px); }
+  .exp-overview > .card.exp-month { order: 21; }
+  .exp-page > .fin-table-card { order: 10; }
+  .exp-page > .fin-toolbar { order: 9; }
+}
+
+/* Toolbar filters on the shared select: 32px beside the search and seg. */
+.exp-filters { display: flex; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+.fin-page .fin-toolbar .fin-filter.tw-select-trigger { width: auto; min-height: 32px; height: 32px; padding: 0 10px 0 12px; font-size: 13px; max-width: 220px; }
+.fin-filter > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
+.fin-filter__short { display: none; }
+@media (max-width: 767px) {
+  .exp-filters { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .fin-page .fin-toolbar .fin-filter.tw-select-trigger { width: 100% !important; max-width: none; min-height: 44px !important; height: 44px !important; }
+  .fin-filter__long { display: none; }
+  .fin-filter__short { display: inline; }
+}
+/* Overview cards stay compact: one line per category (the count is in the
+   row's accessible name), and the filters keep the 32px toolbar height. */
+.exp-overview .exp-cat .fin-rank__label small { display: none; }
+.exp-overview .exp-cat .fin-rank__row { min-height: 28px; padding-top: 4px; padding-bottom: 4px; }
+.exp-overview .fin-panel-head { margin-bottom: 8px; }
+.expenses-type-roles .expenses-filter-bar .fin-filter.tw-select-trigger { min-height: 32px; }
+@media (max-width: 767px), (pointer: coarse) {
+  .expenses-type-roles .expenses-filter-bar .fin-filter.tw-select-trigger { min-height: 44px; }
+}
+.section-header__description .fin-id { color: inherit; font-size: inherit; }

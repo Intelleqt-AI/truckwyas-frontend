@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import SectionHeader, { FINANCE_TABS } from '@/components/layout/SectionHeader';
 import { useCompany, useLedger } from '@/components/reports/data';
 import { REPORTS, ReportLibrary, type ReportId } from '@/components/reports/library';
-import { Partial, ReportState } from '@/components/reports/ui';
+import { Partial, ReportState, useLibraryHref } from '@/components/reports/ui';
 import ProfitLoss from '@/components/reports/ProfitLoss';
 import CashMovement from '@/components/reports/CashMovement';
 import DebtorsAge from '@/components/reports/DebtorsAge';
@@ -21,9 +21,15 @@ export default function FinanceReports() {
   const [params] = useSearchParams();
   const id = params.get('report') as ReportId | null;
   const def = REPORTS.find(r => r.id === id);
+  const back = useLibraryHref();
+  // One head: the library is "Reports"; a report is titled by its own name
+  // with a back link to the library on the subtitle line. The head renders at
+  // once; only the content below waits for data.
   return (
     <div className="fin-page fr-page">
-      <SectionHeader eyebrow="Finance" title="Finance" tabs={FINANCE_TABS} />
+      {def
+        ? <SectionHeader title={def.title} back={{ to: back, label: 'Reports' }} />
+        : <SectionHeader eyebrow="Finance" title="Reports" tabs={FINANCE_TABS} description="Reconciled to your invoices, payments and expenses" />}
       {def ? <Report id={def.id} key={def.id} /> : <Library />}
     </div>
   );

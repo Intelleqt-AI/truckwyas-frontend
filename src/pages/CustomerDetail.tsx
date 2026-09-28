@@ -3,6 +3,7 @@ import './table-heading-roles.css';
 import './bookings-typography.css';
 import './bookings-section.css';
 import './ops-tiles.css';
+import SectionHeader from '@/components/layout/SectionHeader';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { KpiRow, KpiTile } from '@/components/ui/KpiTile';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
@@ -12,10 +13,12 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchData, patchData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatMoneyWhole } from '@/lib/formatters';
 import { ArrowLeft, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader } from '@/components/Loader';
+import { BlockSkeleton, TilesSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { usePipeline } from '@/components/overview/today';
+import { useLedger, isOpen, num, todayISO, daysBetween } from '@/components/reports/data';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import { rowLink } from '@/lib/rowLink';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
@@ -103,6 +106,13 @@ export default function CustomerDetail() {
     queryFn: () => fetchData(`api/v1/quotes/?customer=${id}&page_size=50`),
     enabled: !!id,
   });
+  const quotes: any[] = Array.isArray(quotesData) ? quotesData : (quotesData?.results || []);
+  // Win rate uses Home's definition (components/overview/today.tsx): quotes
+  // accepted or turned into a load, out of quotes actually sent. Drafts were
+  // never offered, so they are neither won nor lost.
+  const pipeline = usePipeline(quotes);
+  // Their invoices, from the same ledger as Invoices and the Debtors report.
+  const ledger = useLedger(['invoices']);
 
   // A failed request is not a missing record: only a 404 says "not found".
   if (customerFailed && customerError?.status !== 404) return (
@@ -114,7 +124,17 @@ export default function CustomerDetail() {
     </div>
   );
 
-  if (isLoading && !customerFailed) return <Loader fullScreen />;
+  // Loading: keep the back link and page frame; only the content waits.
+  if (isLoading && !customerFailed) return (
+    <div className="bk-detail bookings-typography">
+      <SectionHeader
+        title="Loading customer"
+        back={{ to: '/customers', label: 'Customers' }}
+      />
+      <TilesSkeleton count={4} />
+      <BlockSkeleton height={280} label="Loading customer" />
+    </div>
+  );
 
   if (!customer) return (
     <div className="bk-detail">
@@ -131,17 +151,32 @@ export default function CustomerDetail() {
     </div>
   );
 
-  const quotes = Array.isArray(quotesData) ? quotesData : (quotesData?.results || []);
   const totalQuotes = quotes.length;
   // The quotes endpoint is paginated (page_size=50): every figure below is
   // computed from the quotes actually loaded, and says so when that is not all of them.
   const quotesOnServer: number = Array.isArray(quotesData) ? quotes.length : (quotesData?.count ?? quotes.length);
   const basis = quotesOnServer > totalQuotes ? `the latest ${totalQuotes} of ${quotesOnServer} quotes` : `${totalQuotes} ${totalQuotes === 1 ? "quote" : "quotes"}`;
-  const acceptedQuotes = quotes.filter((q: any) => q.status === "ACCEPTED").length;
-  const totalRevenue = quotes
-    .filter((q: any) => q.status === "ACCEPTED")
-    .reduce((s: number, q: any) => s + parseFloat(q.total_amount || q.quote_price || "0"), 0);
+  const WON = ["ACCEPTED", "IT", "COMPLETED"];
+  const wonQuotes = quotes.filter((q: any) => WON.includes(String(q.status || "").toUpperCase()));
+  const sentQuotes = quotes.length - pipeline.drafts;
+  const totalRevenue = wonQuotes.reduce((s: number, q: any) => s + parseFloat(q.total_amount || q.quote_price || "0"), 0);
   const isActive = customer.is_active !== false && customer.status !== "INACTIVE";
+
+  // Money: open invoices (issued, unpaid, balance above zero, incl. VAT).
+  const today = todayISO();
+  const theirInvoices = (ledger.data?.invoices ?? [])
+    .filter(i => i.customer === customer.id)
+    .sort((a, b) => (b.issue_date || "").localeCompare(a.issue_date || ""));
+  const openInvoices = theirInvoices.filter(isOpen);
+  const owed = openInvoices.reduce((t, i) => t + num(i.balance), 0);
+  const lateInvoices = openInvoices.filter(i => i.due_date && i.due_date.slice(0, 10) < today);
+  const overdue = lateInvoices.reduce((t, i) => t + num(i.balance), 0);
+  const oldestLate = lateInvoices.reduce((m, i) => Math.max(m, daysBetween(i.due_date, today)), 0);
+  const invoiceRows = [...openInvoices, ...theirInvoices.filter(i => !isOpen(i))].slice(0, 10);
+  // Company first; the contact person only when they differ.
+  const displayName = (customer.company_name || "").trim() || customer.name;
+  const contact = (customer.name || "").trim();
+  const showContact = contact && contact.toLowerCase() !== displayName.toLowerCase();
 
   function openEdit() {
     setEditForm({
@@ -192,26 +227,17 @@ export default function CustomerDetail() {
   }
 
   // Tiles show whole rands; the exact amount sits in the title.
-  const wholeRand = (n: number) => 'R ' + Math.round(n).toLocaleString('en-ZA');
+  const wholeRand = (n: number) => formatMoneyWhole(n);
 
   return (
     <div className="bk-detail bookings-typography">
       {/* Back + Header */}
-      <button type="button" className="bk-back" onClick={() => navigate("/customers")}>
-        <ArrowLeft size={16} aria-hidden="true" /> Back to customers
-      </button>
-      <div className="bk-detail-header">
-        <div className="bk-detail-header__titles">
-          <div className="bk-eyebrow">Customer</div>
-          <div className="bk-title-row">
-            <h1 className="bk-title">{customer.name}</h1>
-            <StatusChip status={isActive ? "ACTIVE" : "INACTIVE"} />
-          </div>
-          {customer.company_name && customer.company_name !== customer.name && (
-            <p className="bk-subtitle">{customer.company_name}</p>
-          )}
-        </div>
-        <div className="bk-detail-header__actions">
+      <SectionHeader
+        title={displayName}
+        back={{ to: '/customers', label: 'Customers' }}
+        titleAdornment={<><StatusChip status={isActive ? "ACTIVE" : "INACTIVE"} /></>}
+        description={showContact ? <>Contact: {contact}</> : undefined}
+        actions={<>
           <button
             type="button"
             className="bk-btn bk-btn--quiet"
@@ -224,33 +250,55 @@ export default function CustomerDetail() {
             onClick={() => navigate(`/customers/${id}/risk`)}
           >Payment risk profile</button>
           <button type="button" className="bk-btn bk-btn--primary" onClick={openEdit}>Edit customer</button>
-        </div>
-      </div>
+        </>}
+      />
 
       <div className="bk-detail-grid bk-detail-grid--rail">
         <div className="bk-stack">
-          {/* Key figure first: what this customer is worth, from their own quotes. */}
-          {totalQuotes > 0 ? (
+          {/* Key figures first: what they owe you, then what they are worth. */}
+          {(owed > 0 || totalQuotes > 0) ? (
             <KpiRow>
-              <KpiTile
-                aria-label="Won from quotes"
-                label="Won from quotes"
-                aside={<InfoTip>Totals of accepted quotes, from {basis}.</InfoTip>}
-                figure={<span title={formatZAR(totalRevenue)}>{wholeRand(totalRevenue)}</span>}
-                note="Accepted quotes"
-              />
-              <KpiTile
-                aria-label="Quotes accepted"
-                label="Quotes accepted"
-                aside={<InfoTip>Share of all their quotes, drafts included, that were accepted.</InfoTip>}
-                figure={<>{acceptedQuotes}<span className="tw-kpi__of"> of {totalQuotes}</span></>}
-                note={`${Math.round((acceptedQuotes / totalQuotes) * 100)}% win rate`}
-              />
+              {owed > 0 && (
+                <KpiTile
+                  aria-label="Owed to you"
+                  label="Owed to you"
+                  aside={<InfoTip>Unpaid balances on issued invoices, including VAT. Same basis as Invoices and the Debtors report.</InfoTip>}
+                  figure={<span title={formatZAR(owed)}>{wholeRand(owed)}</span>}
+                  note={`${openInvoices.length} ${openInvoices.length === 1 ? "invoice" : "invoices"}`}
+                />
+              )}
+              {overdue > 0 && (
+                <KpiTile
+                  aria-label="Overdue"
+                  label="Overdue"
+                  figure={<span title={formatZAR(overdue)}>{wholeRand(overdue)}</span>}
+                  note={`Oldest ${oldestLate} ${oldestLate === 1 ? "day" : "days"} late`}
+                  tone="danger"
+                />
+              )}
+              {wonQuotes.length > 0 && (
+                <KpiTile
+                  aria-label="Won from quotes"
+                  label="Won from quotes"
+                  aside={<InfoTip>Totals of quotes accepted or turned into a load, from {basis}.</InfoTip>}
+                  figure={<span title={formatZAR(totalRevenue)}>{wholeRand(totalRevenue)}</span>}
+                  note={`${wonQuotes.length} ${wonQuotes.length === 1 ? "quote" : "quotes"} won`}
+                />
+              )}
+              {pipeline.winRate != null && (
+                <KpiTile
+                  aria-label="Win rate"
+                  label="Win rate"
+                  aside={<InfoTip>Quotes accepted or turned into a load, out of quotes sent. Drafts are left out. Same definition as Home.</InfoTip>}
+                  figure={`${pipeline.winRate}%`}
+                  note={`${wonQuotes.length} of ${sentQuotes} sent`}
+                />
+              )}
             </KpiRow>
           ) : (
             <div className="bk-notice" style={{ marginBottom: 0 }}>
               <div>
-                <p className="bk-notice__text">You have not quoted {customer.name} yet.</p>
+                <p className="bk-notice__text">You have not quoted {displayName} yet.</p>
               </div>
               <button type="button" className="bk-btn bk-btn--secondary" onClick={() => navigate("/bookings/quotes/new")}>New quote</button>
             </div>
@@ -262,6 +310,7 @@ export default function CustomerDetail() {
             <div className="bk-card__head"><h2 className="bk-card__title" id="cd-contact-title">Contact details</h2></div>
             <dl className="bk-facts bk-facts--auto">
               {[
+                ...(showContact ? [{ label: "Contact", value: contact }] : []),
                 { label: "Email", value: customer.email },
                 { label: "Phone", value: customer.phone },
                 { label: "City", value: customer.city },
@@ -272,7 +321,7 @@ export default function CustomerDetail() {
               ].map(r => (
                 <div key={r.label}>
                   <dt className="bk-fact__label">{r.label}</dt>
-                  <dd className="bk-fact__value">{r.value || "—"}</dd>
+                  <dd className="bk-fact__value">{r.value || <span className="bk-muted">Not recorded</span>}</dd>
                 </div>
               ))}
             </dl>
@@ -284,9 +333,9 @@ export default function CustomerDetail() {
           <div className="bk-card__head"><h2 className="bk-card__title" id="cd-account-title">Account details</h2></div>
           {[
             { label: "Payment terms", value: paymentTermsLabel(customer.payment_terms_default) },
-            { label: "Credit limit", value: customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "—" },
-            { label: "Status", value: isActive ? "Active" : "Inactive" },
-            { label: "Customer since", value: customer.created_at ? formatDate(customer.created_at) : "—" },
+            { label: "Owed now", value: ledger.data ? (owed > 0 ? formatZAR(owed) : "Nothing owed") : ledger.error ? "Could not load" : "…" },
+            { label: "Credit limit", value: customer.credit_limit ? formatZAR(parseFloat(customer.credit_limit)) : "Not set" },
+            { label: "Customer since", value: customer.created_at ? formatDate(customer.created_at) : "Not recorded" },
           ].map(r => (
             <div key={r.label} className="bk-kv">
               <span className="bk-kv__label">{r.label}</span>
@@ -296,8 +345,62 @@ export default function CustomerDetail() {
         </section>
       </div>
 
+      {/* Invoices: open ones first, then the most recent settled ones. */}
+      <section className="bk-card" style={{ marginTop: "var(--section-gap, 24px)", padding: 0 }} aria-labelledby="cd-invoices-title">
+        <div className="bk-card__head" style={{ padding: "24px 24px 0" }}>
+          <h2 className="bk-card__title" id="cd-invoices-title">Invoices</h2>
+          <span className="bk-toolbar__end">
+            {theirInvoices.length > invoiceRows.length
+              ? `${invoiceRows.length} of ${theirInvoices.length}`
+              : `${theirInvoices.length} ${theirInvoices.length === 1 ? "invoice" : "invoices"}`}
+          </span>
+        </div>
+        {!ledger.data ? (
+          ledger.error ? (
+            <div className="bk-empty"><p className="bk-empty__text">Invoices could not be loaded. <button type="button" className="bk-link" onClick={ledger.retry}>Try again</button></p></div>
+          ) : (
+            <div style={{ padding: 24 }}><div className="ops-skel" style={{ height: 120 }} /></div>
+          )
+        ) : theirInvoices.length === 0 ? (
+          <div className="bk-empty"><p className="bk-empty__text">No invoices for this customer yet.</p></div>
+        ) : (
+          <div className="bk-table-wrap bk-table-wrap--bare">
+            <table className="table-heading-roles bk-table">
+              <thead>
+                <tr>
+                  <th scope="col">Invoice</th>
+                  <th scope="col" className="bk-col-opt">Issued</th>
+                  <th scope="col" className="bk-col-phone">Due</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" className="is-num bk-col-narrow">Total</th>
+                  <th scope="col" className="is-num">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoiceRows.map(inv => {
+                  const late = isOpen(inv) && inv.due_date && inv.due_date.slice(0, 10) < today;
+                  return (
+                    <tr key={inv.id} className="is-clickable" {...rowLink(() => navigate(`/finance/invoices/${inv.id}`))} onClick={() => navigate(`/finance/invoices/${inv.id}`)}>
+                      <td className="is-id">{inv.invoice_number}</td>
+                      <td className="is-date bk-col-opt">{inv.issue_date ? formatDate(inv.issue_date) : "Not issued"}</td>
+                      <td className="is-date bk-col-phone">
+                        {inv.due_date ? formatDate(inv.due_date) : "Not set"}
+                        {late && <span className="bk-muted"> · {daysBetween(inv.due_date, today)} days late</span>}
+                      </td>
+                      <td><StatusChip status={late && String(inv.status).toUpperCase() === "SENT" ? "OVERDUE" : inv.status} size="sm" /></td>
+                      <td className="is-num bk-col-narrow">{formatZAR(num(inv.total_amount))}</td>
+                      <td className="is-money">{isOpen(inv) ? formatZAR(num(inv.balance)) : <span className="bk-muted">Paid</span>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       {/* Quotes table */}
-      <section className="bk-card" style={{ marginTop: 24, padding: 0 }} aria-labelledby="cd-quotes-title">
+      <section className="bk-card" style={{ marginTop: "var(--section-gap, 24px)", padding: 0 }} aria-labelledby="cd-quotes-title">
         <div className="bk-card__head" style={{ padding: "24px 24px 0" }}>
           <h2 className="bk-card__title" id="cd-quotes-title">Quotes</h2>
           <span className="bk-toolbar__end">
@@ -309,14 +412,14 @@ export default function CustomerDetail() {
             <p className="bk-empty__text">No quotes yet for this customer.</p>
           </div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <div className="bk-table-wrap bk-table-wrap--bare">
             <table className="table-heading-roles bk-table">
               <thead>
                 <tr>
-                  <th scope="col">Quote #</th>
-                  <th scope="col">Route</th>
+                  <th scope="col">Quote</th>
+                  <th scope="col" className="bk-col-route">Route</th>
                   <th scope="col">Status</th>
-                  <th scope="col">Date</th>
+                  <th scope="col" className="bk-col-narrow">Date</th>
                   <th scope="col" className="is-num">Amount</th>
                 </tr>
               </thead>
@@ -331,13 +434,16 @@ export default function CustomerDetail() {
                     <td className="is-id">
                       {q.quote_number || `#${q.id}`}
                     </td>
-                    <td className="is-truncate" title={`${q.pickup_location || "—"} → ${q.delivery_location || "—"}`}>
+                    <td className="is-truncate bk-col-route" title={`${q.pickup_location || "—"} → ${q.delivery_location || "—"}`}>
                       {q.pickup_location || "—"} → {q.delivery_location || "—"}
                     </td>
                     <td>
-                      <StatusChip status={q.status === "IT" ? "IN_TRANSIT" : q.status} size="sm" />
+                      {/* A quote that became a load reads as booked, not as the load's own state. */}
+                      {String(q.status).toUpperCase() === "IT"
+                        ? <StatusChip tone="success" label="Booked" size="sm" />
+                        : <StatusChip status={q.status} size="sm" />}
                     </td>
-                    <td className="is-date">
+                    <td className="is-date bk-col-narrow">
                       {q.created_at ? formatDate(q.created_at) : "—"}
                     </td>
                     <td className="is-money">

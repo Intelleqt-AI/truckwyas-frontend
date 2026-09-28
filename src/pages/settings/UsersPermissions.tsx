@@ -1,11 +1,14 @@
 import '@/pages/table-heading-roles.css';
+import '@/pages/ops-tiles.css';
 import '@/pages/settings/settings-brand.css';
+import '@/pages/bookings-section.css';
 import { useState, useEffect } from "react";
 import { fetchData, postData, patchData, deleteData } from "@/lib/Api";
 import { toast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/AuthContext';
-import { formatDateTime } from '@/lib/formatters';
+import { formatDate, formatDateTime } from '@/lib/formatters';
+import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
 import { settingsCardStyle, settingsCardHeaderStyle, settingsCardTitleStyle, settingsLabelStyle, settingsInputStyle, settingsSecondaryButtonStyle, settingsDangerButtonStyle, SettingsPageHeader } from './settingsUi';
 import RowActions from '@/components/ui/RowActions';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -13,7 +16,7 @@ import { StatusChip } from '@/components/ui/StatusChip';
 // Presentation only: the API sends a raw ISO timestamp; show it in the app's
 // date format, and anything unparseable verbatim.
 const displayLastActive = (v?: string) => {
-  if (!v) return '—';
+  if (!v) return 'Never';
   const d = new Date(v);
   return isNaN(d.getTime()) ? v : formatDateTime(d);
 };
@@ -83,6 +86,9 @@ export function UsersPermissions() {
   const [inviteRole, setInviteRole] = useState('operator');
   const [inviting, setInviting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  // Role is plain text in the table; "Change role" in the row menu opens this.
+  const [roleEdit, setRoleEdit] = useState<{ user: User; role: string } | null>(null);
+  useFocusTrap(latestModal, !!roleEdit);
 
   useEffect(() => {
     loadUsers();
@@ -217,7 +223,7 @@ export function UsersPermissions() {
 
   return (
     <div style={{ maxWidth: 960 }}>
-      <SettingsPageHeader title="Users & permissions" description="Manage team access and roles" />
+      <SettingsPageHeader title="Users and permissions" description="Manage team access and roles" />
 
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
@@ -293,18 +299,29 @@ export function UsersPermissions() {
 
         {/* Table */}
         {loading ? (
-          <div style={{ padding: 24 }}>
-            <div style={{ height: 16, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', marginBottom: 12, width: '60%' }} />
-            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', marginBottom: 12, width: '40%' }} />
-            <div style={{ height: 32, background: 'var(--bg-deep)', borderRadius: 'var(--radius-chip)', width: '40%' }} />
-          </div>
+          // Real head plus placeholder rows at the final row height (65px, avatar
+          // and two lines), so the cards below do not move when users arrive.
+          <table className="table-heading-roles settings-table" aria-busy="true" aria-label="Loading team members">
+            <thead><tr>{['User', 'Role', 'Status', 'Last active', ''].map(h => <th key={h || 'a'} scope="col" className={h === 'Role' || h === 'Last active' ? 'st-col-phone' : undefined}>{h}</th>)}</tr></thead>
+            <tbody>
+              {Array.from({ length: 12 }, (_, i) => (
+                <tr key={i} aria-hidden="true" style={{ borderBottom: '1px solid var(--border-row)', height: 65 }}>
+                  <td><span className="ops-skel" style={{ width: 180, height: 12 }} /></td>
+                  <td className="st-col-phone"><span className="ops-skel" style={{ width: 60 }} /></td>
+                  <td><span className="ops-skel" style={{ width: 56 }} /></td>
+                  <td className="st-col-phone"><span className="ops-skel" style={{ width: 100 }} /></td>
+                  <td />
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ) : (
           <div className="settings-scroll-region" role="region" aria-label="Team members" tabIndex={0} style={{ overflowX: 'auto' }}>
           <table className="table-heading-roles settings-table settings-table--pin-actions">
             <thead>
               <tr>
                 {['User', 'Role', 'Status', 'Last active', ''].map(h => (
-                  <th key={h || 'actions'} scope="col" style={{ textAlign: (h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
+                  <th key={h || 'actions'} scope="col" className={h === 'Role' || h === 'Last active' ? 'st-col-phone' : undefined} style={{ textAlign: (h === '') ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
                 ))}
               </tr>
             </thead>
@@ -322,58 +339,43 @@ export function UsersPermissions() {
                         style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                       />
                     ) : (
-                      <div style={{
-                        width: 30, height: 30, borderRadius: '50%',
-                        background: 'var(--accent-dim)', display: 'flex', alignItems: 'center',
+                      <div aria-hidden="true" style={{
+                        width: 30, height: 30, borderRadius: '50%', boxSizing: 'border-box',
+                        background: 'var(--bg-surface-hover)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center',
                         justifyContent: 'center', fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
-                        color: 'var(--avatar-on-dim, var(--accent-primary))', flexShrink: 0,
+                        color: 'var(--text-secondary)', flexShrink: 0,
                       }}>
                         {u.name?.charAt(0).toUpperCase() || '?'}
                       </div>
                     )}
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{u.name}</div>
-                      <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{u.email}</div>
+                      <div className="st-email" title={u.email} style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>{u.email}</div>
                     </div>
                   </div>
                 </td>
-                <td>
-                  {isAdmin && u.id !== currentUser?.id ? (
-                    <Select value={u.role?.toLowerCase()} onValueChange={val => handleRoleChange(u.id, val)} disabled={isDemo}>
-                      <SelectTrigger
-                        title={isDemo ? 'Fixed in demo mode' : undefined}
-                        style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="operator">Operator</SelectItem>
-                        <SelectItem value="dispatcher">Dispatcher</SelectItem>
-                        <SelectItem value="viewer">Viewer</SelectItem>
-                        <SelectItem value="driver">Driver</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <span style={{
-                      ...roleBadgeStyle,
-                      border: '1px solid var(--border-active)',
-                      color: 'var(--text-secondary)',
-                    }}>{roleDisplay(u.role)}</span>
-                  )}
+                <td className="st-col-phone">
+                  <span className="st-role" style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{roleDisplay(u.role)}</span>
                 </td>
                 <td>
                   <StatusChip status={u.status} label={statusDisplay(u.status)} size="sm" />
                 </td>
-                <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
+                <td className="st-col-phone" style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
                   {displayLastActive(u.last_active)}
                 </td>
                 <td style={{ textAlign: 'right' as const }}>
                   {isAdmin && (
                     <RowActions
                       label={u.email || `User ${u.id}`}
-                      items={[{ label: 'Remove', danger: true, onSelect: () => setDeleteConfirm(u.id), disabled: isDemo }]}
+                      items={[
+                        ...(u.id !== currentUser?.id ? [{
+                          label: 'Change role',
+                          onSelect: () => setRoleEdit({ user: u, role: u.role?.toLowerCase() || 'operator' }),
+                          disabled: isDemo,
+                          title: isDemo ? 'Fixed in demo mode' : undefined,
+                        }] : []),
+                        { label: 'Remove', danger: true, onSelect: () => setDeleteConfirm(u.id), disabled: isDemo },
+                      ]}
                     />
                   )}
                 </td>
@@ -405,17 +407,13 @@ export function UsersPermissions() {
                 <tr key={inv.id} style={{ borderBottom: i < pendingInvites.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
                   <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{inv.email}</td>
                   <td>
-                    <span style={{
-                      ...roleBadgeStyle,
-                      border: '1px solid var(--border-active)',
-                      color: 'var(--text-secondary)',
-                    }}>{roleDisplay(inv.role)}</span>
+                    <span style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{roleDisplay(inv.role)}</span>
                   </td>
                   <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                    {new Date(inv.invited_at).toLocaleDateString()}
+                    {formatDate(inv.invited_at)}
                   </td>
                   <td style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-tertiary)' }}>
-                    {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString() : '—'}
+                    {inv.expires_at ? formatDate(inv.expires_at) : 'No expiry'}
                   </td>
                   <td style={{ textAlign: 'right' as const }}>
                     <RowActions
@@ -452,16 +450,48 @@ export function UsersPermissions() {
               padding: '12px 24px',
               borderBottom: i < arr.length - 1 ? '1px solid var(--border-row)' : 'none',
             }}>
-              <span style={{
-                ...roleBadgeStyle,
-                border: `1px solid ${r.color}`, color: r.color,
-                width: 80, textAlign: 'center' as const,
-              }}>{r.role}</span>
+              <span style={{ width: 96, flexShrink: 0, fontSize: 14, lineHeight: '20px', fontWeight: 500, color: 'var(--text-primary)' }}>{r.role}</span>
               <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{r.desc}</span>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Change role: same PATCH as before, now behind one row action. */}
+      {roleEdit && (
+        <div className="bk-dialog-backdrop" onClick={() => setRoleEdit(null)}>
+          <div className="bk-dialog" role="dialog" aria-modal="true" aria-labelledby="role-edit-title" onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === 'Escape') setRoleEdit(null); }}>
+            <h2 className="bk-dialog__title" id="role-edit-title">Change role</h2>
+            <p className="bk-dialog__body">{roleEdit.user.name || roleEdit.user.email} is now {roleDisplay(roleEdit.user.role).toLowerCase()}.</p>
+            <span style={fieldLabelStyle} id="role-edit-label">New role</span>
+            <Select value={roleEdit.role} onValueChange={(val) => setRoleEdit({ ...roleEdit, role: val })}>
+              <SelectTrigger aria-labelledby="role-edit-label" data-autofocus>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="operator">Operator</SelectItem>
+                <SelectItem value="dispatcher">Dispatcher</SelectItem>
+                <SelectItem value="viewer">Viewer</SelectItem>
+                <SelectItem value="driver">Driver</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="bk-dialog__footer">
+              <button type="button" className="bk-btn bk-btn--secondary" onClick={() => setRoleEdit(null)}>Cancel</button>
+              <button
+                type="button"
+                className="bk-btn bk-btn--primary"
+                disabled={isDemo || roleEdit.role === roleEdit.user.role?.toLowerCase()}
+                onClick={() => { const { user, role } = roleEdit; setRoleEdit(null); handleRoleChange(user.id, role); }}
+              >
+                Save role
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (

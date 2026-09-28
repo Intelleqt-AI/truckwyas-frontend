@@ -30,7 +30,9 @@ These read as generated UI. Never use them.
 
 All values live in `src/styles/theme.css`, in the `:root, [data-theme="dark"]` block and the `[data-theme="light"]` block. Every token is global. Nothing is scoped to `.os-app-shell`, so portals (menus, popovers, toasts), auth pages and public documents get the same values. Each theme block sets `color-scheme` (`light` or `dark`), so native checkboxes, date inputs, scrollbars and select arrows follow the theme. `html { accent-color: var(--accent-primary) }` tints native controls.
 
-- **Radius:** cards 16px (`--radius-card`), controls 10px, chips 8px, pills 999px, dialogs and sheets 20px, nested surfaces 12px. The segmented control track is 8px, with 6px options.
+- **Radius (v3, agrees with `docs/design/v3/00-V3-DECISION.md`):** cards 12px (`--radius-card`), controls 8px (`--radius-control`), chips 6px (`--radius-chip`), dialogs and sheets 16px (`--radius-dialog`), menus and popovers 12px (`--radius-menu`), nested surfaces 8px (`--radius-nested`), pills 999px. The segmented control track is 8px, with 6px options. Larger radii read soft and junior.
+- **Identifiers** (invoice, quote and load numbers, plates, licences) are tabular sans, not monospace: `.mono` / `--font-mono` / `--font-id` all resolve to the sans face with tabular figures. Only true code (API keys, headers, payloads, code blocks) uses `--font-code`.
+- **Numbers and dates** come from `src/lib/formatters.ts` only (en-ZA): `formatMoney` "R 20 505,65" in tables, `formatMoneyWhole` "R 20 506" on tiles, `formatCompact` "R 7,8k" / "R 1,2m", `formatPercent` "14,1%", `formatDays` "31,9 days", `formatWeight` "8,0 t", `formatDate` "5 Apr 2026", `formatDateShort` "5 Apr". Never ISO dates, never "Sept", never a point decimal.
 - **Neutrals** are cool greys, hue 214 to 220 degrees.
 
 **Surfaces**
@@ -75,7 +77,7 @@ All values live in `src/styles/theme.css`, in the `:root, [data-theme="dark"]` b
 - **Hover** on rows and interactive cards is a surface tint, not a border change.
 - **Shadows:** popovers, menus and toasts use `--shadow-pop` with a hairline `--border-overlay`. Cards have a border and no shadow.
 
-**Type:** page title 28/34 700 -0.025em. KPI figure 28/34 700 -0.03em tabular on standard tiles, 32/38 for a lone hero figure. Card title 15/22 600. Body 14/20. Small 13/20. Label 12/16 500 tertiary. Sidebar group label 11/16 600, uppercase, +0.06em. That group label is the only uppercase in the product.
+**Type:** page title 28/34 600 -0.025em. KPI figure 28/34 600 -0.03em tabular on standard tiles, 32/38 for a lone hero figure. Card title 15/22 600. Body 14/20. Small 13/20. Label 12/16 500 tertiary. Sidebar group label 11/16 600, uppercase, +0.06em. That group label is the only uppercase in the product.
 
 ## 4. Colour and emphasis (v3 final)
 
@@ -197,7 +199,7 @@ Every pair the palette ships was computed with the WCAG relative-luminance formu
 3. Do bars encode the metric the list is sorted by?
 4. Is the sample size visible, and is thin data kept out of rankings?
 5. Is every number real, labelled with its basis, and neutral unless it needs attention?
-6. Card padding 20, rows 44 to 48, gaps 16/24, radius 16/10/8?
+6. Card padding 20, rows 44 to 48, gaps 16/24, radius 12/8/6 (dialogs 16)?
 7. Correct in light and dark, and at phone width?
 8. Measured at 1280, 1440, 1920 and 390: every chart is at least 95% of its card width, every card is less than 25% empty, no figure is repeated on screen, there is one segmented control, and there is no horizontal overflow.
 9. Primary button is ink, accent appears once per screen, every status is a `<StatusChip>`, every form control uses `--border-control`.
@@ -221,8 +223,8 @@ Every pair the palette ships was computed with the WCAG relative-luminance formu
 
 The shell (`src/components/shell/`) and the primitives at the end of `src/styles/theme.css` are the whole kit. For each page:
 
-1. **Head.** Use `SectionHeader` (already v3: 28px bold title, grey subtitle, neutral tab underline) or `.tw-page-head` + `.tw-title` + `.tw-subtitle`. Subtitle is one line, at most 8 words. Delete any paragraph under the title.
-2. **Cards.** `.tw-card` (16px radius, 20px padding). Head: `.tw-card__head` > `.tw-card__titles` > `.tw-card__title` (+ `<InfoTip>` from `components/ui/InfoTip`) and `.tw-card__sub`. Tables go in `.tw-card--flush` with the head padded.
+1. **Head.** Use `SectionHeader` (28/34 600 title, one grey subtitle line, neutral tab underline) or `.tw-page-head` + `.tw-title` + `.tw-subtitle`; both render the same geometry. Subtitle is one line, at most 8 words. No eyebrow row and no breadcrumb row above the H1: a detail page's way back goes on the subtitle line (`SectionHeader back={{ to, label }}`). Delete any paragraph under the title.
+2. **Cards.** `.tw-card` (12px radius, 20px padding). Head: `.tw-card__head` > `.tw-card__titles` > `.tw-card__title` (+ `<InfoTip>` from `components/ui/InfoTip`) and `.tw-card__sub`. Tables go in `.tw-card--flush` with the head padded.
 3. **Numbers.** Big figure `.tw-figure` (32px, whole rands on tiles, cents in the `title` attribute and tables). Change: `.tw-delta` with a trend glyph and a named period ("+8% vs prior 30 days"). Max four tiles per row; at most one inverted `--emphasis-bg` tile per page.
 4. **Controls.** `.tw-btn` (outline), `.tw-btn--primary` (ink, one per page), `.tw-btn--ghost`; `<Segmented>` / `.tw-seg` for every filter and period (§11.4); `<StatusChip>` for every status (§12); `.tw-chip` only for a scope label ("Last 20 quotes").
 5. **Words.** Apply §9. Every "Each month shows…" or "This list holds…" sentence moves into an `InfoTip` or is deleted.
@@ -253,12 +255,15 @@ The shell (`src/components/shell/`) and the primitives at the end of `src/styles
    - Forms and settings are 720px (`--form-max`).
    - Prose is 72ch inside full-width cards.
    - No page-specific caps and no centring offsets.
-9. **One page head.**
-   - H1 is 28px at the top of main, and tabs are 40px.
+9. **One page head.** Same coordinates on every page, set by tokens in `theme.css` and applied by `SectionHeader` / `.tw-page-head` and the shell's `<main>`:
+   - H1 box top at `--page-head-top` (24px desktop, 16px phone) below the top bar; 28/34 600.
+   - The head block is `--page-head-h` (58px: title 34 + 4 + one subtitle line 20); the subtitle line is reserved even when empty, so tabs never move.
+   - Tabs row (40px) at `--head-to-tabs` (16px) below the head; content at `--tabs-to-content` (24px) below the tabs, or `--head-to-content` (24px) below the head when there are no tabs.
+   - Section pages take their H1 from the sidebar item they live under ("Get paid", "Quotes and loads", "Fleet"): the nav label and the H1 always agree.
    - Actions and the period control sit on the H1 row.
    - First data by 150px on lists and analytics, by 200px on details, and by 400px at 390 wide.
 10. **Gutters are 16 or 24px.** Nothing else, at any width.
-11. **Phone grids never orphan.** Three items get 3 columns or 1, never 2 plus 1. `.tw-kpi-row` does this automatically.
+11. **Phone grids never orphan.** KPI rows are 2 columns on phones; an odd last tile (the 3rd of 3) spans the row as a compact line with the figure on the right. Never 3-up with truncated labels. `.tw-kpi-row` does this automatically.
 12. **Focus rings hug the control.**
     - A text button's box is its line box, plus 4px.
     - Touch targets grow through an invisible hit area (`::after`), not a bigger visible box.
@@ -340,7 +345,7 @@ It renders a `radiogroup` with roving focus (arrow keys, Home and End). Plain ma
 
 The tile is 96px: 12/16 label, 28/34 figure, 12/16 note, 16px padding.
 
-`KpiRow` is a responsive grid with a 180px minimum column. On phones it uses 2 columns, and 3 compact columns when there are exactly 3 tiles.
+`KpiRow` sets its column count from its tiles (1 to 4; 2 tiles are 2 columns, never half a 4-column grid) and caps each tile at `--kpi-max` (296px), so the row follows its content on wide screens instead of stretching tiles into empty slabs. On phones it uses 2 columns, and an odd last tile spans the row as a compact line.
 
 ### Form controls
 

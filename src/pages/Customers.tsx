@@ -11,12 +11,15 @@ import LoadError, { loadFailed } from "@/components/data/LoadError";
 import { rowLink } from "@/lib/rowLink";
 import { PasteImportDrawer } from "@/components/import/PasteImportDrawer";
 import { BulkDeleteBar, RowCheckbox, secondaryButtonStyle } from "@/components/BulkDeleteBar";
-import { fetchData, postData, patchData, deleteData } from "../lib/Api";
+import { postData, patchData, deleteData } from "../lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { toast } from "@/lib/toast";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader } from '@/components/Loader';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { fetchAllPages } from '@/components/insights/findings';
+import { useLedger, isOpen, num, todayISO } from '@/components/reports/data';
+import { formatCurrency } from '@/lib/formatters';
 import { useAuth } from '@/lib/AuthContext';
 import RowActions from '@/components/ui/RowActions';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -132,16 +135,42 @@ export default function Customers() {
       const url = debouncedSearch
         ? `api/v1/customers/?search=${encodeURIComponent(debouncedSearch)}`
         : "api/v1/customers/";
-      return fetchData(url);
+      // Same list endpoint, every page followed, so the directory is complete.
+      return fetchAllPages<Customer>(url);
     },
   });
   const { data, refetch } = customersQuery;
   // Failed (or failing and retrying) with nothing to show: say so, never "No customers yet".
   const failed = loadFailed(customersQuery);
   const loading = customersQuery.isLoading && !failed;
-  const customers: Customer[] = Array.isArray(data) ? data : data?.results || [];
-  // The endpoint is paginated; count is the true total, results only the first page.
-  const totalCustomers: number = Array.isArray(data) ? customers.length : (data?.count ?? customers.length);
+  const customers: Customer[] = data?.rows ?? [];
+  // The endpoint is paginated; count is the true total (every page is followed).
+  const totalCustomers: number = data?.count ?? customers.length;
+
+  // Money owed per customer, from the same invoice ledger as Invoices and the
+  // Debtors report: issued, not paid, balance above zero (incl. VAT). Overdue
+  // is the part of that past its due date.
+  const ledger = useLedger(['invoices']);
+  const today = todayISO();
+  const owedBy = new Map<number, { owed: number; overdue: number }>();
+  for (const inv of ledger.data?.invoices ?? []) {
+    if (inv.customer == null || !isOpen(inv)) continue;
+    const row = owedBy.get(inv.customer) ?? { owed: 0, overdue: 0 };
+    row.owed += num(inv.balance);
+    if (inv.due_date && inv.due_date.slice(0, 10) < today) row.overdue += num(inv.balance);
+    owedBy.set(inv.customer, row);
+  }
+  const moneyCell = (v: number | undefined) => {
+    if (!ledger.data) return <span className="bk-muted">{ledger.error ? 'Not loaded' : '…'}</span>;
+    if (!v || v < 0.005) return <span className="bk-muted">None</span>;
+    return formatCurrency(v);
+  };
+  // Customer is the company; the contact name is shown only when it differs.
+  const displayName = (c: Customer) => (c.company_name || '').trim() || c.name;
+  const contactName = (c: Customer) => {
+    const n = (c.name || '').trim();
+    return n && n.toLowerCase() !== displayName(c).toLowerCase() ? n : '';
+  };
 
   useAutoRefresh(refetch);
 
@@ -157,8 +186,10 @@ export default function Customers() {
 
   const filtered = [...customers].sort((a, b) => {
       switch (sortBy) {
-        case "name_asc":  return a.name.localeCompare(b.name);
-        case "name_desc": return b.name.localeCompare(a.name);
+        case "name_asc":  return displayName(a).localeCompare(displayName(b));
+        case "name_desc": return displayName(b).localeCompare(displayName(a));
+        case "owed":      return (owedBy.get(b.id)?.owed ?? 0) - (owedBy.get(a.id)?.owed ?? 0);
+        case "overdue":   return (owedBy.get(b.id)?.overdue ?? 0) - (owedBy.get(a.id)?.overdue ?? 0);
         case "city":      return (a.city || "").localeCompare(b.city || "");
         case "newest":    return (b.created_at || "").localeCompare(a.created_at || "");
         case "oldest":    return (a.created_at || "").localeCompare(b.created_at || "");
@@ -222,7 +253,7 @@ export default function Customers() {
       </div>
     );
   }
-  if (loading) return <div className="customers-typography">{header}<Loader fullScreen /></div>;
+  if (loading) return <div className="customers-typography">{header}<TableSkeleton rows={8} cols={6} label="Loading customers" /></div>;
 
   return (
     <div className="customers-typography bookings-typography">
@@ -230,19 +261,8 @@ export default function Customers() {
 
       {/* Table. No summary tiles: nothing on this directory drives a decision
           except finding the customer, so the count sits in the toolbar. */}
-      <div className="card" style={{ padding: 0, overflow: "hidden", borderRadius: "var(--radius-card, 12px)" }}>
-        {/* Sits above the toolbar so it never covers the rows being chosen. */}
-        <div style={{ padding: selected.length ? "12px 16px 0" : 0 }}>
-          <BulkDeleteBar
-            entity="customers"
-            selected={selected}
-            onClear={() => setSelected([])}
-            onDeleted={() => { setSelected([]); refetch(); }}
-          />
-        </div>
-
-        {/* Table toolbar */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, padding: "16px 24px", borderBottom: "1px solid var(--border-subtle)" }}>
+      {/* Toolbar sits above the card, as on every other list. */}
+      <div className="bk-toolbar">
           <input
             type="search"
             className="bk-search"
@@ -251,32 +271,45 @@ export default function Customers() {
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0, marginLeft: "auto" }}>
             <span className="bk-toolbar__end" style={{ marginRight: 8 }}>
-              {customers.length < totalCustomers
-                ? `Showing ${customers.length} of ${totalCustomers} customers`
+              {data && !data.complete
+                ? `First ${customers.length} of ${totalCustomers} customers`
                 : `${totalCustomers} ${totalCustomers === 1 ? "customer" : "customers"}`}
             </span>
             <span id="customers-sort-label" style={{ fontSize: 13, lineHeight: "20px", fontWeight: 500, fontFamily: "var(--font-sans)", color: "var(--text-secondary)", letterSpacing: 0 }}>Sort</span>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger aria-labelledby="customers-sort-label" style={{ minWidth: 160, minHeight: 40 }}>
+              <SelectTrigger aria-labelledby="customers-sort-label" style={{ width: 'auto', minWidth: 168, minHeight: 40 }}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="name_asc">Name A–Z</SelectItem>
                 <SelectItem value="name_desc">Name Z–A</SelectItem>
+                <SelectItem value="owed">Most owed</SelectItem>
+                <SelectItem value="overdue">Most overdue</SelectItem>
                 <SelectItem value="city">City A–Z</SelectItem>
                 <SelectItem value="newest">Newest first</SelectItem>
                 <SelectItem value="oldest">Oldest first</SelectItem>
               </SelectContent>
             </Select>
           </div>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: "hidden", borderRadius: "var(--radius-card, 12px)" }}>
+        {/* Sits above the table so it never covers the rows being chosen. */}
+        <div style={{ padding: selected.length ? "12px 16px 0" : 0 }}>
+          <BulkDeleteBar
+            entity="customers"
+            selected={selected}
+            onClear={() => setSelected([])}
+            onDeleted={() => { setSelected([]); refetch(); }}
+          />
         </div>
-        <div style={{ overflowX: "auto" }}>
+        <div className="bk-table-wrap bk-table-wrap--bare">
         <table className="table-heading-roles bk-table bk-table--pin-actions">
           <thead>
             <tr>
-              <th scope="col" style={{ paddingRight: 0, width: 32 }}>
+              <th scope="col" className="bk-col-select" style={{ paddingRight: 0, width: 32 }}>
                 {filtered.length > 0 && (
                   <RowCheckbox
                     title="Select everything shown"
@@ -285,9 +318,13 @@ export default function Customers() {
                   />
                 )}
               </th>
-              {["Name", "Company", "Email", "Phone", "City", "Payment terms", "Status"].map(h => (
-                <th key={h} scope="col">{h}</th>
-              ))}
+              <th scope="col">Customer</th>
+              <th scope="col" className="bk-col-opt">Email</th>
+              <th scope="col" className="bk-col-city">City</th>
+              <th scope="col" className="bk-col-terms bk-col-narrow">Terms</th>
+              <th scope="col" className="is-num bk-col-money">Owed</th>
+              <th scope="col" className="is-num bk-col-overdue bk-col-money">Overdue</th>
+              <th scope="col">Status</th>
               <th scope="col" className="is-num"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
@@ -337,30 +374,27 @@ export default function Customers() {
                   {...rowLink(() => navigate(`/customers/${c.id}`))}
                   onClick={() => navigate(`/customers/${c.id}`)}
                 >
-                  <td style={{ paddingRight: 0, width: 32 }}>
+                  <td className="bk-col-select" style={{ paddingRight: 0, width: 32 }}>
                     <RowCheckbox
                       checked={selected.includes(c.id)}
                       onChange={on => toggleOne(c.id, on)}
                     />
                   </td>
-                  <td className="is-primary is-nowrap" style={{ fontWeight: 500 }} title={c.name}>
-                    {c.name}
+                  <td className="is-primary is-truncate bk-col-customer" style={{ fontWeight: 500 }} title={[displayName(c), contactName(c)].filter(Boolean).join(', contact ')}>
+                    {displayName(c)}
+                    {contactName(c) && <span className="bk-muted" style={{ fontWeight: 400 }}> · {contactName(c)}</span>}
                   </td>
-                  <td className="is-nowrap" title={c.company_name || ""}>
-                    {c.company_name || "—"}
+                  <td className="is-truncate bk-col-opt" title={c.email}>
+                    {c.email || <span className="bk-muted">None</span>}
                   </td>
-                  <td className="is-nowrap" title={c.email}>
-                    {c.email}
+                  <td className="is-truncate bk-col-city">
+                    {c.city || <span className="bk-muted">None</span>}
                   </td>
-                  <td>
-                    {c.phone || "—"}
+                  <td className="bk-col-terms bk-col-narrow">
+                    {paymentTermsLabel(c.payment_terms_default).replace(/ days$/, '')}
                   </td>
-                  <td>
-                    {c.city || "—"}
-                  </td>
-                  <td>
-                    {paymentTermsLabel(c.payment_terms_default)}
-                  </td>
+                  <td className="is-money bk-col-money">{moneyCell(owedBy.get(c.id)?.owed)}</td>
+                  <td className="is-money bk-col-overdue bk-col-money">{moneyCell(owedBy.get(c.id)?.overdue)}</td>
                   <td>
                     <StatusChip status={status === "ACTIVE" ? "ACTIVE" : "INACTIVE"} size="sm" />
                   </td>

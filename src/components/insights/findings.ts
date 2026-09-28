@@ -9,6 +9,7 @@
    Rules follow docs/product/review/01-MONEY.md section 5, kept conservative:
    a finding fires only on a clear trigger and above a R 1 000 threshold. */
 
+import { formatMoney, formatMoneyWhole, formatPercent } from '@/lib/formatters';
 import { fetchData } from '@/lib/Api';
 
 // ---------------------------------------------------------------- fetching
@@ -137,10 +138,8 @@ export const daysBetween = (a: string | Date, b: string | Date) => {
 const dateOnly = (s: string | null | undefined) => (s ? s.slice(0, 10) : '');
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /** Whole rand, e.g. "R 127 621". Used in headlines and lines, where cents are noise. */
-export const randWhole = (v: number) =>
-  new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(Math.round(v));
-const perLitre = (v: number) =>
-  new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+export const randWhole = (v: number) => formatMoneyWhole(Math.round(v));
+const perLitre = (v: number) => formatMoney(v, 2);
 const shortName = (s: string) => s.replace(/\s+(\(Pty\)\s*)?(Ltd|Limited|Holdings|Group|Beverages SA|Industries)\.?$/i, '').replace(/\s+(Ltd|Limited|Holdings)\.?$/i, '').trim() || s;
 
 const CLOSED = new Set(['PAID', 'CANCELLED', 'CANCELED', 'VOID', 'WRITTEN_OFF', 'DRAFT']);
@@ -346,7 +345,7 @@ export function computeFindings(input: FindingInputs, now = new Date()): Finding
         amount: pendingTotal,
         headline: 'Costs left out of profit',
         line: flips && pct != null
-          ? `Counted, your ${pct.toFixed(1).replace('.', ',')}% margin becomes a ${randWhole(Math.abs(withPending))} loss.`
+          ? `Counted, your ${formatPercent(pct)} margin becomes a ${randWhole(Math.abs(withPending))} loss.`
           : `${plural(pending.length, 'expense')} waiting for approval, not in your margin yet.`,
         action: { label: `Review ${plural(pending.length, 'expense')}`, href: '/finance/expenses' },
         method: `Expenses still Pending 7 or more days after they were entered. Reports count approved expenses only. Margin to date: paid invoices ${randWhole(revenue)} less approved expenses ${randWhole(approved)}, then less these pending costs.${input.expenses.complete ? '' : ` Based on the first ${input.expenses.rows.length} of ${input.expenses.count} expenses.`}`,

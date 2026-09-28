@@ -1294,7 +1294,7 @@ export default function QuoteBuilder() {
       <div className="qb-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
         <div>
           <div style={labelS}>Bookings</div>
-          <h1 style={{ fontSize: 22, lineHeight: "28px", fontWeight: 600, color: "var(--text-primary)", margin: "4px 0 0" }}>{isEditing ? "Edit quote" : "New quote"}</h1>
+          <h1 style={{ fontSize: "var(--text-display, 28px)", lineHeight: "34px", fontWeight: 600, letterSpacing: "var(--tracking-display, -0.025em)", color: "var(--text-primary)", margin: "4px 0 0" }}>{isEditing ? "Edit quote" : "New quote"}</h1>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ fontSize: 13, lineHeight: "20px", color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", display: "flex", alignItems: "center", gap: 6 }}>

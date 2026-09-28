@@ -8,7 +8,7 @@
   flex-wrap: wrap;
   gap: 12px;
   min-height: 40px;
-  margin-bottom: 16px;
+  margin-bottom: var(--card-gap, 16px);
   flex-shrink: 0;
 }
 .bk-toolbar__end {
@@ -112,6 +112,9 @@
   border-radius: var(--radius-card, 12px);
   overflow-x: auto;
   overflow-y: hidden;
+  /* Column priority is decided by the card's own width, not the viewport,
+     so a collapsed or expanded sidebar gives the same result. */
+  container-type: inline-size;
 }
 .bk-table { width: 100%; border-collapse: collapse; }
 .bk-table thead tr { background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); }
@@ -138,9 +141,47 @@
 .bk-table .is-center, .bk-table th.is-center { text-align: center; }
 .bk-table .is-primary { color: var(--text-primary); }
 .bk-table .is-money { color: var(--text-primary); font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
-.bk-table .is-id { font-family: var(--font-mono); font-size: 13px; color: var(--text-primary); font-weight: 400; }
+.bk-table .is-id { font-family: var(--font-sans); font-size: 14px; color: var(--text-primary); font-weight: 400; font-variant-numeric: tabular-nums; }
 .bk-table .is-date { color: var(--text-secondary); }
 .bk-table .is-truncate { max-width: 40ch; overflow: hidden; text-overflow: ellipsis; }
+.bk-table .bk-col-customer { max-width: 22ch; }
+.bk-table .bk-col-route { max-width: 30ch; }
+.bk-table .bk-col-opt { max-width: 24ch; }
+.bk-muted { color: var(--text-tertiary); }
+/* Money columns hold their width while figures load, so nothing reflows. */
+.bk-table .bk-col-money { width: 128px; min-width: 112px; }
+.bk-table .bk-overdue { color: var(--status-danger-text); }
+.bk-table .bk-col-terms { white-space: nowrap; }
+/* A table wrap inside an existing card: no second border or radius. */
+.bk-table-wrap--bare { border: 0; border-radius: 0; background: transparent; }
+/* Column priority (§11.14): Status and Amount never leave the card. Free
+   text truncates first, then the lowest-value column drops out. */
+@container (max-width: 1040px) {
+  .bk-table .bk-col-customer { max-width: 17ch; }
+  .bk-table .bk-col-route { max-width: 20ch; }
+  .bk-table .bk-col-opt { max-width: 18ch; }
+  .bk-table .bk-col-city { display: none; }
+}
+@container (max-width: 900px) {
+  .bk-table .bk-col-opt { display: none; }
+}
+/* History carries a row action as well, so the assignment column (least
+   useful once a load is finished) gives way earlier. */
+@container (max-width: 1280px) {
+  .bk-table--history .bk-col-opt { display: none; }
+}
+@container (max-width: 700px) {
+  .bk-table .bk-col-route, .bk-table .bk-col-narrow { display: none; }
+}
+/* Phones: the row keeps who, status and money; paddings tighten first. */
+@container (max-width: 520px) {
+  .bk-table .bk-col-load, .bk-table .bk-col-overdue, .bk-table .bk-col-phone, .bk-table .bk-col-select { display: none; }
+  .bk-table .bk-col-customer { max-width: 14ch; }
+  .bk-table td { font-size: 13px; }
+  .bk-table th, .bk-table td { padding-left: 8px; padding-right: 8px; }
+  .bk-table th:first-child, .bk-table td:first-child { padding-left: 16px; }
+  .bk-table th:last-child, .bk-table td:last-child { padding-right: 16px; }
+}
 /* Columns size to their content; the card scrolls sideways before any cell is cut. */
 .bk-table .is-nowrap { white-space: nowrap; }
 /* One row action (RowActions) pinned to the right edge, so it is reachable
@@ -184,8 +225,8 @@
 .bk-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--card-gap, 16px);
+  margin-bottom: var(--section-gap, 24px);
 }
 @media (max-width: 900px) {
   .bk-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -222,7 +263,7 @@
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: var(--section-gap, 24px);
 }
 .bk-detail-header__titles { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .bk-detail-header__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -263,10 +304,10 @@
 .bk-help--warning { color: var(--status-warning-text); }
 .bk-help--danger { color: var(--status-danger-text); }
 .bk-link { background: none; border: none; padding: 0; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
-.bk-mono { font-family: var(--font-mono); font-size: 13px; line-height: 20px; }
+.bk-mono { font-family: var(--font-sans); font-size: 14px; line-height: 20px; font-variant-numeric: tabular-nums; }
 
-.bk-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
-.bk-stack { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.bk-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--card-gap, 16px); align-items: start; }
+.bk-stack { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
 /* Main column plus a 360px rail that stays in view, so the two columns never
    read as a dead gap when their heights differ. */
 .bk-detail-grid--rail { grid-template-columns: minmax(0, 1fr) 360px; }
@@ -367,7 +408,7 @@
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
   gap: 12px 24px;
   padding: 16px 24px;
-  margin-bottom: 24px;
+  margin-bottom: var(--section-gap, 24px);
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card, 12px);
@@ -411,7 +452,7 @@
 .bk-qcard:hover { background: var(--bg-surface-hover); }
 .bk-qcard:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 .bk-qcard__top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
-.bk-qcard__id { font-family: var(--font-mono); font-size: 13px; line-height: 20px; color: var(--text-secondary); }
+.bk-qcard__id { font-family: var(--font-sans); font-size: 13px; line-height: 20px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .bk-qcard__flags { display: inline-flex; align-items: center; gap: 6px; }
 .bk-qcard__customer { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bk-qcard__route {

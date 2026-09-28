@@ -4,7 +4,7 @@ import {
   type Company, type Ledger,
 } from './data';
 import { ageInvoices } from './DebtorsAge';
-import { Check, Empty, Info, ReportFrame, StatementTable, Tiles, statementCsv, type SRow, type Statement } from './ui';
+import { Check, Choice, Empty, Info, ReportFrame, StatementTable, Tiles, statementCsv, type SRow, type Statement } from './ui';
 
 const BUCKETS = ['Current', '1 to 30 days', '31 to 60 days', '61 to 90 days', 'Over 90 days'];
 
@@ -86,18 +86,8 @@ export default function CustomerStatement({ d, company }: { d: Ledger; company?:
         'Print it or export it to send to the customer.',
       ]} />}
       controls={<>
-        <label className="fr-select">
-          <span className="fr-muted">Customer</span>
-          <select className="fr-input" value={selected ?? ''} onChange={e => set('customer', e.target.value || null)}>
-            {options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </select>
-        </label>
-        <label className="fr-select">
-          <span className="fr-muted">Period</span>
-          <select className="fr-input" value={since ?? ''} onChange={e => set('since', e.target.value || null)}>
-            {sinceOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
-        </label>
+        <Choice label="Customer" wide value={String(selected ?? '')} onChange={v => set('customer', v || null)} options={options.map(o => ({ id: String(o.id), label: o.name }))} />
+        <Choice label="Period" value={since ?? ''} onChange={v => set('since', v || null)} options={sinceOptions} />
       </>}
       tiles={<Tiles table={[table, ageTable]} tiles={[
         { label: 'Balance due', value: moneyWhole(closing), title: money(closing), note: plural(aged.length, 'open invoice'), amount: closing },

@@ -6,7 +6,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--card-gap, 16px);
-  margin-bottom: 24px;
+  margin-bottom: var(--section-gap, 24px);
 }
 .ops-tiles--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .ops-tiles--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -89,7 +89,24 @@
 }
 
 /* Space between a page's KPI row and the toolbar or table below it. */
-.fleet-kpis, .bk-kpis, .ops-kpis { margin-bottom: 24px; }
+.fleet-kpis, .bk-kpis, .ops-kpis { margin-bottom: var(--section-gap, 24px); }
 @media (max-width: 767px) {
   .fleet-kpis, .bk-kpis, .ops-kpis { margin-bottom: 16px; }
 }
+
+/* Content skeletons (components/fleet-detail/ContentSkeleton.tsx). The page
+   head is never replaced; only the waiting content shows these. */
+.ops-skel { display: block; height: 12px; border-radius: 4px; background: var(--bg-surface-hover); animation: skeleton-pulse 1.5s ease-in-out infinite; }
+.ops-skel-table { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px); overflow: hidden; }
+.ops-skel-table--bare { border: 0; border-radius: 0; background: transparent; }
+.ops-skel-table--bare .ops-skel-row--head { display: none; }
+.ops-skel-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 16px; align-items: center; height: 48px; padding: 0 24px; border-bottom: 1px solid var(--border-row); }
+.ops-skel-row:last-child { border-bottom: none; }
+.ops-skel-row--head { height: 44px; border-bottom-color: var(--border-subtle); }
+.ops-skel-row--head .ops-skel { height: 10px; }
+.ops-skel-tiles { display: grid; gap: var(--card-gap, 16px); margin-bottom: var(--section-gap, 24px); }
+.ops-skel-tile { display: flex; flex-direction: column; min-height: 96px; padding: 18px 20px; box-sizing: border-box; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-card, 12px); }
+.ops-skel-block { border-radius: var(--radius-card, 12px); border: 1px solid var(--border-subtle); background: var(--bg-surface); position: relative; overflow: hidden; }
+.ops-skel-block::after { content: ''; position: absolute; inset: 24px; border-radius: 6px; background: var(--bg-surface-hover); animation: skeleton-pulse 1.5s ease-in-out infinite; }
+@media (max-width: 720px) { .ops-skel-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+@media (prefers-reduced-motion: reduce) { .ops-skel, .ops-skel-block::after { animation: none; } }

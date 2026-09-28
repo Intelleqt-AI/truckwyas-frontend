@@ -1,4 +1,5 @@
 import '@/pages/admin/admin-brand.css';
+import { formatDateTime } from '@/lib/formatters';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData } from '@/lib/Api';
@@ -13,7 +14,7 @@ const sectionTitleStyle: React.CSSProperties = {
 };
 
 const fmt = (dateStr?: string | null) =>
-  dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  dateStr ? formatDateTime(dateStr) : 'Never';
 
 export default function DemoAccountPanel() {
   const qc = useQueryClient();

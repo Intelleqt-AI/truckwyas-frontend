@@ -6,7 +6,7 @@
   min-width: 0;
 }
 
-.fp-stack { display: flex; flex-direction: column; gap: 16px; }
+.fp-stack { display: flex; flex-direction: column; gap: var(--card-gap, 16px); }
 
 /* ---- Card ---- */
 .fp-card {
@@ -88,7 +88,8 @@
   background: var(--bg-raised);
   overflow: hidden;
 }
-.fp-rank__bar > span { display: block; height: 100%; border-radius: 3px; background: var(--chart-series-1, var(--accent-primary)); }
+/* Value held back by a check is not money in: neutral, per the chart grammar (viz.css). */
+.fp-rank__bar > span { display: block; height: 100%; border-radius: 3px; background: var(--chart-muted); }
 .fp-rank__value {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -130,7 +131,8 @@
 .fp-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fp-table td.fp-muted { font-size: 13px; }
 .fp-id {
-  font: 400 13px/20px var(--font-mono);
+  font: 400 14px/20px var(--font-sans);
+  font-variant-numeric: tabular-nums;
   color: var(--text-primary);
   text-decoration: underline;
   text-decoration-color: var(--border-strong, var(--border-active));
@@ -189,6 +191,8 @@
 .fp-btn--secondary { border-color: var(--border-default, var(--border-subtle)); }
 .fp-btn--secondary:hover, .fp-btn--quiet:hover { background: var(--bg-surface-hover); }
 .fp-btn--quiet { padding: 8px 12px; margin-right: -12px; color: var(--text-primary); }
+/* A quiet button under a list starts on the list's text edge, not 12px in. */
+.fp-btn--quiet.fp-btn--flush { margin: 8px 0 0 -12px; }
 .fp-btn:focus-visible, .fp-id:focus-visible { outline: 2px solid var(--focus-outline, var(--accent-primary)); outline-offset: 3px; }
 
 /* ---- States ---- */

@@ -39,7 +39,8 @@ interface BillingTransaction {
 // Exact ZAR with cents (brand: two decimals for exact totals).
 const formatRand = (amount?: string | number | null) => formatCurrency(Number(amount ?? 0));
 
-const PERIODS = ['All time', 'Today', 'This week', 'This month', 'This year'] as const;
+// No "Today": a single day of platform charges is never a useful view.
+const PERIODS = ['All time', 'This week', 'This month', 'This year'] as const;
 type Period = typeof PERIODS[number];
 
 function startOfWeek(d: Date): Date {
@@ -54,7 +55,6 @@ function startOfWeek(d: Date): Date {
 function matchesPeriod(isoDate: string, period: Period, now: Date): boolean {
   if (period === 'All time') return true;
   const d = new Date(isoDate);
-  if (period === 'Today') return d.toDateString() === now.toDateString();
   if (period === 'This week') return d >= startOfWeek(now);
   if (period === 'This month') return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   if (period === 'This year') return d.getFullYear() === now.getFullYear();
@@ -89,7 +89,7 @@ function HistoryTable({ title, rows }: { title: string; rows: BillingTransaction
             {rows.map((tx, i) => (
               <tr key={tx.id} style={{ borderBottom: i < rows.length - 1 ? '1px solid var(--border-row)' : 'none' }}>
                 <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{tx.label}</td>
-                <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
+                <td style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>
                   {tx.reference || '—'}
                 </td>
                 <td style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>

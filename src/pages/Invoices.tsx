@@ -4,10 +4,9 @@ import "./finance-brand.css";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatNumber, formatPercent } from "@/lib/formatters";
 import { fetchData, postData } from "@/lib/Api";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { Loader } from "@/components/Loader";
 import SectionHeader, { FINANCE_TABS } from "@/components/layout/SectionHeader";
 import RowActions from "@/components/ui/RowActions";
 import { InfoTip } from "@/components/ui/InfoTip";
@@ -58,6 +57,7 @@ const safeDate = (d?: string) => {
 };
 
 const PAGE_SIZE = 10;
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const STATUSES = ["All", "SENT", "OVERDUE", "PAID", "DRAFT"];
 
 /** Finance tabs; on the legacy /invoices path the Invoices tab points at it so it stays active. */
@@ -248,7 +248,7 @@ export default function Invoices() {
   //   overdue              unpaid balance incl. VAT, due date passed
   //   avg days to pay      issue date to paid date, all paid invoices
   const now = new Date();
-  const monthName = now.toLocaleString("en-GB", { month: "long" });
+  const monthName = MONTH_NAMES[now.getMonth()];
   const byStatus = stats?.by_status ?? {};
   const draftCount: number = byStatus.DRAFT ?? 0;
   const invoicedMtd: number = stats?.total_invoiced_mtd ?? 0;
@@ -267,6 +267,15 @@ export default function Invoices() {
   const paidCount: number = byStatus.PAID ?? 0;
   const avgDays: number | null = paidCount > 0 && stats?.avg_days_to_pay ? stats.avg_days_to_pay : null;
   const truncated = truncatedList;
+  // Drafts waiting to be sent: a decision (send them), counted from the list
+  // when it is complete, otherwise from the server's status counts.
+  const draftList = invoices.filter((i) => (i.status || "").toUpperCase() === "DRAFT");
+  const draftsCount: number = truncatedList ? draftCount : draftList.length;
+  // At most four tiles: the drafts tile only fills a row that has room.
+  const showDrafts = draftsCount > 0 && (monthActive ? 2 : 0) + (overdueCount > 0 ? 1 : 0) + (avgDays != null ? 1 : 0) < 4;
+  const draftAmount: number | null = truncatedList
+    ? null
+    : draftList.reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
 
   // Previous-month comparison only when every invoice is loaded; a partial
   // page would understate last month.
@@ -280,12 +289,12 @@ export default function Invoices() {
           return d >= lastMonthStart && d < monthStart;
         })
         .reduce((s, i) => s + (parseFloat(i.total_amount || i.amount) || 0), 0);
-  const lastMonthName = lastMonthStart.toLocaleString("en-GB", { month: "long" });
+  const lastMonthName = MONTH_NAMES[lastMonthStart.getMonth()];
   const invoicedDelta = (() => {
     if (invoicedLastMonth == null) return null;
     if (invoicedLastMonth === 0) return `Nothing invoiced in ${lastMonthName}`;
     const pct = ((invoicedMtd - invoicedLastMonth) / invoicedLastMonth) * 100;
-    return `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(0)}% vs ${lastMonthName}`;
+    return `${pct >= 0 ? "+" : "−"}${formatPercent(Math.abs(pct), 0)} vs ${lastMonthName}`;
   })();
 
   const showStatus = (s: string) => {
@@ -338,8 +347,8 @@ export default function Invoices() {
       <>
       {/* Headline: tiles only where the number drives a decision */}
       {loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "20px 0", marginBottom: 24 }}>
-          <Loader size={28} />
+        <div className="tw-kpi-row fin-kpi-row" aria-busy="true" aria-label="Loading totals">
+          {[0, 1, 2].map((i) => <div key={i} className="tw-kpi fin-skel-tile" aria-hidden="true" />)}
         </div>
       ) : !stats ? (
         <div className="card fin-summary">
@@ -355,24 +364,26 @@ export default function Invoices() {
         </div>
       ) : (
         // The standard tile: only figures that drive a decision, never a dash.
-        (monthActive || overdueCount > 0 || avgDays != null) && (
+        (monthActive || overdueCount > 0 || avgDays != null || showDrafts) && (
         <KpiRow className="fin-kpi-row">
+          {/* Separate children (not a fragment) so KpiRow counts the tiles. */}
           {monthActive && (
-            <>
               <KpiTile
                 label={`Invoiced in ${monthName}`}
                 aside={<InfoTip>{`Invoice totals incl. VAT, by issue date since the 1st. Covers all invoices.${invoicedLastMonth == null ? "" : ` Change compares ${lastMonthName}.`}`}</InfoTip>}
                 figure={<span title={formatCurrency(invoicedMtd)}>{wholeRand(invoicedMtd)}</span>}
                 note={invoicedDelta ?? "By issue date"}
               />
+          )}
+          {monthActive && (
               <KpiTile
                 label="Collected"
                 aside={<InfoTip>{`Paid amount of invoices issued in ${monthName}. Covers all invoices.`}</InfoTip>}
                 figure={<span title={formatCurrency(collectedMtd)}>{wholeRand(collectedMtd)}</span>}
                 note={invoicedMtd > 0 ? `${Math.round((stats.collection_rate ?? 0) * 100)}% of ${monthName} invoiced` : `On ${monthName} invoices`}
               />
-            </>
           )}
+
           {overdueCount > 0 && (
             <KpiTile
               label="Overdue"
@@ -394,8 +405,20 @@ export default function Invoices() {
             <KpiTile
               label="Time to get paid"
               aside={<InfoTip>Average from issue date to payment date, across all paid invoices.</InfoTip>}
-              figure={<>{avgDays}<span className="fin-tile__unit">days</span></>}
+              figure={<>{formatNumber(avgDays, { maximumFractionDigits: 1 })}<span className="fin-tile__unit">days</span></>}
               note={`Average, ${paidCount} paid ${paidCount === 1 ? "invoice" : "invoices"}`}
+            />
+          )}
+          {showDrafts && (
+            <KpiTile
+              label="Not sent yet"
+              aside={<InfoTip>Draft invoices, incl. VAT. They are not owed until you send them. Select to show them.</InfoTip>}
+              figure={draftAmount != null
+                ? <span title={formatCurrency(draftAmount)}>{wholeRand(draftAmount)}</span>
+                : <>{draftsCount}<span className="fin-tile__unit">{draftsCount === 1 ? "draft" : "drafts"}</span></>}
+              note={draftAmount != null ? `${draftsCount} ${draftsCount === 1 ? "draft" : "drafts"} to send` : "Drafts to send"}
+              onClick={statusFilter !== "DRAFT" ? () => showStatus("DRAFT") : undefined}
+              aria-label={`Not sent yet: ${draftsCount} ${draftsCount === 1 ? "draft" : "drafts"}. Show drafts`}
             />
           )}
         </KpiRow>

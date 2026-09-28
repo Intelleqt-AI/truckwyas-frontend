@@ -1,4 +1,5 @@
 import { StatusChip } from '@/components/ui/StatusChip';
+import { formatDateTime } from '@/lib/formatters';
 import { useState, useRef } from "react";
 import useFetch from "@/hooks/useFetch";
 import { usePost } from "@/hooks/usePost";
@@ -217,13 +218,7 @@ export default function FleetImport() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("en-ZA", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTime(dateString);
   };
 
   const STATUS_TEXT: Record<string, string> = {

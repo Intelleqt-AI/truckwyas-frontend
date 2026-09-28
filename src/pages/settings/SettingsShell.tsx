@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import '@/pages/settings/settings-brand.css';
@@ -26,7 +26,7 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
     group: 'Workspace',
     items: [
       { id: 'company', label: 'Company details', adminOnly: true },
-      { id: 'users', label: 'Users & permissions', adminOnly: true },
+      { id: 'users', label: 'Users and permissions', adminOnly: true },
       { id: 'billing', label: 'Billing', adminOnly: true },
       { id: 'integrations', label: 'Integrations', adminOnly: true },
     ],
@@ -57,6 +57,19 @@ const groupLabelStyle: React.CSSProperties = {
   textTransform: 'none',
 };
 
+/* On phones the section picker sits under the page head (so every H1 is at
+   the same place as on other pages). The shell hands the picker to the page
+   head through this context; if a page renders no head (a loading state),
+   the shell shows the picker at the top instead. */
+const PhoneNavContext = createContext<{ nav: ReactNode; claim: () => () => void } | null>(null);
+
+/** Rendered by SettingsPageHeader right under the head (phones only). */
+export function SettingsPhoneNav() {
+  const ctx = useContext(PhoneNavContext);
+  useLayoutEffect(() => (ctx ? ctx.claim() : undefined), [ctx]);
+  return ctx ? <>{ctx.nav}</> : null;
+}
+
 interface SettingsShellProps {
   /** Sidebar item to highlight (sub-pages pass their parent section). */
   activeId: string;
@@ -69,6 +82,7 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
 
   // On phones the list is one horizontal row; keep the current page in view.
   const navRef = useRef<HTMLElement>(null);
+  const [claims, setClaims] = useState(0);
   useEffect(() => {
     const nav = navRef.current;
     if (!nav || nav.scrollWidth <= nav.clientWidth) return;
@@ -76,14 +90,32 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
     if (!cur) return;
     const left = cur.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft;
     nav.scrollLeft = left - (nav.clientWidth - cur.offsetWidth) / 2;
-  }, [activeId]);
+  }, [activeId, claims]);
 
   const visibleSections = SETTINGS_NAV.map(s => ({
     ...s,
     items: s.items.filter(item => !item.adminOnly || isAdmin),
   })).filter(s => s.items.length > 0);
 
+  const phoneNav = (
+    <nav ref={navRef} aria-label="Settings sections" className="tw-settings-phone-nav">
+      {visibleSections.flatMap(s => s.items).map(item => (
+        <NavLink
+          key={item.id}
+          to={`/settings/${item.id}`}
+          className="settings-control settings-nav-link"
+          aria-current={activeId === item.id ? 'page' : undefined}
+        >
+          {item.label}
+        </NavLink>
+      ))}
+      {user?.is_superuser && <NavLink to="/admin" className="settings-control settings-nav-link">Admin dashboard</NavLink>}
+    </nav>
+  );
+  const ctx = { nav: phoneNav, claim: () => { setClaims(c => c + 1); return () => setClaims(c => c - 1); } };
+
   return (
+    <PhoneNavContext.Provider value={ctx}>
     <div className="tw-settings-shell" style={{ display: 'flex', minHeight: '100%', gap: 0 }}>
       {/* Sidebar — this outer column stays full height so its right border
           runs top to bottom alongside the (taller) settings panel; only the
@@ -93,7 +125,7 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
         flexShrink: 0,
         borderRight: '1px solid var(--border-subtle)',
       }}>
-      <nav ref={navRef} aria-label="Settings" className="tw-settings-shell__nav" style={{
+      <nav aria-label="Settings" className="tw-settings-shell__nav" style={{
         position: 'sticky',
         top: 0,
         maxHeight: '100vh',
@@ -141,8 +173,10 @@ export function SettingsShell({ activeId, children }: SettingsShellProps) {
 
       {/* Content */}
       <div className="tw-settings-shell__content" style={{ flex: 1, padding: '0 0 0 32px', minWidth: 0 }}>
+        {claims === 0 && phoneNav}
         {children}
       </div>
     </div>
+    </PhoneNavContext.Provider>
   );
 }

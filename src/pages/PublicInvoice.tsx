@@ -4,17 +4,17 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Loader } from '@/components/Loader';
+import { formatDate, formatMoney } from '@/lib/formatters';
 
 const BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/').replace(/\/$/, '');
 
+// House formats: "R 20 505,65" and "5 Apr 2026".
 function fmt(n: string | number) {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency', currency: 'ZAR', minimumFractionDigits: 2,
-  }).format(Number(n));
+  return formatMoney(Number(n) || 0);
 }
 
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
+  return formatDate(d.length > 10 ? d : d.slice(0, 10));
 }
 
 // Status presentation only; the API enum is unchanged.
@@ -151,11 +151,11 @@ export default function PublicInvoice() {
                 </div>
                 <div className="pd-field">
                   <div className="pd-label">Issue date</div>
-                  <div className="pd-value">{data.issue_date ? fmtDate(data.issue_date) : '—'}</div>
+                  <div className="pd-value">{data.issue_date ? fmtDate(data.issue_date) : 'Not set'}</div>
                 </div>
                 <div className="pd-field">
                   <div className="pd-label">Due date</div>
-                  <div className="pd-value">{data.due_date ? fmtDate(data.due_date) : '—'}</div>
+                  <div className="pd-value">{data.due_date ? fmtDate(data.due_date) : 'Not set'}</div>
                 </div>
               </div>
             </section>

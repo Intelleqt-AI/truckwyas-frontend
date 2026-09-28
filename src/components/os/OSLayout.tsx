@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, MessageSquareText, Sun, Moon, ChevronDown } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +13,8 @@ import { Sidebar } from '@/components/shell/Sidebar';
 import { PhoneBar } from '@/components/shell/PhoneBar';
 import '@/components/shell/shell.css';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { PageHeadSkeleton } from '@/components/layout/SectionHeader';
+import { warmRoutesWhenIdle } from '@/components/shell/routePrefetch';
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // "Auto sign out after 30 minutes of inactivity"
 
@@ -182,6 +184,8 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
   const closeMore = useCallback((v: boolean) => setMoreOpen(v), []);
   const { pathname } = useLocation();
   const mainRef = useRef<HTMLElement>(null);
+  // After the first page has rendered, fetch the primary route chunks while idle.
+  useEffect(() => { warmRoutesWhenIdle(); }, []);
 
   return (
     <div
@@ -302,9 +306,15 @@ export function OSLayout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* CONTENT */}
-      <main id="main-content" ref={mainRef} tabIndex={-1} className="os-app-main tw-main">
+      {/* The route Suspense boundary lives here, inside <main>: a lazy page
+          that is still loading shows the page-head skeleton at the exact head
+          geometry, and the sidebar and top bar are never hidden or remounted
+          (the app-level boundary in App.tsx would otherwise blank the shell). */}
+      <main id="main-content" ref={mainRef} tabIndex={-1} className="os-app-main tw-main" data-route={pathname}>
         <ErrorBoundary variant="page" resetKey={pathname}>
-          {children}
+          <Suspense fallback={<PageHeadSkeleton />}>
+            {children}
+          </Suspense>
         </ErrorBoundary>
       </main>
 

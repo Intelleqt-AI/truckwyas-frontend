@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/formatters';
 import './findings.css';
 import { useId, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -11,8 +12,7 @@ const SEVERITY: Record<Finding['severity'], { label: string; tone: StatusTone }>
   low: { label: 'Low', tone: 'neutral' },
 };
 const EVIDENCE_PREVIEW = 8;
-const rand2 = (v: number) =>
-  new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+const rand2 = (v: number) => formatMoney(v, 2);
 
 /* One finding as one dense row (about 100px): the rand figure and its 2 to 6
    word headline on the left; severity, category and basis over the supporting

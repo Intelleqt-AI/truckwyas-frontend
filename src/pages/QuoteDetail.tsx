@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, patchData, deleteData, postData, downloadBlob } from '@/lib/Api';
-import { formatCurrency, formatDate } from '@/lib/formatters';
+import { formatCurrency, formatDate, formatDistance, formatMoney, formatMoneyWhole, formatNumber, formatPercent, normaliseFigures, sentenceCaseLabel } from '@/lib/formatters';
 import { toast } from '@/lib/toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ConvertToBookingModal } from '@/components/ConvertToBookingModal';
@@ -13,13 +13,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/lib/AuthContext';
 import { isSubscriptionBlocked, subscriptionStatusDetail } from '@/lib/subscriptionStatus';
 import { ExpandableRouteMap } from '@/components/ExpandableRouteMap';
-import { Loader } from '@/components/Loader';
-import { AlertTriangle, ArrowLeft, Download } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
 import LoadError, { loadFailed } from '@/components/data/LoadError';
 import QuoteSendPreview from '@/components/QuoteSendPreview';
 import { useFocusTrap, latestModal } from '@/hooks/useFocusTrap';
+import SectionHeader from '@/components/layout/SectionHeader';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { useStickyRail } from '@/components/fleet-detail/useStickyRail';
+import { StatusMenu, type StatusOption } from '@/components/fleet-detail/StatusMenu';
+import { BlockSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 
 const STATUS_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
   DRAFT: 'neutral',
@@ -244,8 +246,17 @@ export default function QuoteDetail() {
     );
   }
 
+  // Loading: the back link and page frame stay; only the content waits.
   if (isLoading) {
-    return <Loader fullScreen />;
+    return (
+      <div className="bk-detail">
+        <SectionHeader
+          title="Loading quote"
+          back={{ to: '/bookings/quotes', label: 'Quotes' }}
+        />
+        <BlockSkeleton height={420} label="Loading quote" />
+      </div>
+    );
   }
 
   if (error || !quote) {
@@ -314,497 +325,243 @@ export default function QuoteDetail() {
     </div>
   );
 
-  return (
-    <div className="bk-detail">
-      {/* Header — identity on the left, the quoted amount on the right */}
-      <button type="button" className="bk-back" onClick={() => navigate('/bookings/quotes')}>
-        <ArrowLeft size={16} aria-hidden="true" /> Back to quotes
-      </button>
-      <div className="bk-detail-header">
-        <div className="bk-detail-header__titles">
-          <div className="bk-eyebrow">Quote</div>
-          <div className="bk-title-row">
-            <h1 className="bk-title">{quote.quote_number}</h1>
-            <StatusChip status={quote.status === 'IT' ? 'IN_TRANSIT' : quote.status} label={STATUS_LABEL[quote.status]} />
-            {quote.outcome === 'accepted' && <StatusChip status="WON" />}
-            {quote.outcome === 'rejected' && <StatusChip status="LOST" />}
-          </div>
-          <p className="bk-subtitle">{quote.customer_name}</p>
-        </div>
-        <div className="bk-amount">
-          <span className="bk-amount__label">{quote.trip_type === 'ROUND_TRIP' ? 'Total (both legs)' : 'Total amount'}</span>
-          <span className="bk-amount__value">{formatCurrency(parseFloat(quote.total_amount || '0'))}</span>
-        </div>
-      </div>
+  // One figure system: "R 28 662,00", "55,0%", "12 000 kg", "1 234 km".
+  const total = parseFloat(quote.total_amount || '0');
+  const marginText = quote.margin_percentage != null && quote.margin_percentage !== '' ? formatPercent(quote.margin_percentage, 1) : null;
+  const isRound = quote.trip_type === 'ROUND_TRIP';
+  // Company first; the contact name only when it is a different person.
+  const company = (quote.customer_company || '').trim() || quote.customer_name || '';
+  const contact = (quote.customer_name || '').trim();
+  const showContact = !!contact && contact.toLowerCase() !== company.toLowerCase();
+  // Emails break at "@" and dots, never mid-word ("co.z / a").
+  const breakableEmail = (email: string) => {
+    const parts = email.split(/(?=[@.])/);
+    return parts.map((p, i) => <span key={i}>{i > 0 && <wbr />}{p}</span>);
+  };
+  const validUntil = quote.valid_until ? new Date(quote.valid_until).getTime() : null;
+  const validNote = validUntil == null ? null
+    : validUntil <= Date.now() ? 'expired'
+    : validUntil - Date.now() < 48 * 3600_000 ? `${Math.ceil((validUntil - Date.now()) / 3600_000)} h left`
+    : null;
+  // Fuel: a compact note built from the numbers, in the house format.
+  const fuelDelta = Number(fuelAlert?.fuel_delta_zar);
+  const fuelImpact = Number(fuelAlert?.estimated_cost_impact);
+  const fuelNote = fuelAlert?.has_alert
+    ? (Number.isFinite(fuelDelta) && Number.isFinite(fuelImpact)
+      ? `Diesel is up ${formatMoney(fuelDelta)}/L since this quote was made, so the job costs about ${formatMoneyWhole(fuelImpact)} more.`
+      : normaliseFigures(fuelAlert.message))
+    : null;
+  const fact = (term: string, value: React.ReactNode, wide = false) => (
+    <div className={wide ? 'qd-fact qd-fact--wide' : 'qd-fact'}>
+      <dt className="bk-fact__label">{term}</dt>
+      <dd className="bk-fact__value">{value}</dd>
+    </div>
+  );
+  const priceRows = [
+    { label: 'Base rate', value: parseFloat(quote.base_rate || '0') },
+    { label: 'Fuel surcharge', value: parseFloat(quote.fuel_surcharge || '0') },
+    { label: 'Toll charges', value: parseFloat(quote.toll_charges || '0') },
+    { label: 'Driver allowance', value: parseFloat(quote.driver_allowance || '0') },
+    ...(parseFloat(quote.additional_charges || '0') > 0 ? [{ label: 'Additional charges', value: parseFloat(quote.additional_charges) }] : []),
+    ...(isRound && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0
+      ? [{ label: `Return leg (${quote.return_cargo ? 'with cargo' : 'empty'})`, value: parseFloat(quote.return_base_rate) }] : []),
+  ];
+  const statusOptions: StatusOption[] = [
+    { value: 'DRAFT', label: 'Draft', hint: 'Not offered to the customer yet' },
+    { value: 'SENT', label: 'Sent', hint: 'Emails the quote to the customer' },
+    { value: 'ACCEPTED', label: 'Accepted', hint: 'Ready to convert to a booking' },
+    { value: 'DECLINED', label: 'Declined' },
+    // In transit and Completed live on the order created by "Convert to
+    // booking"; the backend rejects a direct write. Listed only so a legacy
+    // quote that carries one still shows it as current.
+    ...((quote.status === 'IT' || quote.status === 'COMPLETED') ? [{ value: quote.status, label: STATUS_LABEL[quote.status], disabledReason: 'Set by the booking' }] : []),
+  ];
 
-      {/* UPGRADE 2: Fuel Delta Alert */}
-      {fuelAlert && fuelAlert.has_alert && (
-        <div role="status" style={{ padding: '16px 24px', background: 'var(--status-warning-bg)', borderRadius: 'var(--radius-card, 12px)', marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
-            <AlertTriangle size={20} color="var(--status-warning-text)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, lineHeight: '20px', fontWeight: 600, color: 'var(--status-warning-text)', marginBottom: 4 }}>
-                Fuel price alert
-              </div>
-              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', marginBottom: 8 }}>
-                {fuelAlert.message || `Diesel up R${fuelAlert.fuel_delta_zar?.toFixed(2)}/L since this quote was created. This job now costs ~R${Math.round(fuelAlert.estimated_cost_impact).toLocaleString()} more.`}
-              </div>
-              {fuelAlert.action && (
-                <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>
-                  {fuelAlert.action}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+  return (
+    <div className="bk-detail qd">
+      <SectionHeader
+        title={quote.quote_number}
+        back={{ to: '/bookings/quotes', label: 'Quotes' }}
+        titleAdornment={<><StatusChip status={quote.status} label={STATUS_LABEL[quote.status]} />
+            {quote.outcome === 'accepted' && quote.status !== 'ACCEPTED' && <StatusChip status="WON" />}
+            {quote.outcome === 'rejected' && quote.status !== 'DECLINED' && <StatusChip status="LOST" />}</>}
+        description={<>{[company, quote.customer_city, isRound ? 'Round trip' : ''].filter(Boolean).join(' · ')}</>}
+        actions={<>
+          <StatusMenu
+            subject={quote.quote_number}
+            current={quote.status}
+            options={statusOptions}
+            busy={statusMutation.isPending}
+            disabledReason={billingBlocked ? `Status changes are blocked. ${subscriptionStatusDetail(authUser?.subscription_status) || ''}`.trim() : undefined}
+            // Moving to Sent emails the customer: preview and confirm there.
+            intercept={(v) => { if (v === 'SENT' && quote.status !== 'SENT') { setSendPreview('status'); return true; } return false; }}
+            onChange={(v) => statusMutation.mutate(v)}
+          />
+          <button type="button" className="bk-btn bk-btn--secondary" onClick={() => navigate(`/bookings/quotes/${id}/edit`)}>
+            Edit quote
+          </button>
+          {quote.status === 'ACCEPTED' ? (
+            <button type="button" className="bk-btn bk-btn--primary" onClick={handleConvertToLoad} disabled={convertToLoadMutation.isPending}>
+              {convertToLoadMutation.isPending ? 'Converting…' : 'Convert to booking'}
+            </button>
+          ) : (
+            <button type="button" className="bk-btn bk-btn--primary" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending}>
+              {sendToCustomerMutation.isPending
+                ? (quote.status === 'SENT' ? 'Resending…' : 'Generating…')
+                : (quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer')}
+            </button>
+          )}
+        </>}
+      />
+      {billingBlocked && (
+        <p className="bk-help bk-help--danger" style={{ margin: '-12px 0 16px' }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
+          Status changes are blocked.{' '}
+          <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>Go to billing</button>
+        </p>
       )}
 
       <div className="quote-detail-grid">
-        {/* LEFT — Quote Details */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Customer */}
-          <div className="card" style={{ padding: 24 }}>
-            <h2 style={{ ...sectionHeadingStyle, marginBottom: 14 }}>Customer</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px 24px' }}>
+        {/* LEFT: the job in one card (customer, route, cargo), then the map. */}
+        <div className="qd-main">
+          <section className="bk-card" aria-labelledby="qd-job-title">
+            <div className="bk-card__head"><h2 className="bk-card__title" id="qd-job-title">Job</h2></div>
+            <dl className="qd-facts">
+              {fact('Customer', company || 'Not recorded')}
+              {showContact && fact('Contact', contact)}
+              {quote.customer_email && <div className="qd-fact qd-fact--email"><dt className="bk-fact__label">Email</dt><dd className="bk-fact__value"><span className="qd-email">{breakableEmail(quote.customer_email)}</span></dd></div>}
+              {quote.customer_phone && fact('Phone', quote.customer_phone)}
+            </dl>
+            <hr className="qd-rule" />
+            <div className="qd-route-row">
               <div>
-                <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Name</div>
-                <div style={{ fontSize: 14, lineHeight: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>{quote.customer_name || '—'}</div>
+                <div className="bk-fact__label" style={{ marginBottom: 8 }}>{isRound ? 'Leg 1, outbound' : 'Route'}</div>
+                <ol className="bk-route">
+                  <li className="bk-route__stop">
+                    <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
+                    <div><div className="bk-route__label">Pickup</div><div className="bk-route__place">{quote.pickup_location || 'Not recorded'}</div></div>
+                  </li>
+                  {Array.isArray(quote.stops) && quote.stops.map((s: { location: string }, i: number) => (
+                    <li key={i} className="bk-route__stop">
+                      <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
+                      <div><div className="bk-route__label">Stop {i + 1}</div><div className="bk-route__place">{s.location}</div></div>
+                    </li>
+                  ))}
+                  <li className="bk-route__stop">
+                    <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
+                    <div><div className="bk-route__label">Delivery</div><div className="bk-route__place">{quote.delivery_location || 'Not recorded'}</div></div>
+                  </li>
+                </ol>
               </div>
-              {quote.customer_company && (
+              {isRound && (
                 <div>
-                  <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Company</div>
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.customer_company}</div>
-                </div>
-              )}
-              {quote.customer_email && (
-                <div>
-                  <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Email</div>
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.customer_email}</div>
-                </div>
-              )}
-              {quote.customer_phone && (
-                <div>
-                  <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>Phone</div>
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.customer_phone}</div>
-                </div>
-              )}
-              {quote.customer_city && (
-                <div>
-                  <div style={{ ...fieldLabelStyle, marginBottom: 4 }}>City</div>
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.customer_city}</div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Route */}
-          <div className="card" style={{ padding: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h2 style={{ ...sectionHeadingStyle, marginBottom: 0 }}>
-                {quote.trip_type === 'ROUND_TRIP' ? 'Leg 1: outbound route' : 'Route'}
-              </h2>
-              {quote.trip_type === 'ROUND_TRIP' && (
-                <StatusChip tone="neutral" label="Round trip" />
-              )}
-            </div>
-            <ol className="bk-route">
-              <li className="bk-route__stop">
-                <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
-                <div>
-                  <div className="bk-route__label">Pickup</div>
-                  <div className="bk-route__place">{quote.pickup_location || '—'}</div>
-                </div>
-              </li>
-              {Array.isArray(quote.stops) && quote.stops.map((s: { location: string }, i: number) => (
-                <li key={i} className="bk-route__stop">
-                  <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
-                  <div>
-                    <div className="bk-route__label">Stop {i + 1}</div>
-                    <div className="bk-route__place">{s.location}</div>
-                  </div>
-                </li>
-              ))}
-              <li className="bk-route__stop">
-                <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
-                <div>
-                  <div className="bk-route__label">Delivery</div>
-                  <div className="bk-route__place">{quote.delivery_location || '—'}</div>
-                </div>
-              </li>
-            </ol>
-
-            {(quote.pickup_lat || quote.delivery_lat) && (
-              <div style={{ marginTop: 16 }}>
-                <ExpandableRouteMap
-                  pickup={quote.pickup_location}
-                  delivery={quote.delivery_location}
-                  pickupCoords={quote.pickup_lat ? { lat: Number(quote.pickup_lat), lon: Number(quote.pickup_lng) } : undefined}
-                  deliveryCoords={quote.delivery_lat ? { lat: Number(quote.delivery_lat), lon: Number(quote.delivery_lng) } : undefined}
-                  stops={Array.isArray(quote.stops) ? quote.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
-                  geometry={Array.isArray(quote.route_geometry) && quote.route_geometry.length > 1 ? quote.route_geometry.map((p: { lat: number; lon: number }) => [Number(p.lat), Number(p.lon)] as [number, number]) : undefined}
-                  height={220}
-                  dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-dialog, 16px)', boxShadow: 'none' }}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Return Leg — visible only for ROUND_TRIP quotes */}
-          {quote.trip_type === 'ROUND_TRIP' && (
-            <div className="card" style={{ padding: 24 }}>
-              <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>
-                Leg 2: return route
-              </h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px 24px' }}>
-                <div>
-                  {label('Returns from')}
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.delivery_location || '—'}</div>
-                </div>
-                <div>
-                  {label('Return destination')}
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.return_location || '—'}</div>
-                </div>
-                <div>
-                  {label('Return cargo')}
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: quote.return_cargo ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                    {quote.return_cargo || 'Empty return'}
-                  </div>
-                </div>
-                {quote.return_date && (
-                  <div>
-                    {label('Return date')}
-                    <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)' }}>
-                      {formatDate(quote.return_date)}
-                    </div>
-                  </div>
-                )}
-                {quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
-                  <div>
-                    {label('Return rate')}
-                    <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>
-                      {formatCurrency(parseFloat(quote.return_base_rate))}
-                    </div>
-                  </div>
-                )}
-                {quote.return_notes && (
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    {label('Return notes')}
-                    <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)' }}>{quote.return_notes}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Cargo Details */}
-          <div className="card" style={{ padding: 24 }}>
-            <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Cargo details</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px 24px' }}>
-              <div>
-                {label('Description')}
-                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.cargo_description || '—'}</div>
-              </div>
-              <div>
-                {label('Vehicle type')}
-                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.vehicle_type || '—'}</div>
-              </div>
-              <div>
-                {label('Weight (kg)')}
-                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.weight ? parseFloat(quote.weight).toLocaleString('en-ZA') : '—'}</div>
-              </div>
-              <div>
-                {label('Distance (km)')}
-                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.distance ? Math.round(parseFloat(quote.distance)).toLocaleString('en-ZA') : '—'}</div>
-              </div>
-              {quote.vehicle_display && (
-                <div>
-                  {label('Assigned vehicle')}
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.vehicle_display}</div>
-                </div>
-              )}
-              {quote.driver_display && (
-                <div>
-                  {label('Assigned driver')}
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.driver_display}</div>
+                  <div className="bk-fact__label" style={{ marginBottom: 8 }}>Leg 2, return</div>
+                  <ol className="bk-route">
+                    <li className="bk-route__stop">
+                      <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
+                      <div><div className="bk-route__label">Returns from</div><div className="bk-route__place">{quote.delivery_location || 'Not recorded'}</div></div>
+                    </li>
+                    <li className="bk-route__stop">
+                      <span className="bk-route__marker" aria-hidden="true"><span className="bk-route__pin" /><span className="bk-route__line" /></span>
+                      <div>
+                        <div className="bk-route__label">Return destination</div>
+                        <div className="bk-route__place">{quote.return_location || 'Not recorded'}</div>
+                        <div className="bk-route__meta">
+                          {quote.return_cargo || 'Empty return'}{quote.return_date ? ` · ${formatDate(quote.return_date)}` : ''}
+                        </div>
+                      </div>
+                    </li>
+                  </ol>
                 </div>
               )}
             </div>
-          </div>
+            <hr className="qd-rule" />
+            <dl className="qd-facts">
+              {fact('Cargo', quote.cargo_description || 'Not recorded')}
+              {fact('Truck type', sentenceCaseLabel(quote.vehicle_type) || 'Not recorded')}
+              {fact('Weight', quote.weight ? `${formatNumber(parseFloat(quote.weight))} kg` : 'Not recorded')}
+              {fact('Distance', quote.distance ? formatDistance(parseFloat(quote.distance)) : 'Not recorded')}
+              {quote.pickup_date && fact('Pickup date', formatDate(quote.pickup_date))}
+              {quote.vehicle_display && fact('Vehicle', quote.vehicle_display)}
+              {quote.driver_display && fact('Driver', quote.driver_display)}
+              {isRound && quote.return_notes && fact('Return notes', quote.return_notes, true)}
+              {quote.notes && fact('Notes', <span style={{ whiteSpace: 'pre-wrap', color: 'var(--text-secondary)' }}>{quote.notes}</span>, true)}
+            </dl>
+          </section>
 
-          {/* Cost Breakdown */}
-          <div className="card" style={{ padding: 24 }}>
-            <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Cost breakdown</h2>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {(() => {
-                const fuel = parseFloat(quote.fuel_surcharge || '0');
-                const toll = parseFloat(quote.toll_charges || '0');
-                const driver = parseFloat(quote.driver_allowance || '0');
-                const additional = parseFloat(quote.additional_charges || '0');
-                const baseRate = parseFloat(quote.base_rate || '0');
-
-                // Mirrors the quote builder's own breakdown exactly — base_rate,
-                // fuel_surcharge, toll_charges, driver_allowance and
-                // additional_charges are the only cost fields the backend
-                // actually stores (they sum to total_amount). This used to
-                // derive a "Service Charge" as total minus the other four,
-                // which is mathematically just base_rate under a wrong label.
-                const rows = [
-                  { label: 'Fuel surcharge', value: fuel },
-                  { label: 'Toll charges', value: toll },
-                  { label: 'Driver allowance', value: driver },
-                  ...(additional > 0 ? [{ label: 'Additional charges', value: additional }] : []),
-                  { label: 'Base rate', value: baseRate },
-                ];
-
-                return rows.map((item) => (
-                  <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                    <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>{item.label}</span>
-                    <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', textAlign: 'right' }}>
-                      {formatCurrency(item.value)}
-                    </span>
-                  </div>
-                ));
-              })()}
-              {quote.trip_type === 'ROUND_TRIP' && quote.return_base_rate && parseFloat(quote.return_base_rate) > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-row)' }}>
-                  <span style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                    Return leg ({quote.return_cargo ? 'with cargo' : 'empty return'})
-                  </span>
-                  <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)', textAlign: 'right' }}>
-                    {formatCurrency(parseFloat(quote.return_base_rate))}
-                  </span>
-                </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, paddingTop: 12, marginTop: 4 }}>
-                <span style={{ fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {quote.trip_type === 'ROUND_TRIP' ? 'Total (both legs)' : 'Total amount'}
-                </span>
-                <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 16, lineHeight: '24px', fontWeight: 600, color: 'var(--text-primary)', minWidth: 0, overflowWrap: 'anywhere', textAlign: 'right' }}>
-                  {formatCurrency(parseFloat(quote.total_amount || '0'))}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Notes */}
-          {quote.notes && (
-            <div className="card" style={{ padding: 24 }}>
-              <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Notes</h2>
-              <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{quote.notes}</div>
-            </div>
+          {(quote.pickup_lat || quote.delivery_lat) && (
+            <section className="bk-card qd-map" aria-label="Route map">
+              <ExpandableRouteMap
+                pickup={quote.pickup_location}
+                delivery={quote.delivery_location}
+                pickupCoords={quote.pickup_lat ? { lat: Number(quote.pickup_lat), lon: Number(quote.pickup_lng) } : undefined}
+                deliveryCoords={quote.delivery_lat ? { lat: Number(quote.delivery_lat), lon: Number(quote.delivery_lng) } : undefined}
+                stops={Array.isArray(quote.stops) ? quote.stops.map((s: { location: string; lat: number; lon: number }) => ({ lat: Number(s.lat), lon: Number(s.lon), label: s.location })) : undefined}
+                geometry={Array.isArray(quote.route_geometry) && quote.route_geometry.length > 1 ? quote.route_geometry.map((p: { lat: number; lon: number }) => [Number(p.lat), Number(p.lon)] as [number, number]) : undefined}
+                height={200}
+                dialogStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-dialog, 16px)', boxShadow: 'none' }}
+              />
+            </section>
           )}
         </div>
 
-        {/* RIGHT — Actions: a sticky rail, so it never ends in a dead band. */}
-        <div ref={railRef} className="quote-detail-rail" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Metadata */}
-          <div className="card" style={{ padding: 24 }}>
-            <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Quote info</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                {label('Quote number')}
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: '20px', color: 'var(--text-primary)' }}>{quote.quote_number}</div>
-              </div>
-              <div>
-                {label('Status')}
-                <Select value={quote.status} onValueChange={(val) => {
-                  // Moving to Sent emails the customer: preview and confirm first.
-                  if (val === 'SENT' && quote.status !== 'SENT') { setSendPreview('status'); return; }
-                  statusMutation.mutate(val);
-                }} disabled={statusMutation.isPending || billingBlocked}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DRAFT">Draft</SelectItem>
-                    <SelectItem value="SENT">Sent</SelectItem>
-                    <SelectItem value="ACCEPTED">Accepted</SelectItem>
-                    <SelectItem value="DECLINED">Declined</SelectItem>
-                    {/* Not selectable — In-Transit/Completed now live on the Order created via
-                        "Convert to booking", not on the quote itself (the backend rejects a
-                        direct write to either anyway). Kept as SelectItems only so a quote that
-                        already carries one of these legacy statuses still displays correctly. */}
-                    {(quote.status === 'IT' || quote.status === 'COMPLETED') && (
-                      <SelectItem value={quote.status}>{STATUS_LABEL[quote.status]}</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                {billingBlocked && (
-                  <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--status-danger-text)', marginTop: 4 }} title={subscriptionStatusDetail(authUser?.subscription_status)}>
-                    Status changes are blocked.{' '}
-                    <button type="button" className="bk-link" onClick={() => navigate('/settings/billing')}>
-                      Go to billing
-                    </button>
-                  </div>
-                )}
-              </div>
-              <div>
-                {label('Confidence')}
-                <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
-                  {sentenceCase(quote.confidence) || '—'}
-                </div>
-              </div>
-              <div>
-                {label('Margin')}
-                <div style={{ fontSize: 14, lineHeight: '20px', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>{quote.margin_percentage || 0}%</div>
-              </div>
+        {/* RIGHT: the price (the only place the total appears), then tools. */}
+        <div ref={railRef} className="quote-detail-rail">
+          <section className="bk-card" aria-labelledby="qd-price-title">
+            <h2 className="bk-fact__label" id="qd-price-title" style={{ margin: 0 }}>{isRound ? 'Total, both legs' : 'Total'}</h2>
+            <div className="qd-total">{formatMoney(total)}</div>
+            <div className="qd-sub">
+              {marginText && <span>{marginText} margin</span>}
+              {quote.win_probability && (quote.status === 'DRAFT' || quote.status === 'SENT') && (
+                // Stored 0 to 100 already; do not multiply again.
+                <span title="Estimated chance of winning at this price">{Math.round(Number(quote.win_probability))}% chance to win</span>
+              )}
+            </div>
+            {fuelNote && (
+              <p className="qd-fuel" role="status">
+                <span className="bk-dot bk-dot--warning" aria-hidden="true" />
+                <span>{fuelNote}{fuelAlert?.action ? ` ${normaliseFigures(fuelAlert.action).replace(/\.?$/, '.')}` : ''}</span>
+              </p>
+            )}
+            <div className="qd-price-rows">
+              {priceRows.map(r => (
+                <div key={r.label} className="bk-kv"><span className="bk-kv__label">{r.label}</span><span className="bk-kv__value">{formatMoney(r.value)}</span></div>
+              ))}
+            </div>
+            <div className="qd-price-rows">
               {quote.valid_until && (
-                <div>
-                  {label('Valid until')}
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
+                <div className="bk-kv">
+                  <span className="bk-kv__label">Valid until</span>
+                  <span className="bk-kv__value">
                     {formatDate(quote.valid_until)}
-                    {new Date(quote.valid_until).getTime() - Date.now() < 48 * 60 * 60 * 1000 && (
-                      <span style={{ color: 'var(--status-danger-text)', marginLeft: 8 }}>
-                        {new Date(quote.valid_until).getTime() <= Date.now()
-                          ? '(expired)'
-                          : `(${Math.ceil((new Date(quote.valid_until).getTime() - Date.now()) / (1000 * 60 * 60))}h left)`}
-                      </span>
-                    )}
-                  </div>
+                    {validNote && <span style={{ color: validNote === 'expired' ? 'var(--status-danger-text)' : 'var(--status-warning-text)' }}> · {validNote}</span>}
+                  </span>
                 </div>
               )}
-              {quote.created_at && (
-                <div>
-                  {label('Created')}
-                  <div style={{ fontSize: 14, lineHeight: '20px', color: 'var(--text-primary)' }}>
-                    {formatDate(quote.created_at)}
-                  </div>
-                </div>
-              )}
+              {quote.created_at && <div className="bk-kv"><span className="bk-kv__label">Created</span><span className="bk-kv__value">{formatDate(quote.created_at)}</span></div>}
+              {quote.confidence && <div className="bk-kv"><span className="bk-kv__label">Price confidence</span><span className="bk-kv__value">{sentenceCase(quote.confidence)}</span></div>}
             </div>
-          </div>
+          </section>
 
-          {/* UPGRADE 3: Win Probability Display */}
-          {quote.win_probability && (quote.status === 'DRAFT' || quote.status === 'SENT') && (
-            <div className="card" style={{ padding: 24 }}>
-              <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Win probability</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                <div style={{ flex: 1, height: 6, background: 'var(--border-subtle)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{
-                    // quote.win_probability is already stored 0-100 (QuoteBuilder
-                    // converts the model's 0-1 fraction before saving) — do not
-                    // multiply by 100 again here.
-                    width: `${Math.min(Number(quote.win_probability), 100)}%`,
-                    height: '100%',
-                    background: 'var(--accent-primary)',
-                  }} />
-                </div>
-                <span style={{ fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums', fontSize: 28, lineHeight: '36px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {Math.round(Number(quote.win_probability))}%
-                </span>
-              </div>
-              <div style={{ fontSize: 13, lineHeight: '20px', color: 'var(--text-secondary)' }}>
-                Estimated chance of winning at current price
-              </div>
-            </div>
-          )}
-
-          {/* UPGRADE 1: Outcome Buttons */}
-          {(quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome && (
-            <div className="card" style={{ padding: 24 }}>
-              <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Mark outcome</h2>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOutcomeType('accepted');
-                    setFinalPrice(String(quote.total_amount || ''));
-                    setShowOutcomeModal(true);
-                  }}
-                  className="bk-btn bk-btn--success-outline"
-                  style={{ flex: 1 }}
-                >
-                  Mark accepted
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOutcomeType('rejected');
-                    setShowOutcomeModal(true);
-                  }}
-                  className="bk-btn bk-btn--danger-outline"
-                  style={{ flex: 1 }}
-                >
-                  Mark rejected
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Actions — primary next step first, secondary tools, destructive last */}
-          <div className="card" style={{ padding: 24 }}>
-            <h2 style={{ ...sectionHeadingStyle, marginBottom: 16 }}>Actions</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {quote.status === 'ACCEPTED' && (
-                <button
-                  type="button"
-                  className="bk-btn bk-btn--primary bk-btn--block"
-                  onClick={handleConvertToLoad}
-                  disabled={convertToLoadMutation.isPending}
-                >
-                  {convertToLoadMutation.isPending ? 'Converting…' : 'Convert to booking'}
-                </button>
-              )}
-
-              {/* Send to Customer — status SENT now sends automatically no
-                  matter how it got there (this button, a status-dropdown
-                  change, or a Kanban drag), so once a quote is already SENT
-                  this becomes an explicit resend rather than the first send. */}
-              <button
-                type="button"
-                className={`bk-btn bk-btn--block ${quote.status === 'ACCEPTED' ? 'bk-btn--secondary' : 'bk-btn--primary'}`}
-                onClick={() => setSendPreview('button')}
-                disabled={sendToCustomerMutation.isPending}
-              >
-                {sendToCustomerMutation.isPending
-                  ? (quote.status === 'SENT' ? 'Resending…' : 'Generating…')
-                  : (quote.status === 'SENT' ? 'Resend to customer' : 'Send to customer')}
-              </button>
-
+          {(effectiveShareUrl || ((quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome)) && (
+            <section className="bk-card" aria-labelledby="qd-customer-title">
+              <h2 className="bk-card__title" id="qd-customer-title" style={{ marginBottom: 12 }}>With the customer</h2>
               {effectiveShareUrl && (
-                <div style={{
-                  padding: 16,
-                  borderRadius: 'var(--radius-nested, 8px)',
-                  background: 'var(--bg-deep)',
-                  border: '1px solid var(--border-subtle)',
-                  fontSize: 13,
-                  lineHeight: '20px',
-                  color: 'var(--text-primary)',
-                  fontFamily: 'var(--font-sans)',
-                }}>
-                  <div style={{ color: 'var(--text-secondary)', marginBottom: 4, fontWeight: 500 }}>Share link</div>
-                  <div style={{
-                    wordBreak: 'break-all',
-                    color: 'var(--text-primary)',
-                    marginBottom: 8,
-                    fontSize: 13,
-                    lineHeight: '20px',
-                    fontFamily: 'var(--font-mono)',
-                  }}>
-                    {effectiveShareUrl}
-                  </div>
+                <div style={{ marginBottom: 16 }}>
+                  <div className="qd-link" title={effectiveShareUrl}>{effectiveShareUrl}</div>
                   {effectiveEmailStatus && (
-                    <div style={{
-                      color: effectiveEmailStatus.sent ? 'var(--status-success-text)' : 'var(--status-warning-text)',
-                      marginBottom: 12,
-                      fontSize: 13,
-                      lineHeight: '20px',
-                    }}>
+                    <p className="bk-help" style={{ margin: '4px 0 12px' }}>
                       {effectiveEmailStatus.sent
-                        ? `Quote emailed to ${effectiveEmailStatus.address}`
+                        ? <>Emailed to <span className="qd-email">{breakableEmail(String(effectiveEmailStatus.address || ''))}</span></>
                         : isDemoEmailSkip
                           ? 'Demo mode: the link is ready, but no real email is sent.'
                           : 'No email on file for this customer. Share the link instead.'}
-                    </div>
+                    </p>
                   )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div className="qd-btn-row">
                     <button
                       type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(effectiveShareUrl);
-                        toast.success('Link copied to clipboard');
-                      }}
-                      className="bk-btn bk-btn--secondary bk-btn--block"
+                      onClick={() => { navigator.clipboard.writeText(effectiveShareUrl); toast.success('Link copied to clipboard'); }}
+                      className="bk-btn bk-btn--secondary"
                     >
                       Copy link
                     </button>
@@ -815,61 +572,72 @@ export default function QuoteDetail() {
                       )}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bk-btn bk-btn--whatsapp bk-btn--block"
+                      className="bk-btn bk-btn--secondary"
                       style={{ boxSizing: 'border-box' }}
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-                        <path d="M12.001 2C6.478 2 2 6.477 2 12c0 1.892.526 3.708 1.523 5.29L2 22l4.828-1.494A9.953 9.953 0 0012.001 22C17.523 22 22 17.523 22 12S17.523 2 12.001 2zm0 18.062a8.03 8.03 0 01-4.284-1.236l-.307-.183-3.194.988.99-3.13-.2-.32A8.02 8.02 0 013.938 12c0-4.452 3.612-8.062 8.063-8.062 4.45 0 8.061 3.61 8.061 8.062 0 4.452-3.61 8.062-8.061 8.062z" />
-                      </svg>
-                      Share via WhatsApp
+                      WhatsApp
                     </a>
                   </div>
                 </div>
               )}
+              {(quote.status === 'SENT' || quote.status === 'DRAFT') && !quote.outcome && (
+                <>
+                  <div className="bk-fact__label" style={{ marginBottom: 8 }}>Record their answer</div>
+                  <div className="qd-btn-row">
+                    <button
+                      type="button"
+                      onClick={() => { setOutcomeType('accepted'); setFinalPrice(String(quote.total_amount || '')); setShowOutcomeModal(true); }}
+                      className="bk-btn bk-btn--secondary"
+                    >
+                      Accepted
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setOutcomeType('rejected'); setShowOutcomeModal(true); }}
+                      className="bk-btn bk-btn--secondary"
+                    >
+                      Rejected
+                    </button>
+                  </div>
+                </>
+              )}
+            </section>
+          )}
 
-              <button
-                type="button"
-                className="bk-btn bk-btn--secondary bk-btn--block"
-                onClick={() => navigate(`/bookings/quotes/${id}/edit`)}
-              >
-                Edit quote
+          <div className="qd-tools">
+            <button
+              type="button"
+              onClick={() => {
+                downloadBlob(`api/v1/quotes/${id}/generate_pdf/`)
+                  .then(blob => {
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `Quote-${quote?.quote_number || id}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                  })
+                  .catch((e: any) => toast.error(e?.message || 'PDF download failed'));
+              }}
+              className="bk-btn bk-btn--quiet"
+            >
+              <Download size={16} aria-hidden="true" /> Download PDF
+            </button>
+            {quote.status === 'ACCEPTED' && (
+              <button type="button" className="bk-btn bk-btn--quiet" onClick={() => setSendPreview('button')} disabled={sendToCustomerMutation.isPending}>
+                Send to customer
               </button>
-
-              {/* PDF Download */}
-              <button
-                type="button"
-                onClick={() => {
-                  downloadBlob(`api/v1/quotes/${id}/generate_pdf/`)
-                    .then(blob => {
-                      const a = document.createElement('a');
-                      a.href = URL.createObjectURL(blob);
-                      a.download = `Quote-${quote?.quote_number || id}.pdf`;
-                      a.click();
-                      URL.revokeObjectURL(a.href);
-                    })
-                    .catch((e: any) => toast.error(e?.message || 'PDF download failed'));
-                }}
-                className="bk-btn bk-btn--secondary bk-btn--block"
-              >
-                <Download size={16} aria-hidden="true" /> Download PDF
-              </button>
-
-              <hr className="bk-divider" />
-
-              <button
-                type="button"
-                className="bk-btn bk-btn--danger-outline bk-btn--block"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-              >
-                {deleteMutation.isPending ? 'Deleting…' : 'Delete quote'}
-              </button>
-            </div>
+            )}
+            <button
+              type="button"
+              className="bk-btn bk-btn--quiet-danger"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete quote'}
+            </button>
           </div>
         </div>
       </div>
-
       {/* UPGRADE 1: Outcome Modal */}
       {showOutcomeModal && outcomeType && (
         <div style={{

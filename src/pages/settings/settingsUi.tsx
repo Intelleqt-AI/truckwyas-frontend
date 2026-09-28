@@ -1,4 +1,5 @@
 import '@/pages/settings/settings-brand.css';
+import { SettingsPhoneNav } from './SettingsShell';
 import '@/components/layout/section-header.css';
 
 // Shared presentation roles for every settings section (see
@@ -196,6 +197,7 @@ export const settingsDangerButtonStyle: React.CSSProperties = {
  * actions on the title row), so every page head in the product matches. */
 export function SettingsPageHeader({ title, description, actions }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode }) {
   return (
+    <>
     <header className="section-header settings-page-head">
       <div className="section-header__top">
         <div className="section-header__titles">
@@ -207,5 +209,7 @@ export function SettingsPageHeader({ title, description, actions }: { title: Rea
         <div className="section-header__actions">{actions}</div>
       </div>
     </header>
+    <SettingsPhoneNav />
+    </>
   );
 }

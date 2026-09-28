@@ -1,4 +1,5 @@
 import '@/pages/settings/settings-brand.css';
+import { formatDateTime } from '@/lib/formatters';
 import { useState, useEffect, useRef } from "react";
 import { fetchData, patchData, postData } from "@/lib/Api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -675,13 +676,13 @@ export function CompanySettings() {
                     <>
                       Live national price: R{Number(livePrice.inland_price).toFixed(2)}/L
                       {livePrice.last_updated && ` · for ${new Date(livePrice.last_updated).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}`}
-                      {livePrice.last_checked_at && ` · checked ${new Date(livePrice.last_checked_at).toLocaleString('en-ZA')}`}
+                      {livePrice.last_checked_at && ` · checked ${formatDateTime(livePrice.last_checked_at)}`}
                       {livePrice.stale_warning && ` · ${livePrice.stale_warning}`}
                     </>
                   ) : (
                     <>
                       {livePrice.stale_warning}
-                      {livePrice.last_checked_at && ` (checked ${new Date(livePrice.last_checked_at).toLocaleString('en-ZA')})`}
+                      {livePrice.last_checked_at && ` (checked ${formatDateTime(livePrice.last_checked_at)})`}
                     </>
                   )}
                 </div>
@@ -723,12 +724,12 @@ export function CompanySettings() {
                     <>
                       Live national price (95 unleaded): R{Number(livePrice.petrol_95).toFixed(2)}/L
                       {livePrice.last_updated && ` · for ${new Date(livePrice.last_updated).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}`}
-                      {livePrice.last_checked_at && ` · checked ${new Date(livePrice.last_checked_at).toLocaleString('en-ZA')}`}
+                      {livePrice.last_checked_at && ` · checked ${formatDateTime(livePrice.last_checked_at)}`}
                     </>
                   ) : (
                     <>
                       {livePrice.stale_warning}
-                      {livePrice.last_checked_at && ` (checked ${new Date(livePrice.last_checked_at).toLocaleString('en-ZA')})`}
+                      {livePrice.last_checked_at && ` (checked ${formatDateTime(livePrice.last_checked_at)})`}
                     </>
                   )}
                 </div>

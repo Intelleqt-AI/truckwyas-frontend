@@ -1,10 +1,13 @@
 import '@/pages/table-heading-roles.css';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
 import '@/pages/admin/admin-brand.css';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData } from '@/lib/Api';
 import { toast } from '@/lib/toast';
 import { Loader } from '@/components/Loader';
+import { formatDate, formatDateTime, formatMoney } from '@/lib/formatters';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import PaginationControls from '@/pages/admin/PaginationControls';
 import RowActions from '@/components/ui/RowActions';
@@ -49,22 +52,15 @@ interface BillingChargeRow {
 
 type CompanyActionType = 'suspend' | 'reactivate' | 'delete';
 
-const formatCurrency = (n: number) =>
-  new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 0 }).format(n || 0);
+const formatCurrency = (n: number) => formatMoney(n || 0);
 
-const fmtDateTime = (dateStr?: string | null) =>
-  dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+const fmtDateTime = (dateStr?: string | null) => (dateStr ? formatDateTime(dateStr) : 'Not recorded');
 
 // Date-only fields (next_billing_date, grace_period_expires_at) come back as
 // plain 'YYYY-MM-DD' — parsing that with `new Date()` reads it as UTC
 // midnight, which can print as the previous day in timezones behind UTC.
 // Build the Date from local y/m/d parts instead.
-const fmtDate = (dateStr?: string | null) => {
-  if (!dateStr) return '—';
-  const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number);
-  if (!y || !m || !d) return dateStr;
-  return new Date(y, m - 1, d).toLocaleDateString('en-ZA', { dateStyle: 'medium' });
-};
+const fmtDate = (dateStr?: string | null) => (dateStr ? formatDate(dateStr.slice(0, 10)) : 'Not set');
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
   active: 'active',
@@ -75,8 +71,9 @@ const STATUS_BADGE_CLASS: Record<string, string> = {
   grace_period: 'warning',
   suspended: 'delayed',
   cancelled: 'delayed',
-  trialing: 'warning',
-  none: 'warning',
+  trialing: '',
+  // No subscription is a fact, not a warning: neutral.
+  none: '',
 };
 
 // Charge status values aren't a fixed enum on the backend (subscription vs.
@@ -107,7 +104,7 @@ const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
   suspended: 'Suspended',
   cancelled: 'Cancelled',
   trialing: 'Trialing',
-  none: 'None',
+  none: 'No subscription',
 };
 const subscriptionStatusLabel = (s: string) =>
   Object.prototype.hasOwnProperty.call(SUBSCRIPTION_STATUS_LABELS, s) ? SUBSCRIPTION_STATUS_LABELS[s] : s;
@@ -220,16 +217,21 @@ export function CompaniesTable() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <h2 style={sectionTitleStyle}>Companies {data ? `(${data.count})` : ''}</h2>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', minWidth: 0 }}>
-          <select className="admin-control" aria-label="Filter by status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={selectStyle}>
-            {STATUS_FILTER_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+          <Select value={statusFilter || 'all'} onValueChange={v => setStatusFilter(v === 'all' ? '' : v)}>
+            <SelectTrigger aria-label="Filter by status" style={{ width: 'auto', minWidth: 160, minHeight: 40 }}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_FILTER_OPTIONS.map(o => (
+                <SelectItem key={o.value || 'all'} value={o.value || 'all'}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <input className="admin-control" aria-label="Search companies" style={inputStyle} placeholder="Search company or owner email…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
-      {isLoading ? <Loader size={24} /> : (
+      {isLoading ? <TableSkeleton rows={8} cols={6} label="Loading companies" /> : (
         <div className="admin-scroll-region" role="region" aria-label="Companies" tabIndex={0} style={{ overflowX: 'auto' }}>
           <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -240,7 +242,7 @@ export function CompaniesTable() {
                 <th className="num" style={thStyle}>Users</th>
                 <th className="num" style={thStyle}>Quotes</th>
                 <th className="num" style={thStyle}>Orders</th>
-                <th style={thStyle}>Created</th>
+                <th className="adm-col-low" style={thStyle}>Created</th>
                 <th style={{ ...thStyle, position: 'sticky', right: 0, zIndex: 1, width: 1, textAlign: 'right', background: 'var(--bg-surface)' }}><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
@@ -254,7 +256,7 @@ export function CompaniesTable() {
                       <td style={tdStyle}>
                         <div>
                           {c.company_name}
-                          {c.is_demo && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-warning-text)' }}>Demo</span>}
+                          {c.is_demo && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--text-tertiary)' }}>Demo</span>}
                           {c.is_deleted && <span style={{ marginLeft: 8, fontSize: 13, lineHeight: '20px', fontWeight: 500, color: 'var(--status-danger-text)' }}>Deleted</span>}
                         </div>
                         {/* company_name alone is rarely unique — self-service signup
@@ -273,11 +275,11 @@ export function CompaniesTable() {
                       <td style={tdStyle}>
                         <StatusChip tone={badgeTone(STATUS_BADGE_CLASS[c.subscription_status])} label={subscriptionStatusLabel(c.subscription_status)} size="sm" />
                       </td>
-                      <td style={tdStyle}>{fmtDate(c.next_billing_date)}</td>
+                      <td style={{ ...tdStyle, color: c.next_billing_date ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{fmtDate(c.next_billing_date)}</td>
                       <td className="num" style={tdStyle}>{c.user_count}</td>
                       <td className="num" style={tdStyle}>{c.quote_count}</td>
                       <td className="num" style={tdStyle}>{c.load_count}</td>
-                      <td style={tdStyle}>{fmtDateTime(c.created_at)}</td>
+                      <td className="adm-col-low" style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{c.created_at ? formatDate(c.created_at) : 'Not recorded'}</td>
                       <td style={actionTdStyle}>
                         <RowActions
                           label={c.company_name}
@@ -517,7 +519,7 @@ function CompanyBillingPanel({ company }: { company: Company }) {
                         <td style={tdStyle}>
                           <StatusChip tone={badgeTone(chargeStatusClass(ch.status))} label={chargeStatusLabel(ch.status)} size="sm" />
                         </td>
-                        <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)' }}>{ch.reference || '—'}</td>
+                        <td style={{ ...tdStyle, fontSize: 14, fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>{ch.reference || '—'}</td>
                         <td style={tdStyle}>
                           {ch.status === 'failed' && ch.kind === 'delivery_fee' && (
                             <button

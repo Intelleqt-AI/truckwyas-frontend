@@ -1,15 +1,59 @@
-/* Keep the quote and its actions visible without changing their order or behavior. */
+/* Quote detail: one screen at 1440 where the data allows. Left, the job in
+   one card (customer, route, cargo) and the map; right, a sticky rail with
+   the price (the only place the total appears) and the customer tools. */
 .quote-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--card-gap, 24px);
   align-items: start;
 }
 /* The rail sticks beside the longer quote column (top set by useStickyRail). */
-.quote-detail-grid > .quote-detail-rail { position: sticky; top: 24px; }
+.quote-detail-grid > .quote-detail-rail { position: sticky; top: 24px; display: flex; flex-direction: column; gap: var(--card-gap, 16px); }
 .quote-detail-grid > * { min-width: 0; }
-.quote-detail-grid .card { min-width: 0; overflow-wrap: anywhere; }
-@media (max-width: 900px) {
+.qd-main { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
+@media (max-width: 1000px) {
   .quote-detail-grid { grid-template-columns: minmax(0, 1fr); }
   .quote-detail-grid > .quote-detail-rail { position: static; }
 }
+
+/* Definition list: auto columns, label over value. */
+.qd-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 16px 24px; margin: 0; }
+.qd-fact--email { grid-column: span 2; }
+@media (max-width: 520px) { .qd-fact--email { grid-column: 1 / -1; } }
+.qd-facts dd { margin: 0; }
+.qd-fact { min-width: 0; }
+.qd-fact--wide { grid-column: 1 / -1; }
+.qd-rule { border: 0; height: 1px; background: var(--border-row); margin: 20px 0; }
+.qd-route-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px 24px; }
+/* Emails wrap at "@" and dots (<wbr>), never inside a word. */
+.qd-email { overflow-wrap: normal; word-break: normal; }
+.bk-card.qd-map { padding: 0; overflow: hidden; }
+.qd-map > * { border-radius: 0; }
+
+/* Price card */
+.qd-total {
+  margin-top: 4px;
+  font: 600 var(--text-figure, 28px)/36px var(--font-sans);
+  letter-spacing: var(--tracking-figure, -0.02em);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.qd-sub { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 4px; font: 400 13px/20px var(--font-sans); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.qd-fuel {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 12px 0 0; padding: 8px 0 0;
+  border-top: 1px solid var(--border-row);
+  font: 400 13px/20px var(--font-sans); color: var(--text-secondary);
+}
+.qd-fuel .bk-dot { flex-shrink: 0; transform: translateY(-1px); }
+.qd-price-rows { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--border-row); }
+.qd-price-rows .bk-kv { padding: 6px 0; }
+.qd-link {
+  font: 400 13px/20px var(--font-sans); color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding: 8px 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-nested, 8px); background: var(--bg-deep, var(--bg-surface));
+}
+.qd-btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.qd-tools { display: flex; flex-wrap: wrap; gap: 4px; justify-content: space-between; }
+.qd-tools .bk-btn { padding-left: 8px; padding-right: 8px; }

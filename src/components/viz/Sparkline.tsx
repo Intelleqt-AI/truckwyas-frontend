@@ -104,7 +104,7 @@ export function Sparkline({ values, labels, format, ariaLabel, variant = 'line',
           if (e.key === 'Escape') hide();
         }}
         onPointerMove={(e) => showAt(nearest(localPoint(svgRef.current!, e).x))}
-        style={{ outline: 'none' }}>
+        className="viz-focusable">
         {hoverIdx != null && variant === 'bars' && <rect className="viz-hover-band" x={hoverIdx * step} y={0} width={step} height={H} rx={2} />}
         {min < 0 && <line x1={0} x2={W} y1={y(0)} y2={y(0)} className="viz-baseline" />}
         {body}

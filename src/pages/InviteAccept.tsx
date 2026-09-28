@@ -138,7 +138,7 @@ export function InviteAccept() {
                   fontWeight: 500,
                   padding: '2px 8px',
                   border: '1px solid currentColor',
-                  color: 'var(--status-info-text)',
+                  color: 'var(--text-primary)',
                   borderRadius: 'var(--radius-chip)',
                 }}>
                   {/* Presentation only — the role enum is shown in sentence case. */}

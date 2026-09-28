@@ -1,13 +1,15 @@
 import { useRef, useState, type ReactNode } from 'react';
 import {
-  TableTwin, Tip, TipRow, VIZ, boxIn, hLine, linear, niceTicks, placeLabel, rand, randCompact, textBox, textW, useTip, useWidth,
-  type Box,
+  HatchDef, Legend, TableTwin, Tip, TipRow, VIZ, boxIn, hLine, linear, niceTicks, placeLabel, rand, randCompact, textBox, textW, useSvgId, useTip, useWidth,
+  type Box, type LegendItem,
 } from './core';
 
 /**
  * Waterfall / bridge. Each step floats from where the previous one ended, so
- * the reader sees how a starting amount becomes the result. Increases wear the
- * accent, decreases the warm pole, totals are anchored at zero. Hairline
+ * the reader sees how a starting amount becomes the result. Colour follows the
+ * product grammar (viz.css): money in and a positive result wear the accent,
+ * cost steps are the hatched neutral, and only a loss (a negative result or a
+ * month that lost money) is red. Totals are anchored at zero. Hairline
  * connectors carry the running level from step to step. Used for the period
  * margin bridge (revenue, minus costs, = net) and for the month-by-month net
  * that builds up to a multi-month result.
@@ -26,9 +28,11 @@ export interface WaterfallStep {
   detail?: ReactNode;
   /** Text shown instead of a bar when a delta step had no activity. */
   emptyText?: string;
+  /** 'cost': a decrease that is a cost, drawn as the hatched neutral rather than a loss. */
+  tone?: 'cost';
 }
 
-export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, values, caption, valueHeader = 'Change' }: {
+export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, values, caption, valueHeader = 'Change', note }: {
   steps: WaterfallStep[];
   height?: number;
   ariaLabel: string;
@@ -42,6 +46,8 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
   values?: 'all' | 'auto' | 'none';
   caption: string;
   valueHeader?: string;
+  /** One line beside the table toggle, e.g. which empty months were left out. */
+  note?: ReactNode;
 }) {
   const [ref, W] = useWidth<HTMLDivElement>(640);
   const figRef = useRef<HTMLDivElement>(null);
@@ -82,8 +88,19 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
   const maxDown = deltas.reduce<number | null>((b, d) => (d.s.value < 0 && (b == null || d.s.value < steps[b].value) ? d.i : b), null);
   const wantsLabel = (i: number) => mode === 'all' || (mode === 'auto' && (steps[i].kind === 'total' || i === maxUp || i === maxDown));
 
-  const colorOf = (s: WaterfallStep, g: { from: number; to: number }) =>
-    s.kind === 'total' ? (g.to < 0 ? VIZ.warm : VIZ.accent) : s.value >= 0 ? VIZ.accent : VIZ.warm;
+  const hatchId = useSvgId('wf-hatch');
+  type Role = 'in' | 'cost' | 'loss';
+  const roleOf = (s: WaterfallStep, g: { from: number; to: number }): Role =>
+    s.kind === 'total' ? (g.to < 0 ? 'loss' : 'in') : s.tone === 'cost' ? 'cost' : s.value >= 0 ? 'in' : 'loss';
+  const ROLE_COLOR: Record<Role, string> = { in: VIZ.accent, cost: VIZ.hatch, loss: VIZ.loss };
+  const colorOf = (s: WaterfallStep, g: { from: number; to: number }) => ROLE_COLOR[roleOf(s, g)];
+  const roles = new Set(steps.map((s, i) => (s.kind === 'delta' && s.value === 0 ? null : roleOf(s, geo[i]))));
+  // A key only when costs are hatched: the hatch is the one mark a reader cannot guess.
+  const legend: LegendItem[] = roles.has('cost') ? [
+    ...(roles.has('in') ? [{ label: 'Money in and profit', color: VIZ.accent, shape: 'rect' as const }] : []),
+    { label: 'Costs', shape: 'hatch' as const },
+    ...(roles.has('loss') ? [{ label: 'Loss', color: VIZ.loss, shape: 'rect' as const }] : []),
+  ] : [];
 
   // ---- geometry per step
   const bars = steps.map((s, i) => {
@@ -115,7 +132,7 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
     const above = [{ x: lx, y: b.top - 7, inside: false }, { x: lx, y: b.top - 11, inside: false }];
     const below = [{ x: lx, y: b.bottom + 15, inside: false }, { x: lx, y: b.bottom + 19, inside: false }];
     const cands = (down ? [...below, ...above] : [...above, ...below]).map((c) => ({ ...c, box: textBox(text, c.x, c.y) }));
-    if (b.h >= 22 && bw >= tw + 6) {
+    if (b.h >= 22 && bw >= tw + 6 && roleOf(s, geo[i]) !== 'cost') {
       const inY = down ? b.bottom - 7 : b.top + 16;
       cands.push({ x: lx, y: inY, inside: true, box: textBox(text, lx, inY) });
     }
@@ -149,8 +166,10 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
 
   return (
     <div className="viz" ref={figRef}>
+      <Legend items={legend} />
       <div ref={ref} onPointerLeave={close}>
         <svg width={W} height={height} role="img" aria-label={ariaLabel}>
+          <HatchDef id={hatchId} />
           {/* Hover: a column band behind the step; the other bars keep their full value. */}
           {active != null && <rect className="viz-hover-band" x={axisW + band * active} y={0} width={band} height={height - padB + 4} rx={6} />}
           {ticks.map((t) => (
@@ -180,6 +199,8 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
                   <line x1={x - bw / 2} x2={x + bw / 2} y1={y0} y2={y0} stroke="var(--viz-neutral-strong)" strokeWidth={2} />
                 ) : h < 1 ? (
                   <line x1={x - bw / 2} x2={x + bw / 2} y1={y0} y2={y0} stroke={colorOf(s, geo[i])} strokeWidth={2} />
+                ) : roleOf(s, geo[i]) === 'cost' ? (
+                  <path d={d} fill={`url(#${hatchId})`} stroke={VIZ.hatch} strokeWidth={1} />
                 ) : (
                   <path d={d} fill={colorOf(s, geo[i])} />
                 )}
@@ -190,9 +211,9 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
                 <text x={catX} y={height - (catLines.length > 1 ? 22 : 8)} textAnchor="middle" className={s.kind === 'total' ? 'viz-strong' : undefined} style={catPx !== 12 ? { fontSize: catPx } : undefined}>
                   {catLines.map((t, k) => <tspan key={k} x={catX} dy={k === 0 ? 0 : 14}>{t}</tspan>)}
                 </text>
-                <rect className="viz-hit" x={x - band / 2} y={0} width={band} height={height} tabIndex={0}
-                  aria-label={`${s.label}: ${b.empty && s.emptyText ? s.emptyText : rand(s.value)}`}
-                  onPointerEnter={(e) => open(i, e.currentTarget)} onFocus={(e) => open(i, e.currentTarget)} onBlur={close} />
+                {/* Pointer only: the SVG is one labelled image and "Show as table" is the keyboard route to every value. */}
+                <rect className="viz-hit" x={x - band / 2} y={0} width={band} height={height} aria-hidden="true"
+                  onPointerEnter={(e) => open(i, e.currentTarget)} />
               </g>
             );
           })}
@@ -202,6 +223,7 @@ export function Waterfall({ steps, height = 240, ariaLabel, labelAll = false, va
       </div>
       <Tip tip={tip} width={W} />
       <TableTwin
+        note={note}
         table={{
           caption,
           columns: [{ label: 'Step' }, { label: valueHeader, numeric: true }, { label: 'Running total', numeric: true }],

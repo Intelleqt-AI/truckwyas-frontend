@@ -13,6 +13,7 @@ import FindingsFeed, { RETRY, useAllRows } from '@/components/insights/FindingsF
 import type { ExpenseRec, InvoiceRec, LoadRec } from '@/components/insights/findings';
 import { Waterfall, PaymentDotPlot, LaneScatter, Funnel, rand } from '@/components/viz';
 import { paymentRows, lanePoints } from '@/components/insights/insight-series';
+import { formatDate, formatPercent } from '@/lib/formatters';
 
 /* Insights. The first tab is the findings feed: what to change and what it is
    worth. The other tabs keep the charts that answer one question each, with a
@@ -25,11 +26,21 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 const MIN_TRIPS = 3;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthName = (ym: string) => MONTHS[Number(ym.slice(5, 7)) - 1] || ym;
-const formatDay = (iso?: string, withYear = true) => {
-  if (!iso) return '';
-  const d = new Date(`${iso.slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getDate()} ${MONTHS[d.getMonth()]}${withYear ? ` ${d.getFullYear()}` : ''}`;
+const monthYear = (ym: string) => `${monthName(ym)} ${ym.slice(0, 4)}`;
+const formatDay = (iso?: string) => (iso ? formatDate(iso.slice(0, 10)) : '');
+/** "Apr to Jun 2026" or "Oct 2025 to Jun 2026". */
+const monthSpan = (a: string, b: string) => (a === b ? monthYear(a) : a.slice(0, 4) === b.slice(0, 4) ? `${monthName(a)} to ${monthYear(b)}` : `${monthYear(a)} to ${monthYear(b)}`);
+
+/* Calendar day and month of an instant in South African time, the backend's
+   time zone, so client-side month buckets match the API's period filters. */
+const SAST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit' });
+const sastDay = (iso: string) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : SAST_DAY.format(d); };
+const monthsBetween = (fromYm: string, toYm: string) => {
+  const out: string[] = [];
+  let y = Number(fromYm.slice(0, 4)); let m = Number(fromYm.slice(5, 7));
+  const ty = Number(toYm.slice(0, 4)); const tm = Number(toYm.slice(5, 7));
+  while ((y < ty || (y === ty && m <= tm)) && out.length < 120) { out.push(`${y}-${String(m).padStart(2, '0')}`); m += 1; if (m > 12) { m = 1; y += 1; } }
+  return out;
 };
 
 type TabType = 'findings' | 'margin' | 'paid' | 'fleet' | 'lanes';
@@ -156,6 +167,76 @@ export default function Insights() {
 
 // ------------------------------------------------------------------ margin
 
+interface MonthRow { ym: string; month: string; revenue: number; expenses: number; margin: number }
+
+/**
+ * Net margin per calendar month for the selected period, trimmed to the months
+ * that have activity (no leading or trailing empty months).
+ *
+ * The finance API's monthly_trend is fixed to the last 6 calendar months, so
+ * the months are bucketed here from the same rows the other tabs read (paid
+ * invoices by payment date, approved expenses by expense date: the API's own
+ * definitions). They are only used when they add up to the API's period totals
+ * to the cent; otherwise the chart falls back to the API's 6 months, clipped
+ * to the period, and says so.
+ */
+function monthlyForPeriod(
+  f: FinanceData, from: string, to: string,
+  inv: { rows: InvoiceRec[]; complete: boolean } | undefined,
+  exp: { rows: ExpenseRec[]; complete: boolean } | undefined,
+): { months: MonthRow[]; source: 'rows' | 'api'; note?: string } {
+  const pFrom = (f.from_date ?? from).slice(0, 10);
+  const pTo = (f.to_date ?? to).slice(0, 10);
+  const span = monthsBetween(pFrom.slice(0, 7), pTo.slice(0, 7));
+  let rows: MonthRow[] | null = null;
+  if (inv?.complete && exp?.complete) {
+    const rev = new Map<string, number>();
+    const cost = new Map<string, number>();
+    inv.rows.forEach(i => {
+      if ((i.status || '').toUpperCase() !== 'PAID' || !i.paid_at) return;
+      const d = sastDay(i.paid_at);
+      if (!d || d < pFrom || d > pTo) return;
+      rev.set(d.slice(0, 7), (rev.get(d.slice(0, 7)) ?? 0) + num(i.total_amount));
+    });
+    exp.rows.forEach(e => {
+      if ((e.status || '').toUpperCase() !== 'APPROVED' || !e.expense_date) return;
+      const d = e.expense_date.slice(0, 10);
+      if (d < pFrom || d > pTo) return;
+      cost.set(d.slice(0, 7), (cost.get(d.slice(0, 7)) ?? 0) + num(e.amount));
+    });
+    const built = span.map(ym => { const r = rev.get(ym) ?? 0; const c = cost.get(ym) ?? 0; return { ym, month: monthName(ym), revenue: r, expenses: c, margin: r - c }; });
+    const sumRev = built.reduce((s, m) => s + m.revenue, 0);
+    const sumCost = built.reduce((s, m) => s + m.expenses, 0);
+    if (Math.abs(sumRev - num(f.revenue_period)) < 0.01 && Math.abs(sumCost - num(f.expenses_period)) < 0.01) rows = built;
+  }
+  const source: 'rows' | 'api' = rows ? 'rows' : 'api';
+  let shortNote: string | undefined;
+  if (!rows) {
+    // Only calendar months wholly inside the period (the last one may run to today).
+    const firstFull = pFrom.endsWith('-01') ? pFrom.slice(0, 7) : monthsBetween(pFrom.slice(0, 7), '9999-12')[1];
+    const api = [...(f.monthly_trend ?? [])].sort((a, b) => a.month.localeCompare(b.month));
+    if (api.length > 0 && api[0].month > firstFull) {
+      shortNote = `Only ${monthSpan(api[0].month, api[api.length - 1].month)} is available here, so the bars do not add up to the period total.`;
+    }
+    rows = api
+      .filter(m => m.month >= firstFull && m.month <= pTo.slice(0, 7))
+      .map(m => ({ ym: m.month, month: monthName(m.month), revenue: num(m.revenue), expenses: num(m.expenses), margin: num(m.margin) }));
+  }
+  const active = (m: MonthRow) => m.revenue !== 0 || m.expenses !== 0;
+  const firstI = rows.findIndex(active);
+  if (firstI < 0) return { months: [], source };
+  let lastI = rows.length - 1;
+  while (lastI > firstI && !active(rows[lastI])) lastI -= 1;
+  const months = rows.slice(firstI, lastI + 1);
+  // Month labels carry the year when the chart crosses a year end.
+  if (months.length > 0 && months[0].ym.slice(0, 4) !== months[months.length - 1].ym.slice(0, 4)) {
+    months.forEach((m, k) => { if (k === 0 || m.ym.endsWith('-01')) m.month = monthYear(m.ym); });
+  }
+  const after = rows.length - 1 - lastI;
+  const note = [shortNote, after > 0 ? `Nothing paid or approved after ${monthYear(months[months.length - 1].ym)}.` : null].filter(Boolean).join(' ') || undefined;
+  return { months, source, note };
+}
+
 function MarginTab({ period, setPeriod, customFrom, customTo }: PeriodState) {
   const { from, to } = periodRange(period, customFrom, customTo);
   const finance = useQuery<FinanceData | null>({
@@ -165,6 +246,7 @@ function MarginTab({ period, setPeriod, customFrom, customTo }: PeriodState) {
     ...RETRY,
   });
   const expenses = useAllRows<ExpenseRec>('expenses', 'api/v1/expenses/');
+  const invoices = useAllRows<InvoiceRec>('invoices', 'api/v1/invoices/');
   const f = finance.data;
 
   const pendingInPeriod = (expenses.data?.rows ?? [])
@@ -182,8 +264,8 @@ function MarginTab({ period, setPeriod, customFrom, customTo }: PeriodState) {
         const range = f.from_date && f.to_date ? `${formatDay(f.from_date)} to ${formatDay(f.to_date)}` : 'Selected period';
         const withPending = margin - pendingInPeriod;
         const pct = rev > 0 ? (margin / rev) * 100 : null;
-        const trend = [...(f.monthly_trend ?? [])].sort((a, b) => a.month.localeCompare(b.month)).slice(-6)
-          .map(m => ({ month: monthName(m.month), revenue: num(m.revenue), expenses: num(m.expenses), margin: num(m.margin) }));
+        const monthly = monthlyForPeriod(f, from, to, invoices.data, expenses.data);
+        const trend = monthly.months;
         const totalNet = trend.reduce((s, d) => s + d.margin, 0);
         return (
           <>
@@ -202,7 +284,7 @@ function MarginTab({ period, setPeriod, customFrom, customTo }: PeriodState) {
                   <dl className="ic-kpis ic-kpis--4 insights-kpis">
                     <KpiTile label="Revenue" value={rand(rev, 0)} />
                     <KpiTile label="Approved costs" value={rand(cost, 0)} />
-                    <KpiTile label="Net margin" value={pct != null ? `${pct.toFixed(1).replace('.', ',')}%` : rand(margin, 0)} tone={margin < 0 ? 'danger' : undefined} note={pct != null ? rand(margin, 0) : undefined} />
+                    <KpiTile label="Net margin" value={pct != null ? formatPercent(pct) : rand(margin, 0)} tone={margin < 0 ? 'danger' : undefined} note={pct != null ? rand(margin, 0) : undefined} />
                     {pendingInPeriod > 0
                       ? <KpiTile label="With pending costs" value={rand(withPending, 0)} tone={withPending < 0 ? 'danger' : undefined} note={`${rand(pendingInPeriod, 0)} not approved`} />
                       : <KpiTile label="Pending costs" value="None" note="Every cost is approved" />}
@@ -216,10 +298,10 @@ function MarginTab({ period, setPeriod, customFrom, customTo }: PeriodState) {
                     ariaLabel={`Revenue ${rand(rev)}, minus approved costs ${rand(cost)}, leaves ${rand(margin)}.${pendingInPeriod > 0 ? ` Pending costs of ${rand(pendingInPeriod)} would leave ${rand(withPending)}.` : ''}`}
                     steps={[
                       { label: 'Revenue', value: rev, kind: 'total' },
-                      { label: 'Approved costs', value: -cost, kind: 'delta' },
+                      { label: 'Approved costs', value: -cost, kind: 'delta', tone: 'cost' },
                       { label: 'Net margin', value: margin, kind: 'total' },
                       ...(pendingInPeriod > 0 ? [
-                        { label: 'Pending costs', value: -pendingInPeriod, kind: 'delta' as const },
+                        { label: 'Pending costs', value: -pendingInPeriod, kind: 'delta' as const, tone: 'cost' as const },
                         { label: 'If approved', value: withPending, kind: 'total' as const },
                       ] : []),
                     ]}
@@ -228,17 +310,20 @@ function MarginTab({ period, setPeriod, customFrom, customTo }: PeriodState) {
               )}
             </InsightCard>
 
-            {trend.length > 0 && trend.some(d => d.revenue !== 0 || d.expenses !== 0) && (
+            {(invoices.isLoading || expenses.isLoading) ? (
+              <div className="insights-skel insights-skel--card" aria-busy="true" aria-label="Loading net margin by month" />
+            ) : trend.length > 1 && (
               <InsightCard
                 title="Net margin by month"
-                description="Last 6 months, adding up"
-                info="Each month's paid invoices (including VAT, by payment date) less approved expenses (by expense date), added to the months before. Calendar months. Not affected by the period buttons."
+                description={`${monthSpan(trend[0].ym, trend[trend.length - 1].ym)}, adding up`}
+                info={`Each month's paid invoices (including VAT, by payment date) less approved expenses (by expense date), added to the months before. Calendar months within the selected period; a part month at either end counts only the days inside the period.${monthly.source === 'api' ? ' This chart can only show the last 6 calendar months.' : ''}`}
               >
                 <Waterfall
                   height={260}
                   valueHeader="Net margin"
                   caption="Net margin per month and the running total"
-                  ariaLabel={`Net margin by month from ${trend[0]?.month} to ${trend[trend.length - 1]?.month}, adding up to ${rand(totalNet)}.`}
+                  note={monthly.note}
+                  ariaLabel={`Net margin by month from ${monthYear(trend[0].ym)} to ${monthYear(trend[trend.length - 1].ym)}, adding up to ${rand(totalNet)}.`}
                   steps={[
                     ...trend.map(d => ({
                       label: d.month,

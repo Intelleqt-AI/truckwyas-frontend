@@ -1,9 +1,9 @@
 import { useSearchParams } from 'react-router-dom';
 import {
   catLabel, inPeriod, isApproved, isIssued, isPending, monthLabel, monthsIn, money, moneyWhole, num, pct, periodText, plural,
-  vatShare, ymOf, type Ledger,
+  shownMonths, trimNote, vatShare, ymOf, type Ledger,
 } from './data';
-import { Check, Empty, Info, PeriodControl, ReportFrame, Seg, StatementTable, Tiles, statementCsv, usePeriod, type SRow, type Statement } from './ui';
+import { Check, Choice, Empty, Info, PeriodControl, ReportFrame, StatementTable, Tiles, statementCsv, usePeriod, type SRow, type Statement } from './ui';
 
 // ------------------------------------------------------------- expenses
 
@@ -75,7 +75,7 @@ export function ExpenseReport({ d, companyName }: { d: Ledger; companyName?: str
       ]} />}
       controls={<>
         <PeriodControl period={period} onChange={setPeriod} />
-        <Seg label="View" value={view} onChange={setView} options={[{ id: 'category', label: 'By category' }, { id: 'vehicle', label: 'By vehicle' }, { id: 'register', label: 'Register' }]} />
+        <Choice label="View" value={view} onChange={setView} options={[{ id: 'category', label: 'By category' }, { id: 'vehicle', label: 'By vehicle' }, { id: 'register', label: 'Register' }]} />
       </>}
       tiles={list.length ? <Tiles table={table} tiles={[
         { label: 'Approved', value: moneyWhole(aTotal), title: money(aTotal), note: plural(approved.length, 'expense'), amount: aTotal },
@@ -107,7 +107,7 @@ export function VatReport({ d, companyName, vatNumber }: { d: Ledger; companyNam
   const view: VatView = params.get('view') === 'invoice' ? 'invoice' : 'month';
   const set = (k: string, v: string | null) => setParams(p => { const n = new URLSearchParams(p); if (v) n.set(k, v); else n.delete(k); return n; }, { replace: true });
   const invById = new Map(d.invoices.map(i => [i.id, i]));
-  const months = monthsIn(period.from, period.to);
+  const allMonths = monthsIn(period.from, period.to);
 
   // One line per supply: an issued invoice (invoice basis) or a payment (payments basis).
   type Line = { date: string; ref: string; party: string; incl: number; vat: number };
@@ -122,6 +122,9 @@ export function VatReport({ d, companyName, vatNumber }: { d: Ledger; companyNam
   const incl = lines.reduce((s, l) => s + l.incl, 0);
   const vat = lines.reduce((s, l) => s + l.vat, 0);
   const zeroRated = lines.filter(l => l.incl > 0 && l.vat < 0.005);
+  // Rows end at the last month with a supply; the total covers the whole period.
+  const months = shownMonths(allMonths, m => lines.some(l => ymOf(l.date) === m));
+  const trimmed = view === 'month' ? trimNote(allMonths, months) : null;
 
   const table: Statement = view === 'month'
     ? {
@@ -158,15 +161,15 @@ export function VatReport({ d, companyName, vatNumber }: { d: Ledger; companyNam
       ]} />}
       controls={<>
         <PeriodControl period={period} onChange={setPeriod} />
-        <Seg label="Basis" value={basis} onChange={b => set('basis', b === 'invoice' ? null : b)} options={[{ id: 'invoice', label: 'Invoice basis' }, { id: 'payments', label: 'Payments basis' }]} />
-        <Seg label="View" value={view} onChange={x => set('view', x === 'month' ? null : x)} options={[{ id: 'month', label: 'By month' }, { id: 'invoice', label: 'By line' }]} />
+        <Choice label="Basis" value={basis} onChange={b => set('basis', b === 'invoice' ? null : b)} options={[{ id: 'invoice', label: 'Invoice basis' }, { id: 'payments', label: 'Payments basis' }]} />
+        <Choice label="View" value={view} onChange={x => set('view', x === 'month' ? null : x)} options={[{ id: 'month', label: 'By month' }, { id: 'invoice', label: 'By line' }]} />
       </>}
       tiles={lines.length ? <Tiles table={table} tiles={[
         { label: 'Output VAT', value: moneyWhole(vat), title: money(vat), note: basisText, amount: vat },
         { label: 'Supplies excl. VAT', value: moneyWhole(incl - vat), title: money(incl - vat), amount: incl - vat },
         { label: 'Supplies incl. VAT', value: moneyWhole(incl), title: money(incl), note: plural(lines.length, basis === 'invoice' ? 'invoice' : 'payment'), amount: incl },
       ]} /> : undefined}
-      gaps={['Input VAT is not captured on expenses, so only output VAT is shown.']}
+      gaps={[...(trimmed ? [trimmed] : []), 'Input VAT is not captured on expenses, so only output VAT is shown.']}
       csv={() => statementCsv(`VAT report, ${periodText(period)}`, `Output VAT, ${basisText}`, table)}
       csvName={`vat-${basis}-${period.from}-to-${period.to}`}
     >

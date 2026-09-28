@@ -1,9 +1,9 @@
 import { useSearchParams } from 'react-router-dom';
 import {
-  inPeriod, isDraft, isIssued, laneOf, monthLabel, monthsIn, money, moneyWhole, num, pct, periodText, plural,
-  vatShare, ymOf, type Ledger,
+  DELIVERED, inPeriod, isDraft, isIssued, laneOf, monthLabel, monthsIn, money, moneyWhole, num, pct, periodText, plural,
+  shownMonths, trimNote, vatShare, ymOf, type Ledger,
 } from './data';
-import { Check, Empty, Info, PeriodControl, ReportFrame, Seg, StatementTable, Tiles, statementCsv, usePeriod, type SRow, type Statement } from './ui';
+import { Check, Choice, Empty, Info, PeriodControl, ReportFrame, StatementTable, Tiles, statementCsv, usePeriod, type SRow, type Statement } from './ui';
 
 // ---------------------------------------------------------- by customer
 
@@ -63,7 +63,7 @@ export function RevenueByCustomer({ d, companyName }: { d: Ledger; companyName?:
       ]} />}
       controls={<>
         <PeriodControl period={period} onChange={setPeriod} />
-        <Seg label="Basis" value={basis} onChange={setBasis} options={[{ id: 'invoice', label: 'Invoiced' }, { id: 'cash', label: 'Received' }]} />
+        <Choice label="Basis" value={basis} onChange={setBasis} options={[{ id: 'invoice', label: 'Invoiced' }, { id: 'cash', label: 'Received' }]} />
       </>}
       tiles={rows.length ? <Tiles table={table} tiles={[
         { label: 'Revenue excl. VAT', value: moneyWhole(excl), title: money(excl), note: plural(sourceCount, noun.toLowerCase().slice(0, -1)), amount: excl },
@@ -85,7 +85,6 @@ export function RevenueByCustomer({ d, companyName }: { d: Ledger; companyName?:
 
 // -------------------------------------------------------------- by lane
 
-const DELIVERED = new Set(['DELIVERED', 'INVOICED', 'COMPLETED', 'PAID']);
 
 export function RevenueByLane({ d, companyName }: { d: Ledger; companyName?: string }) {
   const [period, setPeriod] = usePeriod('last-12');
@@ -145,8 +144,11 @@ export function RevenueByLane({ d, companyName }: { d: Ledger; companyName?: str
 
 export function SalesByMonth({ d, companyName }: { d: Ledger; companyName?: string }) {
   const [period, setPeriod] = usePeriod('last-12');
-  const months = monthsIn(period.from, period.to);
+  const allMonths = monthsIn(period.from, period.to);
   const issued = d.invoices.filter(i => isIssued(i) && inPeriod(i.issue_date, period));
+  // Rows end at the last month with an invoice; the total covers the whole period.
+  const months = shownMonths(allMonths, m => issued.some(i => ymOf(i.issue_date) === m));
+  const trimmed = trimNote(allMonths, months);
   const drafts = d.invoices.filter(i => isDraft(i) && inPeriod(i.issue_date, period));
   const rowFor = (label: string, list: typeof issued, kind?: SRow['kind'], key = label): SRow => {
     const incl = list.reduce((s, i) => s + num(i.total_amount), 0);
@@ -177,6 +179,7 @@ export function SalesByMonth({ d, companyName }: { d: Ledger; companyName?: stri
         'Drafts are listed below the total and not counted.',
       ]} />}
       controls={<PeriodControl period={period} onChange={setPeriod} />}
+      gaps={trimmed ? [trimmed] : undefined}
       tiles={issued.length ? <Tiles table={table} tiles={[
         { label: 'Sales incl. VAT', value: moneyWhole(incl), title: money(incl), note: plural(issued.length, 'invoice'), amount: incl },
         { label: 'Average invoice', value: moneyWhole(incl / issued.length), title: money(incl / issued.length), note: `Across ${plural(issued.length, 'invoice')}`, amount: incl / issued.length },

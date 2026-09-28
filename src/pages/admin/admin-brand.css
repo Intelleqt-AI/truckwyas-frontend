@@ -35,9 +35,23 @@ table.admin-table .num { text-align: right !important; font-variant-numeric: tab
 
 /* ---- Phone and small tablet: the admin section list becomes one scrollable
    row of links above the page, so tables get the full width. ---- */
+.tw-admin-phone-nav { display: none; }
+@media (max-width: 768px) {
+  .tw-admin-shell > .tw-admin-shell__side { display: none !important; }
+  .tw-admin-phone-nav {
+    display: flex; align-items: center; gap: 4px;
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+    margin: calc(-1 * var(--head-to-content, 16px) + 4px) 0 var(--head-to-content, 16px);
+    padding: 0 0 8px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .tw-admin-phone-nav::-webkit-scrollbar { display: none; }
+  .tw-admin-phone-nav .admin-nav-link { display: block; white-space: nowrap; flex-shrink: 0; padding: 8px 12px; border-radius: var(--radius-control); font: 400 14px/20px var(--font-sans); color: var(--text-secondary); text-decoration: none; }
+  .tw-admin-phone-nav .admin-nav-link[aria-current="page"] { background: var(--surface-tint-active); color: var(--text-primary); font-weight: 500; }
+}
 @media (max-width: 768px) {
   .tw-admin-shell { flex-direction: column; }
-  .tw-admin-shell > .tw-admin-shell__side {
+  .tw-admin-shell > .tw-admin-shell__side-legacy {
     width: auto !important;
     border-right: none !important;
     border-bottom: 1px solid var(--border-subtle);
@@ -66,7 +80,7 @@ table.admin-table .num { text-align: right !important; font-variant-numeric: tab
 .admin-health-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
-  gap: 16px;
+  gap: var(--card-gap, 16px);
   align-items: start;
 }
 .admin-health-grid > * { min-width: 0; }
@@ -82,3 +96,26 @@ table.admin-table .num { text-align: right !important; font-variant-numeric: tab
 .admin-facts dt { display: inline-flex; align-items: center; gap: 4px; font: 500 12px/16px var(--font-sans); color: var(--text-tertiary); }
 .admin-facts dd { margin: 6px 0 0; font: 500 14px/20px var(--font-sans); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .admin-facts dd.admin-facts__figure { font: 600 28px/34px var(--font-sans); letter-spacing: var(--tracking-figure, -0.03em); }
+
+/* Admin overview (AdminHome.tsx): totals, then what they mean. */
+.admin-home .tw-kpi-row { margin-bottom: var(--section-gap, 24px); }
+.admin-home-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--card-gap, 16px); align-items: start; }
+.admin-home-side { display: flex; flex-direction: column; gap: var(--card-gap, 16px); min-width: 0; }
+.admin-dist { display: flex; flex-direction: column; }
+.admin-dist__row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 40px; align-items: center; gap: 16px; padding: 10px 0; border-top: 1px solid var(--border-row); }
+.admin-dist__row:first-child { border-top: 0; }
+.admin-dist__label { display: flex; flex-direction: column; min-width: 0; font: 400 14px/20px var(--font-sans); color: var(--text-primary); }
+.admin-dist__hint { font-size: 13px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.admin-dist__track { display: block; height: 6px; border-radius: 3px; background: var(--border-subtle); overflow: hidden; }
+.admin-dist__track > span { display: block; height: 100%; background: var(--text-secondary); border-radius: 3px; }
+.admin-dist__n { font: 500 14px/20px var(--font-sans); color: var(--text-primary); text-align: right; font-variant-numeric: tabular-nums; }
+.admin-dist__n.is-zero { color: var(--text-tertiary); font-weight: 400; }
+@media (max-width: 1100px) { .admin-home-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Low-value admin columns give way before a table scrolls sideways. */
+@media (max-width: 1360px) { table.admin-table .adm-col-low { display: none; } }
+/* Skeleton rows take the real admin row height (12px padding, 20px line, hairline). */
+table.admin-table .ops-skel-tr td { padding: 12px 16px; height: 45px; box-sizing: border-box; border-bottom: 1px solid var(--border-row); }
+@media (max-width: 520px) { table.admin-table td[title] { max-width: 150px !important; } }
+/* Reserve the summary's two phone lines so the table below never jumps. */
+@media (max-width: 520px) { .admin-job-summary { min-height: 40px; } }

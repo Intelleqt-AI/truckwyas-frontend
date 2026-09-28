@@ -1,4 +1,5 @@
 import './viz.css';
+import { formatCompact, formatMoney, formatNumber, formatPercent } from '@/lib/formatters';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 
 /* Shared chart plumbing: measured width, nice ticks, compact money, the one
@@ -7,20 +8,17 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 
 // ---------------------------------------------------------------- formatting
 
-/** Full rand amount, e.g. "R 12 345,67". Missing values are the placeholder. */
-export const rand = (v: number | null | undefined, digits = 2) =>
-  v == null || !Number.isFinite(v)
-    ? '—'
-    : new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
+/** Full rand amount, e.g. "R 12 345,67" (the shared en-ZA formatter). Missing values are "—". */
+export const rand = (v: number | null | undefined, digits = 2) => formatMoney(v, digits);
 
-/** Compact rand for axes and direct labels: "R 45k", "-R 1,2m", "R 850". */
-export const randCompact = (v: number) => {
-  const a = Math.abs(v);
-  const sign = v < 0 ? '\u2212' : '';
-  if (a >= 1_000_000) return `${sign}R ${(a / 1_000_000).toFixed(a >= 10_000_000 ? 0 : 1).replace('.', ',')}m`;
-  if (a >= 1_000) return `${sign}R ${Math.round(a / 1_000)}k`;
-  return `${sign}R ${Math.round(a)}`;
-};
+/** Compact rand for axes and direct labels: "R 45k", "R 7,8k", "−R 1,2m", "R 850". */
+export const randCompact = (v: number) => formatCompact(v);
+
+/** Percent in percent units: "14,1%". */
+export const pctText = (v: number | null | undefined, decimals = 1) => formatPercent(v, decimals);
+
+/** Whole number with en-ZA grouping: "1 650". */
+export const num0 = (v: number) => formatNumber(Math.round(v));
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -245,7 +243,10 @@ export const hLine = (x0: number, x1: number, y: number): Box => ({ x0: Math.min
 
 export const VIZ = {
   accent: 'var(--viz-accent)',
-  warm: 'var(--viz-warm)',
+  /** Loss: a negative result only. Never a cost, never "below average". */
+  loss: 'var(--viz-loss)',
+  /** Legacy alias of loss. */
+  warm: 'var(--viz-loss)',
   neutral: 'var(--viz-neutral)',
   neutralStrong: 'var(--viz-neutral-strong)',
   hatch: 'var(--viz-hatch)',

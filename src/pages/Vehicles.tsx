@@ -1,7 +1,10 @@
 import './fleet-vehicles-brand.css';
+import { fetchAllPages } from '@/components/insights/findings';
+import { formatDate, formatMoneyWhole, formatWeight, sentenceCaseLabel } from '@/lib/formatters';
+import { SkeletonRows } from '@/components/fleet-detail/ContentSkeleton';
 import StaleDataNotice from '@/components/data/StaleDataNotice';
 import './table-heading-roles.css';
-import { Truck as EmptyFleetIcon } from 'lucide-react';
+import { Plus, Truck as EmptyFleetIcon } from 'lucide-react';
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from '@tanstack/react-query';
@@ -110,22 +113,23 @@ interface FleetIntelligence {
 // sums over DELIVERED loads (see VehicleSerializer), so they are labelled as
 // such rather than "MTD". Health is the rule-based composite score
 // (maintenance, uptime, fuel, age), not a model output, so it is not called AI.
-const COLUMNS: { label: string; numeric?: boolean }[] = [
+// Make, model and type share one "Truck" column so Status and the money
+// columns stay in view at laptop widths; Driver drops first when narrow.
+const COLUMNS: { label: string; numeric?: boolean; cls?: string }[] = [
   { label: 'Registration' },
-  { label: 'Make and model' },
-  { label: 'Type' },
-  { label: 'Driver' },
+  { label: 'Truck', cls: 'fleet-col-phone' },
+  { label: 'Driver', cls: 'fleet-col-opt' },
   { label: 'Status' },
-  { label: 'Delivered revenue', numeric: true },
-  { label: 'Delivered loads', numeric: true },
-  { label: 'Health score', numeric: true },
+  { label: 'Revenue', numeric: true },
+  { label: 'Loads', numeric: true, cls: 'fleet-col-phone' },
+  { label: 'Health', numeric: true, cls: 'fleet-col-opt2' },
   { label: '' },
 ];
 
 // The API sends amounts as decimal strings; coerce before formatting.
 const formatZAR = (v: number | string | null | undefined) => {
   const n = Number(v);
-  return Number.isFinite(n) ? 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '—';
+  return Number.isFinite(n) ? formatMoneyWhole(n) : '—';
 };
 
 // Sentence-case a status token for display: "IN_USE" → "In use".
@@ -140,14 +144,15 @@ async function loadFleet(q: string) {
     ? `api/v1/vehicles/?search=${encodeURIComponent(q)}`
     : 'api/v1/vehicles/';
   const [vehData, overviewData, insightsData, vtData, driverData] = await Promise.all([
-    fetchData(vehiclesUrl),
+    // Every page (the API returns 20 at a time), so "of 23" matches Fleet status and Insights.
+    fetchAllPages<Vehicle>(vehiclesUrl).then(r => r.rows),
     fetchData('api/v1/fleet/overview/'),
     fetchData('api/v1/fleet/intelligence/'),
     fetchData('api/v1/vehicle-types/'),
     fetchData('api/v1/drivers/'),
   ]);
 
-  const vehicles: Vehicle[] = Array.isArray(vehData) ? vehData : (vehData?.results || []);
+  const vehicles: Vehicle[] = vehData;
 
   const overview: FleetOverview | null = overviewData;
 
@@ -279,7 +284,7 @@ export default function Vehicles() {
             disabled={isDemo}
             title={isDemo ? 'Fixed in demo mode' : undefined}
             style={isDemo ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-          >+ Add vehicle</button>
+          ><Plus size={16} aria-hidden="true" /> Add vehicle</button>
         </>}
       />
       <StaleDataNotice updatedAt={dataUpdatedAt} refreshFailed={isRefetchError} onRetry={() => refetch()} />
@@ -292,20 +297,20 @@ export default function Vehicles() {
           <KpiTile
             aria-label="Available now"
             label="Available now"
-            figure={loading ? '—' : <>{readyCount}<span className="tw-kpi__of"> of {vehicles.length}</span></>}
+            figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : <>{readyCount}<span className="tw-kpi__of"> of {vehicles.length}</span></>}
             note={loading ? 'Loading' : `${onJobCount} on a job, ${maintenanceCount} in maintenance`}
           />
           <KpiTile
             aria-label="Delivered revenue"
             label="Delivered revenue"
             aside={<InfoTip>Value of delivered loads per vehicle, summed across the fleet. All time.</InfoTip>}
-            figure={loading ? '—' : formatZAR(deliveredRevenue)}
+            figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : formatZAR(deliveredRevenue)}
             note={loading ? 'Loading' : `${deliveredLoads} ${deliveredLoads === 1 ? 'load' : 'loads'}, all time`}
           />
           <KpiTile
             aria-label="Not earning yet"
             label="Not earning yet"
-            figure={loading ? '—' : <>{notEarning}<span className="tw-kpi__of"> of {vehicles.length}</span></>}
+            figure={loading ? <span className="ops-skel" style={{ display: 'inline-block', width: 96, height: 28 }} /> : <>{notEarning}<span className="tw-kpi__of"> of {vehicles.length}</span></>}
             note={loading ? 'Loading' : notEarning > 0 ? 'No delivered load yet' : 'Every vehicle has earned'}
           />
         </KpiRow>
@@ -363,7 +368,7 @@ export default function Vehicles() {
                 )}
               </th>
               {COLUMNS.map(c => (
-                <th key={c.label || 'actions'} className={c.numeric ? 'is-numeric' : undefined}>
+                <th key={c.label || 'actions'} className={[c.numeric ? 'is-numeric' : '', c.cls ?? ''].filter(Boolean).join(' ') || undefined}>
                   {c.label || <span className="sr-only">Actions</span>}
                 </th>
               ))}
@@ -371,11 +376,7 @@ export default function Vehicles() {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={10} className="fleet-table__state-cell">
-                  <div className="fleet-table-state"><Loader size={32} label="Loading vehicles" /></div>
-                </td>
-              </tr>
+              <SkeletonRows rows={10} cols={COLUMNS.length + 1} skipFirst />
             ) : sorted.length === 0 ? (
               vehicles.length === 0 ? (
                 <tr>
@@ -429,26 +430,23 @@ export default function Vehicles() {
                     <span className="fleet-table__id">{v.plate || v.registration || '—'}</span>
                     {lastSeen}
                   </td>
-                  <td className="is-primary" title={vehicleName}>
-                    {vehicleName || '—'}
-                  </td>
-                  <td>
-                    {v.vehicle_type_name || '—'}
-                    {v.vehicle_type_capacity != null && (
-                      <span style={{ marginLeft: 4, color: 'var(--text-tertiary)' }}>
-                        · {v.vehicle_type_capacity}t
+                  <td className="is-primary fleet-col-truck fleet-col-phone" title={[vehicleName, v.vehicle_type_name, v.vehicle_type_capacity != null ? formatWeight(Number(v.vehicle_type_capacity)) : ''].filter(Boolean).join(', ')}>
+                    {vehicleName || 'Not recorded'}
+                    {(v.vehicle_type_name || v.vehicle_type_capacity != null) && (
+                      <span style={{ color: 'var(--text-tertiary)' }}>
+                        {' · '}{[v.vehicle_type_name ? sentenceCaseLabel(v.vehicle_type_name) : '', v.vehicle_type_capacity != null ? formatWeight(Number(v.vehicle_type_capacity)) : ''].filter(Boolean).join(', ')}
                       </span>
                     )}
                   </td>
-                  <td>{(v as any).driver_name || <span style={{ color: 'var(--text-tertiary)' }}>Unassigned</span>}</td>
+                  <td className="fleet-col-opt">{(v as any).driver_name || <span style={{ color: 'var(--text-tertiary)' }}>Unassigned</span>}</td>
                   <td>{getStatusBadge(v.status)}</td>
                   <td className="is-numeric" style={{ color: v.revenue_generated ? 'var(--text-primary)' : undefined }}>
                     {v.revenue_generated ? formatZAR(v.revenue_generated) : '—'}
                   </td>
-                  <td className="is-numeric">
+                  <td className="is-numeric fleet-col-phone">
                     {v.total_trips ?? 0}
                   </td>
-                  <td className="is-numeric" title="Composite of maintenance, uptime, fuel and age scores">
+                  <td className="is-numeric fleet-col-opt2" title="Composite of maintenance, uptime, fuel and age scores">
                     {v.ai_health_score ? Math.round(v.ai_health_score) : '—'}
                   </td>
                   <td className="fleet-table__actions">

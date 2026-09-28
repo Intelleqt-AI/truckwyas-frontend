@@ -1,9 +1,9 @@
 import { useSearchParams } from 'react-router-dom';
 import {
   CATEGORY_LABEL, DIRECT, OVERHEADS, catLabel, inPeriod, isApproved, isIssued, isPending, monthLabel, monthsIn,
-  money, moneyWhole, num, pct, periodText, plural, priorPeriod, vatShare, ymOf, type Ledger, type Period,
+  money, num, periodText, plural, priorPeriod, shownMonths, trimNote, vatShare, ymOf, type Ledger, type Period,
 } from './data';
-import { Check, Info, PeriodControl, ReportFrame, Seg, StatementTable, Tiles, changeText, statementCsv, usePeriod, type SRow, type Statement } from './ui';
+import { Check, Choice, Info, PeriodControl, ReportFrame, StatementTable, statementCsv, usePeriod, type SRow, type Statement } from './ui';
 
 type Basis = 'cash' | 'invoice';
 type Range = { from: string; to: string };
@@ -71,9 +71,9 @@ export default function ProfitLoss({ d, companyName }: { d: Ledger; companyName?
       ]} />}
       controls={<>
         <PeriodControl period={period} onChange={setPeriod} />
-        <Seg label="Basis" value={basis} onChange={setBasis} options={[{ id: 'cash', label: 'Cash basis' }, { id: 'invoice', label: 'Invoice basis' }]} />
+        <Choice label="Basis" value={basis} onChange={setBasis} options={[{ id: 'cash', label: 'Cash basis' }, { id: 'invoice', label: 'Invoice basis' }]} />
       </>}
-      gaps={['VAT on expenses is not captured, so costs are shown as entered.']}
+      gaps={[...(t.trimmed ? [t.trimmed] : []), 'VAT on expenses is not captured, so costs are shown as entered.']}
       csv={() => statementCsv(`Profit and loss, ${periodText(period)}`, basisText, t.table)}
       csvName={`profit-and-loss-${period.from}-to-${period.to}-${basis}`}
     >
@@ -88,9 +88,9 @@ export default function ProfitLoss({ d, companyName }: { d: Ledger; companyName?
 }
 
 function build(d: Ledger, period: Period, basis: Basis) {
-  const months = monthsIn(period.from, period.to);
+  const allMonths = monthsIn(period.from, period.to);
   const prior = priorPeriod(period);
-  const priorLabel = `prior ${plural(months.length, 'month')}`;
+  const priorLabel = `prior ${plural(allMonths.length, 'month')}`;
   const rNow = revenue(d, basis, period);
   const rPrev = revenue(d, basis, prior);
   const cNow = costs(d, period);
@@ -100,6 +100,12 @@ function build(d: Ledger, period: Period, basis: Basis) {
   pendingList.forEach(e => { const m = ymOf(e.expense_date); pendingByMonth.set(m, (pendingByMonth.get(m) || 0) + num(e.amount)); });
   const pendingPrev = d.expenses.filter(e => isPending(e) && inPeriod(e.expense_date, prior)).reduce((s, e) => s + num(e.amount), 0);
 
+  // Columns end at the last month with any entry (revenue, cost or pending);
+  // totals still cover the whole period. The prior-period comparison is shown
+  // only when the prior period holds entries, otherwise Change would just
+  // repeat Total.
+  const months = shownMonths(allMonths, m => rNow.byMonth.has(m) || pendingByMonth.has(m) || [...cNow.values()].some(x => x.has(m)));
+  const showPrior = rPrev.count > 0 || cPrev.size > 0 || pendingPrev > 0.005;
   const known = new Set([...DIRECT, ...OVERHEADS]);
   const extra = [...new Set([...cNow.keys(), ...cPrev.keys()])].filter(c => !known.has(c)).sort();
   const direct = DIRECT;
@@ -107,7 +113,7 @@ function build(d: Ledger, period: Period, basis: Basis) {
 
   const line = (label: string, get: (m: string) => number, now: number, prev: number, kind: SRow['kind'] = 'row', indent = false): SRow => ({
     key: `${kind}-${label}`, kind, indent,
-    cells: [label, ...months.map(get), now, prev, now - prev],
+    cells: [label, ...months.map(get), now, ...(showPrior ? [prev, now - prev] : [])],
   });
   const catRow = (c: string) => line(CATEGORY_LABEL[c] ?? catLabel(c), m => cNow.get(c)?.get(m) || 0, sumMap(cNow.get(c)), sumMap(cPrev.get(c)), 'row', true);
   const group = (cats: string[], map: Map<string, Map<string, number>>) => ({
@@ -124,7 +130,7 @@ function build(d: Ledger, period: Period, basis: Basis) {
   const netM = (m: string) => grossM(m) - oNow.m(m);
   const ratio = (label: string, f: (m: string) => number, now: number, prev: number): SRow => ({
     key: `ratio-${label}`, kind: 'ratio', fmt: 'pct',
-    cells: [label, ...months.map(m => (revM(m) > 0 ? (f(m) / revM(m)) * 100 : null)), rev > 0 ? (now / rev) * 100 : null, prevRev > 0 ? (prev / prevRev) * 100 : null, null],
+    cells: [label, ...months.map(m => (revM(m) > 0 ? (f(m) / revM(m)) * 100 : null)), rev > 0 ? (now / rev) * 100 : null, ...(showPrior ? [prevRev > 0 ? (prev / prevRev) * 100 : null, null] : [])],
   });
 
   const rows: SRow[] = [
@@ -149,8 +155,10 @@ function build(d: Ledger, period: Period, basis: Basis) {
       { label: 'Account' },
       ...months.map(m => ({ label: monthLabel(m), type: 'money' as const })),
       { label: 'Total', type: 'money' },
-      { label: `Prior ${months.length} mo`, type: 'money' },
-      { label: 'Change', type: 'money' },
+      ...(showPrior ? [
+        { label: `Prior ${allMonths.length} months`, type: 'money' as const },
+        { label: 'Change', type: 'money' as const },
+      ] : []),
     ],
     rows,
   };
@@ -161,7 +169,7 @@ function build(d: Ledger, period: Period, basis: Basis) {
 
   const pending = pendingList.reduce((s, e) => s + num(e.amount), 0);
   return {
-    table, check, rev, prevRev, gross, net, prevNet, priorLabel,
+    table, check, rev, prevRev, gross, net, prevNet, priorLabel, trimmed: trimNote(allMonths, months),
     costs: dNow.total + oNow.total, pending, pendingCount: pendingList.length,
   };
 }

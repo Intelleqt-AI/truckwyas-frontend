@@ -1,4 +1,6 @@
 import '@/pages/table-heading-roles.css';
+import { TableSkeleton } from '@/components/fleet-detail/ContentSkeleton';
+import { formatDateTime } from '@/lib/formatters';
 import '@/pages/admin/admin-brand.css';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -27,7 +29,7 @@ const tdStyle: React.CSSProperties = {
 };
 
 const fmt = (dateStr?: string | null) =>
-  dateStr ? new Date(dateStr).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  dateStr ? formatDateTime(dateStr) : 'Never';
 
 interface AuditLogRow {
   id: string | number;
@@ -93,7 +95,7 @@ export default function AuditLogPanel() {
         />
       </div>
       {isLoading ? (
-        <Loader size={24} />
+        <TableSkeleton rows={8} cols={4} label="Loading audit log" />
       ) : (
         <div className="admin-scroll-region" role="region" aria-label="Audit log" tabIndex={0} style={{ overflowX: 'auto' }}>
           <table className="table-heading-roles admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -111,7 +113,7 @@ export default function AuditLogPanel() {
                 <tr key={row.id}>
                   <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmt(row.created_at)}</td>
                   <td style={tdStyle}>{row.actor || <span style={{ color: 'var(--text-tertiary)' }}>system</span>}</td>
-                  <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)' }}>{row.action}</td>
+                  <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-sans)', fontVariantNumeric: 'tabular-nums' }}>{row.action}</td>
                   <td style={{ ...tdStyle, fontSize: 13, fontFamily: 'var(--font-mono)' }}>
                     {row.resource_type}
                     {row.resource_id != null && <span style={{ color: 'var(--text-tertiary)' }}> #{row.resource_id}</span>}

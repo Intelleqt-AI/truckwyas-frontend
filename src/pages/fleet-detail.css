@@ -3,7 +3,7 @@
    Tight type, big numbers with short labels, compact panels with generous
    space between them. Theme tokens only; mono only for identifiers. */
 .fleet-detail {
-  --fd-gap: 24px;
+  --fd-gap: var(--section-gap, 24px);
   --fd-pad: 24px;
   --fd-panel-bg: var(--bg-surface);
   --fd-line: var(--border-subtle);
@@ -13,11 +13,11 @@
   font-family: var(--font-sans);
   color: var(--text-primary);
 }
-.fleet-detail .fd-mono { font-family: var(--font-mono); font-size: 0.93em; letter-spacing: -0.01em; }
+.fleet-detail .fd-mono { font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
 .fleet-detail .fd-strong { color: var(--text-primary); font-weight: 500; }
 
 /* ---------------------------------------------------------------- header */
-.fleet-detail .fd-head { margin-bottom: 24px; }
+.fleet-detail .fd-head { margin-bottom: var(--head-to-content, 24px); }
 .fleet-detail .fd-crumb { display: flex; align-items: center; gap: 8px; min-width: 0; font: 400 13px/20px var(--font-sans); color: var(--text-tertiary); margin-bottom: 12px; }
 .fleet-detail .fd-crumb a { color: var(--text-secondary); text-decoration: none; display: inline-flex; align-items: center; min-height: 24px; }
 .fleet-detail .fd-crumb a:hover { color: var(--text-primary); }
@@ -32,9 +32,9 @@
 
 /* Buttons (the status control is the shared .tw-seg) */
 .fleet-detail .fd-button {
-  min-height: 36px; padding: 0 14px;
+  min-height: 40px; padding: 0 16px; font-size: 14px;
   background: var(--fd-panel-bg); border: 1px solid var(--fd-line); border-radius: var(--radius-control, 8px);
-  color: var(--text-primary); font: 500 13px/20px var(--font-sans); cursor: pointer; white-space: nowrap;
+  color: var(--text-primary); font: 500 14px/20px var(--font-sans); cursor: pointer; white-space: nowrap;
 }
 .fleet-detail .fd-button:hover:not(:disabled) { background: var(--bg-surface-hover); }
 .fleet-detail .fd-button:focus-visible,
@@ -145,7 +145,7 @@
 .fleet-detail .fd-row dd.is-danger { color: var(--status-danger-text); }
 .fleet-detail .fd-row dd.is-warning { color: var(--status-warning-text); }
 .fleet-detail .fd-row__note { display: inline-flex; }
-.fleet-detail .fd-row dd.fd-mono { font-family: var(--font-mono); font-weight: 400; font-size: 12.5px; }
+.fleet-detail .fd-row dd.fd-mono { font-family: var(--font-sans); font-weight: 400; font-variant-numeric: tabular-nums; }
 .fleet-detail .fd-missing {
   display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
   margin: 0; padding: 8px 0 0; font: 400 12px/18px var(--font-sans); color: var(--text-tertiary);

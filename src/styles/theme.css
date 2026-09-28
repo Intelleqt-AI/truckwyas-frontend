@@ -135,7 +135,7 @@
   --input-bg: #0F1114;
   --input-bg-focus: #0F1114;
 
-  --card-radius: 16px;
+  --card-radius: 12px;
 
   /* Neutral interaction tints (hover is a surface tint, never a border change). */
   --surface-tint-hover: rgba(255, 255, 255, 0.04);
@@ -214,6 +214,22 @@
   --card-pad: 20px;
   --card-gap: 16px;
   --section-gap: 24px;
+
+  /* Page rhythm (one page-head geometry everywhere). Applied by
+     .tw-page-head / SectionHeader and the shell's <main>:
+       main top edge -> H1 box top      = --page-head-top
+       head block (title 34 + 4 + one subtitle line 20, reserved even when
+       there is no subtitle, so tabs never move) = --page-head-h
+       head -> tabs row                 = --head-to-tabs
+       tabs row (40) -> first content   = --tabs-to-content
+       head -> first content (no tabs)  = --head-to-content */
+  --main-pad-top: 8px;
+  --page-head-top: 24px;
+  --page-head-h: 58px;
+  --head-to-tabs: 16px;
+  --tabs-h: 40px;
+  --tabs-to-content: 24px;
+  --head-to-content: 24px;
 
   /* One content width (DESIGN-PRINCIPLES §11.8). */
   --content-max: 1600px;
@@ -336,7 +352,7 @@
   --input-bg: #FFFFFF;
   --input-bg-focus: #FFFFFF;
 
-  --card-radius: 16px;
+  --card-radius: 12px;
 
   --surface-tint-hover: rgba(14, 17, 22, 0.04);
   --surface-tint-active: rgba(14, 17, 22, 0.07);
@@ -381,22 +397,29 @@ html { accent-color: var(--accent-primary); }
    =========================== */
 
 :root {
-  /* The only two families in the product. Identifiers use mono; everything else sans. */
-  --font-mono: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  /* Two families. Identifiers (invoice and quote numbers, plates, licences)
+     use tabular sans (v3 decision): --font-mono is kept as the identifier
+     role name so every existing reference follows, and resolves to sans.
+     True code (API keys, payloads, code blocks) uses --font-code. */
+  --font-code: ui-monospace, 'SFMono-Regular', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --font-mono: var(--font-sans);
+  --font-id: var(--font-sans);
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   /* Tailwind radius scale (tailwind.config.ts) resolves from these: lg/xl = card 8,
      md = control 6, sm = badge 4, 2xl/sheet = dialog 12. Previously undefined,
      so every rounded-* utility collapsed to square corners. */
-  --radius: 16px;
-  --radius-sheet: 20px;
-  /* Design principles v3 shape scale (docs/brand/DESIGN-PRINCIPLES.md §3). */
-  --radius-card: 16px;
-  --radius-control: 10px;
-  --radius-chip: 8px;
+  --radius: 12px;
+  --radius-sheet: 16px;
+  /* v3 shape scale (docs/design/v3/00-V3-DECISION.md, DESIGN-PRINCIPLES §3):
+     cards 12, controls 8, chips 6, dialogs and sheets 16, nested 8. */
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-chip: 6px;
   --radius-pill: 999px;
-  --radius-dialog: 20px;
-  --radius-nested: 12px;
+  --radius-dialog: 16px;
+  --radius-nested: 8px;
+  --radius-menu: 12px;
 }
 
 /* ===========================
@@ -704,10 +727,10 @@ button, input, select, textarea, optgroup {
   color: var(--text-primary);
 }
 
-/* Numeric columns right-align (header and cells); identifiers use the 13px mono role. */
+/* Numeric columns right-align (header and cells); identifiers use the 13px tabular-sans ID role. */
 .data-table th.text-right,
 .data-table td.text-right { text-align: right; }
-.data-table td.mono { font-size: 13px; }
+.data-table td.mono { font-size: 13px; font-variant-numeric: tabular-nums; }
 
 /* ===========================
    STATUS BADGES
@@ -981,8 +1004,23 @@ button, input, select, textarea, optgroup {
    UTILITIES
    =========================== */
 
-.mono {
-  font-family: var(--font-mono);
+/* Identifiers: tabular sans, not monospace (v3 decision). */
+.mono, .font-mono, .tw-id {
+  font-family: var(--font-id);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+}
+
+/* True code keeps a monospace face. Setting --font-mono on the element makes
+   inline `fontFamily: var(--font-mono)` on code blocks resolve to code too. */
+code, pre, kbd, samp, .tw-code {
+  --font-mono: var(--font-code);
+  font-family: var(--font-code);
+}
+/* Developer surfaces show keys, headers and payloads: code face there. */
+.tw-main[data-route^="/settings/risk-api"],
+.tw-main[data-route^="/settings/integrations"] {
+  --font-mono: var(--font-code);
 }
 
 .text-right {
@@ -1128,11 +1166,26 @@ button, input, select, textarea, optgroup {
    =========================================================================== */
 
 /* Page head: bold tight title, one short grey line, actions on the right. */
-.tw-page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 16px 0 24px; }
-.tw-page-head__titles { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* Phone rhythm: the shell's main padding and the head offset tighten together. */
+@media (max-width: 768px) {
+  :root, :root[data-theme] { --main-pad-top: 16px; --page-head-top: 16px; --head-to-tabs: 12px; --tabs-to-content: 16px; --head-to-content: 16px; }
+}
+
+/* ONE page head (shared with components/layout/SectionHeader, which renders
+   the same geometry): H1 28/34 600 at --page-head-top, an optional one-line
+   subtitle whose line is always reserved, actions right on the title row.
+   Scoped under .os-app-shell so page-level margin tweaks cannot move it. */
+.tw-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin: calc(var(--page-head-top) - var(--main-pad-top)) 0 var(--head-to-content); }
+.os-app-shell .tw-main > .tw-page-head,
+.os-app-shell .tw-main > * > .tw-page-head,
+.os-app-shell .tw-main > * > * > .tw-page-head { margin: calc(var(--page-head-top) - var(--main-pad-top)) 0 var(--head-to-content); }
+/* A page-level tabs row placed right after the head takes the same rhythm as SectionHeader's tabs. */
+.os-app-shell .tw-main .tw-page-head:has(+ nav) { margin-bottom: var(--head-to-tabs); }
+.os-app-shell .tw-main .tw-page-head + nav { margin-bottom: var(--tabs-to-content); }
+.tw-page-head__titles { display: flex; flex-direction: column; gap: 4px; min-width: 0; min-height: var(--page-head-h); }
 .tw-title { margin: 0; font: 600 var(--text-display)/34px var(--font-sans); letter-spacing: var(--tracking-display); color: var(--text-primary); }
-.tw-subtitle { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-tertiary); }
-.tw-page-head__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tw-subtitle { margin: 0; font: 400 14px/20px var(--font-sans); color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 72ch; }
+.tw-page-head__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 34px; }
 
 /* Cards: 16px radius, a hairline border in light, a surface step in dark. */
 .tw-card {
@@ -1177,8 +1230,12 @@ button, input, select, textarea, optgroup {
 .tw-btn:disabled, .tw-btn[aria-disabled="true"] { background: var(--btn-disabled-bg); border-color: transparent; color: var(--btn-disabled-fg); cursor: not-allowed; }
 .tw-btn--ghost { background: transparent; border-color: transparent; color: var(--text-secondary); }
 .tw-btn--ghost:hover { background: var(--nav-hover-bg); border-color: transparent; color: var(--text-primary); }
-.tw-btn:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.tw-btn:focus-visible { outline: 2px solid var(--focus-outline); outline-offset: 2px; }
 @media (max-width: 768px) { .tw-btn { height: 44px; } }
+/* Small row action (list rows, Needs you). Keeps a 44px hit area on touch. */
+.tw-btn--sm { height: 28px; padding: 0 10px; font-size: 12px; line-height: 16px; position: relative; }
+@media (max-width: 768px) { .tw-btn.tw-btn--sm { height: 32px; } }
+@media (pointer: coarse) { .tw-btn--sm::after { content: ''; position: absolute; inset: -8px -4px; } }
 
 /* Segmented control (DESIGN-PRINCIPLES §11.4): THE filter/period control.
    28px options on one raised track, neutral active chip, never accent-filled.
@@ -1247,7 +1304,24 @@ button, input, select, textarea, optgroup {
 
 /* Standard KPI tile (DESIGN-PRINCIPLES §11.6): label, figure, one line. 96px.
    React: src/components/ui/KpiTile.tsx. */
-.tw-kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+/* The row sizes to its tile count (max 4 per row) and stops growing at
+   --kpi-max per tile, so 2 tiles never sit in a 4-column grid and wide
+   screens do not stretch tiles into mostly-empty slabs. KpiRow sets
+   --kpi-cols from its children; :has() covers hand-written rows. */
+.tw-kpi-row {
+  --kpi-cols: 4;
+  --kpi-gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(var(--kpi-cols), minmax(0, 1fr));
+  gap: var(--kpi-gap);
+  max-width: calc(var(--kpi-cols) * var(--kpi-max, 296px) + (var(--kpi-cols) - 1) * var(--kpi-gap));
+}
+.tw-kpi-row:has(> :only-child) { --kpi-cols: 1; }
+.tw-kpi-row:has(> :nth-child(2):last-child) { --kpi-cols: 2; }
+.tw-kpi-row:has(> :nth-child(3):last-child) { --kpi-cols: 3; }
+@media (min-width: 768px) and (max-width: 1100px) {
+  .tw-kpi-row { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+}
 .tw-kpi {
   display: flex; flex-direction: column; justify-content: space-between; gap: 0;
   box-sizing: border-box; height: var(--kpi-height); min-width: 0; padding: 14px 16px;
@@ -1270,13 +1344,22 @@ button, input, select, textarea, optgroup {
 .tw-kpi--emphasis .tw-kpi__figure { color: var(--emphasis-fg); }
 .tw-kpi--emphasis:focus-visible, .tw-kpi--emphasis :focus-visible { outline-color: var(--emphasis-focus); }
 .tw-kpi--emphasis.tw-kpi--link:hover { background: var(--emphasis-bg); filter: none; }
-/* Phone: 2 or 4 tiles in 2 columns; 3 tiles in 3 compact columns (never 2 + orphan). */
+/* Phone: always 2 columns, never 3-up with truncated labels. An odd last
+   tile (the 3rd of 3, the 5th of 5) spans the row as a compact line:
+   label and note on the left, figure on the right. */
 @media (max-width: 767px) {
-  .tw-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .tw-kpi-row:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .tw-kpi-row:has(> :nth-child(3):last-child) .tw-kpi { padding: 12px; }
-  .tw-kpi-row:has(> :nth-child(3):last-child) .tw-kpi__figure { font-size: 18px; line-height: 24px; }
+  .tw-kpi-row, .tw-kpi-row[style] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: none; }
   .tw-kpi-row:has(> :only-child) { grid-template-columns: 1fr; }
+  .tw-kpi-row > .tw-kpi:nth-child(odd):last-child:not(:first-child) {
+    grid-column: 1 / -1;
+    height: auto; min-height: 56px;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto;
+    column-gap: 12px; align-items: center; padding: 10px 16px;
+  }
+  .tw-kpi-row > .tw-kpi:nth-child(odd):last-child:not(:first-child) .tw-kpi__head { grid-column: 1; grid-row: 1; }
+  .tw-kpi-row > .tw-kpi:nth-child(odd):last-child:not(:first-child) .tw-kpi__note { grid-column: 1; grid-row: 2; }
+  .tw-kpi-row > .tw-kpi:nth-child(odd):last-child:not(:first-child) .tw-kpi__figure { grid-column: 2; grid-row: 1 / span 2; font-size: 22px; line-height: 28px; }
+  .tw-kpi__figure { font-size: 24px; line-height: 30px; }
 }
 
 /* Form controls: the ONE boundary token for inputs, selects, textareas,
@@ -1302,7 +1385,7 @@ textarea.tw-input { height: auto; padding: 8px 12px; }
   position: absolute; z-index: 400; top: calc(100% + 8px); left: -8px;
   width: max-content; max-width: 280px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--tip-bg); color: var(--tip-fg);
   font: 400 12px/18px var(--font-sans); letter-spacing: normal; text-align: left; white-space: normal;
   box-shadow: var(--shadow-pop);

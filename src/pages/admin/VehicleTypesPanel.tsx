@@ -1,4 +1,5 @@
 import '@/pages/admin/admin-brand.css';
+import { formatMoney } from '@/lib/formatters';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchData, postData, patchData, deleteData } from '@/lib/Api';
@@ -60,7 +61,7 @@ const emptyForm = {
   fuel_consumption_l_per_100km: '', fuel_consumption_sensitivity_pct: '2.0', fuel_type: 'Diesel', active: true,
 };
 
-const fmtRate = (v: any) => (v || v === 0) ? `R${parseFloat(v).toFixed(2)}` : '—';
+const fmtRate = (v: any) => (v || v === 0) ? formatMoney(parseFloat(v)) : 'Not set';
 
 export default function VehicleTypesPanel() {
   const qc = useQueryClient();

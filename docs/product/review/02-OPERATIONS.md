@@ -131,7 +131,7 @@ Personas: **O** = owner-operator (5 trucks, quotes on WhatsApp, no TMS). **F** =
 | Vehicle detail | Recent loads | Evidence | Shown twice | Yes | KEEP (once) | As "Loads this month" with margin per load. |
 | Drivers | Tiles: Active drivers, Completed loads (all time), Next licence renewal | HR and status | Rostering/HR | No | REMOVE | Licence expiry becomes an Overview reminder only when within 30 days. |
 | Drivers | Table: name, licence, licence expires, status, completed loads (+ revenue, efficiency when present) | Staff directory | HR; efficiency falls back to on-time rate | No | REBUILD | TruckWys needs drivers only for cost (wage CTC, allowances) and attribution. Keep a slim directory; money columns only if the fleet enters wage costs. |
-| Drivers | Add driver drawer | Create driver login | Hard-codes password `'TruckWys2026!'` for every new driver (`Drivers.tsx:560`) | n/a | REBUILD | Security finding: invite by link, never a shared default password. Flag for immediate fix. |
+| Drivers | Add driver drawer | Create driver login | Hard-codes password a shared hard-coded password for every new driver (`Drivers.tsx:560`) | n/a | REBUILD | Security finding: invite by link, never a shared default password. Flag for immediate fix. |
 | Driver detail | Revenue tiles, Details, Performance (efficiency, on-time, rating, trips), Recent loads | Profile | Revenue repeated three times across two tabs; rating is never populated | Partly | MERGE | One page: cost per trip-day, allowances paid, loads, revenue per trip-day. |
 | Driver detail | "What is on their record?" (violations, accidents, on-time) | Driver behaviour | **Telematics/HR** | No | REMOVE | Driver safety belongs to the telematics partner. It is also personal data sent to the Copilot provider (backend AI 10). |
 | Driver detail | "How much did they carry each month?" | Trend | Counts loads by created date, includes cancelled | Weakly | REMOVE | |
@@ -403,7 +403,7 @@ Rule: an inline insight appears only when it would change the action on that scr
 
 | # | Change | Work |
 |---|---|---|
-| 1 | Replace the hard-coded driver password `'TruckWys2026!'` (`Drivers.tsx:560`) with an invite link | FE + BE (invite endpoint may exist for users) · security |
+| 1 | Replace the hard-coded driver password a shared hard-coded password (`Drivers.tsx:560`) with an invite link | FE + BE (invite endpoint may exist for users) · security |
 | 2 | Remove "Confidence" everywhere; stop saving `confidence: "MEDIUM"` | FE |
 | 3 | Hide win probability on board, detail and builder until the model meets the Q5 bar; show lane history evidence instead | FE (+ BE Wave 0: stop saving rule win %) |
 | 4 | Show margin as "Not calculated: no cost profile" instead of `serviceCharge/total`; stop Revenue Guard claiming SAFE | FE |
@@ -458,7 +458,7 @@ Rule: an inline insight appears only when it would change the action on that scr
 
 ## 7. Other findings noticed in passing
 
-- **Security:** every driver created in the app gets the literal password `TruckWys2026!` (`src/pages/Drivers.tsx:560`). Anyone who knows it can sign in as any driver who has not changed it.
+- **Security:** every driver created in the app gets the literal password a shared hard-coded password (`src/pages/Drivers.tsx:560`). Anyone who knows it can sign in as any driver who has not changed it.
 - The heatmap requests `page_size=200` and receives 20 rows (API C4), so its analysis is silently based on a fraction of loads.
 - Legacy quote status `IT` is shown raw as "It" in the customer quotes table.
 - JHB → CPT quote QT-20260713-3182 records 1,563 km; typical road distance is about 1,400 km (pricing review uses 1,398). Worth checking whether a stop or detour was saved.
